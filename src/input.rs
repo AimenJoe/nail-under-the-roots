@@ -61,6 +61,10 @@ struct TouchState {
     /// 한 번이라도 터치가 들어오면 오버레이를 보인다.
     seen: bool,
     stick: Option<TouchStick>,
+    /// 지난 프레임까지 본 터치 id. 처음 보는 id가 "눌림"이다.
+    /// (`TouchPhase::Started`에 기대면 안 된다: 실제 손가락은 touchstart 직후 touchmove가 같은 프레임에 들어와
+    /// macroquad의 터치 맵에서 Started가 Moved로 덮인다.)
+    known: Vec<u64>,
 }
 
 #[derive(Clone, Copy)]
@@ -105,8 +109,8 @@ fn touch_layout() -> TouchOverlay {
                 label: "DIG",
             },
             TouchButton {
-                center: vec2(w - r * 1.2, r * 1.2),
-                radius: r * 0.7,
+                center: vec2(w - r * 1.4, r * 1.4),
+                radius: r * 0.85,
                 label: "R",
             },
         ],
@@ -163,49 +167,55 @@ impl Input {
     fn read_touch(&mut self) -> Actions {
         let mut a = Actions::default();
         let touches = touches();
-        if touches.is_empty() && self.touch.stick.is_none() {
+        if touches.is_empty() && self.touch.stick.is_none() && self.touch.known.is_empty() {
             return a;
         }
         self.touch.seen = true;
         let layout = touch_layout();
         let half = screen_width() * 0.5;
         for t in &touches {
-            match t.phase {
-                TouchPhase::Started => {
-                    if let Some(b) = layout
-                        .buttons
-                        .iter()
-                        .find(|b| (t.position - b.center).length() <= b.radius * 1.3)
-                    {
-                        match b.label {
-                            "ATK" => a.attack = true,
-                            "DIG" => a.dodge = true,
-                            _ => a.restart = true,
-                        }
-                        a.confirm |= b.label == "ATK";
-                    } else if t.position.x < half && self.touch.stick.is_none() {
-                        self.touch.stick = Some(TouchStick {
-                            id: t.id,
-                            origin: t.position,
-                            pos: t.position,
-                        });
-                    }
+            let ended = matches!(t.phase, TouchPhase::Ended | TouchPhase::Cancelled);
+            let is_new = !self.touch.known.contains(&t.id);
+            // 한 프레임 안에 start와 end가 다 들어온 짧은 탭도 눌림이다(프레임이 느린 폰에서 흔함).
+            if is_new {
+                if !ended {
+                    self.touch.known.push(t.id);
                 }
-                TouchPhase::Moved | TouchPhase::Stationary => {
-                    if let Some(s) = self.touch.stick.as_mut() {
-                        if s.id == t.id {
-                            s.pos = t.position;
-                        }
+                if let Some(b) = layout
+                    .buttons
+                    .iter()
+                    .find(|b| (t.position - b.center).length() <= b.radius * 1.3)
+                {
+                    match b.label {
+                        "ATK" => a.attack = true,
+                        "DIG" => a.dodge = true,
+                        _ => a.restart = true,
                     }
+                    a.confirm |= b.label == "ATK";
+                } else if t.position.x < half && self.touch.stick.is_none() && !ended {
+                    self.touch.stick = Some(TouchStick {
+                        id: t.id,
+                        origin: t.position,
+                        pos: t.position,
+                    });
                 }
-                TouchPhase::Ended | TouchPhase::Cancelled => {
-                    if self.touch.stick.map(|s| s.id) == Some(t.id) {
-                        self.touch.stick = None;
-                    }
+            }
+            if let Some(s) = self.touch.stick.as_mut() {
+                if s.id == t.id {
+                    s.pos = t.position;
+                }
+            }
+            if ended {
+                self.touch.known.retain(|id| *id != t.id);
+                if self.touch.stick.map(|s| s.id) == Some(t.id) {
+                    self.touch.stick = None;
                 }
             }
         }
         // 손가락이 사라졌는데 Ended를 못 받은 경우(브라우저 탭 전환 등) 정리.
+        self.touch
+            .known
+            .retain(|id| touches.iter().any(|t| t.id == *id));
         if let Some(s) = self.touch.stick {
             if !touches.iter().any(|t| t.id == s.id) {
                 self.touch.stick = None;
