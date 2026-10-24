@@ -5,6 +5,7 @@ use macroquad::prelude::*;
 
 use crate::combat::{Shape, StrikeKind};
 use crate::enemy::{self, Enemy, Kind};
+use crate::input::TouchOverlay;
 use crate::player::{self, Player};
 use crate::tuning as t;
 use crate::world::{self, FxKind, World};
@@ -32,7 +33,13 @@ impl Renderer {
     }
 
     /// `alpha`: 마지막 틱 이후 지난 비율(0..1). 위치 보간에 쓴다.
-    pub fn draw(&mut self, w: &World, alpha: f32, gamepad_count: usize) {
+    pub fn draw(
+        &mut self,
+        w: &World,
+        alpha: f32,
+        gamepad_count: usize,
+        touch: Option<TouchOverlay>,
+    ) {
         // --- 월드 패스 (내부 해상도) ---
         let center = vec2(t::VIEW_W / 2.0, t::VIEW_H / 2.0);
         self.cam.target = center + w.feel.shake_offset;
@@ -78,6 +85,35 @@ impl Renderer {
         );
 
         draw_hud_screen(w, scale, x, y, gamepad_count);
+        if let Some(t) = touch {
+            draw_touch_overlay(&t);
+        }
+    }
+}
+
+/// 터치 조작 오버레이(실제 해상도). 터치가 한 번이라도 있었을 때만.
+fn draw_touch_overlay(t: &TouchOverlay) {
+    let line = Color::new(1.0, 1.0, 1.0, 0.35);
+    let fill = Color::new(1.0, 1.0, 1.0, 0.12);
+    if let Some((origin, pos)) = t.stick {
+        draw_circle_lines(origin.x, origin.y, t.stick_radius, 2.0, line);
+        let d = pos - origin;
+        let knob = origin + d.clamp_length_max(t.stick_radius);
+        draw_circle(knob.x, knob.y, t.stick_radius * 0.4, fill);
+        draw_circle_lines(knob.x, knob.y, t.stick_radius * 0.4, 2.0, line);
+    }
+    for b in &t.buttons {
+        draw_circle(b.center.x, b.center.y, b.radius, fill);
+        draw_circle_lines(b.center.x, b.center.y, b.radius, 2.0, line);
+        let fs = b.radius * 0.6;
+        let dim = measure_text(b.label, None, fs as u16, 1.0);
+        draw_text(
+            b.label,
+            b.center.x - dim.width / 2.0,
+            b.center.y + dim.height / 2.0,
+            fs,
+            line,
+        );
     }
 }
 

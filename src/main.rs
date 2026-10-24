@@ -44,7 +44,7 @@ async fn main() {
             acc -= tuning::TICK_DT;
         }
         let alpha = acc / tuning::TICK_DT;
-        renderer.draw(&world, alpha, input.gamepad_count);
+        renderer.draw(&world, alpha, input.gamepad_count, input.overlay());
         next_frame().await
     }
 }

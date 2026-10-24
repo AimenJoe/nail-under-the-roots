@@ -56,6 +56,7 @@
 | 피격·사망·재시작 | `player.rs`, `world.rs` | 체력 3, 피격 무적 0.8s. R / Start로 즉시 재시작 |
 | 전투감 | `combat.rs`(Feel), `world.rs`, `render.rs` | 히트스톱(로직 시계만), trauma² 흔들림(정수 px), 흰색 플래시, 넉백(감쇠), 합성음 |
 | 게임패드 | `input.rs`, `web/macroquad-gamepads-0.1.js` | 데스크톱(gilrs)·웹(플러그인). 실기 패드로는 아직 안 눌러 봄 |
+| 터치(보조) | `input.rs` TouchState, `render.rs` 오버레이, `web/index.html` | 왼쪽 반 떠다니는 스틱 + ATK/DIG/R 버튼. 모바일 브라우저용. 헤드리스 Chromium에 합성 TouchEvent로 동작 확인, 실기 미확인 |
 | 디버그 | F1 오버레이(fps, 상태), F2 히트박스 | |
 | 웨이브 | `world.rs` | 적을 다 잡으면 1.2초 뒤 다음 웨이브(1C+1S → 2C+1S → 2C+2S → 3C+2S). 명세엔 없지만 5분 플레이 판정을 위해 넣음 |
 

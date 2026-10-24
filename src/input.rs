@@ -1,4 +1,4 @@
-//! 입력 레이어. 키보드·게임패드를 `Actions`로 번역한다.
+//! 입력 레이어. 키보드·게임패드·터치를 `Actions`로 번역한다.
 //!
 //! 이 파일 밖에서는 `KeyCode`도 `gamepads::Button`도 보지 않는다.
 //! (KB: reference/macroquad/gamepad-and-android-input.md)
@@ -51,6 +51,66 @@ pub struct Input {
     /// 가장 최근 프레임의 축 상태.
     held: Actions,
     pub gamepad_count: usize,
+    touch: TouchState,
+}
+
+/// 터치 조작(모바일 브라우저 보조). 왼쪽 반은 떠다니는 가상 스틱, 오른쪽 아래는 버튼.
+/// 화면 좌표(실제 픽셀) 기준. 렌더가 `overlay()`로 읽어 그린다.
+#[derive(Default)]
+struct TouchState {
+    /// 한 번이라도 터치가 들어오면 오버레이를 보인다.
+    seen: bool,
+    stick: Option<TouchStick>,
+}
+
+#[derive(Clone, Copy)]
+struct TouchStick {
+    id: u64,
+    origin: Vec2,
+    pos: Vec2,
+}
+
+/// 렌더용 터치 오버레이 정보.
+#[derive(Clone, Copy)]
+pub struct TouchOverlay {
+    pub stick: Option<(Vec2, Vec2)>,
+    pub stick_radius: f32,
+    pub buttons: [TouchButton; 3],
+}
+
+#[derive(Clone, Copy)]
+pub struct TouchButton {
+    pub center: Vec2,
+    pub radius: f32,
+    pub label: &'static str,
+}
+
+/// 버튼 배치. 화면 짧은 변 기준으로 손가락 크기에 맞춘다.
+fn touch_layout() -> TouchOverlay {
+    let (w, h) = (screen_width(), screen_height());
+    let u = w.min(h);
+    let r = u * 0.09;
+    TouchOverlay {
+        stick: None,
+        stick_radius: u * 0.14,
+        buttons: [
+            TouchButton {
+                center: vec2(w - r * 1.6, h - r * 1.6),
+                radius: r,
+                label: "ATK",
+            },
+            TouchButton {
+                center: vec2(w - r * 4.2, h - r * 1.2),
+                radius: r,
+                label: "DIG",
+            },
+            TouchButton {
+                center: vec2(w - r * 1.2, r * 1.2),
+                radius: r * 0.7,
+                label: "R",
+            },
+        ],
+    }
 }
 
 impl Input {
@@ -61,7 +121,18 @@ impl Input {
             pending: Actions::default(),
             held: Actions::default(),
             gamepad_count: 0,
+            touch: TouchState::default(),
         }
+    }
+
+    /// 터치가 한 번이라도 있었으면 오버레이 정보를 돌려준다.
+    pub fn overlay(&self) -> Option<TouchOverlay> {
+        if !self.touch.seen {
+            return None;
+        }
+        let mut o = touch_layout();
+        o.stick = self.touch.stick.map(|s| (s.origin, s.pos));
+        Some(o)
     }
 
     /// 렌더 프레임마다 한 번.
@@ -70,16 +141,84 @@ impl Input {
         let (pad, count) = self.read_gamepads();
         self.gamepad_count = count;
 
+        let touch = self.read_touch();
+
         let mut now = kb;
         now.merge_edges(&pad);
-        // 축: 키보드가 눌려 있으면 키보드, 아니면 스틱.
+        now.merge_edges(&touch);
+        // 축: 키보드 > 게임패드 > 터치 스틱.
         if now.move_dir == Vec2::ZERO {
             now.move_dir = pad.move_dir;
+        }
+        if now.move_dir == Vec2::ZERO {
+            now.move_dir = touch.move_dir;
         }
         now.aim = pad.aim;
 
         self.pending.merge_edges(&now);
         self.held = now;
+    }
+
+    /// 터치: 왼쪽 반에서 시작한 손가락은 스틱, 버튼 위에서 시작한 손가락은 눌림.
+    fn read_touch(&mut self) -> Actions {
+        let mut a = Actions::default();
+        let touches = touches();
+        if touches.is_empty() && self.touch.stick.is_none() {
+            return a;
+        }
+        self.touch.seen = true;
+        let layout = touch_layout();
+        let half = screen_width() * 0.5;
+        for t in &touches {
+            match t.phase {
+                TouchPhase::Started => {
+                    if let Some(b) = layout
+                        .buttons
+                        .iter()
+                        .find(|b| (t.position - b.center).length() <= b.radius * 1.3)
+                    {
+                        match b.label {
+                            "ATK" => a.attack = true,
+                            "DIG" => a.dodge = true,
+                            _ => a.restart = true,
+                        }
+                        a.confirm |= b.label == "ATK";
+                    } else if t.position.x < half && self.touch.stick.is_none() {
+                        self.touch.stick = Some(TouchStick {
+                            id: t.id,
+                            origin: t.position,
+                            pos: t.position,
+                        });
+                    }
+                }
+                TouchPhase::Moved | TouchPhase::Stationary => {
+                    if let Some(s) = self.touch.stick.as_mut() {
+                        if s.id == t.id {
+                            s.pos = t.position;
+                        }
+                    }
+                }
+                TouchPhase::Ended | TouchPhase::Cancelled => {
+                    if self.touch.stick.map(|s| s.id) == Some(t.id) {
+                        self.touch.stick = None;
+                    }
+                }
+            }
+        }
+        // 손가락이 사라졌는데 Ended를 못 받은 경우(브라우저 탭 전환 등) 정리.
+        if let Some(s) = self.touch.stick {
+            if !touches.iter().any(|t| t.id == s.id) {
+                self.touch.stick = None;
+            }
+        }
+        if let Some(s) = self.touch.stick {
+            let v = (s.pos - s.origin) / layout.stick_radius;
+            let len = v.length();
+            if len > 0.15 {
+                a.move_dir = v / len * ((len - 0.15) / 0.85).min(1.0);
+            }
+        }
+        a
     }
 
     #[cfg(not(target_os = "android"))]
