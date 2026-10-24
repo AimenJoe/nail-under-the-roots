@@ -26,7 +26,8 @@ Netlify 배포는 레포 Secrets(`NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`)가 등
 ---
 
 ## 세션 시작 전 사람이 할 일
-- [ ] Netlify에 사이트를 **Deploy manually**로 생성(Git 연동 금지), Site ID 확인
+- [x] Netlify 사이트 생성 완료 (2026-10-24, Git 연동 없음): `nail-under-the-roots`, Site ID `a0bc4242-4bdd-4fc8-8266-adeaf143e59c`, https://nail-under-the-roots.netlify.app , 관리 https://app.netlify.com/projects/nail-under-the-roots
 - [ ] Netlify User settings → Applications → Personal access token 발급
-- [ ] GitHub 레포 Settings → Secrets → `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID` 등록
+- [ ] GitHub 레포 Settings → Secrets and variables → Actions → `NETLIFY_AUTH_TOKEN`(위 토큰), `NETLIFY_SITE_ID`(`a0bc4242-4bdd-4fc8-8266-adeaf143e59c`) 등록
+- [ ] 등록 후 Actions에서 `deploy-web` 워크플로를 Re-run 하거나 아무 커밋을 push → 사이트가 뜬다
 - [ ] (데스크톱 실행 확인용) 로컬에 Rust 툴체인. Linux면 `libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev`
