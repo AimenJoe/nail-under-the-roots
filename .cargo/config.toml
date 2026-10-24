@@ -1,0 +1,6 @@
+# 웹 빌드: quad-snd(macroquad audio)와 gamepads 크레이트는 JS 호스트 함수를
+# `#[link(wasm_import_module)]` 없이 `extern "C"`로 선언한다. 최신 rustc(1.99)의 rust-lld는
+# 그런 미정의 심볼을 에러로 처리하므로, 미정의 심볼을 `env` 모듈 import로 바꾸게 한다.
+# (miniquad 자체는 `#[link(wasm_import_module = "env")]`를 써서 이 플래그 없이도 링크된다.)
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=--import-undefined"]

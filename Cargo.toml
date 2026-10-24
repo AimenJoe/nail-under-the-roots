@@ -6,7 +6,8 @@ description = "Naïl: Under the Roots — 귀여운 탑다운 액션 로그라�
 publish = false
 
 [dependencies]
-macroquad = "0.4.16"
+gamepads = { version = "0.1.7", default-features = false }
+macroquad = { version = "0.4.16", features = ["audio"] }
 
 [profile.release]
 opt-level = "z"
