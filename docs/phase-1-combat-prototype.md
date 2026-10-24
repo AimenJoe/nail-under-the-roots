@@ -62,8 +62,8 @@
 확인한 것: 데스크톱(Xvfb) 실행 캡처로 렌더 방향·공격 반원·굴파기·히트박스 표시, 헤드리스 Chromium으로 웹 빌드 로드·입력·콘솔(mismatch 없음). 확인 못 한 것: 실제 손맛(판정 1~4), 실기 게임패드, 소리의 실제 느낌(컨테이너에 오디오 장치 없음).
 
 ## 사람이 할 일 (다음 세션 전)
-- [ ] Netlify User settings → Applications → Personal access token 발급
-- [ ] GitHub 레포 Settings → Secrets and variables → Actions → `NETLIFY_AUTH_TOKEN`(위 토큰), `NETLIFY_SITE_ID`(`a0bc4242-4bdd-4fc8-8266-adeaf143e59c`) 등록 → `deploy-web` Re-run 또는 아무 커밋 push → 사이트가 뜬다
+- [x] Netlify Personal access token 발급, GitHub Secrets `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID` 등록 (2026-10-24)
+- [ ] `main`에 머지(또는 push)해서 `deploy-web`이 프로덕션 배포를 하게 한다. PR을 열면 먼저 `pr-<번호>--nail-under-the-roots.netlify.app` 미리보기로 확인할 수 있다
 - [ ] **플레이**(웹 또는 `cargo run`). 위 판정 4개에 예/아니오와 한 줄 이유를 적어 다음 세션에 전달. 가능하면 본인 외 1명 더
 - [ ] 게임패드를 꽂고 데스크톱·웹에서 이동/공격/굴파기/재시작, 스틱 데드존 확인
 - [ ] Actions의 `build-android` 아티팩트 APK를 Android 기기(가능하면 핸드헬드)에 설치해 실행되는지, D-pad로 움직이는지 확인
