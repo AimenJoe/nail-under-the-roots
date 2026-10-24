@@ -4,8 +4,10 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 
 ## 먼저 읽을 것
 1. `docs/concept.md` — 무엇을 만드는가
-2. `docs/phase-1-combat-prototype.md` — 지금 단계의 범위와 판정 기준
+2. `docs/phase-1-combat-prototype.md` — 지금 단계의 범위와 판정 기준. 끝의 **"구현 상태"와 "사람이 할 일"**이 현재 위치다
 3. `docs/decisions/` — 왜 그렇게 정했나. 바꾸려면 새 번호로 기록
+
+세션 시작 프롬프트는 따로 없다. 이 파일과 위 세 문서가 그 역할을 한다. 세션이 끝나면 "구현 상태"·"사람이 할 일"을 갱신하고 커밋한다.
 
 ## 지식 베이스 (KB)
 일반 지식은 이 레포가 아니라 **github.com/AimenJoe/KB** 에 있다. 세션에 KB 레포를 함께 붙이고, 질문 전에 `maps/gamedev.md` → 해당 노트를 먼저 읽는다.
@@ -31,11 +33,13 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 cargo fmt --all -- --check
 cargo clippy --target wasm32-unknown-unknown -- -D warnings
 cargo build --release --target wasm32-unknown-unknown
+cargo check --target aarch64-linux-android   # NDK 없이 됨. Android에서만 깨지는 의존성(gamepads 등)을 잡는다
 ```
-CI(`.github/workflows/deploy-web.yml`)가 같은 것을 돌리고, Netlify 시크릿이 있으면 배포한다.
+CI: `deploy-web.yml`이 위 세 줄을 돌리고 Netlify 시크릿이 있으면 배포한다. `build-android.yml`이 APK를 만들어 아티팩트(태그면 Release)로 올린다. 로컬에 Android SDK/NDK는 두지 않는다(docs/decisions/0005).
 
 ## 하지 않는 것
 - `mq_js_bundle.js`나 게임패드 JS 플러그인을 외부 URL로 핫링크하지 않는다. `web/`에 복사본.
 - 에셋 팩을 라이선스 확인 없이 커밋하지 않는다. `assets/LICENSES.md`에 기록.
 - 1단계 범위 밖(에셋, 허브, 저장, 두 번째 캐릭터)을 판정 전에 만들지 않는다.
+- `cargo-quad-apk` 커밋(`build-android.yml`의 `CARGO_QUAD_APK_REV`)과 `web/*.js` 복사본은 의도적으로만 올린다. 올리면 CI 콘솔/로그를 확인한다.
 - 언어: 문서·커밋 메시지 한국어, 코드 식별자 영어.

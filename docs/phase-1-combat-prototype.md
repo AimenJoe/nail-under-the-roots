@@ -60,3 +60,13 @@
 | 웨이브 | `world.rs` | 적을 다 잡으면 1.2초 뒤 다음 웨이브(1C+1S → 2C+1S → 2C+2S → 3C+2S). 명세엔 없지만 5분 플레이 판정을 위해 넣음 |
 
 확인한 것: 데스크톱(Xvfb) 실행 캡처로 렌더 방향·공격 반원·굴파기·히트박스 표시, 헤드리스 Chromium으로 웹 빌드 로드·입력·콘솔(mismatch 없음). 확인 못 한 것: 실제 손맛(판정 1~4), 실기 게임패드, 소리의 실제 느낌(컨테이너에 오디오 장치 없음).
+
+## 사람이 할 일 (다음 세션 전)
+- [ ] Netlify User settings → Applications → Personal access token 발급
+- [ ] GitHub 레포 Settings → Secrets and variables → Actions → `NETLIFY_AUTH_TOKEN`(위 토큰), `NETLIFY_SITE_ID`(`a0bc4242-4bdd-4fc8-8266-adeaf143e59c`) 등록 → `deploy-web` Re-run 또는 아무 커밋 push → 사이트가 뜬다
+- [ ] **플레이**(웹 또는 `cargo run`). 위 판정 4개에 예/아니오와 한 줄 이유를 적어 다음 세션에 전달. 가능하면 본인 외 1명 더
+- [ ] 게임패드를 꽂고 데스크톱·웹에서 이동/공격/굴파기/재시작, 스틱 데드존 확인
+- [ ] Actions의 `build-android` 아티팩트 APK를 Android 기기(가능하면 핸드헬드)에 설치해 실행되는지, D-pad로 움직이는지 확인
+- [ ] (데스크톱 실행용) Linux면 `libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev libudev-dev pkg-config`
+
+다음 세션의 목표는 위 피드백으로 `src/tuning.rs`를 조정해 판정 4개를 통과시키는 것이다. 수치로 안 되면 메커닉을 바꾸고 `docs/decisions/`에 새 번호로 기록한다. 판정 통과 전에는 2단계(에셋, Android 컨트롤러 스파이크)를 시작하지 않는다.
