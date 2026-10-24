@@ -24,7 +24,8 @@ pub const PLAYER_HURT_HITSTOP: f32 = 0.12;
 pub const PLAYER_HURT_SHAKE: f32 = 0.55;
 /// 입력 버퍼. 이 시간 안에 들어온 공격/굴파기 입력은 가능해지는 순간 실행된다.
 pub const INPUT_BUFFER: f32 = 0.10;
-/// 스틱 데드존(반지름).
+/// 스틱 데드존(반지름). Android 빌드에는 gamepads 크레이트가 없어 쓰이지 않는다.
+#[cfg_attr(target_os = "android", allow(dead_code))]
 pub const STICK_DEADZONE: f32 = 0.2;
 
 // ---- 발톱 3연타 ------------------------------------------------------------

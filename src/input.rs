@@ -7,9 +7,11 @@
 //! 로직 틱마다 `take()`가 래치를 소비한다. 프레임에 틱이 두 번이면 첫 틱만 눌림을 받고,
 //! 틱이 없으면(고주사율) 다음 틱까지 눌림이 보존된다.
 
+#[cfg(not(target_os = "android"))]
 use gamepads::{Button, Gamepads};
 use macroquad::prelude::*;
 
+#[cfg(not(target_os = "android"))]
 use crate::tuning;
 
 /// 게임 로직이 보는 유일한 입력.
@@ -41,6 +43,8 @@ impl Actions {
 }
 
 pub struct Input {
+    /// Android에서는 gamepads 크레이트가 빠진다. D-pad는 miniquad가 화살표 키로 넘겨 주므로 키보드 경로로 들어온다.
+    #[cfg(not(target_os = "android"))]
     pads: Gamepads,
     /// 아직 틱이 소비하지 않은 눌림.
     pending: Actions,
@@ -52,6 +56,7 @@ pub struct Input {
 impl Input {
     pub fn new() -> Self {
         Self {
+            #[cfg(not(target_os = "android"))]
             pads: Gamepads::new(),
             pending: Actions::default(),
             held: Actions::default(),
@@ -61,9 +66,8 @@ impl Input {
 
     /// 렌더 프레임마다 한 번.
     pub fn poll(&mut self) {
-        self.pads.poll();
         let kb = read_keyboard();
-        let (pad, count) = read_gamepads(&self.pads);
+        let (pad, count) = self.read_gamepads();
         self.gamepad_count = count;
 
         let mut now = kb;
@@ -76,6 +80,17 @@ impl Input {
 
         self.pending.merge_edges(&now);
         self.held = now;
+    }
+
+    #[cfg(not(target_os = "android"))]
+    fn read_gamepads(&mut self) -> (Actions, usize) {
+        self.pads.poll();
+        read_gamepads(&self.pads)
+    }
+
+    #[cfg(target_os = "android")]
+    fn read_gamepads(&mut self) -> (Actions, usize) {
+        (Actions::default(), 0)
     }
 
     /// 로직 틱마다 한 번. 눌림을 소비한다.
@@ -119,6 +134,7 @@ fn read_keyboard() -> Actions {
 
 /// 연결된 모든 패드를 합친다(1인 게임이라 어느 패드든 같은 플레이어).
 /// 스틱 y는 두 백엔드(gilrs, 브라우저 플러그인) 모두 위가 +이므로 화면 좌표(아래가 +)로 뒤집는다.
+#[cfg(not(target_os = "android"))]
 fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
     let mut a = Actions::default();
     let mut count = 0;
@@ -161,6 +177,7 @@ fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
 }
 
 /// 반지름 데드존. 데드존 바깥을 0..1로 다시 펴서 작은 기울기도 쓸 수 있게 한다.
+#[cfg(not(target_os = "android"))]
 fn apply_deadzone(v: Vec2) -> Vec2 {
     let len = v.length();
     if len < tuning::STICK_DEADZONE {

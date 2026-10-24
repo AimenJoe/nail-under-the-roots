@@ -6,8 +6,31 @@ description = "Naïl: Under the Roots — 귀여운 탑다운 액션 로그라�
 publish = false
 
 [dependencies]
-gamepads = { version = "0.1.7", default-features = false }
 macroquad = { version = "0.4.16", features = ["audio"] }
+
+# gamepads 0.1.7은 Android에서 `android-winit` feature 없이는 컴파일되지 않는다(poll_android_winit 미정의).
+# 그 feature는 winit 전용이라 miniquad와 맞지 않으므로 Android 빌드에서는 크레이트를 아예 뺀다.
+# Android 게임패드는 miniquad 포크로 해결 (docs/decisions/0002, KB reference/macroquad/gamepad-and-android-input.md).
+[target.'cfg(not(target_os = "android"))'.dependencies]
+gamepads = { version = "0.1.7", default-features = false }
+
+# cargo-quad-apk 설정 (.github/workflows/build-android.yml, docs/decisions/0005)
+[package.metadata.android]
+package_name = "io.github.aimenjoe.nail"
+label = "Naïl: Under the Roots"
+# compileSdk / targetSdk. GitHub 러너와 cargo-quad-apk 기본값(36)에 맞춤.
+android_version = 36
+target_sdk_version = 36
+# Android 8.0. 핸드헬드는 11+ 이므로 여유.
+min_sdk_version = 26
+# 실기 핸드헬드는 arm64. 에뮬레이터가 필요해지면 x86_64-linux-android 추가.
+build_targets = ["aarch64-linux-android"]
+fullscreen = true
+# 앱 스토어 업데이트 판정용 정수. 배포할 때마다 올린다.
+version_code = 1
+
+[package.metadata.android.activity_attributes]
+"android:screenOrientation" = "sensorLandscape"
 
 [profile.release]
 opt-level = "z"
