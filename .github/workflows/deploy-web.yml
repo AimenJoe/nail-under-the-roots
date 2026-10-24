@@ -29,7 +29,7 @@ jobs:
       - name: Assemble publish dir
         run: |
           mkdir -p dist
-          cp web/index.html web/mq_js_bundle.js dist/
+          cp web/index.html web/*.js dist/
           cp target/wasm32-unknown-unknown/release/nail.wasm dist/
           [ -d assets ] && cp -r assets dist/assets || true
           ls -la dist
