@@ -1,0 +1,54 @@
+name: deploy-web
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
+      - run: cargo build --release --target wasm32-unknown-unknown
+
+      - name: Assemble publish dir
+        run: |
+          mkdir -p dist
+          cp web/index.html web/mq_js_bundle.js dist/
+          cp target/wasm32-unknown-unknown/release/nail.wasm dist/
+          [ -d assets ] && cp -r assets dist/assets || true
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist
+
+      - uses: actions/setup-node@v4
+        if: env.NETLIFY_SITE_ID != ''
+        with:
+          node-version: 22
+
+      # Netlify 시크릿이 설정되기 전에는 아래 두 단계가 건너뛰어진다 (빌드 검증만).
+      - name: Deploy production
+        if: env.NETLIFY_SITE_ID != '' && github.event_name == 'push'
+        run: npx netlify-cli@23 deploy --dir=dist --prod --message="${{ github.sha }}"
+
+      - name: Deploy PR preview
+        if: env.NETLIFY_SITE_ID != '' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
+        run: npx netlify-cli@23 deploy --dir=dist --alias="pr-${{ github.event.number }}"
