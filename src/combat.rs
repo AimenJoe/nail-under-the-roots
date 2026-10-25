@@ -43,6 +43,10 @@ impl Shape {
 pub enum StrikeKind {
     Claw(usize),
     Emerge,
+    /// 필살기 드릴의 연타 한 번.
+    Drill,
+    /// 드릴이 벽에 부딪힌 충격파.
+    DrillWall,
 }
 
 /// 플레이어가 이번 틱에 휘두르는 공격 하나.

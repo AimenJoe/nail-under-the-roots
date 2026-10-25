@@ -8,7 +8,7 @@ use macroquad::prelude::*;
 
 use crate::art::Art;
 use crate::cutscene::{self, Cutscene};
-use crate::equipment::{Character, WEAPONS};
+use crate::equipment::{Character, CHARMS, CHARM_SLOTS, WEAPONS};
 use crate::i18n::{self, fill, tr, Tr};
 use crate::input::{Actions, Input};
 use crate::render::{self, Renderer};
@@ -150,6 +150,8 @@ impl Journal {
 pub enum Item {
     /// equipment::WEAPONS 번호.
     Weapon(usize),
+    /// equipment::CHARMS 번호. 끼고 있는지는 world.charms.
+    Charm(usize),
 }
 
 /// 가방. 지금은 무기만 들어간다. 그 밖의 아이템은 2단계(방 클리어 보상)에서.
@@ -181,6 +183,20 @@ impl Inventory {
             .any(|s| matches!(s, Some(Item::Weapon(x)) if *x == w))
     }
 
+    /// 장신구를 빈 칸에 넣는다. 이미 있으면 그대로.
+    fn add_charm(&mut self, c: usize) {
+        if self
+            .slots
+            .iter()
+            .any(|s| matches!(s, Some(Item::Charm(x)) if *x == c))
+        {
+            return;
+        }
+        if let Some(slot) = self.slots.iter_mut().find(|s| s.is_none()) {
+            *slot = Some(Item::Charm(c));
+        }
+    }
+
     /// 빈 칸에 넣는다. 이미 있으면 그대로.
     fn add(&mut self, w: usize) {
         if self.has(w) {
@@ -207,6 +223,19 @@ fn draw_claw_icon(ui: &Ui, r: Rect, color: Color) {
         ui.rect(Rect::new(x, r.y + 13.0 + (k % 2) as f32, 2.0, 2.0), dark);
     }
     ui.rect(Rect::new(r.x + 5.0, r.y + 15.0, 12.0, 2.0), dark);
+}
+
+/// 가방 칸의 장신구 아이콘: 끈에 매단 둥근 돌.
+fn draw_charm_icon(ui: &Ui, r: Rect, color: Color) {
+    let dark = Color::new(color.r * 0.6, color.g * 0.6, color.b * 0.6, 1.0);
+    ui.rect(Rect::new(r.x + 6.0, r.y + 4.0, 10.0, 1.0), ui::BORDER);
+    ui.rect(Rect::new(r.x + 10.0, r.y + 5.0, 2.0, 3.0), ui::BORDER);
+    ui.rect(Rect::new(r.x + 7.0, r.y + 8.0, 8.0, 9.0), dark);
+    ui.rect(Rect::new(r.x + 8.0, r.y + 8.0, 6.0, 7.0), color);
+    ui.rect(
+        Rect::new(r.x + 8.0, r.y + 9.0, 2.0, 2.0),
+        Color::new(1.0, 1.0, 1.0, 0.8),
+    );
 }
 
 /// 직전 프레임에 그린, 탭/클릭에 반응하는 요소.
@@ -411,6 +440,13 @@ impl App {
         self.inventory = match s {
             Scenario::Normal | Scenario::Tutorial => Inventory::new(&[]),
             Scenario::AllClaws => Inventory::new(&[start, 0, 2, 3]),
+            Scenario::Gear => {
+                let mut inv = Inventory::new(&[start]);
+                for c in 0..CHARMS.len() {
+                    inv.add_charm(c);
+                }
+                inv
+            }
             _ => Inventory::new(&[start]),
         };
         self.gift = None;
@@ -654,13 +690,30 @@ impl App {
                     self.inv_cursor = i;
                 }
                 if equip {
-                    if let Some(Item::Weapon(w)) = self.inventory.slots[self.inv_cursor] {
-                        // 캐릭터가 쓸 수 있는 종류만.
-                        if WEAPONS[w].kind == Character::Mole.weapon_kind() {
-                            self.inventory.equipped = Some(w);
-                            self.apply_equipped();
-                            self.sfx.play(crate::sfx::Id::Claw(2));
+                    match self.inventory.slots[self.inv_cursor] {
+                        Some(Item::Weapon(w)) => {
+                            // 캐릭터가 쓸 수 있는 종류만.
+                            if WEAPONS[w].kind == Character::Mole.weapon_kind() {
+                                self.inventory.equipped = Some(w);
+                                self.apply_equipped();
+                                self.sfx.play(crate::sfx::Id::Claw(2));
+                            }
                         }
+                        Some(Item::Charm(c)) => {
+                            // 끼고 있으면 빼고, 아니면 낀다. 칸이 가득이면 먼저 낀 것과 바꾼다.
+                            let charms = &mut self.world.charms;
+                            if let Some(i) = charms.iter().position(|x| *x == c) {
+                                charms.remove(i);
+                            } else {
+                                if charms.len() >= CHARM_SLOTS {
+                                    charms.remove(0);
+                                }
+                                charms.push(c);
+                            }
+                            self.world.refresh_stats();
+                            self.sfx.play(crate::sfx::Id::Claw(1));
+                        }
+                        None => {}
                     }
                 }
             }
@@ -1118,14 +1171,35 @@ impl App {
 
     fn draw_status(&self, ui: &Ui, c: Rect) {
         let p = &self.world.player;
-        let hearts: String = (0..t::PLAYER_HP)
+        let hearts: String = (0..p.stats.max_hp)
             .map(|i| if i < p.hp { '♥' } else { '♡' })
             .collect();
         let secs = self.run_time as u32;
         let s = i18n::s();
         let last = &p.moveset.hits[p.moveset.last()];
+        let charms = if self.world.charms.is_empty() {
+            s.charms_none.to_string()
+        } else {
+            self.world
+                .charms
+                .iter()
+                .map(|c| tr(CHARMS[*c].name))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let st = p.stats;
+        let attack = if st.damage != 0 || (st.attack_speed - 1.0).abs() > 1e-3 {
+            format!(
+                " · {}",
+                fill(
+                    s.stat_attack,
+                    &[&st.damage, &((st.attack_speed * 100.0).round() as i32)]
+                )
+            )
+        } else {
+            String::new()
+        };
         let lines = [
-            (Character::Mole.name(), s.mole_desc.to_string()),
             (s.hp, hearts),
             (
                 s.this_run,
@@ -1148,7 +1222,7 @@ impl App {
                             &format!("{:.2}", last.swing),
                             &(last.knockback as i32),
                         ],
-                    ),
+                    ) + &attack,
                 ),
                 None => (s.bare_hands, s.bare_hands_desc.to_string()),
             },
@@ -1159,14 +1233,15 @@ impl App {
                     &[
                         &format!("{:.2}", t::BURROW_MAX_TIME),
                         &(t::EMERGE_RADIUS as i32),
-                        &format!("{:.1}", t::BURROW_COOLDOWN),
+                        &format!("{:.1}", t::BURROW_COOLDOWN * st.burrow_cd),
                     ],
                 ),
             ),
+            (s.charms_label, charms),
             (s.glowbugs, self.world.glowbugs.to_string()),
-            (s.special, s.special_tbd.to_string()),
+            (s.special, format!("{}: {}", s.special_name, s.special_desc)),
         ];
-        let row_h = FONT_PX + 5.0;
+        let row_h = FONT_PX + 3.0;
         // 이름 칸 폭은 언어마다 다르다(무기 이름이 가장 길다). 가장 긴 이름에 맞춘다.
         let key_w = lines
             .iter()
@@ -1186,7 +1261,7 @@ impl App {
             let wrapped = ui::wrap(ui, v, vw, FONT_PX);
             for (j, l) in wrapped.iter().take(2).enumerate() {
                 if j > 0 {
-                    y += 13.0;
+                    y += 12.0;
                 }
                 let l = if j == 1 && wrapped.len() > 2 {
                     ui.fit(&format!("{l}…"), vw, FONT_PX)
@@ -1222,11 +1297,20 @@ impl App {
                     ui::BORDER
                 },
             );
-            if let Some(Item::Weapon(w)) = item {
-                draw_claw_icon(ui, r, WEAPONS[*w].color);
-                if self.inventory.equipped == Some(*w) {
-                    ui.text("E", r.x + 2.0, r.y + 1.0, FONT_PX, ui::ACCENT);
+            match item {
+                Some(Item::Weapon(w)) => {
+                    draw_claw_icon(ui, r, WEAPONS[*w].color);
+                    if self.inventory.equipped == Some(*w) {
+                        ui.text("E", r.x + 2.0, r.y + 1.0, FONT_PX, ui::ACCENT);
+                    }
                 }
+                Some(Item::Charm(c)) => {
+                    draw_charm_icon(ui, r, CHARMS[*c].color);
+                    if self.world.charms.contains(c) {
+                        ui.text("E", r.x + 2.0, r.y + 1.0, FONT_PX, ui::ACCENT);
+                    }
+                }
+                None => {}
             }
             self.hits.push((r, Hit::InvSlot(i)));
         }
@@ -1258,6 +1342,28 @@ impl App {
                 };
                 ui.text(hint, desc_x, y + 18.0, FONT_PX, ui::ACCENT);
             }
+            Some(Item::Charm(c)) => {
+                let ch = &CHARMS[*c];
+                ui.text(tr(ch.name), desc_x, y0, FONT_PX, ui::ACCENT);
+                let mut y = y0 + 16.0;
+                for l in ui::wrap(ui, tr(ch.desc), desc_w, FONT_PX).iter() {
+                    ui.text(l, desc_x, y, FONT_PX, ui::TEXT);
+                    y += 14.0;
+                }
+                ui.text(
+                    &fill(s.charm_slots, &[&self.world.charms.len(), &CHARM_SLOTS]),
+                    desc_x,
+                    y + 4.0,
+                    FONT_PX,
+                    ui::TEXT_DIM,
+                );
+                let hint = if self.world.charms.contains(c) {
+                    s.charm_unequip
+                } else {
+                    s.charm_equip
+                };
+                ui.text(hint, desc_x, y + 18.0, FONT_PX, ui::ACCENT);
+            }
             None => {
                 ui.text(s.empty_slot, desc_x, y0, FONT_PX, ui::TEXT_DIM);
                 for (i, l) in ui::wrap(ui, s.empty_slot_desc, desc_w, FONT_PX)
@@ -1284,6 +1390,22 @@ impl App {
             ),
             x0,
             y0 + 3.0 * (slot + gap) + 2.0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+        // 퀵 아이템(가방 칸과 따로, HUD 왼쪽 아래와 같은 것)
+        let bag = &self.world.bag;
+        ui.text(
+            &ui.fit(
+                &fill(
+                    s.bag_items,
+                    &[&bag.berries, &t::BERRY_MAX, &bag.worms, &t::WORM_MAX],
+                ),
+                desc_x - x0 - 4.0,
+                FONT_PX,
+            ),
+            x0,
+            y0 + 3.0 * (slot + gap) + 16.0,
             FONT_PX,
             ui::TEXT_DIM,
         );

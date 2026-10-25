@@ -29,6 +29,8 @@ pub enum Scenario {
     InBiome(Biome),
     /// 반딧불·산딸기 줍기 확인(docs/decisions/0016).
     Loot,
+    /// 장신구·퀵 아이템·필살기 확인(docs/decisions/0017, 0018). 장신구는 앱이 가방에 넣는다.
+    Gear,
 }
 
 pub struct Entry {
@@ -37,7 +39,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 13] = [
+pub const LIST: [Entry; 14] = [
     Entry {
         name: "환경: 꽃 핀 입구",
         desc: "밝고 꽃이 많은 첫 환경. 돌격형 1 + 원거리형 1.",
@@ -67,6 +69,11 @@ pub const LIST: [Entry; 13] = [
         name: "떨어지는 것 확인",
         desc: "체력 2/5. 반딧불 12마리와 산딸기 2개가 튀어나온다. 다가가 끌려오는 반딧불, 회복을 본다.",
         scenario: Scenario::Loot,
+    },
+    Entry {
+        name: "장신구·필살기 확인",
+        desc: "장신구 5개가 가방에, 산딸기 3·지렁이 2, SP 가득, 생명의 씨앗 하나. 돌격형 2마리. L·B로 드릴, F·Y로 먹기, Q·L1로 넘기기.",
+        scenario: Scenario::Gear,
     },
     Entry {
         name: "빈 방",
@@ -111,6 +118,18 @@ pub fn build(s: Scenario) -> World {
         Scenario::Normal => World::new(),
         Scenario::Empty | Scenario::CutsceneOnly | Scenario::Tutorial => World::empty(),
         Scenario::AllClaws => World::new(),
+        Scenario::Gear => {
+            let mut w = build(Scenario::Chargers(2));
+            w.bag.berries = 3;
+            w.bag.worms = 2;
+            w.player.sp = crate::tuning::SP_MAX;
+            w.player.hp = 3;
+            w.loot.push(Loot::place(
+                LootKind::LifeSeed,
+                w.room.center() + vec2(-40.0, 30.0),
+            ));
+            w
+        }
         Scenario::Loot => {
             let mut w = World::empty();
             w.player.hp = 2;

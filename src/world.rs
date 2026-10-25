@@ -5,7 +5,10 @@ use macroquad::prelude::*;
 use crate::biome::Biome;
 use crate::combat::{Feel, Strike};
 use crate::enemy::{self, Enemy, Kind, Projectile};
+use crate::equipment::Stats;
+use crate::i18n::Tr;
 use crate::input::Actions;
+use crate::items::{Bag, Consumable};
 use crate::loot::{self, Loot, LootKind};
 use crate::player::{self, Player};
 use crate::room::Room;
@@ -50,6 +53,14 @@ pub struct World {
     pub loot: Vec<Loot>,
     /// 이번 런에 모은 반딧불(화폐). 상점은 2단계.
     pub glowbugs: u32,
+    /// 퀵 아이템(산딸기·쥬시 지렁이).
+    pub bag: Bag,
+    /// 끼고 있는 장신구(equipment::CHARMS 번호). 바꾸면 `refresh_stats`.
+    pub charms: Vec<usize>,
+    /// 먹은 생명의 씨앗 수(최대 체력 +1씩).
+    pub life_seeds: i32,
+    /// 화면 위 한 줄 알림(되살아남, 씨앗)과 남은 시간. 글은 Tr이라 월드는 언어를 모른다.
+    pub toast: Option<(Tr, f32)>,
     /// 체력이 깎인 채로 산딸기 없이 지나간 처치 수(불운 보정).
     kills_since_berry: u32,
     /// 이번 틱에 얻은 무기(WEAPONS 번호). 앱이 가방에 넣고 비운다. 획득물·컷씬 둘 다 여기로.
@@ -89,6 +100,10 @@ impl World {
             pickups: Vec::new(),
             loot: Vec::new(),
             glowbugs: 0,
+            bag: Bag::default(),
+            charms: Vec::new(),
+            life_seeds: 0,
+            toast: None,
             kills_since_berry: 0,
             gifts: Vec::new(),
             feel: Feel::default(),
@@ -163,7 +178,45 @@ impl World {
                     self.feel.add_trauma(0.15);
                     burst(&mut self.fx, self.player.pos, 10, DIRT, 70.0);
                 }
+                player::Event::Drill => {
+                    sfx.play(sfx::Id::Drill);
+                    self.fx
+                        .push(ring(self.player.pos, 4.0, 16.0, 0.2, PROJECTILE));
+                }
+                player::Event::DrillWall => {
+                    sfx.play(sfx::Id::DrillWall);
+                    let p = self.player.pos + self.player.facing * 6.0;
+                    self.fx
+                        .push(ring(p, 6.0, t::DRILL_WALL_RADIUS + 6.0, 0.3, WHITE));
+                    self.fx.push(ring(p, 4.0, t::DRILL_WALL_RADIUS, 0.25, DIRT));
+                    burst(&mut self.fx, p, 18, DIRT, 130.0);
+                }
                 player::Event::Hurt | player::Event::Die => {}
+            }
+        }
+        // 드릴 중에는 흙이 튄다.
+        if let player::State::Drill { dir, .. } = self.player.state {
+            if (self.time * 60.0) as i32 % 2 == 0 {
+                let back = self.player.pos - dir * 6.0;
+                burst(&mut self.fx, back, 1, DIRT, 60.0);
+            }
+        }
+        // 쓰러졌다: 쥬시 지렁이가 있으면 저절로 먹고 일어난다(목숨).
+        if self.player.events.contains(&player::Event::Die) && self.bag.take(Consumable::Worm) {
+            self.revive(sfx);
+        }
+
+        // 1a. 퀵 아이템
+        if a.item_cycle {
+            self.bag.cycle();
+        }
+        if a.use_item && self.player.is_alive() {
+            self.use_quick_item(sfx);
+        }
+        if let Some((_, time)) = self.toast.as_mut() {
+            *time -= dt;
+            if *time <= 0.0 {
+                self.toast = None;
             }
         }
 
@@ -185,41 +238,61 @@ impl World {
             burst(&mut self.fx, pos, 14, PROJECTILE, 80.0);
         }
 
-        // 1c. 반딧불·산딸기. 땅속에서도 줍는다(굴파기로 지나가며 쓸어 담기).
+        // 1c. 반딧불·가방 아이템·씨앗. 땅속에서도 줍는다(굴파기로 지나가며 쓸어 담기).
         let alive = self.player.is_alive();
-        let mut hp = self.player.hp;
-        let (mut bugs, mut berries) = (0, 0);
+        let mut bag = std::mem::take(&mut self.bag);
+        let (mut bugs, mut items, mut seeds) = (0, 0, 0);
         let mut picked_at = Vec::new();
         let room = &self.room;
         self.loot.retain_mut(|l| {
-            let can = alive && (l.kind == LootKind::Glowbug || hp < t::PLAYER_HP);
+            let can = alive
+                && match l.kind {
+                    LootKind::Glowbug | LootKind::LifeSeed => true,
+                    LootKind::Berry => bag.has_room(Consumable::Berry),
+                    LootKind::Worm => bag.has_room(Consumable::Worm),
+                };
             if !l.update(dt, ppos, can, room) {
                 return true;
             }
             match l.kind {
                 LootKind::Glowbug => bugs += 1,
                 LootKind::Berry => {
-                    berries += 1;
-                    hp = (hp + t::BERRY_HEAL).min(t::PLAYER_HP);
+                    bag.add(Consumable::Berry);
+                    items += 1;
                 }
+                LootKind::Worm => {
+                    bag.add(Consumable::Worm);
+                    items += 1;
+                }
+                LootKind::LifeSeed => seeds += 1,
             }
             picked_at.push((l.pos, l.kind));
             false
         });
-        self.player.hp = hp;
+        self.bag = bag;
         self.glowbugs += bugs;
         if bugs > 0 {
             sfx.play(sfx::Id::Glowbug);
         }
-        if berries > 0 {
+        if items > 0 {
+            sfx.play(sfx::Id::Claw(0));
+        }
+        if seeds > 0 {
+            self.life_seeds += seeds;
+            self.refresh_stats();
+            self.player.heal(self.player.stats.max_hp);
             sfx.play(sfx::Id::Heal);
+            self.toast = Some((|s| s.toast_seed, 2.5));
         }
         for (pos, kind) in picked_at {
             match kind {
                 LootKind::Glowbug => self.fx.push(ring(pos, 1.0, 5.0, 0.15, GLOW)),
-                LootKind::Berry => {
-                    self.fx.push(ring(pos, 3.0, 14.0, 0.3, BERRY));
-                    burst(&mut self.fx, pos, 8, BERRY, 60.0);
+                LootKind::Berry | LootKind::Worm => {
+                    self.fx.push(ring(pos, 2.0, 10.0, 0.2, WHITE));
+                }
+                LootKind::LifeSeed => {
+                    self.fx.push(ring(pos, 4.0, 22.0, 0.4, POISON));
+                    burst(&mut self.fx, pos, 16, POISON, 90.0);
                 }
             }
         }
@@ -281,6 +354,9 @@ impl World {
                     dir
                 };
                 e.hurt(s.damage, dir, s.knockback, s.stun);
+                if matches!(s.kind, crate::combat::StrikeKind::Claw(_)) {
+                    self.player.gain_sp(s.finisher);
+                }
                 if s.poison > 0.0 && e.alive {
                     e.apply_poison(s.poison);
                 }
@@ -403,6 +479,58 @@ impl World {
         }
     }
 
+    /// 장신구·씨앗으로 능력치를 다시 계산한다.
+    pub fn refresh_stats(&mut self) {
+        self.player
+            .set_stats(Stats::compute(&self.charms, self.life_seeds));
+    }
+
+    /// 퀵 슬롯 아이템을 먹는다. 체력이 가득이면 먹지 않는다(아깝지 않게).
+    fn use_quick_item(&mut self, sfx: &Sfx) {
+        let p = &mut self.player;
+        if p.hp >= p.stats.max_hp {
+            return;
+        }
+        let c = self.bag.selected;
+        if !self.bag.take(c) {
+            return;
+        }
+        match c {
+            Consumable::Berry => p.heal(t::BERRY_HEAL),
+            Consumable::Worm => p.heal(p.stats.max_hp),
+        }
+        sfx.play(sfx::Id::Heal);
+        let pos = p.pos;
+        self.fx.push(ring(pos, 3.0, 14.0, 0.3, BERRY));
+        burst(&mut self.fx, pos, 8, BERRY, 60.0);
+        if self.bag.count(c) == 0 {
+            self.bag.cycle();
+        }
+    }
+
+    /// 쥬시 지렁이로 일어난다: 체력 일부, 잠깐 무적, 주변을 밀어낸다.
+    fn revive(&mut self, sfx: &Sfx) {
+        self.player.revive();
+        let pos = self.player.pos;
+        for e in &mut self.enemies {
+            let d = e.pos - pos;
+            if d.length() < t::REVIVE_PUSH_RADIUS {
+                e.hurt(0, d.normalize_or_zero(), t::REVIVE_PUSH_KNOCKBACK, 0.5);
+            }
+        }
+        for p in &mut self.projectiles {
+            if (p.pos - pos).length() < t::REVIVE_PUSH_RADIUS {
+                p.alive = false;
+            }
+        }
+        sfx.play(sfx::Id::Heal);
+        self.fx
+            .push(ring(pos, 4.0, t::REVIVE_PUSH_RADIUS, 0.4, BERRY));
+        burst(&mut self.fx, pos, 20, BERRY, 120.0);
+        self.feel.add_trauma(0.4);
+        self.toast = Some((|s| s.toast_revive, 2.5));
+    }
+
     /// 쓰러진 적이 떨어뜨린다: 반딧불 몇 마리 + 확률로 산딸기(loot::berry_chance).
     fn drop_loot(&mut self, pos: Vec2, kind: Kind) {
         let (lo, hi) = loot::glowbugs_for(kind);
@@ -411,8 +539,12 @@ impl World {
                 self.loot.push(Loot::spawn(LootKind::Glowbug, pos));
             }
         }
-        let missing = self.player.hp < t::PLAYER_HP;
-        let p = loot::berry_chance(self.player.hp, t::PLAYER_HP, self.kills_since_berry, kind);
+        if kind != Kind::Dummy && rand::gen_range(0.0, 1.0) < t::WORM_CHANCE {
+            self.loot.push(Loot::spawn(LootKind::Worm, pos));
+        }
+        let max = self.player.stats.max_hp;
+        let missing = self.player.hp < max;
+        let p = loot::berry_chance(self.player.hp, max, self.kills_since_berry, kind);
         if p > 0.0 && rand::gen_range(0.0, 1.0) < p {
             self.loot.push(Loot::spawn(LootKind::Berry, pos));
             self.kills_since_berry = 0;

@@ -23,8 +23,12 @@ pub enum Id {
     WallHit,
     /// 반딧불 줍기. 연달아 주우면 음이 조금씩 올라간다.
     Glowbug,
-    /// 산딸기 회복.
+    /// 회복(먹기·되살아남).
     Heal,
+    /// 필살기 드릴 시작(윙 돌아가는 소리).
+    Drill,
+    /// 드릴이 벽에 쿵.
+    DrillWall,
 }
 
 pub struct Sfx {
@@ -40,6 +44,8 @@ pub struct Sfx {
     wall_hit: Sound,
     glowbug: [Sound; 4],
     heal: Sound,
+    drill: Sound,
+    drill_wall: Sound,
     /// 반딧불 음 높이 차례.
     glow_step: Cell<usize>,
     /// 설정의 소리 크기(0..1). MASTER_VOLUME에 곱한다.
@@ -129,6 +135,18 @@ impl Sfx {
                 Layer::tone(0.3, 1046.0, 1318.0, Wave::Sine, 0.15, 1.5),
             ])
             .await,
+            drill: make(&[
+                Layer::tone(0.85, 140.0, 220.0, Wave::Square, 0.25, 0.3),
+                Layer::tone(0.85, 283.0, 447.0, Wave::Square, 0.12, 0.3),
+                Layer::noise(0.85, 0.18, 0.4),
+            ])
+            .await,
+            drill_wall: make(&[
+                Layer::noise(0.3, 0.9, 1.5),
+                Layer::tone(0.35, 120.0, 35.0, Wave::Sine, 1.0, 1.2),
+                Layer::tone(0.2, 240.0, 60.0, Wave::Square, 0.4, 1.5),
+            ])
+            .await,
             glow_step: Cell::new(0),
             volume: Cell::new(1.0),
         }
@@ -159,6 +177,8 @@ impl Sfx {
                 &self.glowbug[i]
             }
             Id::Heal => &self.heal,
+            Id::Drill => &self.drill,
+            Id::DrillWall => &self.drill_wall,
         };
         play_sound(
             s,

@@ -303,7 +303,7 @@ pub fn opening(w: &World) -> Cutscene {
     let neighbor = crate::world::SHOOTER;
     let actors = vec![
         Actor {
-            name: "Naïl",
+            name: crate::equipment::Character::Mole.name(),
             color: mole,
             portrait: Some(Portrait::NAIL),
             pos: w.player.pos,

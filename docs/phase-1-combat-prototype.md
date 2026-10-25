@@ -68,6 +68,9 @@
 | 다국어 | `i18n.rs`, `ui.rs`, `tools/fonts/`, `web/index.html` | 한국어·영어·일본어·간체 표, 언어별 폰트(일·중은 Ark Pixel 서브셋), 기기 선호 목록으로 시작, 설정에서 전환, 가짜 언어 Pseudo. CJK 줄바꿈(금칙)·넘침 대비(fit·탭 여백). 폰트 글자·자리표시자 테스트(docs/decisions/0013, 0014). 번역은 초안 |
 | 초상화 | `tools/art/portraits.py`, `art.rs`, `render.rs`(draw_portrait), `cutscene.rs`(Face) | 88×88, 게임 픽셀의 2배 밀도. Naïl 보통·기쁨·걱정·결의, 이웃은 그림자(docs/decisions/0015) |
 | 반딧불·산딸기 | `loot.rs`, `world.rs`(drop_loot), `render.rs`(draw_loot, HUD) | 화폐(자석·HUD·상태 탭), 회복(불운 보정), 최대 체력 5, 줍는 소리(음 올라감). 개발 시나리오 "떨어지는 것 확인"(docs/decisions/0016) |
+| 능력치·장신구 | `equipment.rs`(Stats, CHARMS), `app.rs`(가방 끼기/빼기, 상태 탭) | 장신구 5종 2칸, 생명의 씨앗, 공격 속도 = 스윙 시계 배율(docs/decisions/0017) |
+| 퀵 아이템 | `items.rs`, `world.rs`(use_quick_item, revive), `render.rs`(퀵 슬롯) | 산딸기 1칸 회복, 쥬시 지렁이 가득 회복 + 목숨(최대 3), F·Y 먹기, Q·L1 넘기기 |
+| 필살기 | `player.rs`(State::Drill/Recover), `world.rs` | SP 게이지, 드릴 돌진·조향·연타·벽 쿵. 단위 테스트(docs/decisions/0018) |
 | 웨이브 | `world.rs` | 적을 다 잡으면 1.2초 뒤 다음 웨이브(1C+1S → 2C+1S → 2C+2S → 3C+2S). 명세엔 없지만 5분 플레이 판정을 위해 넣음 |
 
 확인한 것: 데스크톱(Xvfb) 실행 캡처로 렌더 방향·공격 반원·굴파기·히트박스 표시, 헤드리스 Chromium으로 웹 빌드 로드·입력·콘솔(mismatch 없음). 확인 못 한 것: 실제 손맛(판정 1~4), 실기 게임패드, 소리의 실제 느낌(컨테이너에 오디오 장치 없음).
@@ -81,6 +84,8 @@
 - [ ] Sunnyside World 내려받기(Name your own price)
 - [ ] 비공개 에셋 레포 만들기(예: `nail-assets`)에 팩을 넣고, 게임 레포 Secrets에 `ASSETS_REPO`(owner/name)·`ASSETS_TOKEN`(그 레포 읽기 권한 fine-grained 토큰) 등록. 그 뒤 세션에 그 레포를 붙여 주면 칸 매핑을 한다
 - [ ] 초상화 v1 피드백(Naïl 표정 4개의 귀여움·닮음, 이웃 그림자). 이웃의 정체(종) 정하기
+- [ ] 장신구·퀵 아이템·드릴 손맛("장신구·필살기 확인"): 드릴 속도·조향·벽 쿵 피해, SP 차는 속도, 지렁이 확률
+- [ ] 화면 이동 구조 결정(필드 맵 스크롤 / 던전 방 / 패링 — docs/decisions/0019 질문)
 - [ ] 반딧불·산딸기 손맛: 개수·자석 반경·회복 확률(tuning.rs). 화폐 이름이 반딧불로 괜찮은지
 - [ ] Naïl 스프라이트 v2 피드백(얼굴을 고쳤다: 이빨처럼 보이던 발톱을 발로 내림, 동그란 분홍 코, 쓰러지면 × 눈). 다음 캐릭터(적 2종) 순서 정하기
 - [ ] 스토리 초안: 발톱을 주는 지점(docs/decisions/0012의 4번 초안) 확정

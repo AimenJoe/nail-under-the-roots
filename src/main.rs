@@ -15,6 +15,7 @@ mod enemy;
 mod equipment;
 mod i18n;
 mod input;
+mod items;
 mod loot;
 mod moveset;
 mod player;

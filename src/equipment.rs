@@ -1,5 +1,8 @@
 //! 장비: 캐릭터마다 쓸 수 있는 무기 종류가 다르다(docs/decisions/0011).
 //! 두더지 Naïl은 발톱만. 다른 캐릭터(2단계 보스 → 3단계 플레이어블)는 자기 무기 종류를 갖는다.
+//!
+//! 능력치(docs/decisions/0017): 기본값 + 장신구(2칸, 아무 캐릭터나) + 생명의 씨앗(최대 체력 영구 +1).
+//! 플레이어 코드는 `Stats`만 본다. 무기는 콤보 모양(moveset), 장신구는 수치 보정.
 
 use macroquad::color::Color;
 
@@ -77,6 +80,125 @@ pub static WEAPONS: [Weapon; 4] = [
     },
 ];
 
+/// 플레이어가 실제로 쓰는 수치. `Stats::compute`로만 만든다.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Stats {
+    pub max_hp: i32,
+    /// 발톱 한 타 피해에 더한다.
+    pub damage: i32,
+    /// 스윙 시간 배율의 역수(1.2 = 20% 빠름). 활성·캔슬·후딜레이가 같이 줄어든다.
+    pub attack_speed: f32,
+    /// 굴파기 쿨다운 배율(0.7 = 30% 짧음).
+    pub burrow_cd: f32,
+    /// SP 차는 배율.
+    pub sp_gain: f32,
+}
+
+impl Stats {
+    pub const BASE: Stats = Stats {
+        max_hp: crate::tuning::PLAYER_HP,
+        damage: 0,
+        attack_speed: 1.0,
+        burrow_cd: 1.0,
+        sp_gain: 1.0,
+    };
+
+    /// 기본값에 장신구와 생명의 씨앗을 더한다. 배율은 곱, 더하기는 합. 너무 극단으로 가지 않게 묶는다.
+    pub fn compute(charms: &[usize], life_seeds: i32) -> Stats {
+        let mut s = Stats::BASE;
+        for &c in charms {
+            let m = CHARMS[c].mods;
+            s.max_hp += m.max_hp;
+            s.damage += m.damage;
+            s.attack_speed *= m.attack_speed;
+            s.burrow_cd *= m.burrow_cd;
+            s.sp_gain *= m.sp_gain;
+        }
+        s.max_hp = (s.max_hp + life_seeds.min(crate::tuning::LIFE_SEED_MAX)).max(1);
+        s.attack_speed = s.attack_speed.clamp(0.6, 1.8);
+        s.burrow_cd = s.burrow_cd.clamp(0.3, 2.0);
+        s
+    }
+}
+
+/// 장신구 하나의 보정. 기본은 "바꾸지 않음".
+#[derive(Debug, Clone, Copy)]
+pub struct Mods {
+    pub max_hp: i32,
+    pub damage: i32,
+    pub attack_speed: f32,
+    pub burrow_cd: f32,
+    pub sp_gain: f32,
+}
+
+const NO_MODS: Mods = Mods {
+    max_hp: 0,
+    damage: 0,
+    attack_speed: 1.0,
+    burrow_cd: 1.0,
+    sp_gain: 1.0,
+};
+
+/// 장신구: 캐릭터와 상관없이 낀다. 2칸. 얻는 곳은 상자·상점(맵 단계).
+pub struct Charm {
+    pub name: Tr,
+    pub desc: Tr,
+    pub mods: Mods,
+    pub color: Color,
+}
+
+/// 동시에 낄 수 있는 장신구 수.
+pub const CHARM_SLOTS: usize = 2;
+
+pub static CHARMS: [Charm; 5] = [
+    Charm {
+        name: |s| s.c_shell,
+        desc: |s| s.c_shell_desc,
+        mods: Mods {
+            max_hp: 1,
+            ..NO_MODS
+        },
+        color: Color::new(0.80, 0.62, 0.42, 1.0),
+    },
+    Charm {
+        name: |s| s.c_whisker,
+        desc: |s| s.c_whisker_desc,
+        mods: Mods {
+            attack_speed: 1.2,
+            ..NO_MODS
+        },
+        color: Color::new(0.86, 0.86, 0.92, 1.0),
+    },
+    Charm {
+        name: |s| s.c_soil,
+        desc: |s| s.c_soil_desc,
+        mods: Mods {
+            burrow_cd: 0.6,
+            ..NO_MODS
+        },
+        color: Color::new(0.50, 0.36, 0.26, 1.0),
+    },
+    Charm {
+        name: |s| s.c_flint,
+        desc: |s| s.c_flint_desc,
+        mods: Mods {
+            damage: 1,
+            attack_speed: 0.9,
+            ..NO_MODS
+        },
+        color: Color::new(0.62, 0.66, 0.74, 1.0),
+    },
+    Charm {
+        name: |s| s.c_amulet,
+        desc: |s| s.c_amulet_desc,
+        mods: Mods {
+            sp_gain: 1.5,
+            ..NO_MODS
+        },
+        color: Color::new(0.95, 0.80, 0.35, 1.0),
+    },
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,6 +216,20 @@ mod tests {
             }
             assert_eq!(w.kind, WeaponKind::Claw);
         }
+    }
+
+    #[test]
+    fn stats_combine_and_clamp() {
+        assert_eq!(Stats::compute(&[], 0), Stats::BASE);
+        let s = Stats::compute(&[0, 3], 2);
+        assert_eq!(s.max_hp, Stats::BASE.max_hp + 1 + 2);
+        assert_eq!(s.damage, 1);
+        assert!((s.attack_speed - 0.9).abs() < 1e-6);
+        // 생명의 씨앗은 상한까지만.
+        assert_eq!(
+            Stats::compute(&[], 99).max_hp,
+            Stats::BASE.max_hp + crate::tuning::LIFE_SEED_MAX
+        );
     }
 
     #[test]

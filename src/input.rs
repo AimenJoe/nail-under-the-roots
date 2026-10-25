@@ -22,6 +22,12 @@ pub struct Actions {
     pub aim: Vec2,
     pub attack: bool,
     pub dodge: bool,
+    /// 필살기(SP가 차면). L / B(○)·L2 / 터치 SP.
+    pub special: bool,
+    /// 퀵 아이템 먹기. F / Y(△) / 터치 ITEM.
+    pub use_item: bool,
+    /// 퀵 슬롯 넘기기. Q / L1 / 터치 <>.
+    pub item_cycle: bool,
     /// 메뉴 확인. Enter / A(×) / 터치 ATK.
     pub confirm: bool,
     /// 메뉴 뒤로. Esc / B(○).
@@ -47,6 +53,9 @@ impl Actions {
     fn merge_edges(&mut self, o: &Actions) {
         self.attack |= o.attack;
         self.dodge |= o.dodge;
+        self.special |= o.special;
+        self.use_item |= o.use_item;
+        self.item_cycle |= o.item_cycle;
         self.confirm |= o.confirm;
         self.cancel |= o.cancel;
         self.menu |= o.menu;
@@ -114,7 +123,7 @@ struct TouchStick {
 pub struct TouchOverlay {
     pub stick: Option<(Vec2, Vec2)>,
     pub stick_radius: f32,
-    pub buttons: [TouchButton; 4],
+    pub buttons: [TouchButton; 7],
 }
 
 #[derive(Clone, Copy)]
@@ -152,6 +161,21 @@ fn touch_layout() -> TouchOverlay {
                 center: vec2(r * 1.2, r * 1.2),
                 radius: r * 0.75,
                 label: "MENU",
+            },
+            TouchButton {
+                center: vec2(w - r * 1.5, h - r * 4.1),
+                radius: r * 0.8,
+                label: "SP",
+            },
+            TouchButton {
+                center: vec2(w - r * 4.4, h - r * 3.7),
+                radius: r * 0.8,
+                label: "ITEM",
+            },
+            TouchButton {
+                center: vec2(w - r * 6.2, h - r * 4.3),
+                radius: r * 0.55,
+                label: "<>",
             },
         ],
     }
@@ -292,6 +316,9 @@ impl Input {
                         }
                         "DIG" => a.dodge = true,
                         "R" => a.restart = true,
+                        "SP" => a.special = true,
+                        "ITEM" => a.use_item = true,
+                        "<>" => a.item_cycle = true,
                         _ => a.menu = true,
                     }
                 } else if t.position.x < half && self.touch.stick.is_none() && !ended {
@@ -386,6 +413,9 @@ fn read_keyboard() -> Actions {
         confirm: is_key_pressed(KeyCode::Enter)
             || is_key_pressed(KeyCode::J)
             || is_key_pressed(KeyCode::Z),
+        special: is_key_pressed(KeyCode::L),
+        use_item: is_key_pressed(KeyCode::F),
+        item_cycle: is_key_pressed(KeyCode::Q),
         cancel: is_key_pressed(KeyCode::Escape),
         menu: is_key_pressed(KeyCode::Escape),
         restart: is_key_pressed(KeyCode::R),
@@ -448,6 +478,10 @@ fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
             pad.is_just_pressed(Button::ActionLeft) || pad.is_just_pressed(Button::FrontRightUpper);
         a.dodge |=
             pad.is_just_pressed(Button::ActionDown) || pad.is_just_pressed(Button::FrontRightLower);
+        a.special |=
+            pad.is_just_pressed(Button::ActionRight) || pad.is_just_pressed(Button::FrontLeftLower);
+        a.use_item |= pad.is_just_pressed(Button::ActionUp);
+        a.item_cycle |= pad.is_just_pressed(Button::FrontLeftUpper);
         a.confirm |= pad.is_just_pressed(Button::ActionDown);
         a.cancel |= pad.is_just_pressed(Button::ActionRight);
         a.menu |= pad.is_just_pressed(Button::RightCenterCluster)

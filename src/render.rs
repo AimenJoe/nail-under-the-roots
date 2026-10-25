@@ -187,7 +187,7 @@ impl Renderer {
     /// 인게임 HUD(실제 해상도): 반딧불 수, 웨이브·처치, 디버그 줄.
     pub fn draw_hud(&self, ui: &Ui, w: &World, gamepad_count: usize) {
         // 반딧불: 체력 핍 오른쪽. 숫자는 언어 폰트(숫자는 모든 폰트에 있다). 글자 윗부분이 화면 밖으로 잘리지 않게 y ≥ 1.
-        let x = 3.0 + t::PLAYER_HP as f32 * 7.0 + 5.0;
+        let x = 3.0 + w.player.stats.max_hp as f32 * 7.0 + 5.0;
         let pulse = 0.6 + 0.4 * (w.time * 3.0).sin().abs();
         ui.rect(
             Rect::new(x, 2.0, 3.0, 3.0),
@@ -201,8 +201,106 @@ impl Renderer {
             crate::ui::FONT_PX,
             crate::ui::TEXT,
         );
+        draw_quick_slots(ui, w);
+        if let Some((text, time)) = w.toast {
+            let s = crate::i18n::tr(text);
+            let a = (time / 0.4).min(1.0);
+            let tw = ui.text_w(s, crate::ui::FONT_PX) + 14.0;
+            let r = Rect::new(160.0 - tw / 2.0, 26.0, tw, crate::ui::FONT_PX + 6.0);
+            ui.rect(r, Color::new(0.07, 0.05, 0.09, 0.9 * a));
+            ui.rect_lines(r, Color::new(0.90, 0.71, 0.47, a));
+            ui.text_center(
+                s,
+                160.0,
+                r.y + 3.0,
+                crate::ui::FONT_PX,
+                Color::new(0.92, 0.86, 0.76, a),
+            );
+        }
         draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
     }
+}
+
+/// 퀵 슬롯(왼쪽 아래): 산딸기·지렁이 두 칸, 고른 칸은 테두리 강조, 개수, 먹기 키 안내.
+fn draw_quick_slots(ui: &Ui, w: &World) {
+    use crate::items::Consumable;
+    let (x0, y0, size) = (4.0, 156.0, 18.0);
+    for (i, c) in Consumable::ALL.iter().enumerate() {
+        let r = Rect::new(x0 + i as f32 * (size + 3.0), y0, size, size);
+        let n = w.bag.count(*c);
+        let selected = w.bag.selected == *c;
+        ui.rect(r, Color::new(0.07, 0.05, 0.09, 0.8));
+        ui.rect_lines(
+            r,
+            if selected {
+                crate::ui::ACCENT
+            } else {
+                crate::ui::BORDER
+            },
+        );
+        let dim = if n == 0 { 0.35 } else { 1.0 };
+        let center = ui.px(vec2(r.x + size / 2.0, r.y + size / 2.0 - 1.0));
+        let k = ui.scale;
+        match c {
+            Consumable::Berry => {
+                let s = k;
+                draw_rectangle(
+                    center.x - 2.0 * s,
+                    center.y - 2.0 * s,
+                    4.0 * s,
+                    5.0 * s,
+                    OUTLINE,
+                );
+                draw_rectangle(
+                    center.x - 1.5 * s,
+                    center.y - 1.5 * s,
+                    3.0 * s,
+                    4.0 * s,
+                    Color::new(0.93 * dim, 0.30 * dim, 0.38 * dim, 1.0),
+                );
+                draw_rectangle(
+                    center.x - 1.0 * s,
+                    center.y - 3.0 * s,
+                    2.0 * s,
+                    1.0 * s,
+                    Color::new(0.45 * dim, 0.75 * dim, 0.35 * dim, 1.0),
+                );
+            }
+            Consumable::Worm => {
+                if n > 0 {
+                    draw_worm(center, w.time * 6.0, k);
+                } else {
+                    draw_rectangle(
+                        center.x - 4.0 * k,
+                        center.y - 0.5 * k,
+                        8.0 * k,
+                        2.0 * k,
+                        Color::new(0.4, 0.3, 0.35, 1.0),
+                    );
+                }
+            }
+        }
+        ui.text(
+            &n.to_string(),
+            r.right() - 6.0,
+            r.bottom() - 11.0,
+            crate::ui::FONT_PX,
+            if n == 0 {
+                crate::ui::TEXT_DIM
+            } else {
+                crate::ui::TEXT
+            },
+        );
+    }
+    // 풀밭 위에서도 읽히게 어두운 바탕.
+    let hint = crate::i18n::s().quick_hint;
+    let hx = x0 + 2.0 * (size + 3.0) + 2.0;
+    let hw = ui.text_w(hint, crate::ui::FONT_PX) + 6.0;
+    ui.rect(
+        Rect::new(hx - 3.0, y0 + 3.0, hw, crate::ui::FONT_PX + 2.0),
+        Color::new(0.07, 0.05, 0.09, 0.6),
+    );
+    ui.text(hint, hx, y0 + 4.0, crate::ui::FONT_PX, crate::ui::TEXT);
 }
 
 /// 컷씬 배우(월드 패스 안에서, begin_world 뒤 present 전에).
@@ -344,6 +442,36 @@ fn draw_player_fx(p: &Player, alpha: f32) {
                     hit.range * 0.5,
                     Color::new(0.6, 0.45, 0.3, 0.6),
                 );
+            }
+        }
+        player::State::Drill { time: dt, dir, .. } => {
+            // 앞쪽 원뿔 드릴: 줄무늬가 돌아간다.
+            let side = vec2(-dir.y, dir.x);
+            let base = pos + dir * 3.0;
+            let tip = pos + dir * 15.0;
+            let claw = Color::new(0.97, 0.93, 0.85, 1.0);
+            let shade = Color::new(0.62, 0.55, 0.48, 1.0);
+            draw_triangle(base + side * 6.0, base - side * 6.0, tip, OUTLINE);
+            draw_triangle(base + side * 5.0, base - side * 5.0, tip - dir, claw);
+            for k in 0..3 {
+                let f = ((dt * 14.0 + k as f32 / 3.0).fract() * 0.9) + 0.05;
+                let a = base + (tip - base) * f;
+                let w = 5.0 * (1.0 - f);
+                draw_line(
+                    a.x + side.x * w,
+                    a.y + side.y * w,
+                    a.x - side.x * w * 0.3,
+                    a.y - side.y * w * 0.3,
+                    1.0,
+                    shade,
+                );
+            }
+            // 바람 줄
+            for k in 0..2 {
+                let o = side * (if k == 0 { 7.0 } else { -7.0 });
+                let a = pos + o - dir * 4.0;
+                let b = a - dir * 8.0;
+                draw_line(a.x, a.y, b.x, b.y, 1.0, Color::new(1.0, 1.0, 1.0, 0.5));
             }
         }
         player::State::Emerge { time: et } => {
@@ -637,6 +765,50 @@ fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool) {
                 );
             }
         }
+        loot::LootKind::Worm => {
+            if light_only {
+                return;
+            }
+            let p = vec2(q.x.round(), (q.y - l.z).round() - 2.0);
+            draw_worm(p, ph, 1.0);
+        }
+        loot::LootKind::LifeSeed => {
+            let hover = 2.0 + (ph * 0.4).sin();
+            let p = vec2(q.x.round(), (q.y - l.z - hover).round() - 3.0);
+            let pulse = 0.6 + 0.4 * (ph * 0.5).sin().abs();
+            draw_circle(
+                p.x + 0.5,
+                p.y + 1.0,
+                6.0,
+                Color::new(0.6, 1.0, 0.5, 0.15 * pulse),
+            );
+            if light_only {
+                return;
+            }
+            draw_rectangle(p.x - 2.0, p.y - 2.0, 5.0, 6.0, OUTLINE);
+            draw_rectangle(p.x - 1.0, p.y - 3.0, 3.0, 8.0, OUTLINE);
+            draw_rectangle(
+                p.x - 1.0,
+                p.y - 2.0,
+                3.0,
+                6.0,
+                Color::new(0.55, 0.80, 0.30, 1.0),
+            );
+            draw_rectangle(
+                p.x - 1.0,
+                p.y + 2.0,
+                3.0,
+                2.0,
+                Color::new(0.35, 0.55, 0.22, 1.0),
+            );
+            draw_rectangle(
+                p.x - 1.0,
+                p.y - 2.0,
+                1.0,
+                2.0,
+                Color::new(0.9, 1.0, 0.7, 1.0),
+            );
+        }
         loot::LootKind::Berry => {
             if light_only {
                 return;
@@ -658,6 +830,37 @@ fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool) {
             draw_rectangle(p.x, p.y - 3.0, 2.0, 1.0, Color::new(0.45, 0.75, 0.35, 1.0));
         }
     }
+}
+
+/// 쥬시 지렁이: 꿈틀대는 분홍 마디 + 반들거리는 하이라이트. `k`는 크기 배율(1 = 월드, HUD는 더 크게).
+pub fn draw_worm(p: Vec2, ph: f32, k: f32) {
+    let body = Color::new(0.95, 0.55, 0.62, 1.0);
+    let dark = Color::new(0.70, 0.32, 0.42, 1.0);
+    for i in 0..5 {
+        let x = p.x + (i as f32 - 2.0) * 1.6 * k;
+        let y = p.y + ((ph + i as f32 * 1.2).sin() * 1.0 * k).round();
+        draw_rectangle(x - 1.0 * k, y - 1.0 * k, 2.4 * k, 3.0 * k, OUTLINE);
+    }
+    for i in 0..5 {
+        let x = p.x + (i as f32 - 2.0) * 1.6 * k;
+        let y = p.y + ((ph + i as f32 * 1.2).sin() * 1.0 * k).round();
+        draw_rectangle(
+            x - 0.5 * k,
+            y - 0.5 * k,
+            1.6 * k,
+            2.0 * k,
+            if i == 4 { dark } else { body },
+        );
+    }
+    // 반들반들(쥬시)
+    let y = p.y + (ph.sin() * 1.0 * k).round();
+    draw_rectangle(
+        p.x - 3.0 * k,
+        y - 0.5 * k,
+        0.8 * k,
+        0.8 * k,
+        Color::new(1.0, 0.95, 0.95, 1.0),
+    );
 }
 
 /// 바닥 무기: 떠오르는 발톱 세 개 + 반짝임.
@@ -689,7 +892,8 @@ fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {
     let (col, row) = match p.state {
         player::State::Dead => (4, 1),
         player::State::Burrow { time: bt } => (((bt * 12.0) as u32) % 2, 2),
-        player::State::Emerge { .. } => (2, 1),
+        player::State::Emerge { .. } | player::State::Drill { .. } => (2, 1),
+        player::State::Recover { .. } => (3, 1),
         player::State::Attack { idx, .. } => {
             let last = p.moveset.last();
             (if idx == last { 2 } else { idx.min(1) as u32 }, 1)
@@ -916,6 +1120,8 @@ fn draw_hitboxes(w: &World, alpha: f32) {
         let col = match s.kind {
             StrikeKind::Claw(_) => YELLOW,
             StrikeKind::Emerge => ORANGE,
+            StrikeKind::Drill => SKYBLUE,
+            StrikeKind::DrillWall => RED,
         };
         match s.shape {
             Shape::Circle { center, r } => draw_circle_lines(center.x, center.y, r, 1.0, col),
@@ -926,7 +1132,7 @@ fn draw_hitboxes(w: &World, alpha: f32) {
 
 fn draw_hud_world(w: &World) {
     // 체력 핍(왼쪽 위, 벽 위에)
-    for i in 0..t::PLAYER_HP {
+    for i in 0..w.player.stats.max_hp {
         let c = if i < w.player.hp {
             world::MOLE
         } else {
@@ -935,7 +1141,7 @@ fn draw_hud_world(w: &World) {
         draw_rectangle(3.0 + i as f32 * 7.0, 1.0, 6.0, 6.0, c);
     }
     // 굴파기 쿨다운 바(오른쪽 위)
-    let cd = w.player.burrow_cd / t::BURROW_COOLDOWN;
+    let cd = w.player.burrow_cd / (t::BURROW_COOLDOWN * w.player.stats.burrow_cd);
     let bw = 24.0;
     draw_rectangle(
         t::VIEW_W - 3.0 - bw,
@@ -944,7 +1150,29 @@ fn draw_hud_world(w: &World) {
         4.0,
         Color::new(0.2, 0.15, 0.2, 1.0),
     );
-    draw_rectangle(t::VIEW_W - 3.0 - bw, 2.0, bw * (1.0 - cd), 4.0, world::DIRT);
+    draw_rectangle(
+        t::VIEW_W - 3.0 - bw,
+        2.0,
+        bw * (1.0 - cd).max(0.0),
+        4.0,
+        world::DIRT,
+    );
+    // SP 게이지(그 아래). 가득이면 깜빡인다 — 필살기를 쓸 수 있다.
+    let sp = w.player.sp / t::SP_MAX;
+    let full = w.player.sp_full();
+    draw_rectangle(
+        t::VIEW_W - 3.0 - bw,
+        8.0,
+        bw,
+        3.0,
+        Color::new(0.2, 0.15, 0.2, 1.0),
+    );
+    let gold = if full && ((w.time * 6.0) as i32) % 2 == 0 {
+        Color::new(1.0, 1.0, 0.75, 1.0)
+    } else {
+        Color::new(0.95, 0.78, 0.30, 1.0)
+    };
+    draw_rectangle(t::VIEW_W - 3.0 - bw, 8.0, bw * sp, 3.0, gold);
 }
 
 fn draw_hud_screen(w: &World, scale: f32, ox: f32, oy: f32, gamepad_count: usize) {
@@ -1005,6 +1233,8 @@ fn short_state(s: &player::State) -> &'static str {
         player::State::Attack { .. } => "attack",
         player::State::Burrow { .. } => "burrow",
         player::State::Emerge { .. } => "emerge",
+        player::State::Drill { .. } => "drill",
+        player::State::Recover { .. } => "recover",
         player::State::Dead => "dead",
     }
 }

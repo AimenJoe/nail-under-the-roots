@@ -134,6 +134,49 @@ pub const BERRY_CHANCE_PER_MISSING: f32 = 0.08;
 pub const BERRY_PITY_KILLS: u32 = 6;
 /// 산딸기 하나가 채우는 체력.
 pub const BERRY_HEAL: i32 = 1;
+/// 쥬시 지렁이: 처치마다 이 확률로 떨어진다(체력과 무관, 드묾).
+pub const WORM_CHANCE: f32 = 0.035;
+
+// ---- 가방(퀵 아이템, src/items.rs, docs/decisions/0017) ----------------------------------
+/// 들고 다닐 수 있는 수. 가득이면 바닥에 남는다.
+pub const BERRY_MAX: u8 = 5;
+/// 쥬시 지렁이 = 목숨. 들고 있다가 쓰러지면 저절로 먹고 일어난다. 최대 목숨 = 1 + 이것.
+pub const WORM_MAX: u8 = 2;
+/// 쓰러졌다 일어날 때 체력(최대의 비율, 올림)과 무적 시간.
+pub const REVIVE_HP_FRAC: f32 = 0.6;
+pub const REVIVE_INVULN: f32 = 2.0;
+/// 일어날 때 주변을 밀어내는 충격.
+pub const REVIVE_PUSH_RADIUS: f32 = 40.0;
+pub const REVIVE_PUSH_KNOCKBACK: f32 = 260.0;
+/// 생명의 씨앗으로 늘릴 수 있는 최대 체력 상한(기본 PLAYER_HP 위로).
+pub const LIFE_SEED_MAX: i32 = 5;
+
+// ---- 필살기: 드릴 돌진 (player.rs State::Drill, docs/decisions/0018) ---------------------
+/// SP 게이지 최대. 발톱이 맞으면 1, 마지막 타는 2 찬다(장신구로 배율).
+pub const SP_MAX: f32 = 12.0;
+pub const SP_PER_HIT: f32 = 1.0;
+pub const SP_FINISHER_BONUS: f32 = 1.0;
+pub const DRILL_TIME: f32 = 0.85;
+pub const DRILL_SPEED: f32 = 170.0;
+/// 직진성: 초당 이만큼(라디안)만 방향을 틀 수 있다.
+pub const DRILL_TURN: f32 = 2.6;
+/// 연타 간격과 한 번의 피해·넉백(앞으로 밀어 벽까지 데려간다).
+pub const DRILL_HIT_EVERY: f32 = 0.07;
+pub const DRILL_RADIUS: f32 = 11.0;
+pub const DRILL_DAMAGE: i32 = 1;
+pub const DRILL_KNOCKBACK: f32 = 210.0;
+pub const DRILL_STUN: f32 = 0.2;
+pub const DRILL_HITSTOP: f32 = 0.02;
+/// 벽 쿵: 부딪힌 자리 충격파.
+pub const DRILL_WALL_RADIUS: f32 = 28.0;
+pub const DRILL_WALL_DAMAGE: i32 = 3;
+pub const DRILL_WALL_KNOCKBACK: f32 = 240.0;
+pub const DRILL_WALL_STUN: f32 = 0.7;
+pub const DRILL_WALL_HITSTOP: f32 = 0.14;
+pub const DRILL_WALL_SHAKE: f32 = 0.75;
+/// 드릴이 끝나거나 벽에 부딪힌 뒤 경직.
+pub const DRILL_RECOVER: f32 = 0.22;
+pub const DRILL_WALL_RECOVER: f32 = 0.4;
 /// 획득 창: 최소 표시 시간(연타로 바로 닫히지 않게), 자동으로 닫히는 시간.
 pub const GIFT_MIN: f32 = 0.5;
 pub const GIFT_AUTO_CLOSE: f32 = 3.5;
