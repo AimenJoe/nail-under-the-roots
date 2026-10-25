@@ -1,5 +1,5 @@
 //! 적: 뿌리에 물든 땅속 이웃. 종류(`Kind`)마다 행동 하나와 수치가 `species.rs` 표에 있다.
-//! 행동: 돌격(쥐들), 던지기(다람쥐), 뛰어 덮치기(청설모). 플레이어 위치와 `Room`만 본다.
+//! 행동: 돌격(쥐들), 던지기(다람쥐), 뛰어 덮치기(청설모), 보스 둘(대장·모모). 플레이어 위치와 `Room`만 본다.
 
 use macroquad::prelude::*;
 
@@ -24,6 +24,8 @@ pub enum Kind {
     Dummy,
     /// 튜토리얼 보스: 들쥐 대장(보리). 돌진 · 뛰어 찍기 · 부하 부르기(docs/decisions/0032).
     Chief,
+    /// 첫 길의 보스: 물든 굴토끼 모모. 세 번 만난다(docs/decisions/0046).
+    Momo,
 }
 
 impl Kind {
@@ -54,6 +56,10 @@ pub enum State {
     Stunned { time: f32 },
     /// 대장: 울부짖어 부하를 부른다(예고 뒤 Event::Summon).
     Howl { time: f32 },
+    /// 모모: 땅속(맞지 않고 닿아도 안 아프다). 흙 둔덕이 플레이어를 따라오다 멈추고 떤다.
+    Under { time: f32 },
+    /// 모모: 튀어나옴. 첫머리에만 둘레 피해.
+    Pop { time: f32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,6 +72,9 @@ pub enum Event {
     Land,
     /// 대장이 부하를 부른다(월드가 생쥐를 둘레에 낳는다).
     Summon,
+    /// 모모가 땅속으로 / 밖으로.
+    Dig,
+    Pop,
 }
 
 pub struct Enemy {
@@ -96,9 +105,12 @@ pub struct Enemy {
     pub asleep: bool,
     /// 던전 방: 이 시간 동안 제자리(들어온 플레이어가 자리 잡게).
     pub wake_delay: f32,
-    /// 대장: 다음 공격 차례(돌진·뛰기가 번갈아), 부른 횟수.
+    /// 대장·모모: 다음 공격 차례, 대장이 부른 횟수, 모모가 남은 이어 뛰기.
     pattern: u32,
     summons: u32,
+    chain: u32,
+    /// 보스가 몇 번째 만남인가(모모: 1~3, 한 수씩 는다). 다른 적은 1.
+    pub level: u8,
 }
 
 pub struct Projectile {
@@ -167,6 +179,8 @@ impl Enemy {
             wake_delay: 0.0,
             pattern: 0,
             summons: 0,
+            chain: 0,
+            level: 1,
         }
     }
 
@@ -186,16 +200,22 @@ impl Enemy {
             State::Leap { time, .. } if time >= self.sp().dash_time - t::LEAP_LAND_WINDOW => {
                 Some(self.sp().damage)
             }
+            State::Pop { time } if time < t::MOMO_POP_WINDOW => Some(self.sp().damage),
             _ => None,
         }
     }
 
-    /// 피해 판정 반지름(내려앉는 순간은 둘레까지).
+    /// 피해 판정 반지름(내려앉는·튀어나오는 순간은 둘레까지).
     pub fn contact_radius(&self) -> f32 {
         match self.state {
-            State::Leap { .. } => self.sp().land_radius,
+            State::Leap { .. } | State::Pop { .. } => self.sp().land_radius,
             _ => self.radius(),
         }
+    }
+
+    /// 맞을 수 있나(땅속의 모모는 안 맞는다).
+    pub fn hittable(&self) -> bool {
+        !matches!(self.state, State::Under { .. })
     }
 
     /// 체공 높이(그리기용 px). 바닥 = 0.
@@ -267,10 +287,14 @@ impl Enemy {
                     self.state = State::Stunned { time };
                 }
             }
-            State::Approach if sp.behavior == Behavior::Chief => {
+            State::Approach if matches!(sp.behavior, Behavior::Chief | Behavior::Momo) => {
                 if player_targetable {
                     self.facing = dir_to_player;
-                    self.state = self.chief_next(dist, player_pos);
+                    self.state = if sp.behavior == Behavior::Chief {
+                        self.chief_next(dist, player_pos)
+                    } else {
+                        self.momo_next(dist, player_pos, events)
+                    };
                     if matches!(self.state, State::Approach) {
                         self.pos += dir_to_player * sp.speed * dt;
                     }
@@ -315,11 +339,16 @@ impl Enemy {
                 let time = time + dt;
                 self.pos += dir * sp.dash_speed * dt;
                 let r = self.radius();
+                let dur = if sp.behavior == Behavior::Momo {
+                    t::MOMO_KICK_TIME
+                } else {
+                    sp.dash_time
+                };
                 if room.resolve_circle(&mut self.pos, r) {
                     self.state = State::Rest { time: sp.wall_rest };
                     self.flash = t::HIT_FLASH;
                     events.push(Event::WallHit);
-                } else if time >= sp.dash_time {
+                } else if time >= dur {
                     self.state = State::Rest { time: sp.rest };
                 } else {
                     self.state = State::Charge { time, dir };
@@ -381,10 +410,44 @@ impl Enemy {
                 if time >= sp.dash_time {
                     events.push(Event::Land);
                     self.fire_cd = sp.fire_every;
-                    self.state = State::Rest { time: sp.rest };
+                    self.state = if self.chain > 0 && player_targetable {
+                        // 모모 세 번째: 내려앉자마자 다시 웅크린다(예고는 짧게).
+                        self.chain -= 1;
+                        State::Crouch {
+                            time: self.windup() * t::MOMO_CHAIN_SKIP,
+                            target: player_pos,
+                        }
+                    } else {
+                        self.chain = 0;
+                        State::Rest { time: sp.rest }
+                    };
                 } else {
                     self.state = State::Leap { time, from, to };
                 }
+            }
+            State::Under { time } => {
+                let time = time + dt;
+                if time < t::MOMO_DIG_TRACK {
+                    // 둔덕이 플레이어를 따라온다(걸음보다 느리게).
+                    if player_targetable {
+                        let step = t::MOMO_DIG_SPEED * dt;
+                        self.pos += to_player.clamp_length_max(step);
+                    }
+                    self.state = State::Under { time };
+                } else if time >= t::MOMO_DIG_TRACK + self.windup() {
+                    events.push(Event::Pop);
+                    self.state = State::Pop { time: 0.0 };
+                } else {
+                    self.state = State::Under { time };
+                }
+            }
+            State::Pop { time } => {
+                let time = time + dt;
+                self.state = if time >= t::MOMO_POP_TIME {
+                    State::Rest { time: sp.rest }
+                } else {
+                    State::Pop { time }
+                };
             }
             State::Aim { time } => {
                 let time = time + dt;
@@ -444,9 +507,41 @@ impl Enemy {
         State::Approach
     }
 
-    /// 공격 동작 중(예고 포함): 대장은 맞아도 멈추지 않는다(슈퍼아머). 피하고 빈틈에 때리는 보스.
+    /// 모모의 다음 수(0046). 만날수록 한 수씩 는다:
+    /// 1번째 높이 뛰기 ↔ 뒷발 차기, 2번째 + 굴로 숨기, 3번째 + 뛰기를 세 번 이어서.
+    /// 차기는 가까워야, 뛰기는 조금 멀어도 된다. 안 닿으면 걸어서 다가간다.
+    fn momo_next(&mut self, dist: f32, player_pos: Vec2, events: &mut Vec<Event>) -> State {
+        let sp = self.sp();
+        let moves = if self.level >= 2 { 3 } else { 2 };
+        match self.pattern % moves {
+            0 if dist < sp.trigger * 1.5 => {
+                self.pattern += 1;
+                self.chain = if self.level >= 3 {
+                    t::MOMO_HOP_CHAIN - 1
+                } else {
+                    0
+                };
+                State::Crouch {
+                    time: 0.0,
+                    target: player_pos,
+                }
+            }
+            1 if dist < sp.trigger => {
+                self.pattern += 1;
+                State::Windup { time: 0.0 }
+            }
+            2 => {
+                self.pattern += 1;
+                events.push(Event::Dig);
+                State::Under { time: 0.0 }
+            }
+            _ => State::Approach,
+        }
+    }
+
+    /// 공격 동작 중(예고 포함): 보스는 맞아도 멈추지 않는다(슈퍼아머). 피하고 빈틈에 때리는 보스.
     fn armored(&self) -> bool {
-        self.sp().behavior == Behavior::Chief
+        self.is_boss()
             && matches!(
                 self.state,
                 State::Windup { .. }
@@ -454,12 +549,13 @@ impl Enemy {
                     | State::Crouch { .. }
                     | State::Leap { .. }
                     | State::Howl { .. }
+                    | State::Pop { .. }
             )
     }
 
     /// 보스(체력 막대를 화면에 따로 그린다).
     pub fn is_boss(&self) -> bool {
-        self.sp().behavior == Behavior::Chief
+        matches!(self.sp().behavior, Behavior::Chief | Behavior::Momo)
     }
 
     /// 독을 건다. 이미 걸려 있으면 더 긴 쪽.
@@ -533,13 +629,15 @@ impl Enemy {
             State::Leap { .. } => "LEAP",
             State::Stunned { .. } => "stunned",
             State::Howl { .. } => "HOWL",
+            State::Under { .. } => "under",
+            State::Pop { .. } => "POP",
         }
     }
 }
 
 fn idle_of(b: Behavior) -> State {
     match b {
-        Behavior::Charger | Behavior::Chief => State::Approach,
+        Behavior::Charger | Behavior::Chief | Behavior::Momo => State::Approach,
         Behavior::Shooter | Behavior::Leaper => State::Keep,
         Behavior::Dummy => State::Rest { time: f32::MAX },
     }
@@ -612,6 +710,39 @@ mod tests {
         }
         let n = ev.iter().filter(|x| **x == Event::Summon).count();
         assert!(n >= 1 && n as u32 <= t::CHIEF_SUMMONS, "{n}");
+    }
+
+    /// 모모: 1번째는 뛰기·차기만, 2번째부터 굴로 숨는다(숨은 동안 안 맞는다). 3번째는 뛰기를 이어서 한다.
+    #[test]
+    fn momo_learns_one_move_per_fight() {
+        let room = Room::new();
+        let player = room.center() + vec2(50.0, 0.0);
+        let run = |level: u8| {
+            let mut e = Enemy::new(Kind::Momo, room.center());
+            e.level = level;
+            let (mut pr, mut ev) = (Vec::new(), Vec::new());
+            let (mut dug, mut kicked, mut lands) = (false, false, 0);
+            for _ in 0..1200 {
+                e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+                match e.state {
+                    State::Under { .. } => {
+                        dug = true;
+                        assert!(!e.hittable());
+                        assert!(e.contact_damage().is_none());
+                    }
+                    State::Charge { .. } => kicked = true,
+                    _ => {}
+                }
+            }
+            lands += ev.iter().filter(|x| **x == Event::Land).count();
+            (dug, kicked, lands, ev.contains(&Event::Pop))
+        };
+        let (dug, kicked, _, _) = run(1);
+        assert!(!dug && kicked);
+        let (dug, _, l2, popped) = run(2);
+        assert!(dug && popped);
+        let (_, _, l3, _) = run(3);
+        assert!(l3 > l2, "세 번째는 더 자주 내려앉는다: {l2} → {l3}");
     }
 
     #[test]

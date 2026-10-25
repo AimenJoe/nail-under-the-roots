@@ -274,6 +274,21 @@ pub const CHIEF_SUMMONS: u32 = 2;
 /// 공격이 아닐 때 맞으면 멈칫하는 시간 배율(보통 적의 경직 × 이것).
 pub const CHIEF_STUN_MUL: f32 = 0.35;
 
+// ---- 모모(첫 길의 보스, 세 번, docs/decisions/0046) -----------------------------------
+/// 뒷발 차기(짧은 돌진) 시간. 높이 뛰기 체공은 종 표의 dash_time.
+pub const MOMO_KICK_TIME: f32 = 0.2;
+/// 굴로 숨기: 흙 둔덕이 플레이어를 따라오는 시간과 속도(플레이어 걸음보다 느리다). 멈춘 뒤 예고 시간만큼 떨다가 튀어나온다.
+pub const MOMO_DIG_TRACK: f32 = 1.1;
+pub const MOMO_DIG_SPEED: f32 = 64.0;
+/// 튀어나오는 동작 시간과 그 첫머리의 둘레 피해 시간.
+pub const MOMO_POP_TIME: f32 = 0.35;
+pub const MOMO_POP_WINDOW: f32 = 0.1;
+/// 세 번째 싸움: 높이 뛰기를 이어서 몇 번. 이어 뛰는 웅크림은 예고의 이 비율에서 시작한다(짧다).
+pub const MOMO_HOP_CHAIN: u32 = 3;
+pub const MOMO_CHAIN_SKIP: f32 = 0.45;
+/// 몇 번 이기면 돌아오나(0037 3-A).
+pub const MOMO_FIGHTS: u32 = 3;
+
 // ---- 쉼터·상점(docs/decisions/0030) ---------------------------------------------------
 /// 상점 값(씨앗). 산딸기 · 쥬시 지렁이 · 뿌리 심장(최대 체력 +1, 쉼터마다 하나) · 장신구.
 pub const PRICE_BERRY: u32 = 3;

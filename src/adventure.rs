@@ -73,6 +73,9 @@ pub enum AdvEvent {
     CampArrive(u32),
     /// 마지막 길의 주인을 이기고 출구를 밟았다: 가장 깊은 곳(엔딩은 앱, 0042).
     Deepest,
+    /// 첫 길 끝 방에 모모가 있다 / 모모를 이겼다(0046). 몇 번째인지는 앱이 안다.
+    MomoIntro,
+    MomoBeaten,
 }
 
 /// 확인 버튼으로 하는 일(쉼터).
@@ -220,6 +223,7 @@ impl World {
                 'K' => w.neighbors.push(Npc::standing(Who::Popo, *at)),
                 'b' if v.bori => w.neighbors.push(Npc::standing(Who::Bori, *at)),
                 'H' if v.halmae => w.neighbors.push(Npc::standing(Who::Halmae, *at)),
+                'M' if v.momo => w.neighbors.push(Npc::standing(Who::Momo, *at)),
                 _ => {}
             }
         }
@@ -252,6 +256,14 @@ impl World {
         w.adv.stage = stage.saturating_sub(1);
         w.enter_camp();
         w
+    }
+
+    /// 개발 시나리오용: 지금 길의 보스 칸 굴로 바로(어두워지는 연출 없이).
+    pub fn enter_route_boss_now(&mut self) {
+        if let Some(r) = self.adv.route.as_mut() {
+            r.at = Some((r.layers.len() - 1, 0));
+        }
+        self.enter_node();
     }
 
     /// 앱이 부른다: 길 지도에서 칸을 골랐다. 고를 수 있는 칸이면 어두워졌다가 그 굴로.
@@ -523,14 +535,15 @@ impl World {
 
     /// 길에서 고른 칸의 굴로. 쉼터에서 오면 쉼터를 맡기고, 굴에서 오면 굴만 바꾼다.
     fn enter_node(&mut self) {
-        let Some((at, prm, biome)) = self
-            .adv
-            .route
-            .as_ref()
-            .and_then(|r| r.at.map(|at| (at, r.params(at), r.node(at).biome)))
-        else {
+        let Some((at, mut prm, biome, stage, kind)) = self.adv.route.as_ref().and_then(|r| {
+            r.at.map(|at| (at, r.params(at), r.node(at).biome, r.stage, r.node(at).kind))
+        }) else {
             return;
         };
+        // 첫 길의 끝은 모모가 지킨다(아직 안 돌아왔고, 이번 런에 모모에게 쓰러지지 않았으면, 0046).
+        if self.momo_fight && stage == 1 && kind == NodeKind::Boss {
+            prm.boss = Some(Kind::Momo);
+        }
         self.adv.node = Some(at);
         self.build_dungeon(&prm, biome);
     }
@@ -632,6 +645,10 @@ impl World {
     }
 
     fn respawn_at_save(&mut self) {
+        // 모모에게 쓰러지면 이번 런의 첫 길 끝은 보통 무리로(이기지 않고도 지나갈 수 있게, 0046).
+        if self.enemies.iter().any(|e| e.kind == Kind::Momo) {
+            self.momo_fight = false;
+        }
         if self.adv.place == Place::Dungeon {
             self.restore_field();
         }
@@ -663,6 +680,10 @@ impl World {
             self.adv.current_room = at;
         }
         let goal = d.goal;
+        let named = d.boss;
+        if let Some(m) = self.enemies.iter().find(|e| e.kind == Kind::Momo) {
+            self.adv.boss_last = m.pos;
+        }
         let Some(room) = d.room_mut(self.adv.current_room) else {
             return;
         };
@@ -696,6 +717,11 @@ impl World {
                 for off in crate::species::pack_offsets(kind) {
                     let mut e = Enemy::new(kind, pos + off);
                     e.wake_delay = t::ROOM_WAKE_DELAY;
+                    if kind == Kind::Momo {
+                        e.level = self.momo_wins.saturating_add(1);
+                        self.adv.boss_last = e.pos;
+                        self.adv.events.push(AdvEvent::MomoIntro);
+                    }
                     self.enemies.push(e);
                 }
             }
@@ -718,7 +744,12 @@ impl World {
                         self.loot.push(Loot::spawn(LootKind::Seed, at));
                     }
                     self.adv.boss_cleared = true;
-                    self.toast = Some((|s| s.toast_boss, 3.0));
+                    if named == Some(Kind::Momo) {
+                        // 모모는 달아난다(장면은 앱). 끝방 보상은 그대로.
+                        self.adv.events.push(AdvEvent::MomoBeaten);
+                    } else {
+                        self.toast = Some((|s| s.toast_boss, 3.0));
+                    }
                 } else {
                     for _ in 0..t::PACK_SEEDS {
                         self.loot.push(Loot::spawn(LootKind::Seed, at));

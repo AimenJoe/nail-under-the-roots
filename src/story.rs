@@ -22,6 +22,8 @@ pub enum When {
 #[derive(Clone, Copy, Debug)]
 pub enum Cond {
     DeathsAtLeast(u32),
+    /// 기록의 수가 이만큼 이상(모모를 이긴 수 등).
+    CountAtLeast(&'static str, u32),
     Flag(&'static str),
     NotFlag(&'static str),
     /// 다른 줄을 이미 봤다(순서 잇기).
@@ -32,6 +34,7 @@ impl Cond {
     fn holds(self, p: &Profile) -> bool {
         match self {
             Cond::DeathsAtLeast(n) => p.count(key::DEATHS) >= n,
+            Cond::CountAtLeast(k, n) => p.count(k) >= n,
             Cond::Flag(k) => p.flag(k),
             Cond::NotFlag(k) => !p.flag(k),
             Cond::Seen(id) => p.flag(&key::line(id)),
@@ -110,6 +113,32 @@ pub const LINES: &[Line] = &[
         needs: &[
             Flag(key::TUTORIAL),
             Flag(key::HALF_ENDING),
+            Seen("village_intro"),
+        ],
+        once: true,
+    },
+    // 모모(0046): 처음 이긴 뒤 보리가 "그 아이"를 알아본다, 돌아온 뒤 포포가 빈 자리를 본다.
+    Line {
+        id: "bori_momo",
+        when: When::Village,
+        who: Speaker::Bori,
+        text: |s| s.bori_momo,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::BORI_BACK),
+            CountAtLeast(key::MOMO_WINS, 1),
+            Seen("village_intro"),
+        ],
+        once: true,
+    },
+    Line {
+        id: "popo_momo",
+        when: When::Village,
+        who: Speaker::Popo,
+        text: |s| s.popo_momo,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::MOMO_BACK),
             Seen("village_intro"),
         ],
         once: true,
@@ -205,6 +234,21 @@ mod tests {
         p.set(&key::line("roots_again"));
         p.set(key::ASSIST);
         assert!(take(&mut p, When::Wake).is_none());
+    }
+
+    #[test]
+    fn momo_village_lines_follow_wins() {
+        let mut p = Profile::default();
+        p.set(key::TUTORIAL);
+        p.set(key::BORI_BACK);
+        assert_eq!(take(&mut p, When::Village).unwrap().id, "village_intro");
+        assert!(take(&mut p, When::Village).is_none());
+        p.add(key::MOMO_WINS, 1);
+        assert_eq!(take(&mut p, When::Village).unwrap().id, "bori_momo");
+        p.add(key::MOMO_WINS, 2);
+        p.set(key::MOMO_BACK);
+        assert_eq!(take(&mut p, When::Village).unwrap().id, "popo_momo");
+        assert!(take(&mut p, When::Village).is_none());
     }
 
     #[test]

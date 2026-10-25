@@ -77,6 +77,8 @@ pub struct Dungeon {
     pub start: (i32, i32),
     pub depth: u32,
     pub goal: Goal,
+    /// 보스방의 주인(있으면 무리 대신 혼자, 0046).
+    pub boss: Option<Kind>,
 }
 
 impl Dungeon {
@@ -150,6 +152,8 @@ pub struct Params {
     pub tough: u32,
     /// 시작방에 돌아가는 출구(필드에서 들어온 던전만).
     pub start_exit: bool,
+    /// 보스방에 무리 대신 이 보스 혼자(첫 길의 모모, 0046).
+    pub boss: Option<Kind>,
 }
 
 impl Params {
@@ -162,6 +166,7 @@ impl Params {
             rest: false,
             tough: 0,
             start_exit: false,
+            boss: None,
         }
     }
 
@@ -346,6 +351,11 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                     let (cx, cy) = corner[(k + rng.below(8) as usize) % corner.len()];
                     room.enemies.push((kind, cell_center(ox + cx, oy + cy)));
                 }
+                // 보스가 정해져 있으면 무리 대신 혼자, 방 가운데 위쪽에. 난수는 위에서 그대로 써서
+                // 같은 시드면 굴 모양이 보스가 있든 없든 같다.
+                if let (RoomKind::Boss, Some(k)) = (room.kind, prm.boss) {
+                    room.enemies = vec![(k, cell_center(ox + 10, oy + 4))];
+                }
             }
             RoomKind::Rest => {}
         }
@@ -355,6 +365,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
         start,
         depth,
         goal: prm.goal,
+        boss: prm.boss,
     };
     (dungeon, Room::from_grid(grid, props, Vec::new()))
 }
@@ -388,6 +399,26 @@ fn distances(rooms: &[DRoom], from: (i32, i32)) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn named_boss_replaces_the_pack_and_keeps_the_layout() {
+        let prm = Params {
+            goal: Goal::Boss,
+            ..Params::new(1)
+        };
+        let named = Params {
+            boss: Some(Kind::Momo),
+            ..prm
+        };
+        let (a, _) = generate(7, &prm);
+        let (b, _) = generate(7, &named);
+        let at = |d: &Dungeon| d.rooms.iter().map(|r| r.at).collect::<Vec<_>>();
+        assert_eq!(at(&a), at(&b), "같은 시드 = 같은 굴");
+        let boss = b.rooms.iter().find(|r| r.kind == RoomKind::Boss).unwrap();
+        assert_eq!(boss.enemies.len(), 1);
+        assert_eq!(boss.enemies[0].0, Kind::Momo);
+        assert_eq!(b.boss, Some(Kind::Momo));
+    }
 
     #[test]
     fn generates_connected_dungeon_with_one_boss() {

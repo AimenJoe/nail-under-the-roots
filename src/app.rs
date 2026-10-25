@@ -761,6 +761,13 @@ impl App {
         });
         self.world.knots = knots;
         self.world.player.eat_cd_mul = knots.eat_cd_mul();
+        // 모모(0046): 이긴 수는 기록에서(빈 자리의 꽃잎). 첫 길 끝에서 싸우는 건 첫 시작에서만, 돌아오기 전까지.
+        // 개발 시나리오 "모모"는 시나리오가 정한 값을 그대로 쓴다.
+        if matches!(s, Scenario::Normal | Scenario::Village) {
+            use crate::profile::key;
+            self.world.momo_wins = self.profile.count(key::MOMO_WINS).min(t::MOMO_FIGHTS) as u8;
+            self.world.momo_fight = s == Scenario::Normal && !self.profile.flag(key::MOMO_BACK);
+        }
         self.inventory = match s {
             Scenario::Normal if veteran => Inventory::new(&[start]),
             Scenario::Normal | Scenario::Tutorial => Inventory::new(&[]),
@@ -1452,6 +1459,7 @@ impl App {
         crate::village::State {
             bori: self.profile.flag(key::BORI_BACK),
             halmae: self.profile.flag(key::HALF_ENDING) || self.profile.flag(key::TRUE_ENDING),
+            momo: self.profile.flag(key::MOMO_BACK),
             decor,
             growth: crate::village::growth(self.profile.count(&key::clears(Character::Mole))),
         }
@@ -2307,7 +2315,10 @@ impl App {
         let s = i18n::s();
         let seen = &self.world.seen;
         let list_w = 74.0;
-        let row_h = FONT_PX + 4.0;
+        // 목록이 아래 "만난 이웃 n/m" 줄에 닿지 않게(종이 늘면 줄 간격을 줄인다).
+        let row_h = ((c.h - FONT_PX - 6.0) / BESTIARY.len() as f32)
+            .floor()
+            .min(FONT_PX + 4.0);
         for (i, k) in BESTIARY.iter().enumerate() {
             let r = Rect::new(c.x, c.y + i as f32 * row_h, list_w, row_h - 1.0);
             let known = seen.contains(k);

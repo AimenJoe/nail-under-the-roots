@@ -211,7 +211,37 @@ impl App {
                 }
                 AdvEvent::RouteOpen => self.open_route(false),
                 AdvEvent::Deepest => self.reach_deepest(),
+                AdvEvent::MomoIntro => {
+                    let level = self.world.momo_wins.saturating_add(1);
+                    self.play(cutscene::momo_meet(&self.world, level));
+                }
+                AdvEvent::MomoBeaten => self.momo_beaten(),
             }
+        }
+    }
+
+    /// 모모를 이겼다(0046): 이긴 수를 남기고, 세 번째면 돌아오는 장면 + 참 엔딩 조건 하나, 아니면 달아나는 장면.
+    /// 개발 시나리오는 기록 없이 이번 월드에서만 센다.
+    fn momo_beaten(&mut self) {
+        use crate::profile::key;
+        let wins = self.world.momo_wins.saturating_add(1);
+        self.world.momo_wins = wins;
+        let back = wins as u32 >= t::MOMO_FIGHTS;
+        if back {
+            self.world.momo_fight = false;
+        }
+        if self.recording() {
+            self.profile.set_count(key::MOMO_WINS, wins as u32);
+            if back {
+                self.profile.set(key::MOMO_BACK);
+            }
+            self.save_profile();
+        }
+        if back {
+            self.play(cutscene::momo_returns(&self.world));
+        } else {
+            let at = self.world.adv.boss_last;
+            self.play(cutscene::momo_flee(&self.world, at, wins as u32));
         }
     }
 
@@ -305,10 +335,26 @@ impl App {
                     &[(Speaker::Bori, text, Face::Normal)],
                 ));
             }
+            // 빈 자리: 모모를 이긴 만큼 꽃잎이 물들어 있다(0046).
             Interact::Seat => {
+                let line: Tr = match self.world.momo_wins {
+                    0 => |s| s.seat_1,
+                    1 => |s| s.seat_p1,
+                    2 => |s| s.seat_p2,
+                    _ => |s| s.seat_p3,
+                };
                 self.play(cutscene::talk(
                     &self.world,
-                    &[(Speaker::Nail, |s| s.seat_1, Face::Worried)],
+                    &[(Speaker::Nail, line, Face::Worried)],
+                ));
+            }
+            Interact::Talk(Who::Momo) => {
+                let lines: [Tr; 3] = [|s| s.momo_v1, |s| s.momo_v2, |s| s.momo_v3];
+                let text = lines[self.talk_n as usize % lines.len()];
+                self.talk_n += 1;
+                self.play(cutscene::talk(
+                    &self.world,
+                    &[(Speaker::Momo, text, Face::Happy)],
                 ));
             }
             // 누룩 할매: 실뜨기 고르기(마을, 0043·0045).
@@ -812,7 +858,7 @@ impl App {
         let verb = match i {
             Interact::Talk(Who::Popo) if village => s.ia_decor,
             Interact::Talk(Who::Popo) => s.ia_shop,
-            Interact::Talk(Who::Bori) => s.ia_talk,
+            Interact::Talk(Who::Bori | Who::Momo) => s.ia_talk,
             Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,
             Interact::Gate if village => s.ia_descend,

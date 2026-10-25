@@ -10,7 +10,7 @@ pub struct Art {
     pub tiles: Texture2D,
     /// 어둠 마스크(가운데 투명, 바깥 검정). 코드로 만든다.
     pub dark: Texture2D,
-    /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모. 아래 CRITTER_ROWS줄은 흰 실루엣.
+    /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모. 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
     /// 대화창 초상화: 88×88 칸 가로로(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
@@ -43,11 +43,13 @@ pub const PORTRAIT: f32 = 88.0;
 pub const CELL: f32 = 16.0;
 
 /// critters.png에서 실루엣 줄까지의 거리(그림 줄 수).
-pub const CRITTER_ROWS: u32 = 8;
+pub const CRITTER_ROWS: u32 = 9;
 /// critters.png의 라쿤 줄.
 pub const RACCOON_ROW: u32 = 6;
 /// critters.png의 모모(물든 굴토끼) 줄(docs/decisions/0029).
 pub const MOMO_ROW: u32 = 7;
+/// 돌아온 모모(꽃이 핀 모습, docs/decisions/0046).
+pub const MOMO_BLOOM_ROW: u32 = 8;
 
 impl Art {
     pub async fn load() -> Option<Self> {

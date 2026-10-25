@@ -475,19 +475,20 @@ mod portrait_tests {
     }
 }
 
-/// 보스 체력 막대(화면 아래 가운데): 이름 + 막대. 깨어 있는 보스가 있을 때만.
+/// 보스 체력 막대(화면 위 가운데): 이름 + 막대. 깨어 있는 보스가 있을 때만.
+/// 위에 둔다: 던전 방(192px)이 화면(180px)보다 커서 방 아래쪽에 서면 아래 막대가 Naïl과 보스를 가렸다(0046).
 fn draw_boss_bar(ui: &Ui, w: &World) {
     let Some(b) = w.enemies.iter().find(|e| e.is_boss() && !e.asleep) else {
         return;
     };
     let name = crate::i18n::tr(b.sp().name);
-    let bar = Rect::new(90.0, 168.0, 140.0, 5.0);
+    let bar = Rect::new(90.0, 4.0 + crate::ui::FONT_PX + 4.0, 140.0, 4.0);
     let nw = ui.text_w(name, crate::ui::FONT_PX) + 10.0;
     ui.rect(
-        Rect::new(160.0 - nw / 2.0, 152.0, nw, crate::ui::FONT_PX + 3.0),
+        Rect::new(160.0 - nw / 2.0, 2.0, nw, crate::ui::FONT_PX + 3.0),
         Color::new(0.07, 0.05, 0.09, 0.75),
     );
-    ui.text_center(name, 160.0, 153.0, crate::ui::FONT_PX, crate::ui::ACCENT);
+    ui.text_center(name, 160.0, 3.0, crate::ui::FONT_PX, crate::ui::ACCENT);
     ui.rect(
         Rect::new(bar.x - 1.0, bar.y - 1.0, bar.w + 2.0, bar.h + 2.0),
         OUTLINE,
@@ -1329,7 +1330,47 @@ fn draw_stall(r: Rect) {
 }
 
 /// 빈 자리: 통나무 의자 + 시든 꽃잎 하나(모모가 돌아올 곳).
-fn draw_seat(r: Rect) {
+/// 모모가 숨은 흙 둔덕(0046): 따라오는 동안은 흙이 튀고, 멈춘 뒤엔 떨며 부풀어 오른다(튀어나올 예고).
+fn draw_dig_mound(pos: Vec2, ut: f32, windup: f32, time: f32) {
+    let hold = ((ut - t::MOMO_DIG_TRACK) / windup.max(0.01)).clamp(0.0, 1.0);
+    let shake = if hold > 0.0 && ((time * 50.0) as i32) % 2 == 0 {
+        1.0
+    } else {
+        0.0
+    };
+    let (x, y) = ((pos.x + shake).round(), pos.y.round() + 4.0);
+    let w = 6.0 + hold * 3.0;
+    draw_ellipse(x, y + 1.0, w + 1.0, 3.5, 0.0, OUTLINE);
+    draw_ellipse(x, y, w, 3.0 + hold, 0.0, world::DIRT);
+    draw_ellipse(
+        x - 1.0,
+        y - 1.0,
+        w * 0.5,
+        1.2,
+        0.0,
+        Color::new(0.70, 0.54, 0.38, 1.0),
+    );
+    // 흙 부스러기
+    for k in 0..3 {
+        let ph = (time * 3.0 + k as f32 * 0.33).fract();
+        let dx = (k as f32 - 1.0) * 4.0;
+        let c = Color::new(0.55, 0.40, 0.28, 1.0 - ph);
+        draw_rectangle(x + dx, y - 3.0 - ph * 5.0, 1.0, 1.0, c);
+    }
+    // 떨 때: 착지 고리처럼 둘레를 보여 준다.
+    if hold > 0.0 {
+        draw_circle_lines(
+            x,
+            y,
+            8.0 + hold * 12.0,
+            1.0,
+            Color::new(1.0, 0.5, 0.5, 0.35 + 0.4 * hold),
+        );
+    }
+}
+
+/// 빈 자리(모모를 기다리는 그루터기). 꽃잎 셋 가운데 모모를 이긴 만큼 분홍(0046).
+fn draw_seat(r: Rect, petals: u8) {
     let bark = Color::new(0.42, 0.28, 0.20, 1.0);
     let ring = Color::new(0.75, 0.58, 0.40, 1.0);
     let (x, y) = (r.x + 1.0, r.bottom() - 9.0);
@@ -1337,14 +1378,16 @@ fn draw_seat(r: Rect) {
     draw_rectangle(x, y + 2.0, 14.0, 6.0, bark);
     draw_ellipse(x + 7.0, y + 2.0, 7.0, 2.5, 0.0, ring);
     draw_ellipse_lines(x + 7.0, y + 2.0, 4.0, 1.2, 0.0, 1.0, bark);
-    // 시든 꽃잎
-    draw_rectangle(
-        x + 10.0,
-        y + 1.0,
-        2.0,
-        1.0,
-        Color::new(0.69, 0.50, 0.55, 1.0),
-    );
+    let wilted = Color::new(0.69, 0.50, 0.55, 1.0);
+    let pink = Color::new(1.0, 0.66, 0.77, 1.0);
+    for (i, dx) in [10.0, 3.0, 7.0].into_iter().enumerate() {
+        // 처음엔 시든 꽃잎 하나만 떨어져 있다(seat_1).
+        if petals == 0 && i > 0 {
+            break;
+        }
+        let c = if (i as u8) < petals { pink } else { wilted };
+        draw_rectangle(x + dx, y + 1.0 + (i % 2) as f32, 2.0, 1.0, c);
+    }
 }
 
 /// 누룩 할매(마을, 0045): 흰 실 덩어리 + 버섯 갓 셋 + 감은 눈. 숨 쉬듯 살짝 오르내린다.
@@ -1728,6 +1771,11 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     }
     for (i, n) in w.neighbors.iter().enumerate() {
         let big = n.who == world::Who::Bori;
+        if n.who == world::Who::Momo {
+            // 모모는 빈 자리 그루터기 위에 앉는다: 그루터기(칸 아래 끝) 뒤에 그린다, 그림자 없이.
+            list.push((n.pos.y + 9.0, Drawable::Neighbor(i)));
+            continue;
+        }
         list.push((n.pos.y + 6.0, Drawable::Neighbor(i)));
         let rx = if big { 12.0 } else { 6.0 };
         draw_ellipse(n.pos.x, n.pos.y + 6.0, rx, 2.5, 0.0, SHADOW_SOFT);
@@ -1749,6 +1797,9 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     for (i, e) in w.enemies.iter().enumerate() {
         let ep = lerp(e.prev_pos, e.pos, alpha);
         list.push((ep.y + e.radius(), Drawable::Enemy(i)));
+        if !e.hittable() {
+            continue; // 땅속: 그림자 없이 둔덕만.
+        }
         draw_ellipse(
             ep.x,
             ep.y + e.radius(),
@@ -1785,7 +1836,7 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                     PropKind::Chest { opened } => draw_chest(r, opened, w.time),
                     PropKind::Campfire => draw_campfire(r, w.time),
                     PropKind::Stall => draw_stall(r),
-                    PropKind::Seat => draw_seat(r),
+                    PropKind::Seat => draw_seat(r, w.momo_wins),
                 }
             }
             Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
@@ -1811,6 +1862,12 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                     }
                     world::Who::Bori => draw_bori_at(art, n.pos, left, false, w.time),
                     world::Who::Halmae => draw_halmae_at(n.pos, w.time),
+                    world::Who::Momo => {
+                        if let Some(tex) = art.critters.as_ref() {
+                            let on_seat = n.pos - vec2(0.0, 7.0);
+                            draw_critter_at(tex, art::MOMO_BLOOM_ROW, on_seat, left, false, w.time);
+                        }
+                    }
                 }
             }
             Drawable::Tree(at, growth) => draw_great_tree(at, growth, w.time),
@@ -2125,6 +2182,10 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
     let sp = e.sp();
     let mut pos = lerp(e.prev_pos, e.pos, alpha);
     let r = e.radius();
+    if let enemy::State::Under { time: ut } = e.state {
+        draw_dig_mound(pos, ut, e.windup(), time);
+        return;
+    }
     let base = sp.color;
     let mut tint = WHITE;
     if e.poison > 0.0 && e.flash <= 0.0 {
@@ -2174,6 +2235,12 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         enemy::State::Leap { .. } => {
             frame = 5;
             pos.y -= e.height();
+        }
+        enemy::State::Pop { time: pt } => {
+            // 튀어나옴: 살짝 솟았다가 내려온다.
+            frame = 5;
+            let k = (pt / t::MOMO_POP_TIME).clamp(0.0, 1.0);
+            pos.y -= (4.0 * 6.0 * k * (1.0 - k)).round();
         }
         enemy::State::Rest { .. } if sp.behavior != crate::species::Behavior::Dummy => {
             tint = Color::new(0.75, 0.75, 0.75, 1.0);
@@ -2226,7 +2293,8 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         draw_line(z.x, z.y + 3.0, z.x + 3.0, z.y + 3.0, 1.0, c);
     }
     let flash = e.flash > 0.0;
-    if let (true, Some(tex)) = (e.is_boss(), art.and_then(|a| a.chief.as_ref())) {
+    let chief = e.kind == crate::enemy::Kind::Chief;
+    if let (true, Some(tex)) = (chief, art.and_then(|a| a.chief.as_ref())) {
         // 대장: 32×32(발바닥 y=30).
         let row = art::CHIEF_TAINTED + if flash { art::CHIEF_ROWS } else { 0 };
         draw_texture_ex(

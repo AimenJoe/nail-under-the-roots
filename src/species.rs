@@ -20,6 +20,9 @@ pub enum Behavior {
     Dummy,
     /// 들쥐 대장(튜토리얼 보스): 돌진 ↔ 뛰어 찍기, 체력 반 아래면 생쥐를 부른다. 공격 중엔 안 멈춘다(enemy.rs).
     Chief,
+    /// 모모(첫 길의 보스, 0046): 높이 뛰기 ↔ 뒷발 차기, 두 번째부터 굴로 숨었다 튀어나오기, 세 번째엔 이어 뛰기.
+    /// 대장처럼 공격 중엔 안 멈춘다. 이길 때마다 한 수씩 는다(`Enemy::level`).
+    Momo,
 }
 
 pub struct Species {
@@ -219,14 +222,42 @@ pub static CHIEF: Species = Species {
     ..BASE
 };
 
+/// 모모(물든 굴토끼, 0029·0046). 첫 길 끝의 보스로 세 번 만난다. 대장보다 가볍고 빠르다: 넉백은 조금 받고,
+/// 체공(0.5초)이 길어 착지 자리를 보고 피할 수 있다. 차기는 짧고 빠르다(tuning MOMO_KICK_TIME).
+pub static MOMO: Species = Species {
+    name: |s| s.mob_momo,
+    lore: |s| s.mob_momo_lore,
+    attack: |s| s.mob_momo_atk,
+    tip: |s| s.mob_momo_tip,
+    behavior: Behavior::Momo,
+    hp: 28,
+    radius: 8.0,
+    speed: 50.0,
+    damage: 1,
+    knock_mul: 0.25,
+    trigger: 70.0,
+    windup: 0.6,
+    dash_speed: 320.0,
+    dash_time: 0.5,
+    rest: 0.85,
+    wall_rest: 1.8,
+    land_radius: 20.0,
+    glowbugs: (16, 20),
+    seed_chance: 1.0,
+    color: Color::new(0.55, 0.40, 0.56, 1.0),
+    sheet_row: crate::art::MOMO_ROW,
+    ..BASE
+};
+
 /// 도감 순서(허수아비는 빼고).
-pub const BESTIARY: [Kind; 6] = [
+pub const BESTIARY: [Kind; 7] = [
     Kind::FieldMouse,
     Kind::HouseMouse,
     Kind::SewerRat,
     Kind::Chipmunk,
     Kind::RedSquirrel,
     Kind::Chief,
+    Kind::Momo,
 ];
 
 pub fn of(kind: Kind) -> &'static Species {
@@ -238,6 +269,7 @@ pub fn of(kind: Kind) -> &'static Species {
         Kind::RedSquirrel => &RED_SQUIRREL,
         Kind::Dummy => &DUMMY,
         Kind::Chief => &CHIEF,
+        Kind::Momo => &MOMO,
     }
 }
 

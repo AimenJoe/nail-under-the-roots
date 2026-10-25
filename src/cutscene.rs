@@ -460,6 +460,10 @@ pub enum Speaker {
     Bori,
     /// 누룩 할매(마을, 0045). 초상화는 아직 없다.
     Halmae,
+    /// 물든 모모(첫 길의 보스, 이름표 "???", 0046).
+    MomoTainted,
+    /// 돌아온 모모(마을). 꽃 핀 초상화는 아직 없다.
+    Momo,
 }
 
 fn speaker_actor(w: &World, who: Speaker) -> Actor {
@@ -479,6 +483,27 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
         Speaker::Chief => hidden(i18n::tr(crate::species::CHIEF.name), Portrait::CHIEF, fur),
         Speaker::Bori => hidden(i18n::s().bori_name, Portrait::BORI, fur),
         Speaker::Halmae => story_actor(i18n::s().name_halmae, Color::new(0.86, 0.84, 0.92, 1.0)),
+        Speaker::MomoTainted => momo_tainted_actor(w.player.pos),
+        Speaker::Momo => Actor {
+            sprite: Some(Sprite::Critter(crate::art::MOMO_BLOOM_ROW)),
+            ..story_actor(i18n::s().name_momo, MOMO_PETAL)
+        },
+    }
+}
+
+/// 돌아온 모모의 색(초상화가 없을 때 이름표 옆 네모).
+const MOMO_PETAL: Color = Color::new(0.80, 0.62, 0.66, 1.0);
+
+/// 물든 모모 배우: 이름은 아직 "???"(이름은 돌아올 때 스스로 말한다, 0027).
+fn momo_tainted_actor(pos: Vec2) -> Actor {
+    Actor {
+        name: "???",
+        sprite: Some(Sprite::Critter(crate::art::MOMO_ROW)),
+        color: Color::new(0.45, 0.35, 0.50, 1.0),
+        portrait: Some(Portrait::MOMO_TAINTED),
+        pos,
+        facing: vec2(-1.0, 0.0),
+        visible: false,
     }
 }
 
@@ -490,6 +515,8 @@ pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
         Speaker::Chief,
         Speaker::Bori,
         Speaker::Halmae,
+        Speaker::MomoTainted,
+        Speaker::Momo,
     ];
     let actors = order.iter().map(|s| speaker_actor(w, *s)).collect();
     let steps = lines
@@ -560,6 +587,56 @@ pub fn boss_beaten(w: &World, at: Vec2, entrance: Vec2) -> Cutscene {
         Step::Hide { actor: 1 },
         say(0, Face::Determined, |s| s.chief_beaten_5),
     ]);
+    Cutscene::new(actors, steps)
+}
+
+/// 첫 길 끝 방에 모모가 있다(0046). 만날 때마다 말이 조금씩 무너진다: 막기 → 사라진 가족 → 걱정.
+pub fn momo_meet(w: &World, level: u8) -> Cutscene {
+    let lines: [(Tr, Tr); 3] = [
+        (|s| s.momo_meet_1, |s| s.momo_meet_1b),
+        (|s| s.momo_meet_2, |s| s.momo_meet_2b),
+        (|s| s.momo_meet_3, |s| s.momo_meet_3b),
+    ];
+    let (momo, nail) = lines[(level.max(1) as usize - 1).min(2)];
+    let face = if level >= 3 {
+        Face::Worried
+    } else {
+        Face::Normal
+    };
+    talk(
+        w,
+        &[
+            (Speaker::MomoTainted, momo, face),
+            (Speaker::Nail, nail, Face::Determined),
+        ],
+    )
+}
+
+/// 모모를 이겼다(첫 번째·두 번째): 한마디 하고 굴 속으로 달아난다. 마을 빈 자리의 꽃잎이 하나 물든다.
+pub fn momo_flee(w: &World, at: Vec2, wins: u32) -> Cutscene {
+    let mut momo = momo_tainted_actor(at);
+    momo.visible = true;
+    momo.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
+    let actors = vec![nail_actor(w), momo];
+    let line: Tr = if wins <= 1 {
+        |s| s.momo_flee_1
+    } else {
+        |s| s.momo_flee_2
+    };
+    // 플레이어 반대쪽으로 뛰어 사라진다.
+    let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
+    let steps = vec![
+        Step::Wait(0.5),
+        say(1, Face::Worried, line),
+        Step::Move {
+            actor: 1,
+            to: at + away * 140.0,
+            speed: 170.0,
+        },
+        Step::Hide { actor: 1 },
+        say(0, Face::Worried, |s| s.momo_flee_wait),
+        Step::Narrate(|s| s.momo_petal),
+    ];
     Cutscene::new(actors, steps)
 }
 
@@ -697,7 +774,7 @@ fn story_actor(name: &'static str, color: Color) -> Actor {
 fn story_actors(w: &World) -> Vec<Actor> {
     vec![
         nail_actor(w),
-        story_actor(i18n::s().name_momo, Color::new(0.80, 0.62, 0.66, 1.0)),
+        story_actor(i18n::s().name_momo, MOMO_PETAL),
         story_actor(i18n::s().name_halmae, Color::new(0.86, 0.84, 0.92, 1.0)),
     ]
 }
@@ -715,6 +792,8 @@ fn momo_steps() -> Vec<Step> {
         say(0, Face::Worried, |s| s.momo_r3),
         say(1, Face::Normal, |s| s.momo_r4),
         say(1, Face::Happy, |s| s.momo_r5),
+        say(0, Face::Happy, |s| s.momo_r6),
+        say(1, Face::Happy, |s| s.momo_r7),
     ];
     v.extend(cut_to(None));
     v
@@ -769,8 +848,7 @@ fn true_ending_steps() -> Vec<Step> {
     v
 }
 
-/// 모모가 돌아오는 장면. 모모 보스가 생기면 세 번째 승리 뒤에 부른다.
-#[allow(dead_code)]
+/// 모모가 돌아오는 장면: 세 번째 승리 뒤(0046).
 pub fn momo_returns(w: &World) -> Cutscene {
     Cutscene::new(story_actors(w), momo_steps())
 }

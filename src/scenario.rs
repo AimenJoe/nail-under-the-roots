@@ -53,6 +53,8 @@ pub enum Scenario {
     Boss,
     /// 첫 쉼터에서 씨앗 40개로(가게·길 지도, docs/decisions/0030, 0031).
     Camp,
+    /// 첫 길 끝 굴(모모가 지킨다)에 바로. 숫자 = 이미 이긴 수(0 → 첫 만남, 2 → 세 번째, docs/decisions/0046).
+    Momo(u8),
 }
 
 pub struct Entry {
@@ -61,7 +63,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 24] = [
+pub const LIST: [Entry; 26] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -182,6 +184,16 @@ pub const LIST: [Entry; 24] = [
         desc: "큰 나무 아래 마을(지금 기록의 모습).",
         scenario: Scenario::Village,
     },
+    Entry {
+        name: "모모 첫 만남",
+        desc: "첫 길 끝 굴에서 시작. 끝방의 모모: 높이 뛰기·뒷발 차기. 이기면 달아나는 장면.",
+        scenario: Scenario::Momo(0),
+    },
+    Entry {
+        name: "모모 세 번째",
+        desc: "굴로 숨기·이어 뛰기까지. 이기면 모모가 돌아오는 장면(기록은 남기지 않는다).",
+        scenario: Scenario::Momo(2),
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -212,6 +224,27 @@ pub fn build(s: Scenario) -> World {
             let mut w = World::camp_start(crate::tuning::FINAL_STAGE);
             w.seeds = 40;
             w.adv.events.clear();
+            w
+        }
+        Scenario::Momo(wins) => {
+            let mut w = World::camp_start(1);
+            w.seeds = 40;
+            w.adv.events.clear();
+            w.momo_fight = true;
+            w.momo_wins = wins;
+            w.enter_route_boss_now();
+            // 끝방 문 안쪽에 바로 선다(들어서면 잠기고 모모가 말한다).
+            let boss = w.adv.dungeon.as_ref().and_then(|d| {
+                d.rooms
+                    .iter()
+                    .find(|r| r.kind == crate::dungeon::RoomKind::Boss)
+                    .map(|r| r.interior().center())
+            });
+            if let Some(c) = boss {
+                w.player.pos = c + vec2(0.0, 40.0);
+                w.player.prev_pos = w.player.pos;
+                w.snap_cam();
+            }
             w
         }
         Scenario::Camp => {

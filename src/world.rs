@@ -45,6 +45,8 @@ pub enum Who {
     Bori,
     /// 누룩 할매: 반쪽 엔딩 뒤 마을에 온다. 실뜨기를 고른다(docs/decisions/0045).
     Halmae,
+    /// 돌아온 모모: 마을의 빈 자리에 앉는다(docs/decisions/0046).
+    Momo,
 }
 
 /// 이웃 NPC: 서 있거나(쉼터) 플레이어 곁으로 걸어온다(튜토리얼의 포포). 막지 않는다.
@@ -137,6 +139,9 @@ pub struct World {
     pub auto_waves: bool,
     /// 이번 런의 실뜨기(엔딩 뒤 어려움, docs/decisions/0043). 새로 나온 적에 한 번 건다.
     pub knots: crate::knots::Knots,
+    /// 모모(0046): 첫 길 끝에서 싸우나(앱이 기록에서 정하고, 모모에게 쓰러지면 이번 런엔 끈다), 지금까지 이긴 수(빈 자리의 꽃잎).
+    pub momo_fight: bool,
+    pub momo_wins: u8,
     /// 지금 환경. `biome_by_wave`면 웨이브가 깊이를 대신해 바뀐다.
     pub biome: Biome,
     pub biome_by_wave: bool,
@@ -193,6 +198,8 @@ impl World {
             },
             auto_waves: true,
             knots: crate::knots::Knots::default(),
+            momo_fight: false,
+            momo_wins: 0,
             biome: Biome::Meadow,
             biome_by_wave: true,
             wave: 0,
@@ -492,6 +499,25 @@ impl World {
                     self.feel.add_trauma(0.12);
                 }
                 enemy::Event::Summon => summon = true,
+                enemy::Event::Dig => sfx.play(sfx::Id::Burrow),
+                enemy::Event::Pop => {
+                    sfx.play(sfx::Id::Emerge);
+                    self.feel.add_trauma(0.25);
+                }
+            }
+        }
+        // 모모가 숨는·튀어나오는 자리에 흙.
+        for e in &self.enemies {
+            match e.state {
+                enemy::State::Under { time } if time <= dt => {
+                    burst(&mut self.fx, e.pos, 10, DIRT, 70.0);
+                }
+                enemy::State::Pop { time } if time <= dt => {
+                    let r = e.contact_radius();
+                    self.fx.push(ring(e.pos, 4.0, r, 0.25, DIRT));
+                    burst(&mut self.fx, e.pos, 14, DIRT, 110.0);
+                }
+                _ => {}
             }
         }
         // 대장이 울부짖으면 양옆에 생쥐 떼(셋).
@@ -529,7 +555,7 @@ impl World {
             .iter_mut()
             .filter(|p| p.alive && p.friendly)
         {
-            for e in self.enemies.iter_mut().filter(|e| e.alive) {
+            for e in self.enemies.iter_mut().filter(|e| e.alive && e.hittable()) {
                 let rr = p.radius() + e.radius();
                 if (e.pos - p.pos).length_squared() <= rr * rr {
                     e.hurt(
@@ -555,7 +581,10 @@ impl World {
         if let Some(s) = strike {
             let origin = self.player.pos;
             for e in &mut self.enemies {
-                if e.last_hit_by == s.id || !s.shape.overlaps_circle(e.pos, e.radius()) {
+                if e.last_hit_by == s.id
+                    || !e.hittable()
+                    || !s.shape.overlaps_circle(e.pos, e.radius())
+                {
                     continue;
                 }
                 e.last_hit_by = s.id;
@@ -790,7 +819,7 @@ impl World {
         let pos = self.player.pos;
         for e in &mut self.enemies {
             let d = e.pos - pos;
-            if d.length() < t::REVIVE_PUSH_RADIUS {
+            if d.length() < t::REVIVE_PUSH_RADIUS && e.hittable() {
                 e.hurt(0, d.normalize_or_zero(), t::REVIVE_PUSH_KNOCKBACK, 0.5);
             }
         }

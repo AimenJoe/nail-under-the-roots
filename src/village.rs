@@ -68,6 +68,8 @@ pub const DECOR: [Decor; 6] = [
 pub struct State {
     pub bori: bool,
     pub halmae: bool,
+    /// 모모가 돌아와 빈 자리에 앉았다(0046).
+    pub momo: bool,
     pub decor: [bool; 6],
     /// 큰 나무의 잎(0 = 거의 없음 … 4 = 꽃).
     pub growth: u8,
