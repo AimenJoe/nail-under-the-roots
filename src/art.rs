@@ -31,6 +31,13 @@ pub struct Art {
 pub struct Sunny {
     /// 둥근 나무 4칸(32×34, 바람에 흔들림).
     pub tree: Texture2D,
+    /// 16px 타일셋(1024×1024). 자리는 `sunny.rs` 표.
+    pub sheet: Texture2D,
+    /// 같은 타일셋의 CPU 쪽 그림: 지도 굽기가 꽃·풀·조약돌을 찍는다.
+    pub sheet_img: Image,
+    /// 불꽃 4칸, 파란 버섯 4칸.
+    pub fire: Texture2D,
+    pub mush: Texture2D,
 }
 
 /// 팩 폴더(assets 기준).
@@ -45,8 +52,32 @@ async fn load_sunny() -> Option<Sunny> {
     ))
     .await
     .ok()?;
-    tree.set_filter(FilterMode::Nearest);
-    Some(Sunny { tree })
+    let sheet_img = load_image(&format!(
+        "{SUNNY}/Tileset/spr_tileset_sunnysideworld_16px.png"
+    ))
+    .await
+    .ok()?;
+    let sheet = Texture2D::from_image(&sheet_img);
+    let fire = load_texture(&format!(
+        "{SUNNY}/Elements/VFX/Fire/spr_deco_fire_02_strip4.png"
+    ))
+    .await
+    .ok()?;
+    let mush = load_texture(&format!(
+        "{SUNNY}/Elements/Plants/spr_deco_mushroom_blue_01_strip4.png"
+    ))
+    .await
+    .ok()?;
+    for t in [&tree, &sheet, &fire, &mush] {
+        t.set_filter(FilterMode::Nearest);
+    }
+    Some(Sunny {
+        tree,
+        sheet,
+        sheet_img,
+        fire,
+        mush,
+    })
 }
 
 pub const CHIEF_CELL: f32 = 32.0;

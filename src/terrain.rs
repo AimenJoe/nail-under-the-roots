@@ -284,7 +284,13 @@ fn shape(g: &Grid) -> Vec<bool> {
 }
 
 /// 굽기. `tiles`가 있으면 장식을 찍는다(시험에서는 없이).
-pub fn bake(g: &Grid, b: Biome, paths: &[(Vec2, Vec2)], tiles: Option<&Image>) -> Image {
+pub fn bake(
+    g: &Grid,
+    b: Biome,
+    paths: &[(Vec2, Vec2)],
+    tiles: Option<&Image>,
+    sunny: Option<&Image>,
+) -> Image {
     let (w, h) = (g.w as i32 * T, g.h as i32 * T);
     let (wu, hu) = (w as usize, h as usize);
     let pal = palette(b);
@@ -479,6 +485,53 @@ pub fn bake(g: &Grid, b: Biome, paths: &[(Vec2, Vec2)], tiles: Option<&Image>) -
                 let Some((d, ox, oy)) = decor_at(b, cx, cy) else {
                     continue;
                 };
+                // 팩이 있으면 꽃·풀·조약돌은 Sunnyside 그림으로(0066). 칸 가운데 아래에 발을 둔다.
+                // 빛나는 버섯은 굽지 않는다: 어둠 뒤에 팩의 파란 버섯(움직임)으로 그린다.
+                if sunny.is_some() && d == Decor::Mushroom {
+                    continue;
+                }
+                if let Some(sheet) = sunny {
+                    let pick = hash(cx, cy, 51) as usize;
+                    let r = match d {
+                        Decor::FlowerWhite => Some(crate::sunny::FLOWERS_WHITE[pick % 4]),
+                        Decor::FlowerYellow => Some(crate::sunny::FLOWERS_BLUE[pick % 4]),
+                        Decor::FlowerPink => Some(crate::sunny::FLOWERS_RED[pick % 4]),
+                        Decor::Tuft => Some(crate::sunny::GRASS[pick % 8]),
+                        Decor::Pebble => Some(crate::sunny::PEBBLES[pick % 3]),
+                        _ => None,
+                    };
+                    if let Some(r) = r {
+                        let fx = cx * T + 8 + ox as i32 - r.2 as i32 / 2;
+                        let fy = cy * T + 12 + oy as i32 - r.3 as i32;
+                        crate::sunny::stamp(&mut img, sheet, r, fx, fy, ft, is_solid);
+                        // 꽃은 무리로: 둘레에 한두 송이 더.
+                        if matches!(
+                            d,
+                            Decor::FlowerWhite | Decor::FlowerYellow | Decor::FlowerPink
+                        ) {
+                            for k in 0..(pick >> 3) % 3 {
+                                let set = match d {
+                                    Decor::FlowerWhite => crate::sunny::FLOWERS_WHITE,
+                                    Decor::FlowerYellow => crate::sunny::FLOWERS_BLUE,
+                                    _ => crate::sunny::FLOWERS_RED,
+                                };
+                                let q = hash(cx, cy, 52 + k as u32) as i32;
+                                let rr = set[(q as usize >> 4) % 2];
+                                let (dx, dy) = ((q % 11) - 5, ((q >> 8) % 7) - 3);
+                                crate::sunny::stamp(
+                                    &mut img,
+                                    sheet,
+                                    rr,
+                                    fx + dx + 3,
+                                    fy + dy + 2,
+                                    ft,
+                                    is_solid,
+                                );
+                            }
+                        }
+                        continue;
+                    }
+                }
                 let (col, row) = decor_cell(d);
                 let (bx, by) = (cx * T + ox as i32, cy * T + oy as i32);
                 for sy in 0..T {
@@ -655,7 +708,13 @@ mod tests {
             }
         }
         for b in [Biome::Meadow, Biome::Roots, Biome::Deep] {
-            let img = bake(&g, b, &[(vec2(160.0, 40.0), vec2(160.0, 100.0))], None);
+            let img = bake(
+                &g,
+                b,
+                &[(vec2(160.0, 40.0), vec2(160.0, 100.0))],
+                None,
+                None,
+            );
             assert_eq!(
                 (img.width as usize, img.height as usize),
                 (g.w * 16, g.h * 16)
@@ -676,7 +735,7 @@ mod tests {
             }
         }
         let t = std::time::Instant::now();
-        let _ = bake(&g, Biome::Roots, &[], None);
+        let _ = bake(&g, Biome::Roots, &[], None, None);
         println!("bake 100×60: {:?}", t.elapsed());
     }
 

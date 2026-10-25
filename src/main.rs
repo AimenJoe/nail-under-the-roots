@@ -39,6 +39,7 @@ mod scenario;
 mod sfx;
 mod species;
 mod story;
+mod sunny;
 mod talents;
 mod terrain;
 mod tuning;

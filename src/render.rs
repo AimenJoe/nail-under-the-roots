@@ -115,9 +115,11 @@ impl Renderer {
                     }
                     _ => Vec::new(),
                 };
-                let key = crate::terrain::key(g, w.biome, &paths);
+                let sunny_img = art.sunny.as_ref().map(|s| &s.sheet_img);
+                let key = crate::terrain::key(g, w.biome, &paths) ^ u64::from(sunny_img.is_some());
                 if self.terrain.as_ref().map(|(k, _)| *k) != Some(key) {
-                    let img = crate::terrain::bake(g, w.biome, &paths, Some(&art.tiles_img));
+                    let img =
+                        crate::terrain::bake(g, w.biome, &paths, Some(&art.tiles_img), sunny_img);
                     let tex = Texture2D::from_image(&img);
                     tex.set_filter(FilterMode::Nearest);
                     self.terrain = Some((key, tex));
@@ -1277,6 +1279,53 @@ fn draw_campfire(r: Rect, time: f32) {
     }
 }
 
+/// 모닥불, 팩 그림판(0066): 돌 두른 자리 + 불꽃 4칸 + 따뜻한 빛·불티(직접).
+fn draw_campfire_sunny(sunny: &art::Sunny, r: Rect, time: f32) {
+    let c = vec2(r.center().x, r.bottom() - 4.0);
+    let flick = (time * 9.0).sin() * 0.5 + (time * 13.7).sin() * 0.5;
+    draw_circle(
+        c.x,
+        c.y - 4.0,
+        24.0 + flick,
+        Color::new(1.0, 0.65, 0.3, 0.07),
+    );
+    draw_circle(
+        c.x,
+        c.y - 4.0,
+        14.0 + flick * 0.5,
+        Color::new(1.0, 0.7, 0.35, 0.08),
+    );
+    crate::sunny::draw_at_foot(
+        &sunny.sheet,
+        crate::sunny::FIRE_PIT,
+        c + vec2(0.0, 6.0),
+        WHITE,
+    );
+    let (fw, fh) = crate::sunny::FIRE_FRAME;
+    let f = ((time * 8.0) as u32 % 4) as f32;
+    draw_texture_ex(
+        &sunny.fire,
+        (c.x - fw / 2.0).round(),
+        (c.y - fh + 1.0).round(),
+        WHITE,
+        DrawTextureParams {
+            source: Some(Rect::new(f * fw, 0.0, fw, fh)),
+            ..Default::default()
+        },
+    );
+    for k in 0..3 {
+        let ph = (time * 0.9 + k as f32 * 0.33).fract();
+        let x = c.x + ((k as f32 * 2.1 + time * 2.0).sin() * 4.0);
+        draw_rectangle(
+            x.round(),
+            (c.y - 10.0 - ph * 16.0).round(),
+            1.0,
+            1.0,
+            Color::new(1.0, 0.8, 0.4, 1.0 - ph),
+        );
+    }
+}
+
 /// 포포의 가게 좌판: 나무 상자 + 줄무늬 차양 + 산딸기·지렁이 단지.
 fn draw_stall(r: Rect) {
     let wood = Color::new(0.55, 0.36, 0.22, 1.0);
@@ -1736,6 +1785,50 @@ fn draw_great_tree(at: Vec2, growth: u8, time: f32) {
 }
 
 /// 마을 꾸미기(0045): 0 꽃밭, 1 반딧불 등, 2 빛나는 버섯, 3 통나무 의자, 4 바람종, 5 깃발 줄.
+/// 마을 꾸미기, 팩 그림판(0066): 0 꽃밭 = 열매·꽃 덤불 + 들꽃, 2 빛나는 버섯 = 파란 버섯 셋(움직임).
+fn draw_decor_sunny(sunny: &art::Sunny, i: usize, at: Vec2, time: f32) {
+    use crate::sunny as sn;
+    let foot = vec2(at.x.round(), at.y.round() + 6.0);
+    match i {
+        0 => {
+            draw_ellipse(foot.x, foot.y - 1.0, 16.0, 3.0, 0.0, SHADOW_SOFT);
+            sn::draw_at_foot(&sunny.sheet, sn::BUSH_BERRY, foot + vec2(-8.0, 0.0), WHITE);
+            sn::draw_at_foot(&sunny.sheet, sn::BUSH_FLOWER, foot + vec2(9.0, 1.0), WHITE);
+            for (k, dx) in [-14.0f32, -2.0, 15.0].iter().enumerate() {
+                let set = [sn::FLOWERS_WHITE, sn::FLOWERS_RED, sn::FLOWERS_BLUE][k];
+                sn::draw_at_foot(&sunny.sheet, set[3], foot + vec2(*dx, 4.0), WHITE);
+            }
+        }
+        _ => {
+            let s = sn::MUSH_FRAME;
+            for (k, dx) in [-8.0f32, 0.0, 8.0].iter().enumerate() {
+                let pulse = 0.6 + 0.3 * (time * 1.8 + k as f32).sin();
+                let f = ((time * 4.0 + k as f32 * 1.3) as u32 % 4) as f32;
+                let (x, y) = (
+                    (foot.x + dx - s / 2.0).round(),
+                    (foot.y - s + (k % 2) as f32 * 2.0).round(),
+                );
+                draw_circle(
+                    x + 8.0,
+                    y + 10.0,
+                    7.0,
+                    Color::new(0.5, 0.85, 1.0, 0.12 * pulse),
+                );
+                draw_texture_ex(
+                    &sunny.mush,
+                    x,
+                    y,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(f * s, 0.0, s, s)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+    }
+}
+
 fn draw_decor(i: usize, at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round() + 4.0);
     let wood = Color::new(0.45, 0.31, 0.22, 1.0);
@@ -2148,13 +2241,42 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                             );
                         }
                     }
+                    // 팩이 있으면 그루터기·바위도 Sunnyside(0066). 바위는 자리 해시로 셋 중 하나.
+                    PropKind::Stump | PropKind::Rock if art.sunny.is_some() => {
+                        if let Some(sunny) = &art.sunny {
+                            let pick = (r.x as usize / 16 * 7 + r.y as usize / 16 * 3) % 3;
+                            let spr = if p.kind == PropKind::Stump {
+                                crate::sunny::STUMPS[pick % 2]
+                            } else {
+                                crate::sunny::BOULDERS[pick]
+                            };
+                            let foot = vec2(r.center().x, r.bottom() + 2.0);
+                            draw_ellipse(
+                                foot.x,
+                                foot.y - 1.0,
+                                spr.2 as f32 * 0.42,
+                                2.5,
+                                0.0,
+                                SHADOW_SOFT,
+                            );
+                            crate::sunny::draw_at_foot(
+                                &sunny.sheet,
+                                spr,
+                                foot,
+                                w.biome.wall_tint(),
+                            );
+                        }
+                    }
                     PropKind::Stump | PropKind::Rock => {
                         let col = if p.kind == PropKind::Stump { 0.0 } else { 16.0 };
                         let src = Rect::new(col, 32.0, 16.0, 32.0);
                         draw_tile(&art.tiles, src, r.x, r.bottom() - 32.0, w.biome.wall_tint());
                     }
                     PropKind::Chest { opened } => draw_chest(r, opened, w.time),
-                    PropKind::Campfire => draw_campfire(r, w.time),
+                    PropKind::Campfire => match &art.sunny {
+                        Some(sunny) => draw_campfire_sunny(sunny, r, w.time),
+                        None => draw_campfire(r, w.time),
+                    },
                     PropKind::Stall => draw_stall(r),
                     PropKind::Seat => draw_seat(r, w.momo_wins),
                 }
@@ -2214,7 +2336,10 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                     draw_tree_motes(at + vec2(0.0, 14.0), w.time);
                 }
             }
-            Drawable::Decor(i, at) => draw_decor(i, at, w.time),
+            Drawable::Decor(i, at) => match &art.sunny {
+                Some(sunny) if matches!(i, 0 | 2) => draw_decor_sunny(sunny, i, at, w.time),
+                _ => draw_decor(i, at, w.time),
+            },
             Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
         }
     }
@@ -2558,6 +2683,28 @@ fn draw_darkness(art: &Art, w: &World, alpha: f32, cam: Vec2) {
     for (x, y, d) in floor_decor(w, cam) {
         if d == Decor::Mushroom {
             let pulse = 0.65 + 0.25 * ((w.time * 2.0 + x * 0.1).sin());
+            // 팩이 있으면 파란 버섯 4칸(0066). 굽기에서는 빼 두었다.
+            if let Some(sunny) = &art.sunny {
+                let s = crate::sunny::MUSH_FRAME;
+                let f = ((w.time * 4.0 + x * 0.13) as u32 % 4) as f32;
+                draw_circle(
+                    x + 8.0,
+                    y + 10.0,
+                    7.0,
+                    Color::new(0.5, 0.85, 1.0, 0.10 * pulse),
+                );
+                draw_texture_ex(
+                    &sunny.mush,
+                    x,
+                    y,
+                    Color::new(1.0, 1.0, 1.0, 0.75 + 0.25 * pulse),
+                    DrawTextureParams {
+                        source: Some(Rect::new(f * s, 0.0, s, s)),
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
             draw_tile(
                 &art.tiles,
                 decor_src(d),
