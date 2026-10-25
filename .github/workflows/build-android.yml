@@ -59,6 +59,16 @@ jobs:
           cargo quad-apk build --release
           ls -la target/android-artifacts/release/apk
 
+      - name: Verify APK (signature, manifest, ABI)
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=target/android-artifacts/release/apk/nail.apk
+          echo "build-tools: $BT"
+          "$BT/apksigner" verify --verbose --print-certs "$APK"
+          "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdkVersion|native-code|launchable-activity|application-label|uses-feature|uses-gl-es" || true
+          unzip -l "$APK"
+          sha256sum "$APK"
+
       - uses: actions/upload-artifact@v4
         with:
           name: nail-apk-${{ github.sha }}
