@@ -381,18 +381,18 @@ impl App {
                     &[(Speaker::Bori, text, Face::Normal)],
                 ));
             }
-            // 빈 자리: 모모를 이긴 만큼 꽃잎이 물들어 있다(0046).
+            // 빈 자리: 모모를 이긴 만큼 꽃잎이 물들어 있다(0046). 모모로 왔으면 제 자리라 1인칭으로, 나일이 있는 곳도 말한다(0067).
             Interact::Seat => {
-                let line: Tr = match self.world.momo_wins {
-                    0 => |s| s.seat_1,
-                    1 => |s| s.seat_p1,
-                    2 => |s| s.seat_p2,
-                    _ => |s| s.seat_p3,
+                let momo = self.world.character == crate::equipment::Character::Momo;
+                let (line, face): (Tr, Face) = match self.world.momo_wins {
+                    _ if momo => (|s| s.seat_momo, Face::Happy),
+                    0 => (|s| s.seat_1, Face::Worried),
+                    1 => (|s| s.seat_p1, Face::Worried),
+                    2 => (|s| s.seat_p2, Face::Worried),
+                    _ => (|s| s.seat_p3, Face::Worried),
                 };
-                self.play(cutscene::talk(
-                    &self.world,
-                    &[(Speaker::Nail, line, Face::Worried)],
-                ));
+                // Speaker::Nail = 이번 런의 플레이어 배우(모모 런이면 모모).
+                self.play(cutscene::talk(&self.world, &[(Speaker::Nail, line, face)]));
             }
             // 수수: 처음엔 새싹 발톱을 만들어 준다(0053). 개발 시나리오는 기록 없이 이번 런에만.
             Interact::Talk(Who::Susu)

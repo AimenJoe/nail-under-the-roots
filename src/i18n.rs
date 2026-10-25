@@ -352,7 +352,7 @@ strings! {
     // 주인공 이름(한국어는 나일, docs/decisions/0057)
     name_nail,
     // 모모와 내려가기(docs/decisions/0056)
-    w_kick, w_kick_desc, toast_shell_momo, stat_hop_cd, pick_title, pick_nail, pick_momo, pick_clears, pick_hint, mend_1, mend_2, mend_3, mend_4, run_momo, halmae_petal, jg_momo_deep, jg_momo_deep_d,
+    w_kick, w_kick_desc, toast_shell_momo, stat_hop_cd, pick_title, pick_nail, pick_momo, pick_clears, pick_hint, mend_1, mend_2, mend_3, mend_4, run_momo, seat_momo, halmae_petal, jg_momo_deep, jg_momo_deep_d,
 }
 
 pub static KO: Strings = Strings {
@@ -960,7 +960,8 @@ pub static KO: Strings = Strings {
     mend_2: "…엄마 꽃이야. 다들 여기를 지나갔구나.",
     mend_3: "기다려. 언젠가 꼭 찾으러 올게.",
     mend_4: "모모는 꽃잎을 품에 안고 마을로 돌아갔다.",
-    run_momo: "모모, 오늘은 네가 가는구나. 뒷발 힘 믿고 깡충깡충 다녀와!",
+    run_momo: "모모, 오늘은 네가 가는구나. 나일이는 큰 나무 곁에서 기다린대. 뒷발 힘 믿고 깡충깡충 다녀와!",
+    seat_momo: "내가 앉던 자리. 나일이는 지금쯤 마을에서 큰 나무를 돌보고 있겠지.",
     halmae_petal: "그 꽃잎… 내 실이 굴토끼들을 품고 있단다. 아직 아픈 꿈을 꾸는 중이지. 언젠가 깨워 주렴.",
     jg_momo_deep: "꽃잎을 따라",
     jg_momo_deep_d: "모모와 함께 가장 깊은 곳에 닿는다.",
@@ -1571,7 +1572,8 @@ pub static EN: Strings = Strings {
     mend_2: "…It's Mom's flower. They all passed through here.",
     mend_3: "Wait for me. Someday I'll come find you.",
     mend_4: "Momo held the petal close and carried it back to the village.",
-    run_momo: "Momo, it's your turn today! Trust those hind legs and hop on back safe!",
+    run_momo: "Momo, it's your turn today! Naïl's waiting by the Great Tree. Trust those hind legs and hop on back safe!",
+    seat_momo: "My seat. Naïl's probably back in the village right now, looking after the Great Tree.",
     halmae_petal: "That petal… my threads are holding the rabbits, dear. They're still dreaming a painful dream. Wake them someday, won't you?",
     jg_momo_deep: "Following the Petal",
     jg_momo_deep_d: "Reach the deepest place with Momo.",
@@ -2182,7 +2184,8 @@ pub static JA: Strings = Strings {
     mend_2: "…お母さんの花だ。みんな、ここを通ったんだね。",
     mend_3: "待ってて。いつか、きっとむかえに来るから。",
     mend_4: "モモは花びらをだきしめて、村へ帰った。",
-    run_momo: "モモ、今日はきみが行くんだね。後ろ足を信じて、ぴょんぴょん行ってらっしゃい！",
+    run_momo: "モモ、今日はきみが行くんだね。ナイルは大きな木のそばで待ってるって。後ろ足を信じて、ぴょんぴょん行ってらっしゃい！",
+    seat_momo: "わたしの席。ナイルは今ごろ、村で大きな木の世話をしてるかな。",
     halmae_petal: "その花びら…わたしの糸がアナウサギたちをつつんでいるんだよ。まだ痛い夢を見ているのさ。いつか起こしてあげておくれ。",
     jg_momo_deep: "花びらをたどって",
     jg_momo_deep_d: "モモといっしょに、いちばん深い場所にたどりつく。",
@@ -2795,7 +2798,8 @@ pub static ZH_HANS: Strings = Strings {
     mend_2: "……是妈妈的花。大家都从这里经过了啊。",
     mend_3: "等着我。总有一天，我一定会来找你们。",
     mend_4: "茉茉把花瓣抱在怀里，带回了村子。",
-    run_momo: "茉茉，今天轮到你了呀。相信你的后腿，蹦蹦跳跳地去吧！",
+    run_momo: "茉茉，今天轮到你了呀。拿日说会在大树旁边等你。相信你的后腿，蹦蹦跳跳地去吧！",
+    seat_momo: "我的位子。拿日这会儿应该正在村里照顾大树吧。",
     halmae_petal:
         "那片花瓣……我的丝线正裹着穴兔们呢。它们还在做着痛苦的梦。总有一天，去把它们叫醒吧。",
     jg_momo_deep: "追随花瓣",
@@ -3407,7 +3411,8 @@ pub static PT_BR: Strings = Strings {
     mend_2: "…É a flor da mamãe. Todos passaram por aqui.",
     mend_3: "Me esperem. Um dia eu volto para buscar vocês.",
     mend_4: "Momo abraçou a pétala e a levou de volta para a vila.",
-    run_momo: "Momo, hoje é a sua vez! Confia nessas patas e volta saltitando!",
+    run_momo: "Momo, hoje é a sua vez! O Naïl vai te esperar perto da Grande árvore. Confia nessas patas e volta saltitando!",
+    seat_momo: "Meu lugar. A essa hora o Naïl deve estar na vila, cuidando da Grande árvore.",
     halmae_petal: "Essa pétala… meus fios estão segurando os coelhos, querida. Eles ainda sonham um sonho doloroso. Um dia, acorde-os, tá?",
     jg_momo_deep: "Seguindo a pétala",
     jg_momo_deep_d: "Chegue ao lugar mais profundo com a Momo.",

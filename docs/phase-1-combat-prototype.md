@@ -111,6 +111,7 @@
 - [ ] **v0.1.0**(2026-10-25 태그, `docs/releases/v0.1.0.md`): 웹 링크·Release의 APK를 본인 외 한 사람에게 건네고 판정 기준 4개를 묻는다
 - [ ] **v0.1.1**(0058·0059): Android Chrome에서 글자가 제 색으로 나오는지, 타이틀 버전이 "v0.1.1 · <커밋>"인지, APK를 덮어 설치했을 때 기록이 남는지
 - [ ] **v0.1.2**(0060~0066): 웹·APK에서 Sunnyside 그림(큰 나무·들판 나무·꽃·모닥불·버섯)이 나오는지, 던전 방 모양이 막힘없이 이어지는지, 보스 뒤 아이템을 다 줍고 출구로 갈 수 있는지, 장소에 들어갈 때 멈칫이 참을 만한지
+- [ ] **서명 키를 Secret으로**(0067): fine-grained 토큰(이 레포 하나, Secrets 읽기/쓰기)을 Secret `SECRETS_TOKEN`에 넣는다 → Claude가 `keystore-to-secret` 워크플로를 돌린다 → 다음 APK 로그가 "from secret"이면 워크플로·`SECRETS_TOKEN`·토큰을 지운다
 - [x] 환경 에셋 팩: Sunnyside World로 결정(2026-10-25, docs/decisions/0010)
 - [x] Sunnyside World 라이선스 원문 확인·기록(V1, 상업 사용 가능, 2026-10-25)
 - [ ] Sunnyside World 내려받기(Name your own price)
