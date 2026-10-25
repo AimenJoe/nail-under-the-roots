@@ -129,6 +129,8 @@ enum Scene {
     Shop,
     /// 앨범: 본 컷씬 일러스트를 다시 본다(타이틀, docs/decisions/0041).
     Album,
+    /// 실뜨기 단계 고르기(첫 클리어 뒤 시작할 때, docs/decisions/0043).
+    KnotPick,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -330,6 +332,10 @@ enum Hit {
     Skip,
     /// 앨범 칸.
     AlbumItem(usize),
+    /// 실뜨기: 단계 내리기·올리기·시작.
+    KnotLeft,
+    KnotRight,
+    KnotGo,
 }
 
 pub struct App {
@@ -390,6 +396,8 @@ pub struct App {
     erase_armed: bool,
     /// 이 컷씬이 끝나면 타이틀로(엔딩 = 런의 끝).
     title_after_cutscene: bool,
+    /// 이번 런의 실뜨기 단계(고르는 화면의 커서이기도 하다).
+    knot_level: u8,
     /// 앨범: 고른 칸, 크게 보는 중이면 흐른 시간.
     album_cursor: usize,
     album_view: Option<f32>,
@@ -458,6 +466,7 @@ impl App {
             album_cursor: 0,
             album_view: None,
             title_after_cutscene: false,
+            knot_level: 0,
         }
     }
 
@@ -713,6 +722,14 @@ impl App {
         self.death_noted = false;
         self.pending_wake = false;
         self.apply_assist();
+        // 실뜨기는 첫 시작에만(개발 시나리오는 0단계).
+        let knots = crate::knots::Knots::new(if s == Scenario::Normal {
+            self.knot_level
+        } else {
+            0
+        });
+        self.world.knots = knots;
+        self.world.player.eat_cd_mul = knots.eat_cd_mul();
         self.inventory = match s {
             Scenario::Normal if veteran => Inventory::new(&[start]),
             Scenario::Normal | Scenario::Tutorial => Inventory::new(&[]),
@@ -806,7 +823,7 @@ impl App {
                     None
                 };
                 match chosen {
-                    Some(0) => self.start(Scenario::Normal),
+                    Some(0) => self.begin_run(),
                     Some(1) => {
                         self.album_cursor = 0;
                         self.album_view = None;
@@ -924,6 +941,7 @@ impl App {
             Scene::Route => self.update_route(a, tap_hit),
             Scene::Shop => self.update_shop(a, tap_hit, dt),
             Scene::Album => self.update_album(a, tap_hit, dt),
+            Scene::KnotPick => self.update_knot_pick(a, tap_hit),
             Scene::Game | Scene::Cutscene => {}
         }
     }
@@ -1207,6 +1225,7 @@ impl App {
             Scene::Intro => self.draw_intro(&ui),
             Scene::Title => self.draw_title(&ui),
             Scene::Album => self.draw_album(&ui),
+            Scene::KnotPick => self.draw_knot_pick(&ui),
             Scene::Dev => self.draw_dev(&ui),
             Scene::Cutscene => {
                 self.draw_letterbox(&ui);
@@ -1270,7 +1289,7 @@ impl App {
             o.buttons[crate::input::TOUCH_DIG].ready = 1.0 - p.burrow_cd / burrow;
             o.buttons[crate::input::TOUCH_SP].ready = p.sp / crate::tuning::SP_MAX;
             o.buttons[crate::input::TOUCH_ITEM].ready =
-                1.0 - p.item_cd / crate::tuning::ITEM_COOLDOWN;
+                1.0 - p.item_cd / (crate::tuning::ITEM_COOLDOWN * p.eat_cd_mul);
             render::draw_touch_overlay(&o);
         }
     }
@@ -1305,6 +1324,113 @@ impl App {
         }
         let hint = vfill(i18n::s().skip_hint, &[Verb::Confirm]);
         ui.text_center(&hint, 160.0, 160.0, FONT_PX, ui::TEXT_DIM);
+    }
+
+    /// 실뜨기에서 고를 수 있는 가장 높은 단계.
+    fn knots_open(&self) -> u8 {
+        let k = crate::profile::key::knots_open(Character::Mole);
+        (self.profile.count(&k) as u8).min(crate::knots::MAX_LEVEL)
+    }
+
+    /// 타이틀 "시작": 실뜨기가 열렸으면 단계를 고르고, 아니면 바로.
+    fn begin_run(&mut self) {
+        let open = self.knots_open();
+        if open == 0 {
+            self.knot_level = 0;
+            self.start(Scenario::Normal);
+        } else {
+            let last = self.profile.count(crate::profile::key::KNOT_PICK) as u8;
+            self.knot_level = last.min(open);
+            self.scene = Scene::KnotPick;
+        }
+    }
+
+    fn update_knot_pick(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        let open = self.knots_open();
+        if a.left || tap_hit == Some(Hit::KnotLeft) {
+            self.knot_level = self.knot_level.saturating_sub(1);
+        }
+        if a.right || tap_hit == Some(Hit::KnotRight) {
+            self.knot_level = (self.knot_level + 1).min(open);
+        }
+        if a.confirm || tap_hit == Some(Hit::KnotGo) {
+            use crate::profile::key;
+            self.profile
+                .set_count(key::KNOT_PICK, self.knot_level as u32);
+            self.profile.unset(key::KNOT_NEW);
+            crate::profile::save(&self.profile);
+            self.start(Scenario::Normal);
+            return;
+        }
+        if a.cancel || tap_hit == Some(Hit::Close) {
+            self.scene = Scene::Title;
+        }
+    }
+
+    fn draw_knot_pick(&mut self, ui: &Ui) {
+        use crate::knots::{MAX_LEVEL, NAMES};
+        let s = i18n::s();
+        let open = self.knots_open();
+        let panel = Rect::new(36.0, 8.0, 248.0, 152.0);
+        ui.panel(panel, Some(s.knot_title));
+        let mut y = panel.y + 20.0;
+        for l in ui::wrap(ui, s.knot_intro, panel.w - 16.0, FONT_PX)
+            .iter()
+            .take(2)
+        {
+            ui.text(l, panel.x + 8.0, y, FONT_PX, ui::TEXT_DIM);
+            y += 13.0;
+        }
+        // ◀ 단계 ▶
+        y += 4.0;
+        let label = if self.knot_level == 0 {
+            s.knot_none.to_string()
+        } else {
+            fill(s.knot_level, &[&self.knot_level])
+        };
+        let (row, l, r) =
+            ui.setting_row(s.knot_title, &label, panel.x + 8.0, y, panel.w - 16.0, true);
+        self.hits.push((l, Hit::KnotLeft));
+        self.hits.push((r, Hit::KnotRight));
+        self.hits.push((row, Hit::KnotGo));
+        y += FONT_PX + 8.0;
+        // 매듭 목록: 걸림 ● / 열렸지만 안 걸림 ○ / 아직 안 열림 ?
+        for i in 0..MAX_LEVEL {
+            let n = i + 1;
+            let (mark, text, c) = if n > open {
+                ("?", "…".to_string(), ui::TEXT_DIM)
+            } else if n <= self.knot_level {
+                ("●", tr(NAMES[i as usize]).to_string(), ui::TEXT)
+            } else {
+                ("○", tr(NAMES[i as usize]).to_string(), ui::TEXT_DIM)
+            };
+            ui.text(mark, panel.x + 10.0, y, FONT_PX, c);
+            let t = ui.fit(&text, panel.w - 34.0, FONT_PX);
+            ui.text(&t, panel.x + 22.0, y, FONT_PX, c);
+            y += 13.0;
+        }
+        let note = if self.profile.flag(crate::profile::key::KNOT_NEW) {
+            s.toast_knot_open
+        } else {
+            s.knot_locked
+        };
+        for (i, l) in ui::wrap(ui, note, panel.w - 16.0, FONT_PX)
+            .iter()
+            .take(2)
+            .enumerate()
+        {
+            ui.text(
+                l,
+                panel.x + 8.0,
+                y + 2.0 + i as f32 * 12.0,
+                FONT_PX,
+                ui::ACCENT,
+            );
+        }
+        let hint = vfill(s.knot_hint, &[Verb::Confirm, Verb::Change, Verb::Back]);
+        let hint = ui.fit(&hint, 300.0, FONT_PX);
+        ui.text_center(&hint, 160.0, panel.bottom() + 4.0, FONT_PX, ui::TEXT_DIM);
+        self.close_button(ui, panel);
     }
 
     fn album_seen(&self, il: crate::illust::Illust) -> bool {

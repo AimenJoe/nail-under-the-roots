@@ -133,6 +133,8 @@ pub struct World {
     pub debug: Debug,
     /// 적을 다 잡으면 다음 웨이브를 자동으로 띄운다. 시나리오는 끌 수 있다.
     pub auto_waves: bool,
+    /// 이번 런의 실뜨기(엔딩 뒤 어려움, docs/decisions/0043). 새로 나온 적에 한 번 건다.
+    pub knots: crate::knots::Knots,
     /// 지금 환경. `biome_by_wave`면 웨이브가 깊이를 대신해 바뀐다.
     pub biome: Biome,
     pub biome_by_wave: bool,
@@ -188,6 +190,7 @@ impl World {
                 hitboxes: false,
             },
             auto_waves: true,
+            knots: crate::knots::Knots::default(),
             biome: Biome::Meadow,
             biome_by_wave: true,
             wave: 0,
@@ -226,6 +229,10 @@ impl World {
             // 장소를 바꾸는 중(어두워졌다 밝아짐): 로직은 멈춘다.
             self.freeze_interp();
             return;
+        }
+        let knots = self.knots;
+        for e in &mut self.enemies {
+            e.apply_knots(knots);
         }
         self.feel.tick(dt);
         if self.feel.hitstop > 0.0 {
@@ -814,7 +821,11 @@ impl World {
         }
         let max = self.player.stats.max_hp;
         let missing = self.player.hp < max;
-        let p = loot::berry_chance(self.player.hp, max, self.kills_since_berry, kind);
+        let mut p = loot::berry_chance(self.player.hp, max, self.kills_since_berry, kind);
+        // 실뜨기 3: 덜 떨어진다. 불운 보정(확정)은 그대로 둔다.
+        if p < 1.0 {
+            p *= self.knots.berry_mul();
+        }
         if p > 0.0 && rand::gen_range(0.0, 1.0) < p {
             self.push_loot(Loot::spawn(LootKind::Berry, pos));
             self.kills_since_berry = 0;

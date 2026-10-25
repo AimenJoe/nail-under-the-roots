@@ -161,6 +161,12 @@ pub const PARRY_REFLECT_SPEED: f32 = 1.4;
 pub const PARRY_REFLECT_DAMAGE: i32 = 2;
 
 // ---- 모험(필드·던전, src/adventure.rs, docs/decisions/0019) ------------------------------
+/// 실뜨기 매듭(src/knots.rs, docs/decisions/0043): 적 체력 배율, 예고 배율, 산딸기 확률 배율, 가게 값 배율, 먹기 대기 배율.
+pub const KNOT_ENEMY_HP: f32 = 1.25;
+pub const KNOT_WINDUP: f32 = 0.8;
+pub const KNOT_BERRY: f32 = 0.6;
+pub const KNOT_PRICE: f32 = 1.5;
+pub const KNOT_EAT_CD: f32 = 1.6;
 /// 한 런 = 필드 + 길 몇 개. 이 번째 길의 주인을 이기면 가장 깊은 곳(엔딩, docs/decisions/0042).
 pub const FINAL_STAGE: u32 = 3;
 /// 장소를 바꿀 때 어두워지는(그리고 밝아지는) 시간.

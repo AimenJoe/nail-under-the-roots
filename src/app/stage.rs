@@ -214,8 +214,16 @@ impl App {
         use crate::profile::key;
         let true_end = self.profile.flag(key::MOMO_BACK) && self.profile.flag(key::DOTO_MEMORY);
         if self.recording() {
-            self.profile
-                .add(&key::clears(crate::equipment::Character::Mole), 1);
+            use crate::equipment::Character;
+            self.profile.add(&key::clears(Character::Mole), 1);
+            // 실뜨기: 열린 가장 높은 단계로 닿았으면 다음 단계를 연다(첫 클리어가 1단계를 연다, 0043).
+            let open_key = key::knots_open(Character::Mole);
+            let open = self.profile.count(&open_key);
+            let level = self.world.knots.level as u32;
+            if level >= open && open < crate::knots::MAX_LEVEL as u32 {
+                self.profile.add(&open_key, 1);
+                self.profile.set(key::KNOT_NEW);
+            }
             self.profile.set(if true_end {
                 key::TRUE_ENDING
             } else {
@@ -528,7 +536,7 @@ impl App {
     /// 지금 이 물건을 살 수 없는 이유(포포의 말). 살 수 있으면 None.
     fn cant_buy(&self, ware: Ware) -> Option<Tr> {
         let w = &self.world;
-        if w.seeds < ware.price() {
+        if w.seeds < self.world.knots.price(ware.price()) {
             return Some(|s| s.shop_poor);
         }
         let full = match ware {
@@ -540,8 +548,8 @@ impl App {
     }
 
     fn buy(&mut self, ware: Ware) {
+        let price = self.world.knots.price(ware.price());
         let w = &mut self.world;
-        let price = ware.price();
         let msg: Tr = if w.seeds < price {
             |s| s.shop_poor
         } else {
@@ -629,13 +637,13 @@ impl App {
                 ui.rect(r, ui::PANEL_LIGHT);
                 ui.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ui::ACCENT);
             }
-            let afford = self.world.seeds >= ware.price();
+            let afford = self.world.seeds >= self.world.knots.price(ware.price());
             let c = match (on, afford) {
                 (_, false) => ui::TEXT_DIM,
                 (true, true) => ui::TEXT,
                 (false, true) => Color::new(0.78, 0.72, 0.64, 1.0),
             };
-            let price = fill(s.shop_price, &[&ware.price()]);
+            let price = fill(s.shop_price, &[&self.world.knots.price(ware.price())]);
             let pw = ui.text_w(&price, FONT_PX);
             let name = ui.fit(tr(ware.name()), r.w - pw - 26.0, FONT_PX);
             ui.text(&name, r.x + 14.0, r.y + 2.0, FONT_PX, c);
@@ -676,7 +684,10 @@ impl App {
         ui.rect(panel, ui::DIM_OVERLAY);
         let b = Rect::new(panel.x + 26.0, panel.y + 44.0, panel.w - 52.0, 62.0);
         ui.panel(b, None);
-        let q = fill(s.shop_confirm, &[&tr(ware.name()), &ware.price()]);
+        let q = fill(
+            s.shop_confirm,
+            &[&tr(ware.name()), &self.world.knots.price(ware.price())],
+        );
         for (k, l) in ui::wrap(ui, &q, b.w - 12.0, FONT_PX)
             .iter()
             .take(2)

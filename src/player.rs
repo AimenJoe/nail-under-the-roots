@@ -83,6 +83,8 @@ pub struct Player {
     pub burrow_cd: f32,
     /// 다음 먹기까지 남은 시간(먹기 시작 순간부터 ITEM_COOLDOWN).
     pub item_cd: f32,
+    /// 먹기 대기 배율(실뜨기 5, docs/decisions/0043).
+    pub eat_cd_mul: f32,
     /// 받는 피해를 줄이는 비율(0..1). 도움 모드 "포포의 응원"(docs/decisions/0041). 앱이 기록에서 정한다.
     pub resist: f32,
     /// 줄인 피해의 소수 부분을 모아 둔다(체력은 정수라 1이 차면 그때 깎는다).
@@ -123,6 +125,7 @@ impl Player {
             state: State::Free,
             burrow_cd: 0.0,
             item_cd: 0.0,
+            eat_cd_mul: 1.0,
             resist: 0.0,
             dmg_acc: 0.0,
             events: Vec::new(),
@@ -234,7 +237,7 @@ impl Player {
     /// 먹기 시작. 대기는 지금부터 센다(끊겨도 그대로).
     pub fn start_eat(&mut self, item: Consumable) {
         self.item_buf = 0.0;
-        self.item_cd = t::ITEM_COOLDOWN;
+        self.item_cd = t::ITEM_COOLDOWN * self.eat_cd_mul;
         self.state = State::Eat { item, time: 0.0 };
     }
 

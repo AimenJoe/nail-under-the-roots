@@ -74,6 +74,12 @@ pub struct Enemy {
     pub prev_pos: Vec2,
     pub vel: Vec2,
     pub hp: i32,
+    /// 처음 체력(실뜨기가 바꾼다). 막대·반 아래 판정은 이걸 본다.
+    pub max_hp: i32,
+    /// 예고 시간 배율(실뜨기 2단계).
+    pub windup_mul: f32,
+    /// 실뜨기를 이미 걸었나(월드가 새로 나온 적에 한 번).
+    pub knotted: bool,
     pub state: State,
     pub facing: Vec2,
     pub flash: f32,
@@ -119,6 +125,22 @@ impl Projectile {
 }
 
 impl Enemy {
+    /// 예고 시간(종 수치 × 실뜨기 배율).
+    pub fn windup(&self) -> f32 {
+        self.kind.species().windup * self.windup_mul
+    }
+
+    /// 실뜨기 매듭을 건다(한 번만): 체력·예고.
+    pub fn apply_knots(&mut self, k: crate::knots::Knots) {
+        if self.knotted {
+            return;
+        }
+        self.knotted = true;
+        self.max_hp = (self.max_hp as f32 * k.enemy_hp_mul()).ceil() as i32;
+        self.hp = self.max_hp;
+        self.windup_mul = k.windup_mul();
+    }
+
     pub fn new(kind: Kind, pos: Vec2) -> Self {
         let sp = kind.species();
         let hp = sp.hp;
@@ -129,6 +151,9 @@ impl Enemy {
             prev_pos: pos,
             vel: Vec2::ZERO,
             hp,
+            max_hp: hp,
+            windup_mul: 1.0,
+            knotted: false,
             state,
             facing: vec2(-1.0, 0.0),
             flash: 0.0,
@@ -253,7 +278,7 @@ impl Enemy {
             }
             State::Howl { time } => {
                 let time = time + dt;
-                if time >= sp.windup * t::CHIEF_HOWL_MUL {
+                if time >= self.windup() * t::CHIEF_HOWL_MUL {
                     self.summons += 1;
                     events.push(Event::Summon);
                     self.state = State::Rest { time: sp.rest };
@@ -276,7 +301,7 @@ impl Enemy {
                 if player_targetable {
                     self.facing = dir_to_player;
                 }
-                if time >= sp.windup {
+                if time >= self.windup() {
                     self.state = State::Charge {
                         time: 0.0,
                         dir: self.facing,
@@ -336,7 +361,7 @@ impl Enemy {
             State::Crouch { time, target } => {
                 let time = time + dt;
                 self.facing = (target - self.pos).normalize_or(self.facing);
-                if time >= sp.windup {
+                if time >= self.windup() {
                     // 너무 멀면 갈 수 있는 데까지만.
                     let reach = (target - self.pos).clamp_length_max(sp.trigger * 1.2);
                     self.state = State::Leap {
@@ -366,7 +391,7 @@ impl Enemy {
                 if player_targetable {
                     self.facing = dir_to_player;
                 }
-                if time >= sp.windup {
+                if time >= self.windup() {
                     let start =
                         self.pos + self.facing * (self.radius() + t::PROJECTILE_RADIUS + 1.0);
                     projectiles.push(Projectile {
@@ -399,7 +424,7 @@ impl Enemy {
     /// 멀면 걸어서 다가간다(Approach 그대로).
     fn chief_next(&mut self, dist: f32, player_pos: Vec2) -> State {
         let sp = self.sp();
-        let hurt = self.hp * 2 <= sp.hp;
+        let hurt = self.hp * 2 <= self.max_hp;
         if hurt && self.summons < t::CHIEF_SUMMONS && self.pattern % 3 == 2 {
             self.pattern += 1;
             return State::Howl { time: 0.0 };

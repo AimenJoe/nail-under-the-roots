@@ -21,6 +21,7 @@ mod i18n;
 mod illust;
 mod input;
 mod items;
+mod knots;
 mod loading;
 mod loot;
 mod map;

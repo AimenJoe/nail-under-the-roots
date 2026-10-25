@@ -493,7 +493,7 @@ fn draw_boss_bar(ui: &Ui, w: &World) {
         OUTLINE,
     );
     ui.rect(bar, Color::new(0.20, 0.10, 0.14, 1.0));
-    let k = (b.hp.max(0) as f32 / b.sp().hp as f32).clamp(0.0, 1.0);
+    let k = (b.hp.max(0) as f32 / b.max_hp.max(1) as f32).clamp(0.0, 1.0);
     ui.rect(
         Rect::new(bar.x, bar.y, (bar.w * k).round(), bar.h),
         Color::new(0.85, 0.30, 0.38, 1.0),
@@ -564,7 +564,7 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
             }
         }
         // 다음 먹기까지: 위에서부터 어둡게 덮였다가 걷힌다(0038).
-        let cd = w.player.item_cd / t::ITEM_COOLDOWN;
+        let cd = w.player.item_cd / (t::ITEM_COOLDOWN * w.player.eat_cd_mul);
         if cd > 0.0 {
             let h = (size * cd).round();
             ui.rect(
@@ -1878,7 +1878,7 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             } else {
                 -1.0
             };
-            let k = (wt / sp.windup).min(1.0);
+            let k = (wt / e.windup()).min(1.0);
             tint = Color::new(1.0, 1.0 - 0.45 * k, 1.0 - 0.45 * k, 1.0);
             if matches!(e.state, enemy::State::Aim { .. }) {
                 // 도토리를 쳐든다.
@@ -1888,7 +1888,7 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         }
         enemy::State::Crouch { time: ct, .. } => {
             frame = 4;
-            let k = (ct / sp.windup).min(1.0);
+            let k = (ct / e.windup()).min(1.0);
             tint = Color::new(1.0, 1.0 - 0.4 * k, 1.0 - 0.4 * k, 1.0);
         }
         enemy::State::Leap { .. } => {
@@ -1991,8 +1991,8 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         }
     }
     // 체력 점(맞은 적만: 처음부터 숫자를 늘어놓지 않는다). 보스는 화면 아래 막대.
-    if !e.is_boss() && (e.hp < sp.hp || sp.behavior == crate::species::Behavior::Dummy) {
-        let max = sp.hp;
+    if !e.is_boss() && (e.hp < e.max_hp || sp.behavior == crate::species::Behavior::Dummy) {
+        let max = e.max_hp;
         for i in 0..max {
             let c = if i < e.hp { WHITE } else { DARKGRAY };
             draw_rectangle(
@@ -2070,10 +2070,10 @@ fn draw_telegraphs(w: &World, alpha: f32) {
             enemy::State::Windup { time }
                 if matches!(sp.behavior, Behavior::Charger | Behavior::Chief) =>
             {
-                ((time / sp.windup).min(1.0), 0)
+                ((time / e.windup()).min(1.0), 0)
             }
-            enemy::State::Aim { time } => ((time / sp.windup).min(1.0), 1),
-            enemy::State::Crouch { time, .. } => ((time / sp.windup).min(1.0), 2),
+            enemy::State::Aim { time } => ((time / e.windup()).min(1.0), 1),
+            enemy::State::Crouch { time, .. } => ((time / e.windup()).min(1.0), 2),
             enemy::State::Leap { .. } => (1.0, 2),
             _ => continue,
         };

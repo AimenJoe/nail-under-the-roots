@@ -33,6 +33,13 @@ pub mod key {
     pub const MOMO_BACK: &str = "momo";
     pub const DOTO_MEMORY: &str = "doto_memory";
 
+    /// 실뜨기: 고를 수 있는 가장 높은 단계(캐릭터별), 마지막으로 고른 단계, 새 단계가 열렸다는 표시(0043).
+    pub fn knots_open(character: impl std::fmt::Debug) -> String {
+        format!("knots.{character:?}")
+    }
+    pub const KNOT_PICK: &str = "knot_pick";
+    pub const KNOT_NEW: &str = "knot_new";
+
     /// 캐릭터별 클리어 수.
     pub fn clears(character: impl std::fmt::Debug) -> String {
         format!("clears.{character:?}")
@@ -83,6 +90,12 @@ impl Profile {
         debug_assert!(valid_key(k));
         let v = self.counts.entry(k.to_string()).or_insert(0);
         *v = v.saturating_add(n);
+    }
+
+    /// 수를 그대로 정한다(마지막으로 고른 것 등).
+    pub fn set_count(&mut self, k: &str, n: u32) {
+        debug_assert!(valid_key(k));
+        self.counts.insert(k.to_string(), n);
     }
 
     /// 더 크면 바꾼다(최고 기록). 바뀌었으면 true.
