@@ -12,6 +12,7 @@
 
 그리는 법(픽셀 그림 흉내):
   - 하늘·흙은 계단식 그라디언트(띠), 1px 디더는 쓰지 않는다(홀수 화면 배율에서 1.5배로 늘어나 얼룩진다).
+    띠 경계만 2×2 칸 바둑판으로 섞는다(0049): 2×2 = 게임 1px이라 어느 배율에서도 고르게 찍힌다.
   - 몸은 마스크 하나에 구(球) 음영 띠를 입힌다(왼쪽 위 빛). 캐릭터마다 바깥에 어두운 외곽선 1~2px.
   - 실·뿌리는 베지어 곡선을 굵기를 줄여 가며 긋는다.
 """
@@ -140,9 +141,11 @@ def outline(cv, mask, rgb=OUTLINE, r=2):
     cv.paint(dilate(mask, r) & ~mask, rgb)
 
 
-def bands(cv, y0, y1, top, bottom, n, x0=0, x1=None):
-    """y0..y1 세로 계단 그라디언트."""
+def bands(cv, y0, y1, top, bottom, n, x0=0, x1=None, blend=True):
+    """y0..y1 세로 계단 그라디언트. 띠 경계 위아래 4px은 2×2 칸 바둑판으로 두 색을 섞는다(띠 자국을 누그러뜨린다)."""
     x1 = cv.w if x1 is None else x1
+    cols = []
+    edges = []
     for i in range(n):
         t = i / max(1, n - 1)
         c = tuple(top[j] + (bottom[j] - top[j]) * t for j in range(3))
@@ -150,6 +153,19 @@ def bands(cv, y0, y1, top, bottom, n, x0=0, x1=None):
         b = y0 + (y1 - y0) * (i + 1) / n
         m = (cv.yy >= a) & (cv.yy < b) & (cv.xx >= x0) & (cv.xx < x1)
         cv.paint(m, c)
+        cols.append(c)
+        edges.append(b)
+    if not blend:
+        return
+    cell = ((cv.xx // 2) + (cv.yy // 2)) % 2 == 0
+    inx = (cv.xx >= x0) & (cv.xx < x1)
+    for i in range(n - 1):
+        e = int(round(edges[i] / 2)) * 2
+        # 경계 위 한 줄(2px)은 아래 색을 반만, 경계 아래 한 줄은 위 색을 반만.
+        up = (cv.yy >= e - 2) & (cv.yy < e) & inx & cell
+        down = (cv.yy >= e) & (cv.yy < e + 2) & inx & cell
+        cv.paint(up, cols[i + 1])
+        cv.paint(down, cols[i])
 
 
 def glow(cv, cx, cy, r, rgb, strength=0.5, steps=4):
@@ -445,25 +461,41 @@ def momo_bloom():
     ear_r = ellipse(cv, cx + 40, cy - 124, 24, 84, rot=0.22)
     head = ellipse(cv, cx, cy - 6, 92, 80)
     cheeks = ellipse(cv, cx - 50, cy + 30, 46, 34) | ellipse(cv, cx + 50, cy + 30, 46, 34)
-    chest = ellipse(cv, cx, cy + 120, 120, 70)
+    # 몸: 머리 밑으로 이어지는 어깨(목 없이 한 덩어리 — 공 두 개를 쌓은 눈사람처럼 보이지 않게, 0049)
+    chest = ellipse(cv, cx, cy + 116, 128, 74) | poly(cv, [(cx - 92, cy + 30), (cx + 92, cy + 30), (cx + 120, cy + 100), (cx - 120, cy + 100)])
     sil = ear_l | ear_r | head | cheeks | chest
     outline(cv, sil, r=2)
     shade(cv, chest, RABBIT, cx, cy + 110, 130, 80)
     shade(cv, ear_l, RABBIT)
     shade(cv, ear_r, RABBIT)
     cv.paint(ellipse(cv, cx - 44, cy - 124, 11, 66, rot=-0.18) | ellipse(cv, cx + 40, cy - 120, 11, 66, rot=0.22), PINK[1])
+    # 가슴 털(밝은 털 덩어리, 위가 들쭉날쭉) + 앞발 둘
+    bib = ellipse(cv, cx, cy + 112, 58, 46)
+    shade(cv, bib, RABBIT_LIGHT, cx, cy + 100, 70, 60)
+    for k in range(7):
+        x = cx - 48 + k * 16
+        cv.paint(poly(cv, [(x - 8, cy + 76), (x + 8, cy + 76), (x, cy + 66)]), RABBIT_LIGHT[1])
+    for px in (cx - 34, cx + 34):
+        paw = ellipse(cv, px, cy + 150, 22, 15)
+        outline(cv, paw, r=2)
+        shade(cv, paw, RABBIT_LIGHT, px, cy + 146, 24, 16)
+        for k in (-8, 0, 8):
+            cv.paint(stroke(cv, [(px + k, cy + 141), (px + k, cy + 150)], 1), RABBIT[1])
     shade(cv, head | cheeks, RABBIT, cx, cy, 100, 90)
     muzzle = ellipse(cv, cx, cy + 36, 40, 28)
     shade(cv, muzzle, RABBIT_LIGHT)
     cv.paint(poly(cv, [(cx - 8, cy + 22), (cx + 8, cy + 22), (cx, cy + 32)]), PINK[1])
     cv.paint(stroke(cv, [(cx, cy + 32), (cx, cy + 40), (cx - 8, cy + 46)], 2) | stroke(cv, [(cx, cy + 40), (cx + 8, cy + 46)], 2), (96, 60, 64))
-    # 초록 눈(돌아온 눈)
+    # 눈: 초록 빛이 걷힌 맑은 검은 눈(스프라이트·초상화와 같다, 0046·0049). 아래쪽에 따뜻한 반사광.
     for ex in (cx - 38, cx + 38):
-        cv.paint(ellipse(cv, ex, cy - 6, 14, 17), (22, 30, 26))
-        cv.paint(ellipse(cv, ex, cy - 2, 10, 12), (86, 164, 92))
-        cv.paint(ellipse(cv, ex, cy + 2, 7, 7), (38, 80, 46))
-        cv.paint(ellipse(cv, ex - 5, cy - 10, 4, 4), (255, 255, 255))
-        cv.paint(ellipse(cv, ex + 5, cy + 6, 2, 2), (230, 255, 230))
+        cv.paint(ellipse(cv, ex, cy - 6, 14, 17), (22, 14, 30))
+        cv.paint(ellipse(cv, ex, cy + 4, 10, 7), (70, 56, 88))
+        cv.paint(ellipse(cv, ex, cy + 7, 7, 4), (120, 100, 132))
+        cv.paint(ellipse(cv, ex - 5, cy - 11, 5, 5), (255, 255, 255))
+        cv.paint(ellipse(cv, ex + 6, cy + 2, 2, 2), (255, 255, 255))
+        # 속눈썹(바깥 눈꼬리)
+        side = -1 if ex < cx else 1
+        cv.paint(stroke(cv, [(ex + side * 12, cy - 16), (ex + side * 18, cy - 20)], 2), (22, 14, 30))
     # 볼 홍조
     for ex in (cx - 62, cx + 62):
         cv.paint(ellipse(cv, ex, cy + 26, 14, 7), (240, 140, 150), 0.5)

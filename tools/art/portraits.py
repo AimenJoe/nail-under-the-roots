@@ -8,6 +8,9 @@
   칸 7~8: 모모(굴토끼, 히로인) 물든 모습 — 차가움·괴로움(docs/decisions/0029)
   칸 9  : 들쥐 대장(튜토리얼 보스) 물든 모습 — 노려봄(docs/decisions/0032)
   칸 10~11: 돌아온 보리(같은 들쥐) 보통·기쁨. 흉터는 남는다
+  칸 12~14: 돌아온 모모 보통·기쁨·걱정 — 따뜻한 회갈색, 검은 눈, 핀 꽃, 뿌리 없음(docs/decisions/0049)
+  칸 15~16: 누룩 할매 보통·기쁨 — 흰 실 덩어리 몸, 머리에 버섯 갓 셋, 감은 눈
+  칸 17  : 엄마 두더지 — Naïl보다 크고 털이 짙다, 다정하게 감은 눈
 
 그리는 법(손 도트를 흉내 낸 절차):
   1. 부위를 타원으로 놓고 칸마다 재질을 정한다(뒤에 놓인 것부터).
@@ -53,6 +56,16 @@ RAMP = {
     'rmuz':   [(150, 118, 100), (188, 158, 130), (216, 192, 160), (238, 220, 192)],
     'tmuz':   [(104, 84, 96), (132, 110, 120), (158, 136, 144), (182, 162, 166)],
     'scar':   [(150, 110, 104), (196, 160, 150), (226, 200, 188)],
+    # 돌아온 모모: 원래 털(critters.py momo_bloom과 같은 계열), 밝은 주둥이, 분홍 귀 안, 핀 꽃
+    'bfur':   [(66, 50, 46), (104, 84, 74), (146, 120, 102), (184, 158, 134), (218, 196, 172)],
+    'blight': [(176, 156, 136), (204, 186, 166), (228, 214, 196), (246, 238, 224)],
+    'bloom':  [(196, 86, 126), (236, 126, 166), (255, 168, 198), (255, 216, 230)],
+    # 누룩 할매: 흰 실 덩어리(옅은 보랏빛 흰색), 버섯 갓, 버섯 대
+    'thread': [(112, 104, 134), (150, 144, 174), (188, 184, 208), (218, 216, 234), (242, 240, 250)],
+    'cap':    [(84, 56, 40), (126, 88, 56), (170, 126, 78), (206, 166, 108)],
+    'stem':   [(170, 158, 140), (210, 200, 182), (236, 230, 216)],
+    # 엄마 두더지: Naïl보다 한 단 짙은 털
+    'mfurd':  [(46, 30, 34), (72, 50, 46), (102, 74, 62), (132, 98, 80), (162, 128, 104)],
 }
 RED_EYE = [(80, 14, 34), (190, 34, 72), (255, 84, 116), (255, 222, 230)]
 GLOW_EYE = [(40, 70, 36), (110, 190, 70), (190, 245, 120), (240, 255, 210)]
@@ -635,6 +648,161 @@ def bori(face):
     return cv
 
 
+# ---- 돌아온 모모 -------------------------------------------------------------------------
+def momo_back(face):
+    """돌아온 모모(0049): 물든 모습(momo_tainted)과 같은 실루엣. 털은 따뜻하게, 귀 안은 분홍, 눈은 검고 맑게,
+    가까운 귀 밑동의 꽃이 분홍으로 피었다. 뿌리는 없다. face: 'normal' / 'happy' / 'worried'."""
+    cv = Canvas()
+
+    def fluff(x, y, ang):
+        r = tuft(x, y, ang)
+        if 0.2 < ang < 1.3 or 1.85 < ang < 2.95:
+            r *= 1.0 + 0.09 * (0.5 + 0.5 * math.sin(ang * 9.0))
+        return r
+    ellipse(cv, 26, 22, 7, 17, 'bfur', bias=-0.08, clip=lambda x, y: y < 40)
+    flat(cv, 27, 22, 3.5, 12, 'pink', 0)
+    ellipse(cv, 50, 18, 8, 18, 'bfur', bias=0.04, clip=lambda x, y: y < 40)
+    flat(cv, 51, 19, 4.0, 13, 'pink', 1)
+    flat(cv, 51, 16, 2.0, 8, 'pink', 2)
+    for (x, y) in ((49, 6), (50, 5), (51, 5), (52, 6)):
+        cv.put(x, y, 'bfur', 2)
+    ellipse(cv, 42, 54, 29, 24, 'bfur', bias=0.05, rough=fluff)
+    ellipse(cv, 40, 92, 22, 10, 'bfur', bias=-0.15)
+    ellipse(cv, 40, 88, 12, 6, 'blight', bias=-0.1)                 # 가슴 털
+    ellipse(cv, 61, 62, 5.5, 4.5, 'blight', bias=-0.05)
+    ellipse(cv, 66, 58, 2.4, 1.9, 'pink', bias=-0.1)
+    outline(cv)
+    rim_light(cv, 'bfur')
+    # 털 결(머리 위·볼)
+    for (x, y) in ((30, 36), (31, 37), (36, 33), (37, 34), (22, 52), (23, 53), (62, 40), (63, 41)):
+        cv.paint(x, y, RAMP['bfur'][1])
+    for (x, y) in ((28, 40), (34, 36), (24, 48)):
+        cv.paint(x, y, RAMP['bfur'][4])
+    # 핀 꽃(가까운 귀 밑동): 꽃잎 다섯이 위로 펴지고 분홍, 가운데 노랑, 잎 하나.
+    fx, fy = 53, 23
+    for (cx, cy) in ((0, -4), (-4, -1), (4, -1), (-3, 4), (3, 4)):
+        flat(cv, fx + cx, fy + cy, 2.8, 2.5, 'bloom', 2)
+        cv.paint(fx + cx - 1, fy + cy - 1, RAMP['bloom'][3])
+        cv.paint(fx + cx + 1, fy + cy + 1, RAMP['bloom'][1])
+    for (ox, oy) in ((-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1), (0, -1)):
+        cv.paint(fx + ox, fy + oy, (255, 222, 120))
+    cv.paint(fx, fy, (236, 180, 70))
+    for (x, y) in ((fx + 6, fy + 3), (fx + 7, fy + 4), (fx + 7, fy + 5), (fx + 6, fy + 5)):
+        cv.paint(x, y, (110, 170, 90))
+    # 눈: 크고 검은 눈 + 큰 반사(Naïl과 같은 눈). 기쁨은 감은 눈.
+    if face == 'happy':
+        happy_eye(cv, 39, 48, 5.6)
+        happy_eye(cv, 58, 45, 4.2)
+    else:
+        eye(cv, 39, 48, 5.6, 6.6)
+        eye(cv, 58, 45, 4.2, 5.4, look=(0.3, 0.0))
+        for (ex, ey, rx, ry, outer) in ((39, 48, 5.6, 6.6, -1), (58, 45, 4.2, 5.4, 1)):
+            bx, by = int(ex + outer * rx * 0.9), int(ey - ry * 0.6)
+            for (ox, oy) in ((0, 0), (outer, -1), (outer, 1), (2 * outer, 0)):
+                cv.paint(bx + ox, by + oy, RAMP['eye'][0])
+    if face == 'worried':
+        line(cv, [(33, 38), (44, 35)], RAMP['bfur'][0], 2)
+        line(cv, [(54, 34), (62, 36)], RAMP['bfur'][0], 2)
+        line(cv, [(60, 68), (63, 67), (66, 68)], MOUTH, 1)
+    elif face == 'happy':
+        for (x, y) in ((59, 67), (60, 68), (61, 69), (62, 69), (63, 69), (64, 68), (65, 67)):
+            cv.paint(x, y, MOUTH)
+        for (x, y) in ((61, 70), (62, 70), (63, 70)):
+            cv.paint(x, y, RAMP['pink'][2])
+    else:
+        line(cv, [(34, 39), (43, 38)], RAMP['bfur'][1], 2)
+        line(cv, [(54, 36), (61, 36)], RAMP['bfur'][1], 2)
+        line(cv, [(60, 67), (62, 68), (64, 68), (66, 67)], MOUTH, 1)
+    dither_ellipse(cv, 48, 60, 5.0, 2.6, BLUSH, 0.5)
+    dither_ellipse(cv, 30, 58, 3.5, 2.0, BLUSH, 0.4)
+    return cv
+
+
+# ---- 누룩 할매 ---------------------------------------------------------------------------
+def halmae(face):
+    """누룩 할매(0045·0049): 흰 실이 뭉친 둥근 몸(뽕나무버섯의 균사, 0037), 머리에 버섯 갓 셋, 늘 감은 눈.
+    얼굴은 실 사이로 동그랗게 드러난다. face: 'normal'(조용히 감은 눈) / 'happy'(웃는 눈 + 홍조)."""
+    cv = Canvas()
+
+    def wool(x, y, ang):
+        return 1.0 + 0.05 * math.sin(ang * 11.0 + 0.4) + 0.03 * math.sin(ang * 23.0)
+    # 버섯 갓(뒤 → 앞): 대 먼저, 갓은 반원
+    for (sx, sy, sh) in ((24, 22, 12), (46, 14, 14), (66, 24, 11)):
+        flat(cv, sx, sy + sh / 2, 2.5, sh / 2, 'stem', 1)
+    ellipse(cv, 44, 60, 36, 32, 'thread', bias=0.08, rough=wool)
+    for (cx, cy, rx, ry) in ((24, 20, 11, 7), (46, 11, 13, 8), (66, 22, 10, 6.5)):
+        ellipse(cv, cx, cy, rx, ry, 'cap', bias=0.05, clip=lambda x, y, cy=cy: y <= cy + 1)
+    # 얼굴: 실 사이로 드러난 부드러운 면(한 단 밝게)
+    flat(cv, 50, 56, 17, 13, 'thread', 4)
+    flat(cv, 50, 57, 15, 11, 'thread', 3)
+    outline(cv)
+    rim_light(cv, 'thread')
+    # 갓 반점
+    for (x, y) in ((20, 16), (28, 18), (42, 6), (50, 9), (63, 19), (70, 21)):
+        cv.paint(x, y, RAMP['cap'][3])
+        cv.paint(x + 1, y, RAMP['cap'][3])
+    # 실 결: 몸을 감는 가는 흰 선 몇 가닥 + 바닥으로 풀린 실
+    for pts in (
+        [(12, 52), (22, 46), (34, 44)],
+        [(66, 42), (76, 48), (82, 58)],
+        [(10, 70), (20, 76), (30, 74)],
+        [(70, 74), (78, 70), (84, 76)],
+        [(20, 86), (28, 80), (38, 84)],
+    ):
+        line(cv, pts, RAMP['thread'][4], 1)
+    for pts in ([(14, 60), (22, 58)], [(74, 62), (80, 66)], [(56, 84), (66, 80)]):
+        line(cv, pts, RAMP['thread'][1], 1)
+    # 눈: 늘 감고 있다. 보통 = 아래로 휜 조용한 선(︶), 기쁨 = ^ + 눈가 주름
+    if face == 'happy':
+        happy_eye(cv, 42, 54, 4.4)
+        happy_eye(cv, 59, 53, 3.6)
+        dither_ellipse(cv, 41, 61, 4.5, 2.2, BLUSH, 0.5)
+        dither_ellipse(cv, 61, 60, 3.6, 2.0, BLUSH, 0.45)
+        for (x, y) in ((61, 64), (62, 65), (63, 65), (64, 65), (65, 64)):
+            cv.paint(x, y, MOUTH)
+    else:
+        line(cv, [(38, 53), (40, 55), (43, 55), (46, 53)], RAMP['eye'][1], 2)
+        line(cv, [(56, 52), (58, 54), (60, 54), (62, 52)], RAMP['eye'][1], 2)
+        dither_ellipse(cv, 41, 61, 4.0, 2.0, BLUSH, 0.3)
+        dither_ellipse(cv, 61, 60, 3.2, 1.8, BLUSH, 0.3)
+        line(cv, [(60, 65), (62, 66), (64, 65)], MOUTH, 1)
+    # 눈가 주름(나이)
+    for (x, y) in ((35, 51), (34, 52), (64, 50), (65, 51)):
+        cv.paint(x, y, RAMP['thread'][1])
+    return cv
+
+
+# ---- 엄마 두더지 -------------------------------------------------------------------------
+def mom():
+    """엄마 두더지(오프닝, 0037 5-A): Naïl보다 크고(칸을 거의 채운다) 털이 짙다. 다정하게 감은 눈, 긴 주둥이."""
+    cv = Canvas()
+    ellipse(cv, 38, 54, 40, 36, 'mfurd', bias=0.1, rough=tuft)
+    ellipse(cv, 66, 52, 13, 9, 'muzzle', bias=0.0)
+    ellipse(cv, 78, 47, 7, 6.5, 'pink', bias=0.1)
+    for (x, y) in ((75, 44), (76, 44), (75, 45)):
+        cv.paint(x, y, RAMP['pink'][3])
+    outline(cv)
+    inner_edges(cv)
+    rim_light(cv, 'mfurd')
+    import random
+    rnd = random.Random(11)
+    for _ in range(40):
+        x, y = rnd.randint(8, 56), rnd.randint(22, 82)
+        m = cv.mat[y][x]
+        if m and m[0] == 'mfurd' and cv.col[y][x] is None:
+            c = RAMP['mfurd'][max(0, m[1] - 1)]
+            cv.paint(x, y, c)
+            if cv.mat[y + 1][x - 1] and cv.mat[y + 1][x - 1][0] == 'mfurd':
+                cv.paint(x - 1, y + 1, c)
+    # 감은 눈(아래로 휜 부드러운 선, ︶): 반쯤 뜬 눈은 의심하는 눈처럼 읽혔다. 눈썹은 살짝 올라가 다정하게.
+    line(cv, [(49, 40), (51, 42), (55, 42), (58, 40)], RAMP['eye'][1], 2)
+    line(cv, [(63, 37), (65, 39), (68, 39), (70, 37)], RAMP['eye'][1], 2)
+    line(cv, [(48, 33), (57, 32)], RAMP['mfurd'][1], 2)
+    dither_ellipse(cv, 53, 50, 5.0, 2.6, BLUSH, 0.4)
+    line(cv, [(66, 58), (69, 59), (72, 58)], MOUTH, 1)
+    return cv
+
+
 def to_image(cv):
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     px = img.load()
@@ -654,6 +822,8 @@ def sheet():
     frames += [raccoon('normal'), raccoon('happy')]
     frames += [momo_tainted('cold'), momo_tainted('pained')]
     frames += [bori('tainted'), bori('normal'), bori('happy')]
+    frames += [momo_back('normal'), momo_back('happy'), momo_back('worried')]
+    frames += [halmae('normal'), halmae('happy'), mom()]
     out = Image.new('RGBA', (W * len(frames), H), (0, 0, 0, 0))
     for i, cv in enumerate(frames):
         out.paste(to_image(cv), (i * W, 0))

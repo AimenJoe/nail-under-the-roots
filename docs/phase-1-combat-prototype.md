@@ -85,6 +85,7 @@
 | 마을 | `village.rs`, `adventure.rs`(World::village, Place::Village), `render.rs`(큰 나무·꾸미기·할매), `app/stage.rs`(꾸미기 가게·할매·뿌리 길) | 튜토리얼 뒤 시작·엔딩 뒤 돌아오는 허브. 큰 나무 잎 = 깬 횟수, 포포 꾸미기 가게(마을 씨앗 6가지), 보리·할매(실뜨기)·빈 자리(0045) |
 | 모모 보스(세 번) | `enemy.rs`(Momo·Under·Pop), `species.rs`(MOMO), `dungeon.rs`(Params::boss), `adventure.rs`(MomoIntro·MomoBeaten), `app/stage.rs`(momo_beaten), `cutscene.rs`(momo_meet·momo_flee·momo_returns), `tools/art/critters.py`(MOMO_BLOOM) | 첫 길 끝방. 만날수록 한 수씩(뛰기·차기 → 굴 숨기 → 이어 뛰기), 쓰러지면 그 런은 보통 무리. 이길 때마다 빈 자리 꽃잎, 세 번째에 돌아와 마을 그루터기에 앉음(참 엔딩 조건 `momo`). 보스 막대를 화면 위로(0046) |
 | 반딧불·큰 나무 재주 | `talents.rs`, `app/stage.rs`(bank_glowbugs·update_tree·draw_tree), `player.rs`·`world.rs`(재주 배율), `adventure.rs`(Interact::Tree), `sfx.rs`(드릴 소리 셋) | 쉼터·런 끝에 반딧불을 마을로. 마을 큰 나무에서 자리 넷 × 갈래 둘(굴파기·패링·드릴·먹기), 깨우기는 반딧불, 바꿔 끼기는 공짜(0047) |
+| 임시 그림 다듬기 | `tools/art/portraits.py`(칸 12~17), `tools/art/illust.py`(bands, momo_bloom), `cutscene.rs`(Portrait::MOMO·HALMAE·MOM) | 돌아온 모모·누룩 할매·엄마 초상화, 일러스트 띠 경계 2×2 섞기, 모모 일러스트 몸·눈(0049) |
 | 저널 | `journal.rs`, `app.rs`(Tally·draw_journal), `app/stage.rs`(sync_journal·claim_journal·물웅덩이), `village.rs`(자리 7~9·W), `equipment.rs`(장신구 8), `tools/art/nail.py`(털빛 3) | 런을 넘어 남는 목표 31개(이야기·싸움·탐험·이웃·마을), 앞 목표 뒤에 보임, 받기로 반딧불·씨앗·저널 전용 꾸미기 3·털빛 3·새 장신구 3(0048) |
 | 오늘의 굴 | `daily.rs`, `adventure.rs`(camp_start_seeded), `app.rs`(TitleItem) | 날짜(UTC) 시드, 첫 쉼터에서, 가장 먼 쉼터·완주 기록, 타이틀 줄에 날짜·기록, 한 달 넘은 기록 지움(0044) |
 | 실뜨기 | `knots.rs`, `enemy.rs`(max_hp·windup·apply_knots), `world.rs`(knots), `app.rs`(begin_run·KnotPick) | 첫 클리어로 1단계, 가장 높은 단계로 닿으면 다음 단계. 시작할 때 고르기. 매듭: 적 체력 ×1.25 · 예고 ×0.8 · 산딸기 ×0.6 · 가게 ×1.5 · 먹기 대기 ×1.6(0043) |
@@ -135,6 +136,7 @@
 - [ ] **모모**(0046, 개발 "모모 첫 만남"·"모모 세 번째" 또는 처음부터): 체력 28·체공 0.5초·둔덕 속도가 공정한지, 세 번째(이어 뛰기)가 너무 센지, 만남·달아남 대사 톤, 꽃잎이 그루터기에서 보이는지, 돌아온 모모 그림(꽃·눈)
 - [ ] **큰 나무 재주**(0047): 값(깊은 굴 40 … 드릴 80)이 한 런 반딧불에 맞는지, 갈래가 서로 반대로 느껴지는지(되받아치기·꼭꼭 씹기), 쉼터에서 반딧불을 보내는 규칙
 - [ ] **저널**(0048): 목표 숫자(처치 200·패링 60·상자 25 …)가 몇 런에 맞는지, 보상 크기, 받기가 자연스러운지, 털빛 셋(물웅덩이 "비춰 보기")과 새 장신구 셋
+- [ ] **새 초상화 셋·일러스트 다듬기**(0049): 할매가 무섭지 않은지, 엄마가 다정해 보이는지, 하늘 띠 경계 섞기가 거슬리지 않는지
 - [ ] 터치 공격 버튼 크기(1.5배로 키움): 폰에서 엄지에 맞는지, 굴파기와 헷갈리지 않는지
 - [ ] 터치로 가게·길 지도 닫기: 오른쪽 위 ✕ 또는 패널 바깥 탭(2026-10-25)
 - [ ] 안내 글이 장치를 따라 바뀌는지(0036): 패드를 잡으면 A/B·LB/RB, 키보드면 Enter/Esc, 폰은 터치 낱말. 특히 패드는 실기로만 확인 가능

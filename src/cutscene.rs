@@ -52,6 +52,21 @@ impl Portrait {
         first: 10,
         faces: 2,
     };
+    /// 돌아온 모모: 칸 12~14(보통·기쁨·걱정, docs/decisions/0049).
+    pub const MOMO: Portrait = Portrait {
+        first: 12,
+        faces: 3,
+    };
+    /// 누룩 할매: 칸 15~16(보통·기쁨).
+    pub const HALMAE: Portrait = Portrait {
+        first: 15,
+        faces: 2,
+    };
+    /// 엄마 두더지: 칸 17 하나.
+    pub const MOM: Portrait = Portrait {
+        first: 17,
+        faces: 1,
+    };
 
     pub fn frame(self, face: Face) -> u32 {
         // 모모는 칸이 둘(차가움·괴로움)뿐이라 걱정 = 둘째 칸.
@@ -80,6 +95,9 @@ mod portrait_tests {
         assert_eq!(Portrait::NAIL.frame(Face::Determined), 3);
         assert_eq!(Portrait::CHIEF.frame(Face::Worried), 9);
         assert_eq!(Portrait::BORI.frame(Face::Happy), 11);
+        assert_eq!(Portrait::MOMO.frame(Face::Worried), 14);
+        assert_eq!(Portrait::HALMAE.frame(Face::Worried), 15);
+        assert_eq!(Portrait::MOM.frame(Face::Happy), 17);
     }
 }
 
@@ -458,11 +476,11 @@ pub enum Speaker {
     /// 물든 들쥐 대장(이름표 "들쥐 대장").
     Chief,
     Bori,
-    /// 누룩 할매(마을, 0045). 초상화는 아직 없다.
+    /// 누룩 할매(마을, 0045). 초상화 칸 15~16(0049).
     Halmae,
     /// 물든 모모(첫 길의 보스, 이름표 "???", 0046).
     MomoTainted,
-    /// 돌아온 모모(마을). 꽃 핀 초상화는 아직 없다.
+    /// 돌아온 모모(마을). 초상화 칸 12~14(0049).
     Momo,
 }
 
@@ -482,17 +500,31 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
         Speaker::Popo => popo_actor(w.player.pos, false),
         Speaker::Chief => hidden(i18n::tr(crate::species::CHIEF.name), Portrait::CHIEF, fur),
         Speaker::Bori => hidden(i18n::s().bori_name, Portrait::BORI, fur),
-        Speaker::Halmae => story_actor(i18n::s().name_halmae, Color::new(0.86, 0.84, 0.92, 1.0)),
+        Speaker::Halmae => halmae_actor(),
         Speaker::MomoTainted => momo_tainted_actor(w.player.pos),
-        Speaker::Momo => Actor {
-            sprite: Some(Sprite::Critter(crate::art::MOMO_BLOOM_ROW)),
-            ..story_actor(i18n::s().name_momo, MOMO_PETAL)
-        },
+        Speaker::Momo => momo_actor(),
     }
 }
 
-/// 돌아온 모모의 색(초상화가 없을 때 이름표 옆 네모).
+/// 돌아온 모모의 색(초상화를 못 읽었을 때 이름표 옆 네모).
 const MOMO_PETAL: Color = Color::new(0.80, 0.62, 0.66, 1.0);
+
+/// 돌아온 모모 배우(월드 그림 = 꽃 핀 모습, 초상화 칸 12~14).
+fn momo_actor() -> Actor {
+    Actor {
+        sprite: Some(Sprite::Critter(crate::art::MOMO_BLOOM_ROW)),
+        portrait: Some(Portrait::MOMO),
+        ..story_actor(i18n::s().name_momo, MOMO_PETAL)
+    }
+}
+
+/// 누룩 할매 배우(초상화 칸 15~16).
+fn halmae_actor() -> Actor {
+    Actor {
+        portrait: Some(Portrait::HALMAE),
+        ..story_actor(i18n::s().name_halmae, Color::new(0.86, 0.84, 0.92, 1.0))
+    }
+}
 
 /// 물든 모모 배우: 이름은 아직 "???"(이름은 돌아올 때 스스로 말한다, 0027).
 fn momo_tainted_actor(pos: Vec2) -> Actor {
@@ -675,7 +707,10 @@ pub fn opening(w: &World) -> Cutscene {
             visible: false,
         },
         popo_actor(vec2(150.0, 150.0), false),
-        story_actor(i18n::s().name_mom, Color::new(0.48, 0.34, 0.30, 1.0)),
+        Actor {
+            portrait: Some(Portrait::MOM),
+            ..story_actor(i18n::s().name_mom, Color::new(0.48, 0.34, 0.30, 1.0))
+        },
     ];
     let mut steps = vec![
         // 일러스트(0037·0039): 시드는 큰 나무 → 땅속의 보라 실 → 어미가 Naïl을 굴 밖으로.
@@ -757,7 +792,7 @@ fn cut_to(il: Option<Illust>) -> [Step; 3] {
     ]
 }
 
-/// 일러스트 장면에서만 말하는 이(월드에 그림이 없다). 초상화는 아직 없어 색 네모(docs/art/cutscene-illustrations.md).
+/// 월드에 그림이 없는 배우의 바탕(이름 + 색). 초상화는 부르는 쪽이 얹는다(엄마·모모·할매, 0049).
 fn story_actor(name: &'static str, color: Color) -> Actor {
     Actor {
         name,
@@ -772,11 +807,7 @@ fn story_actor(name: &'static str, color: Color) -> Actor {
 
 /// 모모·엔딩 장면의 배우: 0 Naïl, 1 모모, 2 누룩 할매.
 fn story_actors(w: &World) -> Vec<Actor> {
-    vec![
-        nail_actor(w),
-        story_actor(i18n::s().name_momo, MOMO_PETAL),
-        story_actor(i18n::s().name_halmae, Color::new(0.86, 0.84, 0.92, 1.0)),
-    ]
+    vec![nail_actor(w), momo_actor(), halmae_actor()]
 }
 
 /// 모모가 돌아온다: 세 번째 승리 뒤(0037). 꽃이 피고 이름을 말한다.
