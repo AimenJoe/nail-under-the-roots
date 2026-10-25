@@ -34,12 +34,17 @@ pub struct Portrait {
 impl Portrait {
     /// Naïl: 칸 0~3(보통·기쁨·걱정·결의).
     pub const NAIL: Portrait = Portrait { first: 0, faces: 4 };
-    /// 변해 버린 이웃: 칸 4(정체를 모름: 그림자 + 빛나는 눈). 정체는 모모(히로인, 나중에 밝혀짐, docs/decisions/0027).
-    pub const NEIGHBOR_UNKNOWN: Portrait = Portrait { first: 4, faces: 1 };
+    /// 물든 모모(굴토끼, 히로인): 칸 7 차가움(보통), 칸 8 괴로움(걱정). 이름은 나중에 밝혀진다 — 그때까지 "???"
+    /// (docs/decisions/0027, 0029). 칸 4(그림자 + 빛나는 눈)는 시트에 남겨 두었다(정체를 숨길 장면용).
+    pub const MOMO_TAINTED: Portrait = Portrait { first: 7, faces: 2 };
     /// 라쿤 포포: 칸 5~6(보통·기쁨).
     pub const POPO: Portrait = Portrait { first: 5, faces: 2 };
 
     pub fn frame(self, face: Face) -> u32 {
+        // 모모는 칸이 둘(차가움·괴로움)뿐이라 걱정 = 둘째 칸.
+        if self.first == Portrait::MOMO_TAINTED.first {
+            return self.first + u32::from(face == Face::Worried);
+        }
         let i = match face {
             Face::Normal => 0,
             Face::Happy => 1,
@@ -47,6 +52,19 @@ impl Portrait {
             Face::Determined => 3,
         };
         self.first + if i < self.faces { i } else { 0 }
+    }
+}
+
+#[cfg(test)]
+mod portrait_tests {
+    use super::*;
+
+    #[test]
+    fn momo_faces_map_to_her_two_frames() {
+        assert_eq!(Portrait::MOMO_TAINTED.frame(Face::Normal), 7);
+        assert_eq!(Portrait::MOMO_TAINTED.frame(Face::Worried), 8);
+        assert_eq!(Portrait::POPO.frame(Face::Happy), 6);
+        assert_eq!(Portrait::NAIL.frame(Face::Determined), 3);
     }
 }
 
@@ -366,18 +384,18 @@ pub fn popo_talk(w: &World, lines: &[(Tr, Face, Option<Act>)]) -> Cutscene {
 
 // ---- 스크립트 ---------------------------------------------------------------
 
-/// 오프닝: Naïl이 첫 방에 들어서고, 변해 버린 이웃이 말을 건다.
+/// 오프닝: Naïl이 첫 방에 들어서고, 물든 이웃(모모, 아직 이름 모름)이 길을 막는다.
 pub fn opening(w: &World) -> Cutscene {
-    let neighbor = Color::new(0.60, 0.40, 0.85, 1.0);
+    let neighbor = Color::new(0.45, 0.35, 0.50, 1.0);
     let mut nail = nail_actor(w);
     nail.facing = vec2(1.0, 0.0);
     let actors = vec![
         nail,
         Actor {
             name: "???",
-            sprite: None,
+            sprite: Some(crate::art::MOMO_ROW),
             color: neighbor,
-            portrait: Some(Portrait::NEIGHBOR_UNKNOWN),
+            portrait: Some(Portrait::MOMO_TAINTED),
             pos: vec2(280.0, 90.0),
             facing: vec2(-1.0, 0.0),
             visible: false,
@@ -410,7 +428,7 @@ pub fn opening(w: &World) -> Cutscene {
             dir: vec2(1.0, 0.0),
         },
         say(1, Face::Normal, |s| s.op_2),
-        say(1, Face::Normal, |s| s.op_3),
+        say(1, Face::Worried, |s| s.op_3),
         say(0, Face::Normal, |s| s.op_4),
         Step::Shake(0.4),
         Step::Hide { actor: 1 },

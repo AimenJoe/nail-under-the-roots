@@ -5,7 +5,8 @@
   줄 0 들쥐 · 1 생쥐 · 2 시궁쥐 · 3 다람쥐 · 4 청설모 · 5 허수아비 (species.rs의 sheet_row)
     칸 0·1 서 있기(숨쉬기), 2·3 걷기, 4 예고(떨기·웅크림·조준), 5 공격(돌진·뛰기·던지기), 6 맞음
   줄 6 라쿤 포포(튜토리얼 안내): 0·1 서 있기, 2·3 걷기, 4 말하기(손 들기), 5 기뻐하기
-  줄 7~13: 줄 0~6의 흰 실루엣(피격 번쩍임용)
+  줄 7 모모(물든 굴토끼, 히로인, docs/decisions/0029): 0·1 서 있기, 2·3 깡충, 4 웅크림, 5 뛰어 차기, 6 맞음
+  줄 8~15: 줄 0~7의 흰 실루엣(피격 번쩍임용)
 
 그리는 법(nail.py와 같다): 채움 색만 글자로 찍고 외곽선('o')은 자동으로 두른다. 종마다 기본 자세 한 장을 손으로 찍고,
 동작은 그 자세를 옮기거나(통통·웅크림·내밀기) 몇 점만 바꿔 만든다(발, 눈, 꼬리).
@@ -49,6 +50,9 @@ COMMON = {
     'c': (248, 238, 218),   # 흰 줄무늬·이빨
     'W': (255, 255, 255),   # 흰 반사(포포 눈)
     'r': (236, 132, 140),   # 볼 홍조
+    'g': (150, 230, 90),    # 모모의 물든 눈(초록 빛 — 졸개의 붉은 눈과 다르다)
+    'G': (232, 255, 204),   # 그 반사
+    'f': (176, 128, 140),   # 시든 꽃(귀 밑동, 돌아오면 핀다)
 }
 
 FUR = {
@@ -60,6 +64,8 @@ FUR = {
     'red':    [(84, 64, 66), (122, 98, 92), (160, 136, 124), (226, 218, 206)],
     'raccoon': [(96, 96, 110), (144, 144, 156), (188, 188, 198), (238, 236, 232)],
     'straw':  [(150, 110, 52), (198, 158, 84), (232, 200, 124), (110, 80, 56)],
+    # 모모(물든 굴토끼): 따뜻한 회갈색이었을 털이 자두빛·잿빛으로. 초상화(portraits.py mfur)와 같은 계열.
+    'momo':   [(58, 42, 66), (88, 64, 90), (118, 90, 116), (150, 124, 146)],
 }
 
 
@@ -105,7 +111,7 @@ def clear_row(g, y):
 
 def squint(g):
     """맞음: 붉은 눈을 질끈(짙은 가로줄)."""
-    eyes = find(g, 'ew')
+    eyes = find(g, 'ewgG')
     if not eyes:
         return
     top = min(y for _, y in eyes)
@@ -225,6 +231,27 @@ RED = grid([
     ".....ddbbbblll",
     "......ddddll",
     ".......pp.pp",
+    "",
+])
+
+# 모모(물든 굴토끼): 긴 귀 둘(가까운 귀 안은 어두운 보라 q, 밑동에 시든 꽃 f), 동그란 머리, 초록 빛 눈(g/G),
+# 하얀 솜꼬리(c), 몸에 보라 뿌리. 졸개(쥐)보다 몸이 둥글고 귀가 실루엣을 만든다.
+MOMO = grid([
+    ".......b....bb..",
+    ".......hb..bhhb.",
+    ".......bhb.bhqb.",
+    "........bhbbhqb.",
+    "........bhbbhqb.",
+    ".........dbbbffb",
+    ".......hhhhhhhf.",
+    "......hhbbbbbbbh",
+    ".....hbbbbbbGgbh",
+    "....hbbbbbbbggbp",
+    "..ccbvVbbbbbrlll",
+    ".cccdvbbbbbblll.",
+    "..cddbbbbbbll...",
+    "....ddbbbbll....",
+    ".....pp..pp.....",
     "",
 ])
 
@@ -365,6 +392,7 @@ def sheet():
         rows.append((FUR[name], frames_of(g), True))
     rows.append((FUR['straw'], [DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, lunge(DUMMY), shift(DUMMY, dx=-1)], False))
     rows.append((FUR['raccoon'], raccoon_frames(), False))
+    rows.append((FUR['momo'], frames_of(MOMO), False))
     img = Image.new('RGBA', (N * 7, N * len(rows) * 2), (0, 0, 0, 0))
     for ry, (pal, frames, tainted) in enumerate(rows):
         for rx, g in enumerate(frames):
