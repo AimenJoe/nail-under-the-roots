@@ -1505,13 +1505,34 @@ impl App {
                     self.draw_interact_bubble(&ui);
                 }
                 // 마을: 마을 씨앗·맡긴 반딧불(오른쪽 위 막대 아래).
+                // 깨울 수 있는 재주가 있으면 반딧불 줄이 빛나고, 나무 밑동도 빛난다(0061).
                 if self.world.adv.place == crate::adventure::Place::Village {
+                    let ready = self.tree_affordable();
+                    if let Some(v) = self.world.adv.village.as_mut() {
+                        v.tree_ready = ready;
+                    }
                     let n = self.profile.count(crate::village::KEY_SEEDS);
                     let t = fill(i18n::s().village_seeds, &[&n]);
                     ui.text_right(&t, 316.0, 14.0, FONT_PX, ui::TEXT);
                     let l = self.profile.count(crate::talents::KEY_LIGHT);
                     let t = fill(i18n::s().tree_light, &[&l]);
-                    ui.text_right(&t, 316.0, 27.0, FONT_PX, ui::TEXT);
+                    let pulse =
+                        (0.5 + 0.5 * (self.world.time * 4.0).sin()) * f32::from(u8::from(ready));
+                    let c = if ready { ui::ACCENT } else { ui::TEXT };
+                    ui.text_right(&t, 316.0, 27.0, FONT_PX, c);
+                    // 반딧불 점(글 왼쪽): 깨울 수 있으면 숨 쉬듯 커진다.
+                    let x = 316.0 - ui.text_w(&t, FONT_PX) - 6.0;
+                    let g = crate::world::GLOW;
+                    ui.rect(
+                        Rect::new(
+                            x - 1.0 - pulse,
+                            31.0 - pulse,
+                            3.0 + 2.0 * pulse,
+                            3.0 + 2.0 * pulse,
+                        ),
+                        Color::new(g.r, g.g, g.b, 0.35 + 0.35 * pulse),
+                    );
+                    ui.rect(Rect::new(x, 32.0, 1.0, 1.0), g);
                 }
                 if !self.world.player.is_alive() {
                     self.draw_dead(&ui);
@@ -1656,6 +1677,7 @@ impl App {
                 self.profile.count(&key::clears(Character::Mole))
                     + self.profile.count(&key::clears(Character::Momo)),
             ),
+            tree_ready: self.tree_affordable(),
         }
     }
 

@@ -1565,6 +1565,49 @@ fn draw_halmae_at(pos: Vec2, time: f32) {
     );
 }
 
+/// 큰 나무 밑동의 빛(0061), 나무 뒤: 은은한 빛 웅덩이와, 밑동에서 퍼져 나가는 밝은 고리.
+fn draw_tree_glow(base: Vec2, time: f32) {
+    let warm = Color::new(1.0, 0.95, 0.55, 1.0);
+    let k = 0.5 + 0.5 * (time * 2.5).sin();
+    for (r, a) in [(26.0, 0.14), (16.0, 0.22)] {
+        draw_ellipse(
+            base.x,
+            base.y,
+            r + k * 3.0,
+            (r + k * 3.0) * 0.4,
+            0.0,
+            Color::new(warm.r, warm.g, warm.b, a),
+        );
+    }
+    // 고리 둘이 엇갈려 퍼진다(풀밭 초록 위에서도 선으로 읽힌다).
+    for off in [0.0, 0.5] {
+        let ph = (time * 0.7 + off).fract();
+        let r = 8.0 + ph * 26.0;
+        let a = (1.0 - ph) * 0.9;
+        draw_ellipse_lines(
+            base.x,
+            base.y,
+            r,
+            r * 0.4,
+            0.0,
+            1.0,
+            Color::new(1.0, 1.0, 0.7, a),
+        );
+    }
+}
+
+/// 큰 나무 밑동의 빛 알갱이(0061), 나무 앞: 줄기를 따라 떠오른다.
+fn draw_tree_motes(base: Vec2, time: f32) {
+    for i in 0..10 {
+        let ph = (time * 0.55 + i as f32 / 10.0).fract();
+        let x = base.x + ((i as f32 * 2.4 + time * 1.3).sin()) * 16.0;
+        let y = base.y + 2.0 - ph * 44.0;
+        let a = (1.0 - ph).min(ph * 4.0);
+        let sz = if i % 3 == 0 { 2.0 } else { 1.0 };
+        draw_rectangle(x.round(), y.round(), sz, sz, Color::new(0.95, 1.0, 0.6, a));
+    }
+}
+
 /// 큰 나무(마을, 0045): 벼랑 위로 솟은 줄기와 뿌리. 잎은 깬 횟수만큼 돌아온다(0 = 마른 잎 몇 장, 3부터 꽃).
 fn draw_great_tree(at: Vec2, growth: u8, time: f32) {
     let bark = Color::new(0.40, 0.27, 0.21, 1.0);
@@ -1975,7 +2018,13 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     if let Some(v) = &w.adv.village {
         for (c, at) in &w.adv.marks {
             match c {
-                'Y' => list.push((at.y + 8.0, Drawable::Tree(*at, v.growth))),
+                'Y' => {
+                    list.push((at.y + 8.0, Drawable::Tree(*at, v.growth)));
+                    // 깨울 재주가 있으면 밑동이 빛난다(그림자처럼 먼저, 0061).
+                    if v.tree_ready {
+                        draw_tree_glow(*at + vec2(0.0, 14.0), w.time);
+                    }
+                }
                 // 물웅덩이는 바닥: 맨 먼저.
                 'W' => draw_puddle(*at, w.time),
                 'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
@@ -2084,7 +2133,12 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                     }
                 }
             }
-            Drawable::Tree(at, growth) => draw_great_tree(at, growth, w.time),
+            Drawable::Tree(at, growth) => {
+                draw_great_tree(at, growth, w.time);
+                if w.adv.village.is_some_and(|v| v.tree_ready) {
+                    draw_tree_motes(at + vec2(0.0, 14.0), w.time);
+                }
+            }
             Drawable::Decor(i, at) => draw_decor(i, at, w.time),
             Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
         }

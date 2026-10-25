@@ -93,6 +93,8 @@ pub struct State {
     pub decor: [bool; DECOR_ALL],
     /// 큰 나무의 잎(0 = 거의 없음 … 4 = 꽃).
     pub growth: u8,
+    /// 맡긴 반딧불로 깨울 수 있는 재주가 있다: 밑동이 빛난다(0061).
+    pub tree_ready: bool,
 }
 
 /// 기록 키.

@@ -1139,6 +1139,21 @@ impl App {
         k
     }
 
+    /// 맡긴 반딧불로 지금 깨울 수 있는 것이 있나(재주 갈래 또는 도토 뒤 독 발톱). 나무 밑동 빛·HUD가 본다(0061).
+    pub(super) fn tree_affordable(&self) -> bool {
+        use crate::profile::key;
+        use crate::talents::{key_awake, KEY_LIGHT, SLOTS, TABLE};
+        let have = self.profile.count(KEY_LIGHT);
+        let talent = SLOTS.iter().zip(TABLE.iter()).any(|(slot, (_, sides))| {
+            (0..2)
+                .any(|side| !self.profile.flag(&key_awake(*slot, side)) && sides[side].cost <= have)
+        });
+        let venom = self.profile.flag(key::DOTO_MEMORY)
+            && !self.profile.flag(key::VENOM)
+            && have >= t::VENOM_AWAKE_COST;
+        talent || venom
+    }
+
     /// 큰 나무의 재주(0047): 위아래 = 자리, 좌우 = 갈래, 확인 = 깨우기(반딧불)·끼기·빼기. 닫기: 뒤로·✕·바깥.
     pub(super) fn update_tree(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
         use crate::talents::{key_awake, key_pick, KEY_LIGHT, SLOTS, TABLE};
