@@ -130,8 +130,18 @@ enum Scene {
     Shop,
     /// 앨범: 본 컷씬 일러스트를 다시 본다(타이틀, docs/decisions/0041).
     Album,
-    /// 실뜨기 단계 고르기(첫 클리어 뒤 시작할 때, docs/decisions/0043).
+    /// 실뜨기 단계 고르기(마을의 누룩 할매, docs/decisions/0043·0045).
     KnotPick,
+    /// 마을 꾸미기 가게(마을의 포포, docs/decisions/0045).
+    Decor,
+}
+
+/// 컷씬이 끝난 뒤 갈 곳.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum AfterCut {
+    Game,
+    Title,
+    Village,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -395,8 +405,10 @@ pub struct App {
     pending_wake: bool,
     /// 설정 "기록 지우기"를 한 번 눌렀다(한 번 더 누르면 지운다).
     erase_armed: bool,
-    /// 이 컷씬이 끝나면 타이틀로(엔딩 = 런의 끝).
-    title_after_cutscene: bool,
+    /// 이 컷씬이 끝나면 갈 곳(엔딩 = 런의 끝).
+    after_cutscene: AfterCut,
+    /// 마을 꾸미기 가게의 커서.
+    decor_cursor: usize,
     /// 이번 런의 실뜨기 단계(고르는 화면의 커서이기도 하다).
     knot_level: u8,
     /// 타이틀 아래 잠깐 띄우는 글(오늘의 굴 완주 등)과 남은 시간.
@@ -468,7 +480,8 @@ impl App {
             erase_armed: false,
             album_cursor: 0,
             album_view: None,
-            title_after_cutscene: false,
+            after_cutscene: AfterCut::Game,
+            decor_cursor: 0,
             knot_level: 0,
             title_note: None,
         }
@@ -553,12 +566,14 @@ impl App {
                     self.gift_queue.append(&mut self.world.gifts);
                     if c.is_done() {
                         self.cutscene = None;
-                        self.scene = if std::mem::take(&mut self.title_after_cutscene) {
-                            self.title_cursor = 0;
-                            Scene::Title
-                        } else {
-                            Scene::Game
-                        };
+                        match std::mem::replace(&mut self.after_cutscene, AfterCut::Game) {
+                            AfterCut::Game => self.scene = Scene::Game,
+                            AfterCut::Title => {
+                                self.title_cursor = 0;
+                                self.scene = Scene::Title;
+                            }
+                            AfterCut::Village => self.start(Scenario::Village),
+                        }
                     }
                 } else {
                     self.scene = Scene::Game;
@@ -705,6 +720,9 @@ impl App {
         let hitboxes = self.world.debug.hitboxes;
         self.current = s;
         self.world = scenario::build(s);
+        if s == Scenario::Village {
+            self.world = World::village(self.village_state());
+        }
         self.world.debug.overlay = self.settings.debug_overlay;
         self.world.debug.hitboxes = hitboxes;
         self.journal = Journal::new();
@@ -764,6 +782,11 @@ impl App {
         self.death_t = 0.0;
         self.tutorial = None;
         // 첫 시작은 컷씬 → 플레이 튜토리얼 → 웨이브 1. 튜토리얼이 끝나야 자동 웨이브가 켜진다.
+        if s == Scenario::Village {
+            self.scene = Scene::Game;
+            self.say_story(crate::story::When::Village);
+            return;
+        }
         if veteran {
             self.world.open_glade();
             if self.profile.flag(crate::profile::key::BORI_BACK) {
@@ -968,6 +991,7 @@ impl App {
             Scene::Shop => self.update_shop(a, tap_hit, dt),
             Scene::Album => self.update_album(a, tap_hit, dt),
             Scene::KnotPick => self.update_knot_pick(a, tap_hit),
+            Scene::Decor => self.update_decor(a, tap_hit, dt),
             Scene::Game | Scene::Cutscene => {}
         }
     }
@@ -1208,6 +1232,8 @@ impl App {
                 | Scene::Cutscene
                 | Scene::Route
                 | Scene::Shop
+                | Scene::KnotPick
+                | Scene::Decor
                 | Scene::Settings { back: Back::Pause }
                 | Scene::Controls { back: Back::Pause }
         );
@@ -1251,7 +1277,14 @@ impl App {
             Scene::Intro => self.draw_intro(&ui),
             Scene::Title => self.draw_title(&ui),
             Scene::Album => self.draw_album(&ui),
-            Scene::KnotPick => self.draw_knot_pick(&ui),
+            Scene::KnotPick => {
+                ui.dim();
+                self.draw_knot_pick(&ui);
+            }
+            Scene::Decor => {
+                ui.dim();
+                self.draw_decor(&ui);
+            }
             Scene::Dev => self.draw_dev(&ui),
             Scene::Cutscene => {
                 self.draw_letterbox(&ui);
@@ -1288,6 +1321,12 @@ impl App {
                     self.draw_hint(&ui, &h);
                 }
                 self.draw_interact_bubble(&ui);
+                // 마을: 마을 씨앗(오른쪽 위 막대 아래).
+                if self.world.adv.place == crate::adventure::Place::Village {
+                    let n = self.profile.count(crate::village::KEY_SEEDS);
+                    let t = fill(i18n::s().village_seeds, &[&n]);
+                    ui.text_right(&t, 316.0, 14.0, FONT_PX, ui::TEXT);
+                }
                 if !self.world.player.is_alive() {
                     self.draw_dead(&ui);
                 }
@@ -1392,16 +1431,29 @@ impl App {
         (self.profile.count(&k) as u8).min(crate::knots::MAX_LEVEL)
     }
 
-    /// 타이틀 "시작": 실뜨기가 열렸으면 단계를 고르고, 아니면 바로.
+    /// 타이틀 "시작": 튜토리얼을 마쳤으면 마을로(내려가는 건 마을의 뿌리 길, 0045), 아니면 오프닝부터.
     fn begin_run(&mut self) {
-        let open = self.knots_open();
-        if open == 0 {
-            self.knot_level = 0;
-            self.start(Scenario::Normal);
+        let last = self.profile.count(crate::profile::key::KNOT_PICK) as u8;
+        self.knot_level = last.min(self.knots_open());
+        if self.profile.flag(crate::profile::key::TUTORIAL) {
+            self.start(Scenario::Village);
         } else {
-            let last = self.profile.count(crate::profile::key::KNOT_PICK) as u8;
-            self.knot_level = last.min(open);
-            self.scene = Scene::KnotPick;
+            self.start(Scenario::Normal);
+        }
+    }
+
+    /// 기록 → 마을 모습.
+    fn village_state(&self) -> crate::village::State {
+        use crate::profile::key;
+        let mut decor = [false; 6];
+        for (i, d) in decor.iter_mut().enumerate() {
+            *d = self.profile.flag(&crate::village::key_decor(i));
+        }
+        crate::village::State {
+            bori: self.profile.flag(key::BORI_BACK),
+            halmae: self.profile.flag(key::HALF_ENDING) || self.profile.flag(key::TRUE_ENDING),
+            decor,
+            growth: crate::village::growth(self.profile.count(&key::clears(Character::Mole))),
         }
     }
 
@@ -1419,11 +1471,12 @@ impl App {
                 .set_count(key::KNOT_PICK, self.knot_level as u32);
             self.profile.unset(key::KNOT_NEW);
             crate::profile::save(&self.profile);
-            self.start(Scenario::Normal);
+            // 마을로 돌아간다. 고른 단계는 뿌리 길로 내려갈 때 걸린다.
+            self.scene = Scene::Game;
             return;
         }
         if a.cancel || tap_hit == Some(Hit::Close) {
-            self.scene = Scene::Title;
+            self.scene = Scene::Game;
         }
     }
 
@@ -2542,6 +2595,7 @@ impl App {
             Place::Arena => fill(s.map_floor, &[&biome]),
             Place::Field => fill(s.map_field, &[&biome]),
             Place::Camp => fill(s.map_camp, &[&self.world.adv.stage]),
+            Place::Village => s.village_name.to_string(),
             Place::Dungeon => fill(
                 s.map_dungeon,
                 &[

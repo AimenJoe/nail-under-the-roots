@@ -4,7 +4,8 @@
 //!   `#` 벽(벼랑)  `.` 바닥  `T` 그루터기  `R` 바위  `D` 던전 입구  `U` 출구(위로)  `S` 저장 지점  `+` 문
 //!   `P` 시작 위치  `o` 스폰 지점(튜토리얼)  적: `c` 들쥐  `m` 생쥐 떼  `r` 시궁쥐  `s` 다람쥐  `q` 청설모  `B` 들쥐 대장(보스)
 //!   쉼터(docs/decisions/0030): `G` 뿌리 길(길 지도)  `F` 모닥불  `k` 가게 좌판  `K` 포포 자리  `b` 보리 자리  `M` 빈 자리(통나무)
-//!   (마커 칸은 바닥)
+//!   마을(docs/decisions/0045): `Y` 큰 나무(벽) `H` 누룩 할매 자리 `1`~`6` 꾸미기 자리
+//!   (마커 칸은 바닥, `Y`만 벽)
 
 use macroquad::prelude::*;
 
@@ -89,7 +90,7 @@ pub struct Parsed {
     pub start: Vec2,
     pub spawn_points: Vec<Vec2>,
     pub enemies: Vec<(Kind, Vec2)>,
-    /// 이웃 자리 표시(`K` `b` `M`)와 그 칸 가운데.
+    /// 이웃·마을 자리 표시(`K` `b` `M` `H` `Y` `1`~`6`)와 그 칸 가운데.
     pub marks: Vec<(char, Vec2)>,
 }
 
@@ -114,6 +115,7 @@ pub fn parse(rows: &[&str]) -> Parsed {
                 'S' => Cell::Save,
                 '+' => Cell::Door,
                 'G' => Cell::Gate,
+                'Y' => Cell::Wall,
                 _ => Cell::Floor,
             };
             grid.set(x, y, cell);
@@ -144,7 +146,7 @@ pub fn parse(rows: &[&str]) -> Parsed {
                 }),
                 _ => {}
             }
-            if matches!(ch, 'K' | 'b' | 'M') {
+            if matches!(ch, 'K' | 'b' | 'M' | 'H' | 'Y' | '1'..='6') {
                 marks.push((ch, at));
             }
         }

@@ -222,6 +222,8 @@ impl App {
         if self.current == crate::scenario::Scenario::Daily {
             self.profile
                 .add(&crate::daily::key_clear(crate::daily::today()), 1);
+            self.profile
+                .add(crate::village::KEY_SEEDS, t::VILLAGE_SEEDS_DAILY);
             crate::profile::save(&self.profile);
             self.title_cursor = 0;
             self.title_note = Some((|s| s.toast_daily_clear, 5.0));
@@ -239,7 +241,14 @@ impl App {
             if level >= open && open < crate::knots::MAX_LEVEL as u32 {
                 self.profile.add(&open_key, 1);
                 self.profile.set(key::KNOT_NEW);
+                self.profile
+                    .add(crate::village::KEY_SEEDS, t::VILLAGE_SEEDS_KNOT);
             }
+            // 남은 씨앗 + 보너스가 마을 씨앗이 된다(0045).
+            self.profile.add(
+                crate::village::KEY_SEEDS,
+                self.world.seeds + t::VILLAGE_SEEDS_CLEAR,
+            );
             self.profile.set(if true_end {
                 key::TRUE_ENDING
             } else {
@@ -254,7 +263,12 @@ impl App {
         };
         self.cutscene = Some(c);
         self.scene = Scene::Cutscene;
-        self.title_after_cutscene = true;
+        // 런이 끝났다: 기록하는 런이면 마을로, 아니면(개발) 타이틀로.
+        self.after_cutscene = if self.recording() {
+            super::AfterCut::Village
+        } else {
+            super::AfterCut::Title
+        };
     }
 
     fn play(&mut self, c: Cutscene) {
@@ -266,7 +280,15 @@ impl App {
 
     /// 쉼터에서 확인 버튼: 이웃에게 말 걸기·가게·빈 자리·뿌리 길.
     pub(super) fn interact(&mut self, i: Interact) {
+        let village = self.world.adv.place == crate::adventure::Place::Village;
         match i {
+            // 마을의 포포: 마을 꾸미기 가게(0045).
+            Interact::Talk(Who::Popo) if village => {
+                self.decor_cursor = 0;
+                self.shop_msg = None;
+                self.world.freeze();
+                self.scene = Scene::Decor;
+            }
             Interact::Talk(Who::Popo) => {
                 self.shop_cursor = 0;
                 self.shop_ask = None;
@@ -289,6 +311,15 @@ impl App {
                     &[(Speaker::Nail, |s| s.seat_1, Face::Worried)],
                 ));
             }
+            // 누룩 할매: 실뜨기 고르기(마을, 0043·0045).
+            Interact::Talk(Who::Halmae) => {
+                let open = self.knots_open();
+                self.knot_level = self.knot_level.min(open);
+                self.world.freeze();
+                self.scene = Scene::KnotPick;
+            }
+            // 마을의 뿌리 길: 내려가면 런이 시작된다.
+            Interact::Gate if village => self.start(crate::scenario::Scenario::Normal),
             Interact::Gate => self.open_route(true),
         }
     }
@@ -777,10 +808,14 @@ impl App {
             return;
         };
         let s = i18n::s();
+        let village = w.adv.place == crate::adventure::Place::Village;
         let verb = match i {
+            Interact::Talk(Who::Popo) if village => s.ia_decor,
             Interact::Talk(Who::Popo) => s.ia_shop,
             Interact::Talk(Who::Bori) => s.ia_talk,
+            Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,
+            Interact::Gate if village => s.ia_descend,
             Interact::Gate => s.ia_route,
         };
         let text = fill(verb, &[&input::prompt(Act::Attack)]);
@@ -795,5 +830,121 @@ impl App {
         ui.rect(r, ui::PANEL);
         ui.rect_lines(r, ui::BORDER);
         ui.text_center(&text, r.center().x, r.y + 2.0, FONT_PX, ui::TEXT);
+    }
+
+    /// 마을 꾸미기 가게(마을의 포포, 0045): 위아래로 고르고 확인으로 놓는다. 닫기: 뒤로·✕·바깥.
+    pub(super) fn update_decor(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
+        use crate::village::{key_decor, DECOR, KEY_SEEDS};
+        if let Some((_, t)) = self.shop_msg.as_mut() {
+            *t -= dt;
+            if *t <= 0.0 {
+                self.shop_msg = None;
+            }
+        }
+        let n = DECOR.len();
+        if a.up {
+            self.decor_cursor = (self.decor_cursor + n - 1) % n;
+        }
+        if a.down {
+            self.decor_cursor = (self.decor_cursor + 1) % n;
+        }
+        let chosen = if a.confirm {
+            Some(self.decor_cursor)
+        } else if let Some(Hit::ShopItem(i)) = tap_hit {
+            self.decor_cursor = i;
+            Some(i)
+        } else {
+            None
+        };
+        if let Some(i) = chosen {
+            let owned = self.profile.flag(&key_decor(i));
+            let have = self.profile.count(KEY_SEEDS);
+            if owned {
+                // 이미 놓았다: 아무 일도 없다.
+            } else if have < DECOR[i].price {
+                self.shop_msg = Some((|s| s.decor_poor, 3.0));
+            } else {
+                self.profile.set_count(KEY_SEEDS, have - DECOR[i].price);
+                self.profile.set(&key_decor(i));
+                crate::profile::save(&self.profile);
+                if let Some(v) = self.world.adv.village.as_mut() {
+                    v.decor[i] = true;
+                }
+                self.shop_msg = Some((|s| s.decor_thanks, 2.5));
+                self.sfx.play(crate::sfx::Id::Heal);
+            }
+        }
+        if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
+            self.shop_msg = None;
+            self.scene = Scene::Game;
+        }
+    }
+
+    pub(super) fn draw_decor(&mut self, ui: &Ui) {
+        use crate::village::{key_decor, DECOR, KEY_SEEDS};
+        let s = i18n::s();
+        let panel = Rect::new(44.0, 14.0, 232.0, 150.0);
+        ui.panel(panel, Some(s.decor_title));
+        self.close_button(ui, panel);
+        let have = self.profile.count(KEY_SEEDS);
+        let seeds = fill(s.village_seeds, &[&have]);
+        ui.text_right(
+            &seeds,
+            panel.right() - 20.0,
+            panel.y + 3.0,
+            FONT_PX,
+            ui::TEXT,
+        );
+        let face = Rect::new(panel.x + 6.0, panel.y + 22.0, 44.0, 44.0);
+        ui.rect(face, ui::PANEL_LIGHT);
+        let happy = self.shop_msg.is_some_and(|(m, _)| tr(m) == s.decor_thanks);
+        let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
+        self.renderer.draw_portrait(ui, face, frame);
+        ui.rect_lines(face, ui::BORDER);
+        let say = self.shop_msg.map(|(m, _)| tr(m)).unwrap_or(s.decor_hi);
+        let tx = face.right() + 6.0;
+        for (k, l) in ui::wrap(ui, say, panel.right() - tx - 6.0, FONT_PX)
+            .iter()
+            .take(3)
+            .enumerate()
+        {
+            ui.text(l, tx, face.y + 2.0 + k as f32 * 12.0, FONT_PX, ui::TEXT);
+        }
+        let list_y = face.bottom() + 6.0;
+        let row_h = FONT_PX + 2.0;
+        for (i, d) in DECOR.iter().enumerate() {
+            let r = Rect::new(
+                panel.x + 6.0,
+                list_y + i as f32 * row_h,
+                panel.w - 12.0,
+                row_h,
+            );
+            self.hits.push((r, Hit::ShopItem(i)));
+            let on = i == self.decor_cursor;
+            if on {
+                ui.rect(r, ui::PANEL_LIGHT);
+                ui.text("▶", r.x + 2.0, r.y + 1.0, FONT_PX, ui::ACCENT);
+            }
+            let owned = self.profile.flag(&key_decor(i));
+            let right = if owned {
+                s.decor_owned.to_string()
+            } else {
+                fill(s.shop_price, &[&d.price])
+            };
+            let c = if owned || have < d.price {
+                ui::TEXT_DIM
+            } else if on {
+                ui::TEXT
+            } else {
+                Color::new(0.78, 0.72, 0.64, 1.0)
+            };
+            let pw = ui.text_w(&right, FONT_PX);
+            let name = ui.fit(tr(d.name), r.w - pw - 26.0, FONT_PX);
+            ui.text(&name, r.x + 14.0, r.y + 1.0, FONT_PX, c);
+            ui.text_right(&right, r.right() - 4.0, r.y + 1.0, FONT_PX, c);
+        }
+        let hint = super::vfill(s.decor_hint, &[Verb::Confirm, Verb::Back]);
+        let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
+        ui.text_center(&hint, 160.0, panel.bottom() + 4.0, FONT_PX, ui::TEXT_DIM);
     }
 }

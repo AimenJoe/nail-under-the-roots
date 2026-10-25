@@ -15,6 +15,8 @@ pub enum When {
     Wake,
     /// 튜토리얼을 마친 뒤 새 런을 시작했다(오프닝을 건너뛸 때).
     RunStart,
+    /// 큰 나무 아래 마을에 왔다(0045).
+    Village,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -89,6 +91,27 @@ pub const LINES: &[Line] = &[
         who: Speaker::Popo,
         text: |s| s.ret_ten,
         needs: &[DeathsAtLeast(10), Seen("roots_again")],
+        once: true,
+    },
+    // 마을(0045): 처음 왔을 때, 할매가 처음 왔을 때.
+    Line {
+        id: "village_intro",
+        when: When::Village,
+        who: Speaker::Popo,
+        text: |s| s.village_intro,
+        needs: &[Flag(key::TUTORIAL)],
+        once: true,
+    },
+    Line {
+        id: "halmae_arrive",
+        when: When::Village,
+        who: Speaker::Halmae,
+        text: |s| s.halmae_arrive,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::HALF_ENDING),
+            Seen("village_intro"),
+        ],
         once: true,
     },
     // 반쪽 엔딩 뒤 첫 런: 할매 이야기(한 번).

@@ -36,6 +36,8 @@ pub enum Place {
     Dungeon,
     /// 쉼터(camp.rs).
     Camp,
+    /// 큰 나무 아래 마을(village.rs, docs/decisions/0045). 런과 런 사이.
+    Village,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -136,6 +138,9 @@ pub struct Adventure {
     last_cell: Option<Cell>,
     /// 이 쉼터에서 뿌리 심장을 샀나(쉼터마다 하나).
     pub heart_sold: bool,
+    /// 마을이면 그 모습(이웃·꾸미기·나무)과 자리 표시(0045).
+    pub village: Option<crate::village::State>,
+    pub marks: Vec<(char, Vec2)>,
 }
 
 impl World {
@@ -205,6 +210,31 @@ impl World {
         }
     }
 
+    /// 큰 나무 아래 마을(0045). 이웃·꾸미기·나무는 `v`(앱이 기록에서 만든 것)를 따른다.
+    pub fn village(v: crate::village::State) -> World {
+        let p = crate::village::parse();
+        let mut w = World::empty();
+        w.room = Room::from_grid(p.grid, p.props, p.spawn_points);
+        for (ch, at) in &p.marks {
+            match ch {
+                'K' => w.neighbors.push(Npc::standing(Who::Popo, *at)),
+                'b' if v.bori => w.neighbors.push(Npc::standing(Who::Bori, *at)),
+                'H' if v.halmae => w.neighbors.push(Npc::standing(Who::Halmae, *at)),
+                _ => {}
+            }
+        }
+        w.adv.marks = p.marks.clone();
+        w.adv.village = Some(v);
+        w.player.pos = p.start;
+        w.player.prev_pos = p.start;
+        w.adv.place = Place::Village;
+        w.adv.home = Place::Village;
+        w.adv.save_pos = p.start;
+        w.biome = Biome::Meadow;
+        w.snap_cam();
+        w
+    }
+
     /// 정한 시드로 첫 쉼터에서 시작(오늘의 굴, docs/decisions/0044). 길·굴은 이 시드에서 이어진다.
     pub fn camp_start_seeded(seed: u64) -> World {
         let mut w = World::field();
@@ -235,7 +265,8 @@ impl World {
 
     /// 확인 버튼이 지금 할 일(쉼터에서 이웃·빈 자리·뿌리 길 곁).
     pub fn interactable(&self) -> Option<Interact> {
-        if self.adv.place != Place::Camp || !self.player.is_alive() || self.adv.fade.is_some() {
+        let hub = matches!(self.adv.place, Place::Camp | Place::Village);
+        if !hub || !self.player.is_alive() || self.adv.fade.is_some() {
             return None;
         }
         let p = self.player.pos;
@@ -752,7 +783,7 @@ impl World {
                 (BossFight::Fight, Some(g)) => g,
                 _ => self.room.inner,
             },
-            Place::Camp => self.room.inner,
+            Place::Camp | Place::Village => self.room.inner,
             Place::Dungeon => dungeon::room_rect(self.adv.current_room),
         }
     }

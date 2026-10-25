@@ -458,6 +458,8 @@ pub enum Speaker {
     /// 물든 들쥐 대장(이름표 "들쥐 대장").
     Chief,
     Bori,
+    /// 누룩 할매(마을, 0045). 초상화는 아직 없다.
+    Halmae,
 }
 
 fn speaker_actor(w: &World, who: Speaker) -> Actor {
@@ -476,12 +478,19 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
         Speaker::Popo => popo_actor(w.player.pos, false),
         Speaker::Chief => hidden(i18n::tr(crate::species::CHIEF.name), Portrait::CHIEF, fur),
         Speaker::Bori => hidden(i18n::s().bori_name, Portrait::BORI, fur),
+        Speaker::Halmae => story_actor(i18n::s().name_halmae, Color::new(0.86, 0.84, 0.92, 1.0)),
     }
 }
 
 /// 여러 이웃이 번갈아 말하는 짧은 대화(쉼터·보스 장면). 배우 순서 = `Speaker` 순서.
 pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
-    let order = [Speaker::Nail, Speaker::Popo, Speaker::Chief, Speaker::Bori];
+    let order = [
+        Speaker::Nail,
+        Speaker::Popo,
+        Speaker::Chief,
+        Speaker::Bori,
+        Speaker::Halmae,
+    ];
     let actors = order.iter().map(|s| speaker_actor(w, *s)).collect();
     let steps = lines
         .iter()

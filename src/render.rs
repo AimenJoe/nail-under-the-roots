@@ -1347,6 +1347,266 @@ fn draw_seat(r: Rect) {
     );
 }
 
+/// 누룩 할매(마을, 0045): 흰 실 덩어리 + 버섯 갓 셋 + 감은 눈. 숨 쉬듯 살짝 오르내린다.
+fn draw_halmae_at(pos: Vec2, time: f32) {
+    let bob = ((time * 1.6).sin() * 1.0).round();
+    let (x, y) = (pos.x.round(), pos.y.round() + 2.0 - bob);
+    let pale = Color::new(0.86, 0.84, 0.93, 1.0);
+    let shade = Color::new(0.66, 0.62, 0.78, 1.0);
+    let cap = Color::new(0.78, 0.60, 0.38, 1.0);
+    let cap_dark = Color::new(0.52, 0.38, 0.26, 1.0);
+    // 바닥에 퍼진 실
+    for k in 0..5 {
+        let a = k as f32 * 1.2 + 0.3;
+        let (dx, dy) = (a.cos() * 11.0, a.sin().abs() * 3.0 + 4.0);
+        draw_line(
+            x,
+            y + 3.0,
+            x + dx,
+            y + dy,
+            1.0,
+            Color::new(0.90, 0.88, 0.96, 0.7),
+        );
+    }
+    draw_ellipse(x, y, 9.0, 7.0, 0.0, OUTLINE);
+    draw_ellipse(x, y, 8.0, 6.0, 0.0, shade);
+    draw_ellipse(x - 1.0, y - 1.0, 7.0, 5.0, 0.0, pale);
+    for (cx, cy, r) in [(-4.0, -6.0, 3.0), (1.0, -8.0, 4.0), (5.0, -5.0, 2.5)] {
+        draw_rectangle(x + cx - 0.5, y + cy, 1.0, 3.0, pale);
+        draw_ellipse(x + cx, y + cy, r + 0.8, r * 0.6 + 0.8, 0.0, OUTLINE);
+        draw_ellipse(x + cx, y + cy, r, r * 0.6, 0.0, cap);
+        draw_rectangle(x + cx - r * 0.4, y + cy - r * 0.3, 1.0, 1.0, cap_dark);
+    }
+    // 감은 눈 + 홍조
+    for ex in [-3.0, 2.0] {
+        draw_rectangle(x + ex, y - 1.0, 2.0, 1.0, Color::new(0.35, 0.28, 0.45, 1.0));
+    }
+    draw_rectangle(
+        x - 5.0,
+        y + 1.0,
+        2.0,
+        1.0,
+        Color::new(0.93, 0.62, 0.70, 1.0),
+    );
+    draw_rectangle(
+        x + 4.0,
+        y + 1.0,
+        2.0,
+        1.0,
+        Color::new(0.93, 0.62, 0.70, 1.0),
+    );
+}
+
+/// 큰 나무(마을, 0045): 벼랑 위로 솟은 줄기와 뿌리. 잎은 깬 횟수만큼 돌아온다(0 = 마른 잎 몇 장, 3부터 꽃).
+fn draw_great_tree(at: Vec2, growth: u8, time: f32) {
+    let bark = Color::new(0.40, 0.27, 0.21, 1.0);
+    let bark_hi = Color::new(0.52, 0.37, 0.27, 1.0);
+    let (x, base) = (at.x.round(), at.y + 8.0);
+    // 뿌리
+    for (dx, len) in [(-26.0, 18.0), (-12.0, 10.0), (12.0, 10.0), (26.0, 18.0)] {
+        draw_line(
+            x + dx * 0.4,
+            base - 2.0,
+            x + dx,
+            base + len * 0.2,
+            4.0,
+            OUTLINE,
+        );
+        draw_line(
+            x + dx * 0.4,
+            base - 2.0,
+            x + dx,
+            base + len * 0.2,
+            2.0,
+            bark,
+        );
+    }
+    // 줄기
+    let top = base - 44.0;
+    draw_rectangle(x - 13.0, top, 26.0, base - top, OUTLINE);
+    draw_rectangle(x - 12.0, top, 24.0, base - top, bark);
+    draw_rectangle(x - 9.0, top, 4.0, base - top, bark_hi);
+    for k in 0..3 {
+        draw_rectangle(
+            x - 3.0 + k as f32 * 5.0,
+            top + 6.0 + k as f32 * 9.0,
+            1.0,
+            10.0,
+            OUTLINE,
+        );
+    }
+    // 잎·꽃: 단계마다 더 많이(위치는 고정된 표에서)
+    let spots: [(f32, f32); 15] = [
+        (-30.0, -4.0),
+        (28.0, -6.0),
+        (0.0, -12.0),
+        (-16.0, -14.0),
+        (16.0, -16.0),
+        (-40.0, 4.0),
+        (40.0, 2.0),
+        (-8.0, -22.0),
+        (8.0, -24.0),
+        (-26.0, -18.0),
+        (26.0, -20.0),
+        (0.0, -30.0),
+        (-36.0, -10.0),
+        (36.0, -12.0),
+        (-14.0, -30.0),
+    ];
+    let n = (3 + growth as usize * 3).min(spots.len());
+    for (i, (dx, dy)) in spots.iter().take(n).enumerate() {
+        let sway = ((time * 1.2 + i as f32).sin() * 1.0).round();
+        let (cx, cy) = (x + dx + sway, top + dy);
+        let r = if growth == 0 { 3.0 } else { 7.0 };
+        let leaf = if growth == 0 {
+            Color::new(0.62, 0.48, 0.30, 1.0)
+        } else {
+            Color::new(0.36 + 0.03 * (i % 3) as f32, 0.58, 0.32, 1.0)
+        };
+        draw_circle(cx, cy, r + 1.0, OUTLINE);
+        draw_circle(cx, cy, r, leaf);
+        if growth >= 3 && i % 2 == 0 {
+            draw_circle(cx + 2.0, cy - 2.0, 2.0, Color::new(1.0, 0.78, 0.84, 1.0));
+        }
+    }
+}
+
+/// 마을 꾸미기(0045): 0 꽃밭, 1 반딧불 등, 2 빛나는 버섯, 3 통나무 의자, 4 바람종, 5 깃발 줄.
+fn draw_decor(i: usize, at: Vec2, time: f32) {
+    let (x, y) = (at.x.round(), at.y.round() + 4.0);
+    let wood = Color::new(0.45, 0.31, 0.22, 1.0);
+    match i {
+        0 => {
+            draw_ellipse(x, y, 11.0, 4.0, 0.0, OUTLINE);
+            draw_ellipse(x, y, 10.0, 3.0, 0.0, Color::new(0.42, 0.30, 0.22, 1.0));
+            let cols = [
+                Color::new(1.0, 0.70, 0.78, 1.0),
+                Color::new(1.0, 0.92, 0.55, 1.0),
+                Color::new(0.80, 0.70, 1.0, 1.0),
+            ];
+            for k in 0..5 {
+                let fx = x - 8.0 + k as f32 * 4.0;
+                draw_rectangle(fx, y - 4.0, 1.0, 3.0, Color::new(0.36, 0.58, 0.32, 1.0));
+                draw_rectangle(fx - 1.0, y - 6.0, 3.0, 2.0, cols[k % 3]);
+            }
+        }
+        1 => {
+            let pulse = 0.55 + 0.25 * (time * 2.5).sin();
+            draw_circle(x, y - 12.0, 9.0, Color::new(0.85, 1.0, 0.55, 0.15 * pulse));
+            draw_rectangle(x - 1.0, y - 10.0, 2.0, 12.0, wood);
+            draw_rectangle(x - 3.0, y - 15.0, 6.0, 6.0, OUTLINE);
+            draw_rectangle(
+                x - 2.0,
+                y - 14.0,
+                4.0,
+                4.0,
+                Color::new(0.85, 1.0, 0.55, pulse + 0.2),
+            );
+        }
+        2 => {
+            for (k, (dx, h)) in [(-5.0f32, 5.0f32), (0.0, 8.0), (5.0, 4.0)]
+                .into_iter()
+                .enumerate()
+            {
+                let pulse = 0.6 + 0.3 * (time * 1.8 + k as f32).sin();
+                draw_circle(
+                    x + dx,
+                    y - h,
+                    5.0,
+                    Color::new(0.55, 0.95, 1.0, 0.12 * pulse),
+                );
+                draw_rectangle(
+                    x + dx - 0.5,
+                    y - h + 1.0,
+                    1.0,
+                    h,
+                    Color::new(0.88, 0.90, 0.86, 1.0),
+                );
+                draw_ellipse(x + dx, y - h, 3.0, 2.0, 0.0, OUTLINE);
+                draw_ellipse(
+                    x + dx,
+                    y - h,
+                    2.5,
+                    1.5,
+                    0.0,
+                    Color::new(0.55, 0.95, 1.0, pulse),
+                );
+            }
+        }
+        3 => {
+            draw_rectangle(x - 13.0, y - 5.0, 26.0, 7.0, OUTLINE);
+            draw_rectangle(x - 12.0, y - 4.0, 24.0, 5.0, wood);
+            draw_ellipse(
+                x - 12.0,
+                y - 1.5,
+                2.0,
+                2.5,
+                0.0,
+                Color::new(0.75, 0.58, 0.40, 1.0),
+            );
+            draw_ellipse(
+                x + 12.0,
+                y - 1.5,
+                2.0,
+                2.5,
+                0.0,
+                Color::new(0.75, 0.58, 0.40, 1.0),
+            );
+        }
+        4 => {
+            draw_rectangle(x - 1.0, y - 16.0, 2.0, 18.0, wood);
+            draw_rectangle(x - 6.0, y - 16.0, 12.0, 2.0, wood);
+            for k in 0..3 {
+                let sw = (time * 2.0 + k as f32).sin() * 1.5;
+                let cx = x - 4.0 + k as f32 * 4.0;
+                draw_line(
+                    cx,
+                    y - 14.0,
+                    cx + sw,
+                    y - 9.0,
+                    1.0,
+                    Color::new(0.85, 0.85, 0.80, 1.0),
+                );
+                draw_rectangle(
+                    cx + sw - 1.0,
+                    y - 9.0,
+                    2.0,
+                    3.0,
+                    Color::new(0.70, 0.85, 0.95, 1.0),
+                );
+            }
+        }
+        _ => {
+            draw_rectangle(x - 17.0, y - 16.0, 2.0, 18.0, wood);
+            draw_rectangle(x + 15.0, y - 16.0, 2.0, 18.0, wood);
+            draw_line(
+                x - 16.0,
+                y - 15.0,
+                x + 16.0,
+                y - 15.0,
+                1.0,
+                Color::new(0.85, 0.80, 0.70, 1.0),
+            );
+            let cols = [
+                Color::new(0.95, 0.45, 0.50, 1.0),
+                Color::new(0.98, 0.85, 0.40, 1.0),
+                Color::new(0.50, 0.75, 0.95, 1.0),
+                Color::new(0.60, 0.85, 0.50, 1.0),
+            ];
+            for k in 0..6 {
+                let fx = x - 13.0 + k as f32 * 5.0;
+                let sag = ((k as f32 - 2.5).abs() - 2.5) * -0.6;
+                draw_triangle(
+                    vec2(fx, y - 15.0 + sag),
+                    vec2(fx + 4.0, y - 15.0 + sag),
+                    vec2(fx + 2.0, y - 10.0 + sag),
+                    cols[k % 4],
+                );
+            }
+        }
+    }
+}
+
 /// 3/4 방: 바닥(풀·흙) + 장식, 좌·우·아래 벽 윗면, 위쪽은 벽 윗면 + 벼랑 앞면.
 fn draw_room_art(art: &Art, w: &World) {
     let tex = &art.tiles;
@@ -1434,6 +1694,9 @@ enum Drawable {
     Projectile(usize),
     Npc,
     Neighbor(usize),
+    /// 마을(0045): 큰 나무(자리, 잎 단계), 꾸미기(번호, 자리).
+    Tree(Vec2, u8),
+    Decor(usize, Vec2),
 }
 
 /// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
@@ -1468,6 +1731,20 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
         list.push((n.pos.y + 6.0, Drawable::Neighbor(i)));
         let rx = if big { 12.0 } else { 6.0 };
         draw_ellipse(n.pos.x, n.pos.y + 6.0, rx, 2.5, 0.0, SHADOW_SOFT);
+    }
+    if let Some(v) = &w.adv.village {
+        for (c, at) in &w.adv.marks {
+            match c {
+                'Y' => list.push((at.y + 8.0, Drawable::Tree(*at, v.growth))),
+                '1'..='6' => {
+                    let i = (*c as u8 - b'1') as usize;
+                    if v.decor[i] {
+                        list.push((at.y + 6.0, Drawable::Decor(i, *at)));
+                    }
+                }
+                _ => {}
+            }
+        }
     }
     for (i, e) in w.enemies.iter().enumerate() {
         let ep = lerp(e.prev_pos, e.pos, alpha);
@@ -1533,8 +1810,11 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                         }
                     }
                     world::Who::Bori => draw_bori_at(art, n.pos, left, false, w.time),
+                    world::Who::Halmae => draw_halmae_at(n.pos, w.time),
                 }
             }
+            Drawable::Tree(at, growth) => draw_great_tree(at, growth, w.time),
+            Drawable::Decor(i, at) => draw_decor(i, at, w.time),
         }
     }
 }

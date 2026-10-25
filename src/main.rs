@@ -40,6 +40,7 @@ mod story;
 mod tuning;
 mod tutorial;
 mod ui;
+mod village;
 mod world;
 
 use macroquad::prelude::*;
