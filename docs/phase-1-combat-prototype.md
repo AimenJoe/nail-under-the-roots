@@ -114,7 +114,8 @@
   - APK를 지우지 않고 덮어 설치했을 때 기록이 남는지, Android Chrome 글자 색, 타이틀 "v0.1.3 · <커밋>"
   - 모모 런: 포포 배웅과 쉼터 빈 자리 말(나일은 마을에서 기다린다)
 - [ ] GitHub에서 Secret `SECRETS_TOKEN`과 그 fine-grained 토큰을 지운다(0067, 이미 했으면 체크)
-- [ ] **공식 페이지 켜기**(0069): 레포 Settings → Pages → Build and deployment → Source를 **GitHub Actions**로. 켜면 Claude가 `pages` 워크플로를 다시 돌린다 → https://aimenjoe.github.io/nail-under-the-roots/ 를 폰·PC로 보고 글·그림이 어색한 곳을 알려 준다
+- [x] 공식 페이지 켜기(0069, 2026-10-25 사장이 Source = GitHub Actions, `pages` 4번째 실행 성공)
+- [ ] **공식 페이지 보기**: https://aimenjoe.github.io/nail-under-the-roots/ 를 폰·PC로 보고 글·그림이 어색한 곳을 알려 준다
 
 ### 판정 (한 사람의 의견을 들은 뒤, 몰아서)
 - [ ] **싸움 손맛**: 패링 창 0.12초·분노 +4, 행동 대기(먹기 0.35초·대기 1.5초, 0038), 공격 예고가 읽히는지(0025), 드릴 시동·거리·벽 쿵(0024), 장신구·퀵 아이템

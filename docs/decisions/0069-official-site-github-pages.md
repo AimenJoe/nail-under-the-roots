@@ -36,4 +36,5 @@
   - 글꼴 불러옴(`document.fonts.check`).
   - 콘솔 오류 없음. 세션에서는 GitHub API가 403(요청 제한)일 때가 있었고, 그때는 적어 둔 값으로 남았다.
 - 데스크톱 첫 화면: 일러스트(왼쪽)와 제목·단추(오른쪽)가 한 화면에 들어온다.
-- 확인 못 한 것: 실제 Pages 주소. 이 세션에서는 github.io에 접속이 막혀 있어 배포 로그로 본다.
+- 배포: Pages를 켜기 전 실행 1~3은 `configure-pages`에서 "Get Pages site failed … Not Found"로 멈췄다. 사장이 Source = GitHub Actions로 켠 뒤 실행 4가 성공했다(2026-10-25).
+- 확인 못 한 것: 실제 Pages 주소를 브라우저로 열어 보기. 이 세션에서는 github.io 접속이 막혀 있다.
