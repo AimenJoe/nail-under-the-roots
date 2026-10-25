@@ -310,6 +310,22 @@ pub const MOMO_CHAIN_SKIP: f32 = 0.45;
 /// 몇 번 이기면 돌아오나(0037 3-A).
 pub const MOMO_FIGHTS: u32 = 3;
 
+// ---- 도토(둘째 길의 보스, docs/decisions/0052) -----------------------------------------
+/// 부채꼴 던지기: 도토리 수와 이웃 사이 각(라디안). 체력이 반 아래면 둘 더.
+pub const DOTO_FAN: usize = 3;
+pub const DOTO_FAN_HURT: usize = 5;
+pub const DOTO_FAN_SPREAD: f32 = 0.32;
+/// 도토리 묻기: 땅을 파는 예고(종 예고 × 이 배율), 묻는 수(하나는 플레이어 발밑, 나머지는 둘레), 둘레 거리.
+pub const DOTO_BURY_MUL: f32 = 1.2;
+pub const DOTO_MINES: usize = 3;
+pub const DOTO_MINES_HURT: usize = 4;
+pub const DOTO_MINE_SPREAD: f32 = 34.0;
+/// 묻힌 도토리: 터지기까지(흙이 부풀며 고리가 좁혀 온다), 터지는 둘레. 발톱으로 미리 파내면 안 터진다.
+pub const DOTO_MINE_FUSE: f32 = 1.3;
+pub const DOTO_MINE_RADIUS: f32 = 14.0;
+/// 깨운 독 발톱(큰 나무, 0052)의 값(반딧불).
+pub const VENOM_AWAKE_COST: u32 = 120;
+
 // ---- 쉼터·상점(docs/decisions/0030) ---------------------------------------------------
 /// 상점 값(씨앗). 산딸기 · 쥬시 지렁이 · 뿌리 심장(최대 체력 +1, 쉼터마다 하나) · 장신구.
 pub const PRICE_BERRY: u32 = 3;

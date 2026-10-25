@@ -78,6 +78,15 @@ impl Portrait {
         first: 17,
         faces: 1,
     };
+    /// 물든 도토: 칸 30 하나(노려봄). 돌아온 도토: 칸 31~32(보통·기쁨, docs/decisions/0052).
+    pub const DOTO_TAINTED: Portrait = Portrait {
+        first: 30,
+        faces: 1,
+    };
+    pub const DOTO: Portrait = Portrait {
+        first: 31,
+        faces: 2,
+    };
 
     pub fn frame(self, face: Face) -> u32 {
         // 모모는 칸이 둘(차가움·괴로움)뿐이라 걱정 = 둘째 칸.
@@ -496,6 +505,9 @@ pub enum Speaker {
     MomoTainted,
     /// 돌아온 모모(마을). 초상화 칸 12~14(0049).
     Momo,
+    /// 물든 도토(둘째 길의 보스, 이름표 "???") / 돌아온 도토(마을, 0052).
+    DotoTainted,
+    Doto,
 }
 
 fn speaker_actor(w: &World, who: Speaker) -> Actor {
@@ -517,6 +529,27 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
         Speaker::Halmae => halmae_actor(),
         Speaker::MomoTainted => momo_tainted_actor(w.player.pos),
         Speaker::Momo => momo_actor(),
+        Speaker::DotoTainted => Actor {
+            name: "???",
+            sprite: Some(Sprite::Critter(crate::art::DOTO_ROW)),
+            portrait: Some(Portrait::DOTO_TAINTED),
+            pos: w.player.pos,
+            ..story_actor("???", DOTO_FUR)
+        },
+        Speaker::Doto => doto_actor(w.player.pos),
+    }
+}
+
+/// 도토의 색(초상화를 못 읽었을 때 이름표 옆 네모).
+const DOTO_FUR: Color = Color::new(0.70, 0.42, 0.28, 1.0);
+
+/// 돌아온 도토 배우(월드 그림 = 맑은 눈, 초상화 칸 31~32).
+fn doto_actor(pos: Vec2) -> Actor {
+    Actor {
+        sprite: Some(Sprite::Critter(crate::art::DOTO_BACK_ROW)),
+        portrait: Some(Portrait::DOTO),
+        pos,
+        ..story_actor(i18n::s().name_doto, DOTO_FUR)
     }
 }
 
@@ -563,6 +596,8 @@ pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
         Speaker::Halmae,
         Speaker::MomoTainted,
         Speaker::Momo,
+        Speaker::DotoTainted,
+        Speaker::Doto,
     ];
     let actors = order.iter().map(|s| speaker_actor(w, *s)).collect();
     let steps = lines
@@ -682,6 +717,59 @@ pub fn momo_flee(w: &World, at: Vec2, wins: u32) -> Cutscene {
         Step::Hide { actor: 1 },
         say(0, Face::Worried, |s| s.momo_flee_wait),
         Step::Narrate(|s| s.momo_petal),
+    ];
+    Cutscene::new(actors, steps)
+}
+
+/// 둘째 길 끝 방에 도토가 있다(0052): 묻은 것을 지키려 길을 막는다.
+pub fn doto_meet(w: &World) -> Cutscene {
+    talk(
+        w,
+        &[
+            (Speaker::DotoTainted, |s| s.doto_meet_1, Face::Normal),
+            (Speaker::Nail, |s| s.doto_meet_1b, Face::Determined),
+        ],
+    )
+}
+
+/// 도토를 이겼다(0052): 맑은 눈으로 돌아와 이름을 말하고, 오래전 가장 깊은 곳에 묻은 씨앗을 기억해 낸다(참 엔딩 조건).
+/// 그리고 먼저 마을로 간다.
+pub fn doto_returns(w: &World, at: Vec2) -> Cutscene {
+    let mut doto = doto_actor(at);
+    doto.visible = true;
+    doto.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
+    let actors = vec![nail_actor(w), doto];
+    let side = if at.x >= w.player.pos.x { 22.0 } else { -22.0 };
+    let near = w.player.pos + vec2(side, 0.0);
+    let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
+    let steps = vec![
+        Step::Wait(0.6),
+        say(1, Face::Normal, |s| s.doto_b1),
+        Step::Move {
+            actor: 1,
+            to: near,
+            speed: 45.0,
+        },
+        Step::Face {
+            actor: 1,
+            dir: vec2(-side, 0.0),
+        },
+        Step::Face {
+            actor: 0,
+            dir: vec2(side, 0.0),
+        },
+        say(0, Face::Worried, |s| s.doto_b2),
+        say(1, Face::Happy, |s| s.doto_b3),
+        say(1, Face::Normal, |s| s.doto_b4),
+        say(0, Face::Determined, |s| s.doto_b5),
+        say(1, Face::Happy, |s| s.doto_b6),
+        Step::Move {
+            actor: 1,
+            to: near + away * 150.0,
+            speed: 120.0,
+        },
+        Step::Hide { actor: 1 },
+        Step::Narrate(|s| s.doto_memory),
     ];
     Cutscene::new(actors, steps)
 }

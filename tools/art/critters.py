@@ -7,7 +7,9 @@
   줄 6 라쿤 포포(튜토리얼 안내): 0·1 서 있기, 2·3 걷기, 4 말하기(손 들기), 5 기뻐하기
   줄 7 모모(물든 굴토끼, 히로인, docs/decisions/0029): 0·1 서 있기, 2·3 깡충, 4 웅크림, 5 뛰어 차기, 6 맞음
   줄 8 돌아온 모모(docs/decisions/0046): 같은 칸 순서. 꽃이 피고, 검은 눈, 따뜻한 털, 뿌리 없음
-  줄 9~17: 줄 0~8의 흰 실루엣(피격 번쩍임용)
+  줄 9 도토(물든 청설모, 둘째 길 보스, docs/decisions/0052): 같은 칸 순서. 도토리 갓 모자, 호박색 빛 눈
+  줄 10 돌아온 도토: 검고 맑은 눈, 뿌리 없음, 모자는 그대로
+  줄 11~21: 줄 0~10의 흰 실루엣(피격 번쩍임용)
 
 그리는 법(nail.py와 같다): 채움 색만 글자로 찍고 외곽선('o')은 자동으로 두른다. 종마다 기본 자세 한 장을 손으로 찍고,
 동작은 그 자세를 옮기거나(통통·웅크림·내밀기) 몇 점만 바꿔 만든다(발, 눈, 꼬리).
@@ -56,6 +58,10 @@ COMMON = {
     'f': (176, 128, 140),   # 시든 꽃(귀 밑동, 돌아오면 핀다)
     'F': (255, 168, 196),   # 핀 꽃잎(돌아온 모모)
     'Y': (255, 226, 120),   # 꽃 가운데
+    'A': (255, 168, 48),    # 도토의 물든 눈(호박색 빛 — 모모의 초록, 졸개의 붉은 눈과 다르다)
+    'a': (255, 236, 180),   # 그 반사
+    'u': (98, 64, 38),      # 도토리 갓(짙음)
+    'U': (160, 112, 64),    # 도토리 갓(밝음)
 }
 
 FUR = {
@@ -71,6 +77,8 @@ FUR = {
     'momo':   [(58, 42, 66), (88, 64, 90), (118, 90, 116), (150, 124, 146)],
     # 돌아온 모모: 원래의 따뜻한 회갈색(0046).
     'momo_bloom': [(104, 84, 74), (150, 124, 106), (190, 164, 140), (228, 212, 192)],
+    # 도토(청설모): 다른 청설모 졸개(잿빛 갈색)보다 붉은 밤색. 물든 줄은 taint로 보라 쪽.
+    'doto':   [(112, 62, 42), (160, 96, 60), (200, 134, 86), (238, 216, 190)],
 }
 
 
@@ -116,7 +124,7 @@ def clear_row(g, y):
 
 def squint(g):
     """맞음: 붉은 눈을 질끈(짙은 가로줄)."""
-    eyes = find(g, 'ewgGW')
+    eyes = find(g, 'ewgGWAa')
     if not eyes:
         return
     top = min(y for _, y in eyes)
@@ -281,6 +289,46 @@ MOMO_BLOOM = grid([
     "",
 ])
 
+# 도토(물든 청설모, 0052): 청설모 실루엣(큰 꼬리·귀 술) + 머리에 도토리 갓 모자(u/U). 물든 눈은 호박색(A/a), 몸에 보라 뿌리.
+DOTO = grid([
+    ".hhh",
+    "hbbbh",
+    "bbbbbh",
+    "bbdbbb....k",
+    "dbbdbb...uUUu",
+    ".dbbdb..uUUUUu",
+    "..dbbbb.hhhhhh",
+    "...dbbhhbbbbbbh",
+    "....hvVbbbbaAbh",
+    "...hbvbbbbbAAbbp",
+    "...dbbbbbbbbblll",
+    "....dbbbbbbblll",
+    ".....ddbbbblll",
+    "......ddddll",
+    ".......pp.pp",
+    "",
+])
+
+# 돌아온 도토: 같은 자세, 뿌리 없음, 검고 맑은 눈(n + 반사 W), 볼 홍조 하나. 모자는 그대로.
+DOTO_BACK = grid([
+    ".hhh",
+    "hbbbh",
+    "bbbbbh",
+    "bbdbbb....k",
+    "dbbdbb...uUUu",
+    ".dbbdb..uUUUUu",
+    "..dbbbb.hhhhhh",
+    "...dbbhhbbbbbbh",
+    "....hbbbbbbWnbh",
+    "...hbbbbbbrnnbbp",
+    "...dbbbbbbbbblll",
+    "....dbbbbbbblll",
+    ".....ddbbbblll",
+    "......ddddll",
+    ".......pp.pp",
+    "",
+])
+
 # 허수아비: 말뚝 + 짚 몸 + 천 머리(단추 눈).
 DUMMY = grid([
     "",
@@ -420,6 +468,8 @@ def sheet():
     rows.append((FUR['raccoon'], raccoon_frames(), False))
     rows.append((FUR['momo'], frames_of(MOMO), False))
     rows.append((FUR['momo_bloom'], frames_of(MOMO_BLOOM), False))
+    rows.append((FUR['doto'], frames_of(DOTO), True))
+    rows.append((FUR['doto'], frames_of(DOTO_BACK), False))
     img = Image.new('RGBA', (N * 7, N * len(rows) * 2), (0, 0, 0, 0))
     for ry, (pal, frames, tainted) in enumerate(rows):
         for rx, g in enumerate(frames):

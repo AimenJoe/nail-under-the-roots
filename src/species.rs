@@ -23,6 +23,9 @@ pub enum Behavior {
     /// 모모(첫 길의 보스, 0046): 높이 뛰기 ↔ 뒷발 차기, 두 번째부터 굴로 숨었다 튀어나오기, 세 번째엔 이어 뛰기.
     /// 대장처럼 공격 중엔 안 멈춘다. 이길 때마다 한 수씩 는다(`Enemy::level`).
     Momo,
+    /// 도토(둘째 길의 보스, 0052): 도토리 부채꼴 던지기(되받아칠 수 있다) → 높이 뛰기 → 도토리 묻기(터지기 전에 비키거나 파낸다).
+    /// 거리를 두려 한다. 체력이 반 아래면 던지는 수·묻는 수가 는다.
+    Doto,
 }
 
 pub struct Species {
@@ -249,8 +252,36 @@ pub static MOMO: Species = Species {
     ..BASE
 };
 
+/// 도토(물든 청설모, 0037·0052). 둘째 길 "뿌리 엉킨 곳"의 끝에서 한 번 만난다. 무엇이든 묻고 지킨다.
+/// 손맛: 멀리서 던지는 보스. 도토리는 패링으로 되받아쳐 맞힐 수 있다(그게 가장 빠른 길). 뛰기는 청설모 졸개보다 넓게 찍는다.
+pub static DOTO: Species = Species {
+    name: |s| s.mob_doto,
+    lore: |s| s.mob_doto_lore,
+    attack: |s| s.mob_doto_atk,
+    tip: |s| s.mob_doto_tip,
+    behavior: Behavior::Doto,
+    hp: 34,
+    radius: 8.0,
+    speed: 46.0,
+    damage: 1,
+    knock_mul: 0.25,
+    trigger: 80.0,
+    windup: 0.55,
+    dash_time: 0.5,
+    rest: 0.8,
+    wall_rest: 1.6,
+    keep: (50.0, 110.0),
+    shot_speed: 80.0,
+    land_radius: 18.0,
+    glowbugs: (20, 24),
+    seed_chance: 1.0,
+    color: Color::new(0.70, 0.40, 0.26, 1.0),
+    sheet_row: crate::art::DOTO_ROW,
+    ..BASE
+};
+
 /// 도감 순서(허수아비는 빼고).
-pub const BESTIARY: [Kind; 7] = [
+pub const BESTIARY: [Kind; 8] = [
     Kind::FieldMouse,
     Kind::HouseMouse,
     Kind::SewerRat,
@@ -258,6 +289,7 @@ pub const BESTIARY: [Kind; 7] = [
     Kind::RedSquirrel,
     Kind::Chief,
     Kind::Momo,
+    Kind::Doto,
 ];
 
 pub fn of(kind: Kind) -> &'static Species {
@@ -270,6 +302,7 @@ pub fn of(kind: Kind) -> &'static Species {
         Kind::Dummy => &DUMMY,
         Kind::Chief => &CHIEF,
         Kind::Momo => &MOMO,
+        Kind::Doto => &DOTO,
     }
 }
 

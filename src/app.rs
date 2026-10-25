@@ -209,6 +209,9 @@ pub enum Item {
     Charm(usize),
 }
 
+/// 독 발톱(equipment::WEAPONS 번호, 큰 나무에서 깨운다, 0052).
+pub(crate) const VENOM_CLAW: usize = 3;
+
 /// 가방. 지금은 무기만 들어간다. 그 밖의 아이템은 2단계(방 클리어 보상)에서.
 pub struct Inventory {
     pub slots: Vec<Option<Item>>,
@@ -774,6 +777,8 @@ impl App {
             use crate::profile::key;
             self.world.momo_wins = self.profile.count(key::MOMO_WINS).min(t::MOMO_FIGHTS) as u8;
             self.world.momo_fight = s == Scenario::Normal && !self.profile.flag(key::MOMO_BACK);
+            // 도토(0052)도 첫 시작에서만, 기억해 내기 전까지.
+            self.world.doto_fight = s == Scenario::Normal && !self.profile.flag(key::DOTO_MEMORY);
         }
         self.inventory = match s {
             Scenario::Normal if veteran => Inventory::new(&[start]),
@@ -788,6 +793,10 @@ impl App {
             }
             _ => Inventory::new(&[start]),
         };
+        // 큰 나무에서 깨운 독 발톱(0052)도 런마다 가방에(끼는 건 가방에서). 맨손 시작(튜토리얼 전)은 빼고.
+        if self.profile.flag(crate::profile::key::VENOM) && self.inventory.equipped.is_some() {
+            self.inventory.add(VENOM_CLAW);
+        }
         // 저널로 받은 장신구는 런마다 가방에 들고 시작한다(0050). 상자에서는 다시 안 나온다.
         if s != Scenario::Tutorial {
             for c in crate::journal::owned_charms(&self.profile) {
@@ -1500,6 +1509,7 @@ impl App {
             bori: self.profile.flag(key::BORI_BACK),
             halmae: self.profile.flag(key::HALF_ENDING) || self.profile.flag(key::TRUE_ENDING),
             momo: self.profile.flag(key::MOMO_BACK),
+            doto: self.profile.flag(key::DOTO_MEMORY),
             decor,
             growth: crate::village::growth(self.profile.count(&key::clears(Character::Mole))),
         }

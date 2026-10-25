@@ -47,6 +47,8 @@ pub enum Who {
     Halmae,
     /// 돌아온 모모: 마을의 빈 자리에 앉는다(docs/decisions/0046).
     Momo,
+    /// 돌아온 도토: 마을 그루터기 밑(docs/decisions/0052).
+    Doto,
 }
 
 /// 이웃 NPC: 서 있거나(쉼터) 플레이어 곁으로 걸어온다(튜토리얼의 포포). 막지 않는다.
@@ -80,6 +82,13 @@ pub enum Gift {
     Weapon(usize),
     /// equipment::CHARMS 번호.
     Charm(usize),
+}
+
+/// 도토가 묻은 도토리(0052): 흙이 부풀다가 터진다. 터지는 순간 둘레에 있으면 다친다. 발톱으로 미리 파낼 수 있다.
+pub struct Mine {
+    pub pos: Vec2,
+    pub time: f32,
+    pub fuse: f32,
 }
 
 /// 바닥에 놓인 무기. 닿으면 얻는다.
@@ -142,6 +151,9 @@ pub struct World {
     /// 모모(0046): 첫 길 끝에서 싸우나(앱이 기록에서 정하고, 모모에게 쓰러지면 이번 런엔 끈다), 지금까지 이긴 수(빈 자리의 꽃잎).
     pub momo_fight: bool,
     pub momo_wins: u8,
+    /// 도토(0052): 둘째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다). 묻힌 도토리.
+    pub doto_fight: bool,
+    pub mines: Vec<Mine>,
     /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것, 0048)와 Naïl의 털빛(그리기만).
     pub charm_pool: Vec<usize>,
     pub fur: u8,
@@ -207,6 +219,8 @@ impl World {
             knots: crate::knots::Knots::default(),
             momo_fight: false,
             momo_wins: 0,
+            doto_fight: false,
+            mines: Vec::new(),
             charm_pool: (0..crate::equipment::BASE_CHARMS).collect(),
             fur: 0,
             chests: 0,
@@ -498,6 +512,7 @@ impl World {
             burst(&mut self.fx, e.pos, 10, color, 90.0);
         }
         let mut summon = false;
+        let mut bury = 0;
         for ev in &self.enemy_events {
             match ev {
                 enemy::Event::Charge => sfx.play(sfx::Id::Charge),
@@ -512,6 +527,7 @@ impl World {
                     self.feel.add_trauma(0.12);
                 }
                 enemy::Event::Summon => summon = true,
+                enemy::Event::Bury(n) => bury = *n,
                 enemy::Event::Dig => sfx.play(sfx::Id::Burrow),
                 enemy::Event::Pop => {
                     sfx.play(sfx::Id::Emerge);
@@ -555,6 +571,50 @@ impl World {
                 self.fx.push(ring(p, 4.0, 18.0, 0.3, DIRT));
                 burst(&mut self.fx, p, 10, DIRT, 70.0);
             }
+        }
+        // 도토가 묻으면: 하나는 플레이어 발밑, 나머지는 둘레에 고르게(바닥 안으로).
+        if bury > 0 {
+            sfx.play(sfx::Id::Burrow);
+            let fuse = t::DOTO_MINE_FUSE
+                * self
+                    .enemies
+                    .iter()
+                    .find(|e| e.kind == Kind::Doto)
+                    .map_or(1.0, |e| e.windup_mul);
+            let base = rand::gen_range(0.0, std::f32::consts::TAU);
+            for i in 0..bury {
+                let mut p = self.player.pos;
+                if i > 0 {
+                    let a = base + i as f32 * std::f32::consts::TAU / (bury - 1) as f32;
+                    p += Vec2::from_angle(a) * t::DOTO_MINE_SPREAD;
+                }
+                self.room.resolve_circle(&mut p, 6.0);
+                self.mines.push(Mine {
+                    pos: p,
+                    time: 0.0,
+                    fuse,
+                });
+                burst(&mut self.fx, p, 6, DIRT, 50.0);
+            }
+        }
+        // 묻힌 도토리가 터진다(필살기 시동 중엔 멈춘다). 도토가 없으면 다 사라진다.
+        let mut popped = Vec::new();
+        if !self.enemies.iter().any(|e| e.kind == Kind::Doto) {
+            self.mines.clear();
+        }
+        for m in self.mines.iter_mut().filter(|_| !frozen) {
+            m.time += dt;
+            if m.time >= m.fuse {
+                popped.push(m.pos);
+            }
+        }
+        self.mines.retain(|m| m.time < m.fuse);
+        for &p in &popped {
+            sfx.play(sfx::Id::Emerge);
+            self.feel.add_trauma(0.15);
+            self.fx
+                .push(ring(p, 3.0, t::DOTO_MINE_RADIUS + 2.0, 0.25, PROJECTILE));
+            burst(&mut self.fx, p, 12, DIRT, 110.0);
         }
         for p in self.projectiles.iter_mut().filter(|_| !frozen) {
             p.update(&self.room, dt);
@@ -665,6 +725,23 @@ impl World {
             if parried {
                 self.parry_feedback(sfx);
             }
+            // 발톱이 닿은 묻힌 도토리는 파낸다(터지지 않는다).
+            let before = self.mines.len();
+            let mut dug = Vec::new();
+            self.mines.retain(|m| {
+                let hit = s.shape.overlaps_circle(m.pos, 5.0);
+                if hit {
+                    dug.push(m.pos);
+                }
+                !hit
+            });
+            if self.mines.len() < before {
+                sfx.play(sfx::Id::Claw(0));
+            }
+            for p in dug {
+                self.fx.push(ring(p, 2.0, 8.0, 0.15, DIRT));
+                burst(&mut self.fx, p, 6, DIRT, 70.0);
+            }
         }
 
         for (pos, kind) in deaths {
@@ -699,6 +776,15 @@ impl World {
             }
             if parried {
                 self.parry_feedback(sfx);
+            }
+            if hurt_from.is_none() && !parried {
+                let rr = pr + t::DOTO_MINE_RADIUS;
+                if let Some(p) = popped
+                    .iter()
+                    .find(|p| (**p - ppos).length_squared() <= rr * rr)
+                {
+                    hurt_from = Some((*p, 1));
+                }
             }
             if hurt_from.is_none() && !parried {
                 for p in &mut self.projectiles {

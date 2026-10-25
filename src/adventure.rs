@@ -76,6 +76,9 @@ pub enum AdvEvent {
     /// 첫 길 끝 방에 모모가 있다 / 모모를 이겼다(0046). 몇 번째인지는 앱이 안다.
     MomoIntro,
     MomoBeaten,
+    /// 둘째 길 끝 방에 도토가 있다 / 도토를 이겼다(0052).
+    DotoIntro,
+    DotoBeaten,
 }
 
 /// 확인 버튼으로 하는 일(쉼터).
@@ -228,6 +231,7 @@ impl World {
                 'b' if v.bori => w.neighbors.push(Npc::standing(Who::Bori, *at)),
                 'H' if v.halmae => w.neighbors.push(Npc::standing(Who::Halmae, *at)),
                 'M' if v.momo => w.neighbors.push(Npc::standing(Who::Momo, *at)),
+                'd' if v.doto => w.neighbors.push(Npc::standing(Who::Doto, *at)),
                 _ => {}
             }
         }
@@ -580,6 +584,10 @@ impl World {
         if self.momo_fight && stage == 1 && kind == NodeKind::Boss {
             prm.boss = Some(Kind::Momo);
         }
+        // 둘째 길의 끝은 도토가 지킨다(아직 기억해 내지 않았고, 이번 런에 도토에게 쓰러지지 않았으면, 0052).
+        if self.doto_fight && stage == 2 && kind == NodeKind::Boss {
+            prm.boss = Some(Kind::Doto);
+        }
         self.adv.node = Some(at);
         self.build_dungeon(&prm, biome);
     }
@@ -685,6 +693,10 @@ impl World {
         if self.enemies.iter().any(|e| e.kind == Kind::Momo) {
             self.momo_fight = false;
         }
+        if self.enemies.iter().any(|e| e.kind == Kind::Doto) {
+            self.doto_fight = false;
+        }
+        self.mines.clear();
         if self.adv.place == Place::Dungeon {
             self.restore_field();
         }
@@ -717,7 +729,11 @@ impl World {
         }
         let goal = d.goal;
         let named = d.boss;
-        if let Some(m) = self.enemies.iter().find(|e| e.kind == Kind::Momo) {
+        if let Some(m) = self
+            .enemies
+            .iter()
+            .find(|e| matches!(e.kind, Kind::Momo | Kind::Doto))
+        {
             self.adv.boss_last = m.pos;
         }
         let Some(room) = d.room_mut(self.adv.current_room) else {
@@ -759,6 +775,10 @@ impl World {
                         self.adv.boss_last = e.pos;
                         self.adv.events.push(AdvEvent::MomoIntro);
                     }
+                    if kind == Kind::Doto {
+                        self.adv.boss_last = e.pos;
+                        self.adv.events.push(AdvEvent::DotoIntro);
+                    }
                     self.enemies.push(e);
                 }
             }
@@ -784,6 +804,9 @@ impl World {
                     if named == Some(Kind::Momo) {
                         // 모모는 달아난다(장면은 앱). 끝방 보상은 그대로.
                         self.adv.events.push(AdvEvent::MomoBeaten);
+                    } else if named == Some(Kind::Doto) {
+                        // 도토는 제정신이 돌아와 씨앗 자리를 기억해 낸다(장면은 앱).
+                        self.adv.events.push(AdvEvent::DotoBeaten);
                     } else {
                         self.toast = Some((|s| s.toast_boss, 3.0));
                     }
@@ -1060,6 +1083,25 @@ mod tests {
         };
         assert_eq!(kinds(&a), kinds(&b));
         assert_eq!((a.adv.place, a.adv.stage), (Place::Camp, 1));
+    }
+
+    /// 도토(0052): 둘째 길 끝 굴만 도토가 지키고(싸울 때만), 기억해 낸 뒤엔 마을 그루터기 밑에 있다.
+    #[test]
+    fn doto_guards_the_second_path_and_then_lives_in_the_village() {
+        for (stage, fight, want) in [(2, true, true), (2, false, false), (1, true, false)] {
+            let mut w = World::camp_start(stage);
+            w.doto_fight = fight;
+            w.enter_route_boss_now();
+            let boss = w.adv.dungeon.as_ref().and_then(|d| d.boss);
+            assert_eq!(boss == Some(Kind::Doto), want, "길 {stage}, 싸움 {fight}");
+        }
+        let v = World::village(crate::village::State {
+            doto: true,
+            ..Default::default()
+        });
+        assert!(v.neighbors.iter().any(|n| n.who == Who::Doto));
+        let v = World::village(crate::village::State::default());
+        assert!(!v.neighbors.iter().any(|n| n.who == Who::Doto));
     }
 
     /// 마을의 큰 나무 밑동에 서면 재주 창(0047), 떨어지면 아니다.

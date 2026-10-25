@@ -1,5 +1,5 @@
 //! 적: 뿌리에 물든 땅속 이웃. 종류(`Kind`)마다 행동 하나와 수치가 `species.rs` 표에 있다.
-//! 행동: 돌격(쥐들), 던지기(다람쥐), 뛰어 덮치기(청설모), 보스 둘(대장·모모). 플레이어 위치와 `Room`만 본다.
+//! 행동: 돌격(쥐들), 던지기(다람쥐), 뛰어 덮치기(청설모), 보스 셋(대장·모모·도토). 플레이어 위치와 `Room`만 본다.
 
 use macroquad::prelude::*;
 
@@ -26,6 +26,8 @@ pub enum Kind {
     Chief,
     /// 첫 길의 보스: 물든 굴토끼 모모. 세 번 만난다(docs/decisions/0046).
     Momo,
+    /// 둘째 길의 보스: 물든 청설모 도토. 던지고, 뛰고, 묻는다(docs/decisions/0052).
+    Doto,
 }
 
 impl Kind {
@@ -54,7 +56,7 @@ pub enum State {
     Leap { time: f32, from: Vec2, to: Vec2 },
     /// 공통: 경직(남은 시간).
     Stunned { time: f32 },
-    /// 대장: 울부짖어 부하를 부른다(예고 뒤 Event::Summon).
+    /// 대장: 울부짖어 부하를 부른다(예고 뒤 Event::Summon). 도토: 땅을 판다(예고 뒤 Event::Bury).
     Howl { time: f32 },
     /// 모모: 땅속(맞지 않고 닿아도 안 아프다). 흙 둔덕이 플레이어를 따라오다 멈추고 떤다.
     Under { time: f32 },
@@ -75,6 +77,8 @@ pub enum Event {
     /// 모모가 땅속으로 / 밖으로.
     Dig,
     Pop,
+    /// 도토가 도토리를 묻었다(월드가 플레이어 발밑·둘레에 묻힌 도토리를 놓는다). 몇 개인지.
+    Bury(usize),
 }
 
 pub struct Enemy {
@@ -287,24 +291,47 @@ impl Enemy {
                     self.state = State::Stunned { time };
                 }
             }
-            State::Approach if matches!(sp.behavior, Behavior::Chief | Behavior::Momo) => {
+            State::Approach
+                if matches!(
+                    sp.behavior,
+                    Behavior::Chief | Behavior::Momo | Behavior::Doto
+                ) =>
+            {
                 if player_targetable {
                     self.facing = dir_to_player;
-                    self.state = if sp.behavior == Behavior::Chief {
-                        self.chief_next(dist, player_pos)
-                    } else {
-                        self.momo_next(dist, player_pos, events)
+                    self.state = match sp.behavior {
+                        Behavior::Chief => self.chief_next(dist, player_pos),
+                        Behavior::Momo => self.momo_next(dist, player_pos, events),
+                        _ => self.doto_next(dist, player_pos),
                     };
                     if matches!(self.state, State::Approach) {
-                        self.pos += dir_to_player * sp.speed * dt;
+                        // 도토는 너무 가까우면 물러난다(던지는 보스).
+                        let away = sp.behavior == Behavior::Doto && dist < sp.keep.0;
+                        let dir = if away { -dir_to_player } else { dir_to_player };
+                        self.pos += dir * sp.speed * dt;
                     }
                 }
             }
             State::Howl { time } => {
                 let time = time + dt;
-                if time >= self.windup() * t::CHIEF_HOWL_MUL {
-                    self.summons += 1;
-                    events.push(Event::Summon);
+                let doto = sp.behavior == Behavior::Doto;
+                let dur = self.windup()
+                    * if doto {
+                        t::DOTO_BURY_MUL
+                    } else {
+                        t::CHIEF_HOWL_MUL
+                    };
+                if time >= dur {
+                    if doto {
+                        events.push(Event::Bury(if self.hurt_half() {
+                            t::DOTO_MINES_HURT
+                        } else {
+                            t::DOTO_MINES
+                        }));
+                    } else {
+                        self.summons += 1;
+                        events.push(Event::Summon);
+                    }
                     self.state = State::Rest { time: sp.rest };
                 } else {
                     self.state = State::Howl { time };
@@ -455,18 +482,31 @@ impl Enemy {
                     self.facing = dir_to_player;
                 }
                 if time >= self.windup() {
-                    let start =
-                        self.pos + self.facing * (self.radius() + t::PROJECTILE_RADIUS + 1.0);
-                    projectiles.push(Projectile {
-                        pos: start,
-                        prev_pos: start,
-                        vel: self.facing * sp.shot_speed,
-                        alive: true,
-                        friendly: false,
-                    });
+                    // 도토: 부채꼴로 여럿(가운데가 플레이어 쪽), 던진 뒤 잠깐 쉰다.
+                    let n = match sp.behavior {
+                        Behavior::Doto if self.hurt_half() => t::DOTO_FAN_HURT,
+                        Behavior::Doto => t::DOTO_FAN,
+                        _ => 1,
+                    };
+                    for i in 0..n {
+                        let a = (i as f32 - (n - 1) as f32 * 0.5) * t::DOTO_FAN_SPREAD;
+                        let dir = Vec2::from_angle(a).rotate(self.facing);
+                        let start = self.pos + dir * (self.radius() + t::PROJECTILE_RADIUS + 1.0);
+                        projectiles.push(Projectile {
+                            pos: start,
+                            prev_pos: start,
+                            vel: dir * sp.shot_speed,
+                            alive: true,
+                            friendly: false,
+                        });
+                    }
                     events.push(Event::Shoot);
                     self.fire_cd = sp.fire_every;
-                    self.state = State::Keep;
+                    self.state = if sp.behavior == Behavior::Doto {
+                        State::Rest { time: sp.rest }
+                    } else {
+                        State::Keep
+                    };
                 } else {
                     self.state = State::Aim { time };
                 }
@@ -539,6 +579,35 @@ impl Enemy {
         }
     }
 
+    /// 도토의 다음 수(0052): 부채꼴 던지기 → 높이 뛰기 → 도토리 묻기를 돈다.
+    /// 던지기는 멀어도(유지 거리 끝까지), 뛰기는 조금 멀어도 된다. 묻기는 거리와 상관없이. 안 되면 거리를 맞춘다.
+    fn doto_next(&mut self, dist: f32, player_pos: Vec2) -> State {
+        let sp = self.sp();
+        match self.pattern % 3 {
+            0 if dist < sp.keep.1 * 1.3 => {
+                self.pattern += 1;
+                State::Aim { time: 0.0 }
+            }
+            1 if dist < sp.trigger * 1.5 => {
+                self.pattern += 1;
+                State::Crouch {
+                    time: 0.0,
+                    target: player_pos,
+                }
+            }
+            2 => {
+                self.pattern += 1;
+                State::Howl { time: 0.0 }
+            }
+            _ => State::Approach,
+        }
+    }
+
+    /// 체력이 반 아래(보스가 한 수 세진다).
+    fn hurt_half(&self) -> bool {
+        self.hp * 2 <= self.max_hp
+    }
+
     /// 공격 동작 중(예고 포함): 보스는 맞아도 멈추지 않는다(슈퍼아머). 피하고 빈틈에 때리는 보스.
     fn armored(&self) -> bool {
         self.is_boss()
@@ -550,12 +619,16 @@ impl Enemy {
                     | State::Leap { .. }
                     | State::Howl { .. }
                     | State::Pop { .. }
+                    | State::Aim { .. }
             )
     }
 
     /// 보스(체력 막대를 화면에 따로 그린다).
     pub fn is_boss(&self) -> bool {
-        matches!(self.sp().behavior, Behavior::Chief | Behavior::Momo)
+        matches!(
+            self.sp().behavior,
+            Behavior::Chief | Behavior::Momo | Behavior::Doto
+        )
     }
 
     /// 독을 건다. 이미 걸려 있으면 더 긴 쪽.
@@ -637,7 +710,7 @@ impl Enemy {
 
 fn idle_of(b: Behavior) -> State {
     match b {
-        Behavior::Charger | Behavior::Chief | Behavior::Momo => State::Approach,
+        Behavior::Charger | Behavior::Chief | Behavior::Momo | Behavior::Doto => State::Approach,
         Behavior::Shooter | Behavior::Leaper => State::Keep,
         Behavior::Dummy => State::Rest { time: f32::MAX },
     }
@@ -743,6 +816,33 @@ mod tests {
         assert!(dug && popped);
         let (_, _, l3, _) = run(3);
         assert!(l3 > l2, "세 번째는 더 자주 내려앉는다: {l2} → {l3}");
+    }
+
+    /// 도토: 던지기(부채꼴 셋) → 뛰기 → 묻기를 돌고, 체력이 반 아래면 다섯을 던지고 넷을 묻는다.
+    #[test]
+    fn doto_throws_fans_leaps_and_buries() {
+        let room = Room::new();
+        let player = room.center() + vec2(70.0, 0.0);
+        let run = |hp: i32| {
+            let mut e = Enemy::new(Kind::Doto, room.center());
+            e.hp = hp;
+            let (mut pr, mut ev) = (Vec::new(), Vec::new());
+            let mut most = 0;
+            for _ in 0..900 {
+                let before = pr.len();
+                e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+                most = most.max(pr.len() - before);
+                pr.clear();
+            }
+            (most, ev)
+        };
+        let (fan, ev) = run(species::DOTO.hp);
+        assert_eq!(fan, t::DOTO_FAN);
+        assert!(ev.contains(&Event::Land));
+        assert!(ev.contains(&Event::Bury(t::DOTO_MINES)));
+        let (fan, ev) = run(species::DOTO.hp / 2);
+        assert_eq!(fan, t::DOTO_FAN_HURT);
+        assert!(ev.contains(&Event::Bury(t::DOTO_MINES_HURT)));
     }
 
     #[test]

@@ -220,6 +220,8 @@ impl App {
                     self.play(cutscene::momo_meet(&self.world, level));
                 }
                 AdvEvent::MomoBeaten => self.momo_beaten(),
+                AdvEvent::DotoIntro => self.play(cutscene::doto_meet(&self.world)),
+                AdvEvent::DotoBeaten => self.doto_beaten(),
             }
         }
     }
@@ -247,6 +249,18 @@ impl App {
             let at = self.world.adv.boss_last;
             self.play(cutscene::momo_flee(&self.world, at, wins as u32));
         }
+    }
+
+    /// 도토를 이겼다(0052): 씨앗 자리를 기억해 낸다(참 엔딩 조건 하나). 이번 런엔 다시 안 싸운다.
+    /// 개발 시나리오는 기록 없이 장면만.
+    fn doto_beaten(&mut self) {
+        self.world.doto_fight = false;
+        if self.recording() {
+            self.profile.set(crate::profile::key::DOTO_MEMORY);
+            self.save_profile();
+        }
+        let at = self.world.adv.boss_last;
+        self.play(cutscene::doto_returns(&self.world, at));
     }
 
     /// 가장 깊은 곳(0042): 클리어를 남기고 엔딩을 튼다. 끝나면 타이틀로(런이 끝났다).
@@ -355,6 +369,15 @@ impl App {
                 self.play(cutscene::talk(
                     &self.world,
                     &[(Speaker::Nail, line, Face::Worried)],
+                ));
+            }
+            Interact::Talk(Who::Doto) => {
+                let lines: [Tr; 3] = [|s| s.doto_v1, |s| s.doto_v2, |s| s.doto_v3];
+                let text = lines[self.talk_n as usize % lines.len()];
+                self.talk_n += 1;
+                self.play(cutscene::talk(
+                    &self.world,
+                    &[(Speaker::Doto, text, Face::Happy)],
                 ));
             }
             Interact::Talk(Who::Momo) => {
@@ -891,7 +914,7 @@ impl App {
         let verb = match i {
             Interact::Talk(Who::Popo) if village => s.ia_decor,
             Interact::Talk(Who::Popo) => s.ia_shop,
-            Interact::Talk(Who::Bori | Who::Momo) => s.ia_talk,
+            Interact::Talk(Who::Bori | Who::Momo | Who::Doto) => s.ia_talk,
             Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,
             Interact::Tree => s.ia_tree,
@@ -1065,14 +1088,16 @@ impl App {
             }
         }
         let (mut row, mut side) = self.tree_cursor;
-        let n = SLOTS.len();
+        // 도토 뒤엔 다섯째 줄: Naïl 자신의 독 발톱(한 칸, 0052).
+        let venom_row = self.profile.flag(crate::profile::key::DOTO_MEMORY);
+        let n = SLOTS.len() + usize::from(venom_row);
         if a.up {
             row = (row + n - 1) % n;
         }
         if a.down {
             row = (row + 1) % n;
         }
-        if a.left || a.right {
+        if (a.left || a.right) && row < SLOTS.len() {
             side = 1 - side;
         }
         let mut act = a.confirm;
@@ -1080,11 +1105,30 @@ impl App {
             (row, side) = (r, c);
             act = true;
         }
+        if row >= SLOTS.len() {
+            side = 0;
+        }
         if (row, side) != self.tree_cursor {
             self.shop_msg = None;
         }
         self.tree_cursor = (row, side);
-        if act {
+        if act && row >= SLOTS.len() {
+            use crate::profile::key;
+            let have = self.profile.count(KEY_LIGHT);
+            if self.profile.flag(key::VENOM) {
+                self.shop_msg = Some((|s| s.tree_venom_on, 2.0));
+            } else if have < t::VENOM_AWAKE_COST {
+                self.shop_msg = Some((|s| s.tree_poor, 3.0));
+            } else {
+                self.profile
+                    .set_count(KEY_LIGHT, have - t::VENOM_AWAKE_COST);
+                self.profile.set(key::VENOM);
+                crate::profile::save(&self.profile);
+                self.inventory.add(super::VENOM_CLAW);
+                self.shop_msg = Some((|s| s.tree_venom_on, 3.0));
+                self.sfx.play(crate::sfx::Id::Heal);
+            }
+        } else if act {
             let slot = SLOTS[row];
             let pick = key_pick(slot);
             if !self.profile.flag(&key_awake(slot, side)) {
@@ -1130,7 +1174,10 @@ impl App {
             FONT_PX,
             ui::TEXT,
         );
-        let row_h = 21.0;
+        let venom_row = self.profile.flag(crate::profile::key::DOTO_MEMORY);
+        let venom = self.profile.flag(crate::profile::key::VENOM);
+        let rows = SLOTS.len() + usize::from(venom_row);
+        let row_h = if venom_row { 18.0 } else { 21.0 };
         let y0 = panel.y + 20.0;
         let x0 = panel.x + 70.0;
         let cell_w = ((panel.right() - 6.0 - x0 - 4.0) / 2.0).floor();
@@ -1177,11 +1224,51 @@ impl App {
                 }
             }
         }
+        if venom_row {
+            // 독 발톱: 두 갈래 칸을 하나로.
+            let r = SLOTS.len();
+            let y = y0 + r as f32 * row_h;
+            let label = ui.fit(s.tree_claw, x0 - panel.x - 10.0, FONT_PX);
+            ui.text(&label, panel.x + 6.0, y + 4.0, FONT_PX, ui::TEXT_DIM);
+            let cell = Rect::new(x0, y, cell_w * 2.0 + 4.0, row_h - 2.0);
+            self.hits.push((cell, Hit::TreeCell(r, 0)));
+            let focus = self.tree_cursor.0 == r;
+            ui.rect(cell, if focus { ui::PANEL_LIGHT } else { ui::PANEL });
+            ui.rect_lines(
+                cell,
+                if focus || venom {
+                    ui::ACCENT
+                } else {
+                    ui::BORDER
+                },
+            );
+            if venom {
+                ui.text("●", cell.x + 3.0, cell.y + 3.0, FONT_PX, ui::ACCENT);
+            } else {
+                let cost = t::VENOM_AWAKE_COST.to_string();
+                let cc = if have >= t::VENOM_AWAKE_COST {
+                    ui::ACCENT
+                } else {
+                    ui::TEXT_DIM
+                };
+                ui.text_right(&cost, cell.right() - 3.0, cell.y + 3.0, FONT_PX, cc);
+            }
+            let tc = if venom { ui::TEXT } else { ui::TEXT_DIM };
+            let name = ui.fit(s.w_venom, cell.w - 40.0, FONT_PX);
+            ui.text(&name, cell.x + 13.0, cell.y + 3.0, FONT_PX, tc);
+        }
         // 고른 칸의 설명 + 상태(또는 방금 한 일).
         let (r, c) = self.tree_cursor;
+        let on_venom = r >= SLOTS.len();
+        let r = r.min(SLOTS.len() - 1);
         let tal = &TABLE[r].1[c];
-        let dy = y0 + SLOTS.len() as f32 * row_h + 3.0;
-        for (k, l) in ui::wrap(ui, tr(tal.desc), panel.w - 12.0, FONT_PX)
+        let dy = y0 + rows as f32 * row_h + 3.0;
+        let desc = if on_venom {
+            s.tree_venom_desc
+        } else {
+            tr(tal.desc)
+        };
+        for (k, l) in ui::wrap(ui, desc, panel.w - 12.0, FONT_PX)
             .iter()
             .take(2)
             .enumerate()
@@ -1191,6 +1278,8 @@ impl App {
         let awake = self.profile.flag(&key_awake(SLOTS[r], c));
         let state = match self.shop_msg {
             Some((m, _)) => tr(m).to_string(),
+            None if on_venom && venom => s.tree_venom_on.to_string(),
+            None if on_venom => fill(s.tree_cost, &[&t::VENOM_AWAKE_COST]),
             None if !awake => fill(s.tree_cost, &[&tal.cost]),
             None if self.profile.count(&key_pick(SLOTS[r])) == c as u32 + 1 => {
                 s.tree_on.to_string()

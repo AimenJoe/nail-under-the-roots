@@ -17,7 +17,7 @@ pub enum When {
     RunStart,
     /// 큰 나무 아래 마을에 왔다(0045).
     Village,
-    /// 보리·모모에게 말을 걸었다(0051): 진행에 맞는 한 번짜리 줄이 먼저, 없으면 늘 하는 말.
+    /// 보리·모모에게 말을 걸었다(0051): 진행에 맞는 한 번짜리 줄이 먼저, 없으면 늘 하는 말(도토 줄은 0052).
     TalkBori,
     TalkMomo,
 }
@@ -146,6 +146,19 @@ pub const LINES: &[Line] = &[
         ],
         once: true,
     },
+    // 도토(0052): 씨앗 자리를 기억해 낸 뒤 포포가 마을에 온 도토를 알린다.
+    Line {
+        id: "popo_doto",
+        when: When::Village,
+        who: Speaker::Popo,
+        text: |s| s.popo_doto,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::DOTO_MEMORY),
+            Seen("village_intro"),
+        ],
+        once: true,
+    },
     // 반딧불을 처음 마을로 보낸 뒤: 큰 나무 재주를 알려 준다(0047).
     Line {
         id: "tree_intro",
@@ -190,6 +203,22 @@ pub const LINES: &[Line] = &[
         who: Speaker::Bori,
         text: |s| s.bori_t_tree,
         needs: &[Seen("tree_intro")],
+        once: true,
+    },
+    Line {
+        id: "bori_t_doto",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_t_doto,
+        needs: &[Flag(key::DOTO_MEMORY)],
+        once: true,
+    },
+    Line {
+        id: "momo_t_doto",
+        when: When::TalkMomo,
+        who: Speaker::Momo,
+        text: |s| s.momo_t_doto,
+        needs: &[Flag(key::DOTO_MEMORY)],
         once: true,
     },
     Line {

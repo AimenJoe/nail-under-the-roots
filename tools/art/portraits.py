@@ -12,6 +12,8 @@
   칸 15~16: 누룩 할매 보통·기쁨 — 흰 실 덩어리 몸, 머리에 버섯 갓 셋, 감은 눈
   칸 17  : 엄마 두더지 — Naïl보다 크고 털이 짙다, 다정하게 감은 눈
   칸 18~29: Naïl 털빛 1~3(잿빛·밤빛·모래빛) × 표정 4(저널 보상, docs/decisions/0048) — 털 경사만 바꾼다
+  칸 30  : 도토(물든 청설모, 둘째 길 보스) — 도토리 갓 모자, 호박색 빛 눈, 꼬리를 감은 뿌리(docs/decisions/0052)
+  칸 31~32: 돌아온 도토 보통·기쁨 — 붉은 밤색 털, 검은 눈, 모자는 그대로
 
 그리는 법(손 도트를 흉내 낸 절차):
   1. 부위를 타원으로 놓고 칸마다 재질을 정한다(뒤에 놓인 것부터).
@@ -67,9 +69,16 @@ RAMP = {
     'stem':   [(170, 158, 140), (210, 200, 182), (236, 230, 216)],
     # 엄마 두더지: Naïl보다 한 단 짙은 털
     'mfurd':  [(46, 30, 34), (72, 50, 46), (102, 74, 62), (132, 98, 80), (162, 128, 104)],
+    # 도토(청설모): 붉은 밤색 털, 크림빛 배·주둥이. 물들면 자두빛으로 기운다(모모·보리와 같은 방향).
+    'dfur':   [(70, 36, 30), (112, 62, 42), (160, 96, 60), (200, 134, 86), (230, 170, 116)],
+    'dtfur':  [(48, 28, 40), (80, 46, 54), (112, 66, 66), (146, 92, 82), (176, 120, 104)],
+    'dlight': [(170, 140, 120), (206, 180, 156), (232, 212, 190), (248, 238, 222)],
+    'dtlight': [(120, 96, 108), (150, 124, 132), (176, 152, 156), (200, 180, 180)],
+    'acorn':  [(62, 40, 26), (98, 66, 40), (138, 98, 60), (176, 134, 84)],
 }
 RED_EYE = [(80, 14, 34), (190, 34, 72), (255, 84, 116), (255, 222, 230)]
 GLOW_EYE = [(40, 70, 36), (110, 190, 70), (190, 245, 120), (240, 255, 210)]
+AMBER_EYE = [(96, 52, 12), (224, 132, 32), (255, 192, 84), (255, 240, 200)]
 OUTLINE_BASE = (43, 29, 42)
 # Naïl 털빛(nail.py FURS와 같은 색 방향, 초상화 5단 경사).
 FUR_VARIANTS = {
@@ -725,6 +734,130 @@ def momo_back(face):
     return cv
 
 
+# ---- 도토(청설모) ------------------------------------------------------------------------
+def doto(face):
+    """도토(0052): 등 뒤로 솟은 큰 꼬리, 끝에 털 술이 난 뾰족한 귀, 머리에 도토리 갓 모자(가장 아끼는 것).
+    face: 'tainted'(물든 모습 — 호박색 빛 눈, 찌푸린 눈썹, 앞니, 꼬리·목을 감은 뿌리) / 'normal' / 'happy'."""
+    cv = Canvas()
+    bad = face == 'tainted'
+    fur, light = ('dtfur', 'dtlight') if bad else ('dfur', 'dlight')
+
+    def bushy(x, y, ang):
+        return 1.0 + 0.07 * math.sin(ang * 11.0) + 0.03 * math.sin(ang * 27.0)
+    # 꼬리(뒤): 왼쪽 아래에서 솟아 머리 위로 말린다
+    ellipse(cv, 15, 64, 13, 22, fur, bias=-0.15, rough=bushy)
+    ellipse(cv, 12, 40, 13, 19, fur, bias=-0.08, rough=bushy)
+    ellipse(cv, 20, 20, 15, 12, fur, bias=-0.02, rough=bushy)
+    ellipse(cv, 30, 16, 7, 6, fur, bias=0.05, rough=bushy)
+    # 귀: 뾰족하게, 끝에 털 술(짙은 털 몇 가닥이 위로 삐죽)
+    ellipse(cv, 37, 23, 5, 11, fur, bias=0.0, clip=lambda x, y: y < 36)
+    flat(cv, 37, 25, 2.0, 6, 'pink', 0)
+    ellipse(cv, 57, 20, 6, 12, fur, bias=0.05, clip=lambda x, y: y < 36)
+    flat(cv, 57, 23, 2.5, 7, 'pink', 0 if bad else 1)
+    for (x, y) in ((36, 11), (37, 10), (37, 9), (38, 8), (36, 9), (35, 8),
+                   (56, 8), (57, 7), (57, 6), (58, 5), (56, 5), (55, 6), (59, 7)):
+        cv.put(x, y, fur, 0)
+    # 머리 + 볼털
+    def fluff(x, y, ang):
+        r = tuft(x, y, ang)
+        if 0.2 < ang < 1.3 or 1.85 < ang < 2.95:
+            r *= 1.0 + 0.08 * (0.5 + 0.5 * math.sin(ang * 9.0))
+        return r
+    ellipse(cv, 47, 55, 24, 21, fur, bias=0.05, rough=fluff)
+    ellipse(cv, 46, 92, 20, 10, fur, bias=-0.15)
+    ellipse(cv, 46, 88, 10, 6, light, bias=-0.1)                    # 가슴 털
+    # 주둥이·볼(밝은 털), 코
+    ellipse(cv, 62, 63, 5.5, 4.5, light, bias=-0.05)
+    ellipse(cv, 67, 59, 2.2, 1.8, 'pink', bias=-0.2 if bad else -0.1)
+    # 도토리 갓 모자: 머리 위 반원 + 짧은 꼭지
+    ellipse(cv, 45, 34, 14, 8, 'acorn', bias=0.1, clip=lambda x, y: y < 36)
+    flat(cv, 45, 35, 14, 1.6, 'acorn', 0)
+    for (x, y) in ((45, 25), (46, 24), (46, 23), (47, 22)):
+        cv.put(x, y, 'acorn', 1)
+    # 뿌리(물든 모습만): 목을 한 바퀴, 꼬리를 타고 오른다
+    if bad:
+        for (pts, w) in (
+            ([(14, 78), (28, 74), (42, 77), (56, 73), (70, 76)], 3),
+            ([(10, 70), (14, 56), (20, 42), (16, 28), (24, 16)], 2),
+        ):
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+                n = int(max(abs(x1 - x0), abs(y1 - y0))) * 2 + 1
+                for i in range(n + 1):
+                    t = i / n
+                    x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+                    for oy in range(-(w // 2), w // 2 + 1):
+                        for ox in range(-(w // 2), w // 2 + 1):
+                            if ox * ox + oy * oy <= (w / 2) ** 2 + 0.5:
+                                cv.put(int(x + ox), int(y + oy), 'vroot', 2 if oy < 0 else 1)
+    outline(cv)
+    rim_light(cv, fur)
+    # 모자 비늘 무늬(엇갈린 점), 챙 밝은 선
+    for y in range(27, 35):
+        for x in range(32, 59):
+            m = cv.mat[y][x]
+            if m and m[0] == 'acorn' and (x + (y // 2) * 2) % 4 == 0 and y % 2 == 0:
+                cv.paint(x, y, RAMP['acorn'][max(0, m[1] - 1)])
+    for x in range(33, 58):
+        if cv.mat[34][x] and cv.mat[34][x][0] == 'acorn':
+            cv.paint(x, 34, RAMP['acorn'][3])
+    # 꼬리 털 결
+    for (x0, y0) in ((8, 36), (14, 26), (6, 52), (12, 64), (20, 12), (26, 18), (10, 44)):
+        for k in range(3):
+            x, y = x0 + k, y0 + k
+            if cv.mat[y][x] and cv.mat[y][x][0] == fur and cv.col[y][x] is None:
+                cv.paint(x, y, RAMP[fur][max(0, cv.mat[y][x][1] - 1)])
+    if bad:
+        for (x, y) in ((28, 73), (42, 76), (56, 72), (14, 55), (19, 41)):
+            cv.paint(x, y, RAMP['vroot'][3])
+        # 눈 밑 그늘
+        dither_ellipse(cv, 42, 58, 5.5, 1.8, RAMP[fur][1], 0.45)
+        dither_ellipse(cv, 59, 55, 4.0, 1.5, RAMP[fur][1], 0.45)
+        # 호박색 빛 눈(둥근 동공, 큰 반사 — 모모의 초록과 같은 짜임, 색만 다르다)
+        for (ex, ey, rx, ry) in ((42, 49, 5.4, 6.4), (60, 46, 4.0, 5.2)):
+            for y in range(int(ey - ry - 1), int(ey + ry + 2)):
+                for x in range(int(ex - rx - 1), int(ex + rx + 2)):
+                    dx, dy = (x + 0.5 - ex) / rx, (y + 0.5 - ey) / ry
+                    d = dx * dx + dy * dy
+                    if d <= 1.0:
+                        if d > 0.78:
+                            c = AMBER_EYE[0]
+                        elif d < 0.2:
+                            c = RAMP['eye'][0]
+                        else:
+                            c = AMBER_EYE[1] if dy < 0.15 else AMBER_EYE[2]
+                        cv.paint(x, y, c)
+            hx, hy = int(ex - rx * 0.38), int(ey - ry * 0.42)
+            for (ox, oy) in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                cv.paint(hx + ox, hy + oy, WHITE)
+            cv.paint(int(ex + rx * 0.35), int(ey + ry * 0.4), AMBER_EYE[3])
+        # 찌푸린 눈썹(안쪽이 내려감), 앙다문 입 + 앞니 둘
+        line(cv, [(36, 39), (47, 42)], RAMP[fur][0], 2)
+        line(cv, [(56, 40), (63, 37)], RAMP[fur][0], 2)
+        line(cv, [(62, 68), (65, 69), (68, 68)], MOUTH, 1)
+        for (x, y) in ((64, 70), (65, 70), (64, 71), (65, 71)):
+            cv.paint(x, y, (250, 246, 236))
+        dither_ellipse(cv, 52, 63, 4.0, 2.0, (150, 96, 104), 0.35)
+    else:
+        if face == 'happy':
+            happy_eye(cv, 42, 49, 5.2)
+            happy_eye(cv, 60, 46, 4.0)
+            for (x, y) in ((61, 68), (62, 69), (63, 70), (64, 70), (65, 70), (66, 69), (67, 68)):
+                cv.paint(x, y, MOUTH)
+            for (x, y) in ((63, 71), (64, 71), (65, 71)):
+                cv.paint(x, y, RAMP['pink'][2])
+        else:
+            eye(cv, 42, 49, 5.2, 6.2)
+            eye(cv, 60, 46, 3.9, 5.0, look=(0.3, 0.0))
+            line(cv, [(36, 40), (46, 39)], RAMP[fur][1], 2)
+            line(cv, [(56, 38), (63, 38)], RAMP[fur][1], 2)
+            line(cv, [(62, 68), (64, 69), (66, 69), (68, 68)], MOUTH, 1)
+        for (x, y) in ((64, 70), (65, 70)):
+            cv.paint(x, y, (250, 246, 236))
+        dither_ellipse(cv, 52, 62, 5.0, 2.6, BLUSH, 0.5)
+        dither_ellipse(cv, 33, 60, 3.0, 1.8, BLUSH, 0.4)
+    return cv
+
+
 # ---- 누룩 할매 ---------------------------------------------------------------------------
 def halmae(face):
     """누룩 할매(0045·0049): 흰 실이 뭉친 둥근 몸(뽕나무버섯의 균사, 0037), 머리에 버섯 갓 셋, 늘 감은 눈.
@@ -847,6 +980,7 @@ def sheet():
     frames += [halmae('normal'), halmae('happy'), mom()]
     for fur in (1, 2, 3):
         frames += [nail_fur(f, fur) for f in ('normal', 'happy', 'worried', 'determined')]
+    frames += [doto('tainted'), doto('normal'), doto('happy')]
     # 한 줄 12칸(src/art.rs PORTRAIT_COLS): 한 줄로 늘어놓으면 2,048px를 넘어 오래된 폰에서 텍스처가 안 올라간다.
     cols = 12
     rows = (len(frames) + cols - 1) // cols

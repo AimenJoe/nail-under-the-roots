@@ -29,11 +29,13 @@ pub mod key {
     /// 가장 깊은 곳에 닿아 반쪽 엔딩을 봤다 / 참 엔딩을 봤다(0042).
     pub const HALF_ENDING: &str = "half_ending";
     pub const TRUE_ENDING: &str = "true_ending";
-    /// 참 엔딩 조건(0037): 모모가 돌아옴(세 번 이기면, 0046), 도토가 씨앗 자리를 기억해 냄(도토 보스가 생기면).
+    /// 참 엔딩 조건(0037): 모모가 돌아옴(세 번 이기면, 0046), 도토가 씨앗 자리를 기억해 냄(도토를 이기면, 0052).
     pub const MOMO_BACK: &str = "momo";
     pub const DOTO_MEMORY: &str = "doto_memory";
     /// 모모를 이긴 수(빈 자리의 꽃잎, 0046).
     pub const MOMO_WINS: &str = "momo_wins";
+    /// 큰 나무에서 독 발톱을 깨웠다(도토 뒤, 0037 8-A·0052): 런마다 가방에 들고 시작한다.
+    pub const VENOM: &str = "weapon.venom";
 
     /// 실뜨기: 고를 수 있는 가장 높은 단계(캐릭터별), 마지막으로 고른 단계, 새 단계가 열렸다는 표시(0043).
     pub fn knots_open(character: impl std::fmt::Debug) -> String {

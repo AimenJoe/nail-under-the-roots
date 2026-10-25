@@ -172,6 +172,27 @@ pub const GOALS: &[Goal] = &[
         Some("momo1"),
         Charm(7)
     ),
+    // 도토와 참 엔딩(0052): 도토가 생기면서 넣었다(닿을 수 없는 목표는 넣지 않는다, 0048).
+    goal!(
+        "doto",
+        Story,
+        jg_doto,
+        jg_doto_d,
+        Flag(key::DOTO_MEMORY),
+        1,
+        Some("deeper"),
+        Light(40)
+    ),
+    goal!(
+        "true_end",
+        Story,
+        jg_true,
+        jg_true_d,
+        Flag(key::TRUE_ENDING),
+        1,
+        Some("doto"),
+        Seeds(20)
+    ),
     // 싸움
     goal!(
         "kills",

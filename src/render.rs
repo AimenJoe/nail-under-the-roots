@@ -1369,6 +1369,44 @@ fn draw_dig_mound(pos: Vec2, ut: f32, windup: f32, time: f32) {
     }
 }
 
+/// 도토가 묻은 도토리(0052): 흙 둔덕 + 삐죽 나온 갓. 터질 둘레를 고리로 보이고, 고리가 좁혀 오다 끝에선 깜박인다.
+fn draw_mine(m: &world::Mine, time: f32) {
+    let k = (m.time / m.fuse.max(0.01)).clamp(0.0, 1.0);
+    let (x, y) = (m.pos.x.round(), m.pos.y.round());
+    let r = t::DOTO_MINE_RADIUS;
+    let late = k > 0.7 && ((time * 16.0) as i32) % 2 == 0;
+    let c = if late {
+        Color::new(1.0, 0.85, 0.4, 0.85)
+    } else {
+        Color::new(1.0, 0.55, 0.4, 0.3 + 0.4 * k)
+    };
+    draw_circle_lines(x, y, r, 1.0, c);
+    draw_circle_lines(x, y, (r * (1.0 - k)).max(2.0), 1.0, c);
+    let swell = (k * 2.0).round();
+    draw_ellipse(x, y + 1.0, 5.0 + swell, 2.5, 0.0, OUTLINE);
+    draw_ellipse(x, y, 4.0 + swell, 2.0, 0.0, world::DIRT);
+    // 갓(도토리 머리)
+    let shake = if k > 0.5 && ((time * 40.0) as i32) % 2 == 0 {
+        1.0
+    } else {
+        0.0
+    };
+    draw_rectangle(
+        x - 2.0 + shake,
+        y - 2.0 - swell,
+        4.0,
+        2.0,
+        Color::new(0.42, 0.28, 0.18, 1.0),
+    );
+    draw_rectangle(
+        x + shake,
+        y - 3.0 - swell,
+        1.0,
+        1.0,
+        Color::new(0.42, 0.28, 0.18, 1.0),
+    );
+}
+
 /// 마을 물웅덩이(0048): 파란 타원 + 떠다니는 반짝임 둘.
 fn draw_puddle(at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round() + 3.0);
@@ -1902,6 +1940,10 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
             SHADOW_SOFT,
         );
     }
+    // 묻힌 도토리는 바닥에(세워 그리는 것들보다 먼저).
+    for m in &w.mines {
+        draw_mine(m, w.time);
+    }
     for (i, p) in w.projectiles.iter().enumerate() {
         let q = lerp(p.prev_pos, p.pos, alpha);
         list.push((q.y + 3.0, Drawable::Projectile(i)));
@@ -1959,6 +2001,11 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                         if let Some(tex) = art.critters.as_ref() {
                             let on_seat = n.pos - vec2(0.0, 7.0);
                             draw_critter_at(tex, art::MOMO_BLOOM_ROW, on_seat, left, false, w.time);
+                        }
+                    }
+                    world::Who::Doto => {
+                        if let Some(tex) = art.critters.as_ref() {
+                            draw_critter_at(tex, art::DOTO_BACK_ROW, n.pos, left, false, w.time);
                         }
                     }
                 }
@@ -2362,7 +2409,29 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         _ => {}
     }
     if let enemy::State::Howl { time: ht } = e.state {
-        frame = 7;
+        if e.kind == crate::enemy::Kind::Doto {
+            // 도토: 땅을 판다(웅크린 칸이 떨고, 앞에 흙이 튄다). 울음 고리는 없다.
+            frame = 4;
+            pos.x += if ((time * 30.0) as i32) % 2 == 0 {
+                1.0
+            } else {
+                -1.0
+            };
+            let ph = (ht * 4.0).fract();
+            let front = pos + e.facing * (r + 2.0);
+            draw_rectangle(
+                (front.x + (ph * 7.0).sin() * 3.0).round(),
+                (front.y - 2.0 - ph * 6.0).round(),
+                1.0,
+                1.0,
+                world::DIRT,
+            );
+        } else {
+            frame = 7;
+        }
+    }
+    if let (enemy::State::Howl { time: ht }, false) = (e.state, e.kind == crate::enemy::Kind::Doto)
+    {
         // 울음: 퍼지는 고리 둘.
         for k in 0..2 {
             let ph = ((ht * 2.5) + k as f32 * 0.5).fract();

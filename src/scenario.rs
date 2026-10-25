@@ -55,6 +55,8 @@ pub enum Scenario {
     Camp,
     /// 첫 길 끝 굴(모모가 지킨다)에 바로. 숫자 = 이미 이긴 수(0 → 첫 만남, 2 → 세 번째, docs/decisions/0046).
     Momo(u8),
+    /// 둘째 길 끝 굴(도토가 지킨다)에 바로(docs/decisions/0052).
+    Doto,
 }
 
 pub struct Entry {
@@ -63,7 +65,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 26] = [
+pub const LIST: [Entry; 27] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -194,6 +196,11 @@ pub const LIST: [Entry; 26] = [
         desc: "굴로 숨기·이어 뛰기까지. 이기면 모모가 돌아오는 장면(기록은 남기지 않는다).",
         scenario: Scenario::Momo(2),
     },
+    Entry {
+        name: "도토",
+        desc: "둘째 길 끝 굴. 끝방의 도토: 도토리 부채꼴·높이 뛰기·도토리 묻기. 이기면 기억해 내는 장면(기록은 남기지 않는다).",
+        scenario: Scenario::Doto,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -226,12 +233,16 @@ pub fn build(s: Scenario) -> World {
             w.adv.events.clear();
             w
         }
-        Scenario::Momo(wins) => {
-            let mut w = World::camp_start(1);
+        Scenario::Momo(_) | Scenario::Doto => {
+            let doto = s == Scenario::Doto;
+            let mut w = World::camp_start(if doto { 2 } else { 1 });
             w.seeds = 40;
             w.adv.events.clear();
-            w.momo_fight = true;
-            w.momo_wins = wins;
+            if let Scenario::Momo(wins) = s {
+                w.momo_fight = true;
+                w.momo_wins = wins;
+            }
+            w.doto_fight = doto;
             w.enter_route_boss_now();
             // 끝방 문 안쪽에 바로 선다(들어서면 잠기고 모모가 말한다).
             let boss = w.adv.dungeon.as_ref().and_then(|d| {
