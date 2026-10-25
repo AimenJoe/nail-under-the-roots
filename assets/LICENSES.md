@@ -13,7 +13,7 @@
 | `art/chief.png` | 직접 그림. 원본 `tools/art/chief.py` | © 2026 Beardworks | 튜토리얼 보스 들쥐 대장(물든 모습 8칸)·돌아온 보리(5칸) 32×32 + 흰 실루엣 |
 | `art/illust/*.png` | 직접 그림(임시). 원본 `tools/art/illust.py` | © 2026 Beardworks | 컷씬 일러스트 9장 640×360(2배 밀도, 일부는 패닝용으로 더 큼). 사람이 그린 그림으로 바꾸면 이 행을 작가·계약으로 고친다(docs/art/cutscene-illustrations.md) |
 | `art/tiles.png` | 직접 그림. 원본 `tools/art/tiles.py` | © 2026 Beardworks | Sunnyside가 들어오기 전 대체 타일(풀·꽃·흙·벼랑·그루터기·바위·버섯·뿌리·얼룩) |
-| `vendor/sunnyside/` (레포 밖) | [Sunnyside World](https://danieldiggle.itch.io/sunnyside) by danieldiggle, ASSET PACK V2.1 | 아래 "Sunnyside World 라이선스 원문" | 공개 레포라 커밋하지 않는다(`.gitignore`, docs/decisions/0010). Name your own price |
+| `vendor/sunnyside/` (레포 밖) | [Sunnyside World](https://danieldiggle.itch.io/sunnyside) by danieldiggle, ASSET PACK V2.1 | 아래 "Sunnyside World 라이선스 원문" | 공개 레포라 커밋하지 않는다(`.gitignore`, docs/decisions/0010). CI는 비공개 레포 `AimenJoe/nail-assets`(게임이 쓰는 파일만, 2026-10-25)를 Secrets `ASSETS_REPO`·`ASSETS_TOKEN`으로 받는다. Name your own price |
 
 | `fonts/OFL.md` | Galmuri 레포 `ofl.md` | — | Galmuri 폰트의 OFL 원문. 폰트와 함께 배포해야 한다(예약 폰트 이름 없음) |
 | `THIRD_PARTY_LICENSES.txt` | `tools/licenses.py`가 생성 | — | Rust 크레이트·웹 JS·폰트 고지문 모음. 배포물(웹 `dist/`, APK assets)에 함께 들어간다 |
