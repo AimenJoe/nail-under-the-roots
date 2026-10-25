@@ -5,6 +5,7 @@ use macroquad::prelude::*;
 
 use crate::biome::Biome;
 use crate::enemy::Kind;
+use crate::loot::{Loot, LootKind};
 use crate::world::World;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -26,6 +27,8 @@ pub enum Scenario {
     AllClaws,
     /// 환경 확인: 지정 환경에서 돌격형 1 + 원거리형 1.
     InBiome(Biome),
+    /// 반딧불·산딸기 줍기 확인(docs/decisions/0016).
+    Loot,
 }
 
 pub struct Entry {
@@ -34,7 +37,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 12] = [
+pub const LIST: [Entry; 13] = [
     Entry {
         name: "환경: 꽃 핀 입구",
         desc: "밝고 꽃이 많은 첫 환경. 돌격형 1 + 원거리형 1.",
@@ -59,6 +62,11 @@ pub const LIST: [Entry; 12] = [
         name: "발톱 4종 비교",
         desc: "새싹·두더지·바위·독 발톱이 가방에. 메뉴 → 가방에서 확인으로 바꿔 낀다.",
         scenario: Scenario::AllClaws,
+    },
+    Entry {
+        name: "떨어지는 것 확인",
+        desc: "체력 2/5. 반딧불 12마리와 산딸기 2개가 튀어나온다. 다가가 끌려오는 반딧불, 회복을 본다.",
+        scenario: Scenario::Loot,
     },
     Entry {
         name: "빈 방",
@@ -103,6 +111,21 @@ pub fn build(s: Scenario) -> World {
         Scenario::Normal => World::new(),
         Scenario::Empty | Scenario::CutsceneOnly | Scenario::Tutorial => World::empty(),
         Scenario::AllClaws => World::new(),
+        Scenario::Loot => {
+            let mut w = World::empty();
+            w.player.hp = 2;
+            // 오른쪽 길목(기둥을 피해서). 오른쪽으로 걸어가면 반딧불이 끌려오고 산딸기를 밟는다.
+            let c = w.room.center() + vec2(40.0, 0.0);
+            for _ in 0..12 {
+                w.loot
+                    .push(Loot::spawn(LootKind::Glowbug, c + vec2(0.0, -30.0)));
+            }
+            for _ in 0..2 {
+                w.loot
+                    .push(Loot::place(LootKind::Berry, c + vec2(0.0, -2.0)));
+            }
+            w
+        }
         Scenario::Chargers(n) => {
             let mut w = World::empty();
             for i in 0..n {

@@ -255,7 +255,7 @@ strings! {
     pm_resume, pm_restart, pm_settings, pm_title,
     // 상태
     mole_desc, hp, this_run, run_stats, combo_stats, bare_hands, bare_hands_desc,
-    burrow, burrow_stats, special, special_tbd,
+    burrow, burrow_stats, special, special_tbd, glowbugs,
     // 가방
     bag_combo, equipped, equip_hint, empty_slot, empty_slot_desc, slots,
     // 지도
@@ -316,6 +316,7 @@ pub static KO: Strings = Strings {
     burrow_stats: "땅속 {0}s 무적, 솟구침 반경 {1}px, 쿨다운 {2}s",
     special: "특기",
     special_tbd: "(미정 — 2단계)",
+    glowbugs: "반딧불",
     bag_combo: "{0}연타 · 마지막 타 피해 {1}",
     equipped: "장착 중",
     equip_hint: "확인: 장착",
@@ -402,6 +403,7 @@ pub static EN: Strings = Strings {
     burrow_stats: "Invulnerable {0}s, burst {1}px, cooldown {2}s",
     special: "Special",
     special_tbd: "(TBD — phase 2)",
+    glowbugs: "Glowbugs",
     bag_combo: "{0}-hit combo · finisher damage {1}",
     equipped: "Equipped",
     equip_hint: "Confirm: equip",
@@ -488,6 +490,7 @@ pub static JA: Strings = Strings {
     burrow_stats: "むてき{0}秒・{1}px・待ち{2}秒",
     special: "とくぎ",
     special_tbd: "（未定・フェーズ2）",
+    glowbugs: "ホタル",
     bag_combo: "{0}連打・とどめ{1}ダメージ",
     equipped: "そうび中",
     equip_hint: "決定：そうび",
@@ -574,6 +577,7 @@ pub static ZH_HANS: Strings = Strings {
     burrow_stats: "无敌{0}秒·范围{1}px·冷却{2}秒",
     special: "特技",
     special_tbd: "（待定 — 第2阶段）",
+    glowbugs: "萤火虫",
     bag_combo: "{0}连击·终结伤害{1}",
     equipped: "已装备",
     equip_hint: "确认：装备",

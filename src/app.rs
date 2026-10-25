@@ -842,9 +842,15 @@ impl App {
             ui.rect(tag, ui::PANEL_LIGHT);
             ui.rect_lines(tag, ui::BORDER);
             ui.text(d.name, tag.x + 5.0, tag.y + 2.0, FONT_PX, ui::ACCENT);
-            // 초상 자리(그림이 없으니 색 네모)
-            let portrait = Rect::new(b.x + 8.0, b.y + 10.0, 28.0, 28.0);
-            ui.rect(portrait, d.color);
+            // 초상화(2배 밀도, docs/decisions/0015). 그림이 없으면 색 네모.
+            let portrait = Rect::new(b.x + 4.0, b.y + 3.0, 44.0, 44.0);
+            ui.rect(portrait, ui::PANEL_LIGHT);
+            let drawn = d
+                .portrait
+                .is_some_and(|f| self.renderer.draw_portrait(ui, portrait, f));
+            if !drawn {
+                ui.rect(Rect::new(b.x + 12.0, b.y + 11.0, 28.0, 28.0), d.color);
+            }
             ui.rect_lines(portrait, ui::BORDER);
             // 본문(타자 효과)
             let shown: String = d.text.chars().take(d.shown_chars).collect();
@@ -1157,6 +1163,7 @@ impl App {
                     ],
                 ),
             ),
+            (s.glowbugs, self.world.glowbugs.to_string()),
             (s.special, s.special_tbd.to_string()),
         ];
         let row_h = FONT_PX + 5.0;

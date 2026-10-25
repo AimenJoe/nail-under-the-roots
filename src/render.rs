@@ -8,6 +8,7 @@ use crate::biome::{self, Decor};
 use crate::combat::{Shape, StrikeKind};
 use crate::enemy::{self, Enemy, Kind};
 use crate::input::TouchOverlay;
+use crate::loot;
 use crate::player::{self, Player};
 use crate::tuning as t;
 use crate::ui::Ui;
@@ -133,6 +134,35 @@ impl Renderer {
         }
     }
 
+    /// 대화창 초상화를 논리 사각형 `r`(44×44) 안에 찍는다. 원본 1px = 게임 픽셀 반(화면 배율의 절반, 정수).
+    /// 배율이 홀수면 내림이라 조금 작아지지만 픽셀은 고르게 남는다. 그림이 없으면 false.
+    pub fn draw_portrait(&self, ui: &Ui, r: Rect, frame: u32) -> bool {
+        let Some(tex) = self.art.as_ref().and_then(|a| a.portraits.as_ref()) else {
+            return false;
+        };
+        let k = (ui.scale / 2.0).floor().max(1.0);
+        let size = art::PORTRAIT * k;
+        let p = ui.px(vec2(r.x, r.y));
+        let (bw, bh) = (r.w * ui.scale, r.h * ui.scale);
+        draw_texture_ex(
+            tex,
+            (p.x + (bw - size) / 2.0).round(),
+            (p.y + (bh - size)).round(),
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(vec2(size, size)),
+                source: Some(Rect::new(
+                    frame as f32 * art::PORTRAIT,
+                    0.0,
+                    art::PORTRAIT,
+                    art::PORTRAIT,
+                )),
+                ..Default::default()
+            },
+        );
+        true
+    }
+
     /// 화면 가장자리 비네트(컷씬). 게임 화면 위에 타원형으로 덮는다. 그림 에셋이 없으면 생략.
     pub fn draw_vignette(&self, ui: &Ui, amount: f32) {
         let Some(art) = &self.art else { return };
@@ -154,8 +184,23 @@ impl Renderer {
         );
     }
 
-    /// 인게임 HUD(실제 해상도): 웨이브·처치, 디버그 줄.
+    /// 인게임 HUD(실제 해상도): 반딧불 수, 웨이브·처치, 디버그 줄.
     pub fn draw_hud(&self, ui: &Ui, w: &World, gamepad_count: usize) {
+        // 반딧불: 체력 핍 오른쪽. 숫자는 언어 폰트(숫자는 모든 폰트에 있다). 글자 윗부분이 화면 밖으로 잘리지 않게 y ≥ 1.
+        let x = 3.0 + t::PLAYER_HP as f32 * 7.0 + 5.0;
+        let pulse = 0.6 + 0.4 * (w.time * 3.0).sin().abs();
+        ui.rect(
+            Rect::new(x, 2.0, 3.0, 3.0),
+            Color::new(0.85, 1.0, 0.45, pulse),
+        );
+        ui.rect(Rect::new(x, 3.0, 3.0, 1.0), OUTLINE);
+        ui.text(
+            &w.glowbugs.to_string(),
+            x + 5.0,
+            1.0,
+            crate::ui::FONT_PX,
+            crate::ui::TEXT,
+        );
         draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
     }
 }
@@ -481,6 +526,7 @@ fn draw_room_art(art: &Art, w: &World) {
 #[derive(Clone, Copy)]
 enum Drawable {
     Pickup(usize),
+    Loot(usize),
     Pillar(usize),
     Player,
     Enemy(usize),
@@ -496,6 +542,16 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     for (i, p) in w.pickups.iter().enumerate() {
         list.push((p.pos.y + 4.0, Drawable::Pickup(i)));
         draw_ellipse(p.pos.x, p.pos.y + 4.0, 5.0, 1.8, 0.0, SHADOW_SOFT);
+    }
+    for (i, l) in w.loot.iter().enumerate() {
+        let q = lerp(l.prev_pos, l.pos, alpha);
+        list.push((q.y + 2.0, Drawable::Loot(i)));
+        let r = if l.kind == loot::LootKind::Berry {
+            3.0
+        } else {
+            2.0
+        };
+        draw_ellipse(q.x, q.y + 2.0, r, 1.0, 0.0, SHADOW_SOFT);
     }
     let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
     list.push((pp.y + 6.0, Drawable::Player));
@@ -531,9 +587,75 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                 draw_tile(&art.tiles, src, p.x, p.bottom() - 32.0, w.biome.wall_tint());
             }
             Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
+            Drawable::Loot(i) => draw_loot(&w.loot[i], alpha, w.time, false),
             Drawable::Player => draw_nail(art, &w.player, alpha, w.time),
             Drawable::Enemy(i) => draw_enemy(&w.enemies[i], alpha, w.time),
             Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
+        }
+    }
+}
+
+/// 반딧불(빛나는 꽁무니 + 날개 깜빡임, 둥실) / 산딸기(빨간 열매 + 잎).
+/// `light_only`: 어둠 위에 빛만 다시 그린다(심층에서도 반딧불이 보이게).
+fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool) {
+    let q = lerp(l.prev_pos, l.pos, alpha);
+    let ph = time * 6.0 + l.phase * 10.0;
+    match l.kind {
+        loot::LootKind::Glowbug => {
+            // 바닥에 내려앉지 않고 늘 살짝 떠 있다.
+            let hover = 3.0 + (ph * 0.5).sin() * 1.0;
+            let p = vec2(q.x.round(), (q.y - l.z - hover).round());
+            let pulse = 0.55 + 0.45 * (ph * 0.8).sin().abs();
+            let halo = Color::new(world::GLOW.r, world::GLOW.g, world::GLOW.b, 0.18 * pulse);
+            draw_circle(p.x + 0.5, p.y + 1.5, 4.0, halo);
+            draw_rectangle(
+                p.x,
+                p.y + 1.0,
+                2.0,
+                2.0,
+                Color::new(1.0, 1.0, 0.7, 0.6 + 0.4 * pulse),
+            );
+            if light_only {
+                return;
+            }
+            // 몸(짙은 머리) + 날개 깜빡임
+            draw_rectangle(p.x, p.y - 1.0, 2.0, 2.0, OUTLINE);
+            if (ph as i32) % 2 == 0 {
+                draw_rectangle(
+                    p.x - 1.0,
+                    p.y - 2.0,
+                    1.0,
+                    1.0,
+                    Color::new(0.9, 0.95, 1.0, 0.8),
+                );
+                draw_rectangle(
+                    p.x + 2.0,
+                    p.y - 2.0,
+                    1.0,
+                    1.0,
+                    Color::new(0.9, 0.95, 1.0, 0.8),
+                );
+            }
+        }
+        loot::LootKind::Berry => {
+            if light_only {
+                return;
+            }
+            let p = vec2(q.x.round(), (q.y - l.z).round() - 3.0);
+            let dark = Color::new(0.62, 0.14, 0.24, 1.0);
+            draw_rectangle(p.x - 2.0, p.y - 1.0, 5.0, 4.0, OUTLINE);
+            draw_rectangle(p.x - 1.0, p.y - 2.0, 3.0, 6.0, OUTLINE);
+            draw_rectangle(p.x - 1.0, p.y - 1.0, 3.0, 4.0, world::BERRY);
+            draw_rectangle(p.x - 1.0, p.y + 2.0, 3.0, 1.0, dark);
+            draw_rectangle(
+                p.x - 1.0,
+                p.y - 1.0,
+                1.0,
+                1.0,
+                Color::new(1.0, 0.85, 0.85, 1.0),
+            );
+            // 잎
+            draw_rectangle(p.x, p.y - 3.0, 2.0, 1.0, Color::new(0.45, 0.75, 0.35, 1.0));
         }
     }
 }
@@ -624,6 +746,9 @@ fn draw_darkness(art: &Art, w: &World, alpha: f32) {
     draw_rectangle(-8.0, y0 + s, vw + 8.0, vh - (y0 + s) + 8.0, black);
     draw_rectangle(-8.0, y0, x0 + 8.0, s, black);
     draw_rectangle(x0 + s, y0, vw - (x0 + s) + 8.0, s, black);
+    for l in &w.loot {
+        draw_loot(l, alpha, w.time, true);
+    }
     for (x, y, d) in floor_decor(w) {
         if d == Decor::Mushroom {
             let pulse = 0.65 + 0.25 * ((w.time * 2.0 + x * 0.1).sin());

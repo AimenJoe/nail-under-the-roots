@@ -6,6 +6,7 @@ use crate::biome::Biome;
 use crate::combat::{Feel, Strike};
 use crate::enemy::{self, Enemy, Kind, Projectile};
 use crate::input::Actions;
+use crate::loot::{self, Loot, LootKind};
 use crate::player::{self, Player};
 use crate::room::Room;
 use crate::sfx::{self, Sfx};
@@ -45,6 +46,12 @@ pub struct World {
     pub projectiles: Vec<Projectile>,
     pub fx: Vec<Fx>,
     pub pickups: Vec<Pickup>,
+    /// 바닥의 반딧불·산딸기.
+    pub loot: Vec<Loot>,
+    /// 이번 런에 모은 반딧불(화폐). 상점은 2단계.
+    pub glowbugs: u32,
+    /// 체력이 깎인 채로 산딸기 없이 지나간 처치 수(불운 보정).
+    kills_since_berry: u32,
     /// 이번 틱에 얻은 무기(WEAPONS 번호). 앱이 가방에 넣고 비운다. 획득물·컷씬 둘 다 여기로.
     pub gifts: Vec<usize>,
     pub feel: Feel,
@@ -80,6 +87,9 @@ impl World {
             projectiles: Vec::new(),
             fx: Vec::new(),
             pickups: Vec::new(),
+            loot: Vec::new(),
+            glowbugs: 0,
+            kills_since_berry: 0,
             gifts: Vec::new(),
             feel: Feel::default(),
             debug: Debug {
@@ -175,6 +185,45 @@ impl World {
             burst(&mut self.fx, pos, 14, PROJECTILE, 80.0);
         }
 
+        // 1c. 반딧불·산딸기. 땅속에서도 줍는다(굴파기로 지나가며 쓸어 담기).
+        let alive = self.player.is_alive();
+        let mut hp = self.player.hp;
+        let (mut bugs, mut berries) = (0, 0);
+        let mut picked_at = Vec::new();
+        let room = &self.room;
+        self.loot.retain_mut(|l| {
+            let can = alive && (l.kind == LootKind::Glowbug || hp < t::PLAYER_HP);
+            if !l.update(dt, ppos, can, room) {
+                return true;
+            }
+            match l.kind {
+                LootKind::Glowbug => bugs += 1,
+                LootKind::Berry => {
+                    berries += 1;
+                    hp = (hp + t::BERRY_HEAL).min(t::PLAYER_HP);
+                }
+            }
+            picked_at.push((l.pos, l.kind));
+            false
+        });
+        self.player.hp = hp;
+        self.glowbugs += bugs;
+        if bugs > 0 {
+            sfx.play(sfx::Id::Glowbug);
+        }
+        if berries > 0 {
+            sfx.play(sfx::Id::Heal);
+        }
+        for (pos, kind) in picked_at {
+            match kind {
+                LootKind::Glowbug => self.fx.push(ring(pos, 1.0, 5.0, 0.15, GLOW)),
+                LootKind::Berry => {
+                    self.fx.push(ring(pos, 3.0, 14.0, 0.3, BERRY));
+                    burst(&mut self.fx, pos, 8, BERRY, 60.0);
+                }
+            }
+        }
+
         // 2. 적·투사체
         let targetable = self.player.is_alive() && !self.player.is_burrowed();
         self.enemy_events.clear();
@@ -188,10 +237,12 @@ impl World {
                 &mut self.enemy_events,
             );
         }
-        // 독으로 쓰러진 적
+        // 쓰러진 적(독·공격). 떨어뜨릴 것은 루프가 끝난 뒤에.
+        let mut deaths: Vec<(Vec2, Kind)> = Vec::new();
         for e in self.enemies.iter_mut().filter(|e| e.died_of_poison) {
             e.died_of_poison = false;
             self.kills += 1;
+            deaths.push((e.pos, e.kind));
             sfx.play(sfx::Id::EnemyDie);
             let color = enemy_color(e.kind);
             self.fx
@@ -244,6 +295,7 @@ impl World {
                     sfx.play(sfx::Id::EnemyHit);
                 } else {
                     self.kills += 1;
+                    deaths.push((e.pos, e.kind));
                     if s.kind == crate::combat::StrikeKind::Emerge {
                         self.emerge_kills += 1;
                     }
@@ -261,6 +313,10 @@ impl World {
                     self.fx.push(ring(p.pos, 2.0, 8.0, 0.12, PROJECTILE));
                 }
             }
+        }
+
+        for (pos, kind) in deaths {
+            self.drop_loot(pos, kind);
         }
 
         // 4. 적·투사체 → 플레이어
@@ -347,6 +403,24 @@ impl World {
         }
     }
 
+    /// 쓰러진 적이 떨어뜨린다: 반딧불 몇 마리 + 확률로 산딸기(loot::berry_chance).
+    fn drop_loot(&mut self, pos: Vec2, kind: Kind) {
+        let (lo, hi) = loot::glowbugs_for(kind);
+        if hi > 0 {
+            for _ in 0..rand::gen_range(lo, hi + 1) {
+                self.loot.push(Loot::spawn(LootKind::Glowbug, pos));
+            }
+        }
+        let missing = self.player.hp < t::PLAYER_HP;
+        let p = loot::berry_chance(self.player.hp, t::PLAYER_HP, self.kills_since_berry, kind);
+        if p > 0.0 && rand::gen_range(0.0, 1.0) < p {
+            self.loot.push(Loot::spawn(LootKind::Berry, pos));
+            self.kills_since_berry = 0;
+        } else if missing && kind != Kind::Dummy {
+            self.kills_since_berry += 1;
+        }
+    }
+
     /// 보간이 멈춘 화면(일시정지·히트스톱) 위에서 미끄러지지 않게 prev를 현재로 맞춘다.
     pub fn freeze(&mut self) {
         self.freeze_interp();
@@ -359,6 +433,9 @@ impl World {
         }
         for p in &mut self.projectiles {
             p.prev_pos = p.pos;
+        }
+        for l in &mut self.loot {
+            l.prev_pos = l.pos;
         }
     }
 
@@ -407,6 +484,10 @@ pub const CHARGER: Color = Color::new(0.85, 0.30, 0.30, 1.0);
 pub const SHOOTER: Color = Color::new(0.60, 0.40, 0.85, 1.0);
 pub const PROJECTILE: Color = Color::new(1.0, 0.85, 0.30, 1.0);
 pub const POISON: Color = Color::new(0.55, 0.90, 0.35, 1.0);
+/// 반딧불 빛.
+pub const GLOW: Color = Color::new(0.85, 1.0, 0.45, 1.0);
+/// 산딸기.
+pub const BERRY: Color = Color::new(0.93, 0.30, 0.38, 1.0);
 
 pub fn enemy_color(kind: Kind) -> Color {
     match kind {

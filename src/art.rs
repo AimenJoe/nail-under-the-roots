@@ -10,7 +10,12 @@ pub struct Art {
     pub tiles: Texture2D,
     /// 어둠 마스크(가운데 투명, 바깥 검정). 코드로 만든다.
     pub dark: Texture2D,
+    /// 대화창 초상화: 88×88 칸 가로로(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
+    pub portraits: Option<Texture2D>,
 }
+
+/// 초상화 한 칸(원본 px).
+pub const PORTRAIT: f32 = 88.0;
 
 pub const CELL: f32 = 16.0;
 
@@ -20,10 +25,15 @@ impl Art {
         let tiles = load_texture("art/tiles.png").await.ok()?;
         nail.set_filter(FilterMode::Nearest);
         tiles.set_filter(FilterMode::Nearest);
+        let portraits = load_texture("art/portraits.png").await.ok();
+        if let Some(p) = &portraits {
+            p.set_filter(FilterMode::Nearest);
+        }
         Some(Self {
             nail,
             tiles,
             dark: dark_mask(),
+            portraits,
         })
     }
 }

@@ -18,7 +18,8 @@ pub const WALL_TOP: f32 = 24.0;
 // ---- 플레이어 ------------------------------------------------------------
 pub const PLAYER_RADIUS: f32 = 6.0;
 pub const PLAYER_SPEED: f32 = 90.0;
-pub const PLAYER_HP: i32 = 3;
+/// 최대 체력. 3이면 오래 못 버틴다(사장 피드백 2026-10-25) → 5 + 산딸기 회복(docs/decisions/0016).
+pub const PLAYER_HP: i32 = 5;
 /// 피격 후 무적 시간.
 pub const PLAYER_HURT_INVULN: f32 = 0.8;
 pub const PLAYER_HURT_KNOCKBACK: f32 = 170.0;
@@ -110,6 +111,29 @@ pub const PROJECTILE_DAMAGE: i32 = 1;
 // ---- 획득 ------------------------------------------------------------
 /// 바닥 무기에 이만큼 다가가면 줍는다.
 pub const PICKUP_RADIUS: f32 = 10.0;
+
+// ---- 떨어지는 것: 반딧불(화폐)·산딸기(회복) (src/loot.rs, docs/decisions/0016) -------------
+/// 튀어나오는 수평 속도(최대)와 위로 튀는 속도, 가짜 중력.
+pub const LOOT_POP_SPEED: f32 = 70.0;
+pub const LOOT_POP_UP: f32 = 90.0;
+pub const LOOT_GRAVITY: f32 = 420.0;
+/// 바닥에서 미끄러짐이 멎는 정도(초당).
+pub const LOOT_FRICTION: f32 = 5.0;
+/// 나온 뒤 이 시간 동안은 줍지 않는다(튀어나오는 걸 보게).
+pub const LOOT_PICKUP_DELAY: f32 = 0.35;
+/// 이 거리 안이면 줍는다.
+pub const LOOT_COLLECT_RADIUS: f32 = 8.0;
+/// 반딧불 자석: 이 거리 안이면 끌려온다(넉넉하게 — "스쳤는데 못 주웠다"가 없게).
+pub const GLOWBUG_MAGNET_RADIUS: f32 = 44.0;
+pub const GLOWBUG_MAGNET_ACCEL: f32 = 900.0;
+pub const GLOWBUG_MAGNET_MAX_SPEED: f32 = 230.0;
+/// 산딸기가 떨어질 확률 = 기본 + 깎인 체력 1칸마다. 체력이 가득이면 0.
+pub const BERRY_BASE_CHANCE: f32 = 0.06;
+pub const BERRY_CHANCE_PER_MISSING: f32 = 0.08;
+/// 체력이 깎인 채로 이만큼 처치해도 안 나왔으면 다음엔 반드시(불운 보정).
+pub const BERRY_PITY_KILLS: u32 = 6;
+/// 산딸기 하나가 채우는 체력.
+pub const BERRY_HEAL: i32 = 1;
 /// 획득 창: 최소 표시 시간(연타로 바로 닫히지 않게), 자동으로 닫히는 시간.
 pub const GIFT_MIN: f32 = 0.5;
 pub const GIFT_AUTO_CLOSE: f32 = 3.5;

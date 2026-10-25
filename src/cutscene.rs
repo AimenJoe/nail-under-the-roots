@@ -13,10 +13,55 @@ use crate::world::World;
 /// 글자가 찍히는 속도(초당 글자 수).
 const CHARS_PER_SEC: f32 = 40.0;
 
+/// 대화 표정. 초상화 시트(assets/art/portraits.png, tools/art/portraits.py)의 칸을 고른다.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Face {
+    Normal,
+    /// 아직 쓰는 대사가 없다(첫 사용처: 보상·재회 컷씬). 그림은 있다.
+    #[allow(dead_code)]
+    Happy,
+    Worried,
+    Determined,
+}
+
+/// 배우의 초상화: 시트의 첫 칸과, 표정 칸이 있는지.
+#[derive(Clone, Copy, Debug)]
+pub struct Portrait {
+    pub first: u32,
+    pub has_faces: bool,
+}
+
+impl Portrait {
+    /// Naïl: 칸 0~3(보통·기쁨·걱정·결의).
+    pub const NAIL: Portrait = Portrait {
+        first: 0,
+        has_faces: true,
+    };
+    /// 변해 버린 이웃: 칸 4(정체를 모름: 그림자 + 빛나는 눈).
+    pub const NEIGHBOR_UNKNOWN: Portrait = Portrait {
+        first: 4,
+        has_faces: false,
+    };
+
+    pub fn frame(self, face: Face) -> u32 {
+        if !self.has_faces {
+            return self.first;
+        }
+        self.first
+            + match face {
+                Face::Normal => 0,
+                Face::Happy => 1,
+                Face::Worried => 2,
+                Face::Determined => 3,
+            }
+    }
+}
+
 #[derive(Clone)]
 pub struct Actor {
     pub name: &'static str,
     pub color: Color,
+    pub portrait: Option<Portrait>,
     pub pos: Vec2,
     pub facing: Vec2,
     pub visible: bool,
@@ -27,6 +72,7 @@ pub enum Step {
     /// 대화. 확인으로 넘긴다. 다 찍히기 전에 확인하면 전부 보여 준다.
     Say {
         actor: usize,
+        face: Face,
         text: Tr,
     },
     /// 배우를 목표까지 걷게 한다(px/s).
@@ -76,6 +122,8 @@ pub struct Cutscene {
 pub struct Dialogue<'a> {
     pub name: &'static str,
     pub color: Color,
+    /// 초상화 시트 칸. 없으면 색 네모.
+    pub portrait: Option<u32>,
     pub text: &'a str,
     pub shown_chars: usize,
     pub complete: bool,
@@ -228,7 +276,7 @@ impl Cutscene {
     /// 지금 보여 줄 대화창.
     pub fn dialogue(&self) -> Option<Dialogue<'_>> {
         match self.steps.get(self.idx)? {
-            Step::Say { actor, text } => {
+            Step::Say { actor, face, text } => {
                 let text = i18n::tr(*text);
                 let total = text.chars().count();
                 let shown = (self.shown as usize).min(total);
@@ -236,6 +284,7 @@ impl Cutscene {
                 Some(Dialogue {
                     name: a.name,
                     color: a.color,
+                    portrait: a.portrait.map(|p| p.frame(*face)),
                     text,
                     shown_chars: shown,
                     complete: shown >= total,
@@ -256,6 +305,7 @@ pub fn opening(w: &World) -> Cutscene {
         Actor {
             name: "Naïl",
             color: mole,
+            portrait: Some(Portrait::NAIL),
             pos: w.player.pos,
             facing: vec2(1.0, 0.0),
             visible: true,
@@ -263,6 +313,7 @@ pub fn opening(w: &World) -> Cutscene {
         Actor {
             name: "???",
             color: neighbor,
+            portrait: Some(Portrait::NEIGHBOR_UNKNOWN),
             pos: vec2(280.0, 90.0),
             facing: vec2(-1.0, 0.0),
             visible: false,
@@ -281,6 +332,7 @@ pub fn opening(w: &World) -> Cutscene {
         Step::Wait(0.3),
         Step::Say {
             actor: 0,
+            face: Face::Worried,
             text: |s| s.op_1,
         },
         Step::Show {
@@ -298,14 +350,17 @@ pub fn opening(w: &World) -> Cutscene {
         },
         Step::Say {
             actor: 1,
+            face: Face::Normal,
             text: |s| s.op_2,
         },
         Step::Say {
             actor: 1,
+            face: Face::Normal,
             text: |s| s.op_3,
         },
         Step::Say {
             actor: 0,
+            face: Face::Normal,
             text: |s| s.op_4,
         },
         Step::Shake(0.4),
@@ -313,6 +368,7 @@ pub fn opening(w: &World) -> Cutscene {
         Step::Wait(0.4),
         Step::Say {
             actor: 0,
+            face: Face::Determined,
             text: |s| s.op_5,
         },
     ];

@@ -21,6 +21,10 @@ pub enum Id {
     Shoot,
     Charge,
     WallHit,
+    /// 반딧불 줍기. 연달아 주우면 음이 조금씩 올라간다.
+    Glowbug,
+    /// 산딸기 회복.
+    Heal,
 }
 
 pub struct Sfx {
@@ -34,6 +38,10 @@ pub struct Sfx {
     shoot: Sound,
     charge: Sound,
     wall_hit: Sound,
+    glowbug: [Sound; 4],
+    heal: Sound,
+    /// 반딧불 음 높이 차례.
+    glow_step: Cell<usize>,
     /// 설정의 소리 크기(0..1). MASTER_VOLUME에 곱한다.
     volume: Cell<f32>,
 }
@@ -93,6 +101,35 @@ impl Sfx {
                 Layer::tone(0.12, 90.0, 50.0, Wave::Sine, 0.6, 1.5),
             ])
             .await,
+            glowbug: [
+                make(&[
+                    Layer::tone(0.07, 1320.0, 1500.0, Wave::Sine, 0.35, 1.5),
+                    Layer::tone(0.05, 2640.0, 2900.0, Wave::Sine, 0.12, 2.0),
+                ])
+                .await,
+                make(&[
+                    Layer::tone(0.07, 1480.0, 1680.0, Wave::Sine, 0.35, 1.5),
+                    Layer::tone(0.05, 2960.0, 3200.0, Wave::Sine, 0.12, 2.0),
+                ])
+                .await,
+                make(&[
+                    Layer::tone(0.07, 1660.0, 1880.0, Wave::Sine, 0.35, 1.5),
+                    Layer::tone(0.05, 3320.0, 3600.0, Wave::Sine, 0.12, 2.0),
+                ])
+                .await,
+                make(&[
+                    Layer::tone(0.08, 1760.0, 2000.0, Wave::Sine, 0.35, 1.5),
+                    Layer::tone(0.06, 3520.0, 3900.0, Wave::Sine, 0.12, 2.0),
+                ])
+                .await,
+            ],
+            heal: make(&[
+                Layer::tone(0.12, 523.0, 523.0, Wave::Triangle, 0.4, 0.8),
+                Layer::tone(0.24, 659.0, 1046.0, Wave::Triangle, 0.35, 1.0),
+                Layer::tone(0.3, 1046.0, 1318.0, Wave::Sine, 0.15, 1.5),
+            ])
+            .await,
+            glow_step: Cell::new(0),
             volume: Cell::new(1.0),
         }
     }
@@ -116,6 +153,12 @@ impl Sfx {
             Id::Shoot => &self.shoot,
             Id::Charge => &self.charge,
             Id::WallHit => &self.wall_hit,
+            Id::Glowbug => {
+                let i = self.glow_step.get();
+                self.glow_step.set((i + 1) % self.glowbug.len());
+                &self.glowbug[i]
+            }
+            Id::Heal => &self.heal,
         };
         play_sound(
             s,
