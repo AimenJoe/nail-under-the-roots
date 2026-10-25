@@ -1,7 +1,7 @@
 //! 장비: 캐릭터마다 쓸 수 있는 무기 종류가 다르다(docs/decisions/0011).
 //! 두더지 Naïl은 발톱만. 다른 캐릭터(2단계 보스 → 3단계 플레이어블)는 자기 무기 종류를 갖는다.
 //!
-//! 능력치(docs/decisions/0017): 기본값 + 장신구(2칸, 아무 캐릭터나) + 생명의 씨앗(최대 체력 영구 +1).
+//! 능력치(docs/decisions/0017): 기본값 + 장신구(2칸, 아무 캐릭터나) + 뿌리 심장(최대 체력 영구 +1).
 //! 플레이어 코드는 `Stats`만 본다. 무기는 콤보 모양(moveset), 장신구는 수치 보정.
 
 use macroquad::color::Color;
@@ -32,10 +32,41 @@ impl Character {
         }
     }
 
+    /// 필살기 게이지의 종류. 두더지는 분노(맞히면 찬다), 다음 캐릭터는 기(氣) 등.
+    pub fn gauge(self) -> Gauge {
+        match self {
+            Character::Mole => Gauge::Rage,
+        }
+    }
+
     /// 처음 들고 시작하는 무기(WEAPONS 번호).
     pub fn starting_weapon(self) -> usize {
         match self {
             Character::Mole => 1,
+        }
+    }
+}
+
+/// 필살기 게이지. 채우는 규칙은 지금 모두 "맞히면 찬다"(tuning SP_*). 이름·색만 다르다.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Gauge {
+    Rage,
+    #[allow(dead_code)]
+    Ki,
+}
+
+impl Gauge {
+    pub fn name(self) -> Tr {
+        match self {
+            Gauge::Rage => |s| s.gauge_rage,
+            Gauge::Ki => |s| s.gauge_ki,
+        }
+    }
+
+    pub fn color(self) -> Color {
+        match self {
+            Gauge::Rage => Color::new(1.0, 0.55, 0.22, 1.0),
+            Gauge::Ki => Color::new(0.45, 0.80, 1.0, 1.0),
         }
     }
 }
@@ -103,8 +134,8 @@ impl Stats {
         sp_gain: 1.0,
     };
 
-    /// 기본값에 장신구와 생명의 씨앗을 더한다. 배율은 곱, 더하기는 합. 너무 극단으로 가지 않게 묶는다.
-    pub fn compute(charms: &[usize], life_seeds: i32) -> Stats {
+    /// 기본값에 장신구와 뿌리 심장을 더한다. 배율은 곱, 더하기는 합. 너무 극단으로 가지 않게 묶는다.
+    pub fn compute(charms: &[usize], root_hearts: i32) -> Stats {
         let mut s = Stats::BASE;
         for &c in charms {
             let m = CHARMS[c].mods;
@@ -114,7 +145,7 @@ impl Stats {
             s.burrow_cd *= m.burrow_cd;
             s.sp_gain *= m.sp_gain;
         }
-        s.max_hp = (s.max_hp + life_seeds.min(crate::tuning::LIFE_SEED_MAX)).max(1);
+        s.max_hp = (s.max_hp + root_hearts.min(crate::tuning::ROOT_HEART_MAX)).max(1);
         s.attack_speed = s.attack_speed.clamp(0.6, 1.8);
         s.burrow_cd = s.burrow_cd.clamp(0.3, 2.0);
         s
@@ -225,10 +256,10 @@ mod tests {
         assert_eq!(s.max_hp, Stats::BASE.max_hp + 1 + 2);
         assert_eq!(s.damage, 1);
         assert!((s.attack_speed - 0.9).abs() < 1e-6);
-        // 생명의 씨앗은 상한까지만.
+        // 뿌리 심장은 상한까지만.
         assert_eq!(
             Stats::compute(&[], 99).max_hp,
-            Stats::BASE.max_hp + crate::tuning::LIFE_SEED_MAX
+            Stats::BASE.max_hp + crate::tuning::ROOT_HEART_MAX
         );
     }
 

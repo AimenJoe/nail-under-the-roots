@@ -77,34 +77,15 @@ pub const EMERGE_STUN: f32 = 0.45;
 pub const EMERGE_HITSTOP: f32 = 0.08;
 pub const EMERGE_SHAKE: f32 = 0.35;
 
-// ---- 적: 돌격형 ----------------------------------------------------------
-pub const CHARGER_RADIUS: f32 = 7.0;
-pub const CHARGER_HP: i32 = 3;
-pub const CHARGER_WALK_SPEED: f32 = 35.0;
-/// 이 거리 안이면 돌진 준비.
-pub const CHARGER_TRIGGER_RANGE: f32 = 75.0;
-/// 돌진 전 예고(멈춰서 떨림).
-pub const CHARGER_WINDUP: f32 = 0.45;
-pub const CHARGER_CHARGE_SPEED: f32 = 230.0;
-pub const CHARGER_CHARGE_TIME: f32 = 0.35;
-/// 돌진 후 멈춤.
-pub const CHARGER_REST: f32 = 0.7;
-/// 벽에 박았을 때 멈춤(더 김 = 반격 기회).
-pub const CHARGER_WALL_REST: f32 = 1.1;
-pub const CHARGER_DAMAGE: i32 = 1;
+/// 이웃 NPC(포포)가 걷는 속도.
+pub const NPC_SPEED: f32 = 70.0;
 
-// ---- 적: 원거리형 ----------------------------------------------------------
-pub const SHOOTER_RADIUS: f32 = 6.0;
-pub const SHOOTER_HP: i32 = 2;
-pub const SHOOTER_SPEED: f32 = 40.0;
-/// 이보다 가까우면 물러남.
-pub const SHOOTER_KEEP_MIN: f32 = 60.0;
-/// 이보다 멀면 다가옴.
-pub const SHOOTER_KEEP_MAX: f32 = 110.0;
-/// 발사 전 조준 예고.
-pub const SHOOTER_AIM_TIME: f32 = 0.35;
-pub const SHOOTER_FIRE_INTERVAL: f32 = 1.6;
-pub const PROJECTILE_SPEED: f32 = 65.0;
+// ---- 적 ----------------------------------------------------------
+// 종류별 체력·속도·예고 시간 등은 src/species.rs 표(docs/decisions/0021). 여기는 모든 종에 같은 것.
+/// 뛰기형(청설모): 체공 높이(그리기 px), 내려앉기 직전 피해가 있는 시간.
+pub const LEAP_HEIGHT: f32 = 14.0;
+pub const LEAP_LAND_WINDOW: f32 = 0.06;
+/// 던지는 도토리.
 pub const PROJECTILE_RADIUS: f32 = 3.0;
 pub const PROJECTILE_DAMAGE: i32 = 1;
 
@@ -148,8 +129,11 @@ pub const REVIVE_INVULN: f32 = 2.0;
 /// 일어날 때 주변을 밀어내는 충격.
 pub const REVIVE_PUSH_RADIUS: f32 = 40.0;
 pub const REVIVE_PUSH_KNOCKBACK: f32 = 260.0;
-/// 생명의 씨앗으로 늘릴 수 있는 최대 체력 상한(기본 PLAYER_HP 위로).
-pub const LIFE_SEED_MAX: i32 = 5;
+/// 상점 화폐 씨앗: 보물 상자 한 줌(최소, 최대), 보스.
+pub const CHEST_SEEDS: (u32, u32) = (3, 5);
+pub const BOSS_SEEDS: u32 = 6;
+/// 뿌리 심장으로 늘릴 수 있는 최대 체력 상한(기본 PLAYER_HP 위로).
+pub const ROOT_HEART_MAX: i32 = 5;
 
 // ---- 패링(공격 타이밍, docs/decisions/0020) -----------------------------------------
 /// 스윙을 시작하고 이 시간 안에 앞쪽에서 공격이 닿으면 튕겨낸다(실제 시간, 공격 속도와 무관).
@@ -176,29 +160,40 @@ pub const ENEMY_AGGRO_RADIUS: f32 = 110.0;
 /// 던전 전투방에 들어선 뒤 적이 움직이기 시작하기까지.
 pub const ROOM_WAKE_DELAY: f32 = 0.7;
 
-// ---- 필살기: 드릴 돌진 (player.rs State::Drill, docs/decisions/0018) ---------------------
+// ---- 필살기: 드릴 돌진 (player.rs State::Drill, docs/decisions/0018, 0024) ---------------------
 /// SP 게이지 최대. 발톱이 맞으면 1, 마지막 타는 2 찬다(장신구로 배율).
 pub const SP_MAX: f32 = 12.0;
 pub const SP_PER_HIT: f32 = 1.0;
 pub const SP_FINISHER_BONUS: f32 = 1.0;
-pub const DRILL_TIME: f32 = 0.85;
-pub const DRILL_SPEED: f32 = 170.0;
+/// 시동(부아아…): 제자리에서 돌며 힘을 모은다. 이동 없음·무적, 적·투사체는 멈춘다(필살기 정지 연출).
+/// 이 동안은 방향을 마음대로 고른다.
+pub const DRILL_REV: f32 = 0.3;
+/// 돌진(…아앙): 시동 뒤 이 시간. 처음 DRILL_ACCEL 동안 START → SPEED로 붙는다. 거리 ≈ 화면 한 폭(320px).
+pub const DRILL_TIME: f32 = 0.9;
+pub const DRILL_SPEED_START: f32 = 230.0;
+pub const DRILL_SPEED: f32 = 380.0;
+pub const DRILL_ACCEL: f32 = 0.2;
 /// 직진성: 초당 이만큼(라디안)만 방향을 틀 수 있다.
-pub const DRILL_TURN: f32 = 2.6;
-/// 연타 간격과 한 번의 피해·넉백(앞으로 밀어 벽까지 데려간다).
-pub const DRILL_HIT_EVERY: f32 = 0.07;
-pub const DRILL_RADIUS: f32 = 11.0;
+pub const DRILL_TURN: f32 = 2.2;
+/// 연타 간격과 한 번의 피해. 넉백이 돌진보다 세서 적이 앞으로 튕겨 나갔다가 다시 잡힌다(벽까지 끌고 간다).
+pub const DRILL_HIT_EVERY: f32 = 0.06;
+pub const DRILL_RADIUS: f32 = 12.0;
 pub const DRILL_DAMAGE: i32 = 1;
-pub const DRILL_KNOCKBACK: f32 = 210.0;
-pub const DRILL_STUN: f32 = 0.2;
-pub const DRILL_HITSTOP: f32 = 0.02;
+pub const DRILL_KNOCKBACK: f32 = 430.0;
+pub const DRILL_STUN: f32 = 0.25;
+pub const DRILL_HITSTOP: f32 = 0.025;
+pub const DRILL_HIT_SHAKE: f32 = 0.14;
+/// 돌진하는 동안 계속 걸리는 흔들림(틱당 trauma).
+pub const DRILL_RIDE_SHAKE: f32 = 0.012;
 /// 벽 쿵: 부딪힌 자리 충격파.
-pub const DRILL_WALL_RADIUS: f32 = 28.0;
-pub const DRILL_WALL_DAMAGE: i32 = 3;
-pub const DRILL_WALL_KNOCKBACK: f32 = 240.0;
-pub const DRILL_WALL_STUN: f32 = 0.7;
-pub const DRILL_WALL_HITSTOP: f32 = 0.14;
-pub const DRILL_WALL_SHAKE: f32 = 0.75;
+pub const DRILL_WALL_RADIUS: f32 = 36.0;
+pub const DRILL_WALL_DAMAGE: i32 = 4;
+pub const DRILL_WALL_KNOCKBACK: f32 = 260.0;
+pub const DRILL_WALL_STUN: f32 = 0.9;
+pub const DRILL_WALL_HITSTOP: f32 = 0.2;
+pub const DRILL_WALL_SHAKE: f32 = 1.0;
+/// 벽 쿵 순간 화면이 하얗게 번쩍(초).
+pub const DRILL_WALL_FLASH: f32 = 0.12;
 /// 드릴이 끝나거나 벽에 부딪힌 뒤 경직.
 pub const DRILL_RECOVER: f32 = 0.22;
 pub const DRILL_WALL_RECOVER: f32 = 0.4;
@@ -212,9 +207,6 @@ pub const POISON_TICK: f32 = 0.8;
 /// 독 발톱 1·2타가 거는 독(초), 마지막 타가 거는 독(초).
 pub const VENOM_POISON: f32 = 0.9;
 pub const VENOM_POISON_FINISHER: f32 = 2.5;
-
-// ---- 튜토리얼 허수아비 ------------------------------------------------------------
-pub const DUMMY_HP: i32 = 6;
 
 // ---- 공통 전투 ------------------------------------------------------------
 /// 넉백 속도 감쇠(1/s). v *= exp(-k·dt).

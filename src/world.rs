@@ -36,6 +36,16 @@ pub struct Fx {
     pub kind: FxKind,
 }
 
+/// 이웃 NPC(지금은 라쿤 포포 하나): 서 있거나 플레이어 곁으로 걸어온다. 막지 않는다.
+#[derive(Debug, Clone, Copy)]
+pub struct Npc {
+    pub pos: Vec2,
+    pub prev_pos: Vec2,
+    pub face_left: bool,
+    /// 따라갈 곳(없으면 제자리).
+    pub target: Option<Vec2>,
+}
+
 /// 얻은 것(앱이 가방에 넣고 획득 창을 띄운다).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Gift {
@@ -53,6 +63,8 @@ pub struct Pickup {
 }
 
 pub struct World {
+    /// 지금 조작하는 캐릭터(게이지 종류 등).
+    pub character: crate::equipment::Character,
     pub room: Room,
     pub player: Player,
     pub enemies: Vec<Enemy>,
@@ -61,20 +73,33 @@ pub struct World {
     pub pickups: Vec<Pickup>,
     /// 바닥의 반딧불·산딸기.
     pub loot: Vec<Loot>,
-    /// 이번 런에 모은 반딧불(화폐). 상점은 2단계.
+    /// 모은 반딧불: 기술을 깨우는 데 쓴다(해금은 나중에). 쓰러지면 조금 잃는다.
     pub glowbugs: u32,
+    /// 씨앗: 상점 화폐. 쓰러져도 잃지 않는다.
+    pub seeds: u32,
     /// 퀵 아이템(산딸기·쥬시 지렁이).
     pub bag: Bag,
     /// 끼고 있는 장신구(equipment::CHARMS 번호). 바꾸면 `refresh_stats`.
     pub charms: Vec<usize>,
-    /// 먹은 생명의 씨앗 수(최대 체력 +1씩).
-    pub life_seeds: i32,
+    /// 먹은 뿌리 심장 수(최대 체력 +1씩).
+    pub root_hearts: i32,
     /// 화면 위 한 줄 알림(되살아남, 씨앗)과 남은 시간. 글은 Tr이라 월드는 언어를 모른다.
     pub toast: Option<(Tr, f32)>,
     /// 체력이 깎인 채로 산딸기 없이 지나간 처치 수(불운 보정).
     kills_since_berry: u32,
     /// 이번 틱에 얻은 것. 앱이 가방에 넣고 비운다. 획득물·컷씬·보물 상자 모두 여기로.
     pub gifts: Vec<Gift>,
+    /// 이웃 NPC(튜토리얼의 포포).
+    pub npc: Option<Npc>,
+    /// 연습: 맞아도 체력이 줄지 않는다(튜토리얼).
+    pub no_damage: bool,
+    /// 튜토리얼용 통계: 패링·아이템 먹기·필살기(튀어 나간 수)·솟구침 명중.
+    pub parries: u32,
+    pub items_used: u32,
+    pub drills: u32,
+    pub emerge_hits: u32,
+    /// 도감: 만난(깨어 있는 것을 본) 적 종류.
+    pub seen: Vec<Kind>,
     /// 지금까지 찾은 장신구(같은 걸 두 번 주지 않게).
     pub charms_found: Vec<usize>,
     /// 모험 구조: 장소·카메라·던전·저장 지점(adventure.rs).
@@ -106,6 +131,7 @@ impl World {
         let room = Room::new();
         let player = Player::new(room.center());
         let mut w = Self {
+            character: crate::equipment::Character::Mole,
             room,
             player,
             enemies: Vec::new(),
@@ -114,13 +140,21 @@ impl World {
             pickups: Vec::new(),
             loot: Vec::new(),
             glowbugs: 0,
+            seeds: 0,
             bag: Bag::default(),
             charms: Vec::new(),
-            life_seeds: 0,
+            root_hearts: 0,
             toast: None,
             kills_since_berry: 0,
             gifts: Vec::new(),
             charms_found: Vec::new(),
+            seen: Vec::new(),
+            npc: None,
+            no_damage: false,
+            parries: 0,
+            items_used: 0,
+            drills: 0,
+            emerge_hits: 0,
             adv: Adventure::default(),
             feel: Feel::default(),
             debug: Debug {
@@ -199,27 +233,60 @@ impl World {
                     self.feel.add_trauma(0.15);
                     burst(&mut self.fx, self.player.pos, 10, DIRT, 70.0);
                 }
-                player::Event::Drill => {
+                player::Event::DrillRev => {
+                    // 부아아…: 소리 하나가 시동부터 돌진 끝까지 간다.
                     sfx.play(sfx::Id::Drill);
                     self.fx
-                        .push(ring(self.player.pos, 4.0, 16.0, 0.2, PROJECTILE));
+                        .push(ring(self.player.pos, 22.0, 3.0, t::DRILL_REV, RAGE));
+                }
+                player::Event::Drill => {
+                    // …아앙: 튀어 나간다.
+                    self.drills += 1;
+                    let p = self.player.pos;
+                    self.fx.push(ring(p, 4.0, 22.0, 0.25, WHITE));
+                    burst(&mut self.fx, p, 14, DIRT, 120.0);
+                    self.feel.add_trauma(0.35);
                 }
                 player::Event::DrillWall => {
+                    sfx.stop(sfx::Id::Drill);
                     sfx.play(sfx::Id::DrillWall);
                     let p = self.player.pos + self.player.facing * 6.0;
                     self.fx
-                        .push(ring(p, 6.0, t::DRILL_WALL_RADIUS + 6.0, 0.3, WHITE));
-                    self.fx.push(ring(p, 4.0, t::DRILL_WALL_RADIUS, 0.25, DIRT));
-                    burst(&mut self.fx, p, 18, DIRT, 130.0);
+                        .push(ring(p, 6.0, t::DRILL_WALL_RADIUS + 10.0, 0.35, WHITE));
+                    self.fx.push(ring(p, 4.0, t::DRILL_WALL_RADIUS, 0.3, RAGE));
+                    self.fx
+                        .push(ring(p, 2.0, t::DRILL_WALL_RADIUS * 0.6, 0.25, DIRT));
+                    burst(&mut self.fx, p, 30, DIRT, 170.0);
+                    burst(&mut self.fx, p, 10, RAGE, 120.0);
+                    self.feel.flash = t::DRILL_WALL_FLASH;
                 }
                 player::Event::Hurt | player::Event::Die | player::Event::Parry => {}
             }
         }
-        // 드릴 중에는 흙이 튄다.
-        if let player::State::Drill { dir, .. } = self.player.state {
-            if (self.time * 60.0) as i32 % 2 == 0 {
-                let back = self.player.pos - dir * 6.0;
-                burst(&mut self.fx, back, 1, DIRT, 60.0);
+        // 드릴: 시동 중엔 불꽃이 모이고, 돌진 중엔 흙이 튀고 화면이 계속 떨린다.
+        if let player::State::Drill { dir, time, .. } = self.player.state {
+            let p = self.player.pos;
+            if time < t::DRILL_REV {
+                let ang = rand::gen_range(0.0, std::f32::consts::TAU);
+                let from = p + Vec2::from_angle(ang) * 20.0;
+                self.fx.push(Fx {
+                    pos: from,
+                    vel: (p - from) / 0.2,
+                    time: 0.0,
+                    dur: 0.2,
+                    kind: FxKind::Spark { color: RAGE },
+                });
+            } else {
+                self.feel.add_trauma(t::DRILL_RIDE_SHAKE);
+                let back = p - dir * 6.0;
+                let side = vec2(-dir.y, dir.x) * rand::gen_range(-4.0, 4.0);
+                self.fx.push(Fx {
+                    pos: back + side,
+                    vel: -dir * rand::gen_range(40.0, 110.0) + side * 8.0,
+                    time: 0.0,
+                    dur: 0.3,
+                    kind: FxKind::Spark { color: DIRT },
+                });
             }
         }
         // 쓰러졌다: 쥬시 지렁이가 있으면 저절로 먹고 일어난다(목숨).
@@ -228,8 +295,8 @@ impl World {
         }
 
         // 1a. 퀵 아이템
-        if a.item_cycle {
-            self.bag.cycle();
+        if a.item_prev || a.item_next {
+            self.bag.cycle(a.item_next);
         }
         if a.use_item && self.player.is_alive() {
             self.use_quick_item(sfx);
@@ -262,13 +329,13 @@ impl World {
         // 1c. 반딧불·가방 아이템·씨앗. 땅속에서도 줍는다(굴파기로 지나가며 쓸어 담기).
         let alive = self.player.is_alive();
         let mut bag = std::mem::take(&mut self.bag);
-        let (mut bugs, mut items, mut seeds) = (0, 0, 0);
+        let (mut bugs, mut items, mut hearts, mut seeds) = (0, 0, 0, 0);
         let mut picked_at = Vec::new();
         let room = &self.room;
         self.loot.retain_mut(|l| {
             let can = alive
                 && match l.kind {
-                    LootKind::Glowbug | LootKind::LifeSeed => true,
+                    LootKind::Glowbug | LootKind::Seed | LootKind::RootHeart => true,
                     LootKind::Berry => bag.has_room(Consumable::Berry),
                     LootKind::Worm => bag.has_room(Consumable::Worm),
                 };
@@ -277,6 +344,7 @@ impl World {
             }
             match l.kind {
                 LootKind::Glowbug => bugs += 1,
+                LootKind::Seed => seeds += 1,
                 LootKind::Berry => {
                     bag.add(Consumable::Berry);
                     items += 1;
@@ -285,33 +353,35 @@ impl World {
                     bag.add(Consumable::Worm);
                     items += 1;
                 }
-                LootKind::LifeSeed => seeds += 1,
+                LootKind::RootHeart => hearts += 1,
             }
             picked_at.push((l.pos, l.kind));
             false
         });
         self.bag = bag;
         self.glowbugs += bugs;
-        if bugs > 0 {
+        self.seeds += seeds;
+        if bugs > 0 || seeds > 0 {
             sfx.play(sfx::Id::Glowbug);
         }
         if items > 0 {
             sfx.play(sfx::Id::Claw(0));
         }
-        if seeds > 0 {
-            self.life_seeds += seeds;
+        if hearts > 0 {
+            self.root_hearts += hearts;
             self.refresh_stats();
             self.player.heal(self.player.stats.max_hp);
             sfx.play(sfx::Id::Heal);
-            self.toast = Some((|s| s.toast_seed, 2.5));
+            self.toast = Some((|s| s.toast_heart, 2.5));
         }
         for (pos, kind) in picked_at {
             match kind {
                 LootKind::Glowbug => self.fx.push(ring(pos, 1.0, 5.0, 0.15, GLOW)),
+                LootKind::Seed => self.fx.push(ring(pos, 1.0, 6.0, 0.18, SEED)),
                 LootKind::Berry | LootKind::Worm => {
                     self.fx.push(ring(pos, 2.0, 10.0, 0.2, WHITE));
                 }
-                LootKind::LifeSeed => {
+                LootKind::RootHeart => {
                     self.fx.push(ring(pos, 4.0, 22.0, 0.4, POISON));
                     burst(&mut self.fx, pos, 16, POISON, 90.0);
                 }
@@ -321,7 +391,9 @@ impl World {
         // 2. 적·투사체
         let targetable = self.player.is_alive() && !self.player.is_burrowed();
         self.enemy_events.clear();
-        for e in &mut self.enemies {
+        // 필살기 시동 중에는 적·투사체가 멈춘다(필살기 정지 연출).
+        let frozen = self.player.drill_revving();
+        for e in self.enemies.iter_mut().filter(|_| !frozen) {
             e.update(
                 self.player.pos,
                 targetable,
@@ -330,6 +402,28 @@ impl World {
                 &mut self.projectiles,
                 &mut self.enemy_events,
             );
+        }
+        // 이웃: 따라갈 곳이 있으면 천천히 걸어간다(가까우면 멈춤).
+        if let Some(n) = self.npc.as_mut() {
+            n.prev_pos = n.pos;
+            if let Some(to) = n.target {
+                let d = to - n.pos;
+                if d.length() > 6.0 {
+                    let step = d.normalize() * t::NPC_SPEED * dt;
+                    n.pos += step;
+                    if step.x.abs() > 0.1 {
+                        n.face_left = step.x < 0.0;
+                    }
+                }
+            }
+            let r = 5.0;
+            self.room.resolve_circle(&mut n.pos, r);
+        }
+        // 도감: 깨어 있는 적을 처음 보면 적어 둔다.
+        for e in &self.enemies {
+            if !e.asleep && e.kind != Kind::Dummy && !self.seen.contains(&e.kind) {
+                self.seen.push(e.kind);
+            }
         }
         // 쓰러진 적(독·공격). 떨어뜨릴 것은 루프가 끝난 뒤에.
         let mut deaths: Vec<(Vec2, Kind)> = Vec::new();
@@ -351,9 +445,14 @@ impl World {
                     self.feel.add_trauma(0.2);
                 }
                 enemy::Event::Shoot => sfx.play(sfx::Id::Shoot),
+                enemy::Event::Leap => sfx.play(sfx::Id::Charge),
+                enemy::Event::Land => {
+                    sfx.play(sfx::Id::WallHit);
+                    self.feel.add_trauma(0.12);
+                }
             }
         }
-        for p in &mut self.projectiles {
+        for p in self.projectiles.iter_mut().filter(|_| !frozen) {
             p.update(&self.room, dt);
             if !p.alive {
                 self.fx.push(ring(p.pos, 2.0, 6.0, 0.12, PROJECTILE));
@@ -398,6 +497,9 @@ impl World {
                 let dir = (e.pos - origin).normalize_or_zero();
                 let dir = if dir == Vec2::ZERO {
                     self.player.facing
+                } else if s.kind == crate::combat::StrikeKind::Drill {
+                    // 드릴은 앞으로 밀어 데려간다(옆으로 흩지 않는다).
+                    (self.player.facing * 1.6 + dir * 0.4).normalize()
                 } else {
                     dir
                 };
@@ -410,6 +512,9 @@ impl World {
                 }
                 if s.finisher {
                     self.finisher_hits += 1;
+                }
+                if s.kind == crate::combat::StrikeKind::Emerge {
+                    self.emerge_hits += 1;
                 }
                 self.feel.add_hitstop(s.hitstop);
                 self.feel.add_trauma(s.shake);
@@ -468,7 +573,7 @@ impl World {
             let mut parried = false;
             for e in &mut self.enemies {
                 if let Some(dmg) = e.contact_damage() {
-                    let rr = pr + e.radius();
+                    let rr = pr + e.contact_radius();
                     if (e.pos - ppos).length_squared() <= rr * rr {
                         let from = (e.pos - ppos).normalize_or_zero();
                         if parry.is_some_and(|d| d.dot(from) > t::PARRY_FRONT) {
@@ -497,6 +602,7 @@ impl World {
                 }
             }
             if let Some((from, dmg)) = hurt_from {
+                let dmg = if self.no_damage { 0 } else { dmg };
                 if self.player.take_damage(from, dmg) {
                     self.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
                     self.feel.add_trauma(t::PLAYER_HURT_SHAKE);
@@ -564,6 +670,7 @@ impl World {
 
     /// 패링 성공 연출: 번쩍, 히트스톱, SP.
     fn parry_feedback(&mut self, sfx: &Sfx) {
+        self.parries += 1;
         self.player.on_parry();
         self.feel.add_hitstop(t::PARRY_HITSTOP);
         self.feel.add_trauma(t::PARRY_SHAKE);
@@ -578,7 +685,7 @@ impl World {
     /// 장신구·씨앗으로 능력치를 다시 계산한다.
     pub fn refresh_stats(&mut self) {
         self.player
-            .set_stats(Stats::compute(&self.charms, self.life_seeds));
+            .set_stats(Stats::compute(&self.charms, self.root_hearts));
     }
 
     /// 퀵 슬롯 아이템을 먹는다. 체력이 가득이면 먹지 않는다(아깝지 않게).
@@ -596,11 +703,12 @@ impl World {
             Consumable::Worm => p.heal(p.stats.max_hp),
         }
         sfx.play(sfx::Id::Heal);
+        self.items_used += 1;
         let pos = p.pos;
         self.fx.push(ring(pos, 3.0, 14.0, 0.3, BERRY));
         burst(&mut self.fx, pos, 8, BERRY, 60.0);
         if self.bag.count(c) == 0 {
-            self.bag.cycle();
+            self.bag.cycle(true);
         }
     }
 
@@ -635,6 +743,9 @@ impl World {
                 self.loot.push(Loot::spawn(LootKind::Glowbug, pos));
             }
         }
+        if rand::gen_range(0.0, 1.0) < kind.species().seed_chance {
+            self.loot.push(Loot::spawn(LootKind::Seed, pos));
+        }
         if kind != Kind::Dummy && rand::gen_range(0.0, 1.0) < t::WORM_CHANCE {
             self.loot.push(Loot::spawn(LootKind::Worm, pos));
         }
@@ -665,6 +776,9 @@ impl World {
         for l in &mut self.loot {
             l.prev_pos = l.pos;
         }
+        if let Some(n) = self.npc.as_mut() {
+            n.prev_pos = n.pos;
+        }
         self.adv.prev_cam = self.adv.cam;
     }
 
@@ -693,15 +807,19 @@ impl World {
             points.swap(i, j);
         }
         let mut it = points.into_iter().cycle();
-        for _ in 0..chargers {
+        let depth = self.wave / 3;
+        for _ in 0..(chargers + shooters) {
             if let Some(p) = it.next() {
-                self.enemies.push(Enemy::new(Kind::Charger, p));
+                let kind = crate::species::roll(rand::gen_range(0.0, 1.0), depth);
+                self.spawn_mob(kind, p);
             }
         }
-        for _ in 0..shooters {
-            if let Some(p) = it.next() {
-                self.enemies.push(Enemy::new(Kind::Shooter, p));
-            }
+    }
+
+    /// 적 하나(생쥐는 떼로 둘러서).
+    pub fn spawn_mob(&mut self, kind: Kind, p: Vec2) {
+        for off in crate::species::pack_offsets(kind) {
+            self.enemies.push(Enemy::new(kind, p + off));
         }
     }
 }
@@ -709,21 +827,19 @@ impl World {
 // ---- 팔레트(렌더와 공유) ---------------------------------------------------------
 pub const MOLE: Color = Color::new(0.90, 0.71, 0.47, 1.0);
 pub const DIRT: Color = Color::new(0.55, 0.40, 0.28, 1.0);
-pub const CHARGER: Color = Color::new(0.85, 0.30, 0.30, 1.0);
-pub const SHOOTER: Color = Color::new(0.60, 0.40, 0.85, 1.0);
 pub const PROJECTILE: Color = Color::new(1.0, 0.85, 0.30, 1.0);
+/// 분노 게이지·드릴 불꽃(주황).
+pub const RAGE: Color = Color::new(1.0, 0.55, 0.22, 1.0);
 pub const POISON: Color = Color::new(0.55, 0.90, 0.35, 1.0);
 /// 반딧불 빛.
 pub const GLOW: Color = Color::new(0.85, 1.0, 0.45, 1.0);
+/// 씨앗(상점 화폐).
+pub const SEED: Color = Color::new(0.86, 0.68, 0.40, 1.0);
 /// 산딸기.
 pub const BERRY: Color = Color::new(0.93, 0.30, 0.38, 1.0);
 
 pub fn enemy_color(kind: Kind) -> Color {
-    match kind {
-        Kind::Charger => CHARGER,
-        Kind::Shooter => SHOOTER,
-        Kind::Dummy => Color::new(0.55, 0.52, 0.48, 1.0),
-    }
+    kind.species().color
 }
 
 fn ring(pos: Vec2, r0: f32, r1: f32, dur: f32, color: Color) -> Fx {

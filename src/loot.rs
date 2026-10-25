@@ -1,9 +1,10 @@
-//! 떨어지는 것: 화폐(반딧불)와 가방 아이템(산딸기·쥬시 지렁이), 생명의 씨앗. 적이 쓰러질 때 튀어나와 바닥에 구르고,
-//! 다가가면 줍는다(docs/decisions/0016, 0017).
+//! 떨어지는 것: 화폐 둘(반딧불·씨앗)과 가방 아이템(산딸기·쥬시 지렁이), 뿌리 심장. 적이 쓰러질 때 튀어나와 바닥에 구르고,
+//! 다가가면 줍는다(docs/decisions/0016, 0017, 0021).
 //!
-//! - 반딧불: 땅속에서 빛은 귀하다 → 이웃들의 돈. 상점(2단계)에서 쓴다. 가까이 가면 끌려온다(자석).
+//! - 반딧불: 기술을 깨우는 빛(기술 해금, 나중에). 많이 나온다. 가까이 가면 끌려온다(자석).
+//! - 씨앗: 상점 화폐. 드물게(종마다 확률), 상자·보스에서 한 줌. 끌려온다.
 //! - 산딸기(체력 1)·쥬시 지렁이(체력 가득 / 목숨): 가방에 들어간다. 가방이 가득이면 줍지 않고 남는다. 끌려오지 않는다.
-//! - 생명의 씨앗: 최대 체력 +1(영구). 지금은 개발 시나리오에만, 나중에 보스·숨은 곳.
+//! - 뿌리 심장: 최대 체력 +1(영구). 던전 보스.
 //! - 산딸기가 떨어질 확률은 깎인 체력에 비례하고, 오래 안 나오면 반드시 나온다(불운 보정). 지렁이는 드물게 고정 확률.
 
 use macroquad::prelude::*;
@@ -15,9 +16,12 @@ use crate::tuning as t;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LootKind {
     Glowbug,
+    /// 상점 화폐.
+    Seed,
     Berry,
     Worm,
-    LifeSeed,
+    /// 최대 체력 +1.
+    RootHeart,
 }
 
 pub struct Loot {
@@ -80,7 +84,8 @@ impl Loot {
         let ready = self.age >= t::LOOT_PICKUP_DELAY;
         let to = player - self.pos;
         let dist = to.length();
-        if ready && can_take && self.kind == LootKind::Glowbug && dist < t::GLOWBUG_MAGNET_RADIUS {
+        let magnet = matches!(self.kind, LootKind::Glowbug | LootKind::Seed);
+        if ready && can_take && magnet && dist < t::GLOWBUG_MAGNET_RADIUS {
             // 가까울수록 세게 끌린다.
             let k = 1.0 - dist / t::GLOWBUG_MAGNET_RADIUS;
             self.vel += to / dist.max(0.01) * t::GLOWBUG_MAGNET_ACCEL * (0.3 + k) * dt;
@@ -101,11 +106,7 @@ impl Loot {
 
 /// 적 종류별 반딧불 수(최소, 최대).
 pub fn glowbugs_for(kind: Kind) -> (u32, u32) {
-    match kind {
-        Kind::Charger => (2, 3),
-        Kind::Shooter => (3, 4),
-        Kind::Dummy => (0, 0),
-    }
+    kind.species().glowbugs
 }
 
 /// 이 처치에서 산딸기가 떨어질 확률. 깎인 체력만큼 오르고, `since_heal`번 연속 안 나왔으면 반드시.
@@ -126,21 +127,21 @@ mod tests {
 
     #[test]
     fn no_berry_at_full_hp_or_from_dummy() {
-        assert_eq!(berry_chance(5, 5, 100, Kind::Charger), 0.0);
+        assert_eq!(berry_chance(5, 5, 100, Kind::FieldMouse), 0.0);
         assert_eq!(berry_chance(1, 5, 100, Kind::Dummy), 0.0);
     }
 
     #[test]
     fn berry_chance_grows_with_missing_hp_and_pity_guarantees() {
-        let one = berry_chance(4, 5, 0, Kind::Charger);
-        let three = berry_chance(2, 5, 0, Kind::Charger);
+        let one = berry_chance(4, 5, 0, Kind::FieldMouse);
+        let three = berry_chance(2, 5, 0, Kind::FieldMouse);
         assert!(three > one && one > 0.0);
-        assert_eq!(berry_chance(4, 5, t::BERRY_PITY_KILLS, Kind::Shooter), 1.0);
+        assert_eq!(berry_chance(4, 5, t::BERRY_PITY_KILLS, Kind::Chipmunk), 1.0);
     }
 
     #[test]
     fn dummy_drops_no_glowbugs() {
         assert_eq!(glowbugs_for(Kind::Dummy), (0, 0));
-        assert!(glowbugs_for(Kind::Shooter).0 >= glowbugs_for(Kind::Charger).0);
+        assert!(glowbugs_for(Kind::Chipmunk).0 >= glowbugs_for(Kind::FieldMouse).0);
     }
 }

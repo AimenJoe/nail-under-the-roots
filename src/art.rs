@@ -10,6 +10,8 @@ pub struct Art {
     pub tiles: Texture2D,
     /// 어둠 마스크(가운데 투명, 바깥 검정). 코드로 만든다.
     pub dark: Texture2D,
+    /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤. 아래 CRITTER_ROWS줄은 흰 실루엣.
+    pub critters: Option<Texture2D>,
     /// 대화창 초상화: 88×88 칸 가로로(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
 }
@@ -18,6 +20,11 @@ pub struct Art {
 pub const PORTRAIT: f32 = 88.0;
 
 pub const CELL: f32 = 16.0;
+
+/// critters.png에서 실루엣 줄까지의 거리(그림 줄 수).
+pub const CRITTER_ROWS: u32 = 7;
+/// critters.png의 라쿤 줄.
+pub const RACCOON_ROW: u32 = 6;
 
 impl Art {
     pub async fn load() -> Option<Self> {
@@ -29,10 +36,15 @@ impl Art {
         if let Some(p) = &portraits {
             p.set_filter(FilterMode::Nearest);
         }
+        let critters = load_texture("art/critters.png").await.ok();
+        if let Some(c) = &critters {
+            c.set_filter(FilterMode::Nearest);
+        }
         Some(Self {
             nail,
             tiles,
             dark: dark_mask(),
+            critters,
             portraits,
         })
     }

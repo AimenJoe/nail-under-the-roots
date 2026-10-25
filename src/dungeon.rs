@@ -4,7 +4,7 @@
 //!   카메라는 지금 방 안에만 머물고, 문을 지나면 옆 방으로 미끄러진다(밀기 전환).
 //! - 방 그래프: 시작방에서 무작위로 가지를 뻗는다(나무) + 고리 하나. 시작에서 가장 먼 방 = 보스,
 //!   막다른 방 하나 = 보물(장신구 상자), 다른 막다른 방 = 휴식(산딸기). 나머지는 전투.
-//! - 전투방: 안으로 들어서면 문이 닫히고(Room::set_doors_locked), 다 잡으면 열린다. 보스방을 비우면 출구(U)와 생명의 씨앗.
+//! - 전투방: 안으로 들어서면 문이 닫히고(Room::set_doors_locked), 다 잡으면 열린다. 보스방을 비우면 출구(U)와 뿌리 심장.
 //! - 시작방에는 필드로 돌아가는 출구가 있다.
 //!
 //! 같은 시드 → 같은 던전(테스트·버그 재현).
@@ -111,6 +111,10 @@ impl Rng {
     }
     pub fn below(&mut self, n: u64) -> u64 {
         self.next() % n.max(1)
+    }
+    /// 0..1.
+    pub fn unit(&mut self) -> f32 {
+        (self.next() % 10_000) as f32 / 10_000.0
     }
     pub fn chance(&mut self, p: f32) -> bool {
         (self.next() % 10_000) as f32 / 10_000.0 < p
@@ -248,11 +252,7 @@ pub fn generate(seed: u64, depth: u32) -> (Dungeon, Room) {
                     2 + depth.min(2) as usize + rng.below(2) as usize
                 };
                 for k in 0..count {
-                    let kind = if rng.chance(0.55) {
-                        Kind::Charger
-                    } else {
-                        Kind::Shooter
-                    };
+                    let kind = crate::species::roll(rng.unit(), depth);
                     // 방 가장자리 쪽에(가운데는 들어오는 플레이어 자리).
                     let corner = [
                         (4, 4),

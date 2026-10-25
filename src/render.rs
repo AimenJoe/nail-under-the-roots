@@ -6,7 +6,7 @@ use macroquad::prelude::*;
 use crate::art::{self, Art};
 use crate::biome::{self, Decor};
 use crate::combat::{Shape, StrikeKind};
-use crate::enemy::{self, Enemy, Kind};
+use crate::enemy::{self, Enemy};
 use crate::input::TouchOverlay;
 use crate::loot;
 use crate::map::Cell;
@@ -89,10 +89,15 @@ impl Renderer {
             } else {
                 draw_room_art(art, w);
             }
+            draw_drill_trail(Some(art), &w.player, alpha);
             draw_sorted(art, w, alpha);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
             draw_darkness(art, w, alpha, cam);
+            if draw_super_dim(w, cam) {
+                draw_nail(art, &w.player, alpha, w.time);
+                draw_player_fx(&w.player, alpha);
+            }
         } else {
             clear_background(BG);
             draw_room(w);
@@ -100,11 +105,16 @@ impl Renderer {
                 draw_projectile(p, alpha);
             }
             for e in &w.enemies {
-                draw_enemy(e, alpha, w.time);
+                draw_enemy(None, e, alpha, w.time);
             }
+            draw_drill_trail(None, &w.player, alpha);
             draw_player(&w.player, alpha, w.time);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
+            if draw_super_dim(w, cam) {
+                draw_player(&w.player, alpha, w.time);
+                draw_player_fx(&w.player, alpha);
+            }
         }
         if w.debug.hitboxes {
             draw_hitboxes(w, alpha);
@@ -113,6 +123,17 @@ impl Renderer {
         self.cam.target = center;
         set_camera(&self.cam);
         draw_hud_world(w);
+        if w.feel.flash > 0.0 {
+            // 벽 쿵 번쩍임. 흔들림 설정을 따른다(0이면 끈다: 눈이 예민한 사람).
+            let k = (w.feel.flash / t::DRILL_WALL_FLASH).min(1.0) * shake_mul.min(1.0);
+            draw_rectangle(
+                0.0,
+                0.0,
+                t::VIEW_W,
+                t::VIEW_H,
+                Color::new(1.0, 0.97, 0.9, 0.55 * k),
+            );
+        }
         let fade = w.fade_alpha();
         if fade > 0.0 {
             draw_rectangle(
@@ -155,6 +176,38 @@ impl Renderer {
             font: self.fonts.for_lang(crate::i18n::lang()),
             base: self.fonts.base.clone(),
         }
+    }
+
+    /// 컷씬 배우(그림이 있는 이웃). 그림이 없으면 색 동그라미.
+    pub fn draw_actor_sprite(&self, row: u32, pos: Vec2, facing: Vec2, moving: bool, color: Color) {
+        match self.art.as_ref().and_then(|a| a.critters.as_ref()) {
+            Some(tex) => draw_critter_at(tex, row, pos, facing.x < 0.0, moving, get_time() as f32),
+            None => draw_actor(pos, facing, color),
+        }
+    }
+
+    /// 도감 그림: critters.png의 `row`줄 `frame`칸을 논리 사각형 `r`에 정수 배율로(가운데 맞춤).
+    pub fn draw_critter(&self, ui: &Ui, r: Rect, row: u32, frame: u32) {
+        let Some(tex) = self.art.as_ref().and_then(|a| a.critters.as_ref()) else {
+            return;
+        };
+        let k = ((r.w / art::CELL).floor() * ui.scale).max(1.0);
+        let size = art::CELL * k;
+        let p = ui.px(vec2(r.x, r.y));
+        let (bw, bh) = (r.w * ui.scale, r.h * ui.scale);
+        let x = (p.x + (bw - size) / 2.0).round();
+        let y = (p.y + (bh - size) / 2.0).round();
+        draw_texture_ex(
+            tex,
+            x,
+            y,
+            WHITE,
+            DrawTextureParams {
+                source: Some(art::cell(frame, row)),
+                dest_size: Some(vec2(size, size)),
+                ..Default::default()
+            },
+        );
     }
 
     /// 대화창 초상화를 논리 사각형 `r`(44×44) 안에 찍는다. 원본 1px = 게임 픽셀 반(화면 배율의 절반, 정수).
@@ -220,6 +273,21 @@ impl Renderer {
         ui.text(
             &w.glowbugs.to_string(),
             x + 5.0,
+            1.0,
+            crate::ui::FONT_PX,
+            crate::ui::TEXT,
+        );
+        // 씨앗(상점 화폐): 반딧불 오른쪽.
+        let sx = x + 7.0 + ui.text_w(&w.glowbugs.to_string(), crate::ui::FONT_PX) + 6.0;
+        ui.rect(Rect::new(sx, 1.0, 3.0, 4.0), OUTLINE);
+        ui.rect(Rect::new(sx + 0.5, 1.5, 2.0, 3.0), world::SEED);
+        ui.rect(
+            Rect::new(sx + 1.0, 0.0, 2.0, 1.0),
+            Color::new(0.45, 0.78, 0.35, 1.0),
+        );
+        ui.text(
+            &w.seeds.to_string(),
+            sx + 5.0,
             1.0,
             crate::ui::FONT_PX,
             crate::ui::TEXT,
@@ -316,7 +384,11 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
         );
     }
     // 풀밭 위에서도 읽히게 어두운 바탕.
-    let hint = crate::i18n::s().quick_hint;
+    let hint = crate::i18n::fill(
+        crate::i18n::s().quick_hint,
+        &[&crate::input::prompt(crate::input::Act::UseItem)],
+    );
+    let hint = hint.as_str();
     let hx = x0 + 2.0 * (size + 3.0) + 2.0;
     let hw = ui.text_w(hint, crate::ui::FONT_PX) + 6.0;
     ui.rect(
@@ -467,17 +539,44 @@ fn draw_player_fx(p: &Player, alpha: f32) {
                 );
             }
         }
-        player::State::Drill { time: dt, dir, .. } => {
-            // 앞쪽 원뿔 드릴: 줄무늬가 돌아간다.
+        player::State::Drill { time: dt, dir, .. } if dt < t::DRILL_REV => {
+            // 시동: 몸이 떨리고, 앞에 작은 드릴이 점점 커지며 돈다. 주변에 기운 고리가 조여 든다.
+            let k = dt / t::DRILL_REV;
             let side = vec2(-dir.y, dir.x);
             let base = pos + dir * 3.0;
-            let tip = pos + dir * 15.0;
+            let tip = pos + dir * (6.0 + 9.0 * k);
+            let claw = Color::new(0.97, 0.93, 0.85, 1.0);
+            draw_triangle(base + side * 5.0, base - side * 5.0, tip, OUTLINE);
+            draw_triangle(base + side * 4.0, base - side * 4.0, tip - dir, claw);
+            let rage = world::RAGE;
+            let spin = dt * 40.0;
+            for i in 0..6 {
+                let a = spin + i as f32 * std::f32::consts::TAU / 6.0;
+                let r = 18.0 * (1.0 - k) + 8.0;
+                let q = pos + Vec2::from_angle(a) * r;
+                let q2 = pos + Vec2::from_angle(a - 0.5) * (r + 4.0);
+                draw_line(
+                    q.x,
+                    q.y,
+                    q2.x,
+                    q2.y,
+                    1.0,
+                    Color::new(rage.r, rage.g, rage.b, 0.5 + 0.5 * k),
+                );
+            }
+        }
+        player::State::Drill { time: dt, dir, .. } => {
+            // 앞쪽 원뿔 드릴: 줄무늬가 돌아간다.
+            let dt = dt - t::DRILL_REV;
+            let side = vec2(-dir.y, dir.x);
+            let base = pos + dir * 3.0;
+            let tip = pos + dir * 17.0;
             let claw = Color::new(0.97, 0.93, 0.85, 1.0);
             let shade = Color::new(0.62, 0.55, 0.48, 1.0);
-            draw_triangle(base + side * 6.0, base - side * 6.0, tip, OUTLINE);
-            draw_triangle(base + side * 5.0, base - side * 5.0, tip - dir, claw);
+            draw_triangle(base + side * 7.0, base - side * 7.0, tip, OUTLINE);
+            draw_triangle(base + side * 6.0, base - side * 6.0, tip - dir, claw);
             for k in 0..3 {
-                let f = ((dt * 14.0 + k as f32 / 3.0).fract() * 0.9) + 0.05;
+                let f = ((dt * 22.0 + k as f32 / 3.0).fract() * 0.9) + 0.05;
                 let a = base + (tip - base) * f;
                 let w = 5.0 * (1.0 - f);
                 draw_line(
@@ -489,12 +588,22 @@ fn draw_player_fx(p: &Player, alpha: f32) {
                     shade,
                 );
             }
-            // 바람 줄
-            for k in 0..2 {
-                let o = side * (if k == 0 { 7.0 } else { -7.0 });
-                let a = pos + o - dir * 4.0;
-                let b = a - dir * 8.0;
-                draw_line(a.x, a.y, b.x, b.y, 1.0, Color::new(1.0, 1.0, 1.0, 0.5));
+            // 바람 줄: 몸 양옆으로 길게, 깜빡이며.
+            for k in 0..4 {
+                let off = [8.0, -8.0, 12.0, -12.0][k];
+                let len = 10.0 + 8.0 * (((dt * 30.0) as usize + k) % 3) as f32;
+                let a = pos + side * off - dir * 2.0;
+                let b = a - dir * len;
+                draw_line(a.x, a.y, b.x, b.y, 1.0, Color::new(1.0, 1.0, 1.0, 0.6));
+            }
+            // 화면을 가로지르는 속도선(카메라 둘레에 흩뿌린 고정 무늬가 반대로 흐른다).
+            for i in 0..10 {
+                let h = (i as f32 * 37.7).sin() * 0.5 + 0.5;
+                let lane = (h - 0.5) * 200.0;
+                let flow = ((dt * 3.0 + i as f32 * 0.137).fract() - 0.5) * 360.0;
+                let a = pos + side * lane - dir * flow;
+                let b = a - dir * 24.0;
+                draw_line(a.x, a.y, b.x, b.y, 1.0, Color::new(1.0, 1.0, 1.0, 0.25));
             }
         }
         player::State::Emerge { time: et } => {
@@ -504,6 +613,57 @@ fn draw_player_fx(p: &Player, alpha: f32) {
         }
         _ => {}
     }
+}
+
+/// 드릴 돌진 잔상: 지나온 길에 분노색 그림자 셋. 그림이 있으면 Naïl 실루엣, 없으면 원.
+fn draw_drill_trail(art: Option<&Art>, p: &Player, alpha: f32) {
+    let player::State::Drill { time, dir, .. } = p.state else {
+        return;
+    };
+    if time < t::DRILL_REV {
+        return;
+    }
+    let pos = lerp(p.prev_pos, p.pos, alpha);
+    let rage = world::RAGE;
+    for i in 1..4 {
+        let q = pos - dir * (i as f32 * 9.0);
+        let a = 0.45 - i as f32 * 0.12;
+        let c = Color::new(rage.r, rage.g, rage.b, a);
+        match art {
+            Some(art) => draw_texture_ex(
+                &art.nail,
+                (q.x - 8.0).round(),
+                (q.y - 8.0).round(),
+                c,
+                DrawTextureParams {
+                    source: Some(art::cell(2, 4)),
+                    dest_size: Some(vec2(16.0, 16.0)),
+                    flip_x: p.face_left,
+                    ..Default::default()
+                },
+            ),
+            None => draw_circle(q.x, q.y, t::PLAYER_RADIUS, c),
+        }
+    }
+}
+
+/// 필살기 시동: 화면(카메라)을 어둡게 덮는다. 그 위에 플레이어를 다시 그리라고 true.
+fn draw_super_dim(w: &World, cam: Vec2) -> bool {
+    let player::State::Drill { time, .. } = w.player.state else {
+        return false;
+    };
+    if time >= t::DRILL_REV {
+        return false;
+    }
+    let k = (time / 0.08).min(1.0);
+    draw_rectangle(
+        cam.x - 8.0,
+        cam.y - 8.0,
+        t::VIEW_W + 16.0,
+        t::VIEW_H + 16.0,
+        Color::new(0.04, 0.02, 0.06, 0.55 * k),
+    );
+    true
 }
 
 /// 발톱 자국: 전방 호를 따라 세 줄. 휘두르는 동안 펼쳐지고 끝에서 옅어진다.
@@ -553,14 +713,13 @@ fn draw_projectile(p: &enemy::Projectile, alpha: f32) {
             Color::new(1.0, 1.0, 1.0, 0.5),
         );
     }
+    if !p.friendly {
+        // 다람쥐의 도토리. 날아가며 돈다.
+        draw_acorn(pos, (pos.x + pos.y) * 0.25);
+        return;
+    }
     draw_circle(pos.x, pos.y, p.radius(), c);
-    draw_circle_lines(
-        pos.x,
-        pos.y,
-        p.radius() + 0.5,
-        1.0,
-        if p.friendly { world::PROJECTILE } else { WHITE },
-    );
+    draw_circle_lines(pos.x, pos.y, p.radius() + 0.5, 1.0, world::PROJECTILE);
 }
 
 // ---- 그림 에셋 경로 -----------------------------------------------------------
@@ -889,6 +1048,7 @@ enum Drawable {
     Player,
     Enemy(usize),
     Projectile(usize),
+    Npc,
 }
 
 /// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
@@ -913,6 +1073,11 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     }
     let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
     list.push((pp.y + 6.0, Drawable::Player));
+    if let Some(n) = &w.npc {
+        let q = lerp(n.prev_pos, n.pos, alpha);
+        list.push((q.y + 6.0, Drawable::Npc));
+        draw_ellipse(q.x, q.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+    }
     for (i, e) in w.enemies.iter().enumerate() {
         let ep = lerp(e.prev_pos, e.pos, alpha);
         list.push((ep.y + e.radius(), Drawable::Enemy(i)));
@@ -954,8 +1119,15 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
             Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
             Drawable::Loot(i) => draw_loot(&w.loot[i], alpha, w.time, false),
             Drawable::Player => draw_nail(art, &w.player, alpha, w.time),
-            Drawable::Enemy(i) => draw_enemy(&w.enemies[i], alpha, w.time),
+            Drawable::Enemy(i) => draw_enemy(Some(art), &w.enemies[i], alpha, w.time),
             Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
+            Drawable::Npc => {
+                if let (Some(n), Some(tex)) = (&w.npc, art.critters.as_ref()) {
+                    let q = lerp(n.prev_pos, n.pos, alpha);
+                    let moving = (n.pos - n.prev_pos).length() > 0.05;
+                    draw_critter_at(tex, art::RACCOON_ROW, q, n.face_left, moving, w.time);
+                }
+            }
         }
     }
 }
@@ -1009,42 +1181,64 @@ fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool) {
             let p = vec2(q.x.round(), (q.y - l.z).round() - 2.0);
             draw_worm(p, ph, 1.0);
         }
-        loot::LootKind::LifeSeed => {
+        loot::LootKind::RootHeart => {
+            // 뿌리 심장: 뿌리가 감싼 붉은 심장, 둥실 + 은은한 빛.
             let hover = 2.0 + (ph * 0.4).sin();
             let p = vec2(q.x.round(), (q.y - l.z - hover).round() - 3.0);
             let pulse = 0.6 + 0.4 * (ph * 0.5).sin().abs();
             draw_circle(
                 p.x + 0.5,
                 p.y + 1.0,
-                6.0,
-                Color::new(0.6, 1.0, 0.5, 0.15 * pulse),
+                7.0,
+                Color::new(1.0, 0.4, 0.45, 0.15 * pulse),
             );
             if light_only {
                 return;
             }
-            draw_rectangle(p.x - 2.0, p.y - 2.0, 5.0, 6.0, OUTLINE);
-            draw_rectangle(p.x - 1.0, p.y - 3.0, 3.0, 8.0, OUTLINE);
+            let red = Color::new(0.90, 0.25, 0.32, 1.0);
+            let dark = Color::new(0.60, 0.12, 0.22, 1.0);
+            let root = Color::new(0.45, 0.32, 0.22, 1.0);
+            // 하트: 위 두 혹 + 아래 뾰족
+            draw_rectangle(p.x - 4.0, p.y - 3.0, 9.0, 4.0, OUTLINE);
+            draw_rectangle(p.x - 3.0, p.y + 1.0, 7.0, 2.0, OUTLINE);
+            draw_rectangle(p.x - 2.0, p.y + 3.0, 5.0, 1.0, OUTLINE);
+            draw_rectangle(p.x - 1.0, p.y + 4.0, 3.0, 1.0, OUTLINE);
+            draw_rectangle(p.x - 3.0, p.y - 2.0, 3.0, 3.0, red);
+            draw_rectangle(p.x + 1.0, p.y - 2.0, 3.0, 3.0, red);
+            draw_rectangle(p.x - 2.0, p.y + 1.0, 5.0, 2.0, red);
+            draw_rectangle(p.x - 1.0, p.y + 3.0, 3.0, 1.0, dark);
+            draw_rectangle(p.x + 2.0, p.y, 2.0, 1.0, dark);
             draw_rectangle(
-                p.x - 1.0,
-                p.y - 2.0,
-                3.0,
-                6.0,
-                Color::new(0.55, 0.80, 0.30, 1.0),
-            );
-            draw_rectangle(
-                p.x - 1.0,
-                p.y + 2.0,
-                3.0,
-                2.0,
-                Color::new(0.35, 0.55, 0.22, 1.0),
-            );
-            draw_rectangle(
-                p.x - 1.0,
+                p.x - 2.0,
                 p.y - 2.0,
                 1.0,
-                2.0,
-                Color::new(0.9, 1.0, 0.7, 1.0),
+                1.0,
+                Color::new(1.0, 0.8, 0.8, 1.0),
             );
+            // 감싼 뿌리
+            draw_rectangle(p.x - 3.0, p.y + 1.0, 1.0, 1.0, root);
+            draw_rectangle(p.x - 1.0, p.y - 1.0, 1.0, 3.0, root);
+            draw_rectangle(p.x + 1.0, p.y + 2.0, 2.0, 1.0, root);
+        }
+        loot::LootKind::Seed => {
+            // 씨앗: 통통한 갈색 알 + 초록 새싹 한 잎. 살짝 둥실.
+            let hover = 1.0 + (ph * 0.7).sin() * 0.5;
+            let p = vec2(q.x.round(), (q.y - l.z - hover).round() - 2.0);
+            if light_only {
+                return;
+            }
+            draw_rectangle(p.x - 2.0, p.y - 1.0, 4.0, 4.0, OUTLINE);
+            draw_rectangle(p.x - 1.0, p.y - 2.0, 2.0, 6.0, OUTLINE);
+            draw_rectangle(p.x - 1.0, p.y - 1.0, 2.0, 4.0, world::SEED);
+            draw_rectangle(p.x, p.y + 1.0, 1.0, 2.0, Color::new(0.62, 0.44, 0.24, 1.0));
+            draw_rectangle(
+                p.x - 1.0,
+                p.y - 1.0,
+                1.0,
+                1.0,
+                Color::new(1.0, 0.92, 0.72, 1.0),
+            );
+            draw_rectangle(p.x, p.y - 3.0, 2.0, 1.0, Color::new(0.45, 0.78, 0.35, 1.0));
         }
         loot::LootKind::Berry => {
             if light_only {
@@ -1206,18 +1400,21 @@ fn draw_darkness(art: &Art, w: &World, alpha: f32, cam: Vec2) {
     }
 }
 
-fn draw_enemy(e: &Enemy, alpha: f32, time: f32) {
+/// 적: 그림(critters.png)이 있으면 종류의 줄에서 상태에 맞는 칸, 없으면 색 원.
+/// 예고(떨림·웅크림·조준)는 칸 4 + 떨림/밝아짐, 공격은 칸 5, 맞음·경직은 칸 6. 번쩍일 때는 흰 실루엣 줄.
+fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
+    let sp = e.sp();
     let mut pos = lerp(e.prev_pos, e.pos, alpha);
-    let base = world::enemy_color(e.kind);
     let r = e.radius();
-    let mut color = if e.flash > 0.0 { WHITE } else { base };
+    let base = sp.color;
+    let mut tint = WHITE;
     if e.poison > 0.0 && e.flash <= 0.0 {
         // 독: 초록빛이 돌고 거품이 오른다.
-        color = Color::new(base.r * 0.6, base.g * 0.6 + 0.35, base.b * 0.5, 1.0);
+        tint = Color::new(0.7, 1.0, 0.6, 1.0);
         for k in 0..2 {
             let ph = (time * 1.6 + k as f32 * 0.5 + e.pos.x * 0.01).fract();
             let bx = pos.x + (k as f32 * 2.0 - 1.0) * (r * 0.5) + (ph * 9.0).sin();
-            let by = pos.y - r - ph * 8.0;
+            let by = pos.y - r - 4.0 - ph * 8.0;
             draw_circle(
                 bx.round(),
                 by.round(),
@@ -1226,34 +1423,54 @@ fn draw_enemy(e: &Enemy, alpha: f32, time: f32) {
             );
         }
     }
+    let moving = (e.pos - e.prev_pos).length() > 0.05;
+    let walk = ((time * 8.0 + e.pos.x * 0.05) as u32) % 2;
+    let mut frame = if moving {
+        2 + walk
+    } else {
+        walk.min(1) * ((time * 2.0) as u32 % 2)
+    };
     match e.state {
-        enemy::State::Windup { time: wt } => {
-            // 예고: 떨림 + 점점 밝아짐
+        enemy::State::Windup { time: wt } | enemy::State::Aim { time: wt } => {
+            frame = 4;
+            // 예고: 떨림 + 점점 붉어짐
             pos.x += if ((time * 60.0) as i32) % 2 == 0 {
                 1.0
             } else {
                 -1.0
             };
-            let k = (wt / t::CHARGER_WINDUP).min(1.0);
-            if e.flash <= 0.0 {
-                color = Color::new(base.r + (1.0 - base.r) * k * 0.7, base.g, base.b, 1.0);
+            let k = (wt / sp.windup).min(1.0);
+            tint = Color::new(1.0, 1.0 - 0.45 * k, 1.0 - 0.45 * k, 1.0);
+            if matches!(e.state, enemy::State::Aim { .. }) {
+                // 도토리를 쳐든다.
+                let hand = pos + e.facing * (r + 1.0) - vec2(0.0, 4.0);
+                draw_acorn(hand, 0.0);
             }
         }
-        enemy::State::Rest { .. } => {
-            if e.flash <= 0.0 {
-                color = Color::new(base.r * 0.6, base.g * 0.6, base.b * 0.6, 1.0);
-            }
+        enemy::State::Crouch { time: ct, target } => {
+            frame = 4;
+            let k = (ct / sp.windup).min(1.0);
+            tint = Color::new(1.0, 1.0 - 0.4 * k, 1.0 - 0.4 * k, 1.0);
+            draw_land_mark(target, sp.land_radius, k);
+        }
+        enemy::State::Leap { time: lt, to, .. } => {
+            frame = 5;
+            draw_land_mark(to, sp.land_radius, 1.0);
+            let _ = lt;
+            pos.y -= e.height();
+        }
+        enemy::State::Rest { .. } if sp.behavior != crate::species::Behavior::Dummy => {
+            tint = Color::new(0.75, 0.75, 0.75, 1.0);
         }
         enemy::State::Stunned { time: st } => {
-            if e.flash <= 0.0 {
-                color = Color::new(base.r * 0.5, base.g * 0.5, base.b * 0.5, 1.0);
-            }
-            // 별 대신 작은 점이 돈다
+            frame = 6;
+            // 머리 위에 노란 점이 돈다.
             let a = st * 12.0;
-            let s = pos + vec2(a.cos(), a.sin() * 0.5) * (r + 3.0) - vec2(0.0, r);
+            let s = pos + vec2(a.cos(), a.sin() * 0.5) * (r + 3.0) - vec2(0.0, r + 4.0);
             draw_circle(s.x.round(), s.y.round(), 1.0, YELLOW);
         }
         enemy::State::Charge { dir, .. } => {
+            frame = 5;
             // 잔상
             for i in 1..4 {
                 let back = pos - dir * (i as f32 * 4.0);
@@ -1268,49 +1485,116 @@ fn draw_enemy(e: &Enemy, alpha: f32, time: f32) {
         }
         _ => {}
     }
-    match e.kind {
-        Kind::Charger => {
-            draw_rectangle(pos.x - r, pos.y - r, r * 2.0, r * 2.0, color);
-        }
-        Kind::Dummy => {
-            // 허수아비: 말뚝 + 짚 뭉치
-            draw_rectangle(
-                pos.x - 1.5,
-                pos.y - r,
-                3.0,
-                r * 2.0 + 3.0,
-                Color::new(0.4, 0.3, 0.2, 1.0),
+    if e.asleep {
+        frame = 1;
+        // 자는 중: Z가 떠오른다.
+        let ph = (time * 0.8 + e.pos.x * 0.013).fract();
+        let z = pos + vec2(4.0 + ph * 3.0, -r - 6.0 - ph * 6.0);
+        let c = Color::new(0.9, 0.9, 1.0, 1.0 - ph);
+        draw_line(z.x, z.y, z.x + 3.0, z.y, 1.0, c);
+        draw_line(z.x + 3.0, z.y, z.x, z.y + 3.0, 1.0, c);
+        draw_line(z.x, z.y + 3.0, z.x + 3.0, z.y + 3.0, 1.0, c);
+    }
+    let flash = e.flash > 0.0;
+    match art.and_then(|a| a.critters.as_ref()) {
+        Some(tex) => {
+            let row = sp.sheet_row + if flash { art::CRITTER_ROWS } else { 0 };
+            draw_texture_ex(
+                tex,
+                (pos.x - 8.0).round(),
+                (pos.y + r - 15.0).round(),
+                if flash { WHITE } else { tint },
+                DrawTextureParams {
+                    source: Some(art::cell(frame, row)),
+                    dest_size: Some(vec2(16.0, 16.0)),
+                    flip_x: e.facing.x < 0.0,
+                    ..Default::default()
+                },
             );
-            draw_circle(pos.x, pos.y - 2.0, r - 1.0, color);
         }
-        Kind::Shooter => {
-            draw_circle(pos.x, pos.y, r, color);
-            if let enemy::State::Aim { time: at } = e.state {
-                let k = at / t::SHOOTER_AIM_TIME;
-                let muzzle = pos + e.facing * (r + 2.0);
-                draw_circle(muzzle.x, muzzle.y, 1.0 + 2.5 * k, world::PROJECTILE);
-            }
+        None => {
+            let c = if flash {
+                WHITE
+            } else {
+                Color::new(base.r * tint.r, base.g * tint.g, base.b * tint.b, 1.0)
+            };
+            draw_circle(pos.x, pos.y, r, c);
+            let nose = pos + e.facing * (r + 1.0);
+            draw_circle(nose.x.round(), nose.y.round(), 1.5, BLACK);
         }
     }
-    // 코(방향)
-    let nose = pos + e.facing * (r + 1.0);
-    draw_circle(nose.x.round(), nose.y.round(), 1.5, BLACK);
-    // 체력 점
-    let max = match e.kind {
-        Kind::Charger => t::CHARGER_HP,
-        Kind::Shooter => t::SHOOTER_HP,
-        Kind::Dummy => t::DUMMY_HP,
+    // 체력 점(맞은 적만: 처음부터 숫자를 늘어놓지 않는다)
+    if e.hp < sp.hp || sp.behavior == crate::species::Behavior::Dummy {
+        let max = sp.hp;
+        for i in 0..max {
+            let c = if i < e.hp { WHITE } else { DARKGRAY };
+            draw_rectangle(
+                (pos.x - max as f32 * 1.5 + i as f32 * 3.0).round(),
+                (pos.y - r - 9.0).round(),
+                2.0,
+                2.0,
+                c,
+            );
+        }
+    }
+}
+
+/// 이웃 그림 한 칸(발이 `pos.y + 6` 근처). 걸으면 칸 2·3, 서 있으면 0·1.
+fn draw_critter_at(tex: &Texture2D, row: u32, pos: Vec2, face_left: bool, moving: bool, time: f32) {
+    let frame = if moving {
+        2 + ((time * 8.0) as u32) % 2
+    } else {
+        ((time * 2.0) as u32) % 2
     };
-    for i in 0..max {
-        let c = if i < e.hp { WHITE } else { DARKGRAY };
-        draw_rectangle(
-            pos.x - max as f32 * 1.5 + i as f32 * 3.0,
-            pos.y - r - 5.0,
-            2.0,
-            2.0,
-            c,
-        );
-    }
+    draw_texture_ex(
+        tex,
+        (pos.x - 8.0).round(),
+        (pos.y - 9.0).round(),
+        WHITE,
+        DrawTextureParams {
+            source: Some(art::cell(frame, row)),
+            dest_size: Some(vec2(16.0, 16.0)),
+            flip_x: face_left,
+            ..Default::default()
+        },
+    );
+}
+
+/// 청설모가 내려앉을 자리: 바닥에 점점 진해지는 붉은 고리.
+fn draw_land_mark(at: Vec2, r: f32, k: f32) {
+    let a = 0.25 + 0.55 * k;
+    draw_circle(at.x, at.y, r, Color::new(1.0, 0.3, 0.35, 0.12 * k));
+    draw_circle_lines(
+        at.x,
+        at.y,
+        r * (1.3 - 0.3 * k),
+        1.0,
+        Color::new(1.0, 0.35, 0.4, a),
+    );
+}
+
+/// 도토리(다람쥐가 던지는 것): 갈색 열매 + 짙은 모자.
+fn draw_acorn(p: Vec2, spin: f32) {
+    let p = p.round();
+    let up = Vec2::from_angle(spin - std::f32::consts::FRAC_PI_2);
+    draw_circle(p.x, p.y, 2.5, OUTLINE);
+    draw_circle(p.x, p.y + 0.5, 2.0, Color::new(0.78, 0.52, 0.28, 1.0));
+    let cap = p + up * 1.5;
+    draw_rectangle(
+        cap.x - 2.0,
+        cap.y - 1.0,
+        4.0,
+        2.0,
+        Color::new(0.42, 0.28, 0.18, 1.0),
+    );
+    let stem = p + up * 3.0;
+    draw_rectangle(
+        stem.x,
+        stem.y - 1.0,
+        1.0,
+        1.0,
+        Color::new(0.42, 0.28, 0.18, 1.0),
+    );
 }
 
 fn draw_fx(w: &World) {
@@ -1406,10 +1690,12 @@ fn draw_hud_world(w: &World) {
         3.0,
         Color::new(0.2, 0.15, 0.2, 1.0),
     );
+    // 색은 캐릭터의 게이지 종류(두더지 = 분노, 주황).
+    let gc = w.character.gauge().color();
     let gold = if full && ((w.time * 6.0) as i32) % 2 == 0 {
-        Color::new(1.0, 1.0, 0.75, 1.0)
+        Color::new(1.0, 1.0, 0.85, 1.0)
     } else {
-        Color::new(0.95, 0.78, 0.30, 1.0)
+        gc
     };
     draw_rectangle(t::VIEW_W - 3.0 - bw, 8.0, bw * sp, 3.0, gold);
 }

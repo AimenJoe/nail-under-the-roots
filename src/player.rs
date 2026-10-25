@@ -27,7 +27,7 @@ pub enum State {
     Emerge {
         time: f32,
     },
-    /// 필살기: 직진하며 연타. `dir`은 조금씩만 틀어진다. `next_hit`까지 남은 시간.
+    /// 필살기: 시동(`time < DRILL_REV`, 제자리) 뒤 직진하며 연타. `dir`은 조금씩만 틀어진다. `next_hit`까지 남은 시간.
     Drill {
         time: f32,
         dir: Vec2,
@@ -48,6 +48,9 @@ pub enum Event {
     Emerge,
     Hurt,
     Die,
+    /// 필살기 시동(소리 시작).
+    DrillRev,
+    /// 시동이 끝나고 튀어 나감.
     Drill,
     DrillWall,
     Parry,
@@ -286,18 +289,30 @@ impl Player {
                 next_hit,
             } => {
                 let time = time + dt;
-                // 직진성: 입력 쪽으로 초당 DRILL_TURN 라디안만 튼다.
                 let mut dir = dir;
-                if move_dir != Vec2::ZERO {
-                    let want = move_dir.normalize();
-                    let ang = dir.angle_between(want);
-                    let step = ang.clamp(-t::DRILL_TURN * dt, t::DRILL_TURN * dt);
-                    dir = Vec2::from_angle(step).rotate(dir).normalize();
+                let mut next_hit = next_hit;
+                if time < t::DRILL_REV {
+                    // 시동: 제자리. 방향은 입력대로 바로.
+                    let aim = if a.aim != Vec2::ZERO { a.aim } else { move_dir };
+                    if aim != Vec2::ZERO {
+                        dir = aim.normalize();
+                    }
+                } else {
+                    if time - dt < t::DRILL_REV {
+                        self.events.push(Event::Drill);
+                    }
+                    // 직진성: 입력 쪽으로 초당 DRILL_TURN 라디안만 튼다.
+                    if move_dir != Vec2::ZERO {
+                        let want = move_dir.normalize();
+                        let ang = dir.angle_between(want);
+                        let step = ang.clamp(-t::DRILL_TURN * dt, t::DRILL_TURN * dt);
+                        dir = Vec2::from_angle(step).rotate(dir).normalize();
+                    }
+                    self.pos += dir * drill_speed(time - t::DRILL_REV) * dt;
+                    next_hit -= dt;
                 }
                 self.facing = dir;
-                self.pos += dir * t::DRILL_SPEED * dt;
-                let mut next_hit = next_hit - dt;
-                if next_hit <= 0.0 {
+                if time >= t::DRILL_REV && next_hit <= 0.0 {
                     next_hit += t::DRILL_HIT_EVERY;
                     self.swing_id += 1;
                     strike = Some(Strike {
@@ -311,12 +326,12 @@ impl Player {
                         knockback: t::DRILL_KNOCKBACK,
                         stun: t::DRILL_STUN,
                         hitstop: t::DRILL_HITSTOP,
-                        shake: 0.1,
+                        shake: t::DRILL_HIT_SHAKE,
                         finisher: false,
                         poison: 0.0,
                     });
                 }
-                self.state = if time >= t::DRILL_TIME {
+                self.state = if time >= t::DRILL_REV + t::DRILL_TIME {
                     State::Recover {
                         time: t::DRILL_RECOVER,
                     }
@@ -347,7 +362,7 @@ impl Player {
         let bumped = room.resolve_circle(&mut self.pos, r);
         // 드릴이 벽(기둥)에 부딪히면 쿵: 충격파 + 경직. 시작하자마자 벽에 붙어 있던 건 치지 않는다.
         if let State::Drill { time, dir, .. } = self.state {
-            if bumped && time > 0.06 {
+            if bumped && time > t::DRILL_REV + 0.06 {
                 self.swing_id += 1;
                 self.vel = -dir * 80.0;
                 self.state = State::Recover {
@@ -413,7 +428,12 @@ impl Player {
             dir,
             next_hit: 0.0,
         };
-        self.events.push(Event::Drill);
+        self.events.push(Event::DrillRev);
+    }
+
+    /// 필살기 시동 중(제자리에서 힘 모으기). 월드는 이 동안 적을 멈춘다.
+    pub fn drill_revving(&self) -> bool {
+        matches!(self.state, State::Drill { time, .. } if time < t::DRILL_REV)
     }
 
     fn start_burrow(&mut self) {
@@ -498,6 +518,12 @@ impl Player {
     }
 }
 
+/// 돌진 속도: 시동 뒤 `dash_t`초. 처음엔 붙고(DRILL_ACCEL), 그 뒤 최고 속도.
+pub fn drill_speed(dash_t: f32) -> f32 {
+    let k = (dash_t / t::DRILL_ACCEL).clamp(0.0, 1.0);
+    t::DRILL_SPEED_START + (t::DRILL_SPEED - t::DRILL_SPEED_START) * k
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -511,7 +537,7 @@ mod tests {
     #[test]
     fn drill_needs_full_sp_and_bonks_walls() {
         let room = Room::new();
-        let mut p = Player::new(vec2(room.inner.right() - 40.0, room.center().y));
+        let mut p = Player::new(vec2(room.inner.right() - 120.0, room.center().y));
         let go = Actions {
             move_dir: vec2(1.0, 0.0),
             special: true,
@@ -532,7 +558,14 @@ mod tests {
         };
         let mut bonk = false;
         let mut hits = 0;
-        for _ in 0..60 {
+        let x0 = p.pos.x;
+        // 시동 동안은 제자리.
+        for _ in 0..((t::DRILL_REV / t::TICK_DT) as usize - 1) {
+            tick(&mut p, &room, &hold);
+            assert!(p.drill_revving());
+        }
+        assert!((p.pos.x - x0).abs() < 0.01, "시동 중엔 움직이지 않는다");
+        for _ in 0..120 {
             let (s, ev) = tick(&mut p, &room, &hold);
             if let Some(s) = s {
                 match s.kind {
@@ -564,10 +597,22 @@ mod tests {
             ..Default::default()
         };
         tick(&mut p, &room, &go);
+        let hold = Actions {
+            move_dir: vec2(1.0, 0.0),
+            ..Default::default()
+        };
+        while p.drill_revving() {
+            tick(&mut p, &room, &hold);
+        }
         let back = Actions {
             move_dir: vec2(0.0, 1.0),
             ..Default::default()
         };
+        let before = match p.state {
+            State::Drill { dir, .. } => dir,
+            _ => panic!("드릴 중이어야 한다"),
+        };
+        assert!(before.angle_between(vec2(1.0, 0.0)).abs() < 1e-3);
         tick(&mut p, &room, &back);
         if let State::Drill { dir, .. } = p.state {
             let turned = vec2(1.0, 0.0).angle_between(dir).abs();
@@ -575,6 +620,16 @@ mod tests {
         } else {
             panic!("드릴 중이어야 한다");
         }
+    }
+
+    /// 돌진 거리는 화면 한 폭 남짓(320px ± 10%).
+    #[test]
+    fn drill_travels_about_a_screen() {
+        let n = (t::DRILL_TIME / t::TICK_DT).round() as usize;
+        let d: f32 = (0..n)
+            .map(|i| drill_speed(i as f32 * t::TICK_DT) * t::TICK_DT)
+            .sum();
+        assert!((290.0..=355.0).contains(&d), "{d}");
     }
 
     /// 패링 창: 스윙 시작 직후 PARRY_WINDOW 동안만, 공격 방향으로.

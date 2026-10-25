@@ -25,28 +25,47 @@ const INTRO_LINE_TIME: f32 = 2.6;
 const TITLE_ITEMS: [Tr; 3] = [|s| s.title_start, |s| s.title_settings, |s| s.title_dev];
 #[cfg(not(feature = "dev"))]
 const TITLE_ITEMS: [Tr; 2] = [|s| s.title_start, |s| s.title_settings];
-const PAUSE_TABS: [Tr; 5] = [
+const PAUSE_TABS: [Tr; 6] = [
     |s| s.tab_menu,
     |s| s.tab_status,
     |s| s.tab_bag,
     |s| s.tab_journal,
+    |s| s.tab_bestiary,
     |s| s.tab_map,
 ];
+/// 지도 탭 번호(지도 버튼으로 바로 연다).
+const TAB_MAP: usize = 5;
 const PAUSE_MENU: [Tr; 4] = [
     |s| s.pm_resume,
     |s| s.pm_restart,
     |s| s.pm_settings,
     |s| s.pm_title,
 ];
-const SETTING_ROWS: [Tr; 5] = [
+const SETTING_ROWS: [Tr; 6] = [
     |s| s.set_sound,
     |s| s.set_shake,
     |s| s.set_debug,
     |s| s.set_language,
+    |s| s.set_controls,
     |s| s.set_back,
 ];
-/// 설정의 "돌아가기" 줄.
-const SETTING_BACK: usize = 4;
+/// 설정의 "조작 설정"·"돌아가기" 줄.
+const SETTING_CONTROLS: usize = 4;
+const SETTING_BACK: usize = 5;
+/// 조작 설정의 줄: 동작들(input::ACTS) + 기본값 + 돌아가기.
+const CONTROL_NAMES: [Tr; 7] = [
+    |s| s.act_attack,
+    |s| s.act_dodge,
+    |s| s.act_special,
+    |s| s.act_use_item,
+    |s| s.act_item_prev,
+    |s| s.act_item_next,
+    |s| s.act_map,
+];
+const CONTROL_RESET: usize = 7;
+const CONTROL_BACK: usize = 8;
+/// 다시 붙이기: 이만큼 아무것도 안 누르면 그만둔다.
+const REBIND_TIMEOUT: f32 = 5.0;
 
 /// 표 → 지금 언어의 글 목록(메뉴 그리기용).
 fn trs(items: &[Tr]) -> Vec<&'static str> {
@@ -58,6 +77,10 @@ enum Scene {
     Intro,
     Title,
     Settings {
+        back: Back,
+    },
+    /// 조작 설정(설정 안). 돌아가면 설정.
+    Controls {
         back: Back,
     },
     /// 개발용 시나리오 목록.
@@ -74,11 +97,13 @@ enum Back {
     Pause,
 }
 
-/// 설정. 아직 저장하지 않는다(저장은 3단계). 값은 0..=10 단계.
+/// 설정. 값은 0..=10 단계. 웹에서는 브라우저에 저장한다(prefs.rs). 디버그 정보는 저장하지 않는다.
 pub struct Settings {
     pub volume: u8,
     pub shake: u8,
     pub debug_overlay: bool,
+    /// 사람이 고른 언어(None = 기기 언어).
+    pub lang: Option<i18n::Lang>,
 }
 
 impl Settings {
@@ -248,7 +273,10 @@ enum Hit {
     SettingLeft(usize),
     SettingRight(usize),
     InvSlot(usize),
+    /// 조작 설정 칸(줄, 열).
+    ControlCell(usize, usize),
     JournalItem(usize),
+    BestiaryItem(usize),
     DevItem(usize),
 }
 
@@ -261,6 +289,11 @@ pub struct App {
     settings_cursor: usize,
     inv_cursor: usize,
     journal_cursor: usize,
+    bestiary_cursor: usize,
+    /// 조작 설정: 줄, 열(0 키보드 · 1 패드), 다시 붙이는 중이면 남은 시간.
+    controls_cursor: usize,
+    controls_col: usize,
+    rebind: Option<f32>,
     dev_cursor: usize,
     /// 지금 플레이 중인 시나리오. "다시 시작"은 이걸 다시 만든다.
     current: Scenario,
@@ -289,11 +322,19 @@ pub struct App {
 
 impl App {
     pub fn new(sfx: Sfx, fonts: render::Fonts, art: Option<Art>) -> Self {
+        let saved = crate::prefs::load();
         let settings = Settings {
-            volume: 7,
-            shake: 10,
+            volume: saved.map(|p| p.volume).unwrap_or(7),
+            shake: saved.map(|p| p.shake).unwrap_or(10),
             debug_overlay: false,
+            lang: saved.and_then(|p| p.lang),
         };
+        if let Some(p) = saved {
+            crate::input::set_bindings(p.bindings);
+        }
+        if let Some(l) = settings.lang {
+            i18n::set_lang(l);
+        }
         sfx.set_volume(settings.volume_f());
         let mut world = World::new();
         world.debug.overlay = settings.debug_overlay;
@@ -306,6 +347,10 @@ impl App {
             settings_cursor: 0,
             inv_cursor: 0,
             journal_cursor: 0,
+            bestiary_cursor: 0,
+            controls_cursor: 0,
+            controls_col: 0,
+            rebind: None,
             dev_cursor: 0,
             current: Scenario::Normal,
             cutscene: None,
@@ -377,6 +422,7 @@ impl App {
             return;
         }
         let mut open_pause = false;
+        let mut open_map = false;
         let mut restart = false;
         while self.acc >= t::TICK_DT {
             let a = self.input.take();
@@ -389,6 +435,9 @@ impl App {
             }
             if a.menu {
                 open_pause = true;
+            }
+            if a.map {
+                open_map = true;
             }
             let dead = !self.world.player.is_alive();
             // 쓰러진 직후의 연타는 버린다. 잠금이 풀린 뒤 새로 누른 확인만 재시작.
@@ -407,6 +456,12 @@ impl App {
         self.take_gifts();
         if let Some(tu) = self.tutorial.as_mut() {
             tu.update(&mut self.world, dt);
+            // 포포가 할 말이 생기면 대화 컷씬(월드는 멈춘다).
+            let talk = tu.take_talk();
+            if !talk.is_empty() && self.cutscene.is_none() && self.world.player.is_alive() {
+                self.cutscene = Some(cutscene::popo_talk(&self.world, &talk));
+                self.scene = Scene::Cutscene;
+            }
             if tu.is_done() {
                 self.tutorial = None;
             }
@@ -424,6 +479,9 @@ impl App {
             }
         } else if open_pause {
             self.open_pause();
+        } else if open_map {
+            self.open_pause();
+            self.pause_tab = TAB_MAP;
         }
     }
 
@@ -584,7 +642,7 @@ impl App {
                     }
                     Some(Hit::SettingRow(i)) => {
                         row = i;
-                        if i == SETTING_BACK {
+                        if i == SETTING_BACK || i == SETTING_CONTROLS {
                             adjust = 0;
                         } else {
                             adjust = 1;
@@ -592,20 +650,31 @@ impl App {
                     }
                     _ => {}
                 }
-                if adjust != 0 {
+                if adjust != 0 && row != SETTING_CONTROLS {
                     self.settings_cursor = row;
                     self.adjust_setting(row, adjust);
+                }
+                let open_controls = (a.confirm && self.settings_cursor == SETTING_CONTROLS)
+                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_CONTROLS)));
+                if open_controls {
+                    self.settings_cursor = SETTING_CONTROLS;
+                    self.controls_cursor = 0;
+                    self.rebind = None;
+                    self.scene = Scene::Controls { back };
+                    return;
                 }
                 let back_chosen = a.cancel
                     || (a.confirm && self.settings_cursor == SETTING_BACK)
                     || matches!(tap_hit, Some(Hit::SettingRow(SETTING_BACK)));
                 if back_chosen {
+                    self.save_prefs();
                     self.scene = match back {
                         Back::Title => Scene::Title,
                         Back::Pause => Scene::Pause,
                     };
                 }
             }
+            Scene::Controls { back } => self.update_controls(a, tap_hit, back, dt),
             Scene::Pause => self.update_pause(a, tap_hit),
             Scene::Game | Scene::Cutscene => {}
         }
@@ -623,8 +692,80 @@ impl App {
                 self.settings.debug_overlay = !self.settings.debug_overlay;
                 self.world.debug.overlay = self.settings.debug_overlay;
             }
-            3 => i18n::set_lang(i18n::lang().cycle(d)),
+            3 => {
+                let l = i18n::lang().cycle(d);
+                i18n::set_lang(l);
+                self.settings.lang = Some(l);
+            }
             _ => {}
+        }
+    }
+
+    fn save_prefs(&self) {
+        crate::prefs::save(&crate::prefs::Prefs {
+            volume: self.settings.volume,
+            shake: self.settings.shake,
+            lang: self.settings.lang,
+            bindings: crate::input::bindings(),
+        });
+    }
+
+    /// 조작 설정: 위아래로 동작, 좌우로 키보드/패드 칸, 확인으로 다시 붙이기(다음에 누르는 키·버튼).
+    fn update_controls(&mut self, a: &Actions, tap_hit: Option<Hit>, back: Back, dt: f32) {
+        use crate::input::{self, Captured, ACTS};
+        if let Some(left) = self.rebind {
+            // 기다리는 중: 다른 입력은 무시. Esc로 그만두기, 시간이 다 돼도 그만.
+            let left = left - dt;
+            if a.menu {
+                self.rebind = None;
+                return;
+            }
+            if let Some(c) = self.input.capture() {
+                let mut b = input::bindings();
+                let act = ACTS[self.controls_cursor];
+                let ok = match c {
+                    Captured::Key(k) if self.controls_col == 0 => b.bind_key(act, k),
+                    Captured::Pad(p) if self.controls_col == 1 => b.bind_pad(act, p),
+                    _ => false,
+                };
+                if ok {
+                    input::set_bindings(b);
+                    self.sfx.play(crate::sfx::Id::Claw(1));
+                    self.rebind = None;
+                    return;
+                }
+            }
+            self.rebind = if left <= 0.0 { None } else { Some(left) };
+            return;
+        }
+        let n = CONTROL_BACK + 1;
+        if a.up {
+            self.controls_cursor = (self.controls_cursor + n - 1) % n;
+        }
+        if a.down {
+            self.controls_cursor = (self.controls_cursor + 1) % n;
+        }
+        if a.left || a.right {
+            self.controls_col = 1 - self.controls_col;
+        }
+        let mut chosen = a.confirm;
+        if let Some(Hit::ControlCell(row, col)) = tap_hit {
+            chosen = true;
+            self.controls_cursor = row;
+            self.controls_col = col;
+        }
+        if a.cancel || (chosen && self.controls_cursor == CONTROL_BACK) {
+            self.save_prefs();
+            self.scene = Scene::Settings { back };
+            return;
+        }
+        if chosen && self.controls_cursor == CONTROL_RESET {
+            input::set_bindings(input::Bindings::DEFAULT);
+            self.sfx.play(crate::sfx::Id::Claw(0));
+        } else if chosen {
+            // 확인을 누른 그 프레임의 키(Enter·Space·J)가 바로 잡히지 않게 다음 프레임부터.
+            self.rebind = Some(REBIND_TIMEOUT + dt);
+            self.input.take();
         }
     }
 
@@ -741,6 +882,18 @@ impl App {
                     self.journal_cursor = i;
                 }
             }
+            4 => {
+                let n = crate::species::BESTIARY.len();
+                if a.up {
+                    self.bestiary_cursor = (self.bestiary_cursor + n - 1) % n;
+                }
+                if a.down {
+                    self.bestiary_cursor = (self.bestiary_cursor + 1) % n;
+                }
+                if let Some(Hit::BestiaryItem(i)) = tap_hit {
+                    self.bestiary_cursor = i;
+                }
+            }
             _ => {}
         }
     }
@@ -750,7 +903,11 @@ impl App {
     fn draw(&mut self) {
         let in_world = matches!(
             self.scene,
-            Scene::Game | Scene::Pause | Scene::Cutscene | Scene::Settings { back: Back::Pause }
+            Scene::Game
+                | Scene::Pause
+                | Scene::Cutscene
+                | Scene::Settings { back: Back::Pause }
+                | Scene::Controls { back: Back::Pause }
         );
         let alpha = if self.scene == Scene::Game {
             self.acc / t::TICK_DT
@@ -763,8 +920,20 @@ impl App {
             self.settings.shake_f(),
         );
         if let Some(c) = &self.cutscene {
-            for actor in c.actors.iter().skip(1).filter(|a| a.visible) {
-                render::draw_actor(actor.pos, actor.facing, actor.color);
+            for (i, actor) in c.actors.iter().enumerate().skip(1) {
+                if !actor.visible {
+                    continue;
+                }
+                match actor.sprite {
+                    Some(row) => self.renderer.draw_actor_sprite(
+                        row,
+                        actor.pos,
+                        actor.facing,
+                        c.moving(i),
+                        actor.color,
+                    ),
+                    None => render::draw_actor(actor.pos, actor.facing, actor.color),
+                }
             }
         }
         let ui = self.renderer.present();
@@ -787,6 +956,12 @@ impl App {
                 }
                 self.draw_settings(&ui);
             }
+            Scene::Controls { back } => {
+                if back == Back::Pause {
+                    ui.dim();
+                }
+                self.draw_controls(&ui);
+            }
             Scene::Game => {
                 self.draw_letterbox(&ui);
                 self.renderer
@@ -794,7 +969,7 @@ impl App {
                 if let Some(g) = &self.gift {
                     self.draw_gift(&ui, g);
                 } else if let Some(h) = self.tutorial.as_ref().and_then(|t| t.hint()) {
-                    self.draw_hint(&ui, tr(h));
+                    self.draw_hint(&ui, &h);
                 }
                 if !self.world.player.is_alive() {
                     self.draw_dead(&ui);
@@ -861,16 +1036,40 @@ impl App {
         let ui = &base;
         let panel = Rect::new(24.0, 16.0, 272.0, 148.0);
         ui.panel(panel, Some("개발 시나리오"));
-        let names: Vec<&str> = scenario::LIST.iter().map(|e| e.name).collect();
+        // 목록이 패널보다 길다: 고른 줄이 보이게 VISIBLE줄씩 굴린다.
+        const VISIBLE: usize = 7;
+        let n = scenario::LIST.len();
+        let first = self
+            .dev_cursor
+            .saturating_sub(VISIBLE - 1)
+            .min(n.saturating_sub(VISIBLE));
+        let names: Vec<&str> = scenario::LIST
+            .iter()
+            .skip(first)
+            .take(VISIBLE)
+            .map(|e| e.name)
+            .collect();
         let rects = ui.menu_list(
             &names,
-            self.dev_cursor,
+            self.dev_cursor - first,
             panel.x + 6.0,
             panel.y + 24.0,
             110.0,
         );
         for (i, r) in rects.into_iter().enumerate() {
-            self.hits.push((r, Hit::DevItem(i)));
+            self.hits.push((r, Hit::DevItem(first + i)));
+        }
+        if first > 0 {
+            ui.text("▲", panel.x + 112.0, panel.y + 24.0, FONT_PX, ui::TEXT_DIM);
+        }
+        if first + VISIBLE < n {
+            ui.text(
+                "▼",
+                panel.x + 112.0,
+                panel.y + 24.0 + 6.0 * (FONT_PX + 4.0),
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
         }
         let e = &scenario::LIST[self.dev_cursor];
         let dx = panel.x + 126.0;
@@ -947,7 +1146,7 @@ impl App {
     }
 
     fn draw_settings(&mut self, ui: &Ui) {
-        let panel = Rect::new(56.0, 28.0, 208.0, 116.0);
+        let panel = Rect::new(56.0, 20.0, 208.0, 134.0);
         let s = i18n::s();
         ui.panel(panel, Some(s.settings));
         let values = [
@@ -961,25 +1160,31 @@ impl App {
             .to_string(),
             s.lang_name.to_string(),
             String::new(),
+            String::new(),
         ];
         let row_h = FONT_PX + 6.0;
         for (i, label) in trs(&SETTING_ROWS).into_iter().enumerate() {
             let y = panel.y + 22.0 + i as f32 * row_h;
             let selected = self.settings_cursor == i;
-            if i == SETTING_BACK {
+            if i == SETTING_BACK || i == SETTING_CONTROLS {
                 let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, FONT_PX + 4.0);
                 if selected {
                     ui.rect(r, ui::PANEL_LIGHT);
                     ui.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ui::ACCENT);
                 }
+                let label = if i == SETTING_CONTROLS {
+                    format!("{label}  →")
+                } else {
+                    label.to_string()
+                };
                 ui.text(
-                    label,
+                    &label,
                     r.x + 14.0,
                     r.y + 2.0,
                     FONT_PX,
                     if selected { ui::TEXT } else { ui::TEXT_DIM },
                 );
-                self.hits.push((r, Hit::SettingRow(SETTING_BACK)));
+                self.hits.push((r, Hit::SettingRow(i)));
             } else {
                 let (row, l, r) = ui.setting_row(
                     label,
@@ -1006,6 +1211,104 @@ impl App {
                 FONT_PX,
                 ui::TEXT_DIM,
             );
+        }
+    }
+
+    /// 조작 설정 화면: 동작 | 키보드 | 패드 표. 고른 칸 강조, 기다리는 중이면 "누르세요… 5".
+    fn draw_controls(&mut self, ui: &Ui) {
+        use crate::input::{self, ACTS};
+        let s = i18n::s();
+        let panel = Rect::new(28.0, 2.0, 264.0, 156.0);
+        ui.panel(panel, Some(s.set_controls));
+        let b = input::bindings();
+        let row_h = FONT_PX + 0.5;
+        let name_w = 110.0;
+        let col_w = (panel.w - 12.0 - name_w) / 2.0;
+        let x0 = panel.x + 6.0;
+        let y0 = panel.y + 19.0;
+        ui.text(
+            &ui.fit(s.ctl_key, col_w - 6.0, FONT_PX),
+            x0 + name_w + 4.0,
+            y0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+        ui.text(
+            &ui.fit(s.ctl_pad, col_w - 6.0, FONT_PX),
+            x0 + name_w + col_w + 4.0,
+            y0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+        for row in 0..=CONTROL_BACK {
+            let y = y0 + (row as f32 + 1.0) * row_h;
+            let on = row == self.controls_cursor;
+            if row < CONTROL_RESET {
+                let act = ACTS[row];
+                ui.text(
+                    &ui.fit(tr(CONTROL_NAMES[row]), name_w - 4.0, FONT_PX),
+                    x0 + 2.0,
+                    y,
+                    FONT_PX,
+                    if on { ui::TEXT } else { ui::TEXT_DIM },
+                );
+                for col in 0..2 {
+                    let r = Rect::new(
+                        x0 + name_w + col as f32 * col_w,
+                        y - 1.0,
+                        col_w - 4.0,
+                        row_h,
+                    );
+                    let sel = on && col == self.controls_col;
+                    let waiting = sel && self.rebind.is_some();
+                    if sel {
+                        ui.rect(r, ui::PANEL_LIGHT);
+                        ui.rect_lines(r, ui::ACCENT);
+                    }
+                    let label = if waiting {
+                        fill(s.ctl_wait, &[&(self.rebind.unwrap_or(0.0).ceil() as i32)])
+                    } else if col == 0 {
+                        b.key_label(act).to_string()
+                    } else {
+                        b.pad(act).label().to_string()
+                    };
+                    ui.text(
+                        &ui.fit(&label, r.w - 6.0, FONT_PX),
+                        r.x + 4.0,
+                        y,
+                        FONT_PX,
+                        if waiting { ui::ACCENT } else { ui::TEXT },
+                    );
+                    self.hits.push((r, Hit::ControlCell(row, col)));
+                }
+            } else {
+                let label = if row == CONTROL_RESET {
+                    s.ctl_reset
+                } else {
+                    s.set_back
+                };
+                let r = Rect::new(x0, y - 1.0, panel.w - 12.0, row_h);
+                if on {
+                    ui.rect(r, ui::PANEL_LIGHT);
+                    ui.text("▶", r.x + 2.0, y, FONT_PX, ui::ACCENT);
+                }
+                ui.text(
+                    label,
+                    r.x + 14.0,
+                    y,
+                    FONT_PX,
+                    if on { ui::TEXT } else { ui::TEXT_DIM },
+                );
+                self.hits.push((r, Hit::ControlCell(row, 0)));
+            }
+        }
+        // 안내: 바꾸는 법은 패널 안 아래, 고정된 키는 패널 밖(두 줄까지).
+        let hint = ui.fit(s.ctl_hint, panel.w - 12.0, FONT_PX);
+        ui.text_center(&hint, 160.0, panel.bottom() - 12.0, FONT_PX, ui::TEXT_DIM);
+        let mut y = panel.bottom() + 1.0;
+        for l in ui::wrap(ui, s.ctl_fixed, 312.0, FONT_PX).iter().take(2) {
+            ui.text_center(l, 160.0, y, FONT_PX, ui::TEXT_DIM);
+            y += 10.5;
         }
     }
 
@@ -1183,112 +1486,218 @@ impl App {
             1 => self.draw_status(ui, content),
             2 => self.draw_inventory(ui, content),
             3 => self.draw_journal(ui, content),
+            4 => self.draw_bestiary(ui, content),
             _ => self.draw_map(ui, content),
         }
     }
 
+    /// 상태 탭: 캐릭터 능력치는 숫자로(두 칸 표), 그 아래 필살기 설명과 이번 판 기록.
     fn draw_status(&self, ui: &Ui, c: Rect) {
-        let p = &self.world.player;
-        let hearts: String = (0..p.stats.max_hp)
-            .map(|i| if i < p.hp { '♥' } else { '♡' })
-            .collect();
-        let secs = self.run_time as u32;
+        let w = &self.world;
+        let p = &w.player;
         let s = i18n::s();
-        let last = &p.moveset.hits[p.moveset.last()];
-        let charms = if self.world.charms.is_empty() {
+        let st = p.stats;
+        let gauge = w.character.gauge();
+        let base_dmg = p.moveset.hits.first().map(|h| h.damage).unwrap_or(1);
+        let weapon = match self.inventory.equipped.filter(|_| p.armed) {
+            Some(i) => tr(WEAPONS[i].name).to_string(),
+            None => s.bare_hands.to_string(),
+        };
+        let charms = if w.charms.is_empty() {
             s.charms_none.to_string()
         } else {
-            self.world
-                .charms
+            w.charms
                 .iter()
                 .map(|c| tr(CHARMS[*c].name))
                 .collect::<Vec<_>>()
                 .join(", ")
         };
-        let st = p.stats;
-        let attack = if st.damage != 0 || (st.attack_speed - 1.0).abs() > 1e-3 {
-            format!(
-                " · {}",
-                fill(
-                    s.stat_attack,
-                    &[&st.damage, &((st.attack_speed * 100.0).round() as i32)]
-                )
-            )
-        } else {
-            String::new()
-        };
-        let lines = [
-            (s.hp, hearts),
+        let pct = |x: f32| fill(s.fmt_pct, &[&((x * 100.0).round() as i32)]);
+        let left: [(&str, String); 5] = [
+            (s.hp, fill(s.fmt_hp, &[&p.hp, &st.max_hp])),
+            (s.stat_power, (base_dmg + st.damage).to_string()),
+            (s.stat_aspd, pct(st.attack_speed)),
             (
-                s.this_run,
+                s.stat_dig_cd,
                 fill(
-                    s.run_stats,
-                    &[
-                        &self.world.wave,
-                        &self.world.kills,
-                        &format!("{:02}:{:02}", secs / 60, secs % 60),
-                    ],
+                    s.fmt_secs,
+                    &[&format!("{:.1}", t::BURROW_COOLDOWN * st.burrow_cd)],
                 ),
             ),
-            match self.inventory.equipped.filter(|_| p.armed) {
-                Some(w) => (
-                    tr(WEAPONS[w].name),
-                    fill(
-                        s.combo_stats,
-                        &[
-                            &p.moveset.hits.len(),
-                            &format!("{:.2}", last.swing),
-                            &(last.knockback as i32),
-                        ],
-                    ) + &attack,
-                ),
-                None => (s.bare_hands, s.bare_hands_desc.to_string()),
-            },
-            (
-                s.burrow,
-                fill(
-                    s.burrow_stats,
-                    &[
-                        &format!("{:.2}", t::BURROW_MAX_TIME),
-                        &(t::EMERGE_RADIUS as i32),
-                        &format!("{:.1}", t::BURROW_COOLDOWN * st.burrow_cd),
-                    ],
-                ),
-            ),
-            (s.charms_label, charms),
-            (s.glowbugs, self.world.glowbugs.to_string()),
-            (s.special, format!("{}: {}", s.special_name, s.special_desc)),
+            (&fill(s.stat_gauge, &[&tr(gauge.name())]), pct(st.sp_gain)),
         ];
-        let row_h = FONT_PX + 3.0;
-        // 이름 칸 폭은 언어마다 다르다(무기 이름이 가장 길다). 가장 긴 이름에 맞춘다.
-        let key_w = lines
-            .iter()
-            .map(|(k, _)| ui.text_w(k, FONT_PX))
-            .fold(0.0, f32::max)
-            + 8.0;
-        // 값이 길면(언어에 따라) 두 줄까지 바꾸고 아래 줄을 민다. 그보다 길면 자른다.
-        let mut y = c.y;
-        for (k, v) in lines.iter() {
-            // 칸을 넘으면 그리지 않는다(아래는 탭 안내 자리).
-            if y + FONT_PX > c.bottom() {
+        let right: [(&str, String); 4] = [
+            (s.stat_weapon, weapon),
+            (s.charms_label, charms),
+            (s.glowbugs, w.glowbugs.to_string()),
+            (s.seeds, w.seeds.to_string()),
+        ];
+        let row_h = FONT_PX + 1.0;
+        let col_w = c.w / 2.0 - 4.0;
+        for (col, rows) in [(0usize, &left[..]), (1, &right[..])] {
+            let x = c.x + col as f32 * (col_w + 8.0);
+            let key_w = rows
+                .iter()
+                .map(|(k, _)| ui.text_w(k, FONT_PX))
+                .fold(0.0, f32::max)
+                .min(col_w * 0.55)
+                + 6.0;
+            for (i, (k, v)) in rows.iter().enumerate() {
+                let y = c.y + i as f32 * row_h;
+                ui.text(&ui.fit(k, key_w - 6.0, FONT_PX), x, y, FONT_PX, ui::ACCENT);
+                ui.text(
+                    &ui.fit(v, col_w - key_w, FONT_PX),
+                    x + key_w,
+                    y,
+                    FONT_PX,
+                    ui::TEXT,
+                );
+            }
+        }
+        // 체력 하트(숫자 옆에 그림으로도)
+        let hy = c.y + 2.0;
+        let hx0 = c.x + 92.0;
+        for i in 0..st.max_hp.min(10) {
+            let col = if i < p.hp {
+                Color::new(0.93, 0.33, 0.40, 1.0)
+            } else {
+                ui::TEXT_DIM
+            };
+            ui.rect(Rect::new(hx0 + i as f32 * 5.0, hy + 2.0, 4.0, 3.0), col);
+            ui.rect(
+                Rect::new(hx0 + i as f32 * 5.0 + 1.0, hy + 5.0, 2.0, 1.0),
+                col,
+            );
+        }
+        // 필살기
+        let y0 = c.y + 5.0 * row_h + 4.0;
+        ui.line(vec2(c.x, y0 - 2.0), vec2(c.right(), y0 - 2.0), ui::BORDER);
+        ui.text(s.special_name, c.x, y0, FONT_PX, gauge.color());
+        let desc = fill(
+            s.special_desc,
+            &[
+                &tr(gauge.name()),
+                &crate::input::prompt(crate::input::Act::Special),
+            ],
+        );
+        let dx = c.x + ui.text_w(s.special_name, FONT_PX) + 6.0;
+        let lines = ui::wrap(ui, &desc, c.right() - dx, FONT_PX);
+        let n = lines.len().min(3);
+        for (j, l) in lines.iter().take(n).enumerate() {
+            ui.text(l, dx, y0 + j as f32 * 12.0, FONT_PX, ui::TEXT);
+        }
+        // 화폐 설명(필살기 설명 아래, 칸이 남으면 두 줄까지).
+        let mut y = y0 + n as f32 * 12.0 + 2.0;
+        for l in ui::wrap(ui, s.wallet_note, c.w, FONT_PX) {
+            if y + FONT_PX > c.bottom() + 4.0 {
                 break;
             }
-            ui.text(&ui.fit(k, 72.0, FONT_PX), c.x, y, FONT_PX, ui::ACCENT);
-            let vx = c.x + key_w.min(80.0);
-            let vw = c.right() - vx;
-            let wrapped = ui::wrap(ui, v, vw, FONT_PX);
-            for (j, l) in wrapped.iter().take(2).enumerate() {
-                if j > 0 {
-                    y += 12.0;
-                }
-                let l = if j == 1 && wrapped.len() > 2 {
-                    ui.fit(&format!("{l}…"), vw, FONT_PX)
-                } else {
-                    l.clone()
-                };
-                ui.text(&l, vx, y, FONT_PX, ui::TEXT);
+            ui.text(&l, c.x, y, FONT_PX, ui::TEXT_DIM);
+            y += 12.0;
+        }
+    }
+
+    /// 도감 탭: 왼쪽 목록(만난 이웃만 이름, 아니면 ???), 오른쪽 그림 + 말로 된 능력 + 이야기·공격·요령.
+    fn draw_bestiary(&mut self, ui: &Ui, c: Rect) {
+        use crate::species::{self, BESTIARY};
+        let s = i18n::s();
+        let seen = &self.world.seen;
+        let list_w = 74.0;
+        let row_h = FONT_PX + 4.0;
+        for (i, k) in BESTIARY.iter().enumerate() {
+            let r = Rect::new(c.x, c.y + i as f32 * row_h, list_w, row_h - 1.0);
+            let known = seen.contains(k);
+            let name = if known {
+                tr(k.species().name)
+            } else {
+                s.best_unknown
+            };
+            let on = i == self.bestiary_cursor;
+            if on {
+                ui.rect(r, Color::new(0.25, 0.18, 0.22, 0.9));
+                ui.rect_lines(r, ui::ACCENT);
             }
-            y += row_h;
+            ui.text(
+                &ui.fit(name, list_w - 6.0, FONT_PX),
+                r.x + 3.0,
+                r.y + 1.0,
+                FONT_PX,
+                if on {
+                    ui::ACCENT
+                } else if known {
+                    ui::TEXT
+                } else {
+                    ui::TEXT_DIM
+                },
+            );
+            self.hits.push((r, Hit::BestiaryItem(i)));
+        }
+        let n_seen = BESTIARY.iter().filter(|k| seen.contains(k)).count();
+        ui.text(
+            &fill(s.best_count, &[&n_seen, &BESTIARY.len()]),
+            c.x,
+            c.bottom() - FONT_PX,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+        let k = BESTIARY[self.bestiary_cursor.min(BESTIARY.len() - 1)];
+        let x = c.x + list_w + 8.0;
+        let w = c.right() - x;
+        if !seen.contains(&k) {
+            ui.text(s.best_unseen, x, c.y + 20.0, FONT_PX, ui::TEXT_DIM);
+            return;
+        }
+        let sp = k.species();
+        // 그림: 2배 정수 배율
+        let pic = Rect::new(x, c.y, 34.0, 34.0);
+        ui.rect(pic, Color::new(0.10, 0.08, 0.12, 0.9));
+        ui.rect_lines(pic, ui::BORDER);
+        self.renderer.draw_critter(
+            ui,
+            Rect::new(pic.x + 1.0, pic.y + 1.0, 32.0, 32.0),
+            sp.sheet_row,
+            ((get_time() * 2.0) as u32) % 2,
+        );
+        let tx = pic.right() + 6.0;
+        ui.text(tr(sp.name), tx, c.y, FONT_PX, ui::ACCENT);
+        let (hp, pow, spd) = species::words(sp);
+        let words = [(s.best_hp, hp), (s.best_pow, pow), (s.best_spd, spd)];
+        for (i, (label, v)) in words.iter().enumerate() {
+            let y = c.y + 13.0 + i as f32 * 12.0;
+            let lw = words
+                .iter()
+                .map(|(l, _)| ui.text_w(l, FONT_PX))
+                .fold(0.0, f32::max)
+                + 6.0;
+            ui.text(
+                &ui.fit(label, lw - 2.0, FONT_PX),
+                tx,
+                y,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+            ui.text(
+                &ui.fit(tr(*v), c.right() - tx - lw, FONT_PX),
+                tx + lw,
+                y,
+                FONT_PX,
+                ui::TEXT,
+            );
+        }
+        let mut y = c.y + 51.0;
+        let lore = ui::wrap(ui, tr(sp.lore), w, FONT_PX);
+        for l in lore.iter().take(2) {
+            ui.text(l, x, y, FONT_PX, ui::TEXT);
+            y += 12.0;
+        }
+        for (label, text) in [(s.best_atk, sp.attack), (s.best_tip, sp.tip)] {
+            let lw = ui.text_w(label, FONT_PX) + 5.0;
+            ui.text(label, x, y, FONT_PX, ui::ACCENT);
+            let lines = ui::wrap(ui, tr(text), w - lw, FONT_PX);
+            for l in lines.iter().take(2) {
+                ui.text(l, x + lw, y, FONT_PX, ui::TEXT);
+                y += 12.0;
+            }
         }
     }
 

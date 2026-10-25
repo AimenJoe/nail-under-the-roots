@@ -85,11 +85,17 @@ impl Bag {
     }
 
     /// 퀵 슬롯을 다음 "가진 것"으로. 아무것도 없으면 그대로.
-    pub fn cycle(&mut self) {
+    /// 다음(`forward`) / 앞 칸으로. 비어 있는 칸은 건너뛴다.
+    pub fn cycle(&mut self, forward: bool) {
         let all = Consumable::ALL;
+        let n = all.len();
         let i = all.iter().position(|c| *c == self.selected).unwrap_or(0);
-        for k in 1..=all.len() {
-            let c = all[(i + k) % all.len()];
+        for k in 1..=n {
+            let c = if forward {
+                all[(i + k) % n]
+            } else {
+                all[(i + n * 2 - k) % n]
+            };
             if self.count(c) > 0 {
                 self.selected = c;
                 return;
@@ -112,11 +118,11 @@ mod tests {
         }
         assert_eq!(b.berries, t::BERRY_MAX);
         assert!(!b.add(Consumable::Berry));
-        b.cycle();
+        b.cycle(true);
         assert_eq!(b.selected, Consumable::Berry);
         assert!(b.take(Consumable::Worm));
         assert!(!b.take(Consumable::Worm));
-        b.cycle();
+        b.cycle(true);
         assert_eq!(b.selected, Consumable::Berry);
     }
 }

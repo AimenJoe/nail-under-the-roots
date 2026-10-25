@@ -4,6 +4,7 @@
 칸 88×88, 게임 픽셀의 2배 밀도(대화창의 44×44 칸에 찍는다 → 화면 배율 4면 원본 1px = 화면 2px).
   칸 0~3: Naïl 보통·기쁨·걱정·결의
   칸 4  : 변해 버린 이웃(아직 정체를 모름: 그림자 + 빛나는 눈 + 뿌리)
+  칸 5~6: 라쿤 포포(튜토리얼 안내) 보통·기쁨
 
 그리는 법(손 도트를 흉내 낸 절차):
   1. 부위를 타원으로 놓고 칸마다 재질을 정한다(뒤에 놓인 것부터).
@@ -32,6 +33,11 @@ RAMP = {
     'shade':  [(26, 18, 36), (44, 30, 58), (66, 44, 82), (92, 62, 108)],     # 이웃 그림자 몸
     'root':   [(44, 30, 28), (78, 54, 44), (112, 80, 60), (146, 110, 80)],
     'glow':   [(150, 200, 60), (210, 240, 110), (250, 255, 200)],
+    # 라쿤: 회색 털, 흰 얼굴, 검은 가면, 코
+    'grey':   [(56, 54, 66), (88, 86, 100), (122, 120, 134), (156, 154, 166), (190, 188, 198)],
+    'white':  [(170, 166, 172), (204, 200, 204), (230, 228, 228), (248, 246, 244)],
+    'mask':   [(22, 18, 28), (36, 32, 44), (54, 50, 64), (74, 70, 86)],
+    'nose':   [(18, 14, 22), (40, 34, 46), (84, 78, 96)],
 }
 OUTLINE_BASE = (43, 29, 42)
 BLUSH = (236, 120, 128)
@@ -336,6 +342,65 @@ def neighbor():
     return cv
 
 
+# ---- 라쿤 포포 ------------------------------------------------------------------------
+def raccoon(face):
+    cv = Canvas()
+
+    def cheeks(x, y, ang):
+        # 옆으로 뻗은 볼털(양옆 아래), 머리 윗선 털 뭉치
+        r = tuft(x, y, ang)
+        a = abs(math.cos(ang))
+        if 0.0 < ang < 1.2 or 1.9 < ang < 3.2:
+            r *= 1.0 + 0.10 * a * (0.6 + 0.4 * math.sin(ang * 7.0))
+        return r
+    # 귀(뒤): 회색 + 흰 테두리 + 검은 안쪽
+    for (ex, ey) in ((20, 22), (60, 16)):
+        ellipse(cv, ex, ey, 10, 11, 'grey', bias=0.0)
+        flat(cv, ex + 1, ey + 2, 6, 7, 'mask', 1)
+    # 머리
+    ellipse(cv, 42, 50, 34, 28, 'grey', bias=0.05, rough=cheeks)
+    # 흰 이마·눈썹 무늬, 흰 주둥이
+    ellipse(cv, 30, 32, 9, 4.5, 'white', bias=0.1)
+    ellipse(cv, 55, 29, 8, 4.0, 'white', bias=0.1)
+    ellipse(cv, 55, 60, 17, 12, 'white', bias=0.08)
+    # 검은 가면: 두 눈 둘레 + 콧등으로 이어짐
+    ellipse(cv, 32, 45, 13, 9, 'mask', bias=0.0)
+    ellipse(cv, 57, 42, 11, 8, 'mask', bias=0.0)
+    flat(cv, 45, 46, 6, 3.5, 'mask', 1)
+    # 코
+    ellipse(cv, 66, 54, 6, 4.2, 'nose', bias=0.1)
+    cv.paint(64, 52, RAMP['nose'][2])
+    cv.paint(65, 52, RAMP['nose'][2])
+    outline(cv)
+    rim_light(cv, 'grey')
+    # 눈: 가면 속이라 테두리를 한 단 밝게(눈이 묻히지 않게)
+    if face == 'happy':
+        # 가면이 검어서 감은 눈은 밝은 선으로.
+        for (cx, cy, rx) in ((34, 44, 4.6), (57, 41, 3.8)):
+            pts = [(cx - rx, cy + 1.5), (cx - rx * 0.5, cy - 1.5), (cx, cy - 2.5), (cx + rx * 0.5, cy - 1.5), (cx + rx, cy + 1.5)]
+            line(cv, pts, RAMP['white'][2], 2)
+    else:
+        for (ex, ey, rx, ry) in ((34, 44, 5.0, 5.8), (57, 41, 4.0, 4.8)):
+            dither_ellipse(cv, ex, ey, rx + 1.6, ry + 1.4, RAMP['mask'][3], 0.6)
+        eye(cv, 34, 44, 4.6, 5.4)
+        eye(cv, 57, 41, 3.6, 4.4, look=(0.3, 0.0))
+    # 볼 홍조, 입
+    dither_ellipse(cv, 46, 61, 5.0, 2.6, BLUSH, 0.5)
+    if face == 'happy':
+        for (x, y) in ((60, 63), (61, 64), (62, 64), (63, 64), (64, 63)):
+            cv.paint(x, y, MOUTH)
+        for (x, y) in ((61, 65), (62, 66), (63, 65)):
+            cv.paint(x, y, RAMP['pink'][2])
+    else:
+        line(cv, [(59, 63), (61, 64), (63, 63), (65, 64)], MOUTH, 1)
+    # 털 결(볼·이마)
+    for (x, y) in ((14, 56), (15, 57), (12, 60), (70, 66), (71, 67), (24, 70), (25, 71)):
+        m = cv.mat[y][x]
+        if m and m[0] == 'grey':
+            cv.paint(x, y, RAMP['grey'][1])
+    return cv
+
+
 def to_image(cv):
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     px = img.load()
@@ -352,6 +417,7 @@ def to_image(cv):
 
 def sheet():
     frames = [nail(f) for f in ('normal', 'happy', 'worried', 'determined')] + [neighbor()]
+    frames += [raccoon('normal'), raccoon('happy')]
     out = Image.new('RGBA', (W * len(frames), H), (0, 0, 0, 0))
     for i, cv in enumerate(frames):
         out.paste(to_image(cv), (i * W, 0))

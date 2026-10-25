@@ -37,6 +37,8 @@ pub enum Scenario {
     Loot,
     /// 장신구·퀵 아이템·필살기 확인(docs/decisions/0017, 0018). 장신구는 앱이 가방에 넣는다.
     Gear,
+    /// 적 다섯 종을 한 마리씩(생쥐는 떼). 도감·그림 확인(docs/decisions/0021).
+    AllSpecies,
 }
 
 pub struct Entry {
@@ -45,7 +47,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 17] = [
+pub const LIST: [Entry; 18] = [
     Entry {
         name: "필드(모험)",
         desc: "컷씬·튜토리얼 없이 필드에서. 남쪽 굴 입구로 던전, 저장 지점(초록 버섯 고리).",
@@ -93,8 +95,13 @@ pub const LIST: [Entry; 17] = [
     },
     Entry {
         name: "장신구·필살기 확인",
-        desc: "장신구 5개가 가방에, 산딸기 3·지렁이 2, SP 가득, 생명의 씨앗 하나. 돌격형 2마리. L·B로 드릴, F·Y로 먹기, Q·L1로 넘기기.",
+        desc: "장신구 5개가 가방에, 산딸기 3·지렁이 2, 분노 가득, 뿌리 심장 하나. 들쥐 2마리. L/B 드릴, I/Y 먹기, Q·E/LB·RB 넘기기.",
         scenario: Scenario::Gear,
+    },
+    Entry {
+        name: "적 다섯 종",
+        desc: "들쥐·생쥐 떼·시궁쥐·다람쥐·청설모. 도감 탭에 차례로 적힌다.",
+        scenario: Scenario::AllSpecies,
     },
     Entry {
         name: "빈 방",
@@ -102,28 +109,28 @@ pub const LIST: [Entry; 17] = [
         scenario: Scenario::Empty,
     },
     Entry {
-        name: "돌격형 1마리",
+        name: "들쥐 1마리",
         desc: "예고→돌진→멈춤 타이밍 확인.",
         scenario: Scenario::Chargers(1),
     },
     Entry {
-        name: "원거리형 1마리",
+        name: "다람쥐 1마리",
         desc: "거리 유지·투사체. 솟구침으로 투사체 지우기.",
         scenario: Scenario::Shooters(1),
     },
     Entry {
-        name: "돌격형 3마리",
+        name: "들쥐 3마리",
         desc: "판정 2: 위치 선정을 생각하게 되는가.",
         scenario: Scenario::Chargers(3),
     },
     Entry {
         name: "1+1",
-        desc: "돌격형 1 + 원거리형 1. 다음 웨이브 없음.",
+        desc: "들쥐 1 + 다람쥐 1. 다음 웨이브 없음.",
         scenario: Scenario::OneEach,
     },
     Entry {
         name: "웨이브 3부터",
-        desc: "2C+2S부터 자동 웨이브.",
+        desc: "4마리(종류는 무작위)부터 자동 웨이브.",
         scenario: Scenario::FromWave(3),
     },
     Entry {
@@ -152,9 +159,17 @@ pub fn build(s: Scenario) -> World {
             w.player.sp = crate::tuning::SP_MAX;
             w.player.hp = 3;
             w.loot.push(Loot::place(
-                LootKind::LifeSeed,
+                LootKind::RootHeart,
                 w.room.center() + vec2(-40.0, 30.0),
             ));
+            w
+        }
+        Scenario::AllSpecies => {
+            let mut w = World::empty();
+            for (i, k) in crate::species::BESTIARY.iter().enumerate() {
+                let p = spawn_point(&w, i);
+                w.spawn_mob(*k, p);
+            }
             w
         }
         Scenario::Loot => {
@@ -176,7 +191,7 @@ pub fn build(s: Scenario) -> World {
             let mut w = World::empty();
             for i in 0..n {
                 let p = spawn_point(&w, i as usize);
-                w.spawn_enemy(Kind::Charger, p);
+                w.spawn_enemy(Kind::FieldMouse, p);
             }
             w
         }
@@ -184,7 +199,7 @@ pub fn build(s: Scenario) -> World {
             let mut w = World::empty();
             for i in 0..n {
                 let p = spawn_point(&w, i as usize + 1);
-                w.spawn_enemy(Kind::Shooter, p);
+                w.spawn_enemy(Kind::Chipmunk, p);
             }
             w
         }
@@ -197,8 +212,8 @@ pub fn build(s: Scenario) -> World {
             let mut w = World::empty();
             let a = spawn_point(&w, 0);
             let b = spawn_point(&w, 3);
-            w.spawn_enemy(Kind::Charger, a);
-            w.spawn_enemy(Kind::Shooter, b);
+            w.spawn_enemy(Kind::FieldMouse, a);
+            w.spawn_enemy(Kind::Chipmunk, b);
             w
         }
         Scenario::FromWave(n) => {

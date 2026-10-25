@@ -76,12 +76,15 @@ pub struct Feel {
     pub trauma: f32,
     /// 이번 틱의 흔들림 오프셋(정수 px).
     pub shake_offset: Vec2,
+    /// 화면 번쩍임(남은 초). 렌더가 하얗게 덮는다.
+    pub flash: f32,
 }
 
 impl Feel {
     /// 매 틱, 히트스톱 여부와 무관하게 호출.
     pub fn tick(&mut self, dt: f32) {
         self.trauma = (self.trauma - tuning::SHAKE_DECAY * dt).max(0.0);
+        self.flash = (self.flash - dt).max(0.0);
         let amount = tuning::SHAKE_MAX_OFFSET * self.trauma * self.trauma;
         self.shake_offset = if amount < 0.5 {
             Vec2::ZERO

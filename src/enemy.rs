@@ -1,17 +1,33 @@
-//! 적 2종: 돌격형(Charger), 원거리형(Shooter). 플레이어 위치와 `Room`만 본다.
+//! 적: 뿌리에 물든 땅속 이웃. 종류(`Kind`)마다 행동 하나와 수치가 `species.rs` 표에 있다.
+//! 행동: 돌격(쥐들), 던지기(다람쥐), 뛰어 덮치기(청설모). 플레이어 위치와 `Room`만 본다.
 
 use macroquad::prelude::*;
 
 use crate::combat;
 use crate::room::Room;
+use crate::species::{self, Behavior, Species};
 use crate::tuning as t;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Kind {
-    Charger,
-    Shooter,
+    /// 들쥐: 기본 돌격.
+    FieldMouse,
+    /// 생쥐: 작고 빠르고 약하다. 떼로.
+    HouseMouse,
+    /// 시궁쥐: 크고 단단하고 세게 돌진.
+    SewerRat,
+    /// 다람쥐: 도토리를 던진다.
+    Chipmunk,
+    /// 청설모: 뛰어 덮친다.
+    RedSquirrel,
     /// 튜토리얼 허수아비. 움직이지도 때리지도 않는다.
     Dummy,
+}
+
+impl Kind {
+    pub fn species(self) -> &'static Species {
+        species::of(self)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -28,6 +44,10 @@ pub enum State {
     Keep,
     /// 원거리형: 조준 예고.
     Aim { time: f32 },
+    /// 뛰기형: 웅크림(예고). 착지할 자리를 정해 둔다.
+    Crouch { time: f32, target: Vec2 },
+    /// 뛰기형: 체공. `from`에서 `to`로 포물선.
+    Leap { time: f32, from: Vec2, to: Vec2 },
     /// 공통: 경직(남은 시간).
     Stunned { time: f32 },
 }
@@ -37,6 +57,9 @@ pub enum Event {
     Charge,
     WallHit,
     Shoot,
+    /// 뛰기형이 튀어 오름 / 내려앉음.
+    Leap,
+    Land,
 }
 
 pub struct Enemy {
@@ -88,11 +111,9 @@ impl Projectile {
 
 impl Enemy {
     pub fn new(kind: Kind, pos: Vec2) -> Self {
-        let (hp, state) = match kind {
-            Kind::Charger => (t::CHARGER_HP, State::Approach),
-            Kind::Shooter => (t::SHOOTER_HP, State::Keep),
-            Kind::Dummy => (t::DUMMY_HP, State::Rest { time: f32::MAX }),
-        };
+        let sp = kind.species();
+        let hp = sp.hp;
+        let state = idle_of(sp.behavior);
         Self {
             kind,
             pos,
@@ -104,7 +125,7 @@ impl Enemy {
             flash: 0.0,
             alive: true,
             last_hit_by: 0,
-            fire_cd: t::SHOOTER_FIRE_INTERVAL * 0.5,
+            fire_cd: sp.fire_every * 0.5,
             poison: 0.0,
             poison_tick: t::POISON_TICK,
             died_of_poison: false,
@@ -113,19 +134,42 @@ impl Enemy {
         }
     }
 
+    pub fn sp(&self) -> &'static Species {
+        self.kind.species()
+    }
+
     pub fn radius(&self) -> f32 {
-        match self.kind {
-            Kind::Charger => t::CHARGER_RADIUS,
-            Kind::Shooter => t::SHOOTER_RADIUS,
-            Kind::Dummy => t::CHARGER_RADIUS,
-        }
+        self.sp().radius
     }
 
     /// 지금 닿으면 플레이어가 입는 피해.
     pub fn contact_damage(&self) -> Option<i32> {
         match self.state {
-            State::Charge { .. } => Some(t::CHARGER_DAMAGE),
+            State::Charge { .. } => Some(self.sp().damage),
+            // 내려앉기 직전 몇 틱.
+            State::Leap { time, .. } if time >= self.sp().dash_time - t::LEAP_LAND_WINDOW => {
+                Some(self.sp().damage)
+            }
             _ => None,
+        }
+    }
+
+    /// 피해 판정 반지름(내려앉는 순간은 둘레까지).
+    pub fn contact_radius(&self) -> f32 {
+        match self.state {
+            State::Leap { .. } => self.sp().land_radius,
+            _ => self.radius(),
+        }
+    }
+
+    /// 체공 높이(그리기용 px). 바닥 = 0.
+    pub fn height(&self) -> f32 {
+        match self.state {
+            State::Leap { time, .. } => {
+                let k = (time / self.sp().dash_time).clamp(0.0, 1.0);
+                4.0 * t::LEAP_HEIGHT * k * (1.0 - k)
+            }
+            _ => 0.0,
         }
     }
 
@@ -133,7 +177,7 @@ impl Enemy {
     pub fn on_hit_player(&mut self) {
         if matches!(self.state, State::Charge { .. }) {
             self.state = State::Rest {
-                time: t::CHARGER_REST,
+                time: self.sp().rest,
             };
         }
     }
@@ -150,7 +194,8 @@ impl Enemy {
         self.prev_pos = self.pos;
         self.flash = (self.flash - dt).max(0.0);
         self.tick_poison(dt);
-        if self.kind == Kind::Dummy {
+        let sp = self.sp();
+        if sp.behavior == Behavior::Dummy {
             // 허수아비: 넉백만 받고 제자리로 돌아오지 않는다. 경직은 즉시 푼다.
             self.pos += self.vel * dt;
             combat::apply_friction(&mut self.vel, dt);
@@ -188,10 +233,10 @@ impl Enemy {
             State::Approach => {
                 if player_targetable {
                     self.facing = dir_to_player;
-                    if dist < t::CHARGER_TRIGGER_RANGE {
+                    if dist < sp.trigger {
                         self.state = State::Windup { time: 0.0 };
                     } else {
-                        self.pos += dir_to_player * t::CHARGER_WALK_SPEED * dt;
+                        self.pos += dir_to_player * sp.speed * dt;
                     }
                 }
             }
@@ -200,7 +245,7 @@ impl Enemy {
                 if player_targetable {
                     self.facing = dir_to_player;
                 }
-                if time >= t::CHARGER_WINDUP {
+                if time >= sp.windup {
                     self.state = State::Charge {
                         time: 0.0,
                         dir: self.facing,
@@ -212,18 +257,14 @@ impl Enemy {
             }
             State::Charge { time, dir } => {
                 let time = time + dt;
-                self.pos += dir * t::CHARGER_CHARGE_SPEED * dt;
+                self.pos += dir * sp.dash_speed * dt;
                 let r = self.radius();
                 if room.resolve_circle(&mut self.pos, r) {
-                    self.state = State::Rest {
-                        time: t::CHARGER_WALL_REST,
-                    };
+                    self.state = State::Rest { time: sp.wall_rest };
                     self.flash = t::HIT_FLASH;
                     events.push(Event::WallHit);
-                } else if time >= t::CHARGER_CHARGE_TIME {
-                    self.state = State::Rest {
-                        time: t::CHARGER_REST,
-                    };
+                } else if time >= sp.dash_time {
+                    self.state = State::Rest { time: sp.rest };
                 } else {
                     self.state = State::Charge { time, dir };
                 }
@@ -231,7 +272,7 @@ impl Enemy {
             State::Rest { time } => {
                 let time = time - dt;
                 self.state = if time <= 0.0 {
-                    State::Approach
+                    idle_of(sp.behavior)
                 } else {
                     State::Rest { time }
                 };
@@ -239,15 +280,54 @@ impl Enemy {
             State::Keep => {
                 if player_targetable {
                     self.facing = dir_to_player;
-                    if dist < t::SHOOTER_KEEP_MIN {
-                        self.pos -= dir_to_player * t::SHOOTER_SPEED * dt;
-                    } else if dist > t::SHOOTER_KEEP_MAX {
-                        self.pos += dir_to_player * t::SHOOTER_SPEED * dt;
+                    let (near, far) = sp.keep;
+                    if dist < near {
+                        self.pos -= dir_to_player * sp.speed * dt;
+                    } else if dist > far {
+                        self.pos += dir_to_player * sp.speed * dt;
+                    } else if sp.behavior == Behavior::Leaper {
+                        // 청설모: 거리 안에서는 옆으로 돈다(가만히 있지 않는다).
+                        let side = vec2(-dir_to_player.y, dir_to_player.x);
+                        self.pos += side * sp.speed * 0.6 * dt;
                     }
                     self.fire_cd -= dt;
                     if self.fire_cd <= 0.0 {
-                        self.state = State::Aim { time: 0.0 };
+                        self.state = match sp.behavior {
+                            Behavior::Leaper => State::Crouch {
+                                time: 0.0,
+                                target: player_pos,
+                            },
+                            _ => State::Aim { time: 0.0 },
+                        };
                     }
+                }
+            }
+            State::Crouch { time, target } => {
+                let time = time + dt;
+                self.facing = (target - self.pos).normalize_or(self.facing);
+                if time >= sp.windup {
+                    // 너무 멀면 갈 수 있는 데까지만.
+                    let reach = (target - self.pos).clamp_length_max(sp.trigger * 1.2);
+                    self.state = State::Leap {
+                        time: 0.0,
+                        from: self.pos,
+                        to: self.pos + reach,
+                    };
+                    events.push(Event::Leap);
+                } else {
+                    self.state = State::Crouch { time, target };
+                }
+            }
+            State::Leap { time, from, to } => {
+                let time = time + dt;
+                let k = (time / sp.dash_time).min(1.0);
+                self.pos = from + (to - from) * k;
+                if time >= sp.dash_time {
+                    events.push(Event::Land);
+                    self.fire_cd = sp.fire_every;
+                    self.state = State::Rest { time: sp.rest };
+                } else {
+                    self.state = State::Leap { time, from, to };
                 }
             }
             State::Aim { time } => {
@@ -255,18 +335,18 @@ impl Enemy {
                 if player_targetable {
                     self.facing = dir_to_player;
                 }
-                if time >= t::SHOOTER_AIM_TIME {
+                if time >= sp.windup {
                     let start =
                         self.pos + self.facing * (self.radius() + t::PROJECTILE_RADIUS + 1.0);
                     projectiles.push(Projectile {
                         pos: start,
                         prev_pos: start,
-                        vel: self.facing * t::PROJECTILE_SPEED,
+                        vel: self.facing * sp.shot_speed,
                         alive: true,
                         friendly: false,
                     });
                     events.push(Event::Shoot);
-                    self.fire_cd = t::SHOOTER_FIRE_INTERVAL;
+                    self.fire_cd = sp.fire_every;
                     self.state = State::Keep;
                 } else {
                     self.state = State::Aim { time };
@@ -281,11 +361,7 @@ impl Enemy {
     }
 
     fn idle_state(&self) -> State {
-        match self.kind {
-            Kind::Charger => State::Approach,
-            Kind::Shooter => State::Keep,
-            Kind::Dummy => State::Rest { time: f32::MAX },
-        }
+        idle_of(self.sp().behavior)
     }
 
     /// 독을 건다. 이미 걸려 있으면 더 긴 쪽.
@@ -316,13 +392,13 @@ impl Enemy {
         }
     }
 
-    /// 피격. 넉백 방향은 단위 벡터.
+    /// 피격. 넉백 방향은 단위 벡터. 무거운 종은 덜 밀린다. 체공 중엔 떨어진다(그 자리에서 경직).
     pub fn hurt(&mut self, dmg: i32, knock_dir: Vec2, knockback: f32, stun: f32) {
         self.asleep = false;
         self.wake_delay = 0.0;
         self.hp -= dmg;
         self.flash = t::HIT_FLASH;
-        self.vel = knock_dir * knockback;
+        self.vel = knock_dir * knockback * self.sp().knock_mul;
         self.state = State::Stunned { time: stun };
         if self.hp <= 0 {
             self.alive = false;
@@ -337,8 +413,18 @@ impl Enemy {
             State::Rest { .. } => "rest",
             State::Keep => "keep",
             State::Aim { .. } => "aim",
+            State::Crouch { .. } => "crouch",
+            State::Leap { .. } => "LEAP",
             State::Stunned { .. } => "stunned",
         }
+    }
+}
+
+fn idle_of(b: Behavior) -> State {
+    match b {
+        Behavior::Charger => State::Approach,
+        Behavior::Shooter | Behavior::Leaper => State::Keep,
+        Behavior::Dummy => State::Rest { time: f32::MAX },
     }
 }
 
@@ -346,10 +432,39 @@ impl Enemy {
 mod tests {
     use super::*;
 
+    const FIELD_HP: i32 = species::FIELD_MOUSE.hp;
+
+    /// 청설모: 웅크렸다가 뛰고, 내려앉는 순간에만 둘레 피해.
+    #[test]
+    fn squirrel_crouches_leaps_and_lands() {
+        let room = Room::new();
+        let mut e = Enemy::new(Kind::RedSquirrel, room.center());
+        e.fire_cd = 0.0;
+        let player = room.center() + vec2(70.0, 0.0);
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let mut saw = (false, false, false);
+        for _ in 0..240 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            match e.state {
+                State::Crouch { .. } => saw.0 = true,
+                State::Leap { .. } => {
+                    saw.1 = true;
+                    if e.contact_damage().is_some() {
+                        saw.2 = true;
+                        assert!(e.contact_radius() > e.radius());
+                    }
+                }
+                _ => assert!(e.contact_damage().is_none()),
+            }
+        }
+        assert!(saw.0 && saw.1 && saw.2, "{saw:?}");
+        assert!(ev.contains(&Event::Land));
+    }
+
     #[test]
     fn poison_ticks_down_hp_and_kills() {
-        let mut e = Enemy::new(Kind::Charger, vec2(100.0, 100.0));
-        assert_eq!(e.hp, t::CHARGER_HP);
+        let mut e = Enemy::new(Kind::FieldMouse, vec2(100.0, 100.0));
+        assert_eq!(e.hp, FIELD_HP);
         e.apply_poison(t::VENOM_POISON_FINISHER);
         let dt = t::TICK_DT;
         let mut secs = 0.0;
@@ -365,12 +480,12 @@ mod tests {
 
     #[test]
     fn short_poison_deals_one_tick() {
-        let mut e = Enemy::new(Kind::Charger, vec2(0.0, 0.0));
+        let mut e = Enemy::new(Kind::FieldMouse, vec2(0.0, 0.0));
         e.apply_poison(t::VENOM_POISON);
         for _ in 0..600 {
             e.tick_poison(t::TICK_DT);
         }
-        assert_eq!(e.hp, t::CHARGER_HP - 1);
+        assert_eq!(e.hp, FIELD_HP - 1);
         assert_eq!(e.poison, 0.0);
         assert!(e.alive);
     }

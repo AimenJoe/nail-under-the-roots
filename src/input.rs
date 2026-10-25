@@ -3,15 +3,270 @@
 //! 이 파일 밖에서는 `KeyCode`도 `gamepads::Button`도 보지 않는다.
 //! (KB: reference/macroquad/gamepad-and-android-input.md)
 //!
+//! 게임 동작은 바꿀 수 있다(`Bindings`, 설정 → 조작, docs/decisions/0022). 기본: 오른쪽 네 버튼 = 자주 쓰는 넷
+//! (X 공격 · A 굴파기 · B 필살기 · Y 아이템), 덜 쓰는 것은 어깨·가운데(LB/RB 아이템 넘기기, Select 지도, Start 메뉴).
+//! 키보드는 같은 모양의 다이아몬드 J(공격)·K(굴파기)·L(필살기)·I(아이템). 메뉴 확인·뒤로·이동은 고정.
+//! 화면의 버튼 안내는 `prompt()`로 지금 배치를 읽는다(패드가 있으면 패드 이름, 없으면 키).
+//!
 //! 고정 타임스텝과의 관계: 렌더 프레임마다 `poll()`로 상태를 읽고, "눌림(edge)"은 래치에 모아 둔다.
 //! 로직 틱마다 `take()`가 래치를 소비한다. 프레임에 틱이 두 번이면 첫 틱만 눌림을 받고,
 //! 틱이 없으면(고주사율) 다음 틱까지 눌림이 보존된다. 메뉴 장면은 프레임마다 한 번 `take()`한다.
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::RwLock;
 
 #[cfg(not(target_os = "android"))]
 use gamepads::{Button, Gamepads};
 use macroquad::prelude::*;
 
 use crate::tuning;
+
+/// 바꿀 수 있는 게임 동작.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Act {
+    Attack,
+    Dodge,
+    Special,
+    UseItem,
+    ItemPrev,
+    ItemNext,
+    Map,
+}
+
+pub const ACTS: [Act; 7] = [
+    Act::Attack,
+    Act::Dodge,
+    Act::Special,
+    Act::UseItem,
+    Act::ItemPrev,
+    Act::ItemNext,
+    Act::Map,
+];
+
+/// 패드 버튼(W3C 표준 배치 위치). gamepads 크레이트가 없는 Android에서도 컴파일되게 따로 둔다.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Pad {
+    South,
+    East,
+    West,
+    North,
+    L1,
+    R1,
+    L2,
+    R2,
+    Select,
+    Start,
+    L3,
+    R3,
+}
+
+/// 저장·캡처 순서.
+pub const PADS: [Pad; 12] = [
+    Pad::South,
+    Pad::East,
+    Pad::West,
+    Pad::North,
+    Pad::L1,
+    Pad::R1,
+    Pad::L2,
+    Pad::R2,
+    Pad::Select,
+    Pad::Start,
+    Pad::L3,
+    Pad::R3,
+];
+
+impl Pad {
+    /// 화면 이름(Xbox 배치 글자. 소니·닌텐도도 위치는 같다).
+    pub fn label(self) -> &'static str {
+        match self {
+            Pad::South => "A",
+            Pad::East => "B",
+            Pad::West => "X",
+            Pad::North => "Y",
+            Pad::L1 => "LB",
+            Pad::R1 => "RB",
+            Pad::L2 => "LT",
+            Pad::R2 => "RT",
+            Pad::Select => "Select",
+            Pad::Start => "Start",
+            Pad::L3 => "L3",
+            Pad::R3 => "R3",
+        }
+    }
+
+    #[cfg(not(target_os = "android"))]
+    fn button(self) -> Button {
+        match self {
+            Pad::South => Button::ActionDown,
+            Pad::East => Button::ActionRight,
+            Pad::West => Button::ActionLeft,
+            Pad::North => Button::ActionUp,
+            Pad::L1 => Button::FrontLeftUpper,
+            Pad::R1 => Button::FrontRightUpper,
+            Pad::L2 => Button::FrontLeftLower,
+            Pad::R2 => Button::FrontRightLower,
+            Pad::Select => Button::LeftCenterCluster,
+            Pad::Start => Button::RightCenterCluster,
+            Pad::L3 => Button::LeftStick,
+            Pad::R3 => Button::RightStick,
+        }
+    }
+}
+
+/// 바꿀 수 있는 키(저장 번호 = 이 표의 자리). 이동(WASD·화살표)·Enter·Esc는 고정이라 없다.
+const KEYS: [(KeyCode, &str); 44] = [
+    (KeyCode::J, "J"),
+    (KeyCode::K, "K"),
+    (KeyCode::L, "L"),
+    (KeyCode::I, "I"),
+    (KeyCode::Q, "Q"),
+    (KeyCode::E, "E"),
+    (KeyCode::M, "M"),
+    (KeyCode::Space, "Space"),
+    (KeyCode::B, "B"),
+    (KeyCode::C, "C"),
+    (KeyCode::F, "F"),
+    (KeyCode::G, "G"),
+    (KeyCode::H, "H"),
+    (KeyCode::N, "N"),
+    (KeyCode::O, "O"),
+    (KeyCode::P, "P"),
+    (KeyCode::R, "R"),
+    (KeyCode::T, "T"),
+    (KeyCode::U, "U"),
+    (KeyCode::V, "V"),
+    (KeyCode::X, "X"),
+    (KeyCode::Y, "Y"),
+    (KeyCode::Z, "Z"),
+    (KeyCode::Key1, "1"),
+    (KeyCode::Key2, "2"),
+    (KeyCode::Key3, "3"),
+    (KeyCode::Key4, "4"),
+    (KeyCode::Key5, "5"),
+    (KeyCode::Key6, "6"),
+    (KeyCode::Key7, "7"),
+    (KeyCode::Key8, "8"),
+    (KeyCode::Key9, "9"),
+    (KeyCode::Key0, "0"),
+    (KeyCode::Comma, ","),
+    (KeyCode::Period, "."),
+    (KeyCode::Slash, "/"),
+    (KeyCode::Semicolon, ";"),
+    (KeyCode::Apostrophe, "'"),
+    (KeyCode::Tab, "Tab"),
+    (KeyCode::LeftShift, "Shift"),
+    (KeyCode::RightShift, "RShift"),
+    (KeyCode::LeftControl, "Ctrl"),
+    (KeyCode::LeftAlt, "Alt"),
+    (KeyCode::Backspace, "Bksp"),
+];
+
+/// 동작마다 키 하나, 패드 버튼 하나(KEYS·PADS의 번호).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Bindings {
+    pub keys: [u8; 7],
+    pub pads: [u8; 7],
+}
+
+impl Bindings {
+    /// J K L I / Q E / M,  X A B Y / LB RB / Select.
+    pub const DEFAULT: Bindings = Bindings {
+        keys: [0, 1, 2, 3, 4, 5, 6],
+        pads: [2, 0, 1, 3, 4, 5, 8],
+    };
+
+    fn idx(a: Act) -> usize {
+        ACTS.iter().position(|x| *x == a).unwrap_or(0)
+    }
+
+    pub fn key(&self, a: Act) -> KeyCode {
+        KEYS[self.keys[Self::idx(a)] as usize % KEYS.len()].0
+    }
+
+    pub fn pad(&self, a: Act) -> Pad {
+        PADS[self.pads[Self::idx(a)] as usize % PADS.len()]
+    }
+
+    pub fn key_label(&self, a: Act) -> &'static str {
+        KEYS[self.keys[Self::idx(a)] as usize % KEYS.len()].1
+    }
+
+    /// 키를 동작에 붙인다. 다른 동작이 쓰던 키면 서로 바꾼다. 표에 없는 키(이동·Esc 등)면 false.
+    pub fn bind_key(&mut self, a: Act, k: KeyCode) -> bool {
+        let Some(n) = KEYS.iter().position(|(kk, _)| *kk == k) else {
+            return false;
+        };
+        let i = Self::idx(a);
+        if let Some(j) = self.keys.iter().position(|x| *x as usize == n) {
+            self.keys[j] = self.keys[i];
+        }
+        self.keys[i] = n as u8;
+        true
+    }
+
+    /// 패드 버튼을 붙인다. Start는 메뉴 고정이라 안 된다. 겹치면 서로 바꾼다.
+    pub fn bind_pad(&mut self, a: Act, p: Pad) -> bool {
+        if p == Pad::Start {
+            return false;
+        }
+        let n = PADS.iter().position(|x| *x == p).unwrap_or(0);
+        let i = Self::idx(a);
+        if let Some(j) = self.pads.iter().position(|x| *x as usize == n) {
+            self.pads[j] = self.pads[i];
+        }
+        self.pads[i] = n as u8;
+        true
+    }
+
+    /// 저장된 번호가 표 밖이거나 겹치면 기본값.
+    pub fn sanitized(self) -> Bindings {
+        let ok_k = self.keys.iter().all(|k| (*k as usize) < KEYS.len());
+        let ok_p = self
+            .pads
+            .iter()
+            .all(|p| (*p as usize) < PADS.len() && PADS[*p as usize] != Pad::Start);
+        let uniq = |v: &[u8; 7]| (0..7).all(|i| (i + 1..7).all(|j| v[i] != v[j]));
+        if ok_k && ok_p && uniq(&self.keys) && uniq(&self.pads) {
+            self
+        } else {
+            Bindings::DEFAULT
+        }
+    }
+}
+
+static BINDINGS: RwLock<Bindings> = RwLock::new(Bindings::DEFAULT);
+/// 마지막으로 패드를 썼나(안내를 패드 이름으로).
+static PAD_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+pub fn bindings() -> Bindings {
+    BINDINGS.read().map(|b| *b).unwrap_or(Bindings::DEFAULT)
+}
+
+pub fn set_bindings(b: Bindings) {
+    if let Ok(mut g) = BINDINGS.write() {
+        *g = b.sanitized();
+    }
+}
+
+/// 화면 안내용 버튼 이름. 패드를 쓰고 있으면 패드, 아니면 키.
+pub fn prompt(a: Act) -> &'static str {
+    let b = bindings();
+    if PAD_ACTIVE.load(Ordering::Relaxed) {
+        b.pad(a).label()
+    } else {
+        b.key_label(a)
+    }
+}
+
+/// 설정에서 다시 붙이기: 이번 프레임에 새로 눌린 키(표에 있는 것)나 패드 버튼.
+#[derive(Clone, Copy, Debug)]
+pub enum Captured {
+    Key(KeyCode),
+    // Android 빌드에는 gamepads가 없어 패드를 잡지 않는다(D-pad는 키로 들어온다).
+    #[cfg_attr(target_os = "android", allow(dead_code))]
+    Pad(Pad),
+}
 
 /// 게임 로직과 메뉴가 보는 유일한 입력.
 #[derive(Default, Debug, Clone, Copy)]
@@ -26,8 +281,11 @@ pub struct Actions {
     pub special: bool,
     /// 퀵 아이템 먹기. F / Y(△) / 터치 ITEM.
     pub use_item: bool,
-    /// 퀵 슬롯 넘기기. Q / L1 / 터치 <>.
-    pub item_cycle: bool,
+    /// 퀵 슬롯 넘기기(앞·뒤). Q·E / LB·RB / 터치 <>(뒤로).
+    pub item_prev: bool,
+    pub item_next: bool,
+    /// 지도 바로 열기. M / Select.
+    pub map: bool,
     /// 메뉴 확인. Enter / A(×) / 터치 ATK.
     pub confirm: bool,
     /// 메뉴 뒤로. Esc / B(○).
@@ -55,7 +313,9 @@ impl Actions {
         self.dodge |= o.dodge;
         self.special |= o.special;
         self.use_item |= o.use_item;
-        self.item_cycle |= o.item_cycle;
+        self.item_prev |= o.item_prev;
+        self.item_next |= o.item_next;
+        self.map |= o.map;
         self.confirm |= o.confirm;
         self.cancel |= o.cancel;
         self.menu |= o.menu;
@@ -217,6 +477,12 @@ impl Input {
         let kb = read_keyboard();
         let (pad, count) = self.read_gamepads();
         self.gamepad_count = count;
+        // 안내 글: 패드를 만지면 패드 이름, 키를 누르면 키 이름.
+        if pad.move_dir != Vec2::ZERO || any_edge(&pad) {
+            PAD_ACTIVE.store(true, Ordering::Relaxed);
+        } else if kb.move_dir != Vec2::ZERO || any_edge(&kb) {
+            PAD_ACTIVE.store(false, Ordering::Relaxed);
+        }
         let touch = self.read_touch();
         let mouse = read_mouse();
 
@@ -318,7 +584,7 @@ impl Input {
                         "R" => a.restart = true,
                         "SP" => a.special = true,
                         "ITEM" => a.use_item = true,
-                        "<>" => a.item_cycle = true,
+                        "<>" => a.item_next = true,
                         _ => a.menu = true,
                     }
                 } else if t.position.x < half && self.touch.stick.is_none() && !ended {
@@ -366,6 +632,24 @@ impl Input {
         read_gamepads(&self.pads)
     }
 
+    /// 다시 붙이기용: 이번 프레임에 눌린 키(표 안) 또는 패드 버튼. 이동·Enter·Esc는 돌려주지 않는다.
+    pub fn capture(&self) -> Option<Captured> {
+        if let Some(k) = get_last_key_pressed() {
+            if is_key_pressed(k) && KEYS.iter().any(|(kk, _)| *kk == k) {
+                return Some(Captured::Key(k));
+            }
+        }
+        #[cfg(not(target_os = "android"))]
+        for pad in self.pads.all() {
+            for p in PADS {
+                if pad.is_just_pressed(p.button()) {
+                    return Some(Captured::Pad(p));
+                }
+            }
+        }
+        None
+    }
+
     #[cfg(target_os = "android")]
     fn read_gamepads(&mut self) -> (Actions, usize) {
         (Actions::default(), 0)
@@ -390,6 +674,7 @@ fn nav_dir(held: (i8, i8), mv: Vec2) -> (i8, i8) {
 }
 
 fn read_keyboard() -> Actions {
+    let b = bindings();
     let mut m = Vec2::ZERO;
     if is_key_down(KeyCode::Left) || is_key_down(KeyCode::A) {
         m.x -= 1.0;
@@ -403,22 +688,22 @@ fn read_keyboard() -> Actions {
     if is_key_down(KeyCode::Down) || is_key_down(KeyCode::S) {
         m.y += 1.0;
     }
+    let k = |a: Act| is_key_pressed(b.key(a));
     Actions {
         move_dir: m.normalize_or_zero(),
         aim: Vec2::ZERO,
-        attack: is_key_pressed(KeyCode::J) || is_key_pressed(KeyCode::Z),
-        dodge: is_key_pressed(KeyCode::K)
-            || is_key_pressed(KeyCode::X)
-            || is_key_pressed(KeyCode::Space),
-        confirm: is_key_pressed(KeyCode::Enter)
-            || is_key_pressed(KeyCode::J)
-            || is_key_pressed(KeyCode::Z),
-        special: is_key_pressed(KeyCode::L),
-        use_item: is_key_pressed(KeyCode::F),
-        item_cycle: is_key_pressed(KeyCode::Q),
-        cancel: is_key_pressed(KeyCode::Escape),
+        attack: k(Act::Attack),
+        dodge: k(Act::Dodge),
+        special: k(Act::Special),
+        use_item: k(Act::UseItem),
+        item_prev: k(Act::ItemPrev),
+        item_next: k(Act::ItemNext),
+        map: k(Act::Map),
+        // 메뉴: Enter·Space 또는 공격 키로 확인, Esc 또는 필살기 키로 뒤로. 탭은 Q·E(아이템 넘기기 키) 고정.
+        confirm: is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) || k(Act::Attack),
+        cancel: is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Backspace),
         menu: is_key_pressed(KeyCode::Escape),
-        restart: is_key_pressed(KeyCode::R),
+        restart: false,
         tab_prev: is_key_pressed(KeyCode::Q),
         tab_next: is_key_pressed(KeyCode::E),
         toggle_debug: is_key_pressed(KeyCode::F1),
@@ -430,6 +715,20 @@ fn read_keyboard() -> Actions {
         right: is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D),
         ..Default::default()
     }
+}
+
+/// 이동을 뺀 눌림이 하나라도 있나(안내 글 장치 판정).
+fn any_edge(a: &Actions) -> bool {
+    a.attack
+        || a.dodge
+        || a.special
+        || a.use_item
+        || a.item_prev
+        || a.item_next
+        || a.map
+        || a.confirm
+        || a.cancel
+        || a.menu
 }
 
 /// 마우스는 보조: 왼쪽 클릭을 탭으로.
@@ -473,19 +772,19 @@ fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
         if aim != Vec2::ZERO {
             a.aim = aim.normalize();
         }
-        // 공격 X/□ 또는 R1, 굴파기 A/× 또는 R2. 메뉴에서는 A 확인, B 뒤로.
-        a.attack |=
-            pad.is_just_pressed(Button::ActionLeft) || pad.is_just_pressed(Button::FrontRightUpper);
-        a.dodge |=
-            pad.is_just_pressed(Button::ActionDown) || pad.is_just_pressed(Button::FrontRightLower);
-        a.special |=
-            pad.is_just_pressed(Button::ActionRight) || pad.is_just_pressed(Button::FrontLeftLower);
-        a.use_item |= pad.is_just_pressed(Button::ActionUp);
-        a.item_cycle |= pad.is_just_pressed(Button::FrontLeftUpper);
+        // 게임 동작은 배치표대로. 메뉴: A 확인, B 뒤로, Start 메뉴, LB·RB 탭(고정).
+        let b = bindings();
+        let j = |x: Act| pad.is_just_pressed(b.pad(x).button());
+        a.attack |= j(Act::Attack);
+        a.dodge |= j(Act::Dodge);
+        a.special |= j(Act::Special);
+        a.use_item |= j(Act::UseItem);
+        a.item_prev |= j(Act::ItemPrev);
+        a.item_next |= j(Act::ItemNext);
+        a.map |= j(Act::Map);
         a.confirm |= pad.is_just_pressed(Button::ActionDown);
         a.cancel |= pad.is_just_pressed(Button::ActionRight);
-        a.menu |= pad.is_just_pressed(Button::RightCenterCluster)
-            || pad.is_just_pressed(Button::LeftCenterCluster);
+        a.menu |= pad.is_just_pressed(Button::RightCenterCluster);
         a.tab_prev |= pad.is_just_pressed(Button::FrontLeftUpper);
         a.tab_next |= pad.is_just_pressed(Button::FrontRightUpper);
         a.up |= pad.is_just_pressed(Button::DPadUp);
@@ -510,6 +809,27 @@ fn apply_deadzone(v: Vec2) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 겹치는 키를 붙이면 서로 바뀐다. Start·이동 키는 붙지 않는다.
+    #[test]
+    fn rebinding_swaps_and_rejects_reserved() {
+        let mut b = Bindings::DEFAULT;
+        assert_eq!(b.key(Act::Attack), KeyCode::J);
+        assert!(b.bind_key(Act::Attack, KeyCode::K));
+        assert_eq!(b.key(Act::Attack), KeyCode::K);
+        assert_eq!(b.key(Act::Dodge), KeyCode::J, "서로 바뀜");
+        assert!(!b.bind_key(Act::Attack, KeyCode::W), "이동 키는 안 된다");
+        assert!(!b.bind_pad(Act::Attack, Pad::Start));
+        assert!(b.bind_pad(Act::UseItem, Pad::West));
+        assert_eq!(b.pad(Act::UseItem), Pad::West);
+        assert_eq!(b.pad(Act::Attack), Pad::North);
+        assert_eq!(b.sanitized(), b);
+        let broken = Bindings {
+            keys: [0, 0, 1, 2, 3, 4, 5],
+            ..b
+        };
+        assert_eq!(broken.sanitized(), Bindings::DEFAULT);
+    }
 
     #[test]
     fn stick_nav_needs_press_and_holds_until_release() {

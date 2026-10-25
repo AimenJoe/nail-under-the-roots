@@ -2,7 +2,7 @@
 //!
 //! 칸 16px. 글자:
 //!   `#` 벽(벼랑)  `.` 바닥  `T` 그루터기  `R` 바위  `D` 던전 입구  `U` 출구(위로)  `S` 저장 지점  `+` 문
-//!   `P` 시작 위치  `o` 스폰 지점(튜토리얼)  `c` 돌격형  `s` 원거리형  (마커 칸은 바닥)
+//!   `P` 시작 위치  `o` 스폰 지점(튜토리얼)  적: `c` 들쥐  `m` 생쥐 떼  `r` 시궁쥐  `s` 다람쥐  `q` 청설모  (마커 칸은 바닥)
 
 use macroquad::prelude::*;
 
@@ -120,8 +120,11 @@ pub fn parse(rows: &[&str]) -> Parsed {
                 }),
                 'P' => start = at,
                 'o' => spawn_points.push(at),
-                'c' => enemies.push((Kind::Charger, at)),
-                's' => enemies.push((Kind::Shooter, at)),
+                'c' => enemies.push((Kind::FieldMouse, at)),
+                'm' => enemies.push((Kind::HouseMouse, at)),
+                'r' => enemies.push((Kind::SewerRat, at)),
+                's' => enemies.push((Kind::Chipmunk, at)),
+                'q' => enemies.push((Kind::RedSquirrel, at)),
                 _ => {}
             }
         }

@@ -80,9 +80,11 @@ impl World {
         w.player.pos = p.start;
         w.player.prev_pos = p.start;
         for (kind, pos) in p.enemies {
-            let mut e = Enemy::new(kind, pos);
-            e.asleep = true;
-            w.enemies.push(e);
+            for off in crate::species::pack_offsets(kind) {
+                let mut e = Enemy::new(kind, pos + off);
+                e.asleep = true;
+                w.enemies.push(e);
+            }
         }
         w.adv.place = Place::Field;
         w.adv.save_pos = p.start;
@@ -278,9 +280,11 @@ impl World {
         {
             self.room.set_doors_locked(true);
             for (kind, pos) in room.enemies.drain(..) {
-                let mut e = Enemy::new(kind, pos);
-                e.wake_delay = t::ROOM_WAKE_DELAY;
-                self.enemies.push(e);
+                for off in crate::species::pack_offsets(kind) {
+                    let mut e = Enemy::new(kind, pos + off);
+                    e.wake_delay = t::ROOM_WAKE_DELAY;
+                    self.enemies.push(e);
+                }
             }
             sfx.play(sfx::Id::WallHit);
             self.feel.add_trauma(0.25);
@@ -295,12 +299,16 @@ impl World {
                     g.set((c.x / 16.0) as usize, (c.y / 16.0) as usize, Cell::Exit);
                 }
                 self.loot
-                    .push(Loot::place(LootKind::LifeSeed, c + vec2(0.0, 24.0)));
+                    .push(Loot::place(LootKind::RootHeart, c + vec2(0.0, 24.0)));
+                for _ in 0..t::BOSS_SEEDS {
+                    self.loot
+                        .push(Loot::spawn(LootKind::Seed, c + vec2(0.0, 24.0)));
+                }
                 self.adv.boss_cleared = true;
                 self.toast = Some((|s| s.toast_boss, 3.0));
             }
         }
-        // 보물 상자: 닿으면 연다 → 아직 없는 장신구 하나(다 있으면 반딧불).
+        // 보물 상자: 닿으면 연다 → 씨앗 한 줌 + 아직 없는 장신구 하나(다 있으면 반딧불).
         let ppos = self.player.pos;
         let near: Option<usize> = self.room.props.iter().position(|p| {
             matches!(p.kind, PropKind::Chest { opened: false })
@@ -308,6 +316,10 @@ impl World {
         });
         if let Some(i) = near {
             self.room.open_chest(i);
+            let at = self.room.props[i].rect.center();
+            for _ in 0..rand::gen_range(t::CHEST_SEEDS.0, t::CHEST_SEEDS.1 + 1) {
+                self.loot.push(Loot::spawn(LootKind::Seed, at));
+            }
             let missing: Vec<usize> = (0..crate::equipment::CHARMS.len())
                 .filter(|c| !self.charms_found.contains(c))
                 .collect();
