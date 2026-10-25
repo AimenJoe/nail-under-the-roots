@@ -36,6 +36,16 @@ enum TitleItem {
     Dev,
 }
 /// 앨범 칸 배치(가로 칸 수).
+/// 타이틀에 보이는 버전: Cargo.toml 버전(= 릴리스 태그 v<버전>, 0059) + CI에서 만들었으면 커밋 앞 7자.
+/// 같은 버전이라도 main에 올라간 웹 빌드가 어느 커밋인지 알 수 있다.
+fn build_label() -> String {
+    let v = env!("CARGO_PKG_VERSION");
+    match option_env!("GITHUB_SHA") {
+        Some(sha) if sha.len() >= 7 => format!("{v} · {}", &sha[..7]),
+        _ => v.to_string(),
+    }
+}
+
 /// 상태 탭 글 한 줄 높이 = 위아래로 한 번 내리는 양.
 const STATUS_LINE: f32 = 12.0;
 const ALBUM_COLS: usize = 5;
@@ -1852,8 +1862,10 @@ impl App {
             &[Verb::Pick, Verb::Confirm, Verb::Back],
         );
         ui.text_center(&hint, 160.0, 150.0, FONT_PX, ui::TEXT_DIM);
-        ui.text_right(s.version, 316.0, 166.0, FONT_PX, ui::TEXT_DIM);
         ui.text(s.copyright, 4.0, 166.0, FONT_PX, ui::TEXT_DIM);
+        let room = 312.0 - ui.text_w(s.copyright, FONT_PX) - 12.0;
+        let version = ui.fit(&fill(s.version, &[&build_label()]), room, FONT_PX);
+        ui.text_right(&version, 316.0, 166.0, FONT_PX, ui::TEXT_DIM);
     }
 
     fn draw_dev(&mut self, ui: &Ui) {
