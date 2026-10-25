@@ -18,6 +18,10 @@ use crate::world::{self, FxKind, World};
 
 const VW: u32 = t::VIEW_W as u32;
 const VH: u32 = t::VIEW_H as u32;
+/// 렌더 타깃은 화면보다 오른쪽·아래로 1px 크다. 카메라의 소수점 부분은 올릴 때 화면 px로 밀어서 보여 준다
+/// (부드러운 스크롤 + 그림은 정수 픽셀 격자 그대로). 아래 `present`.
+const RW: f32 = t::VIEW_W + 1.0;
+const RH: f32 = t::VIEW_H + 1.0;
 
 const BG: Color = Color::new(0.12, 0.09, 0.14, 1.0);
 const GRID: Color = Color::new(0.16, 0.12, 0.19, 1.0);
@@ -53,13 +57,15 @@ pub struct Renderer {
     /// 이번 프레임 월드 화면의 왼쪽 위(월드 좌표, 흔들림 포함). 월드 패스 뒤에는 카메라가 화면 고정이라
     /// 컷씬 배우는 이걸 빼서 그린다(`to_view`).
     view_origin: Vec2,
+    /// 카메라의 소수점 부분(0..1, 게임 px). 올릴 때 이만큼 화면을 민다.
+    subpixel: Vec2,
 }
 
 impl Renderer {
     pub fn new(fonts: Fonts, art: Option<Art>) -> Self {
-        let rt = render_target(VW, VH);
+        let rt = render_target(VW + 1, VH + 1);
         rt.texture.set_filter(FilterMode::Nearest);
-        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, t::VIEW_W, t::VIEW_H));
+        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, RW, RH));
         cam.render_target = Some(rt.clone());
         Self {
             rt,
@@ -68,22 +74,29 @@ impl Renderer {
             art,
             warmed: std::cell::Cell::new(None),
             view_origin: Vec2::ZERO,
+            subpixel: Vec2::ZERO,
         }
     }
 
     /// 월드 패스(내부 해상도). `w`가 없으면 타이틀 배경만 그린다.
     /// `alpha`: 마지막 틱 이후 지난 비율(0..1), 위치 보간. `shake_mul`: 설정의 흔들림 배율.
     pub fn begin_world(&mut self, w: Option<&World>, alpha: f32, shake_mul: f32) {
-        let center = vec2(t::VIEW_W / 2.0, t::VIEW_H / 2.0);
+        let center = vec2(RW / 2.0, RH / 2.0);
         let shake = w
             .map(|w| (w.feel.shake_offset * shake_mul).round())
             .unwrap_or(Vec2::ZERO);
         // 모험: 카메라 왼쪽 위(보간, 정수 px). 아레나·타이틀은 0.
+        // 카메라는 반올림하지 않는다(`lerp`는 그림 위치용으로 반올림한다). 소수점은 아래에서 따로 쓴다.
         let cam = w
-            .map(|w| lerp(w.adv.prev_cam, w.adv.cam, alpha))
+            .map(|w| w.adv.prev_cam + (w.adv.cam - w.adv.prev_cam) * alpha)
             .unwrap_or(Vec2::ZERO);
-        self.cam.target = cam + center + shake;
-        self.view_origin = cam + shake;
+        // 걷는 속도(90px/s = 틱당 1.5px)는 정수 px가 아니라, 카메라를 정수로 굴리면 화면 전체가 1·2px씩
+        // 번갈아 걸으며 떨린다(사람 피드백 "화면 전체가 조금 떨려 눈이 피로"). 정수 부분으로 그리고, 소수점 부분은
+        // present에서 화면 px 단위로 민다. 그림(타일·스프라이트)은 렌더 타깃의 정수 격자에 그대로 남는다.
+        let whole = cam.floor();
+        self.subpixel = cam - whole;
+        self.cam.target = whole + center + shake;
+        self.view_origin = whole + shake;
         set_camera(&self.cam);
         let Some(w) = w else {
             clear_background(BG);
@@ -129,30 +142,18 @@ impl Renderer {
         if w.debug.hitboxes {
             draw_hitboxes(w, alpha);
         }
-        // HUD는 화면에 고정(흔들림·스크롤 없이).
+        // 화면 전체 덮개는 화면에 고정(흔들림·스크롤 없이). HUD 막대는 화면 패스(draw_hud)에서 — 렌더 타깃에
+        // 그리면 소수점 밀기에 같이 흔들린다.
         self.cam.target = center;
         set_camera(&self.cam);
-        draw_hud_world(w);
         if w.feel.flash > 0.0 {
             // 벽 쿵 번쩍임. 흔들림 설정을 따른다(0이면 끈다: 눈이 예민한 사람).
             let k = (w.feel.flash / t::DRILL_WALL_FLASH).min(1.0) * shake_mul.min(1.0);
-            draw_rectangle(
-                0.0,
-                0.0,
-                t::VIEW_W,
-                t::VIEW_H,
-                Color::new(1.0, 0.97, 0.9, 0.55 * k),
-            );
+            draw_rectangle(0.0, 0.0, RW, RH, Color::new(1.0, 0.97, 0.9, 0.55 * k));
         }
         let fade = w.fade_alpha();
         if fade > 0.0 {
-            draw_rectangle(
-                0.0,
-                0.0,
-                t::VIEW_W,
-                t::VIEW_H,
-                Color::new(0.0, 0.0, 0.0, fade),
-            );
+            draw_rectangle(0.0, 0.0, RW, RH, Color::new(0.0, 0.0, 0.0, fade));
         }
     }
 
@@ -167,18 +168,24 @@ impl Renderer {
         let (dw, dh) = (t::VIEW_W * scale, t::VIEW_H * scale);
         let x = ((screen_width() - dw) / 2.0).floor();
         let y = ((screen_height() - dh) / 2.0).floor();
+        // 카메라 소수점만큼 화면 px로 민다(정수 화면 px로 반올림: 배율 4면 게임 px의 1/4 단위로 부드럽게).
+        let shift = (self.subpixel * scale).round();
         draw_texture_ex(
             &self.rt.texture,
-            x,
-            y,
+            x - shift.x,
+            y - shift.y,
             WHITE,
             DrawTextureParams {
-                dest_size: Some(vec2(dw, dh)),
+                dest_size: Some(vec2(RW * scale, RH * scale)),
                 // macroquad 0.4.16: from_display_rect + render_target 조합은 상하가 뒤집혀 나온다(실행 확인 2026-10-24).
                 flip_y: true,
                 ..Default::default()
             },
         );
+        // 1px 여분이 화면 칸 밖(오른쪽·아래 레터박스)으로 나온 것을 덮는다.
+        let (sw, sh) = (screen_width(), screen_height());
+        draw_rectangle(x + dw, 0.0, sw - x - dw, sh, BLACK);
+        draw_rectangle(0.0, y + dh, sw, sh - y - dh, BLACK);
         let ui = Ui {
             scale,
             ox: x,
@@ -288,6 +295,7 @@ impl Renderer {
 
     /// 인게임 HUD(실제 해상도): 반딧불 수, 웨이브·처치, 디버그 줄.
     pub fn draw_hud(&self, ui: &Ui, w: &World, gamepad_count: usize) {
+        draw_hud_bars(ui, w);
         // 반딧불: 체력 핍 오른쪽. 숫자는 언어 폰트(숫자는 모든 폰트에 있다). 글자 윗부분이 화면 밖으로 잘리지 않게 y ≥ 1.
         let x = 3.0 + w.player.stats.max_hp as f32 * 7.0 + 5.0;
         let pulse = 0.6 + 0.4 * (w.time * 3.0).sin().abs();
@@ -2057,51 +2065,32 @@ fn draw_hitboxes(w: &World, alpha: f32) {
     }
 }
 
-fn draw_hud_world(w: &World) {
-    // 체력 핍(왼쪽 위, 벽 위에)
+/// 체력 핍(왼쪽 위)·굴파기 쿨다운·SP 게이지(오른쪽 위). 화면 패스에서 게임 px 격자로(ui.rect).
+fn draw_hud_bars(ui: &Ui, w: &World) {
+    let dark = Color::new(0.2, 0.15, 0.2, 1.0);
     for i in 0..w.player.stats.max_hp {
-        let c = if i < w.player.hp {
-            world::MOLE
-        } else {
-            Color::new(0.2, 0.15, 0.2, 1.0)
-        };
-        draw_rectangle(3.0 + i as f32 * 7.0, 1.0, 6.0, 6.0, c);
+        let c = if i < w.player.hp { world::MOLE } else { dark };
+        ui.rect(Rect::new(3.0 + i as f32 * 7.0, 1.0, 6.0, 6.0), c);
     }
-    // 굴파기 쿨다운 바(오른쪽 위)
     let cd = w.player.burrow_cd / (t::BURROW_COOLDOWN * w.player.stats.burrow_cd);
     let bw = 24.0;
-    draw_rectangle(
-        t::VIEW_W - 3.0 - bw,
-        2.0,
-        bw,
-        4.0,
-        Color::new(0.2, 0.15, 0.2, 1.0),
-    );
-    draw_rectangle(
-        t::VIEW_W - 3.0 - bw,
-        2.0,
-        bw * (1.0 - cd).max(0.0),
-        4.0,
+    let x = t::VIEW_W - 3.0 - bw;
+    ui.rect(Rect::new(x, 2.0, bw, 4.0), dark);
+    ui.rect(
+        Rect::new(x, 2.0, (bw * (1.0 - cd).max(0.0)).round(), 4.0),
         world::DIRT,
     );
-    // SP 게이지(그 아래). 가득이면 깜빡인다 — 필살기를 쓸 수 있다.
+    // SP 게이지(그 아래). 가득이면 깜빡인다 — 필살기를 쓸 수 있다. 색은 캐릭터의 게이지 종류(두더지 = 분노).
     let sp = w.player.sp / t::SP_MAX;
     let full = w.player.sp_full();
-    draw_rectangle(
-        t::VIEW_W - 3.0 - bw,
-        8.0,
-        bw,
-        3.0,
-        Color::new(0.2, 0.15, 0.2, 1.0),
-    );
-    // 색은 캐릭터의 게이지 종류(두더지 = 분노, 주황).
+    ui.rect(Rect::new(x, 8.0, bw, 3.0), dark);
     let gc = w.character.gauge().color();
     let gold = if full && ((w.time * 6.0) as i32) % 2 == 0 {
         Color::new(1.0, 1.0, 0.85, 1.0)
     } else {
         gc
     };
-    draw_rectangle(t::VIEW_W - 3.0 - bw, 8.0, bw * sp, 3.0, gold);
+    ui.rect(Rect::new(x, 8.0, (bw * sp).round(), 3.0), gold);
 }
 
 fn draw_hud_screen(w: &World, scale: f32, ox: f32, oy: f32, gamepad_count: usize) {

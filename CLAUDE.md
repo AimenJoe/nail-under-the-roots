@@ -22,7 +22,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 
 ## 코드 규칙
 - 입력은 `Actions` 구조체로만. 게임 로직 어디에서도 `KeyCode`를 직접 보지 않는다. 게임 동작의 키·버튼은 `input::Bindings`(설정에서 바꿈, docs/decisions/0022), 화면에 버튼 이름을 쓸 때는 `input::prompt(Act)` — 글에 키 이름을 박지 않는다.
-- 내부 해상도 320×180, 정수 배율. 월드 좌표는 그릴 때 반올림.
+- 내부 해상도 320×180, 정수 배율. 월드 좌표는 그릴 때 반올림. 카메라만은 반올림하지 않는다: 정수 부분으로 그리고 소수점은 화면에서 민다(렌더 타깃 1px 여분, docs/decisions/0034). HUD는 화면 패스에.
 - 로직은 고정 타임스텝(60Hz). 히트스톱은 로직 시계만 멈춘다.
 - 손맛 수치는 `src/tuning.rs` 한 곳에. 적 종류별 수치·도감 글은 `src/species.rs` 표(docs/decisions/0021). 콤보(무기별)는 `src/moveset.rs`의 `Moveset` 표, 어떤 캐릭터가 어떤 무기 종류를 쓰는지는 `src/equipment.rs`(docs/decisions/0011). 플레이어 코드에 타별 숫자를 직접 쓰지 않는다(docs/decisions/0009).
 - UI는 커서 없이 동작해야 한다(좌우 이동 + 확인). 마우스는 보조.
@@ -32,8 +32,8 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - 테스트용 방 구성은 `src/scenario.rs`에 한 줄 추가(타이틀 "개발"). 컷씬은 `src/cutscene.rs`의 `Step` 스크립트, JRPG식(docs/decisions/0008). 튜토리얼은 `src/tutorial.rs`의 단계 + 포포의 말(docs/decisions/0023).
 - 설정 저장은 `src/prefs.rs`(웹 localStorage 정수 칸). 칸 형식을 바꾸면 `MAGIC`을 올린다.
 - UI 텍스트는 `assets/fonts/Galmuri11-Condensed.ttf`(KS X 1001 2,350자 서브셋)로 실제 해상도에 찍는다. 그 밖의 한자·확장 한글은 안 나온다.
-- 플레이어가 보는 글은 `src/i18n.rs`의 언어별 표에만 쓴다(한국어·영어·일본어·중국어 간체). 코드에 글 리터럴을 두지 않는다. 숫자는 `{0}` + `fill()`, 데이터 표는 `Tr`. 개발 전용 화면만 예외(docs/decisions/0013).
-- 글을 넣거나 바꾸면 네 언어를 다 쓰고, 일본어·간체 표를 고쳤으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font 체크아웃>`으로 폰트를 다시 만든다. 새 화면은 가짜 언어 Pseudo(설정 → 언어 끝)와 일본어로 넘침을 본다. 고정 칸은 `ui.fit`, 긴 글은 `ui::wrap`(docs/decisions/0014).
+- 플레이어가 보는 글은 `src/i18n.rs`의 언어별 표에만 쓴다(한국어·영어·일본어·중국어 간체·브라질 포르투갈어). 코드에 글 리터럴을 두지 않는다. 숫자는 `{0}` + `fill()`, 데이터 표는 `Tr`. 개발 전용 화면만 예외(docs/decisions/0013).
+- 글을 넣거나 바꾸면 다섯 언어를 다 쓰고, 일본어·간체 표를 고쳤으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font 체크아웃>`으로 폰트를 다시 만든다. 새 화면은 가짜 언어 Pseudo(설정 → 언어 끝)와 일본어로 넘침을 본다. 고정 칸은 `ui.fit`, 긴 글은 `ui::wrap`(docs/decisions/0014).
 
 ## 커밋 전
 ```sh
