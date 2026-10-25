@@ -25,7 +25,9 @@
   4. 선택 외곽선(sel-out): 바깥선은 이웃 재질의 가장 어두운 색, 빛 받는 쪽은 한 단 밝게. 검은 선을 피한다.
   5. 눈: 큰 흰 반사 + 작은 반사 + 아래쪽 푸른 반사광. 볼 홍조는 디더.
 """
+import colorsys
 import math
+import os
 import sys
 
 from PIL import Image
@@ -106,6 +108,46 @@ WHITE = (255, 255, 255)
 BAYER2 = [[0.0, 0.5], [0.75, 0.25]]
 
 
+# ---- v2(비교 시험, 기본 꺼짐): NAIL_ART_V2=1 -------------------------------------------
+# 참고한 기법(KB guides/pixel-art-without-an-artist.md "코드 그림 v2"):
+#   색조 이동(그늘은 차갑게 보라·파랑 쪽, 빛은 따뜻하게 노랑 쪽), 디더 없는 단(셀 음영) + 외톨이 픽셀 정리(덩어리),
+#   홍조는 디더 대신 작은 덩어리, 털 결은 무작위 줄을 줄여 덩어리 쪽 몇 가닥만.
+V2 = os.environ.get('NAIL_ART_V2') == '1'
+
+
+def _toward(h, target, amt):
+    d = (target - h + 0.5) % 1.0 - 0.5
+    return (h + d * amt) % 1.0
+
+
+def hue_shift(ramp, dark_to=0.73, light_to=0.12, dark_amt=0.2, light_amt=0.18):
+    """어두운 단은 보라·파랑 쪽, 밝은 단은 노랑 쪽으로 색조를 민다. 어두운 단은 채도를 조금 올린다."""
+    n = len(ramp)
+    out = []
+    for i, (r, g, b) in enumerate(ramp):
+        t = i / max(1, n - 1)
+        h, l, sat = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+        if t < 0.5:
+            k = (0.5 - t) * 2
+            h = _toward(h, dark_to, dark_amt * k)
+            sat = min(1.0, sat * (1 + 0.12 * k) + 0.02 * k)
+        else:
+            k = (t - 0.5) * 2
+            h = _toward(h, light_to, light_amt * k)
+            l = min(0.97, l + 0.02 * k)
+        rr, gg, bb = colorsys.hls_to_rgb(h, l, sat)
+        out.append((round(rr * 255), round(gg * 255), round(bb * 255)))
+    return out
+
+
+if V2:
+    for _k in list(RAMP):
+        if _k not in ('eye', 'glow', 'lens'):
+            RAMP[_k] = hue_shift(RAMP[_k])
+    for _k in list(FUR_VARIANTS):
+        FUR_VARIANTS[_k] = hue_shift(FUR_VARIANTS[_k])
+
+
 class Canvas:
     def __init__(self):
         self.mat = [[None] * W for _ in range(H)]     # (재질, 단) 또는 None
@@ -126,6 +168,10 @@ def shade_level(nx, ny, n_levels, x, y, bias=0.0):
     nz = math.sqrt(max(0.0, 1.0 - nx * nx - ny * ny))
     i = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]
     i = max(0.0, min(1.0, i * 0.8 + 0.12 + bias))
+    if V2:
+        # 셀 음영: 빛 쪽 경계를 조금 더 밀어 가운데 단(바탕색)이 넓다. 디더 없음.
+        v = (i ** 0.85) * (n_levels - 0.01)
+        return max(0, min(n_levels - 1, int(v)))
     v = i * (n_levels - 1)
     lo = int(v)
     frac = v - lo
@@ -173,6 +219,11 @@ def dither_ellipse(cv, cx, cy, rx, ry, rgb, density=0.5):
             dx, dy = (x + 0.5 - cx) / rx, (y + 0.5 - cy) / ry
             r2 = dx * dx + dy * dy
             if r2 <= 1.0 and cv.mat[y][x] is not None:
+                if V2:
+                    # 디더 대신 작은 덩어리: 가운데만 칠한다(밀도가 낮으면 더 작게).
+                    if r2 < 0.25 + 0.5 * density:
+                        cv.paint(x, y, rgb)
+                    continue
                 core = r2 < 0.35
                 if core or BAYER2[y % 2][x % 2] < density:
                     cv.paint(x, y, rgb)
@@ -200,8 +251,33 @@ def happy_eye(cv, cx, cy, rx):
     line(cv, pts, RAMP['eye'][0], 2)
 
 
+def cleanup_clusters(cv, passes=2):
+    """v2: 같은 재질 안에서 상하좌우 어느 이웃과도 단이 다른 외톨이 픽셀을 둘레에 가장 많은 단으로 바꾼다(덩어리)."""
+    for _ in range(passes):
+        changes = []
+        for y in range(1, H - 1):
+            for x in range(1, W - 1):
+                m = cv.mat[y][x]
+                if not m or cv.col[y][x] is not None:
+                    continue
+                mat, lvl = m
+                same, count = 0, {}
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    n = cv.mat[y + dy][x + dx]
+                    if n and n[0] == mat:
+                        if n[1] == lvl:
+                            same += 1
+                        count[n[1]] = count.get(n[1], 0) + 1
+                if same == 0 and count:
+                    changes.append((x, y, mat, max(count, key=count.get)))
+        for x, y, mat, lvl in changes:
+            cv.mat[y][x] = (mat, lvl)
+
+
 def outline(cv):
     """선택 외곽선: 빈 칸이 채운 칸과 닿으면 그 재질의 가장 어두운 색(빛 쪽은 한 단 밝게)."""
+    if V2:
+        cleanup_clusters(cv)
     out = []
     for y in range(H):
         for x in range(W):
@@ -239,7 +315,7 @@ def fur_strands(cv, seed):
     """등·머리 위 짧은 털 결(어두운 2~3px 사선)."""
     import random
     rnd = random.Random(seed)
-    for _ in range(34):
+    for _ in range(10 if V2 else 34):
         x = rnd.randint(14, 58)
         y = rnd.randint(22, 70)
         m = cv.mat[y][x]
@@ -253,7 +329,7 @@ def fur_strands(cv, seed):
             if mm and mm[0] == 'fur':
                 cv.paint(xx, yy, c)
     # 하이라이트 털 몇 가닥(빛 쪽)
-    for _ in range(14):
+    for _ in range(5 if V2 else 14):
         x = rnd.randint(16, 44)
         y = rnd.randint(24, 46)
         m = cv.mat[y][x]

@@ -48,6 +48,14 @@ DFUR = [(70, 36, 30), (112, 62, 42), (160, 96, 60), (200, 134, 86), (230, 170, 1
 DLIGHT = [(206, 180, 156), (232, 212, 190), (248, 238, 222)]
 ACORN = [(62, 40, 26), (98, 66, 40), (138, 98, 60), (176, 134, 84)]
 
+# v2(비교 시험, 기본 꺼짐): NAIL_ART_V2=1. 초상화 v2와 같은 색조 이동 + 덩어리(조약돌·풀·나무껍질)·노을 가장자리 빛.
+V2 = os.environ.get('NAIL_ART_V2') == '1'
+if V2:
+    from portraits import hue_shift
+    FUR, MOM_FUR, PINK, RFUR, RMUZ, RABBIT, BARK, VIOLET, GREEN, BLOSSOM, CAP, DFUR, ACORN = (
+        hue_shift(r) for r in (FUR, MOM_FUR, PINK, RFUR, RMUZ, RABBIT, BARK, VIOLET, GREEN, BLOSSOM, CAP, DFUR, ACORN))
+    SUNSET_RIM = (226, 160, 118)
+
 
 # ---- 캔버스와 마스크 -----------------------------------------------------------
 
@@ -295,23 +303,71 @@ def blossom_cluster(cv, rng, cx, cy, r, n):
 
 # ---- 장면 -------------------------------------------------------------------
 
+def pebbles(cv, rng, region, n, base):
+    """v2 조약돌: 덩어리 하나 + 오른쪽 아래 그늘 + 왼쪽 위 2×2 빛(흩뿌린 얼룩 대신)."""
+    for _ in range(n):
+        x, y = rng.uniform(region[0], region[2]), rng.uniform(region[1], region[3])
+        r = rng.uniform(2.5, 5.5)
+        m = ellipse(cv, x, y, r, r * 0.7)
+        c = rng.choice(base)
+        cv.paint(m, c)
+        cv.paint(m & ~ellipse(cv, x - 1.2, y - 1.0, r, r * 0.7), tuple(v * 0.62 for v in c))
+        cv.paint(m & ellipse(cv, x - r * 0.35, y - r * 0.3, 1.4, 1.1), tuple(min(255, v * 1.35) for v in c))
+
+
+def grass_tufts(cv, rng, y, x0, x1, ramp):
+    """v2 풀: 포기마다 잎 셋(어두운 밑 → 밝은 끝)."""
+    x = x0
+    while x < x1:
+        for k, lean in enumerate((-3, 0, 3)):
+            h = rng.randint(5, 13)
+            tip = (x + lean + rng.uniform(-1, 1), y - h)
+            cv.paint(stroke(cv, [(x, y + 1), tip], 3, 1), ramp[1])
+            cv.paint(stroke(cv, [(x + lean * 0.4, y - h * 0.45), tip], 1), ramp[3] if k == 1 else ramp[2])
+        x += rng.randint(5, 9)
+
+
+def rim_light(cv, mask, rgb, width=2, alpha=1.0, within=None):
+    """v2 가장자리 빛: 빛 쪽(왼쪽 위)으로 비어 있는 가장자리 width px만 rgb로. within이 있으면 그 안만 칠한다
+    (가장자리는 mask 전체 윤곽으로 재므로, 줄기와 가지가 이어진 곳에 선이 생기지 않는다)."""
+    edge = np.zeros_like(mask)
+    for i in range(1, width + 1):
+        s = np.zeros_like(mask)
+        s[i:, i:] = mask[:-i, :-i]   # 오른쪽 아래로 민 마스크: 원래 칸의 왼쪽 위 이웃이 비었으면 False
+        edge |= mask & ~s
+    if within is not None:
+        edge &= within
+    cv.paint(edge, rgb, alpha)
+
+
 def great_tree():
     rng = random.Random(11)
     cv = Canvas(640, 560)
     ground = 300
     bands(cv, 0, ground, (46, 38, 74), (206, 150, 126), 10)
+    if V2:
+        # 대기 원근: 먼 산줄기 한 겹 더(하늘색 쪽으로 밝게)
+        far = poly(cv, [(0, 236)] + [(x, 232 - 22 * math.sin(x / 110 + 1.3) - 9 * math.sin(x / 37)) for x in range(0, 641, 16)] + [(640, ground), (0, ground)])
+        cv.paint(far, (146, 110, 128))
     # 먼 언덕
     hill = poly(cv, [(0, 262)] + [(x, 258 - 14 * math.sin(x / 70) - 8 * math.sin(x / 23)) for x in range(0, 641, 16)] + [(640, ground), (0, ground)])
     cv.paint(hill, (92, 78, 96))
     # 땅속 흙 띠
     bands(cv, ground, 560, (92, 64, 50), (30, 20, 26), 9)
-    speckle(cv, rng, (0, ground + 10, 640, 560), 140, [(70, 50, 42), (110, 82, 62), (54, 38, 36)])
+    if V2:
+        pebbles(cv, rng, (0, ground + 14, 640, 556), 110, [(104, 80, 66), (88, 70, 64), (120, 96, 74)])
+    else:
+        speckle(cv, rng, (0, ground + 10, 640, 560), 140, [(70, 50, 42), (110, 82, 62), (54, 38, 36)])
     # 풀 줄
     grass = (cv.yy >= ground - 6) & (cv.yy < ground + 4)
-    cv.paint(grass, (88, 104, 66))
-    for x in range(0, 640, 6):
-        h = rng.randint(4, 12)
-        cv.paint(stroke(cv, [(x, ground), (x + rng.randint(-2, 2), ground - h)], 2), (104, 124, 76))
+    if V2:
+        cv.paint(grass, (72, 92, 62))
+        grass_tufts(cv, rng, ground, 0, 640, hue_shift([(52, 70, 50), (74, 96, 60), (98, 122, 72), (140, 156, 90)]))
+    else:
+        cv.paint(grass, (88, 104, 66))
+        for x in range(0, 640, 6):
+            h = rng.randint(4, 12)
+            cv.paint(stroke(cv, [(x, ground), (x + rng.randint(-2, 2), ground - h)], 2), (104, 124, 76))
     # 뿌리(갈색, 진짜 뿌리)
     root_paths = []
     for k in range(9):
@@ -331,6 +387,8 @@ def great_tree():
             t = i / 38
             out.append((x + math.sin(t * 30) * 6, y))
         m = stroke(cv, out, 3, 1)
+        if V2:   # 실 둘레 은은한 빛(땅속에서 실이 스스로 빛나는 느낌)
+            cv.paint(dilate(m, 4) & ~m, VIOLET[1], 0.22)
         cv.paint(dilate(m) & ~m, VIOLET[0])
         cv.paint(m, VIOLET[2])
     for _ in range(14):
@@ -376,9 +434,22 @@ def great_tree():
     shade(cv, trunk, BARK, 322, 200, 60, 140)
     shade(cv, branch_only, BARK, 300, 110, 240, 170, bias=0.1)
     # 줄기 결
-    for k in range(5):
-        x = 300 + k * 9
-        cv.paint(stroke(cv, [(x, 290), (x + 3, 200), (x + 1, 130)], 1) & trunk, BARK[0])
+    if V2:
+        # 껍질: 곧은 선 대신 짧은 갈라짐 덩어리(어두운 틈 + 오른쪽 1px 밝은 턱), 노을 쪽 가장자리 빛
+        for _ in range(34):
+            x = rng.uniform(296, 348)
+            y = rng.uniform(110, 296)
+            ln = rng.uniform(8, 22)
+            crack = stroke(cv, [(x, y), (x + rng.uniform(-2, 2), y + ln)], 2) & trunk
+            cv.paint(crack, BARK[0])
+            cv.paint(stroke(cv, [(x + 2, y + 1), (x + 2, y + ln - 1)], 1) & trunk & ~crack, BARK[3])
+        # 가는 가지까지 2px이면 주황 테두리처럼 보인다: 줄기만 2px, 가지는 1px을 옅게.
+        rim_light(cv, trunk, SUNSET_RIM, 2, within=trunk & ~branch_only)
+        rim_light(cv, trunk, SUNSET_RIM, 1, 0.45, within=branch_only)
+    else:
+        for k in range(5):
+            x = 300 + k * 9
+            cv.paint(stroke(cv, [(x, 290), (x + 3, 200), (x + 1, 130)], 1) & trunk, BARK[0])
     # 몇 안 남은 마른 잎(가지 끝 몇 군데에만)
     for (x, y) in tips:
         if rng.random() < 0.35:
