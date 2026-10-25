@@ -23,20 +23,42 @@ const SHADOW: Color = Color::new(0.05, 0.03, 0.06, 0.8);
 
 const SHADOW_SOFT: Color = Color::new(0.05, 0.03, 0.08, 0.35);
 
+/// 언어별 폰트(i18n::Lang::font_file). 시작할 때 전부 읽는다(일본어·중국어는 서브셋이라 100KB 안쪽).
+pub struct Fonts {
+    pub base: Option<Font>,
+    pub by_file: Vec<(&'static str, Font)>,
+}
+
+impl Fonts {
+    fn for_lang(&self, l: crate::i18n::Lang) -> Option<Font> {
+        let file = l.font_file();
+        self.by_file
+            .iter()
+            .find(|(f, _)| *f == file)
+            .map(|(_, font)| font.clone())
+            .or_else(|| self.base.clone())
+    }
+}
+
 pub struct Renderer {
     rt: RenderTarget,
     cam: Camera2D,
-    font: Option<Font>,
+    fonts: Fonts,
     art: Option<Art>,
 }
 
 impl Renderer {
-    pub fn new(font: Option<Font>, art: Option<Art>) -> Self {
+    pub fn new(fonts: Fonts, art: Option<Art>) -> Self {
         let rt = render_target(VW, VH);
         rt.texture.set_filter(FilterMode::Nearest);
         let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, t::VIEW_W, t::VIEW_H));
         cam.render_target = Some(rt.clone());
-        Self { rt, cam, font, art }
+        Self {
+            rt,
+            cam,
+            fonts,
+            art,
+        }
     }
 
     /// 월드 패스(내부 해상도). `w`가 없으면 타이틀 배경만 그린다.
@@ -106,7 +128,8 @@ impl Renderer {
             scale,
             ox: x,
             oy: y,
-            font: self.font.clone(),
+            font: self.fonts.for_lang(crate::i18n::lang()),
+            base: self.fonts.base.clone(),
         }
     }
 

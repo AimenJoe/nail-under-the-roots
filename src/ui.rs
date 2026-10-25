@@ -20,7 +20,10 @@ pub struct Ui {
     pub scale: f32,
     pub ox: f32,
     pub oy: f32,
+    /// 지금 언어의 폰트.
     pub font: Option<Font>,
+    /// 한국어 폰트(Galmuri). 번역하지 않는 개발 화면은 언어와 상관없이 이걸로 찍는다.
+    pub base: Option<Font>,
 }
 
 impl Ui {
@@ -59,9 +62,33 @@ impl Ui {
         draw_text_ex(s, p.x.round(), p.y.round(), self.params(size, c));
     }
 
+    /// 같은 배치에 기본 폰트(개발 화면용).
+    pub fn with_base_font(&self) -> Ui {
+        Ui {
+            font: self.base.clone(),
+            ..self.clone()
+        }
+    }
+
     /// 글자 폭(논리 px).
     pub fn text_w(&self, s: &str, size: f32) -> f32 {
         measure_text(s, self.font.as_ref(), (size * self.scale) as u16, 1.0).width / self.scale
+    }
+
+    /// 폭에 안 맞으면 뒤를 잘라 "…"를 붙인다. 언어마다 길이가 달라 고정 칸에서 넘칠 때의 마지막 안전장치.
+    pub fn fit(&self, s: &str, max_w: f32, size: f32) -> String {
+        if self.text_w(s, size) <= max_w {
+            return s.to_string();
+        }
+        let mut cut: Vec<char> = s.chars().collect();
+        while !cut.is_empty() {
+            cut.pop();
+            let t: String = cut.iter().collect::<String>().trim_end().to_string() + "…";
+            if self.text_w(&t, size) <= max_w {
+                return t;
+            }
+        }
+        "…".to_string()
     }
 
     pub fn text_center(&self, s: &str, cx: f32, y: f32, size: f32, c: Color) {
@@ -99,26 +126,37 @@ impl Ui {
                 self.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ACCENT);
             }
             let c = if i == cursor { TEXT } else { TEXT_DIM };
-            self.text(it, r.x + 14.0, r.y + 2.0, FONT_PX, c);
+            let label = self.fit(it, w - 16.0, FONT_PX);
+            self.text(&label, r.x + 14.0, r.y + 2.0, FONT_PX, c);
             rects.push(r);
         }
         rects
     }
 
-    /// 가로 탭 줄. 각 탭의 논리 rect를 돌려준다.
-    pub fn tabs(&self, labels: &[&str], active: usize, x: f32, y: f32) -> Vec<Rect> {
+    /// 가로 탭 줄(폭 `max_w` 안). 각 탭의 논리 rect를 돌려준다.
+    /// 이름이 긴 언어면 여백을 줄이고, 그래도 넘치면 탭마다 같은 몫으로 자른다.
+    pub fn tabs(&self, labels: &[&str], active: usize, x: f32, y: f32, max_w: f32) -> Vec<Rect> {
+        let n = labels.len().max(1) as f32;
+        let text: f32 = labels.iter().map(|l| self.text_w(l, FONT_PX)).sum();
+        let pad = ((max_w - text - 2.0 * (n - 1.0)) / n).clamp(2.0, 10.0);
+        let share = (max_w - 2.0 * (n - 1.0)) / n - pad;
         let mut rects = Vec::with_capacity(labels.len());
         let mut cx = x;
         for (i, l) in labels.iter().enumerate() {
-            let w = self.text_w(l, FONT_PX) + 10.0;
+            let l = if text + n * pad + 2.0 * (n - 1.0) > max_w {
+                self.fit(l, share, FONT_PX)
+            } else {
+                l.to_string()
+            };
+            let w = self.text_w(&l, FONT_PX) + pad;
             let r = Rect::new(cx, y, w, FONT_PX + 4.0);
             if i == active {
                 self.rect(r, PANEL_LIGHT);
                 self.rect_lines(r, BORDER);
             }
             self.text(
-                l,
-                r.x + 5.0,
+                &l,
+                r.x + pad / 2.0,
                 r.y + 2.0,
                 FONT_PX,
                 if i == active { ACCENT } else { TEXT_DIM },
@@ -144,12 +182,13 @@ impl Ui {
             self.rect(row, PANEL_LIGHT);
         }
         let c = if selected { TEXT } else { TEXT_DIM };
-        self.text(label, x + 4.0, y + 2.0, FONT_PX, c);
         let right = x + w - 4.0;
         let vw = self.text_w(value, FONT_PX).max(40.0);
         let arrow_w = 12.0;
         let r_arrow = Rect::new(right - arrow_w, y, arrow_w, row.h);
         let l_arrow = Rect::new(right - arrow_w * 2.0 - vw, y, arrow_w, row.h);
+        let label = self.fit(label, l_arrow.x - x - 8.0, FONT_PX);
+        self.text(&label, x + 4.0, y + 2.0, FONT_PX, c);
         let ac = if selected { ACCENT } else { TEXT_DIM };
         self.text("◀", l_arrow.x + 2.0, y + 2.0, FONT_PX, ac);
         self.text_center(
@@ -169,25 +208,126 @@ impl Ui {
     }
 }
 
-/// 단어 단위로 줄바꿈(한글은 글자 단위로도 끊긴다).
+/// 줄바꿈. 띄어쓰기가 있는 글(한국어·영어)은 단어 단위, 띄어쓰기가 없는 글(일본어·중국어)은 글자 단위.
 pub fn wrap(ui: &Ui, s: &str, max_w: f32, size: f32) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut cur = String::new();
-    for word in s.split(' ') {
-        let cand = if cur.is_empty() {
-            word.to_string()
-        } else {
-            format!("{cur} {word}")
-        };
-        if ui.text_w(&cand, size) <= max_w || cur.is_empty() {
-            cur = cand;
-        } else {
-            lines.push(cur);
-            cur = word.to_string();
+    wrap_with(s, max_w, |t| ui.text_w(t, size))
+}
+
+/// 한자·가나·전각 문장부호: 이 글자 앞뒤에서는 띄어쓰기 없이도 줄을 바꿀 수 있다.
+fn is_cjk(c: char) -> bool {
+    matches!(c as u32, 0x3000..=0x30FF | 0x3400..=0x4DBF | 0x4E00..=0x9FFF | 0xF900..=0xFAFF | 0xFF00..=0xFFEF)
+        || c == '…'
+}
+
+/// 금칙: 줄 맨 앞에 오면 안 되는 글자(닫는 부호·구두점·작은 가나·장음).
+fn no_line_start(c: char) -> bool {
+    "、。，．！？：；）」』】〕…ー〜・ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮ!?,.:;)".contains(c)
+}
+
+/// 금칙: 줄 맨 끝에 오면 안 되는 글자(여는 부호).
+fn no_line_end(c: char) -> bool {
+    "（「『【〔(".contains(c)
+}
+
+/// 측정 함수를 받는 줄바꿈(테스트용으로 분리).
+pub fn wrap_with(s: &str, max_w: f32, measure: impl Fn(&str) -> f32) -> Vec<String> {
+    // 끊을 수 있는 조각: (조각, 앞에 띄어쓰기가 있었나). CJK 글자는 한 글자가 한 조각.
+    let mut units: Vec<(String, bool)> = Vec::new();
+    let mut space = false;
+    for c in s.chars() {
+        if c == ' ' {
+            space = true;
+            continue;
         }
+        let joins_prev = !space
+            && units
+                .last()
+                .is_some_and(|(u, _)| !is_cjk(c) && !u.chars().last().is_some_and(is_cjk));
+        if joins_prev {
+            units.last_mut().unwrap().0.push(c);
+        } else {
+            units.push((c.to_string(), space));
+        }
+        space = false;
+    }
+    // 한 조각이 혼자서도 줄보다 길면(독일어 합성어, URL 등) 글자 단위로 쪼갠다.
+    let units: Vec<(String, bool)> = units
+        .into_iter()
+        .flat_map(|(u, sp)| {
+            if measure(&u) <= max_w {
+                return vec![(u, sp)];
+            }
+            let mut parts: Vec<(String, bool)> = Vec::new();
+            for c in u.chars() {
+                match parts.last_mut() {
+                    Some((p, _)) if measure(&format!("{p}{c}")) <= max_w => p.push(c),
+                    _ => parts.push((c.to_string(), parts.is_empty() && sp)),
+                }
+            }
+            parts
+        })
+        .collect();
+    let mut lines: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    for (u, sp) in units {
+        let joined = if cur.is_empty() {
+            u.clone()
+        } else if sp {
+            format!("{cur} {u}")
+        } else {
+            format!("{cur}{u}")
+        };
+        let starts_badly = u.chars().next().is_some_and(no_line_start);
+        if cur.is_empty() || measure(&joined) <= max_w || starts_badly {
+            cur = joined;
+            continue;
+        }
+        // 여는 부호로 끝나는 줄이면 그 부호를 다음 줄로 넘긴다.
+        let mut carry = String::new();
+        if let Some(last) = cur.chars().last().filter(|c| no_line_end(*c)) {
+            cur.pop();
+            carry.push(last);
+        }
+        lines.push(cur.trim_end().to_string());
+        cur = carry + &u;
     }
     if !cur.is_empty() {
         lines.push(cur);
     }
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn w(s: &str) -> f32 {
+        s.chars().count() as f32
+    }
+
+    #[test]
+    fn wraps_words_with_spaces() {
+        assert_eq!(wrap_with("aa bb cc", 5.0, w), vec!["aa bb", "cc"]);
+        // 줄보다 긴 단어는 쪼갠다.
+        assert_eq!(wrap_with("abcdefgh", 3.0, w), vec!["abc", "def", "gh"]);
+    }
+
+    #[test]
+    fn wraps_cjk_by_character_with_kinsoku() {
+        // 5글자 폭: 。는 줄 맨 앞에 오지 않고 앞 줄에 붙는다.
+        assert_eq!(
+            wrap_with("あいうえお。かき", 5.0, w),
+            vec!["あいうえお。", "かき"]
+        );
+        // 여는 괄호는 줄 끝에 남지 않는다.
+        assert_eq!(
+            wrap_with("あいうえ（かき）", 5.0, w),
+            vec!["あいうえ", "（かき）"]
+        );
+        // 라틴 단어는 CJK 사이에서도 쪼개지지 않는다.
+        assert_eq!(
+            wrap_with("こうげき（ATK）", 6.0, w),
+            vec!["こうげき", "（ATK）"]
+        );
+    }
 }

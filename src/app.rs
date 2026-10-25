@@ -259,7 +259,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(sfx: Sfx, font: Option<Font>, art: Option<Art>) -> Self {
+    pub fn new(sfx: Sfx, fonts: render::Fonts, art: Option<Art>) -> Self {
         let settings = Settings {
             volume: 7,
             shake: 10,
@@ -289,7 +289,7 @@ impl App {
             gift: None,
             sfx,
             input: Input::new(),
-            renderer: Renderer::new(font, art),
+            renderer: Renderer::new(fonts, art),
             acc: 0.0,
             run_time: 0.0,
             death_t: 0.0,
@@ -791,6 +791,9 @@ impl App {
     }
 
     fn draw_dev(&mut self, ui: &Ui) {
+        // 개발 화면은 번역하지 않는다(한국어). 언어와 상관없이 한글 폰트로.
+        let base = ui.with_base_font();
+        let ui = &base;
         let panel = Rect::new(24.0, 16.0, 272.0, 148.0);
         ui.panel(panel, Some("개발 시나리오"));
         let names: Vec<&str> = scenario::LIST.iter().map(|e| e.name).collect();
@@ -920,13 +923,19 @@ impl App {
                 self.hits.push((row, Hit::SettingRow(i)));
             }
         }
-        ui.text_center(
-            s.settings_hint,
-            160.0,
-            panel.bottom() + 6.0,
-            FONT_PX,
-            ui::TEXT_DIM,
-        );
+        for (i, l) in ui::wrap(ui, s.settings_hint, 300.0, FONT_PX)
+            .iter()
+            .take(2)
+            .enumerate()
+        {
+            ui.text_center(
+                l,
+                160.0,
+                panel.bottom() + 4.0 + i as f32 * 13.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
     }
 
     /// 장착 무기를 플레이어에 반영한다. 맨손이면 공격이 안 나간다.
@@ -973,7 +982,7 @@ impl App {
     fn draw_gift(&self, ui: &Ui, g: &Gift) {
         let wp = &WEAPONS[g.weapon];
         let k = (g.t / 0.2).min(1.0);
-        let r = Rect::new(56.0, 48.0 + (1.0 - k) * 8.0, 208.0, 74.0);
+        let r = Rect::new(56.0, 42.0 + (1.0 - k) * 8.0, 208.0, 86.0);
         ui.panel(r, None);
         ui.text_center(i18n::s().gift_title, 160.0, r.y + 5.0, FONT_PX, ui::ACCENT);
         let icon = Rect::new(r.x + 10.0, r.y + 22.0, 22.0, 22.0);
@@ -988,7 +997,7 @@ impl App {
             ui::TEXT,
         );
         let lines = ui::wrap(ui, tr(wp.desc), r.right() - icon.right() - 16.0, FONT_PX);
-        for (i, l) in lines.iter().take(2).enumerate() {
+        for (i, l) in lines.iter().take(3).enumerate() {
             ui.text(
                 l,
                 icon.right() + 8.0,
@@ -1010,11 +1019,20 @@ impl App {
 
     /// 튜토리얼 힌트: 아래 가운데 한 줄.
     fn draw_hint(&self, ui: &Ui, text: &str) {
-        let w = ui.text_w(text, FONT_PX) + 16.0;
-        let r = Rect::new(160.0 - w / 2.0, 158.0, w, FONT_PX + 8.0);
+        // 한 줄이 기본. 언어에 따라 길면 두 줄로 위로 자란다.
+        let lines = ui::wrap(ui, text, 288.0, FONT_PX);
+        let w = lines
+            .iter()
+            .map(|l| ui.text_w(l, FONT_PX))
+            .fold(0.0, f32::max)
+            + 16.0;
+        let h = lines.len() as f32 * 13.0 + 8.0;
+        let r = Rect::new(160.0 - w / 2.0, 178.0 - h - 7.0, w, h);
         ui.rect(r, ui::PANEL);
         ui.rect_lines(r, ui::BORDER);
-        ui.text_center(text, 160.0, r.y + 4.0, FONT_PX, ui::TEXT);
+        for (i, l) in lines.iter().enumerate() {
+            ui.text_center(l, 160.0, r.y + 4.0 + i as f32 * 13.0, FONT_PX, ui::TEXT);
+        }
     }
 
     /// 사망 연출: 서서히 어두워지고 글자가 떠오른 뒤, 입력 잠금이 풀리면 안내가 깜빡인다.
@@ -1041,13 +1059,14 @@ impl App {
     }
 
     fn draw_pause(&mut self, ui: &Ui) {
-        let panel = Rect::new(12.0, 10.0, 296.0, 160.0);
+        let panel = Rect::new(12.0, 8.0, 296.0, 156.0);
         ui.panel(panel, None);
         let tabs = ui.tabs(
             &trs(&PAUSE_TABS),
             self.pause_tab,
             panel.x + 6.0,
             panel.y + 5.0,
+            panel.w - 12.0,
         );
         for (i, r) in tabs.into_iter().enumerate() {
             self.hits.push((r, Hit::PauseTab(i)));
@@ -1057,10 +1076,11 @@ impl App {
             vec2(panel.right() - 4.0, panel.y + 24.0),
             ui::BORDER,
         );
+        // 탭 안내는 패널 밖 오른쪽 아래. 탭 줄에 두면 탭 이름이 긴 언어에서 겹치고, 패널 안에 두면 내용과 겹친다.
         ui.text_right(
             i18n::s().tab_hint,
-            panel.right() - 6.0,
-            panel.y + 7.0,
+            panel.right() - 2.0,
+            panel.bottom() + 2.0,
             FONT_PX,
             ui::TEXT_DIM,
         );
@@ -1146,10 +1166,29 @@ impl App {
             .map(|(k, _)| ui.text_w(k, FONT_PX))
             .fold(0.0, f32::max)
             + 8.0;
-        for (i, (k, v)) in lines.iter().enumerate() {
-            let y = c.y + i as f32 * row_h;
-            ui.text(k, c.x, y, FONT_PX, ui::ACCENT);
-            ui.text(v, c.x + key_w, y, FONT_PX, ui::TEXT);
+        // 값이 길면(언어에 따라) 두 줄까지 바꾸고 아래 줄을 민다. 그보다 길면 자른다.
+        let mut y = c.y;
+        for (k, v) in lines.iter() {
+            // 칸을 넘으면 그리지 않는다(아래는 탭 안내 자리).
+            if y + FONT_PX > c.bottom() {
+                break;
+            }
+            ui.text(&ui.fit(k, 72.0, FONT_PX), c.x, y, FONT_PX, ui::ACCENT);
+            let vx = c.x + key_w.min(80.0);
+            let vw = c.right() - vx;
+            let wrapped = ui::wrap(ui, v, vw, FONT_PX);
+            for (j, l) in wrapped.iter().take(2).enumerate() {
+                if j > 0 {
+                    y += 13.0;
+                }
+                let l = if j == 1 && wrapped.len() > 2 {
+                    ui.fit(&format!("{l}…"), vw, FONT_PX)
+                } else {
+                    l.clone()
+                };
+                ui.text(&l, vx, y, FONT_PX, ui::TEXT);
+            }
+            y += row_h;
         }
     }
 
@@ -1266,7 +1305,8 @@ impl App {
                 FONT_PX,
                 if q.done() { ui::ACCENT } else { col },
             );
-            ui.text(tr(q.title), r.x + 16.0, r.y + 2.0, FONT_PX, col);
+            let title = ui.fit(tr(q.title), r.w - 46.0, FONT_PX);
+            ui.text(&title, r.x + 16.0, r.y + 2.0, FONT_PX, col);
             ui.text_right(
                 &format!("{}/{}", q.progress, q.goal),
                 r.right() - 4.0,
@@ -1287,8 +1327,13 @@ impl App {
 
     fn draw_map(&self, ui: &Ui, c: Rect) {
         let s = i18n::s();
+        let proto_w = ui.text_w(s.map_proto, FONT_PX);
         ui.text(
-            &fill(s.map_floor, &[&tr(self.world.biome.name())]),
+            &ui.fit(
+                &fill(s.map_floor, &[&tr(self.world.biome.name())]),
+                c.w - proto_w - 8.0,
+                FONT_PX,
+            ),
             c.x,
             c.y,
             FONT_PX,
@@ -1329,18 +1374,13 @@ impl App {
         }
         let p = m(self.world.player.pos);
         ui.rect(Rect::new(p.x - 2.0, p.y - 2.0, 4.0, 4.0), ui::ACCENT);
-        for (i, l) in ui::wrap(ui, s.map_note, c.w, FONT_PX)
-            .iter()
-            .take(2)
-            .enumerate()
-        {
-            ui.text(
-                l,
-                c.x,
-                origin.y + t::VIEW_H * k + 4.0 + i as f32 * 12.0,
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
-        }
+        // 한 줄만(아래는 탭 안내 자리). 길면 자른다.
+        ui.text(
+            &ui.fit(s.map_note, c.w, FONT_PX),
+            c.x,
+            origin.y + t::VIEW_H * k + 4.0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
     }
 }

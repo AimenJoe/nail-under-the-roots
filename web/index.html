@@ -18,17 +18,18 @@
   <!-- gamepads 크레이트의 macroquad 플러그인. 레포 복사본(web/README.md). 핫링크 금지. -->
   <script src="macroquad-gamepads-0.1.js"></script>
   <!-- 브라우저 선호 언어 → 게임 언어(src/i18n.rs가 고른다: 가진 첫 언어, 없으면 영어).
-       i번째 선호 언어의 주 언어 코드 두 글자를 (첫 글자 << 8) | 둘째 글자로 돌려준다. 목록 끝이면 0. -->
+       nail_locale(i, k): i번째 선호 언어 태그(예 "zh-Hant-TW")의 k번째 네 글자를 u32 하나로(빅엔디언). 끝이면 0. ASCII만. -->
   <script>
     miniquad_add_plugin({
       name: "nail_locale",
-      version: 1,
+      version: 2,
       register_plugin: function (importObject) {
-        importObject.env.nail_locale = function (i) {
+        importObject.env.nail_locale = function (i, k) {
           var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
-          var tag = (langs[i] || "").toLowerCase();
-          if (!/^[a-z]{2}/.test(tag)) return 0;
-          return (tag.charCodeAt(0) << 8) | tag.charCodeAt(1);
+          var tag = String(langs[i] || "").replace(/[^A-Za-z0-9_.@-]/g, "").slice(k * 4, k * 4 + 4);
+          var w = 0;
+          for (var j = 0; j < 4; j++) w = (w * 256) + (j < tag.length ? tag.charCodeAt(j) : 0);
+          return w >>> 0;
         };
       }
     });

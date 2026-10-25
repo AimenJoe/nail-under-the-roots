@@ -3,7 +3,7 @@
 실행: python3 tools/licenses.py  → assets/THIRD_PARTY_LICENSES.txt
 - cargo metadata로 모든 크레이트(모든 플랫폼)의 이름·버전·SPDX를 모으고, 크레이트 폴더의 LICENSE*/COPYING*/NOTICE* 원문을 붙인다.
 - 같은 원문은 한 번만 싣고 해당 크레이트를 나열한다.
-- 웹 JS 복사본(mq_js_bundle.js = macroquad, macroquad-gamepads = gamepads)과 폰트(Galmuri, OFL)도 싣는다.
+- 웹 JS 복사본(mq_js_bundle.js = macroquad, macroquad-gamepads = gamepads)과 폰트(Galmuri, Ark Pixel 서브셋 — 둘 다 OFL)도 싣는다.
 MIT·BSD·Apache·ISC·Unicode 라이선스는 바이너리 배포에도 저작권 고지와 라이선스 원문을 함께 줄 것을 요구한다.
 """
 import hashlib
@@ -60,6 +60,9 @@ def main():
         '== 폰트 ==',
         'assets/fonts/Galmuri11-Condensed.ttf — Galmuri, Copyright (c) 2019-2025 Lee Minseo, SIL Open Font License 1.1.',
         '원문: assets/fonts/OFL.md (예약 폰트 이름 없음. 글리프를 추린 서브셋)',
+        'assets/fonts/NailCJK-ja.ttf, assets/fonts/NailCJK-zh-Hans.ttf — Ark Pixel Font(https://github.com/TakWolf/ark-pixel-font),',
+        '  Copyright (c) 2021, TakWolf (https://takwolf.com), SIL Open Font License 1.1. 원문: assets/fonts/OFL-ArkPixel.txt',
+        '  (예약 폰트 이름 없음. 게임에 쓰는 글자만 뽑아 다시 지은 수정본, 이름 Nail CJK 12 JA/SC — tools/fonts/build_cjk.py)',
         '',
         '== Rust 크레이트 ==',
     ]

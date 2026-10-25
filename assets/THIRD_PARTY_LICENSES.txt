@@ -8,6 +8,9 @@ web/macroquad-gamepads-0.1.js: gamepads(fornwall) — MIT OR Apache-2.0 (아래 
 == 폰트 ==
 assets/fonts/Galmuri11-Condensed.ttf — Galmuri, Copyright (c) 2019-2025 Lee Minseo, SIL Open Font License 1.1.
 원문: assets/fonts/OFL.md (예약 폰트 이름 없음. 글리프를 추린 서브셋)
+assets/fonts/NailCJK-ja.ttf, assets/fonts/NailCJK-zh-Hans.ttf — Ark Pixel Font(https://github.com/TakWolf/ark-pixel-font),
+  Copyright (c) 2021, TakWolf (https://takwolf.com), SIL Open Font License 1.1. 원문: assets/fonts/OFL-ArkPixel.txt
+  (예약 폰트 이름 없음. 게임에 쓰는 글자만 뽑아 다시 지은 수정본, 이름 Nail CJK 12 JA/SC — tools/fonts/build_cjk.py)
 
 == Rust 크레이트 ==
 ------------------------------------------------------------------------

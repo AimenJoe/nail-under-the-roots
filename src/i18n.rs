@@ -1,43 +1,78 @@
-//! 다국어(docs/decisions/0013). 플레이어가 보는 글은 전부 여기 언어별 표 한 곳에 있다.
+//! 다국어(docs/decisions/0013, 0014). 플레이어가 보는 글은 전부 여기 언어별 표 한 곳에 있다.
 //!
 //! - 키는 `Strings`의 필드 이름. 한 언어에 필드가 빠지면 컴파일이 안 된다.
 //! - 숫자가 들어가는 글은 `{0}`, `{1}` 자리표시자 + `fill()`. 언어마다 어순이 달라도 된다. 문장을 조각으로 잇지 않는다.
 //! - 다른 모듈은 글 대신 `Tr`(표에서 글을 고르는 함수)을 들고 있다가, 그릴 때 `tr()`로 꺼낸다.
 //!   월드 로직은 지금 언어를 모른다.
-//! - 개발 전용 화면(시나리오 목록, 디버그 오버레이)은 번역하지 않는다.
-//! - 테스트: 모든 언어의 모든 글이 폰트에 있는 글자로만 되어 있는지, 자리표시자가 언어끼리 같은지.
+//! - 언어마다 폰트가 다르다(`Lang::font_file`). 한국어·영어는 Galmuri, 일본어·중국어는 Ark Pixel에서 만든 서브셋
+//!   (tools/fonts/build_cjk.py — 표를 고치면 다시 돌린다).
+//! - 개발 전용 화면(시나리오 목록, 디버그 오버레이)은 번역하지 않고 기본 폰트로 찍는다.
+//! - 개발 빌드에는 가짜 언어 "Pseudo"(영어를 악센트 + 40% 늘림)가 있다. 넘치는 칸·번역 안 된 글을 미리 찾는다.
+//! - 테스트: 모든 언어의 모든 글이 그 언어 폰트에 있는 글자로만 되어 있는지, 자리표시자가 언어끼리 같은지.
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
 /// 표에서 글 하나를 고르는 함수. 데이터 표(무기·퀘스트·컷씬)가 글 대신 이걸 든다.
 pub type Tr = fn(&Strings) -> &'static str;
 
+/// 한국어·영어 폰트(그리고 개발 화면·가짜 언어).
+pub const BASE_FONT: &str = "fonts/Galmuri11-Condensed.ttf";
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Lang {
     Ko,
     En,
+    Ja,
+    ZhHans,
+    #[cfg(feature = "dev")]
+    Pseudo,
 }
 
 impl Lang {
-    pub const ALL: [Lang; 2] = [Lang::Ko, Lang::En];
+    /// 설정에서 넘기는 순서.
+    #[cfg(not(feature = "dev"))]
+    pub const ALL: &'static [Lang] = &[Lang::Ko, Lang::En, Lang::Ja, Lang::ZhHans];
+    #[cfg(feature = "dev")]
+    pub const ALL: &'static [Lang] = &[Lang::Ko, Lang::En, Lang::Ja, Lang::ZhHans, Lang::Pseudo];
 
     pub fn strings(self) -> &'static Strings {
         match self {
             Lang::Ko => &KO,
             Lang::En => &EN,
+            Lang::Ja => &JA,
+            Lang::ZhHans => &ZH_HANS,
+            #[cfg(feature = "dev")]
+            Lang::Pseudo => pseudo(),
         }
     }
 
-    /// BCP 47 태그("ko-KR", "en-US", "ko", "en_US.UTF-8")가 우리가 가진 언어면 그 언어.
+    /// 이 언어를 찍는 폰트(assets 기준 경로).
+    pub fn font_file(self) -> &'static str {
+        match self {
+            Lang::Ja => "fonts/NailCJK-ja.ttf",
+            Lang::ZhHans => "fonts/NailCJK-zh-Hans.ttf",
+            _ => BASE_FONT,
+        }
+    }
+
+    /// BCP 47 태그("ko-KR", "en-US", "zh-Hans-CN", "en_US.UTF-8")가 우리가 가진 언어면 그 언어.
+    /// 중국어는 번체(zh-Hant, zh-TW·HK·MO)를 아직 갖고 있지 않으므로 간체로 바꾸지 않고 다음 선호 언어로 넘긴다.
     pub fn from_tag(tag: &str) -> Option<Lang> {
-        let primary = tag
-            .split(['-', '_', '.', '@'])
-            .next()
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        match primary.as_str() {
+        let lower = tag.to_ascii_lowercase();
+        let mut parts = lower.split(['-', '_', '.', '@']);
+        let primary = parts.next().unwrap_or("");
+        let rest: Vec<&str> = parts.collect();
+        match primary {
             "ko" => Some(Lang::Ko),
             "en" => Some(Lang::En),
+            "ja" => Some(Lang::Ja),
+            "zh" if rest
+                .iter()
+                .any(|p| matches!(*p, "hant" | "tw" | "hk" | "mo")) =>
+            {
+                None
+            }
+            "zh" => Some(Lang::ZhHans),
             _ => None,
         }
     }
@@ -88,35 +123,94 @@ pub fn fill(template: &str, args: &[&dyn std::fmt::Display]) -> String {
     out
 }
 
+/// 가짜 언어: 영어를 악센트 글자로 바꾸고 40% 늘린다. 자리표시자는 그대로.
+/// 늘어난 글이 칸을 넘치면 실제 번역(독일어 등 +30~40%)에서도 넘친다. 악센트가 없는 글은 표를 거치지 않은 글이다.
+#[cfg(any(test, feature = "dev"))]
+pub fn pseudo_text(s: &str) -> String {
+    let mut out = String::from("[");
+    let mut in_ph = false;
+    for c in s.chars() {
+        in_ph = match c {
+            '{' => true,
+            '}' => false,
+            _ => in_ph,
+        };
+        out.push(if in_ph {
+            c
+        } else {
+            match c {
+                'a' => 'à',
+                'e' => 'é',
+                'i' => 'î',
+                'o' => 'ö',
+                'u' => 'ü',
+                'y' => 'ý',
+                'c' => 'ç',
+                'n' => 'ñ',
+                'A' => 'Å',
+                'E' => 'É',
+                'I' => 'Î',
+                'O' => 'Ö',
+                'U' => 'Ü',
+                'C' => 'Ç',
+                'N' => 'Ñ',
+                _ => c,
+            }
+        });
+    }
+    let pad = (s.chars().count() * 2).div_ceil(5);
+    out.extend(std::iter::repeat_n('~', pad));
+    out.push(']');
+    out
+}
+
+#[cfg(feature = "dev")]
+fn pseudo() -> &'static Strings {
+    static P: std::sync::OnceLock<Strings> = std::sync::OnceLock::new();
+    P.get_or_init(|| {
+        let mut p = EN.map(|s| Box::leak(pseudo_text(s).into_boxed_str()));
+        p.lang_name = "Pseudo";
+        p
+    })
+}
+
 /// 기기 언어로 시작 언어를 고른다: 선호 목록에서 우리가 가진 첫 언어, 없으면 영어.
 /// 웹은 브라우저의 navigator.languages(index.html의 nail_locale 플러그인), 그 밖은 OS 선호 언어(sys-locale).
 pub fn detect() -> Lang {
     Lang::pick(preferred_tags())
 }
 
-/// 웹: JS가 i번째 선호 언어의 주 언어 코드(두 글자)를 u32 하나로 접어 준다(문자열을 넘기지 않으려고).
-/// 0이면 목록 끝. 없으면(옛 index.html) miniquad가 빈 함수를 끼워 넣어 0이 된다.
+/// 웹: JS가 i번째 선호 언어 태그의 k번째 네 글자를 u32 하나로 접어 준다(문자열 대신 정수, ASCII만).
+/// 0이면 끝. 없으면(옛 index.html) miniquad가 빈 함수를 끼워 넣어 0이 된다.
 #[cfg(target_arch = "wasm32")]
 fn preferred_tags() -> Vec<String> {
     extern "C" {
-        fn nail_locale(i: u32) -> u32;
+        fn nail_locale(i: u32, k: u32) -> u32;
     }
-    (0..8)
-        // SAFETY: 정수 하나를 받고 돌려주는 JS 함수(web/index.html).
-        .map(|i| unsafe { nail_locale(i) })
-        .take_while(|code| *code != 0)
-        .map(|code| {
-            let b = [(code >> 8) as u8, code as u8];
-            String::from_utf8_lossy(&b).into_owned()
-        })
-        .collect()
+    let mut tags = Vec::new();
+    for i in 0..8 {
+        let mut tag = Vec::new();
+        for k in 0..6 {
+            // SAFETY: 정수 둘을 받고 정수를 돌려주는 JS 함수(web/index.html).
+            let word = unsafe { nail_locale(i, k) };
+            if word == 0 {
+                break;
+            }
+            tag.extend(word.to_be_bytes().into_iter().filter(|b| *b != 0));
+        }
+        if tag.is_empty() {
+            break;
+        }
+        tags.push(String::from_utf8_lossy(&tag).into_owned());
+    }
+    tags
 }
 
 /// miniquad가 플러그인 버전을 맞춰 보는 함수(mq_js_bundle.js의 init_plugins).
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub extern "C" fn nail_locale_crate_version() -> u32 {
-    1
+    2
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -127,6 +221,8 @@ fn preferred_tags() -> Vec<String> {
 macro_rules! strings {
     ($($key:ident),* $(,)?) => {
         /// 언어 하나의 글 전부.
+        // 배포 빌드(dev 끔)에서는 개발 메뉴 이름(title_dev)을 쓰지 않는다.
+        #[cfg_attr(not(feature = "dev"), allow(dead_code))]
         pub struct Strings {
             $(pub $key: &'static str,)*
         }
@@ -136,6 +232,12 @@ macro_rules! strings {
             #[cfg(test)]
             pub fn all(&self) -> Vec<(&'static str, &'static str)> {
                 vec![$((stringify!($key), self.$key)),*]
+            }
+
+            /// 모든 글을 바꾼 새 표(가짜 언어용).
+            #[cfg(feature = "dev")]
+            fn map(&self, f: impl Fn(&'static str) -> &'static str) -> Strings {
+                Strings { $($key: f(self.$key),)* }
             }
         }
     };
@@ -345,6 +447,178 @@ pub static EN: Strings = Strings {
     dead_hint: "Confirm: restart   Menu: pause",
 };
 
+pub static JA: Strings = Strings {
+    lang_name: "日本語",
+    intro_1: "大きな木が枯れていく。",
+    intro_2: "根っこが地下の住人たちを変えてしまった。",
+    intro_3: "子モグラのNaïlは、わけを知るため根をたどって下りていく。",
+    skip_hint: "決定：スキップ",
+    title_start: "はじめる",
+    title_settings: "設定",
+    title_dev: "開発",
+    title_controls: "上下：えらぶ・決定（Enter/A）・もどる（Esc/B）",
+    version: "プロトタイプ v0.1",
+    settings: "設定",
+    set_sound: "音量",
+    set_shake: "画面のゆれ",
+    set_debug: "デバッグ表示",
+    set_language: "言語",
+    set_back: "もどる",
+    on: "オン",
+    off: "オフ",
+    settings_hint: "左右で変更・設定はまだ保存されません",
+    tab_menu: "メニュー",
+    tab_status: "つよさ",
+    tab_bag: "どうぐ",
+    tab_journal: "きろく",
+    tab_map: "ちず",
+    tab_hint: "Q/E・L1/R1",
+    pm_resume: "つづける",
+    pm_restart: "やりなおす",
+    pm_settings: "設定",
+    pm_title: "タイトルへ",
+    mole_desc: "ツメでたたかう子モグラ。",
+    hp: "HP",
+    this_run: "今回",
+    run_stats: "ウェーブ{0}  {1}体  {2}",
+    combo_stats: "{0}連打・とどめ{1}秒・ふっとび{2}",
+    bare_hands: "すで",
+    bare_hands_desc: "まだツメがない。こうげきできない。",
+    burrow: "あなほり",
+    burrow_stats: "むてき{0}秒・{1}px・待ち{2}秒",
+    special: "とくぎ",
+    special_tbd: "（未定・フェーズ2）",
+    bag_combo: "{0}連打・とどめ{1}ダメージ",
+    equipped: "そうび中",
+    equip_hint: "決定：そうび",
+    empty_slot: "からっぽ",
+    empty_slot_desc: "アイテムはフェーズ2（へやクリアのほうび）で入る。今はわくだけ。",
+    slots: "{0} / {1} マス",
+    map_floor: "地下1階・{0}",
+    map_proto: "プロトタイプ：へや1つ",
+    map_note: "階とへやのつながりはフェーズ3で。",
+    q_roots: "根をたどって",
+    q_roots_desc: "枯れていく木の根をたどって、もっと深くへ。（階はフェーズ3）",
+    q_claws: "ツメのならし",
+    q_claws_desc: "ツメの3連打で敵を3体たおす。3発目の重さを感じてみよう。",
+    q_ambush: "ふいうち",
+    q_ambush_desc: "あなほりで地中にもぐり、とびだして敵をたおす。",
+    q_survive: "もちこたえる",
+    q_survive_desc: "ウェーブ3まで生きのこる。",
+    biome_meadow: "花さく入り口",
+    biome_roots: "根っこエリア",
+    biome_deep: "くらい深み",
+    w_sprout: "新芽のツメ",
+    w_sprout_desc: "かるい。すばやい4連打。1発は弱い。",
+    w_mole: "モグラのツメ",
+    w_mole_desc: "ふつう。3連打で3発目が重い。いつでもあなほりで中断できる。",
+    w_stone: "岩のツメ",
+    w_stone_desc: "おもい。広く強くふっとばす2連打。ふり終わってから中断できる。",
+    w_venom: "毒のツメ",
+    w_venom_desc: "当てた敵を毒にする。とどめは毒が長い。毒はひるませず体力だけけずる。",
+    gift_title: "新しいツメを手に入れた！",
+    tut_move: "スティック／WASD：うごいてみよう",
+    tut_pickup: "ひかるものに近づいてみよう",
+    tut_attack: "こうげき（J・X・ATK）を3回：3回目が重い",
+    tut_burrow: "あなほり（K・A・DIG）：地中ではやられない",
+    tut_emerge: "地中で敵の下へ行き、もう一度おすととびだす",
+    tut_outro: "根をたどって下りていこう",
+    cut_skip: "もどる（Esc/B）：スキップ",
+    op_1: "…根っこがこんなところまで。土の感じがちがう。",
+    op_2: "だれ？ ここはぼくたちの家だったんだ。",
+    op_3: "木が…木がぼくたちをこんなふうにした。帰って。",
+    op_4: "ぼくはわけをさがしに行くんだ。通して。",
+    op_5: "（ツメをかまえる。）",
+    dead: "たおれた",
+    dead_hint: "決定：やりなおす　メニュー：ポーズ",
+};
+
+pub static ZH_HANS: Strings = Strings {
+    lang_name: "简体中文",
+    intro_1: "大树正在枯萎。",
+    intro_2: "树根让地下的邻居们变得奇怪。",
+    intro_3: "小鼹鼠Naïl顺着树根往下走，去寻找原因。",
+    skip_hint: "确认：跳过",
+    title_start: "开始",
+    title_settings: "设置",
+    title_dev: "开发",
+    title_controls: "上下：选择·确认（Enter/A）·返回（Esc/B）",
+    version: "原型 v0.1",
+    settings: "设置",
+    set_sound: "音量",
+    set_shake: "画面震动",
+    set_debug: "调试信息",
+    set_language: "语言",
+    set_back: "返回",
+    on: "开",
+    off: "关",
+    settings_hint: "左右切换·设置尚未保存",
+    tab_menu: "菜单",
+    tab_status: "状态",
+    tab_bag: "背包",
+    tab_journal: "日志",
+    tab_map: "地图",
+    tab_hint: "Q/E·L1/R1：切换",
+    pm_resume: "继续",
+    pm_restart: "重新开始",
+    pm_settings: "设置",
+    pm_title: "返回标题",
+    mole_desc: "小鼹鼠。用爪子战斗，用爪子挖洞。",
+    hp: "体力",
+    this_run: "本局",
+    run_stats: "第{0}波  击败{1}  时间{2}",
+    combo_stats: "{0}连击·终结{1}秒·击退{2}",
+    bare_hands: "空手",
+    bare_hands_desc: "还没有爪子，无法攻击。",
+    burrow: "挖洞",
+    burrow_stats: "无敌{0}秒·范围{1}px·冷却{2}秒",
+    special: "特技",
+    special_tbd: "（待定 — 第2阶段）",
+    bag_combo: "{0}连击·终结伤害{1}",
+    equipped: "已装备",
+    equip_hint: "确认：装备",
+    empty_slot: "空",
+    empty_slot_desc: "道具将在第2阶段（通关房间后选择）加入。现在只有框架。",
+    slots: "{0} / {1} 格",
+    map_floor: "第1层·{0}",
+    map_proto: "原型：只有一个房间",
+    map_note: "楼层与房间的连接在第3阶段。现在只有这个房间。",
+    q_roots: "顺着树根",
+    q_roots_desc: "顺着枯萎大树的根，往更深处走。（楼层在第3阶段）",
+    q_claws: "驯服爪子",
+    q_claws_desc: "用爪子三连击打倒三个敌人。感受一下第三下的分量。",
+    q_ambush: "突袭",
+    q_ambush_desc: "挖洞钻进地下，再冲出来打倒敌人。",
+    q_survive: "坚持住",
+    q_survive_desc: "活到第3波。",
+    biome_meadow: "花开的入口",
+    biome_roots: "树根地带",
+    biome_deep: "黑暗深处",
+    w_sprout: "嫩芽之爪",
+    w_sprout_desc: "轻。快速的四连击，单击较弱。",
+    w_mole: "鼹鼠之爪",
+    w_mole_desc: "标准。三连击，第三下很重。随时可以挖洞取消。",
+    w_stone: "岩石之爪",
+    w_stone_desc: "重。两连击，范围大、击退强。挥完后才能取消。",
+    w_venom: "毒之爪",
+    w_venom_desc: "命中的敌人会中毒，终结的毒更久。毒不会造成硬直，只扣体力。",
+    gift_title: "获得了新的爪子！",
+    tut_move: "左杆／WASD：试着移动",
+    tut_pickup: "靠近那个发光的东西",
+    tut_attack: "攻击（J·X·ATK）三次：第三下很重",
+    tut_burrow: "挖洞（K·A·DIG）：在地下不会被打到",
+    tut_emerge: "在地下移到敌人下方，再按一次就会冲出",
+    tut_outro: "顺着树根往下走吧",
+    cut_skip: "返回（Esc/B）：跳过",
+    op_1: "……树根一直伸到了这里。泥土的感觉不一样了。",
+    op_2: "是谁？这里以前是我们的家。",
+    op_3: "是树……是树把我们变成这样的。回去吧。",
+    op_4: "我要去找出原因。请让我过去。",
+    op_5: "（竖起爪子。）",
+    dead: "倒下了",
+    dead_hint: "确认：重新开始   菜单：暂停",
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,7 +638,7 @@ mod tests {
     #[test]
     fn placeholders_match_across_languages() {
         let ko = KO.all();
-        for l in Lang::ALL {
+        for &l in Lang::ALL {
             for ((key, a), (_, b)) in ko.iter().zip(l.strings().all()) {
                 assert_eq!(placeholders(a), placeholders(b), "{l:?} {key}");
             }
@@ -373,24 +647,25 @@ mod tests {
 
     #[test]
     fn no_empty_strings() {
-        for l in Lang::ALL {
+        for &l in Lang::ALL {
             for (key, v) in l.strings().all() {
                 assert!(!v.trim().is_empty(), "{l:?} {key}");
             }
         }
     }
 
-    /// 폰트는 서브셋이라(CLAUDE.md) 표의 글자가 폰트에 없으면 빈칸으로 나온다. TTF cmap을 직접 읽어 확인한다.
+    /// 폰트는 서브셋이라(CLAUDE.md) 표의 글자가 그 언어 폰트에 없으면 빈칸으로 나온다. TTF cmap을 직접 읽어 확인한다.
+    /// 일본어·중국어 표를 고쳐서 여기서 깨지면 tools/fonts/build_cjk.py를 다시 돌린다.
     #[test]
     fn every_glyph_is_in_the_font() {
-        let font = std::fs::read("assets/fonts/Galmuri11-Condensed.ttf").expect("font");
-        let cmap = font_cmap(&font);
-        for l in Lang::ALL {
+        for &l in Lang::ALL {
+            let path = format!("assets/{}", l.font_file());
+            let cmap = font_cmap(&std::fs::read(&path).expect("font"));
             for (key, v) in l.strings().all() {
                 for c in v.chars() {
                     assert!(
                         cmap.contains(&(c as u32)),
-                        "{l:?} {key}: 폰트에 없는 글자 {c:?} (U+{:04X})",
+                        "{l:?} {key}: {path}에 없는 글자 {c:?} (U+{:04X})",
                         c as u32
                     );
                 }
@@ -399,18 +674,32 @@ mod tests {
     }
 
     #[test]
+    fn pseudo_keeps_placeholders_and_grows() {
+        let p = pseudo_text("{0}-hit combo");
+        assert!(p.contains("{0}"));
+        assert!(p.chars().count() as f32 >= "{0}-hit combo".len() as f32 * 1.4);
+        assert!(p.contains('ö'));
+    }
+
+    #[test]
     fn fill_reorders() {
         assert_eq!(fill("{1} then {0}", &[&1, &"a"]), "a then 1");
         assert_eq!(Lang::from_tag("ko-KR"), Some(Lang::Ko));
         assert_eq!(Lang::from_tag("en_US.UTF-8"), Some(Lang::En));
-        assert_eq!(Lang::from_tag("ja"), None);
+        assert_eq!(Lang::from_tag("ja"), Some(Lang::Ja));
+        assert_eq!(Lang::from_tag("zh-CN"), Some(Lang::ZhHans));
+        assert_eq!(Lang::from_tag("zh-Hans-SG"), Some(Lang::ZhHans));
+        assert_eq!(Lang::from_tag("zh-TW"), None);
+        assert_eq!(Lang::from_tag("zh-Hant-HK"), None);
+        assert_eq!(Lang::from_tag("fr"), None);
         // 선호 목록에서 가진 첫 언어. 없으면 영어.
-        assert_eq!(Lang::pick(["ja-JP", "ko-KR", "en"]), Lang::Ko);
+        assert_eq!(Lang::pick(["fr-FR", "ko-KR", "en"]), Lang::Ko);
         assert_eq!(Lang::pick(["fr-FR", "en-GB", "ko"]), Lang::En);
-        assert_eq!(Lang::pick(["ja", "zh-Hans"]), Lang::En);
+        assert_eq!(Lang::pick(["zh-TW", "ja"]), Lang::Ja);
+        assert_eq!(Lang::pick(["de", "it"]), Lang::En);
         assert_eq!(Lang::pick(Vec::<String>::new()), Lang::En);
         assert_eq!(Lang::Ko.cycle(1), Lang::En);
-        assert_eq!(Lang::Ko.cycle(-1), Lang::En);
+        assert_eq!(Lang::Ko.cycle(-1), *Lang::ALL.last().unwrap());
     }
 
     /// TTF cmap 형식 4(BMP)와 12에서 코드 포인트 집합을 읽는다. 테스트 전용 최소 파서.

@@ -30,7 +30,8 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - 그림 문법은 3/4 탑다운(docs/decisions/0006). 아이소메트릭 아님.
 - 테스트용 방 구성은 `src/scenario.rs`에 한 줄 추가(타이틀 "개발"). 컷씬은 `src/cutscene.rs`의 `Step` 스크립트, JRPG식(docs/decisions/0008).
 - UI 텍스트는 `assets/fonts/Galmuri11-Condensed.ttf`(KS X 1001 2,350자 서브셋)로 실제 해상도에 찍는다. 그 밖의 한자·확장 한글은 안 나온다.
-- 플레이어가 보는 글은 `src/i18n.rs`의 언어별 표에만 쓴다(한국어·영어). 코드에 글 리터럴을 두지 않는다. 숫자는 `{0}` + `fill()`, 데이터 표는 `Tr`. 개발 전용 화면만 예외(docs/decisions/0013).
+- 플레이어가 보는 글은 `src/i18n.rs`의 언어별 표에만 쓴다(한국어·영어·일본어·중국어 간체). 코드에 글 리터럴을 두지 않는다. 숫자는 `{0}` + `fill()`, 데이터 표는 `Tr`. 개발 전용 화면만 예외(docs/decisions/0013).
+- 글을 넣거나 바꾸면 네 언어를 다 쓰고, 일본어·간체 표를 고쳤으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font 체크아웃>`으로 폰트를 다시 만든다. 새 화면은 가짜 언어 Pseudo(설정 → 언어 끝)와 일본어로 넘침을 본다. 고정 칸은 `ui.fit`, 긴 글은 `ui::wrap`(docs/decisions/0014).
 
 ## 커밋 전
 ```sh
