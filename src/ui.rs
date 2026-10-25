@@ -335,20 +335,37 @@ pub fn wrap_with(s: &str, max_w: f32, measure: impl Fn(&str) -> f32) -> Vec<Stri
 /// 글자를 몇 px로 굽고(래스터화) 몇 배로 키워 그릴까: (font_size, font_scale).
 ///
 /// 폰트가 12px 픽셀 폰트라, 원래 크기의 정수배로 구워 정수배로 키우면 화면 크기로 바로 굽는 것과 모양이 같다.
-/// macroquad는 `font_size × dpi`로 굽고(text.rs), 새 글자가 생길 때마다 글자 아틀라스 텍스처를 통째로 다시 올린다.
+/// macroquad는 `ceil(font_size × dpi)` 물리 px로 굽고(text.rs), 새 글자가 생길 때마다 글자 아틀라스 텍스처를 통째로 다시 올린다.
 /// 화면 크기로 구우면 레티나(dpi 2)·배율 4에서 글자 하나가 96px → 아틀라스가 금방 커지고,
-/// 대화창이 한 글자씩 찍힐 때마다 큰 텍스처를 다시 올린다(Safari에서 특히 버벅임). 그래서
-/// 굽는 크기 = size × m(물리 px, m은 정수), 키우는 배 = size × scale × dpi / (size × m)이 정수가 되는 가장 작은 m을 고른다.
-/// 그런 m이 없으면(dpi가 어중간) 예전처럼 화면 크기로 굽는다.
+/// 대화창이 한 글자씩 찍힐 때마다 큰 텍스처를 다시 올린다(Safari에서 특히 버벅임).
+/// 아틀라스가 4096²까지 크면 Android Chrome에서 글자가 검게 뭉개졌다(dpi 2.625, 0058): macroquad 셰이더의
+/// `varying lowp vec2 uv`가 큰 텍스처에서 엉뚱한 곳을 집는다. 그래서
+/// 1. 굽는 크기 = size × m(m은 정수, 4 이하)이고 키우는 배가 정수인 가장 작은 m.
+/// 2. 없으면(dpi가 어중간) size × m으로 정확히 구워지는 가장 작은 m으로 굽고 정수가 아닌 배로 키운다.
+///    픽셀 폭이 조금 고르지 않지만(화면 전체가 이미 그렇다) 선명하고 아틀라스가 작다.
+/// 3. 그것도 없으면 예전처럼 화면 크기로 굽는다.
 pub fn glyph_plan(size: f32, scale: f32, dpi: f32) -> (u16, f32) {
     let whole = |x: f32| (x - x.round()).abs() < 1e-3;
     let target = size * scale * dpi;
+    // raster 물리 px로 정확히 구워지는 font_size(ceil(k × dpi) = raster인 k).
+    let bake = |raster: f32| -> Option<u16> {
+        let k = (raster / dpi + 1e-4).floor();
+        (k >= 1.0 && ((k * dpi - 1e-4).ceil() - raster).abs() < 1e-3).then_some(k as u16)
+    };
+    for m in 1..=4 {
+        let raster = size * m as f32;
+        let mag = target / raster;
+        if let Some(k) = bake(raster).filter(|_| whole(mag) && mag >= 1.0) {
+            return (k, mag.round());
+        }
+    }
     for m in 1..=8 {
         let raster = size * m as f32;
-        let font_size = raster / dpi;
-        let mag = target / raster;
-        if whole(font_size) && font_size >= 1.0 && whole(mag) && mag >= 1.0 {
-            return (font_size.round() as u16, mag.round());
+        if raster > target + 1e-3 {
+            break;
+        }
+        if let Some(k) = bake(raster) {
+            return (k, target / raster);
         }
     }
     ((size * scale) as u16, 1.0)
@@ -369,8 +386,26 @@ mod tests {
             (8, 6.0),
             "12px로 구워 6배 = 72px"
         );
-        // 정수배가 안 나오면 예전처럼
-        assert_eq!(glyph_plan(12.0, 3.0, 1.25), (36, 1.0));
+        // macroquad는 ceil(9 × 1.25) = 12px로 굽는다: 12px로 구워 3.75배.
+        assert_eq!(glyph_plan(12.0, 3.0, 1.25), (9, 3.75));
+        // Android Chrome dpi 2.625: 12px로는 정확히 못 구워(ceil(4 × 2.625) = 11) 24px로 굽고 2.625배.
+        // 예전에는 화면 크기(63px)로 구워 아틀라스가 4096²까지 컸다(0058).
+        assert_eq!(glyph_plan(12.0, 2.0, 2.625), (9, 2.625));
+        // dpi 2.75: 36px(13 × 2.75 = 35.75 → 36)로 구워 66/36배.
+        let (k, mag) = glyph_plan(12.0, 2.0, 2.75);
+        assert_eq!(k, 13);
+        assert!((mag - 66.0 / 36.0).abs() < 1e-4);
+        // 굽는 크기는 macroquad가 실제로 굽는 크기와 같다.
+        for dpi in [1.0f32, 1.25, 1.5, 1.75, 2.0, 2.25, 2.625, 2.75, 3.0, 3.5] {
+            for scale in [1.0f32, 2.0, 3.0, 4.0, 6.0] {
+                let (k, mag) = glyph_plan(12.0, scale, dpi);
+                let raster = (k as f32 * dpi - 1e-4).ceil();
+                assert!(
+                    (raster * mag - 12.0 * scale * dpi).abs() < 0.01,
+                    "dpi {dpi} scale {scale}: {raster} × {mag}"
+                );
+            }
+        }
     }
 
     fn w(s: &str) -> f32 {
