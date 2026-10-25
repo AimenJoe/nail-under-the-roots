@@ -24,4 +24,5 @@
 
 ## 확인
 - `cargo test`, 다섯 언어 글자 테스트. 간체 `概`가 폰트에 없어 문장을 바꿨다.
-- 키 옮기기는 사장이 토큰을 넣은 뒤 실행하고, 다음 Android 빌드 로그가 "keystore: from secret ANDROID_DEBUG_KEYSTORE_B64"이고 인증서가 같은지 본다.
+- 키 옮기기(2026-10-25): 토큰 없이 한 번 돌려 캐시 복원·지문 확인(83:EF:43:…)이 되는 것을 먼저 봤다. 사장이 `SECRETS_TOKEN`을 넣은 뒤 다시 돌려 성공했다. 워크플로 파일은 지웠다.
+- 다음 Android 빌드 로그가 "keystore: from secret ANDROID_DEBUG_KEYSTORE_B64"이고 인증서가 같은지 본다.
