@@ -69,6 +69,8 @@ pub enum AdvEvent {
     RouteOpen,
     /// 쉼터에 처음 닿음(번호).
     CampArrive(u32),
+    /// 마지막 길의 주인을 이기고 출구를 밟았다: 가장 깊은 곳(엔딩은 앱, 0042).
+    Deepest,
 }
 
 /// 확인 버튼으로 하는 일(쉼터).
@@ -337,12 +339,14 @@ impl World {
                 Some(Cell::Exit) if self.adv.place == Place::Dungeon => match self.adv.node {
                     None => self.start_fade(Transition::ExitDungeon),
                     Some(at) => {
-                        let boss = self
-                            .adv
-                            .route
-                            .as_ref()
-                            .is_some_and(|r| r.node(at).kind == NodeKind::Boss);
-                        if boss {
+                        let route = self.adv.route.as_ref();
+                        let boss = route.is_some_and(|r| r.node(at).kind == NodeKind::Boss);
+                        let last = route.is_some_and(|r| r.is_final());
+                        if boss && last {
+                            if stepped {
+                                self.adv.events.push(AdvEvent::Deepest);
+                            }
+                        } else if boss {
                             self.start_fade(Transition::EnterCamp);
                         } else if stepped {
                             self.adv.events.push(AdvEvent::RouteOpen);
@@ -905,6 +909,28 @@ mod tests {
         assert_eq!(w.adv.fade.map(|f| f.kind), Some(Transition::EnterCamp));
         w.enter_camp();
         assert_eq!((w.adv.place, w.adv.stage), (Place::Camp, 2));
+    }
+
+    /// 마지막 길의 주인을 이기고 출구를 밟으면 쉼터가 아니라 가장 깊은 곳(한 번만).
+    #[test]
+    fn final_route_boss_exit_reaches_the_deepest_place() {
+        let mut w = World::camp_start(t::FINAL_STAGE);
+        assert!(w.adv.route.as_ref().unwrap().is_final());
+        w.adv.events.clear();
+        let r = w.adv.route.as_mut().unwrap();
+        let boss = (r.layers.len() - 1, 0);
+        r.at = Some((boss.0 - 1, 0));
+        assert!(w.choose_node(boss));
+        w.adv.fade = None;
+        w.enter_node();
+        let p = w.player.pos;
+        if let Some(g) = w.room.grid.as_mut() {
+            g.set((p.x / 16.0) as usize, (p.y / 16.0) as usize, Cell::Exit);
+        }
+        w.cell_triggers();
+        w.cell_triggers();
+        assert_eq!(w.adv.events, vec![AdvEvent::Deepest]);
+        assert!(w.adv.fade.is_none(), "쉼터로 가지 않는다");
     }
 
     #[test]

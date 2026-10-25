@@ -316,6 +316,8 @@ strings! {
     name_mom, name_halmae, name_momo, op_n1, op_n2, op_n3, op_mom_1, op_mom_2, bori_free, momo_r1, momo_r2, momo_r3, momo_r4, momo_r5, half_1, half_2, half_3, half_4, half_5, true_1, true_2, true_3, true_4, epi_1, epi_2,
     // 다회차: 앨범·도움 모드·기록 지우기·깨어날 때 한마디(docs/decisions/0041)
     title_album, album_count, album_hint, album_close, set_assist, set_erase, set_erase_confirm, ret_first, ret_roots, ret_bori, ret_assist, ret_ten, run_again, run_again_bori,
+    // 런의 끝(docs/decisions/0042)
+    node_deepest, node_deepest_desc, run_after_half,
 }
 
 pub static KO: Strings = Strings {
@@ -582,6 +584,9 @@ pub static KO: Strings = Strings {
     map_camp: "쉼터 {0}",
     name_mom: "엄마",
     title_album: "앨범",
+    node_deepest: "가장 깊은 곳",
+    node_deepest_desc: "모든 실이 모이는 곳. 이 길의 주인을 이기면 그곳에 닿는다.",
+    run_after_half: "가장 깊은 곳까지 갔었다며? …그 할머니, 많이 외로웠나 봐.",
     album_count: "본 장면 {0} / {1}",
     album_hint: "{1} 고르기 · {0} 보기",
     album_close: "{0} 닫기",
@@ -897,6 +902,9 @@ pub static EN: Strings = Strings {
     map_camp: "Camp {0}",
     name_mom: "Mom",
     title_album: "Album",
+    node_deepest: "The Deepest Place",
+    node_deepest_desc: "Where all the threads gather. Beat this path's keeper to get there.",
+    run_after_half: "I heard you made it to the deepest place? …That granny must have been very lonely.",
     album_count: "Scenes seen {0} / {1}",
     album_hint: "{1} choose · {0} view",
     album_close: "{0} close",
@@ -1212,6 +1220,9 @@ pub static JA: Strings = Strings {
     map_camp: "休み場 {0}",
     name_mom: "お母さん",
     title_album: "アルバム",
+    node_deepest: "いちばん深い場所",
+    node_deepest_desc: "すべての糸が集まる場所。この道のぬしにかてば、そこへ着く。",
+    run_after_half: "いちばん深いところまで行ったんだって？…あのおばあちゃん、すごくさびしかったんだね。",
     album_count: "見た場面 {0} / {1}",
     album_hint: "{1} えらぶ · {0} 見る",
     album_close: "{0} とじる",
@@ -1529,6 +1540,9 @@ pub static ZH_HANS: Strings = Strings {
     map_camp: "营地 {0}",
     name_mom: "妈妈",
     title_album: "相册",
+    node_deepest: "最深处",
+    node_deepest_desc: "所有丝线汇聚的地方。打败路之主，就能到达那里。",
+    run_after_half: "听说你去了最深处？……那位奶奶，一定很孤单吧。",
     album_count: "看过的场景 {0} / {1}",
     album_hint: "{1} 选择 · {0} 观看",
     album_close: "{0} 关闭",
@@ -1844,6 +1858,9 @@ pub static PT_BR: Strings = Strings {
     map_camp: "Refúgio {0}",
     name_mom: "Mamãe",
     title_album: "Álbum",
+    node_deepest: "O lugar mais profundo",
+    node_deepest_desc: "Onde todos os fios se juntam. Vença o dono desta trilha para chegar lá.",
+    run_after_half: "Ouvi dizer que você chegou ao lugar mais profundo? …Aquela vovó devia estar muito sozinha.",
     album_count: "Cenas vistas {0} / {1}",
     album_hint: "{1} escolher · {0} ver",
     album_close: "{0} fechar",

@@ -161,6 +161,8 @@ pub const PARRY_REFLECT_SPEED: f32 = 1.4;
 pub const PARRY_REFLECT_DAMAGE: i32 = 2;
 
 // ---- 모험(필드·던전, src/adventure.rs, docs/decisions/0019) ------------------------------
+/// 한 런 = 필드 + 길 몇 개. 이 번째 길의 주인을 이기면 가장 깊은 곳(엔딩, docs/decisions/0042).
+pub const FINAL_STAGE: u32 = 3;
 /// 장소를 바꿀 때 어두워지는(그리고 밝아지는) 시간.
 pub const FADE_HALF: f32 = 0.3;
 /// 카메라가 목표를 따라가는 빠르기(초당, 지수 감쇠). 던전 방을 넘을 때 이 속도로 미끄러진다.

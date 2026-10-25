@@ -29,6 +29,10 @@ pub enum Scenario {
     CutsceneOnly,
     /// 아직 게임에 자리가 없는 이야기 일러스트 장면(모모·엔딩, docs/decisions/0039).
     StoryPreview,
+    /// 마지막 쉼터(길 지도의 보스 칸이 "가장 깊은 곳", docs/decisions/0042).
+    LastCamp,
+    /// 가장 깊은 곳에 바로 닿는다: 반쪽 엔딩 → 타이틀(기록은 남기지 않는다).
+    Deepest,
     /// 컷씬 없이 튜토리얼만.
     Tutorial,
     /// 발톱 4종을 가방에 넣고 웨이브 1부터. 가방에서 바꿔 끼며 비교.
@@ -53,7 +57,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 21] = [
+pub const LIST: [Entry; 23] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -159,6 +163,16 @@ pub const LIST: [Entry; 21] = [
         desc: "모모가 돌아옴 → 반쪽 엔딩 → 참 엔딩·에필로그. 아직 게임에 자리가 없는 장면(임시 그림).",
         scenario: Scenario::StoryPreview,
     },
+    Entry {
+        name: "마지막 쉼터",
+        desc: "마지막 길(길 지도의 끝이 가장 깊은 곳). 씨앗 40.",
+        scenario: Scenario::LastCamp,
+    },
+    Entry {
+        name: "가장 깊은 곳",
+        desc: "런의 끝: 반쪽 엔딩을 보고 타이틀로.",
+        scenario: Scenario::Deepest,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -178,6 +192,12 @@ pub fn build(s: Scenario) -> World {
                 w.player.prev_pos = w.player.pos;
             }
             w.snap_cam();
+            w
+        }
+        Scenario::LastCamp | Scenario::Deepest => {
+            let mut w = World::camp_start(crate::tuning::FINAL_STAGE);
+            w.seeds = 40;
+            w.adv.events.clear();
             w
         }
         Scenario::Camp => {

@@ -26,6 +26,17 @@ pub mod key {
     pub const ASSIST_DEATHS: &str = "assist_deaths";
     /// 가장 멀리 간 쉼터 번호.
     pub const DEEPEST: &str = "deepest";
+    /// 가장 깊은 곳에 닿아 반쪽 엔딩을 봤다 / 참 엔딩을 봤다(0042).
+    pub const HALF_ENDING: &str = "half_ending";
+    pub const TRUE_ENDING: &str = "true_ending";
+    /// 참 엔딩 조건(0037): 모모가 돌아옴, 도토가 씨앗 자리를 기억해 냄. 아직 세우는 곳이 없다(모모·도토 보스가 생기면).
+    pub const MOMO_BACK: &str = "momo";
+    pub const DOTO_MEMORY: &str = "doto_memory";
+
+    /// 캐릭터별 클리어 수.
+    pub fn clears(character: impl std::fmt::Debug) -> String {
+        format!("clears.{character:?}")
+    }
 
     pub fn mob(kind: impl std::fmt::Debug) -> String {
         format!("mob.{kind:?}")

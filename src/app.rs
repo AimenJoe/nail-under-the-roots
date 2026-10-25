@@ -388,6 +388,8 @@ pub struct App {
     pending_wake: bool,
     /// 설정 "기록 지우기"를 한 번 눌렀다(한 번 더 누르면 지운다).
     erase_armed: bool,
+    /// 이 컷씬이 끝나면 타이틀로(엔딩 = 런의 끝).
+    title_after_cutscene: bool,
     /// 앨범: 고른 칸, 크게 보는 중이면 흐른 시간.
     album_cursor: usize,
     album_view: Option<f32>,
@@ -455,6 +457,7 @@ impl App {
             erase_armed: false,
             album_cursor: 0,
             album_view: None,
+            title_after_cutscene: false,
         }
     }
 
@@ -537,7 +540,12 @@ impl App {
                     self.gift_queue.append(&mut self.world.gifts);
                     if c.is_done() {
                         self.cutscene = None;
-                        self.scene = Scene::Game;
+                        self.scene = if std::mem::take(&mut self.title_after_cutscene) {
+                            self.title_cursor = 0;
+                            Scene::Title
+                        } else {
+                            Scene::Game
+                        };
                     }
                 } else {
                     self.scene = Scene::Game;
@@ -748,6 +756,8 @@ impl App {
             self.world.snap_cam();
             self.cutscene = Some(cutscene::opening(&self.world));
             self.scene = Scene::Cutscene;
+        } else if s == Scenario::Deepest {
+            self.reach_deepest();
         } else if s == Scenario::StoryPreview {
             self.world.wave = 0;
             self.cutscene = Some(cutscene::story_preview(&self.world));

@@ -91,6 +91,19 @@ pub const LINES: &[Line] = &[
         needs: &[DeathsAtLeast(10), Seen("roots_again")],
         once: true,
     },
+    // 반쪽 엔딩 뒤 첫 런: 할매 이야기(한 번).
+    Line {
+        id: "after_half",
+        when: When::RunStart,
+        who: Speaker::Popo,
+        text: |s| s.run_after_half,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::HALF_ENDING),
+            NotFlag(key::TRUE_ENDING),
+        ],
+        once: true,
+    },
     // 새 런(튜토리얼을 마친 뒤): 매번 짧게.
     Line {
         id: "again",

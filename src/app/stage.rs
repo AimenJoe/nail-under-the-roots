@@ -59,8 +59,9 @@ impl Ware {
 }
 
 /// 길 칸 종류의 이름·설명(모르는 칸은 "?").
-fn node_text(kind: Option<NodeKind>) -> (Tr, Tr) {
+fn node_text(kind: Option<NodeKind>, last: bool) -> (Tr, Tr) {
     match kind {
+        Some(NodeKind::Boss) if last => (|s| s.node_deepest, |s| s.node_deepest_desc),
         Some(NodeKind::Burrow) => (|s| s.node_burrow, |s| s.node_burrow_desc),
         Some(NodeKind::Nest) => (|s| s.node_nest, |s| s.node_nest_desc),
         Some(NodeKind::Cache) => (|s| s.node_cache, |s| s.node_cache_desc),
@@ -203,8 +204,33 @@ impl App {
                     self.play(cutscene::camp_arrive(&self.world, n));
                 }
                 AdvEvent::RouteOpen => self.open_route(false),
+                AdvEvent::Deepest => self.reach_deepest(),
             }
         }
+    }
+
+    /// 가장 깊은 곳(0042): 클리어를 남기고 엔딩을 튼다. 끝나면 타이틀로(런이 끝났다).
+    pub(super) fn reach_deepest(&mut self) {
+        use crate::profile::key;
+        let true_end = self.profile.flag(key::MOMO_BACK) && self.profile.flag(key::DOTO_MEMORY);
+        if self.recording() {
+            self.profile
+                .add(&key::clears(crate::equipment::Character::Mole), 1);
+            self.profile.set(if true_end {
+                key::TRUE_ENDING
+            } else {
+                key::HALF_ENDING
+            });
+            self.save_profile();
+        }
+        let c = if true_end {
+            cutscene::ending_true(&self.world)
+        } else {
+            cutscene::ending_half(&self.world)
+        };
+        self.cutscene = Some(c);
+        self.scene = Scene::Cutscene;
+        self.title_after_cutscene = true;
     }
 
     fn play(&mut self, c: Cutscene) {
@@ -377,7 +403,7 @@ impl App {
         ui.rect(info, ui::PANEL_LIGHT);
         ui.rect_lines(info, ui::BORDER);
         if let Some(&at) = sel {
-            let (name, desc) = node_text(Some(r.node(at).kind));
+            let (name, desc) = node_text(Some(r.node(at).kind), r.is_final());
             ui.text(tr(name), info.x + 6.0, info.y + 3.0, FONT_PX, ui::ACCENT);
             for (k, l) in ui::wrap(ui, tr(desc), info.w - 12.0, FONT_PX)
                 .iter()

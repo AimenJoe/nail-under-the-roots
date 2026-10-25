@@ -766,14 +766,12 @@ pub fn momo_returns(w: &World) -> Cutscene {
     Cutscene::new(story_actors(w), momo_steps())
 }
 
-/// 반쪽 엔딩. 깊은 곳 마지막 방이 생기면 부른다.
-#[allow(dead_code)]
+/// 반쪽 엔딩: 마지막 길의 주인을 이기고 처음(또는 참 엔딩 조건 없이) 가장 깊은 곳에 닿았을 때(0042).
 pub fn ending_half(w: &World) -> Cutscene {
     Cutscene::new(story_actors(w), half_ending_steps())
 }
 
-/// 참 엔딩 + 에필로그.
-#[allow(dead_code)]
+/// 참 엔딩 + 에필로그: 참 엔딩 조건(모모·도토)이 다 섰을 때.
 pub fn ending_true(w: &World) -> Cutscene {
     Cutscene::new(story_actors(w), true_ending_steps())
 }

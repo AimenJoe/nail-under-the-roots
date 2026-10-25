@@ -172,6 +172,11 @@ impl Route {
         }
     }
 
+    /// 마지막 길: 주인을 이기면 쉼터가 아니라 가장 깊은 곳(0042).
+    pub fn is_final(&self) -> bool {
+        self.stage >= crate::tuning::FINAL_STAGE
+    }
+
     /// 지금 고를 수 있는 칸(층, 번호).
     pub fn choices(&self) -> Vec<(usize, usize)> {
         match self.at {
