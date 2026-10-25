@@ -442,6 +442,8 @@ impl App {
                 self.scene = Scene::KnotPick;
             }
             // 물웅덩이: 열린 털빛을 차례로 비춰 본다(저널 보상, 0048).
+            // 실 고리: 실의 꿈 고르기(0055).
+            Interact::Dream => self.open_dream(),
             Interact::Puddle => {
                 let n = crate::journal::next_fur(&self.profile, self.world.fur);
                 let none = n == self.world.fur;
@@ -964,6 +966,7 @@ impl App {
             Interact::Seat => s.ia_look,
             Interact::Tree => s.ia_tree,
             Interact::Puddle => s.ia_puddle,
+            Interact::Dream => s.ia_dream,
             Interact::Gate if village => s.ia_descend,
             Interact::Gate => s.ia_route,
         };

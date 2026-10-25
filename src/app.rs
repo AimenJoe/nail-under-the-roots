@@ -6,6 +6,7 @@
 
 use macroquad::prelude::*;
 
+mod dream;
 mod stage;
 
 use crate::art::Art;
@@ -136,6 +137,8 @@ enum Scene {
     Decor,
     /// 큰 나무의 재주: 반딧불로 깨우고 고른다(마을, docs/decisions/0047).
     Tree,
+    /// 실의 꿈 고르기(마을의 실 고리, docs/decisions/0055).
+    DreamPick,
 }
 
 /// 컷씬이 끝난 뒤 갈 곳.
@@ -335,6 +338,8 @@ enum Hit {
     KnotGo,
     /// 큰 나무의 재주 칸(자리, 갈래).
     TreeCell(usize, usize),
+    /// 실의 꿈 줄.
+    DreamRow(usize),
 }
 
 pub struct App {
@@ -405,6 +410,11 @@ pub struct App {
     decor_cursor: usize,
     /// 재주 창 커서(자리, 갈래).
     tree_cursor: (usize, usize),
+    /// 실의 꿈(0055): 고르기 창의 줄, 꾸고 있는 꿈.
+    dream_cursor: usize,
+    dream: Option<dream::DreamRun>,
+    /// 꿈에서 깬 직후 고르기 창이 입력을 받지 않는 남은 시간(싸우던 연타가 다음 꿈을 열지 않게).
+    dream_lock: f32,
     /// 이번 런의 실뜨기 단계(고르는 화면의 커서이기도 하다).
     knot_level: u8,
     /// 타이틀 아래 잠깐 띄우는 글(오늘의 굴 완주 등)과 남은 시간.
@@ -483,6 +493,9 @@ impl App {
             after_cutscene: AfterCut::Game,
             decor_cursor: 0,
             tree_cursor: (0, 0),
+            dream_cursor: 0,
+            dream: None,
+            dream_lock: 0.0,
             knot_level: 0,
             title_note: None,
         }
@@ -671,6 +684,7 @@ impl App {
         }
         self.sync_journal(t::TICK_DT);
         self.take_adventure_events();
+        self.tick_dream(dt);
         if let Some(i) = interact {
             if self.scene == Scene::Game {
                 self.interact(i);
@@ -679,7 +693,8 @@ impl App {
         if self.scene != Scene::Game {
             return;
         }
-        if restart {
+        // 꿈에서 쓰러지면 잠깐 뒤 마을로 깬다(tick_dream). 재시작 입력은 받지 않는다.
+        if restart && self.dream.is_none() {
             // 모험(필드·던전)에서 쓰러지면 저장 지점으로. 아레나·개발 시나리오는 처음부터.
             if self.world.adv.place != crate::adventure::Place::Arena
                 && !self.world.player.is_alive()
@@ -722,6 +737,9 @@ impl App {
     /// 시나리오로 새 런을 시작한다. Normal과 CutsceneOnly는 오프닝 컷씬을 먼저 재생한다.
     fn start(&mut self, s: Scenario) {
         let hitboxes = self.world.debug.hitboxes;
+        if s != Scenario::Dream {
+            self.dream = None;
+        }
         self.current = s;
         self.world = scenario::build(s);
         if s == Scenario::Village {
@@ -858,6 +876,9 @@ impl App {
             self.scene = Scene::Cutscene;
         } else if s == Scenario::Deepest {
             self.reach_deepest();
+        } else if s == Scenario::Dream {
+            self.begin_dream();
+            self.scene = Scene::Game;
         } else if s == Scenario::StoryPreview {
             self.world.wave = 0;
             self.cutscene = Some(cutscene::story_preview(&self.world));
@@ -1040,6 +1061,7 @@ impl App {
             Scene::KnotPick => self.update_knot_pick(a, tap_hit),
             Scene::Decor => self.update_decor(a, tap_hit, dt),
             Scene::Tree => self.update_tree(a, tap_hit, dt),
+            Scene::DreamPick => self.update_dream_pick(a, tap_hit, dt),
             Scene::Game | Scene::Cutscene => {}
         }
     }
@@ -1298,6 +1320,7 @@ impl App {
                 | Scene::KnotPick
                 | Scene::Decor
                 | Scene::Tree
+                | Scene::DreamPick
                 | Scene::Settings { back: Back::Pause }
                 | Scene::Controls { back: Back::Pause }
         );
@@ -1353,6 +1376,10 @@ impl App {
                 ui.dim();
                 self.draw_tree(&ui);
             }
+            Scene::DreamPick => {
+                ui.dim();
+                self.draw_dream_pick(&ui);
+            }
             Scene::Dev => self.draw_dev(&ui),
             Scene::Cutscene => {
                 self.draw_letterbox(&ui);
@@ -1389,6 +1416,7 @@ impl App {
                     self.draw_hint(&ui, &h);
                 }
                 // 획득 창이 떠 있으면 말풍선은 숨긴다(창 위에 겹쳤다).
+                self.draw_dream_hud(&ui);
                 if self.gift.is_none() {
                     self.draw_interact_bubble(&ui);
                 }

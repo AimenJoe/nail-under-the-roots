@@ -148,6 +148,19 @@ pub const LINES: &[Line] = &[
         ],
         once: true,
     },
+    // 실의 꿈(0055): 할매가 온 뒤, 이긴 길의 주인이 있으면 실 고리를 알려 준다.
+    Line {
+        id: "halmae_dream",
+        when: When::Village,
+        who: Speaker::Halmae,
+        text: |s| s.halmae_dream,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::HALF_ENDING),
+            Seen("halmae_arrive"),
+        ],
+        once: true,
+    },
     // 도토(0052): 씨앗 자리를 기억해 낸 뒤 포포가 마을에 온 도토를 알린다.
     Line {
         id: "popo_doto",

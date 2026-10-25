@@ -345,6 +345,8 @@ strings! {
     bori_t_susu, bori_t_true, momo_t_knot, momo_t_true, doto_t_venom, doto_t_true, popo_true,
     // 콩이(docs/decisions/0054)
     mob_kongi, mob_kongi_lore, mob_kongi_atk, mob_kongi_tip, name_kongi, kongi_meet_1, kongi_meet_1b, kongi_b1, kongi_b2, kongi_b3, kongi_b4, kongi_b5, kongi_b6, kongi_v1, kongi_v2, kongi_v3, toast_shell, toast_guard_break, jg_kongi, jg_kongi_d,
+    // 실의 꿈(docs/decisions/0055)
+    dream_title, dream_intro, dream_locked, dream_all, dream_none, dream_legend, dream_hint, toast_dream_in, toast_dream_next, toast_dream_win, toast_dream_best, toast_dream_wake, ia_dream, halmae_dream, jg_dream, jg_dream_d, jg_dream2, jg_dream2_d,
 }
 
 pub static KO: Strings = Strings {
@@ -920,6 +922,24 @@ pub static KO: Strings = Strings {
     toast_guard_break: "등딱지가 열렸다!",
     jg_kongi: "깊은 곳의 문",
     jg_kongi_d: "셋째 길 끝에서 아르마딜로를 정신 차리게 한다.",
+    dream_title: "실의 꿈",
+    dream_intro: "할매의 실이 기억하는 모습들과 꿈속에서 다시 싸운다. 기록만 남는다.",
+    dream_locked: "??? (아직 이기지 못했다)",
+    dream_all: "이어서 꾸기 (넷 모두)",
+    dream_none: "—",
+    dream_legend: "★ = 한 번도 안 맞고 이김",
+    dream_hint: "{0} 꿈꾸기 · {1} 돌아가기",
+    toast_dream_in: "실의 꿈. 기억 속 모습이 깨어난다…",
+    toast_dream_next: "다음 꿈으로…",
+    toast_dream_win: "꿈에서 이겼다!",
+    toast_dream_best: "꿈에서 이겼다! 가장 빠른 기록!",
+    toast_dream_wake: "꿈에서 깼다.",
+    ia_dream: "꿈꾸기",
+    halmae_dream: "내 실이 기억하는 모습들이 있단다. 실 고리에 손을 대면 꿈속에서 그 아이들을 다시 만날 수 있지.",
+    jg_dream: "실의 꿈",
+    jg_dream_d: "꿈에서 길의 주인 넷을 모두 이긴다.",
+    jg_dream2: "끝나지 않는 실",
+    jg_dream2_d: "넷을 이어서 꾸는 꿈을 끝까지 깬다.",
 };
 
 pub static EN: Strings = Strings {
@@ -1495,6 +1515,24 @@ pub static EN: Strings = Strings {
     toast_guard_break: "The shell opened!",
     jg_kongi: "The Deep Door",
     jg_kongi_d: "Bring the armadillo at the third path's end back to its senses.",
+    dream_title: "Thread Dream",
+    dream_intro: "Fight the shapes Granny's threads remember, again, in a dream. Only records remain.",
+    dream_locked: "??? (not beaten yet)",
+    dream_all: "Dream them all (all four)",
+    dream_none: "—",
+    dream_legend: "★ = won without getting hit",
+    dream_hint: "{0} dream · {1} back",
+    toast_dream_in: "Thread Dream. A remembered shape awakens…",
+    toast_dream_next: "On to the next dream…",
+    toast_dream_win: "You won in the dream!",
+    toast_dream_best: "You won in the dream! New best time!",
+    toast_dream_wake: "You woke from the dream.",
+    ia_dream: "Dream",
+    halmae_dream: "My threads remember some shapes, dear. Touch the thread loop and you can meet those children again in a dream.",
+    jg_dream: "Thread Dream",
+    jg_dream_d: "Beat all four path keepers in the dream.",
+    jg_dream2: "Endless Thread",
+    jg_dream2_d: "Clear the dream of all four in a row.",
 };
 
 pub static JA: Strings = Strings {
@@ -2070,6 +2108,24 @@ pub static JA: Strings = Strings {
     toast_guard_break: "こうらが開いた！",
     jg_kongi: "深いところの門",
     jg_kongi_d: "3本目の道の先で、アルマジロの目をさまさせる。",
+    dream_title: "糸の夢",
+    dream_intro: "ばあちゃんの糸がおぼえている姿と、夢の中でもう一度たたかう。記録だけが残る。",
+    dream_locked: "？？？（まだやっつけていない）",
+    dream_all: "つづけて見る（四つぜんぶ）",
+    dream_none: "—",
+    dream_legend: "★ = 一度も当たらずにやっつけた",
+    dream_hint: "{0} 夢を見る ・ {1} もどる",
+    toast_dream_in: "糸の夢。おぼえている姿が目をさます…",
+    toast_dream_next: "次の夢へ…",
+    toast_dream_win: "夢の中でやっつけた！",
+    toast_dream_best: "夢の中でやっつけた！いちばん速い記録！",
+    toast_dream_wake: "夢からさめた。",
+    ia_dream: "夢を見る",
+    halmae_dream: "わたしの糸がおぼえている姿があるんだよ。糸の輪にさわれば、夢の中であの子たちにまた会えるよ。",
+    jg_dream: "糸の夢",
+    jg_dream_d: "夢の中で道のぬし四つをぜんぶやっつける。",
+    jg_dream2: "終わらない糸",
+    jg_dream2_d: "四つをつづけて見る夢を最後までやりとげる。",
 };
 
 pub static ZH_HANS: Strings = Strings {
@@ -2647,6 +2703,24 @@ pub static ZH_HANS: Strings = Strings {
     toast_guard_break: "壳打开了！",
     jg_kongi: "深处之门",
     jg_kongi_d: "在第三条路的尽头，让犰狳清醒过来。",
+    dream_title: "丝之梦",
+    dream_intro: "和婆婆的丝线记得的样子，在梦里再打一次。只留下记录。",
+    dream_locked: "？？？（还没打赢）",
+    dream_all: "连续做梦（全部四个）",
+    dream_none: "—",
+    dream_legend: "★ = 一次也没被打中就赢了",
+    dream_hint: "{0} 做梦 · {1} 返回",
+    toast_dream_in: "丝之梦。记忆中的样子醒过来了……",
+    toast_dream_next: "前往下一个梦……",
+    toast_dream_win: "在梦里赢了！",
+    toast_dream_best: "在梦里赢了！最快纪录！",
+    toast_dream_wake: "从梦里醒来了。",
+    ia_dream: "做梦",
+    halmae_dream: "我的丝线记得一些样子哦。碰一碰丝圈，就能在梦里再见到那些孩子。",
+    jg_dream: "丝之梦",
+    jg_dream_d: "在梦里打赢全部四位路之主。",
+    jg_dream2: "不断的丝",
+    jg_dream2_d: "把连续四场的梦做到最后。",
 };
 /// 브라질 포르투갈어(docs/decisions/0033). DeepL 초안 + 사람 손 검토(한국어·영어 대조). 원어민 검수 전.
 pub static PT_BR: Strings = Strings {
@@ -3222,6 +3296,24 @@ pub static PT_BR: Strings = Strings {
     toast_guard_break: "O casco abriu!",
     jg_kongi: "A porta do fundo",
     jg_kongi_d: "Faça o tatu no fim da terceira trilha voltar a si.",
+    dream_title: "Sonho de fio",
+    dream_intro: "Lute de novo, num sonho, com as formas que os fios da vovó lembram. Só ficam recordes.",
+    dream_locked: "??? (ainda não vencido)",
+    dream_all: "Sonhar todos (os quatro)",
+    dream_none: "—",
+    dream_legend: "★ = venceu sem levar golpe",
+    dream_hint: "{0} sonhar · {1} voltar",
+    toast_dream_in: "Sonho de fio. Uma forma lembrada desperta…",
+    toast_dream_next: "Para o próximo sonho…",
+    toast_dream_win: "Você venceu no sonho!",
+    toast_dream_best: "Você venceu no sonho! Novo recorde!",
+    toast_dream_wake: "Você acordou do sonho.",
+    ia_dream: "Sonhar",
+    halmae_dream: "Meus fios lembram algumas formas, querido. Toque no laço de fio e você reencontra aquelas crianças num sonho.",
+    jg_dream: "Sonho de fio",
+    jg_dream_d: "Vença os quatro donos da trilha no sonho.",
+    jg_dream2: "Fio sem fim",
+    jg_dream2_d: "Complete o sonho dos quatro seguidos.",
 };
 
 #[cfg(test)]

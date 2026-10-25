@@ -160,6 +160,8 @@ pub struct World {
     pub mines: Vec<Mine>,
     /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
     pub kongi_fight: bool,
+    /// 실의 꿈(0055): 쓰러진 적이 아무것도 떨어뜨리지 않는다(기록이 공정하게).
+    pub dream: bool,
     /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것, 0048)와 Naïl의 털빛(그리기만).
     pub charm_pool: Vec<usize>,
     pub fur: u8,
@@ -228,6 +230,7 @@ impl World {
             doto_fight: false,
             mines: Vec::new(),
             kongi_fight: false,
+            dream: false,
             charm_pool: (0..crate::equipment::BASE_CHARMS).collect(),
             fur: 0,
             chests: 0,
@@ -978,6 +981,9 @@ impl World {
 
     /// 쓰러진 적이 떨어뜨린다: 반딧불 몇 마리 + 확률로 산딸기(loot::berry_chance).
     fn drop_loot(&mut self, pos: Vec2, kind: Kind) {
+        if self.dream {
+            return;
+        }
         let (lo, hi) = loot::glowbugs_for(kind);
         if hi > 0 {
             for _ in 0..rand::gen_range(lo, hi + 1) {

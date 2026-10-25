@@ -194,6 +194,27 @@ pub const GOALS: &[Goal] = &[
         Some("deeper"),
         Light(40)
     ),
+    // 실의 꿈(0055): 꿈에서 넷을 다 이기기 → 이어서 꾸기.
+    goal!(
+        "dream",
+        Village,
+        jg_dream,
+        jg_dream_d,
+        Count(crate::dream::KEY_WINS),
+        4,
+        Some("deepest"),
+        Light(60)
+    ),
+    goal!(
+        "dream_all",
+        Village,
+        jg_dream2,
+        jg_dream2_d,
+        Count("dream.all"),
+        1,
+        Some("dream"),
+        Seeds(30)
+    ),
     // 도토와 참 엔딩(0052): 도토가 생기면서 넣었다(닿을 수 없는 목표는 넣지 않는다, 0048).
     goal!(
         "doto",

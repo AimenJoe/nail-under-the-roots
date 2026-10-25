@@ -94,6 +94,8 @@ pub enum Interact {
     Tree,
     /// 마을 물웅덩이: 털빛 바꾸기(0048).
     Puddle,
+    /// 마을 할매 곁 실 고리: 실의 꿈(0055).
+    Dream,
     Gate,
 }
 
@@ -312,6 +314,9 @@ impl World {
         if self.puddle().is_some_and(near) {
             return Some(Interact::Puddle);
         }
+        if self.dream_loop().is_some_and(near) {
+            return Some(Interact::Dream);
+        }
         let gates = self
             .room
             .grid
@@ -335,6 +340,19 @@ impl World {
     }
 
     /// 마을 물웅덩이(W).
+    /// 마을 실 고리(할매가 온 뒤에만 선다, 0055).
+    pub fn dream_loop(&self) -> Option<Vec2> {
+        let v = self.adv.village?;
+        if !v.halmae {
+            return None;
+        }
+        self.adv
+            .marks
+            .iter()
+            .find(|(c, _)| *c == 'X')
+            .map(|(_, at)| *at)
+    }
+
     fn puddle(&self) -> Option<Vec2> {
         self.adv.village?;
         self.adv
@@ -367,6 +385,9 @@ impl World {
         }
         if let Some(b) = self.puddle() {
             consider(b, 8.0);
+        }
+        if let Some(b) = self.dream_loop() {
+            consider(b, 18.0);
         }
         if let Some(g) = &self.room.grid {
             for q in g.find(Cell::Gate) {

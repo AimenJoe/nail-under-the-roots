@@ -33,6 +33,8 @@ pub enum Scenario {
     LastCamp,
     /// 오늘의 굴: 날짜 시드로 첫 쉼터에서(타이틀에서 고른다, docs/decisions/0044).
     Daily,
+    /// 실의 꿈(마을의 실 고리에서, docs/decisions/0055): 빈 방에서 보스 다시 싸우기. 개발 목록에는 없다.
+    Dream,
     /// 큰 나무 아래 마을(모습은 기록에서, docs/decisions/0045).
     Village,
     /// 가장 깊은 곳에 바로 닿는다: 반쪽 엔딩 → 타이틀(기록은 남기지 않는다).
@@ -227,6 +229,11 @@ pub fn build(s: Scenario) -> World {
                 w.player.prev_pos = w.player.pos;
             }
             w.snap_cam();
+            w
+        }
+        Scenario::Dream => {
+            let mut w = World::empty();
+            w.biome = crate::biome::Biome::Roots;
             w
         }
         Scenario::Daily => {

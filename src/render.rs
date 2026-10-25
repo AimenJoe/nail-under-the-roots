@@ -1407,6 +1407,64 @@ fn draw_mine(m: &world::Mine, time: f32) {
     );
 }
 
+/// 실 고리(0055): 막대 둘에 걸린 흰 실 고리(실뜨기 모양 하나). 둥실 떠오르며 보랏빛으로 숨 쉰다.
+fn draw_dream_loop(at: Vec2, time: f32) {
+    let (x, y) = (at.x.round(), at.y.round());
+    // 막대 둘
+    for dx in [-7.0, 7.0] {
+        draw_rectangle(x + dx - 1.0, y - 14.0, 2.0, 18.0, OUTLINE);
+        draw_rectangle(
+            x + dx - 0.5,
+            y - 13.0,
+            1.0,
+            16.0,
+            Color::new(0.55, 0.40, 0.30, 1.0),
+        );
+    }
+    let bob = ((time * 1.6).sin() * 1.5).round();
+    let glow = 0.35 + 0.25 * (time * 2.2).sin().abs();
+    draw_circle(
+        x,
+        y - 12.0 + bob,
+        9.0,
+        Color::new(0.72, 0.62, 0.95, glow * 0.35),
+    );
+    // 실뜨기 마름모 + 가로줄
+    let c = Color::new(0.95, 0.93, 1.0, 1.0);
+    let (cx, cy) = (x, y - 12.0 + bob);
+    let pts = [
+        vec2(cx - 6.0, cy),
+        vec2(cx, cy - 5.0),
+        vec2(cx + 6.0, cy),
+        vec2(cx, cy + 5.0),
+    ];
+    for i in 0..4 {
+        let (a, b) = (pts[i], pts[(i + 1) % 4]);
+        draw_line(a.x, a.y, b.x, b.y, 1.0, c);
+    }
+    draw_line(
+        cx - 6.0,
+        cy,
+        cx + 6.0,
+        cy,
+        1.0,
+        Color::new(0.80, 0.72, 1.0, 1.0),
+    );
+    draw_line(x - 7.0, y - 13.0, cx - 6.0, cy, 1.0, c);
+    draw_line(x + 7.0, y - 13.0, cx + 6.0, cy, 1.0, c);
+    // 떠오르는 빛 알갱이
+    for k in 0..2 {
+        let ph = (time * 0.7 + k as f32 * 0.5).fract();
+        draw_rectangle(
+            (cx - 3.0 + k as f32 * 6.0).round(),
+            (cy - 4.0 - ph * 10.0).round(),
+            1.0,
+            1.0,
+            Color::new(0.85, 0.80, 1.0, 1.0 - ph),
+        );
+    }
+}
+
 /// 마을 물웅덩이(0048): 파란 타원 + 떠다니는 반짝임 둘.
 fn draw_puddle(at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round() + 3.0);
@@ -1869,6 +1927,8 @@ enum Drawable {
     /// 마을(0045): 큰 나무(자리, 잎 단계), 꾸미기(번호, 자리).
     Tree(Vec2, u8),
     Decor(usize, Vec2),
+    /// 실 고리(0055).
+    DreamLoop(Vec2),
 }
 
 /// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
@@ -1915,6 +1975,7 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                 'Y' => list.push((at.y + 8.0, Drawable::Tree(*at, v.growth))),
                 // 물웅덩이는 바닥: 맨 먼저.
                 'W' => draw_puddle(*at, w.time),
+                'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
                 '1'..='9' => {
                     let i = (*c as u8 - b'1') as usize;
                     if v.decor[i] {
@@ -2022,6 +2083,7 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
             }
             Drawable::Tree(at, growth) => draw_great_tree(at, growth, w.time),
             Drawable::Decor(i, at) => draw_decor(i, at, w.time),
+            Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
         }
     }
 }
@@ -2802,8 +2864,8 @@ fn draw_hud_screen(w: &World, scale: f32, ox: f32, oy: f32, gamepad_count: usize
     let line = fs * 1.2;
     // 월드 HUD(체력 핍 8px 높이) 아래부터 텍스트.
     let mut y = oy + 9.0 * scale + fs;
-    // 웨이브·처치 수는 아레나(웨이브 시험장)에서만.
-    if w.adv.place == crate::adventure::Place::Arena {
+    // 웨이브·처치 수는 아레나(웨이브 시험장)에서만. 실의 꿈(0055)도 아레나지만 보이지 않는다.
+    if w.adv.place == crate::adventure::Place::Arena && !w.dream {
         draw_text(
             format!("wave {}  kills {}", w.wave, w.kills),
             ox + 4.0,
