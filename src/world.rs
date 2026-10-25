@@ -2,6 +2,7 @@
 
 use macroquad::prelude::*;
 
+use crate::biome::Biome;
 use crate::combat::{Feel, Strike};
 use crate::enemy::{self, Enemy, Kind, Projectile};
 use crate::input::Actions;
@@ -40,6 +41,9 @@ pub struct World {
     pub debug: Debug,
     /// 적을 다 잡으면 다음 웨이브를 자동으로 띄운다. 시나리오는 끌 수 있다.
     pub auto_waves: bool,
+    /// 지금 환경. `biome_by_wave`면 웨이브가 깊이를 대신해 바뀐다.
+    pub biome: Biome,
+    pub biome_by_wave: bool,
     pub wave: u32,
     pub kills: u32,
     /// 솟구침으로 잡은 수(저널용).
@@ -71,6 +75,8 @@ impl World {
                 hitboxes: false,
             },
             auto_waves: true,
+            biome: Biome::Meadow,
+            biome_by_wave: true,
             wave: 0,
             kills: 0,
             emerge_kills: 0,
@@ -91,6 +97,8 @@ impl World {
         w.enemies.clear();
         w.wave = 0;
         w.auto_waves = false;
+        w.biome = Biome::Meadow;
+        w.biome_by_wave = false;
         w
     }
 
@@ -313,6 +321,9 @@ impl World {
 
     pub fn next_wave(&mut self) {
         self.wave += 1;
+        if self.biome_by_wave {
+            self.biome = Biome::for_wave(self.wave);
+        }
         let (chargers, shooters) = match self.wave {
             1 => (1, 1),
             2 => (2, 1),

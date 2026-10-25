@@ -6,6 +6,7 @@
 
 use macroquad::prelude::*;
 
+use crate::art::Art;
 use crate::cutscene::{self, Cutscene};
 use crate::input::{Actions, Input};
 use crate::render::{self, Renderer};
@@ -183,13 +184,15 @@ pub struct App {
     run_time: f32,
     /// 쓰러진 뒤 흐른 시간. 사망 연출과 입력 잠금.
     death_t: f32,
+    /// 컷씬 레터박스(0 = 없음, 1 = 다 내려옴). 조작이 돌아오면 걷힌다.
+    letterbox: f32,
     hits: Vec<(Rect, Hit)>,
     /// 직전 프레임의 (scale, ox, oy). 탭 좌표를 논리 좌표로 바꿀 때.
     last_ui: (f32, f32, f32),
 }
 
 impl App {
-    pub fn new(sfx: Sfx, font: Option<Font>) -> Self {
+    pub fn new(sfx: Sfx, font: Option<Font>, art: Option<Art>) -> Self {
         let settings = Settings {
             volume: 7,
             shake: 10,
@@ -217,10 +220,11 @@ impl App {
             inventory: Inventory::new(),
             sfx,
             input: Input::new(),
-            renderer: Renderer::new(font),
+            renderer: Renderer::new(font, art),
             acc: 0.0,
             run_time: 0.0,
             death_t: 0.0,
+            letterbox: 0.0,
             hits: Vec::new(),
             last_ui: (1.0, 0.0, 0.0),
         }
@@ -231,6 +235,17 @@ impl App {
         self.input.set_menu_mode(self.scene != Scene::Game);
         self.input.poll();
         let dt = get_frame_time().min(t::MAX_FRAME_DT);
+        let target = if self.scene == Scene::Cutscene {
+            1.0
+        } else {
+            0.0
+        };
+        let step = dt / t::LETTERBOX_TIME;
+        self.letterbox = if self.letterbox < target {
+            (self.letterbox + step).min(target)
+        } else {
+            (self.letterbox - step).max(target)
+        };
         match self.scene {
             Scene::Game => self.update_game(dt),
             Scene::Cutscene => {
@@ -596,7 +611,10 @@ impl App {
             Scene::Intro => self.draw_intro(&ui),
             Scene::Title => self.draw_title(&ui),
             Scene::Dev => self.draw_dev(&ui),
-            Scene::Cutscene => self.draw_cutscene(&ui),
+            Scene::Cutscene => {
+                self.draw_letterbox(&ui);
+                self.draw_cutscene(&ui);
+            }
             Scene::Settings { back } => {
                 if back == Back::Pause {
                     self.renderer
@@ -606,6 +624,7 @@ impl App {
                 self.draw_settings(&ui);
             }
             Scene::Game => {
+                self.draw_letterbox(&ui);
                 self.renderer
                     .draw_hud(&ui, &self.world, self.input.gamepad_count);
                 if let Some(h) = self.tutorial.as_ref().and_then(|t| t.hint()) {
@@ -624,6 +643,25 @@ impl App {
         }
         if let Some(o) = self.input.overlay() {
             render::draw_touch_overlay(&o);
+        }
+    }
+
+    /// 컷씬 레터박스: 위아래 검은 띠 + 안쪽으로 번지는 그림자. 대화창·건너뛰기 안내는 그 위에.
+    fn draw_letterbox(&self, ui: &Ui) {
+        if self.letterbox <= 0.0 {
+            return;
+        }
+        let k = self.letterbox;
+        let e = k * k * (3.0 - 2.0 * k);
+        let bar = (t::LETTERBOX_BAR * e).round();
+        let soft = 8.0;
+        ui.rect(Rect::new(0.0, 0.0, 320.0, bar), BLACK);
+        ui.rect(Rect::new(0.0, 180.0 - bar, 320.0, bar), BLACK);
+        for i in 0..soft as i32 {
+            let a = 0.55 * e * (1.0 - i as f32 / soft);
+            let c = Color::new(0.0, 0.0, 0.0, a);
+            ui.rect(Rect::new(0.0, bar + i as f32, 320.0, 1.0), c);
+            ui.rect(Rect::new(0.0, 180.0 - bar - 1.0 - i as f32, 320.0, 1.0), c);
         }
     }
 
@@ -1037,7 +1075,13 @@ impl App {
     }
 
     fn draw_map(&self, ui: &Ui, c: Rect) {
-        ui.text("1층 · 방 1", c.x, c.y, FONT_PX, ui::ACCENT);
+        ui.text(
+            &format!("1층 · {}", self.world.biome.name()),
+            c.x,
+            c.y,
+            FONT_PX,
+            ui::ACCENT,
+        );
         ui.text_right("프로토타입: 방 하나", c.right(), c.y, FONT_PX, ui::TEXT_DIM);
         // 방 전체(320×180)를 0.5배로.
         let k = 0.5;

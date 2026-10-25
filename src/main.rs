@@ -7,6 +7,8 @@
 #![allow(clippy::new_without_default)]
 
 mod app;
+mod art;
+mod biome;
 mod combat;
 mod cutscene;
 mod enemy;
@@ -49,8 +51,12 @@ async fn main() {
             None
         }
     };
+    let art = art::Art::load().await;
+    if art.is_none() {
+        eprintln!("그림 에셋(assets/art) 로드 실패: 도형으로 그린다");
+    }
     let sfx = sfx::Sfx::load().await;
-    let mut app = app::App::new(sfx, font);
+    let mut app = app::App::new(sfx, font, art);
     loop {
         app.frame();
         next_frame().await

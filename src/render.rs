@@ -3,6 +3,8 @@
 
 use macroquad::prelude::*;
 
+use crate::art::{self, Art};
+use crate::biome::{self, Decor};
 use crate::combat::{Shape, StrikeKind};
 use crate::enemy::{self, Enemy, Kind};
 use crate::input::TouchOverlay;
@@ -19,19 +21,22 @@ const GRID: Color = Color::new(0.16, 0.12, 0.19, 1.0);
 const WALL_COLOR: Color = Color::new(0.30, 0.22, 0.20, 1.0);
 const SHADOW: Color = Color::new(0.05, 0.03, 0.06, 0.8);
 
+const SHADOW_SOFT: Color = Color::new(0.05, 0.03, 0.08, 0.35);
+
 pub struct Renderer {
     rt: RenderTarget,
     cam: Camera2D,
     font: Option<Font>,
+    art: Option<Art>,
 }
 
 impl Renderer {
-    pub fn new(font: Option<Font>) -> Self {
+    pub fn new(font: Option<Font>, art: Option<Art>) -> Self {
         let rt = render_target(VW, VH);
         rt.texture.set_filter(FilterMode::Nearest);
         let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, t::VIEW_W, t::VIEW_H));
         cam.render_target = Some(rt.clone());
-        Self { rt, cam, font }
+        Self { rt, cam, font, art }
     }
 
     /// 월드 패스(내부 해상도). `w`가 없으면 타이틀 배경만 그린다.
@@ -43,22 +48,31 @@ impl Renderer {
             .unwrap_or(Vec2::ZERO);
         self.cam.target = center + shake;
         set_camera(&self.cam);
-        clear_background(BG);
         let Some(w) = w else {
+            clear_background(BG);
             draw_title_background();
             return;
         };
-        draw_room(w);
-        for p in &w.projectiles {
-            let pos = lerp(p.prev_pos, p.pos, alpha);
-            draw_circle(pos.x, pos.y, p.radius(), world::PROJECTILE);
-            draw_circle_lines(pos.x, pos.y, p.radius() + 0.5, 1.0, WHITE);
+        if let Some(art) = &self.art {
+            clear_background(w.biome.clear());
+            draw_room_art(art, w);
+            draw_sorted(art, w, alpha);
+            draw_player_fx(&w.player, alpha);
+            draw_fx(w);
+            draw_darkness(art, w, alpha);
+        } else {
+            clear_background(BG);
+            draw_room(w);
+            for p in &w.projectiles {
+                draw_projectile(p, alpha);
+            }
+            for e in &w.enemies {
+                draw_enemy(e, alpha, w.time);
+            }
+            draw_player(&w.player, alpha, w.time);
+            draw_player_fx(&w.player, alpha);
+            draw_fx(w);
         }
-        for e in &w.enemies {
-            draw_enemy(e, alpha, w.time);
-        }
-        draw_player(&w.player, alpha, w.time);
-        draw_fx(w);
         if w.debug.hitboxes {
             draw_hitboxes(w, alpha);
         }
@@ -212,17 +226,35 @@ fn draw_player(p: &Player, alpha: f32, time: f32) {
     }
     let nose = pos + p.facing * 8.0;
     draw_circle(nose.x.round(), nose.y.round(), 2.0, WHITE);
+}
 
+/// 공격 이펙트(발톱 자국 세 줄)와 솟구침 고리. 무브셋 수치를 따른다.
+fn draw_player_fx(p: &Player, alpha: f32) {
+    let pos = lerp(p.prev_pos, p.pos, alpha);
     match p.state {
         player::State::Attack { idx, time: at, dir } => {
-            let (a0, a1) = t::CLAW_ACTIVE[idx];
+            let hit = p.moveset.hits[idx];
+            let (a0, a1) = hit.active;
             let origin = pos + dir * 2.0;
-            if at >= a0 && at <= a1 + 0.03 {
-                let c = if idx == 2 { WHITE } else { world::MOLE };
-                draw_sector(origin, dir, t::CLAW_RANGE, Color::new(c.r, c.g, c.b, 0.55));
-                draw_sector_lines(origin, dir, t::CLAW_RANGE, c);
+            let finisher = idx == p.moveset.last();
+            if at >= a0 && at <= a1 + 0.04 {
+                let k = ((at - a0) / (a1 - a0 + 0.04)).clamp(0.0, 1.0);
+                if finisher {
+                    draw_sector(
+                        origin,
+                        dir,
+                        hit.range,
+                        Color::new(1.0, 1.0, 1.0, 0.25 * (1.0 - k)),
+                    );
+                }
+                draw_claw_marks(origin, dir, hit.range, k, finisher);
             } else if at < a0 {
-                draw_sector_lines(origin, dir, t::CLAW_RANGE * 0.6, world::DIRT);
+                draw_sector_lines(
+                    origin,
+                    dir,
+                    hit.range * 0.5,
+                    Color::new(0.6, 0.45, 0.3, 0.6),
+                );
             }
         }
         player::State::Emerge { time: et } => {
@@ -231,6 +263,301 @@ fn draw_player(p: &Player, alpha: f32, time: f32) {
             draw_circle_lines(pos.x, pos.y, r, 1.5, Color::new(1.0, 1.0, 1.0, 1.0 - p01));
         }
         _ => {}
+    }
+}
+
+/// 발톱 자국: 전방 호를 따라 세 줄. 휘두르는 동안 펼쳐지고 끝에서 옅어진다.
+fn draw_claw_marks(origin: Vec2, dir: Vec2, r: f32, k: f32, strong: bool) {
+    let base = dir.y.atan2(dir.x);
+    let span = std::f32::consts::FRAC_PI_2 * 0.95;
+    let reveal = (k * 1.6).min(1.0);
+    let fade = 1.0 - ((k - 0.6) / 0.4).clamp(0.0, 1.0);
+    let col = if strong {
+        Color::new(1.0, 1.0, 1.0, fade)
+    } else {
+        Color::new(0.97, 0.93, 0.85, 0.9 * fade)
+    };
+    let thick = if strong { 2.0 } else { 1.0 };
+    let steps = 10;
+    for line in 0..3 {
+        let rr = r - line as f32 * 3.0;
+        let a_start = base - span;
+        let a_end = base - span + 2.0 * span * reveal;
+        let mut prev = origin + vec2(a_start.cos(), a_start.sin()) * rr;
+        for i in 1..=steps {
+            let a = a_start + (a_end - a_start) * i as f32 / steps as f32;
+            let q = origin + vec2(a.cos(), a.sin()) * rr;
+            draw_line(prev.x, prev.y, q.x, q.y, thick, col);
+            prev = q;
+        }
+    }
+}
+
+fn draw_projectile(p: &enemy::Projectile, alpha: f32) {
+    let pos = lerp(p.prev_pos, p.pos, alpha);
+    draw_circle(pos.x, pos.y, p.radius(), world::PROJECTILE);
+    draw_circle_lines(pos.x, pos.y, p.radius() + 0.5, 1.0, WHITE);
+}
+
+// ---- 그림 에셋 경로 -----------------------------------------------------------
+
+fn tile_src(col: u32, row: u32) -> Rect {
+    art::cell(col, row)
+}
+
+fn draw_tile(tex: &Texture2D, src: Rect, x: f32, y: f32, tint: Color) {
+    draw_texture_ex(
+        tex,
+        x,
+        y,
+        tint,
+        DrawTextureParams {
+            source: Some(src),
+            dest_size: Some(vec2(src.w, src.h)),
+            ..Default::default()
+        },
+    );
+}
+
+fn decor_src(d: Decor) -> Rect {
+    match d {
+        Decor::FlowerWhite => tile_src(4, 0),
+        Decor::FlowerYellow => tile_src(5, 0),
+        Decor::FlowerPink => tile_src(6, 0),
+        Decor::Tuft => tile_src(7, 0),
+        Decor::Pebble => tile_src(3, 1),
+        Decor::Mushroom => tile_src(4, 1),
+        Decor::RootVine => tile_src(5, 1),
+        Decor::Moss => tile_src(6, 1),
+    }
+}
+
+/// 바닥 칸마다 (x, y, 장식). 방 그림은 칸 해시로 정해져 프레임마다 같다.
+fn floor_decor(w: &World) -> Vec<(f32, f32, Decor)> {
+    let r = w.room.inner;
+    let mut out = Vec::new();
+    let (cx0, cy0) = ((r.x / 16.0).floor() as i32, (r.y / 16.0).floor() as i32);
+    let (cx1, cy1) = (
+        (r.right() / 16.0).ceil() as i32,
+        (r.bottom() / 16.0).ceil() as i32,
+    );
+    for cy in cy0..cy1 {
+        for cx in cx0..cx1 {
+            let (roll, pick) = biome::hash01(cx, cy, 7);
+            if let Some(d) = w.biome.decor(roll, pick) {
+                out.push((cx as f32 * 16.0, cy as f32 * 16.0, d));
+            }
+        }
+    }
+    out
+}
+
+/// 3/4 방: 바닥(풀·흙) + 장식, 좌·우·아래 벽 윗면, 위쪽은 벽 윗면 + 벼랑 앞면.
+fn draw_room_art(art: &Art, w: &World) {
+    let tex = &art.tiles;
+    let r = w.room.inner;
+    let ft = w.biome.floor_tint();
+    let wt = w.biome.wall_tint();
+    // 바닥
+    let cols = (t::VIEW_W / 16.0) as i32;
+    let rows = (t::VIEW_H / 16.0).ceil() as i32;
+    let dirt = w.biome.dirt_floor();
+    for cy in 0..rows {
+        for cx in 0..cols {
+            let (_, pick) = biome::hash01(cx, cy, 1);
+            let src = if dirt {
+                tile_src(3, 0)
+            } else {
+                tile_src(pick % 3, 0)
+            };
+            draw_tile(tex, src, cx as f32 * 16.0, cy as f32 * 16.0, ft);
+        }
+    }
+    // 반대 재질 얼룩. 칸 가운데를 반 칸 어긋나게 놓아 격자가 덜 보인다.
+    for cy in 0..rows {
+        for cx in 0..cols {
+            let (roll, pick) = biome::hash01(cx, cy, 2);
+            if roll < w.biome.patch_chance() {
+                let row = if dirt { 3 } else { 2 };
+                let src = tile_src(2 + pick % 2, row);
+                let ox = ((pick >> 2) % 9) as f32 - 4.0;
+                let oy = ((pick >> 6) % 9) as f32 - 4.0;
+                draw_tile(tex, src, cx as f32 * 16.0 + ox, cy as f32 * 16.0 + oy, ft);
+            }
+        }
+    }
+    for (x, y, d) in floor_decor(w) {
+        // 빛나는 버섯은 어둠 뒤에 한 번 더 그린다(draw_darkness).
+        draw_tile(tex, decor_src(d), x, y, ft);
+    }
+    // 좌·우 벽(윗면 8px 폭)
+    for cy in 0..rows {
+        let y = cy as f32 * 16.0;
+        draw_tile(tex, Rect::new(0.0, 16.0, 8.0, 16.0), 0.0, y, wt);
+        draw_tile(tex, Rect::new(8.0, 16.0, 8.0, 16.0), r.right(), y, wt);
+    }
+    // 아래 벽(윗면 위쪽 8px)
+    for cx in 0..cols {
+        draw_tile(
+            tex,
+            Rect::new(0.0, 16.0, 16.0, 8.0),
+            cx as f32 * 16.0,
+            r.bottom(),
+            wt,
+        );
+    }
+    // 위쪽: 윗면(아래 8px, 풀이 늘어진 가장자리) + 벼랑 앞면 16px
+    let face_y = r.y - 16.0;
+    for cx in 0..cols {
+        let x = cx as f32 * 16.0;
+        draw_tile(tex, Rect::new(0.0, 24.0, 16.0, 8.0), x, face_y - 8.0, wt);
+        let (roll, _) = biome::hash01(cx, 0, 3);
+        let roots = match w.biome {
+            crate::biome::Biome::Meadow => roll < 0.15,
+            crate::biome::Biome::Roots => roll < 0.55,
+            crate::biome::Biome::Deep => roll < 0.8,
+        };
+        let src = if roots {
+            tile_src(2, 1)
+        } else {
+            tile_src(1, 1)
+        };
+        draw_tile(tex, src, x, face_y, wt);
+    }
+    // 벼랑 아래 그늘
+    draw_rectangle(r.x, r.y, r.w, 2.0, Color::new(0.0, 0.0, 0.0, 0.25));
+    draw_rectangle(r.x, r.y + 2.0, r.w, 2.0, Color::new(0.0, 0.0, 0.0, 0.12));
+}
+
+#[derive(Clone, Copy)]
+enum Drawable {
+    Pillar(usize),
+    Player,
+    Enemy(usize),
+    Projectile(usize),
+}
+
+/// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
+fn draw_sorted(art: &Art, w: &World, alpha: f32) {
+    let mut list: Vec<(f32, Drawable)> = Vec::new();
+    for (i, p) in w.room.pillars.iter().enumerate() {
+        list.push((p.bottom(), Drawable::Pillar(i)));
+    }
+    let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
+    list.push((pp.y + 6.0, Drawable::Player));
+    for (i, e) in w.enemies.iter().enumerate() {
+        let ep = lerp(e.prev_pos, e.pos, alpha);
+        list.push((ep.y + e.radius(), Drawable::Enemy(i)));
+        draw_ellipse(
+            ep.x,
+            ep.y + e.radius(),
+            e.radius() + 1.0,
+            2.5,
+            0.0,
+            SHADOW_SOFT,
+        );
+    }
+    for (i, p) in w.projectiles.iter().enumerate() {
+        let q = lerp(p.prev_pos, p.pos, alpha);
+        list.push((q.y + 3.0, Drawable::Projectile(i)));
+        draw_ellipse(q.x, q.y + 6.0, 2.5, 1.2, 0.0, SHADOW_SOFT);
+    }
+    if !matches!(
+        w.player.state,
+        player::State::Burrow { .. } | player::State::Dead
+    ) {
+        draw_ellipse(pp.x, pp.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+    }
+    list.sort_by(|a, b| a.0.total_cmp(&b.0));
+    for (_, d) in list {
+        match d {
+            Drawable::Pillar(i) => {
+                let p = w.room.pillars[i];
+                let src = Rect::new(if i % 2 == 0 { 0.0 } else { 16.0 }, 32.0, 16.0, 32.0);
+                draw_tile(&art.tiles, src, p.x, p.bottom() - 32.0, w.biome.wall_tint());
+            }
+            Drawable::Player => draw_nail(art, &w.player, alpha, w.time),
+            Drawable::Enemy(i) => draw_enemy(&w.enemies[i], alpha, w.time),
+            Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
+        }
+    }
+}
+
+/// Naïl 스프라이트. 상태 → 칸, 좌우 반전, 피격 플래시는 흰 실루엣 줄.
+fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {
+    let pos = lerp(p.prev_pos, p.pos, alpha);
+    let moving = (p.pos - p.prev_pos).length() > 0.05;
+    let (col, row) = match p.state {
+        player::State::Dead => (4, 1),
+        player::State::Burrow { time: bt } => (((bt * 12.0) as u32) % 2, 2),
+        player::State::Emerge { .. } => (2, 1),
+        player::State::Attack { idx, .. } => {
+            let last = p.moveset.last();
+            (if idx == last { 2 } else { idx.min(1) as u32 }, 1)
+        }
+        _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => (3, 1),
+        _ if moving => (2 + ((time * 10.0) as u32) % 4, 0),
+        _ => (((time * 2.0) as u32) % 2, 0),
+    };
+    let flash = p.flash > 0.0 && !matches!(p.state, player::State::Burrow { .. });
+    let row = if flash { row + 3 } else { row };
+    let blink = p.invuln > 0.0 && ((time * 24.0) as i32) % 2 == 0 && !flash;
+    let tint = if blink {
+        Color::new(1.0, 1.0, 1.0, 0.35)
+    } else {
+        WHITE
+    };
+    draw_texture_ex(
+        &art.nail,
+        pos.x - 8.0,
+        pos.y - 8.0,
+        tint,
+        DrawTextureParams {
+            source: Some(art::cell(col, row)),
+            dest_size: Some(vec2(16.0, 16.0)),
+            flip_x: p.face_left,
+            ..Default::default()
+        },
+    );
+}
+
+/// 환경 어둠: 플레이어 주변만 밝고 바깥은 어둡다. 빛나는 버섯은 어둠 위에 다시.
+fn draw_darkness(art: &Art, w: &World, alpha: f32) {
+    let (dark, radius) = w.biome.darkness();
+    if dark <= 0.0 {
+        return;
+    }
+    let c = lerp(w.player.prev_pos, w.player.pos, alpha);
+    let s = radius * 2.0;
+    let (x0, y0) = (c.x - radius, c.y - radius);
+    let col = Color::new(1.0, 1.0, 1.0, dark);
+    draw_texture_ex(
+        &art.dark,
+        x0,
+        y0,
+        col,
+        DrawTextureParams {
+            dest_size: Some(vec2(s, s)),
+            ..Default::default()
+        },
+    );
+    let black = Color::new(0.0, 0.0, 0.0, dark);
+    let (vw, vh) = (t::VIEW_W + 8.0, t::VIEW_H + 8.0);
+    draw_rectangle(-8.0, -8.0, vw + 8.0, y0 + 8.0, black);
+    draw_rectangle(-8.0, y0 + s, vw + 8.0, vh - (y0 + s) + 8.0, black);
+    draw_rectangle(-8.0, y0, x0 + 8.0, s, black);
+    draw_rectangle(x0 + s, y0, vw - (x0 + s) + 8.0, s, black);
+    for (x, y, d) in floor_decor(w) {
+        if d == Decor::Mushroom {
+            let pulse = 0.65 + 0.25 * ((w.time * 2.0 + x * 0.1).sin());
+            draw_tile(
+                &art.tiles,
+                decor_src(d),
+                x,
+                y,
+                Color::new(1.0, 1.0, 1.0, pulse),
+            );
+        }
     }
 }
 

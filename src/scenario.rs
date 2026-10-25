@@ -3,6 +3,7 @@
 
 use macroquad::prelude::*;
 
+use crate::biome::Biome;
 use crate::enemy::Kind;
 use crate::world::World;
 
@@ -23,6 +24,8 @@ pub enum Scenario {
     Tutorial,
     /// 실험용 무거운 무기(2타 콤보)로 웨이브 1부터.
     Heavy,
+    /// 환경 확인: 지정 환경에서 돌격형 1 + 원거리형 1.
+    InBiome(Biome),
 }
 
 pub struct Entry {
@@ -31,7 +34,22 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 9] = [
+pub const LIST: [Entry; 12] = [
+    Entry {
+        name: "환경: 꽃 핀 입구",
+        desc: "밝고 꽃이 많은 첫 환경. 돌격형 1 + 원거리형 1.",
+        scenario: Scenario::InBiome(Biome::Meadow),
+    },
+    Entry {
+        name: "환경: 뿌리 지대",
+        desc: "꽃이 줄고 뿌리가 드러난다. 가장자리가 어두워진다.",
+        scenario: Scenario::InBiome(Biome::Roots),
+    },
+    Entry {
+        name: "환경: 어두운 심층",
+        desc: "빛은 Naïl 주변뿐. 이끼와 빛나는 버섯.",
+        scenario: Scenario::InBiome(Biome::Deep),
+    },
     Entry {
         name: "튜토리얼",
         desc: "컷씬 없이 플레이 튜토리얼만(이동→3연타→굴파기→솟구침).",
@@ -103,6 +121,11 @@ pub fn build(s: Scenario) -> World {
                 let p = spawn_point(&w, i as usize + 1);
                 w.spawn_enemy(Kind::Shooter, p);
             }
+            w
+        }
+        Scenario::InBiome(b) => {
+            let mut w = build(Scenario::OneEach);
+            w.biome = b;
             w
         }
         Scenario::OneEach => {

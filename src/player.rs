@@ -45,6 +45,8 @@ pub struct Player {
     pub events: Vec<Event>,
     /// 콤보 표. 무기·캐릭터에 따라 바뀐다(moveset.rs).
     pub moveset: &'static Moveset,
+    /// 스프라이트 좌우(마지막으로 본 가로 방향).
+    pub face_left: bool,
     attack_buf: f32,
     dodge_buf: f32,
     combo_next: usize,
@@ -67,6 +69,7 @@ impl Player {
             burrow_cd: 0.0,
             events: Vec::new(),
             moveset: &moveset::CLAWS,
+            face_left: false,
             attack_buf: 0.0,
             dodge_buf: 0.0,
             combo_next: 0,
@@ -190,6 +193,9 @@ impl Player {
         combat::apply_friction(&mut self.vel, dt);
         let r = self.radius();
         room.resolve_circle(&mut self.pos, r);
+        if self.facing.x.abs() > 0.2 {
+            self.face_left = self.facing.x < 0.0;
+        }
         strike
     }
 

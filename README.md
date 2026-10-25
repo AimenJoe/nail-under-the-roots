@@ -4,7 +4,7 @@
 
 - 컨셉: [`docs/concept.md`](docs/concept.md)
 - 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md) (1단계 전투 프로토타입, 회색 박스)
-- 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md)
+- 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 캐릭터·대체 타일은 직접 그림(원본 `tools/art/*.py`, `python3 tools/art/nail.py && python3 tools/art/tiles.py`로 PNG 재생성). 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
 - 결정 기록: [`docs/decisions/`](docs/decisions/)
 - 지식 베이스: [AimenJoe/KB](https://github.com/AimenJoe/KB) (`maps/gamedev.md`)
 
@@ -38,7 +38,8 @@ python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 
 - **튜토리얼**: 첫 시작은 오프닝 컷씬 뒤 플레이 튜토리얼(이동 → 허수아비 3연타 → 굴파기 → 솟구침)을 거쳐 웨이브 1로. 글은 아래 한 줄 힌트뿐.
 - **개발 시나리오**: 타이틀 "개발"에서 튜토리얼·무거운 무기(실험)·빈 방·돌격형 1/3·원거리형 1·1+1·웨이브 3부터·오프닝 컷씬을 바로 시작한다. 목록은 `src/scenario.rs` 한 곳. `dev` feature(기본 켬)이며 배포 빌드는 `--no-default-features`로 뺀다.
-- **컷씬**: JRPG식. 배우가 걷고 아래 대화창에 글자가 찍힌다. 확인으로 넘기고 Esc/B로 건너뛴다. 스크립트는 `src/cutscene.rs`(docs/decisions/0008).
+- **환경**: 꽃 핀 입구 → 뿌리 지대 → 어두운 심층. 지금은 웨이브 1~2/3~4/5~가 깊이를 대신한다. 개발 시나리오 "환경: …"으로 바로 볼 수 있다.
+- **컷씬**: JRPG식. 들어가면 위아래 레터박스가 내려오고 조작이 돌아오면 걷힌다. 배우가 걷고 아래 대화창에 글자가 찍힌다. 확인으로 넘기고 Esc/B로 건너뛴다. 스크립트는 `src/cutscene.rs`(docs/decisions/0008).
 
 모바일 브라우저(터치): 화면 왼쪽 반을 누른 채 끌면 가상 스틱, 오른쪽 아래 `ATK`·`DIG` 버튼, 오른쪽 위 `R` 재시작, 왼쪽 위 `MENU`. 메뉴 안에서는 항목을 탭한다. 터치가 한 번이라도 들어오면 오버레이가 보인다. 가로로 들고 플레이.
 

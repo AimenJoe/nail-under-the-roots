@@ -15,7 +15,12 @@ impl Room {
     pub fn new() -> Self {
         let w = tuning::WALL;
         Self {
-            inner: Rect::new(w, w, tuning::VIEW_W - 2.0 * w, tuning::VIEW_H - 2.0 * w),
+            inner: Rect::new(
+                w,
+                tuning::WALL_TOP,
+                tuning::VIEW_W - 2.0 * w,
+                tuning::VIEW_H - tuning::WALL_TOP - w,
+            ),
             pillars: vec![
                 Rect::new(104.0, 56.0, 16.0, 16.0),
                 Rect::new(200.0, 108.0, 16.0, 16.0),
@@ -25,7 +30,7 @@ impl Room {
                 vec2(280.0, 40.0),
                 vec2(40.0, 140.0),
                 vec2(280.0, 140.0),
-                vec2(160.0, 28.0),
+                vec2(160.0, 40.0),
                 vec2(160.0, 152.0),
             ],
         }

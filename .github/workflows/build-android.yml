@@ -29,8 +29,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write   # 태그 push 시 Release 생성
+    env:
+      ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
     steps:
       - uses: actions/checkout@v4
+
+      # 유료 에셋 팩(레포 밖, docs/decisions/0010). 시크릿이 없으면 건너뛰고 직접 그린 대체 타일로 빌드한다.
+      - name: Fetch vendor assets (private repo)
+        if: env.ASSETS_REPO != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.ASSETS_REPO }}
+          token: ${{ secrets.ASSETS_TOKEN }}
+          path: assets/vendor
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android

@@ -2,3 +2,6 @@
 /dist
 /.netlify
 *.apk
+
+# 유료/제3자 에셋 팩 원본은 공개 레포에 넣지 않는다(docs/decisions/0010). CI는 비공개 레포에서 받는다.
+/assets/vendor/

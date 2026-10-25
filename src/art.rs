@@ -1,0 +1,53 @@
+//! 그림 에셋. 지금은 직접 그린 그림(tools/art/*.py가 원본)만. Sunnyside World 팩은 레포 밖에서 들어온다(docs/decisions/0010).
+//! 파일이 없으면 `None`이고 렌더는 도형 그리기로 돌아간다.
+
+use macroquad::prelude::*;
+
+pub struct Art {
+    /// Naïl 시트: 16×16 칸, 줄 0 idle·walk, 줄 1 attack·hurt·dead, 줄 2 흙더미·그림자, 줄 3~5 흰 실루엣.
+    pub nail: Texture2D,
+    /// 대체 타일셋(tools/art/tiles.py).
+    pub tiles: Texture2D,
+    /// 어둠 마스크(가운데 투명, 바깥 검정). 코드로 만든다.
+    pub dark: Texture2D,
+}
+
+pub const CELL: f32 = 16.0;
+
+impl Art {
+    pub async fn load() -> Option<Self> {
+        let nail = load_texture("art/nail.png").await.ok()?;
+        let tiles = load_texture("art/tiles.png").await.ok()?;
+        nail.set_filter(FilterMode::Nearest);
+        tiles.set_filter(FilterMode::Nearest);
+        Some(Self {
+            nail,
+            tiles,
+            dark: dark_mask(),
+        })
+    }
+}
+
+/// 64×64 원형 어둠 마스크. 가운데는 투명, 가장자리로 갈수록 검정. 부드러운 빛이라 Linear로 늘린다.
+fn dark_mask() -> Texture2D {
+    let n = 64u16;
+    let mut img = Image::gen_image_color(n, n, Color::new(0.0, 0.0, 0.0, 0.0));
+    for y in 0..n {
+        for x in 0..n {
+            let dx = (x as f32 + 0.5) / n as f32 * 2.0 - 1.0;
+            let dy = (y as f32 + 0.5) / n as f32 * 2.0 - 1.0;
+            let d = (dx * dx + dy * dy).sqrt();
+            let t = ((d - 0.35) / 0.65).clamp(0.0, 1.0);
+            let a = t * t * (3.0 - 2.0 * t);
+            img.set_pixel(x as u32, y as u32, Color::new(0.0, 0.0, 0.0, a));
+        }
+    }
+    let tex = Texture2D::from_image(&img);
+    tex.set_filter(FilterMode::Linear);
+    tex
+}
+
+/// 시트의 칸 사각형.
+pub fn cell(col: u32, row: u32) -> Rect {
+    Rect::new(col as f32 * CELL, row as f32 * CELL, CELL, CELL)
+}

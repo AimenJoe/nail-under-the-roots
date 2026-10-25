@@ -12,6 +12,8 @@ pub const MAX_FRAME_DT: f32 = 0.25;
 pub const VIEW_W: f32 = 320.0;
 pub const VIEW_H: f32 = 180.0;
 pub const WALL: f32 = 8.0;
+/// 위쪽 벽 두께. 3/4 시점이라 벼랑 앞면(16px)이 보인다(docs/decisions/0006).
+pub const WALL_TOP: f32 = 24.0;
 
 // ---- 플레이어 ------------------------------------------------------------
 pub const PLAYER_RADIUS: f32 = 6.0;
@@ -121,6 +123,11 @@ pub const SHAKE_DECAY: f32 = 2.2;
 pub const DEATH_FADE: f32 = 0.8;
 /// 쓰러진 뒤 입력을 버리는 시간. 연타 중이던 손이 멈출 여유. 이 뒤에 안내가 뜨고 새 눌림만 받는다.
 pub const DEATH_INPUT_LOCK: f32 = 1.2;
+
+// ---- 컷씬 ------------------------------------------------------------
+/// 레터박스 띠 높이(논리 px)와 내려오는/걷히는 시간.
+pub const LETTERBOX_BAR: f32 = 18.0;
+pub const LETTERBOX_TIME: f32 = 0.4;
 
 // ---- 웨이브 ------------------------------------------------------------
 pub const WAVE_RESPAWN_DELAY: f32 = 1.2;
