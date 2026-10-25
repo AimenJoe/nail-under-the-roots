@@ -148,6 +148,8 @@ pub struct Adventure {
     pub glade: Option<Rect>,
     boss_home: Vec2,
     pub boss_last: Vec2,
+    /// 마지막으로 쓰러진 적의 자리. 끝방 보상은 여기에, 출구는 여기서 떨어진 곳에(0060).
+    pub last_kill: Vec2,
     pub events: Vec<AdvEvent>,
     /// 직전 틱에 서 있던 칸(출구를 밟는 순간에만 길 지도를 연다).
     last_cell: Option<Cell>,
@@ -449,28 +451,33 @@ impl World {
         if self.player.is_alive() && self.adv.fade.is_none() {
             match cell {
                 // 굴 입구는 공터의 대장을 이긴 뒤에야 산다. 그 아래는 쉼터.
+                // 입구·출구는 밟는 순간에만(0060): 싸움이 끝날 때 그 칸에 서 있었다면, 한 번 비켰다가 다시 밟아야 나간다.
                 Some(Cell::Entrance)
-                    if self.adv.place == Place::Field && self.adv.boss == BossFight::Done =>
+                    if stepped
+                        && self.adv.place == Place::Field
+                        && self.adv.boss == BossFight::Done =>
                 {
                     self.start_fade(Transition::EnterCamp)
                 }
-                Some(Cell::Exit) if self.adv.place == Place::Dungeon => match self.adv.node {
-                    None => self.start_fade(Transition::ExitDungeon),
-                    Some(at) => {
-                        let route = self.adv.route.as_ref();
-                        let boss = route.is_some_and(|r| r.node(at).kind == NodeKind::Boss);
-                        let last = route.is_some_and(|r| r.is_final());
-                        if boss && last {
-                            if stepped {
-                                self.adv.events.push(AdvEvent::Deepest);
+                Some(Cell::Exit) if stepped && self.adv.place == Place::Dungeon => {
+                    match self.adv.node {
+                        None => self.start_fade(Transition::ExitDungeon),
+                        Some(at) => {
+                            let route = self.adv.route.as_ref();
+                            let boss = route.is_some_and(|r| r.node(at).kind == NodeKind::Boss);
+                            let last = route.is_some_and(|r| r.is_final());
+                            if boss && last {
+                                if stepped {
+                                    self.adv.events.push(AdvEvent::Deepest);
+                                }
+                            } else if boss {
+                                self.start_fade(Transition::EnterCamp);
+                            } else if stepped {
+                                self.adv.events.push(AdvEvent::RouteOpen);
                             }
-                        } else if boss {
-                            self.start_fade(Transition::EnterCamp);
-                        } else if stepped {
-                            self.adv.events.push(AdvEvent::RouteOpen);
                         }
                     }
-                },
+                }
                 Some(Cell::Save) => return self.touch_save(),
                 _ => {}
             }
@@ -507,7 +514,15 @@ impl World {
                         self.enemies.retain(|e| !glade.contains(e.pos));
                         self.room.set_doors_locked(false);
                         self.adv.boss = BossFight::Done;
-                        let at = self.adv.boss_last;
+                        // 대장 보상이 굴 입구 곁에 떨어지면 줍다가 들어가 버린다: 입구에서 떨어진 곳으로 민다(0060).
+                        let mut at = self.adv.boss_last;
+                        let from = at - self.adv.entrance_pos;
+                        if from.length() < t::EXIT_MIN_DIST {
+                            at = self.adv.entrance_pos
+                                + from.normalize_or(vec2(0.0, -1.0)) * t::EXIT_MIN_DIST;
+                            at.x = at.x.clamp(inside.x, inside.right());
+                            at.y = at.y.clamp(inside.y, inside.bottom());
+                        }
                         self.loot
                             .push(Loot::place(LootKind::RootHeart, at + vec2(0.0, 18.0)));
                         for _ in 0..t::BOSS_SEEDS {
@@ -828,11 +843,28 @@ impl World {
             room.cleared = true;
             sfx.play(sfx::Id::Emerge);
             if room.kind == RoomKind::Boss {
-                let c = room.rect().center();
+                // 보상은 마지막으로 쓰러진 자리(플레이어 곁)에, 출구는 거기와 플레이어에서 떨어진 바닥 칸에.
+                // 예전엔 출구가 방 한가운데라, 가운데서 끝내면 서 있던 칸이 곧 출구가 되어 보상을 못 줍고 나갔다(0060).
+                let inside = room.interior();
+                let at = vec2(
+                    self.adv
+                        .last_kill
+                        .x
+                        .clamp(inside.x + 8.0, inside.right() - 8.0),
+                    self.adv
+                        .last_kill
+                        .y
+                        .clamp(inside.y + 8.0, inside.bottom() - 8.0),
+                );
+                let (ex, ey) = exit_cell(
+                    &self.room,
+                    inside,
+                    room.rect().center(),
+                    &[at, self.player.pos],
+                );
                 if let Some(g) = self.room.grid.as_mut() {
-                    g.set((c.x / 16.0) as usize, (c.y / 16.0) as usize, Cell::Exit);
+                    g.set(ex, ey, Cell::Exit);
                 }
-                let at = c + vec2(0.0, 24.0);
                 if goal == Goal::Boss {
                     self.loot.push(Loot::place(LootKind::RootHeart, at));
                     for _ in 0..t::BOSS_SEEDS {
@@ -957,6 +989,52 @@ impl World {
     }
 }
 
+/// 끝방 출구 칸: 방 안쪽의 막히지 않은 바닥 칸 가운데, `avoid`의 모든 점에서 `EXIT_MIN_DIST` 넘게 떨어진 칸 중
+/// 방 가운데에 가장 가까운 칸. 그런 칸이 없으면(좁은 방) 가장 멀리 떨어진 칸(0060).
+fn exit_cell(
+    room: &crate::room::Room,
+    inside: Rect,
+    center: Vec2,
+    avoid: &[Vec2],
+) -> (usize, usize) {
+    let Some(g) = room.grid.as_ref() else {
+        return ((center.x / 16.0) as usize, (center.y / 16.0) as usize);
+    };
+    let far = |p: Vec2| {
+        avoid
+            .iter()
+            .map(|a| (*a - p).length())
+            .fold(f32::MAX, f32::min)
+    };
+    let mut best: Option<((usize, usize), f32)> = None;
+    let mut fallback: Option<((usize, usize), f32)> = None;
+    let (x0, x1) = ((inside.x / 16.0) as usize, (inside.right() / 16.0) as usize);
+    let (y0, y1) = (
+        (inside.y / 16.0) as usize,
+        (inside.bottom() / 16.0) as usize,
+    );
+    for y in y0..y1.min(g.h) {
+        for x in x0..x1.min(g.w) {
+            let p = vec2(x as f32 * 16.0 + 8.0, y as f32 * 16.0 + 8.0);
+            if g.get(x, y) != Cell::Floor || !inside.contains(p) || room.is_solid(p, 7.0) {
+                continue;
+            }
+            let d = far(p);
+            if d >= t::EXIT_MIN_DIST {
+                let c = (p - center).length();
+                if best.is_none_or(|(_, b)| c < b) {
+                    best = Some(((x, y), c));
+                }
+            } else if fallback.is_none_or(|(_, f)| d > f) {
+                fallback = Some(((x, y), d));
+            }
+        }
+    }
+    best.or(fallback)
+        .map(|(c, _)| c)
+        .unwrap_or(((center.x / 16.0) as usize, (center.y / 16.0) as usize))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1051,6 +1129,62 @@ mod tests {
         w.field_boss();
         assert_eq!(w.adv.boss, BossFight::Done);
         assert!(!w.adv.events.contains(&AdvEvent::BossIntro));
+    }
+
+    /// 끝방 출구(0060): 마지막으로 쓰러진 자리·플레이어가 방 한가운데여도 출구는 거기서 떨어진 바닥 칸에 생긴다.
+    #[test]
+    fn boss_exit_appears_away_from_the_last_kill() {
+        let mut w = World::camp_start(1);
+        let r = w.adv.route.as_mut().unwrap();
+        let boss = (r.layers.len() - 1, 0);
+        r.at = Some((boss.0 - 1, 0));
+        assert!(w.choose_node(boss));
+        w.adv.fade = None;
+        w.enter_node();
+        let d = w.adv.dungeon.as_ref().unwrap();
+        let room = d.rooms.iter().find(|r| r.kind == RoomKind::Boss).unwrap();
+        let (inside, c) = (room.interior(), room.rect().center());
+        for avoid in [vec![c], vec![c + vec2(-40.0, 10.0), c + vec2(30.0, 0.0)]] {
+            let (x, y) = exit_cell(&w.room, inside, c, &avoid);
+            let p = vec2(x as f32 * 16.0 + 8.0, y as f32 * 16.0 + 8.0);
+            assert_eq!(w.room.grid.as_ref().unwrap().get(x, y), Cell::Floor);
+            assert!(inside.contains(p));
+            for a in &avoid {
+                assert!(
+                    (*a - p).length() >= t::EXIT_MIN_DIST,
+                    "{p} 가 {a} 에 너무 가깝다"
+                );
+            }
+        }
+    }
+
+    /// 공터(0060): 대장이 굴 입구 위에서 쓰러져도 보상은 입구에서 떨어진 곳에, 입구는 서 있던 채로는 안 열린다.
+    #[test]
+    fn glade_loot_avoids_the_entrance_and_standing_on_it_does_not_enter() {
+        let mut w = World::field();
+        w.adv.boss = BossFight::Fight;
+        w.enemies.retain(|e| e.kind != Kind::Chief);
+        w.adv.boss_last = w.adv.entrance_pos;
+        w.player.pos = w.adv.entrance_pos;
+        w.field_boss();
+        assert_eq!(w.adv.boss, BossFight::Done);
+        let heart = w
+            .loot
+            .iter()
+            .find(|l| l.kind == LootKind::RootHeart)
+            .unwrap();
+        assert!((heart.pos - w.adv.entrance_pos).length() >= t::EXIT_MIN_DIST * 0.7);
+        // 싸움이 끝날 때 입구에 서 있었다: 그대로면 안 들어간다.
+        w.adv.last_cell = w.room.cell_at(w.player.pos);
+        assert_eq!(w.adv.last_cell, Some(Cell::Entrance));
+        w.cell_triggers();
+        assert!(w.adv.fade.is_none(), "서 있던 채로는 들어가지 않는다");
+        // 비켰다가 다시 밟으면 들어간다.
+        w.player.pos += vec2(0.0, -32.0);
+        w.cell_triggers();
+        w.player.pos += vec2(0.0, 32.0);
+        w.cell_triggers();
+        assert_eq!(w.adv.fade.map(|f| f.kind), Some(Transition::EnterCamp));
     }
 
     /// 길의 굴: 출구를 밟는 순간 길 지도를 한 번 연다. 보스 칸의 출구는 다음 쉼터로.

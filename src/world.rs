@@ -813,6 +813,7 @@ impl World {
         }
 
         for (pos, kind) in deaths {
+            self.adv.last_kill = pos;
             self.drop_loot(pos, kind);
         }
 
