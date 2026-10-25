@@ -393,23 +393,37 @@ pub struct TouchButton {
     pub label: &'static str,
 }
 
-/// 버튼 배치. 화면 짧은 변 기준으로 손가락 크기에 맞춘다.
+/// 버튼 배치(논리 px). 화면 짧은 변 기준으로 손가락 크기에 맞춘다.
 fn touch_layout() -> TouchOverlay {
-    let (w, h) = (screen_width(), screen_height());
+    layout_for(screen_width(), screen_height())
+}
+
+/// 오른손 엄지가 쉬는 오른쪽 아래에 공격(가장 크게), 그 둘레 호를 따라 굴파기·필살기·아이템을 둔다.
+/// 공격은 가장 자주 누르는 버튼이라 엄지 크기(지름 ≈ 짧은 변의 27%, 가로 폰에서 약 100pt)로 —
+/// 예전엔 굴파기와 같은 크기(약 70pt)라 작다는 피드백(2026-10-25). 플랫폼 최소 터치 크기(44pt·48dp)는 바닥일 뿐이다.
+fn layout_for(w: f32, h: f32) -> TouchOverlay {
     let u = w.min(h);
     let r = u * 0.09;
+    let atk_r = r * 1.5;
+    let dig_r = r * 1.1;
+    let sp_r = r * 0.85;
+    let atk = vec2(w - atk_r * 1.3, h - atk_r * 1.3);
+    // 굴파기: 공격 왼쪽, 조금 아래(엄지가 왼쪽으로 쓸 때 닿는 자리).
+    let dig = vec2(atk.x - (atk_r + dig_r + r * 0.5), h - dig_r * 1.2);
+    // 필살기: 공격 바로 위.
+    let sp = vec2(atk.x, atk.y - (atk_r + sp_r + r * 0.45));
     TouchOverlay {
         stick: None,
         stick_radius: u * 0.14,
         buttons: [
             TouchButton {
-                center: vec2(w - r * 1.6, h - r * 1.6),
-                radius: r,
+                center: atk,
+                radius: atk_r,
                 label: "ATK",
             },
             TouchButton {
-                center: vec2(w - r * 4.2, h - r * 1.2),
-                radius: r,
+                center: dig,
+                radius: dig_r,
                 label: "DIG",
             },
             TouchButton {
@@ -423,17 +437,18 @@ fn touch_layout() -> TouchOverlay {
                 label: "MENU",
             },
             TouchButton {
-                center: vec2(w - r * 1.5, h - r * 4.1),
-                radius: r * 0.8,
+                center: sp,
+                radius: sp_r,
                 label: "SP",
             },
             TouchButton {
-                center: vec2(w - r * 4.4, h - r * 3.7),
+                // 아이템: 굴파기와 필살기 사이, 왼쪽 위 대각선.
+                center: vec2(dig.x + r * 0.2, sp.y + r * 0.4),
                 radius: r * 0.8,
                 label: "ITEM",
             },
             TouchButton {
-                center: vec2(w - r * 6.2, h - r * 4.3),
+                center: vec2(dig.x - r * 2.0, sp.y - r * 0.2),
                 radius: r * 0.55,
                 label: "<>",
             },
@@ -841,5 +856,45 @@ mod tests {
         // 대각선은 큰 축. 잡힌 축이 약해지면 다른 축으로.
         assert_eq!(nav_dir((0, 0), vec2(0.8, -0.6)), (1, 0));
         assert_eq!(nav_dir((1, 0), vec2(0.2, 0.9)), (0, 1));
+    }
+
+    /// 터치 버튼: 공격이 가장 크고, 버튼끼리(그린 동그라미) 겹치지 않고 화면 안에 있다. 가로·세로 폰, 태블릿.
+    #[test]
+    fn touch_buttons_attack_biggest_no_overlap() {
+        for (w, h) in [
+            (844.0, 390.0),
+            (390.0, 844.0),
+            (1180.0, 820.0),
+            (667.0, 375.0),
+        ] {
+            let l = layout_for(w, h);
+            let atk = l.buttons.iter().find(|b| b.label == "ATK").unwrap();
+            assert!(l.buttons.iter().all(|b| b.radius <= atk.radius), "{w}x{h}");
+            assert!(
+                atk.radius * 2.0 >= 0.25 * w.min(h),
+                "공격 지름은 짧은 변의 25% 이상"
+            );
+            for (i, a) in l.buttons.iter().enumerate() {
+                assert!(
+                    a.center.x - a.radius >= 0.0 && a.center.x + a.radius <= w,
+                    "{w}x{h} {}",
+                    a.label
+                );
+                assert!(
+                    a.center.y - a.radius >= 0.0 && a.center.y + a.radius <= h,
+                    "{w}x{h} {}",
+                    a.label
+                );
+                for b in &l.buttons[i + 1..] {
+                    let d = (a.center - b.center).length();
+                    assert!(
+                        d >= a.radius + b.radius,
+                        "{w}x{h}: {} {} 겹침",
+                        a.label,
+                        b.label
+                    );
+                }
+            }
+        }
     }
 }
