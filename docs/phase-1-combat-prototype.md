@@ -56,6 +56,7 @@
 | 내 캐릭터 구별 | `tools/art/critters.py`(taint), `render.rs`(draw_player_halo) | 물든 적은 털색을 보라 쪽 + 어둡게, 외곽선 차갑게. Naïl은 따뜻한 색 그대로 + 발밑 빛 고리(천천히 숨 쉼). 흑백으로 봐도 Naïl이 더 밝다 |
 | 떨어진 것 | `loot.rs`(bounds), `adventure.rs`(loot_bounds, push_loot) | 던전에서는 떨어진 방 안쪽에서만 구른다(문 칸으로 굴러가 주우려다 옆 방으로 넘어가던 문제) |
 | 공격 예고 | `render.rs`(draw_telegraphs), `room.rs`(ray_len) | 돌진 길 띠·조준 점선·착지 고리를 바닥에 반투명 붉게(채움 3→16%, 테두리 15→50%), 예고가 끝날수록 진하게 + 마지막 15% 깜빡임(docs/decisions/0025, 0026) |
+| 웹 로딩 화면 | `web/index.html`, `src/loading.rs`, `main.rs` | 글 없는 걷는 Naïl + 막대. wasm 받은 바이트(0~60%) + 준비 5단계(60~100%), 첫 프레임 뒤 걷음(docs/decisions/0028). 느린 회선 흉내로 확인 |
 | 웹 GL 컨텍스트 | `web/index.html` | 안티에일리어싱·투명 배경 끔, 고성능 GPU 요청. 아이폰급(dpr 3) 캔버스 2532×1170에서 매 프레임 4배 샘플을 없앰. 헤드리스 같은 3초 동안 그린 프레임 62 → 144(docs/decisions/0026) |
 | 도감·상태 | `app.rs`(draw_bestiary, draw_status) | 도감: 만난 이웃, 능력은 말로. 상태: 플레이어 능력치 숫자(체력·공격력·공속·굴파기 대기·분노 충전·무기·장신구·반딧불·씨앗) |
 | 조작 설정 | `input.rs`(Bindings, prompt, capture), `prefs.rs`, `app.rs`(draw_controls), `web/index.html`(nail_prefs) | 오른쪽 넷 = 공격·굴파기·필살기·아이템, 어깨 = 아이템 넘기기, Select = 지도. 다시 붙이기(겹치면 맞바꿈), 웹 저장(docs/decisions/0022) |

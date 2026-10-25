@@ -19,6 +19,7 @@ mod field;
 mod i18n;
 mod input;
 mod items;
+mod loading;
 mod loot;
 mod map;
 mod moveset;
@@ -66,26 +67,42 @@ async fn main() {
     // 기기 언어로 시작한다. 설정에서 바꿀 수 있다(아직 저장하지 않음, docs/decisions/0013).
     i18n::set_lang(i18n::detect());
     // 언어별 폰트를 전부 읽는다. 없으면 기본 폰트(한글·한자 없음)로라도 뜨게 한다.
+    // 준비 단계마다 웹 로딩 화면의 막대를 채운다(loading::STEPS = 기본 폰트 1 + 일본어·간체 2 + 그림 1 + 소리 1).
+    let mut done = 0;
     let mut fonts = render::Fonts {
         base: load_font(i18n::BASE_FONT).await,
         by_file: Vec::new(),
     };
+    done += 1;
+    loading::step(done);
     for l in i18n::Lang::ALL {
         let file = l.font_file();
         if file != i18n::BASE_FONT && !fonts.by_file.iter().any(|(f, _)| *f == file) {
             if let Some(f) = load_font(file).await {
                 fonts.by_file.push((file, f));
             }
+            done += 1;
+            loading::step(done);
         }
     }
     let art = art::Art::load().await;
     if art.is_none() {
         eprintln!("그림 에셋(assets/art) 로드 실패: 도형으로 그린다");
     }
+    done += 1;
+    loading::step(done);
     let sfx = sfx::Sfx::load().await;
+    done += 1;
+    loading::step(done);
     let mut app = app::App::new(sfx, fonts, art);
+    let mut first = true;
     loop {
         app.frame();
-        next_frame().await
+        next_frame().await;
+        if first {
+            // 첫 프레임이 화면에 나간 뒤 로딩 화면을 걷는다(그 전에 걷으면 검은 화면이 한 번 보인다).
+            first = false;
+            loading::ready();
+        }
     }
 }
