@@ -2,6 +2,7 @@
 
 귀엽지만 쓸쓸한 땅속 세계에서, 아기 두더지 Naïl이 발톱과 굴파기로 방을 돌파하며 시들어 가는 나무의 뿌리를 따라 내려가는 탑다운 액션 로그라이트. Rust + macroquad.
 
+- 공식 페이지: https://aimenjoe.github.io/nail-under-the-roots/ (원본 `site/`, `pages.yml`이 GitHub Pages에 올린다, docs/decisions/0069). 게임은 https://nail-under-the-roots.netlify.app
 - 컨셉: [`docs/concept.md`](docs/concept.md)
 - 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md) (1단계 전투 프로토타입, 회색 박스)
 - 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 캐릭터·대체 타일은 직접 그림(원본 `tools/art/*.py`, `python3 tools/art/<이름>.py`로 PNG 재생성 — nail·critters·chief·portraits·tiles). 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)

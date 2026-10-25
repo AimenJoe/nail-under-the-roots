@@ -47,6 +47,8 @@ python3 tools/licenses.py                    # 의존성을 바꿨을 때만. as
 ```
 CI: `deploy-web.yml`이 위 세 줄을 돌리고 Netlify 시크릿이 있으면 배포한다. `build-android.yml`이 APK를 만들어 아티팩트(태그면 Release)로 올린다. 릴리스는 `Cargo.toml` 버전을 올리고 `docs/releases/v<버전>.md`를 함께 main에 push하면 `release.yml`이 태그·APK·Release를 만든다(세션 프록시는 태그 push를 받지 않는다). 로컬에 Android SDK/NDK는 두지 않는다(docs/decisions/0005).
 
+공식 페이지(0069): `site/`(한국어 `index.html`, 영어 `en/`)를 `pages.yml`이 GitHub Pages에 올린다. 그림·글꼴은 `python3 tools/site/make_images.py`(초상화 자르기·일러스트 복사·페이지 글자만 남긴 Galmuri), 스크린숏은 `tools/site/shots.js`. 페이지 글을 바꾸면 두 언어를 다 고치고 `make_images.py`를 다시 돌린다(글꼴 글자). 최신 버전·APK·소식은 `site.js`가 GitHub Releases에서 읽는다(못 읽으면 적어 둔 값).
+
 ## 하지 않는 것
 - `mq_js_bundle.js`나 게임패드 JS 플러그인을 외부 URL로 핫링크하지 않는다. `web/`에 복사본.
 - 에셋 팩을 라이선스 확인 없이 커밋하지 않는다. `assets/LICENSES.md`에 기록. **이 레포는 공개다. 유료·제3자 팩 원본은 `assets/vendor/`(gitignore)에만 두고 커밋하지 않는다**(docs/decisions/0010). 팩 그림은 Claude가 보고 고르고 확인해도 되지만 AI 학습·생성 참조에는 쓰지 않는다(0064).
