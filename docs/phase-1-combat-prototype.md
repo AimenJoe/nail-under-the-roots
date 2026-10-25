@@ -55,8 +55,8 @@
 | 적 2종 | `enemy.rs` | 돌격형: 접근→예고 0.45s→돌진 0.35s→멈춤. 벽에 박으면 더 오래 멈춤. 원거리형: 60~110px 유지, 조준 0.35s 후 발사 |
 | 피격·사망·재시작 | `player.rs`, `world.rs` | 체력 3, 피격 무적 0.8s. R / Start로 즉시 재시작 |
 | 전투감 | `combat.rs`(Feel), `world.rs`, `render.rs` | 히트스톱(로직 시계만), trauma² 흔들림(정수 px), 흰색 플래시, 넉백(감쇠), 합성음 |
-| 게임패드 | `input.rs`, `web/macroquad-gamepads-0.1.js` | 데스크톱(gilrs)·웹(플러그인). 실기 패드로는 아직 안 눌러 봄 |
-| 터치(보조) | `input.rs` TouchState, `render.rs` 오버레이, `web/index.html` | 왼쪽 반 떠다니는 스틱 + ATK/DIG/R 버튼. 모바일 브라우저용. 헤드리스 Chromium에 합성 TouchEvent로 동작 확인, 실기 미확인 |
+| 게임패드 | `input.rs`, `web/macroquad-gamepads-0.1.js` | 데스크톱(gilrs)·웹(플러그인). 웹은 비표준 매핑 패드도 받도록 플러그인 패치. Android 13 폰 브라우저 + 실기 패드로 인식 확인(2026-10-25). 데스크톱 실기는 미확인 |
+| 터치(보조) | `input.rs` TouchState, `render.rs` 오버레이, `web/index.html` | 왼쪽 반 떠다니는 스틱 + ATK/DIG/R 버튼. 모바일 브라우저용. 터치 좌표는 DPI로 나눠야 함(macroquad touches()는 물리 픽셀). Android 13 폰 브라우저 실기 확인(2026-10-25) |
 | 디버그 | F1 오버레이(fps, 상태), F2 히트박스 | |
 | 웨이브 | `world.rs` | 적을 다 잡으면 1.2초 뒤 다음 웨이브(1C+1S → 2C+1S → 2C+2S → 3C+2S). 명세엔 없지만 5분 플레이 판정을 위해 넣음 |
 
@@ -66,7 +66,8 @@
 - [x] Netlify Personal access token 발급, GitHub Secrets `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID` 등록 (2026-10-24)
 - [ ] `main`에 머지(또는 push)해서 `deploy-web`이 프로덕션 배포를 하게 한다. PR을 열면 먼저 `pr-<번호>--nail-under-the-roots.netlify.app` 미리보기로 확인할 수 있다
 - [ ] **플레이**(웹 또는 `cargo run`). 위 판정 4개에 예/아니오와 한 줄 이유를 적어 다음 세션에 전달. 가능하면 본인 외 1명 더
-- [ ] 게임패드를 꽂고 데스크톱·웹에서 이동/공격/굴파기/재시작, 스틱 데드존 확인
+- [x] 웹(Android 13 폰 브라우저)에서 터치·게임패드 인식 확인 (2026-10-25)
+- [ ] 데스크톱에서 게임패드 이동/공격/굴파기/재시작, 스틱 데드존 확인
 - [ ] GitHub Secrets에 `ANDROID_DEBUG_KEYSTORE_B64` 등록(README "Android" 절). 등록 전 빌드로 설치한 앱은 기기에서 삭제 후 재설치
 - [ ] Actions의 `build-android` 아티팩트 APK를 Android 기기(가능하면 핸드헬드)에 설치해 실행되는지, D-pad로 움직이는지 확인
 - [ ] (데스크톱 실행용) Linux면 `libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev libudev-dev pkg-config`
