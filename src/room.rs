@@ -180,6 +180,20 @@ impl Room {
         hit
     }
 
+    /// `from`에서 `dir`(단위 벡터)로 반지름 `r`인 원이 막히지 않고 갈 수 있는 거리(최대 `max`). 공격 예고 길이에 쓴다.
+    pub fn ray_len(&self, from: Vec2, dir: Vec2, r: f32, max: f32) -> f32 {
+        let step = 2.0;
+        let mut d = 0.0;
+        while d < max {
+            let next = (d + step).min(max);
+            if self.is_solid(from + dir * next, r) {
+                return d;
+            }
+            d = next;
+        }
+        max
+    }
+
     /// 점이 벽/기둥 안에 있는가(투사체용).
     pub fn is_solid(&self, p: Vec2, r: f32) -> bool {
         if p.x - r < self.inner.x

@@ -90,7 +90,8 @@ def wall_front(img, ox, oy, roots):
     for y in range(0, T, 5):  # 흙 지층
         for x in range(T):
             if r.random() < 0.8:
-                px(img, ox + x, oy + y + r.randrange(2), EARTH[1])
+                # 칸 밖(y = 16)으로 넘치면 아래 칸(바위·흙 얼룩) 꼭대기에 짙은 줄이 찍힌다 → 칸 안으로 자른다.
+                px(img, ox + x, oy + min(T - 1, y + r.randrange(2)), EARTH[1])
     for _ in range(8):  # 돌 박힘
         x, y = r.randrange(1, T - 2), r.randrange(1, T - 2)
         px(img, ox + x, oy + y, EARTH[2])
@@ -130,23 +131,36 @@ def mushroom(img, ox, oy):
 
 
 def root_vine(img, ox, oy):
-    r = random.Random(3)
-    y = 4
-    for x in range(T):
-        px(img, ox + x, oy + y, (110, 78, 56))
-        px(img, ox + x, oy + y + 1, (78, 54, 40))
-        if r.random() < 0.35:
-            y = max(2, min(13, y + r.choice((-1, 1))))
-    for (x, yy) in [(4, 7), (4, 8), (5, 9), (11, 8), (11, 9), (12, 10)]:
-        px(img, ox + x, oy + yy, (110, 78, 56))
+    """땅에서 솟았다 다시 들어가는 뿌리 하나(아치). 위는 밝게, 아래는 어둡게, 들어가는 양 끝에 흙.
+    v1은 무작위로 오르내리는 1px 줄 + 떨어진 점이라 바닥 위에 뜬 얼룩처럼 보였다."""
+    light, mid, dark = (150, 110, 78), (118, 84, 60), (80, 56, 42)
+    soil = (104, 76, 56)
+    pts = []
+    for x in range(2, 14):
+        t = (x - 2) / 11.0
+        y = 10 - round(3.2 * (1 - (2 * t - 1) ** 2))   # 10 → 7 → 10
+        pts.append((x, y))
+    for (x, y) in pts:
+        px(img, ox + x, oy + y, light)
+        px(img, ox + x, oy + y + 1, mid)
+        px(img, ox + x, oy + y + 2, dark)
+    # 곁뿌리 하나
+    for (x, y) in [(9, 11), (10, 12)]:
+        px(img, ox + x, oy + y, mid)
+    # 땅속으로 들어가는 자리: 흙 조금
+    for (x, y) in [(1, 12), (2, 13), (3, 13), (12, 13), (13, 13), (14, 12)]:
+        px(img, ox + x, oy + y, soil)
 
 
 def moss(img, ox, oy):
-    r = random.Random(9)
-    for _ in range(14):
-        x, y = r.randrange(2, 14), r.randrange(6, 14)
-        px(img, ox + x, oy + y, (70, 120, 90))
-        px(img, ox + x + 1, oy + y, (90, 140, 100))
+    """이끼 뭉치 둘: 둥근 덩어리, 위가 밝고 아래가 어둡다. v1의 흩어진 2px 줄은 얼룩처럼 보였다."""
+    dark, mid, light = (58, 104, 70), (76, 128, 84), (104, 156, 100)
+    for (cx, cy, w) in [(5, 9, 4), (11, 12, 3)]:
+        for dx in range(w):
+            px(img, ox + cx + dx, oy + cy, light if dx < w - 1 else mid)
+            px(img, ox + cx + dx - 1, oy + cy + 1, mid)
+            px(img, ox + cx + dx - 1, oy + cy + 2, dark)
+        px(img, ox + cx + w - 1, oy + cy + 1, mid)
 
 
 def stump(img, ox, oy):
@@ -190,11 +204,12 @@ def rock(img, ox, oy):
                 if dx > 0.4 or dy > 0.6:
                     c = dark
                 px(img, ox + x, oy + y, c)
-    for (x, y) in [(6, 14), (7, 15), (10, 20), (11, 21), (5, 24)]:
+    # 금 두 줄(이어진 선). 3/4 시점 윗면은 밝은 띠 하나.
+    for (x, y) in [(6, 15), (7, 16), (7, 17), (10, 21), (10, 22), (11, 23)]:
         px(img, ox + x, oy + y, dark)
-    # 이끼 모자
-    for x in range(4, 11):
-        px(img, ox + x, oy + 11 + (x % 2), (90, 150, 84))
+    for x in range(5, 10):
+        px(img, ox + x, oy + 12, light)
+    # v1의 "이끼 모자"(한 칸씩 엇갈린 초록 점)는 바위 위의 얼룩처럼 보여 뺐다.
     outline_region(img, ox, oy, 16, 32)
 
 

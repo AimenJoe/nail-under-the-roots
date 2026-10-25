@@ -71,5 +71,13 @@ fn dark_mask() -> Texture2D {
 
 /// 시트의 칸 사각형.
 pub fn cell(col: u32, row: u32) -> Rect {
-    Rect::new(col as f32 * CELL, row as f32 * CELL, CELL, CELL)
+    inset(Rect::new(col as f32 * CELL, row as f32 * CELL, CELL, CELL))
+}
+
+/// 시트에서 칸을 잘라 쓸 때 가장자리를 아주 조금(0.01px) 안으로(예방). 카메라·배율의 소수점 오차로
+/// 칸 경계를 표본하면 이웃 칸의 한 줄이 묻어 나올 수 있다. Nearest라 그려지는 픽셀은 같다.
+/// (바위 위 "얼룩"의 실제 원인은 이게 아니라 tiles.py의 벽 앞면이 칸 밖으로 한 줄 넘친 것이었다.)
+pub fn inset(r: Rect) -> Rect {
+    const E: f32 = 0.01;
+    Rect::new(r.x + E, r.y + E, r.w - 2.0 * E, r.h - 2.0 * E)
 }
