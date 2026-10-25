@@ -38,6 +38,8 @@ pub struct World {
     pub fx: Vec<Fx>,
     pub feel: Feel,
     pub debug: Debug,
+    /// 적을 다 잡으면 다음 웨이브를 자동으로 띄운다. 시나리오는 끌 수 있다.
+    pub auto_waves: bool,
     pub wave: u32,
     pub kills: u32,
     /// 솟구침으로 잡은 수(저널용).
@@ -64,6 +66,7 @@ impl World {
                 overlay: false,
                 hitboxes: false,
             },
+            auto_waves: true,
             wave: 0,
             kills: 0,
             emerge_kills: 0,
@@ -74,6 +77,19 @@ impl World {
         };
         w.next_wave();
         w
+    }
+
+    /// 적도 웨이브도 없는 방(시나리오·컷씬용).
+    pub fn empty() -> Self {
+        let mut w = Self::new();
+        w.enemies.clear();
+        w.wave = 0;
+        w.auto_waves = false;
+        w
+    }
+
+    pub fn spawn_enemy(&mut self, kind: Kind, pos: Vec2) {
+        self.enemies.push(Enemy::new(kind, pos));
     }
 
     pub fn tick(&mut self, a: &Actions, sfx: &Sfx) {
@@ -261,7 +277,7 @@ impl World {
         self.fx.retain(|f| f.time < f.dur);
 
         // 7. 웨이브
-        if self.player.is_alive() && self.enemies.is_empty() {
+        if self.auto_waves && self.player.is_alive() && self.enemies.is_empty() {
             self.respawn_timer -= dt;
             if self.respawn_timer <= 0.0 {
                 self.next_wave();
@@ -285,7 +301,7 @@ impl World {
         }
     }
 
-    fn next_wave(&mut self) {
+    pub fn next_wave(&mut self) {
         self.wave += 1;
         let (chargers, shooters) = match self.wave {
             1 => (1, 1),

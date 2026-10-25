@@ -5,6 +5,11 @@ edition = "2021"
 description = "Naïl: Under the Roots — 귀여운 탑다운 액션 로그라이트"
 publish = false
 
+[features]
+# dev: 타이틀의 "개발" 시나리오 메뉴. 스토어 배포 빌드는 --no-default-features.
+default = ["dev"]
+dev = []
+
 [dependencies]
 macroquad = { version = "0.4.16", features = ["audio"] }
 

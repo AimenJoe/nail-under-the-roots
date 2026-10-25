@@ -6,8 +6,10 @@
 
 use macroquad::prelude::*;
 
+use crate::cutscene::{self, Cutscene};
 use crate::input::{Actions, Input};
 use crate::render::{self, Renderer};
+use crate::scenario::{self, Scenario};
 use crate::sfx::Sfx;
 use crate::tuning as t;
 use crate::ui::{self, Ui, FONT_PX};
@@ -19,6 +21,9 @@ const INTRO_LINES: [&str; 3] = [
     "아기 두더지 Naïl은 원인을 찾아 뿌리를 따라 내려간다.",
 ];
 const INTRO_LINE_TIME: f32 = 2.6;
+#[cfg(feature = "dev")]
+const TITLE_ITEMS: [&str; 3] = ["시작", "설정", "개발"];
+#[cfg(not(feature = "dev"))]
 const TITLE_ITEMS: [&str; 2] = ["시작", "설정"];
 const PAUSE_TABS: [&str; 5] = ["메뉴", "상태", "가방", "저널", "지도"];
 const PAUSE_MENU: [&str; 4] = ["계속하기", "다시 시작", "설정", "타이틀로"];
@@ -28,7 +33,13 @@ const SETTING_ROWS: [&str; 4] = ["소리", "화면 흔들림", "디버그 정보
 enum Scene {
     Intro,
     Title,
-    Settings { back: Back },
+    Settings {
+        back: Back,
+    },
+    /// 개발용 시나리오 목록.
+    Dev,
+    /// 컷씬. 끝나면 게임.
+    Cutscene,
     Game,
     Pause,
 }
@@ -143,6 +154,7 @@ enum Hit {
     SettingRight(usize),
     InvSlot(usize),
     JournalItem(usize),
+    DevItem(usize),
 }
 
 pub struct App {
@@ -154,6 +166,10 @@ pub struct App {
     settings_cursor: usize,
     inv_cursor: usize,
     journal_cursor: usize,
+    dev_cursor: usize,
+    /// 지금 플레이 중인 시나리오. "다시 시작"은 이걸 다시 만든다.
+    current: Scenario,
+    cutscene: Option<Cutscene>,
     pub settings: Settings,
     world: World,
     journal: Journal,
@@ -187,6 +203,9 @@ impl App {
             settings_cursor: 0,
             inv_cursor: 0,
             journal_cursor: 0,
+            dev_cursor: 0,
+            current: Scenario::Normal,
+            cutscene: None,
             settings,
             world,
             journal: Journal::new(),
@@ -206,11 +225,24 @@ impl App {
         self.input.set_menu_mode(self.scene != Scene::Game);
         self.input.poll();
         let dt = get_frame_time().min(t::MAX_FRAME_DT);
-        if self.scene == Scene::Game {
-            self.update_game(dt);
-        } else {
-            let a = self.input.take();
-            self.update_menu(&a, dt);
+        match self.scene {
+            Scene::Game => self.update_game(dt),
+            Scene::Cutscene => {
+                let a = self.input.take();
+                if let Some(c) = self.cutscene.as_mut() {
+                    c.update(&a, dt, &mut self.world);
+                    if c.is_done() {
+                        self.cutscene = None;
+                        self.scene = Scene::Game;
+                    }
+                } else {
+                    self.scene = Scene::Game;
+                }
+            }
+            _ => {
+                let a = self.input.take();
+                self.update_menu(&a, dt);
+            }
         }
         self.draw();
     }
@@ -257,16 +289,33 @@ impl App {
         self.scene = Scene::Pause;
     }
 
-    fn start_game(&mut self) {
+    /// 시나리오로 새 런을 시작한다. Normal과 CutsceneOnly는 오프닝 컷씬을 먼저 재생한다.
+    fn start(&mut self, s: Scenario) {
         let hitboxes = self.world.debug.hitboxes;
-        self.world = World::new();
+        self.current = s;
+        self.world = scenario::build(s);
         self.world.debug.overlay = self.settings.debug_overlay;
         self.world.debug.hitboxes = hitboxes;
         self.journal = Journal::new();
         self.inventory = Inventory::new();
         self.run_time = 0.0;
         self.acc = 0.0;
-        self.scene = Scene::Game;
+        if matches!(s, Scenario::Normal | Scenario::CutsceneOnly) {
+            // 컷씬 동안은 적이 없다가, 끝나면 웨이브 1.
+            let auto = self.world.auto_waves;
+            self.world.enemies.clear();
+            self.world.wave = 0;
+            self.world.auto_waves = auto;
+            self.world.player.pos = vec2(40.0, 90.0);
+            self.cutscene = Some(cutscene::opening(&self.world));
+            self.scene = Scene::Cutscene;
+        } else {
+            self.scene = Scene::Game;
+        }
+    }
+
+    fn start_game(&mut self) {
+        self.start(self.current);
     }
 
     fn hit_at(&self, screen: Vec2) -> Option<Hit> {
@@ -304,12 +353,39 @@ impl App {
                     None
                 };
                 match chosen {
-                    Some(0) => self.start_game(),
+                    Some(0) => self.start(Scenario::Normal),
                     Some(1) => {
                         self.settings_cursor = 0;
                         self.scene = Scene::Settings { back: Back::Title };
                     }
+                    Some(2) => {
+                        self.dev_cursor = 0;
+                        self.scene = Scene::Dev;
+                    }
                     _ => {}
+                }
+            }
+            Scene::Dev => {
+                let n = scenario::LIST.len();
+                if a.up {
+                    self.dev_cursor = (self.dev_cursor + n - 1) % n;
+                }
+                if a.down {
+                    self.dev_cursor = (self.dev_cursor + 1) % n;
+                }
+                if a.cancel {
+                    self.scene = Scene::Title;
+                    return;
+                }
+                let chosen = if a.confirm {
+                    Some(self.dev_cursor)
+                } else if let Some(Hit::DevItem(i)) = tap_hit {
+                    Some(i)
+                } else {
+                    None
+                };
+                if let Some(i) = chosen {
+                    self.start(scenario::LIST[i].scenario);
                 }
             }
             Scene::Settings { back } => {
@@ -362,7 +438,7 @@ impl App {
                 }
             }
             Scene::Pause => self.update_pause(a, tap_hit),
-            Scene::Game => {}
+            Scene::Game | Scene::Cutscene => {}
         }
     }
 
@@ -475,7 +551,7 @@ impl App {
     fn draw(&mut self) {
         let in_world = matches!(
             self.scene,
-            Scene::Game | Scene::Pause | Scene::Settings { back: Back::Pause }
+            Scene::Game | Scene::Pause | Scene::Cutscene | Scene::Settings { back: Back::Pause }
         );
         let alpha = if self.scene == Scene::Game {
             self.acc / t::TICK_DT
@@ -487,6 +563,11 @@ impl App {
             alpha,
             self.settings.shake_f(),
         );
+        if let Some(c) = &self.cutscene {
+            for actor in c.actors.iter().skip(1).filter(|a| a.visible) {
+                render::draw_actor(actor.pos, actor.facing, actor.color);
+            }
+        }
         let ui = self.renderer.present();
         self.hits.clear();
         self.last_ui = (ui.scale, ui.ox, ui.oy);
@@ -494,6 +575,8 @@ impl App {
         match self.scene {
             Scene::Intro => self.draw_intro(&ui),
             Scene::Title => self.draw_title(&ui),
+            Scene::Dev => self.draw_dev(&ui),
+            Scene::Cutscene => self.draw_cutscene(&ui),
             Scene::Settings { back } => {
                 if back == Back::Pause {
                     self.renderer
@@ -534,7 +617,7 @@ impl App {
     fn draw_title(&mut self, ui: &Ui) {
         ui.text_center("Naïl", 160.0, 34.0, FONT_PX * 2.0, ui::ACCENT);
         ui.text_center("Under the Roots", 160.0, 60.0, FONT_PX, ui::TEXT);
-        let rects = ui.menu_list(&TITLE_ITEMS, self.title_cursor, 124.0, 96.0, 72.0);
+        let rects = ui.menu_list(&TITLE_ITEMS, self.title_cursor, 124.0, 92.0, 72.0);
         for (i, r) in rects.into_iter().enumerate() {
             self.hits.push((r, Hit::TitleItem(i)));
         }
@@ -546,6 +629,88 @@ impl App {
             ui::TEXT_DIM,
         );
         ui.text_right("프로토타입 v0.1", 316.0, 166.0, FONT_PX, ui::TEXT_DIM);
+    }
+
+    fn draw_dev(&mut self, ui: &Ui) {
+        let panel = Rect::new(24.0, 16.0, 272.0, 148.0);
+        ui.panel(panel, Some("개발 시나리오"));
+        let names: Vec<&str> = scenario::LIST.iter().map(|e| e.name).collect();
+        let rects = ui.menu_list(
+            &names,
+            self.dev_cursor,
+            panel.x + 6.0,
+            panel.y + 24.0,
+            110.0,
+        );
+        for (i, r) in rects.into_iter().enumerate() {
+            self.hits.push((r, Hit::DevItem(i)));
+        }
+        let e = &scenario::LIST[self.dev_cursor];
+        let dx = panel.x + 126.0;
+        ui.text(e.name, dx, panel.y + 26.0, FONT_PX, ui::ACCENT);
+        for (i, l) in ui::wrap(ui, e.desc, panel.right() - dx - 6.0, FONT_PX)
+            .iter()
+            .enumerate()
+        {
+            ui.text(l, dx, panel.y + 42.0 + i as f32 * 14.0, FONT_PX, ui::TEXT);
+        }
+        for (i, l) in ["확인: 시작 · 뒤로: 타이틀", "적 구성은 src/scenario.rs"]
+            .iter()
+            .enumerate()
+        {
+            ui.text(
+                l,
+                dx,
+                panel.bottom() - 30.0 + i as f32 * 13.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
+    }
+
+    /// JRPG식 대화창: 아래 전체 폭, 이름표, 초상 자리, 타자 효과, ▼.
+    fn draw_cutscene(&self, ui: &Ui) {
+        let Some(c) = &self.cutscene else { return };
+        if let Some(d) = c.dialogue() {
+            let b = Rect::new(8.0, 124.0, 304.0, 50.0);
+            ui.panel(b, None);
+            // 이름표
+            let name_w = ui.text_w(d.name, FONT_PX) + 10.0;
+            let tag = Rect::new(b.x + 6.0, b.y - 8.0, name_w, FONT_PX + 4.0);
+            ui.rect(tag, ui::PANEL_LIGHT);
+            ui.rect_lines(tag, ui::BORDER);
+            ui.text(d.name, tag.x + 5.0, tag.y + 2.0, FONT_PX, ui::ACCENT);
+            // 초상 자리(그림이 없으니 색 네모)
+            let portrait = Rect::new(b.x + 8.0, b.y + 10.0, 28.0, 28.0);
+            ui.rect(portrait, d.color);
+            ui.rect_lines(portrait, ui::BORDER);
+            // 본문(타자 효과)
+            let shown: String = d.text.chars().take(d.shown_chars).collect();
+            let tx = portrait.right() + 8.0;
+            let tw = b.right() - tx - 10.0;
+            for (i, l) in ui::wrap(ui, &shown, tw, FONT_PX).iter().take(3).enumerate() {
+                ui.text(l, tx, b.y + 9.0 + i as f32 * 13.0, FONT_PX, ui::TEXT);
+            }
+            if d.complete && (get_time() * 2.0) as i64 % 2 == 0 {
+                ui.text(
+                    "▼",
+                    b.right() - 16.0,
+                    b.bottom() - 15.0,
+                    FONT_PX,
+                    ui::ACCENT,
+                );
+            }
+        }
+        ui.text_center("뒤로(Esc/B): 건너뛰기", 160.0, 1.0, FONT_PX, ui::TEXT_DIM);
+        if c.fade > 0.0 {
+            draw_rectangle(
+                0.0,
+                0.0,
+                screen_width(),
+                screen_height(),
+                Color::new(0.0, 0.0, 0.0, c.fade),
+            );
+        }
     }
 
     fn draw_settings(&mut self, ui: &Ui) {

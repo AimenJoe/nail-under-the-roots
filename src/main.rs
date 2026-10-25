@@ -2,17 +2,19 @@
 //!
 //! 루프: `App::frame()` = 입력 폴링 → 장면 갱신(게임은 고정 타임스텝 60Hz 틱 N번) → 가변 렌더(보간).
 //! 모듈 경계: `input`(Actions) · `player` · `enemy` · `combat` · `room` · `render` · `world`(틱 순서) ·
-//! `app`(장면·메뉴) · `ui`(패널 그리기) · `sfx` · `tuning`(수치).
+//! `app`(장면·메뉴) · `ui`(패널 그리기) · `cutscene`(JRPG식 컷씬) · `scenario`(개발용 시작 구성) · `sfx` · `tuning`(수치).
 //! 범위와 판정 기준: docs/phase-1-combat-prototype.md
 #![allow(clippy::new_without_default)]
 
 mod app;
 mod combat;
+mod cutscene;
 mod enemy;
 mod input;
 mod player;
 mod render;
 mod room;
+mod scenario;
 mod sfx;
 mod tuning;
 mod ui;

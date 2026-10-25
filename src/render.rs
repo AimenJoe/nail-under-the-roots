@@ -102,6 +102,15 @@ impl Renderer {
     }
 }
 
+/// 컷씬 배우(월드 패스 안에서, begin_world 뒤 present 전에).
+pub fn draw_actor(pos: Vec2, facing: Vec2, color: Color) {
+    let p = pos.round();
+    draw_ellipse(p.x, p.y + 6.0, 7.0, 3.0, 0.0, SHADOW);
+    draw_rectangle(p.x - 6.0, p.y - 6.0, 12.0, 12.0, color);
+    let nose = p + facing * 8.0;
+    draw_circle(nose.x.round(), nose.y.round(), 2.0, WHITE);
+}
+
 /// 타이틀 배경: 격자 위에 뿌리 몇 가닥.
 fn draw_title_background() {
     for gx in (0..VW).step_by(16) {

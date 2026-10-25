@@ -28,6 +28,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - UI는 커서 없이 동작해야 한다(좌우 이동 + 확인). 마우스는 보조.
 - 모듈 경계: `input`, `player`, `enemy`, `combat`, `room`, `render`, `world`(틱 순서). 각 모듈은 `Actions`와 월드 상태만 본다. 장면·메뉴는 `app`(+`ui`)에만 있고 `world`는 메뉴를 모른다.
 - 그림 문법은 3/4 탑다운(docs/decisions/0006). 아이소메트릭 아님.
+- 테스트용 방 구성은 `src/scenario.rs`에 한 줄 추가(타이틀 "개발"). 컷씬은 `src/cutscene.rs`의 `Step` 스크립트, JRPG식(docs/decisions/0008).
 - UI 텍스트는 `assets/fonts/Galmuri11-Condensed.ttf`(KS X 1001 2,350자 서브셋)로 실제 해상도에 찍는다. 그 밖의 한자·확장 한글은 안 나온다.
 
 ## 커밋 전
