@@ -83,6 +83,10 @@ pub struct Player {
     pub burrow_cd: f32,
     /// 다음 먹기까지 남은 시간(먹기 시작 순간부터 ITEM_COOLDOWN).
     pub item_cd: f32,
+    /// 받는 피해를 줄이는 비율(0..1). 도움 모드 "포포의 응원"(docs/decisions/0041). 앱이 기록에서 정한다.
+    pub resist: f32,
+    /// 줄인 피해의 소수 부분을 모아 둔다(체력은 정수라 1이 차면 그때 깎는다).
+    dmg_acc: f32,
     pub events: Vec<Event>,
     /// 콤보 표. 무기·캐릭터에 따라 바뀐다(moveset.rs).
     pub moveset: &'static Moveset,
@@ -119,6 +123,8 @@ impl Player {
             state: State::Free,
             burrow_cd: 0.0,
             item_cd: 0.0,
+            resist: 0.0,
+            dmg_acc: 0.0,
             events: Vec::new(),
             moveset: &moveset::CLAWS,
             face_left: false,
@@ -562,6 +568,15 @@ impl Player {
         if self.is_invulnerable() {
             return false;
         }
+        // 도움 모드: 피해를 비율만큼 줄인다. 소수는 모아 두었다가 1이 되면 깎는다(맞은 반응은 그대로).
+        let dmg = if self.resist > 0.0 {
+            self.dmg_acc += dmg as f32 * (1.0 - self.resist.min(0.95));
+            let d = self.dmg_acc.floor();
+            self.dmg_acc -= d;
+            d as i32
+        } else {
+            dmg
+        };
         self.hp -= dmg;
         self.invuln = t::PLAYER_HURT_INVULN;
         self.flash = t::HIT_FLASH;
@@ -701,6 +716,23 @@ mod tests {
     }
 
     /// 패링 창: 스윙 시작 직후 PARRY_WINDOW 동안만, 공격 방향으로.
+    /// 도움 모드: 피해가 비율만큼 줄고, 소수는 모였다가 깎인다.
+    #[test]
+    fn assist_resist_spreads_damage_over_hits() {
+        let room = Room::new();
+        let mut p = Player::new(room.center());
+        p.resist = 0.5;
+        let start = p.hp;
+        for _ in 0..4 {
+            p.invuln = 0.0;
+            assert!(
+                p.take_damage(p.pos + vec2(10.0, 0.0), 1),
+                "맞은 반응(넉백·무적)은 그대로"
+            );
+        }
+        assert_eq!(start - p.hp, 2, "1 피해 네 번 × 0.5 = 2");
+    }
+
     /// 연타로 패링 창을 이어 붙이지 못한다: 창은 PARRY_COOLDOWN마다 한 번. 성공하면 바로 다시(0038).
     #[test]
     fn mashing_attack_does_not_chain_parry_windows() {

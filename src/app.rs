@@ -24,9 +24,16 @@ use crate::world::World;
 const INTRO_LINES: [Tr; 3] = [|s| s.intro_1, |s| s.intro_2, |s| s.intro_3];
 const INTRO_LINE_TIME: f32 = 2.6;
 #[cfg(feature = "dev")]
-const TITLE_ITEMS: [Tr; 3] = [|s| s.title_start, |s| s.title_settings, |s| s.title_dev];
+const TITLE_ITEMS: [Tr; 4] = [
+    |s| s.title_start,
+    |s| s.title_album,
+    |s| s.title_settings,
+    |s| s.title_dev,
+];
 #[cfg(not(feature = "dev"))]
-const TITLE_ITEMS: [Tr; 2] = [|s| s.title_start, |s| s.title_settings];
+const TITLE_ITEMS: [Tr; 3] = [|s| s.title_start, |s| s.title_album, |s| s.title_settings];
+/// 앨범 칸 배치(가로 칸 수).
+const ALBUM_COLS: usize = 4;
 const PAUSE_TABS: [Tr; 6] = [
     |s| s.tab_menu,
     |s| s.tab_status,
@@ -43,17 +50,25 @@ const PAUSE_MENU: [Tr; 4] = [
     |s| s.pm_settings,
     |s| s.pm_title,
 ];
-const SETTING_ROWS: [Tr; 6] = [
+const SETTING_ROWS: [Tr; 8] = [
     |s| s.set_sound,
     |s| s.set_shake,
     |s| s.set_debug,
     |s| s.set_language,
+    |s| s.set_assist,
     |s| s.set_controls,
+    |s| s.set_erase,
     |s| s.set_back,
 ];
-/// 설정의 "조작 설정"·"돌아가기" 줄.
-const SETTING_CONTROLS: usize = 4;
-const SETTING_BACK: usize = 5;
+/// 설정의 "포포의 응원"·"조작 설정"·"기록 지우기"·"돌아가기" 줄.
+const SETTING_ASSIST: usize = 4;
+const SETTING_CONTROLS: usize = 5;
+const SETTING_ERASE: usize = 6;
+const SETTING_BACK: usize = 7;
+/// 값이 아니라 누르는 줄(좌우로 바뀌지 않는다).
+fn setting_is_button(i: usize) -> bool {
+    matches!(i, SETTING_CONTROLS | SETTING_ERASE | SETTING_BACK)
+}
 /// 조작 설정의 줄: 동작들(input::ACTS) + 기본값 + 돌아가기.
 const CONTROL_NAMES: [Tr; 7] = [
     |s| s.act_attack,
@@ -112,6 +127,8 @@ enum Scene {
     Route,
     /// 포포의 가게(쉼터, docs/decisions/0030).
     Shop,
+    /// 앨범: 본 컷씬 일러스트를 다시 본다(타이틀, docs/decisions/0041).
+    Album,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -311,6 +328,8 @@ enum Hit {
     Close,
     /// 컷씬 건너뛰기 안내.
     Skip,
+    /// 앨범 칸.
+    AlbumItem(usize),
 }
 
 pub struct App {
@@ -361,6 +380,17 @@ pub struct App {
     shop_ask: Option<(usize, bool)>,
     /// 보리에게 말 건 횟수(말이 돌아간다).
     talk_n: u32,
+    /// 런을 넘어 남는 기록(docs/decisions/0041).
+    profile: crate::profile::Profile,
+    /// 이번 쓰러짐을 이미 셌나.
+    death_noted: bool,
+    /// 깨어나는 장면(어두워졌다 밝아짐)이 끝나면 한마디.
+    pending_wake: bool,
+    /// 설정 "기록 지우기"를 한 번 눌렀다(한 번 더 누르면 지운다).
+    erase_armed: bool,
+    /// 앨범: 고른 칸, 크게 보는 중이면 흐른 시간.
+    album_cursor: usize,
+    album_view: Option<f32>,
 }
 
 impl App {
@@ -419,6 +449,51 @@ impl App {
             shop_msg: None,
             shop_ask: None,
             talk_n: 0,
+            profile: crate::profile::load(),
+            death_noted: false,
+            pending_wake: false,
+            erase_armed: false,
+            album_cursor: 0,
+            album_view: None,
+        }
+    }
+
+    /// 기록을 저장한다. 이번 런에서 만난 이웃도 함께 남긴다.
+    fn save_profile(&mut self) {
+        for k in &self.world.seen {
+            self.profile.set(&crate::profile::key::mob(k));
+        }
+        crate::profile::save(&self.profile);
+    }
+
+    /// 첫 시작(Normal)만 이야기 기록을 남긴다. 개발 시나리오는 기록을 건드리지 않는다.
+    fn recording(&self) -> bool {
+        self.current == Scenario::Normal
+    }
+
+    /// 도움 모드 "포포의 응원": 켜져 있으면 20%에서 시작해 쓰러질 때마다 2%씩, 최대 80%(Hades God Mode를 참고, 0041).
+    fn assist_resist(&self) -> f32 {
+        use crate::profile::key;
+        if self.profile.flag(key::ASSIST) {
+            (0.2 + 0.02 * self.profile.count(key::ASSIST_DEATHS) as f32).min(0.8)
+        } else {
+            0.0
+        }
+    }
+
+    fn apply_assist(&mut self) {
+        self.world.player.resist = self.assist_resist();
+    }
+
+    /// 짧은 한마디(런 사이). 맞는 줄이 있으면 대화 컷씬.
+    fn say_story(&mut self, when: crate::story::When) {
+        if let Some(l) = crate::story::take(&mut self.profile, when) {
+            crate::profile::save(&self.profile);
+            let c = cutscene::talk(&self.world, &[(l.who, l.text, cutscene::Face::Happy)]);
+            if self.cutscene.is_none() {
+                self.cutscene = Some(c);
+                self.scene = Scene::Cutscene;
+            }
         }
     }
 
@@ -449,6 +524,15 @@ impl App {
                 }
                 if let Some(c) = self.cutscene.as_mut() {
                     c.update(&a, dt, &mut self.world);
+                    // 본 일러스트는 앨범에 남는다(개발 시나리오에서 봐도).
+                    if let Some(il) = c.illust {
+                        if self
+                            .profile
+                            .set(&crate::profile::key::illust(il.spec().file))
+                        {
+                            crate::profile::save(&self.profile);
+                        }
+                    }
                     // 컷씬에서 받은 무기는 컷씬이 끝난 뒤 창으로 보여 준다.
                     self.gift_queue.append(&mut self.world.gifts);
                     if c.is_done() {
@@ -512,8 +596,22 @@ impl App {
         }
         if self.world.player.is_alive() {
             self.run_time += dt;
+            self.death_noted = false;
         } else {
             self.death_t += dt;
+            if !self.death_noted {
+                self.death_noted = true;
+                self.on_death();
+            }
+        }
+        // 깨어나는 어두워짐·밝아짐이 끝나면 이웃의 한마디(갈색 뿌리가 데려왔다, 0037).
+        if self.pending_wake
+            && self.world.adv.fade.is_none()
+            && self.world.player.is_alive()
+            && self.scene == Scene::Game
+        {
+            self.pending_wake = false;
+            self.say_story(crate::story::When::Wake);
         }
         self.take_gifts();
         if let Some(tu) = self.tutorial.as_mut() {
@@ -526,6 +624,9 @@ impl App {
             }
             if tu.is_done() {
                 self.tutorial = None;
+                if self.recording() && self.profile.set(crate::profile::key::TUTORIAL) {
+                    self.save_profile();
+                }
             }
         }
         self.journal.update(&self.world);
@@ -545,6 +646,7 @@ impl App {
             {
                 self.world.begin_respawn();
                 self.death_t = 0.0;
+                self.pending_wake = self.recording();
             } else {
                 self.start_game();
             }
@@ -554,6 +656,20 @@ impl App {
             self.open_pause();
             self.pause_tab = TAB_MAP;
         }
+    }
+
+    /// 쓰러졌다: 센다(이야기 조건·도움 모드), 기록을 저장한다.
+    fn on_death(&mut self) {
+        if !self.recording() {
+            return;
+        }
+        use crate::profile::key;
+        self.profile.add(key::DEATHS, 1);
+        if self.profile.flag(key::ASSIST) {
+            self.profile.add(key::ASSIST_DEATHS, 1);
+        }
+        self.save_profile();
+        self.apply_assist();
     }
 
     fn open_pause(&mut self) {
@@ -574,7 +690,23 @@ impl App {
         // 무기는 스토리를 따라 하나씩(docs/decisions/0012). 첫 시작·튜토리얼은 맨손에서 출발해
         // 튜토리얼에서 두더지 발톱을 줍는다. 개발 시나리오는 테스트를 위해 기본 발톱(또는 전부)을 들고 시작.
         let start = Character::Mole.starting_weapon();
+        // 튜토리얼을 마친 기록이 있으면 오프닝·튜토리얼을 건너뛰고 발톱을 든 채 시작한다(0041).
+        let veteran = s == Scenario::Normal && self.profile.flag(crate::profile::key::TUTORIAL);
+        if s == Scenario::Normal {
+            self.profile.add(crate::profile::key::RUNS, 1);
+            crate::profile::save(&self.profile);
+        }
+        // 도감은 런을 넘어 남는다.
+        for k in crate::species::BESTIARY {
+            if self.profile.flag(&crate::profile::key::mob(k)) && !self.world.seen.contains(&k) {
+                self.world.seen.push(k);
+            }
+        }
+        self.death_noted = false;
+        self.pending_wake = false;
+        self.apply_assist();
         self.inventory = match s {
+            Scenario::Normal if veteran => Inventory::new(&[start]),
             Scenario::Normal | Scenario::Tutorial => Inventory::new(&[]),
             Scenario::AllClaws => Inventory::new(&[start, 0, 2, 3]),
             Scenario::Gear => {
@@ -594,6 +726,15 @@ impl App {
         self.death_t = 0.0;
         self.tutorial = None;
         // 첫 시작은 컷씬 → 플레이 튜토리얼 → 웨이브 1. 튜토리얼이 끝나야 자동 웨이브가 켜진다.
+        if veteran {
+            self.world.open_glade();
+            if self.profile.flag(crate::profile::key::BORI_BACK) {
+                self.world.skip_glade_boss();
+            }
+            self.scene = Scene::Game;
+            self.say_story(crate::story::When::RunStart);
+            return;
+        }
         if matches!(s, Scenario::Normal | Scenario::Tutorial) {
             self.tutorial = Some(Tutorial::new(&mut self.world));
         }
@@ -657,10 +798,15 @@ impl App {
                 match chosen {
                     Some(0) => self.start(Scenario::Normal),
                     Some(1) => {
+                        self.album_cursor = 0;
+                        self.album_view = None;
+                        self.scene = Scene::Album;
+                    }
+                    Some(2) => {
                         self.settings_cursor = 0;
                         self.scene = Scene::Settings { back: Back::Title };
                     }
-                    Some(2) => {
+                    Some(3) => {
                         self.dev_cursor = 0;
                         self.scene = Scene::Dev;
                     }
@@ -694,9 +840,11 @@ impl App {
                 let n = SETTING_ROWS.len();
                 if a.up {
                     self.settings_cursor = (self.settings_cursor + n - 1) % n;
+                    self.erase_armed = false;
                 }
                 if a.down {
                     self.settings_cursor = (self.settings_cursor + 1) % n;
+                    self.erase_armed = false;
                 }
                 let mut adjust = 0i8;
                 if a.left {
@@ -717,15 +865,11 @@ impl App {
                     }
                     Some(Hit::SettingRow(i)) => {
                         row = i;
-                        if i == SETTING_BACK || i == SETTING_CONTROLS {
-                            adjust = 0;
-                        } else {
-                            adjust = 1;
-                        }
+                        adjust = if setting_is_button(i) { 0 } else { 1 };
                     }
                     _ => {}
                 }
-                if adjust != 0 && row != SETTING_CONTROLS {
+                if adjust != 0 && !setting_is_button(row) {
                     self.settings_cursor = row;
                     self.adjust_setting(row, adjust);
                 }
@@ -738,10 +882,26 @@ impl App {
                     self.scene = Scene::Controls { back };
                     return;
                 }
+                // 기록 지우기: 한 번 누르면 묻고, 한 번 더 누르면 지운다.
+                let erase = (a.confirm && self.settings_cursor == SETTING_ERASE)
+                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_ERASE)));
+                if erase {
+                    self.settings_cursor = SETTING_ERASE;
+                    if self.erase_armed {
+                        self.erase_armed = false;
+                        self.profile = crate::profile::Profile::default();
+                        crate::profile::save(&self.profile);
+                        self.apply_assist();
+                        self.sfx.play(crate::sfx::Id::Hurt);
+                    } else {
+                        self.erase_armed = true;
+                    }
+                }
                 let back_chosen = a.cancel
                     || (a.confirm && self.settings_cursor == SETTING_BACK)
                     || matches!(tap_hit, Some(Hit::SettingRow(SETTING_BACK)));
                 if back_chosen {
+                    self.erase_armed = false;
                     self.save_prefs();
                     self.scene = match back {
                         Back::Title => Scene::Title,
@@ -753,6 +913,7 @@ impl App {
             Scene::Pause => self.update_pause(a, tap_hit),
             Scene::Route => self.update_route(a, tap_hit),
             Scene::Shop => self.update_shop(a, tap_hit, dt),
+            Scene::Album => self.update_album(a, tap_hit, dt),
             Scene::Game | Scene::Cutscene => {}
         }
     }
@@ -773,6 +934,14 @@ impl App {
                 let l = i18n::lang().cycle(d);
                 i18n::set_lang(l);
                 self.settings.lang = Some(l);
+            }
+            SETTING_ASSIST => {
+                use crate::profile::key;
+                if !self.profile.unset(key::ASSIST) {
+                    self.profile.set(key::ASSIST);
+                }
+                crate::profile::save(&self.profile);
+                self.apply_assist();
             }
             _ => {}
         }
@@ -1027,6 +1196,7 @@ impl App {
         match self.scene {
             Scene::Intro => self.draw_intro(&ui),
             Scene::Title => self.draw_title(&ui),
+            Scene::Album => self.draw_album(&ui),
             Scene::Dev => self.draw_dev(&ui),
             Scene::Cutscene => {
                 self.draw_letterbox(&ui);
@@ -1127,13 +1297,105 @@ impl App {
         ui.text_center(&hint, 160.0, 160.0, FONT_PX, ui::TEXT_DIM);
     }
 
+    fn album_seen(&self, il: crate::illust::Illust) -> bool {
+        self.profile
+            .flag(&crate::profile::key::illust(il.spec().file))
+    }
+
+    /// 앨범: 4×2 칸에서 고르고, 본 그림은 크게(패닝·입자 그대로). 확인·뒤로·탭으로 닫는다.
+    fn update_album(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
+        use crate::illust::Illust;
+        if let Some(t) = self.album_view.as_mut() {
+            *t += dt;
+            if a.confirm || a.cancel || a.attack || a.tap.is_some() {
+                self.album_view = None;
+            }
+            return;
+        }
+        let n = Illust::ALL.len();
+        let c = self.album_cursor;
+        if a.left {
+            self.album_cursor = (c + n - 1) % n;
+        }
+        if a.right {
+            self.album_cursor = (c + 1) % n;
+        }
+        if a.up || a.down {
+            self.album_cursor = (c + ALBUM_COLS) % n;
+        }
+        let chosen = if a.confirm {
+            Some(self.album_cursor)
+        } else if let Some(Hit::AlbumItem(i)) = tap_hit {
+            self.album_cursor = i;
+            Some(i)
+        } else {
+            None
+        };
+        if let Some(i) = chosen {
+            if self.album_seen(Illust::ALL[i]) {
+                self.album_view = Some(0.0);
+            }
+        }
+        if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
+            self.scene = Scene::Title;
+        }
+    }
+
+    fn draw_album(&mut self, ui: &Ui) {
+        use crate::illust::Illust;
+        let s = i18n::s();
+        if let Some(t) = self.album_view {
+            let il = Illust::ALL[self.album_cursor];
+            self.renderer.draw_illust(ui, il, t);
+            let hint = vfill(s.album_close, &[Verb::Back]);
+            ui.text_center(&hint, 160.0, 166.0, FONT_PX, ui::TEXT_DIM);
+            return;
+        }
+        let panel = Rect::new(16.0, 8.0, 288.0, 150.0);
+        ui.panel(panel, Some(s.title_album));
+        let (cw, ch, gap) = (64.0, 36.0, 6.0);
+        let x0 = panel.x + (panel.w - ALBUM_COLS as f32 * cw - (ALBUM_COLS - 1) as f32 * gap) / 2.0;
+        let y0 = panel.y + 38.0;
+        let mut seen = 0;
+        for (i, il) in Illust::ALL.iter().enumerate() {
+            let r = Rect::new(
+                x0 + (i % ALBUM_COLS) as f32 * (cw + gap),
+                y0 + (i / ALBUM_COLS) as f32 * (ch + gap + 10.0),
+                cw,
+                ch,
+            );
+            if self.album_seen(*il) {
+                seen += 1;
+                self.renderer.draw_illust_thumb(ui, *il, r);
+            } else {
+                ui.rect(r, ui::PANEL_LIGHT);
+                ui.text_center("?", r.center().x, r.y + 12.0, FONT_PX, ui::TEXT_DIM);
+            }
+            let selected = i == self.album_cursor;
+            ui.rect_lines(r, if selected { ui::ACCENT } else { ui::BORDER });
+            if selected {
+                ui.rect_lines(
+                    Rect::new(r.x - 1.0, r.y - 1.0, r.w + 2.0, r.h + 2.0),
+                    ui::ACCENT,
+                );
+            }
+            self.hits.push((r, Hit::AlbumItem(i)));
+        }
+        let count = fill(s.album_count, &[&seen, &Illust::ALL.len()]);
+        ui.text(&count, panel.x + 8.0, panel.y + 21.0, FONT_PX, ui::TEXT_DIM);
+        let hint = device_hint(s.album_hint, s.album_hint, &[Verb::Confirm, Verb::Pick]);
+        let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
+        ui.text_center(&hint, 160.0, panel.bottom() + 4.0, FONT_PX, ui::TEXT_DIM);
+        self.close_button(ui, panel);
+    }
+
     fn draw_title(&mut self, ui: &Ui) {
         // 뒤의 뿌리 선이 가는 글자 획과 겹치면 끊겨(깨져) 보인다(사람 피드백). 타이틀 글에는 어두운 테두리.
         let ui = &ui.with_outline();
         ui.text_center("Naïl", 160.0, 34.0, FONT_PX * 2.0, ui::ACCENT);
         ui.text_center("Under the Roots", 160.0, 60.0, FONT_PX, ui::TEXT);
         let s = i18n::s();
-        let rects = ui.menu_list(&trs(&TITLE_ITEMS), self.title_cursor, 124.0, 92.0, 72.0);
+        let rects = ui.menu_list(&trs(&TITLE_ITEMS), self.title_cursor, 124.0, 84.0, 72.0);
         for (i, r) in rects.into_iter().enumerate() {
             self.hits.push((r, Hit::TitleItem(i)));
         }
@@ -1301,9 +1563,10 @@ impl App {
     }
 
     fn draw_settings(&mut self, ui: &Ui) {
-        let panel = Rect::new(56.0, 20.0, 208.0, 134.0);
+        let panel = Rect::new(56.0, 6.0, 208.0, 156.0);
         let s = i18n::s();
         ui.panel(panel, Some(s.settings));
+        let assist = self.assist_resist();
         let values = [
             format!("{}%", self.settings.volume * 10),
             format!("{}%", self.settings.shake * 10),
@@ -1314,14 +1577,21 @@ impl App {
             }
             .to_string(),
             s.lang_name.to_string(),
+            // 포포의 응원: 켜져 있으면 지금 줄여 주는 비율.
+            if assist > 0.0 {
+                format!("{} {}%", s.on, (assist * 100.0).round())
+            } else {
+                s.off.to_string()
+            },
+            String::new(),
             String::new(),
             String::new(),
         ];
-        let row_h = FONT_PX + 6.0;
+        let row_h = FONT_PX + 4.0;
         for (i, label) in trs(&SETTING_ROWS).into_iter().enumerate() {
             let y = panel.y + 22.0 + i as f32 * row_h;
             let selected = self.settings_cursor == i;
-            if i == SETTING_BACK || i == SETTING_CONTROLS {
+            if setting_is_button(i) {
                 let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, FONT_PX + 4.0);
                 if selected {
                     ui.rect(r, ui::PANEL_LIGHT);
@@ -1329,6 +1599,8 @@ impl App {
                 }
                 let label = if i == SETTING_CONTROLS {
                     format!("{label}  →")
+                } else if i == SETTING_ERASE && self.erase_armed {
+                    s.set_erase_confirm.to_string()
                 } else {
                     label.to_string()
                 };

@@ -116,6 +116,24 @@
         };
       }
     });
+    // 기록(프로필) 저장(src/profile.rs): 글 한 칸. wasm 메모리에서 UTF-8 바이트를 직접 읽고 쓴다(wasm-bindgen 없이).
+    miniquad_add_plugin({
+      name: "nail_save",
+      version: 1,
+      register_plugin: function (importObject) {
+        var KEY = "nail.profile";
+        var get = function () { try { return window.localStorage.getItem(KEY) || ""; } catch (e) { return ""; } };
+        importObject.env.nail_save_len = function () { return new TextEncoder().encode(get()).length; };
+        importObject.env.nail_save_read = function (ptr, len) {
+          var bytes = new TextEncoder().encode(get());
+          new Uint8Array(wasm_memory.buffer, ptr, len).set(bytes.subarray(0, len));
+        };
+        importObject.env.nail_save_write = function (ptr, len) {
+          var text = new TextDecoder().decode(new Uint8Array(wasm_memory.buffer, ptr, len));
+          try { window.localStorage.setItem(KEY, text); } catch (e) {}
+        };
+      }
+    });
     // 로딩 화면 갱신(src/loading.rs): 준비 단계, 첫 프레임을 그림.
     miniquad_add_plugin({
       name: "nail_loading",

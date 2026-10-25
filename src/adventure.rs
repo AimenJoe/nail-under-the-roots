@@ -194,6 +194,15 @@ impl World {
         }
     }
 
+    /// 보리가 이미 돌아왔다(기록, docs/decisions/0041): 공터는 열려 있고 대장은 없다. 굴 입구도 산다.
+    pub fn skip_glade_boss(&mut self) {
+        self.enemies.retain(|e| e.kind != Kind::Chief);
+        self.adv.boss = BossFight::Done;
+        if self.adv.place == Place::Field {
+            self.room.set_doors_locked(false);
+        }
+    }
+
     /// 쉼터에서 시작하는 모험 월드(개발 시나리오).
     pub fn camp_start(stage: u32) -> World {
         let mut w = World::field();
@@ -848,6 +857,19 @@ mod tests {
         assert!(w.adv.route.as_ref().unwrap().at.is_none());
         assert_eq!(w.player.pos, w.adv.save_pos);
         assert!(!w.neighbors.is_empty());
+    }
+
+    /// 보리가 이미 돌아왔으면(기록): 대장 없이 공터가 열려 있고, 들어가도 싸움이 시작되지 않는다.
+    #[test]
+    fn bori_back_skips_the_glade_boss() {
+        let mut w = World::field();
+        w.skip_glade_boss();
+        assert!(!w.room.doors_locked());
+        assert!(w.enemies.iter().all(|e| e.kind != Kind::Chief));
+        w.player.pos = w.adv.glade.expect("공터").center();
+        w.field_boss();
+        assert_eq!(w.adv.boss, BossFight::Done);
+        assert!(!w.adv.events.contains(&AdvEvent::BossIntro));
     }
 
     /// 길의 굴: 출구를 밟는 순간 길 지도를 한 번 연다. 보스 칸의 출구는 다음 쉼터로.

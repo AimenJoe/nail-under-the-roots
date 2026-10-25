@@ -30,7 +30,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - 모험 구조(docs/decisions/0019): 장소·카메라·던전 오가기는 `adventure`, 격자·ASCII 기호는 `map`, 필드 지도는 `field`(ASCII를 고치면 `cargo test`의 field 테스트로 컷씬 줄·입구·저장 지점 확인), 던전 생성은 `dungeon`(같은 시드 = 같은 던전). 월드 좌표는 지도 전체, 화면은 `world.adv.cam`. 스테이지 고리(0030~0032): 쉼터 지도는 `camp`, 길 지도(갈래)는 `route`, 굴 모양은 `dungeon::Params`, 길 지도·가게·말 걸기 화면은 `app/stage.rs`. 월드 패스 뒤 그리는 컷씬 배우는 `Renderer::to_view`로 화면 좌표.
 - 그림 문법은 3/4 탑다운(docs/decisions/0006). 아이소메트릭 아님.
 - 테스트용 방 구성은 `src/scenario.rs`에 한 줄 추가(타이틀 "개발"). 컷씬은 `src/cutscene.rs`의 `Step` 스크립트, JRPG식(docs/decisions/0008). 화면 전체 그림은 `Step::Illust` + `Step::Narrate`, 그림 목록·패닝·입자는 `src/illust.rs`(0039). 튜토리얼은 `src/tutorial.rs`의 단계 + 포포의 말(docs/decisions/0023).
-- 설정 저장은 `src/prefs.rs`(웹 localStorage 정수 칸). 칸 형식을 바꾸면 `MAGIC`을 올린다.
+- 설정 저장은 `src/prefs.rs`(웹 localStorage 정수 칸). 칸 형식을 바꾸면 `MAGIC`을 올린다. 런을 넘어 남는 기록은 `src/profile.rs`(깃발 + 수, 문자열 키 — 키 이름은 바꾸지 않는다, 0041). 기록은 첫 시작(Normal)만 남긴다. 런 사이 한마디는 `src/story.rs` 표(조건이 가장 구체적인 줄, `once`는 한 번).
 - UI 텍스트는 `assets/fonts/Galmuri11-Condensed.ttf`(KS X 1001 2,350자 서브셋)로 실제 해상도에 찍는다. 그 밖의 한자·확장 한글은 안 나온다.
 - 플레이어가 보는 글은 `src/i18n.rs`의 언어별 표에만 쓴다(한국어·영어·일본어·중국어 간체·브라질 포르투갈어). 코드에 글 리터럴을 두지 않는다. 숫자는 `{0}` + `fill()`, 데이터 표는 `Tr`. 개발 전용 화면만 예외(docs/decisions/0013).
 - 글을 넣거나 바꾸면 다섯 언어를 다 쓰고, 일본어·간체 표를 고쳤으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font 체크아웃>`으로 폰트를 다시 만든다. 새 화면은 가짜 언어 Pseudo(설정 → 언어 끝)와 일본어로 넘침을 본다. 고정 칸은 `ui.fit`, 긴 글은 `ui::wrap`(docs/decisions/0014).

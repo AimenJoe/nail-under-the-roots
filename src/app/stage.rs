@@ -188,10 +188,20 @@ impl App {
             match e {
                 AdvEvent::BossIntro => self.play(cutscene::boss_intro(&self.world)),
                 AdvEvent::BossBeaten => {
+                    if self.recording() {
+                        self.profile.set(crate::profile::key::BORI_BACK);
+                        self.save_profile();
+                    }
                     let (at, ent) = (self.world.adv.boss_last, self.world.adv.entrance_pos);
                     self.play(cutscene::boss_beaten(&self.world, at, ent));
                 }
-                AdvEvent::CampArrive(n) => self.play(cutscene::camp_arrive(&self.world, n)),
+                AdvEvent::CampArrive(n) => {
+                    if self.recording() {
+                        self.profile.raise(crate::profile::key::DEEPEST, n);
+                        self.save_profile();
+                    }
+                    self.play(cutscene::camp_arrive(&self.world, n));
+                }
                 AdvEvent::RouteOpen => self.open_route(false),
             }
         }
@@ -686,7 +696,7 @@ impl App {
     /// 닫기 단추(패널 오른쪽 위 ✕)와 패널 바깥 탭 = 닫기. 터치에는 뒤로 버튼이 없어서(사람 피드백 2026-10-25).
     /// 그림은 작게(10px), 누르는 칸은 크게(24px = 가로 폰에서 48pt 이상). 패널 안 빈 곳 탭은 닫지 않는다(실수 방지).
     /// 탭 판정은 먼저 넣은 것이 이기므로, 항목 칸을 넣은 뒤에 부른다.
-    fn close_button(&mut self, ui: &Ui, panel: Rect) {
+    pub(super) fn close_button(&mut self, ui: &Ui, panel: Rect) {
         let c = vec2(panel.right() - 9.0, panel.y + 9.0);
         let x = Color::new(0.85, 0.78, 0.70, 1.0);
         ui.rect(Rect::new(c.x - 6.0, c.y - 6.0, 12.0, 12.0), ui::PANEL_LIGHT);

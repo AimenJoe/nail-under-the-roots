@@ -246,6 +246,32 @@ impl Renderer {
 
     /// 대화창 초상화를 논리 사각형 `r`(44×44) 안에 찍는다. 원본 1px = 게임 픽셀 반(화면 배율의 절반, 정수).
     /// 배율이 홀수면 내림이라 조금 작아지지만 픽셀은 고르게 남는다. 그림이 없으면 false.
+    /// 앨범 칸: 일러스트의 첫 화면(패닝 시작 자리)을 줄여서. 그림이 없으면 어두운 칸.
+    pub fn draw_illust_thumb(&self, ui: &Ui, il: crate::illust::Illust, r: Rect) {
+        use crate::illust::{VIEW_H, VIEW_W};
+        let p = ui.px(vec2(r.x, r.y));
+        let (w, h) = (r.w * ui.scale, r.h * ui.scale);
+        let tex = self
+            .art
+            .as_ref()
+            .and_then(|a| a.illust.get(il.index()))
+            .and_then(|t| t.as_ref());
+        match tex {
+            Some(tex) => draw_texture_ex(
+                tex,
+                p.x,
+                p.y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(vec2(w, h)),
+                    source: Some(Rect::new(0.0, 0.0, VIEW_W, VIEW_H)),
+                    ..Default::default()
+                },
+            ),
+            None => draw_rectangle(p.x, p.y, w, h, Color::new(0.08, 0.06, 0.10, 1.0)),
+        }
+    }
+
     /// 컷씬 일러스트를 게임 화면 전체에(docs/decisions/0039). 원본 1px = 화면 배율/2 px(초상화와 같은 2배 밀도).
     /// 홀수 배율에서는 원본 픽셀이 1.5배처럼 고르지 않게 늘어난다 — 그래서 임시 그림은 1px 디더를 쓰지 않는다.
     /// `t`는 그림이 뜬 뒤 흐른 시간(패닝·입자).
