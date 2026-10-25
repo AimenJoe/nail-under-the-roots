@@ -23,15 +23,16 @@ use crate::world::World;
 
 const INTRO_LINES: [Tr; 3] = [|s| s.intro_1, |s| s.intro_2, |s| s.intro_3];
 const INTRO_LINE_TIME: f32 = 2.6;
-#[cfg(feature = "dev")]
-const TITLE_ITEMS: [Tr; 4] = [
-    |s| s.title_start,
-    |s| s.title_album,
-    |s| s.title_settings,
-    |s| s.title_dev,
-];
-#[cfg(not(feature = "dev"))]
-const TITLE_ITEMS: [Tr; 3] = [|s| s.title_start, |s| s.title_album, |s| s.title_settings];
+/// 타이틀 메뉴 줄. 오늘의 굴은 튜토리얼을 마친 뒤에만 보인다.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum TitleItem {
+    Start,
+    Daily,
+    Album,
+    Settings,
+    #[cfg(feature = "dev")]
+    Dev,
+}
 /// 앨범 칸 배치(가로 칸 수).
 const ALBUM_COLS: usize = 4;
 const PAUSE_TABS: [Tr; 6] = [
@@ -398,6 +399,8 @@ pub struct App {
     title_after_cutscene: bool,
     /// 이번 런의 실뜨기 단계(고르는 화면의 커서이기도 하다).
     knot_level: u8,
+    /// 타이틀 아래 잠깐 띄우는 글(오늘의 굴 완주 등)과 남은 시간.
+    title_note: Option<(Tr, f32)>,
     /// 앨범: 고른 칸, 크게 보는 중이면 흐른 시간.
     album_cursor: usize,
     album_view: Option<f32>,
@@ -467,6 +470,7 @@ impl App {
             album_view: None,
             title_after_cutscene: false,
             knot_level: 0,
+            title_note: None,
         }
     }
 
@@ -713,6 +717,15 @@ impl App {
             self.profile.add(crate::profile::key::RUNS, 1);
             crate::profile::save(&self.profile);
         }
+        if s == Scenario::Daily {
+            // 한 달 넘은 오늘의 굴 기록은 지운다(기록이 끝없이 늘지 않게).
+            let today = crate::daily::today();
+            self.profile
+                .drop_counts(|k| crate::daily::is_stale_key(k, today));
+            // 첫 쉼터에서 시작하니 시작만 해도 쉼터 1.
+            self.profile.raise(&crate::daily::key_best(today), 1);
+            crate::profile::save(&self.profile);
+        }
         // 도감은 런을 넘어 남는다.
         for k in crate::species::BESTIARY {
             if self.profile.flag(&crate::profile::key::mob(k)) && !self.world.seen.contains(&k) {
@@ -808,12 +821,20 @@ impl App {
                 }
             }
             Scene::Title => {
+                let items = self.title_items();
+                let n = items.len();
+                self.title_cursor = self.title_cursor.min(n - 1);
+                if let Some((_, t)) = self.title_note.as_mut() {
+                    *t -= dt;
+                    if *t <= 0.0 {
+                        self.title_note = None;
+                    }
+                }
                 if a.up {
-                    self.title_cursor =
-                        (self.title_cursor + TITLE_ITEMS.len() - 1) % TITLE_ITEMS.len();
+                    self.title_cursor = (self.title_cursor + n - 1) % n;
                 }
                 if a.down {
-                    self.title_cursor = (self.title_cursor + 1) % TITLE_ITEMS.len();
+                    self.title_cursor = (self.title_cursor + 1) % n;
                 }
                 let chosen = if a.confirm {
                     Some(self.title_cursor)
@@ -822,22 +843,27 @@ impl App {
                 } else {
                     None
                 };
-                match chosen {
-                    Some(0) => self.begin_run(),
-                    Some(1) => {
+                match chosen.and_then(|i| items.get(i).copied()) {
+                    Some(TitleItem::Start) => self.begin_run(),
+                    Some(TitleItem::Daily) => {
+                        self.knot_level = 0;
+                        self.start(Scenario::Daily);
+                    }
+                    Some(TitleItem::Album) => {
                         self.album_cursor = 0;
                         self.album_view = None;
                         self.scene = Scene::Album;
                     }
-                    Some(2) => {
+                    Some(TitleItem::Settings) => {
                         self.settings_cursor = 0;
                         self.scene = Scene::Settings { back: Back::Title };
                     }
-                    Some(3) => {
+                    #[cfg(feature = "dev")]
+                    Some(TitleItem::Dev) => {
                         self.dev_cursor = 0;
                         self.scene = Scene::Dev;
                     }
-                    _ => {}
+                    None => {}
                 }
             }
             Scene::Dev => {
@@ -1326,6 +1352,40 @@ impl App {
         ui.text_center(&hint, 160.0, 160.0, FONT_PX, ui::TEXT_DIM);
     }
 
+    fn title_items(&self) -> Vec<TitleItem> {
+        let mut v = vec![TitleItem::Start];
+        if self.profile.flag(crate::profile::key::TUTORIAL) {
+            v.push(TitleItem::Daily);
+        }
+        v.push(TitleItem::Album);
+        v.push(TitleItem::Settings);
+        #[cfg(feature = "dev")]
+        v.push(TitleItem::Dev);
+        v
+    }
+
+    fn title_label(&self, it: TitleItem) -> String {
+        let s = i18n::s();
+        match it {
+            TitleItem::Start => s.title_start.to_string(),
+            TitleItem::Daily => {
+                let day = crate::daily::today();
+                if self.profile.count(&crate::daily::key_clear(day)) > 0 {
+                    s.daily_clear.to_string()
+                } else {
+                    match self.profile.count(&crate::daily::key_best(day)) {
+                        0 => s.title_daily.to_string(),
+                        n => fill(s.daily_best, &[&n]),
+                    }
+                }
+            }
+            TitleItem::Album => s.title_album.to_string(),
+            TitleItem::Settings => s.title_settings.to_string(),
+            #[cfg(feature = "dev")]
+            TitleItem::Dev => s.title_dev.to_string(),
+        }
+    }
+
     /// 실뜨기에서 고를 수 있는 가장 높은 단계.
     fn knots_open(&self) -> u8 {
         let k = crate::profile::key::knots_open(Character::Mole);
@@ -1528,10 +1588,35 @@ impl App {
     fn draw_title(&mut self, ui: &Ui) {
         // 뒤의 뿌리 선이 가는 글자 획과 겹치면 끊겨(깨져) 보인다(사람 피드백). 타이틀 글에는 어두운 테두리.
         let ui = &ui.with_outline();
-        ui.text_center("Naïl", 160.0, 34.0, FONT_PX * 2.0, ui::ACCENT);
-        ui.text_center("Under the Roots", 160.0, 60.0, FONT_PX, ui::TEXT);
+        ui.text_center("Naïl", 160.0, 26.0, FONT_PX * 2.0, ui::ACCENT);
+        ui.text_center("Under the Roots", 160.0, 50.0, FONT_PX, ui::TEXT);
         let s = i18n::s();
-        let rects = ui.menu_list(&trs(&TITLE_ITEMS), self.title_cursor, 124.0, 84.0, 72.0);
+        let labels: Vec<String> = self
+            .title_items()
+            .into_iter()
+            .map(|it| self.title_label(it))
+            .collect();
+        let labels: Vec<&str> = labels.iter().map(|l| l.as_str()).collect();
+        let rects = ui.menu_list(&labels, self.title_cursor, 96.0, 68.0, 128.0);
+        // 오늘의 굴 줄 오른쪽에 오늘 날짜(UTC): 날마다 다른 굴이라는 표시.
+        if let Some(i) = self
+            .title_items()
+            .iter()
+            .position(|t| *t == TitleItem::Daily)
+        {
+            let (_, m, d) = crate::daily::civil(crate::daily::today());
+            let r = rects[i];
+            ui.text(
+                &format!("{m}/{d}"),
+                r.right() + 4.0,
+                r.y + 2.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
+        if let Some((note, _)) = self.title_note {
+            ui.text_center(tr(note), 160.0, 138.0, FONT_PX, ui::ACCENT);
+        }
         for (i, r) in rects.into_iter().enumerate() {
             self.hits.push((r, Hit::TitleItem(i)));
         }

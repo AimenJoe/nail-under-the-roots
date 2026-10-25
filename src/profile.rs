@@ -82,6 +82,11 @@ impl Profile {
         self.flags.remove(k)
     }
 
+    /// 조건에 맞는 수를 지운다(오래된 오늘의 굴 기록 등).
+    pub fn drop_counts(&mut self, f: impl Fn(&str) -> bool) {
+        self.counts.retain(|k, _| !f(k));
+    }
+
     pub fn count(&self, k: &str) -> u32 {
         self.counts.get(k).copied().unwrap_or(0)
     }

@@ -31,6 +31,8 @@ pub enum Scenario {
     StoryPreview,
     /// 마지막 쉼터(길 지도의 보스 칸이 "가장 깊은 곳", docs/decisions/0042).
     LastCamp,
+    /// 오늘의 굴: 날짜 시드로 첫 쉼터에서(타이틀에서 고른다, docs/decisions/0044).
+    Daily,
     /// 가장 깊은 곳에 바로 닿는다: 반쪽 엔딩 → 타이틀(기록은 남기지 않는다).
     Deepest,
     /// 컷씬 없이 튜토리얼만.
@@ -192,6 +194,11 @@ pub fn build(s: Scenario) -> World {
                 w.player.prev_pos = w.player.pos;
             }
             w.snap_cam();
+            w
+        }
+        Scenario::Daily => {
+            let mut w = World::camp_start_seeded(crate::daily::seed(crate::daily::today()));
+            w.adv.events.clear();
             w
         }
         Scenario::LastCamp | Scenario::Deepest => {

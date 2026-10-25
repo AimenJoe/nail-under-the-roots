@@ -13,6 +13,7 @@ mod biome;
 mod camp;
 mod combat;
 mod cutscene;
+mod daily;
 mod dungeon;
 mod enemy;
 mod equipment;

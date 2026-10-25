@@ -205,6 +205,16 @@ impl World {
         }
     }
 
+    /// 정한 시드로 첫 쉼터에서 시작(오늘의 굴, docs/decisions/0044). 길·굴은 이 시드에서 이어진다.
+    pub fn camp_start_seeded(seed: u64) -> World {
+        let mut w = World::field();
+        w.adv.boss = BossFight::Done;
+        w.adv.stage = 0;
+        w.adv.seed = seed;
+        w.enter_camp();
+        w
+    }
+
     /// 쉼터에서 시작하는 모험 월드(개발 시나리오).
     pub fn camp_start(stage: u32) -> World {
         let mut w = World::field();
@@ -931,6 +941,22 @@ mod tests {
         w.cell_triggers();
         assert_eq!(w.adv.events, vec![AdvEvent::Deepest]);
         assert!(w.adv.fade.is_none(), "쉼터로 가지 않는다");
+    }
+
+    /// 오늘의 굴: 같은 시드면 같은 첫 길.
+    #[test]
+    fn seeded_camp_start_gives_the_same_route() {
+        let a = World::camp_start_seeded(42);
+        let b = World::camp_start_seeded(42);
+        let kinds = |w: &World| {
+            let r = w.adv.route.as_ref().unwrap();
+            r.layers
+                .iter()
+                .map(|l| l.iter().map(|n| n.kind).collect::<Vec<_>>())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(kinds(&a), kinds(&b));
+        assert_eq!((a.adv.place, a.adv.stage), (Place::Camp, 1));
     }
 
     #[test]

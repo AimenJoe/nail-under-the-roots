@@ -197,6 +197,12 @@ impl App {
                     self.play(cutscene::boss_beaten(&self.world, at, ent));
                 }
                 AdvEvent::CampArrive(n) => {
+                    if self.current == crate::scenario::Scenario::Daily {
+                        let k = crate::daily::key_best(crate::daily::today());
+                        if self.profile.raise(&k, n) {
+                            crate::profile::save(&self.profile);
+                        }
+                    }
                     if self.recording() {
                         self.profile.raise(crate::profile::key::DEEPEST, n);
                         self.save_profile();
@@ -212,6 +218,16 @@ impl App {
     /// 가장 깊은 곳(0042): 클리어를 남기고 엔딩을 튼다. 끝나면 타이틀로(런이 끝났다).
     pub(super) fn reach_deepest(&mut self) {
         use crate::profile::key;
+        // 오늘의 굴은 이야기 엔딩 없이 기록만 남기고 타이틀로.
+        if self.current == crate::scenario::Scenario::Daily {
+            self.profile
+                .add(&crate::daily::key_clear(crate::daily::today()), 1);
+            crate::profile::save(&self.profile);
+            self.title_cursor = 0;
+            self.title_note = Some((|s| s.toast_daily_clear, 5.0));
+            self.scene = Scene::Title;
+            return;
+        }
         let true_end = self.profile.flag(key::MOMO_BACK) && self.profile.flag(key::DOTO_MEMORY);
         if self.recording() {
             use crate::equipment::Character;
