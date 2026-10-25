@@ -42,6 +42,10 @@ RAMP = {
     'fur':    [(58, 38, 42), (88, 60, 54), (122, 88, 72), (152, 114, 90), (184, 146, 116)],
     'muzzle': [(150, 112, 92), (184, 146, 118), (212, 180, 150), (234, 210, 182)],
     'pink':   [(160, 78, 100), (206, 112, 132), (240, 150, 164), (255, 198, 204)],
+    # v2 캐릭터 해석: Naïl의 뜨개 목도리(엄마가 떠 준 것, 따뜻한 빨강), 포포의 노란 연필(깎은 나무 끝·심)
+    'scarf':  [(104, 34, 44), (150, 52, 54), (196, 82, 66), (228, 122, 86), (246, 166, 120)],
+    'twig':   [(70, 46, 34), (112, 78, 52), (152, 112, 74), (190, 150, 100)],
+    'pencil': [(134, 92, 30), (196, 146, 50), (236, 192, 78), (252, 228, 140)],
     'claw':   [(176, 160, 138), (214, 200, 176), (244, 236, 216), (255, 252, 240)],
     'eye':    [(22, 14, 30), (40, 28, 54), (70, 66, 112)],
     'shade':  [(26, 18, 36), (44, 30, 58), (66, 44, 82), (92, 62, 108)],     # 이웃 그림자 몸
@@ -1172,11 +1176,295 @@ def mom():
     return cv
 
 
+# ---- v2 캐릭터 해석(NAIL_ART_V2=1에서만 시트에 쓴다) --------------------------------------------
+# 아기 도식(Lorenz): 큰 머리·높은 이마·낮게 놓인 큰 눈·둥근 볼. 둥근 모양 = 부드럽고 다가가기 쉬움(모양 언어).
+# 눈은 표정의 대부분이라 새로 짓는다: 두꺼운 윗눈꺼풀 선 + 바깥 끝 살짝 올림, 홍채 3단(자두 → 아래 푸른 반사), 동공,
+# 큰 반사 하나 + 반대쪽 작은 반사. 털 가장자리는 물결(풍선) 대신 뾰족한 털 뭉치(톱니).
+EYE2 = [(30, 18, 40), (60, 40, 78), (104, 92, 150)]
+PUPIL = (12, 8, 18)
+LID = (24, 14, 26)
+
+
+def saw(ang, lo, hi, freq, amp, sharp=1.6):
+    """lo < ang < hi 구간에서 뾰족한 털 뭉치(삼각파). 바깥 반지름 배율."""
+    if not (lo < ang < hi):
+        return 1.0
+    t = ((ang - lo) * freq / (2 * math.pi)) % 1.0
+    tri = 1.0 - abs(2.0 * t - 1.0)
+    return 1.0 + amp * tri ** sharp
+
+
+def eye2(cv, cx, cy, rx, ry, look=(0.5, 0.0), outer=1, lash=False, iris=None):
+    iris = iris or EYE2
+    for y in range(int(cy - ry - 2), int(cy + ry + 3)):
+        for x in range(int(cx - rx - 2), int(cx + rx + 3)):
+            dx, dy = (x + 0.5 - cx) / rx, (y + 0.5 - cy) / ry
+            if dx * dx + dy * dy > 1.0:
+                continue
+            c = iris[0] if dy < -0.15 else (iris[1] if dy < 0.5 else iris[2])
+            px, py = (x + 0.5 - cx - look[0]) / (rx * 0.5), (y + 0.5 - cy - ry * 0.08) / (ry * 0.55)
+            if px * px + py * py <= 1.0:
+                c = PUPIL
+            cv.paint(x, y, c)
+    # 윗눈꺼풀: 위쪽 가장자리 2px(가운데 70%), 바깥 끝은 위로 한 칸 튄다.
+    for x in range(int(cx - rx * 0.85), int(cx + rx * 0.85) + 1):
+        dx = (x + 0.5 - cx) / rx
+        top = cy - ry * math.sqrt(max(0.0, 1 - dx * dx))
+        cv.paint(x, int(top), LID)
+        cv.paint(x, int(top) + 1, LID)
+    ox = int(cx + outer * rx * 0.95)
+    cv.paint(ox, int(cy - ry * 0.55), LID)
+    cv.paint(ox + outer, int(cy - ry * 0.75), LID)
+    if lash:
+        cv.paint(ox + outer * 2, int(cy - ry * 0.85), LID)
+        cv.paint(ox + outer, int(cy - ry * 0.35), LID)
+    # 큰 반사(둥근 3×3, 작은 눈은 2×3)와 반대쪽 작은 반사
+    hx, hy = int(cx - rx * 0.42 + look[0]), int(cy - ry * 0.42)
+    big = [(0, 0), (1, 0), (0, 1), (1, 1), (-1, 1), (0, 2)] if rx >= 4.2 else [(0, 0), (1, 0), (0, 1), (1, 1)]
+    for ox_, oy_ in big:
+        cv.paint(hx + ox_, hy + oy_, WHITE)
+    cv.paint(int(cx + rx * 0.38 + look[0]), int(cy + ry * 0.38), WHITE)
+
+
+def happy_eye2(cv, cx, cy, rx):
+    """∩ 모양 감은 눈(두껍게, 끝이 살짝 아래로)."""
+    pts = [(cx - rx, cy + 1.8), (cx - rx * 0.6, cy - 1.2), (cx, cy - 2.4), (cx + rx * 0.6, cy - 1.2), (cx + rx, cy + 1.8)]
+    line(cv, pts, LID, 2)
+
+
+def nail2(face):
+    """Naïl v2: 한 덩어리 몸(목이 없다) + 뾰족한 털 뭉치 윗선, 엄마가 떠 준 빨간 목도리, 큰 삽 모양 앞발."""
+    cv = Canvas()
+    determined = face == 'determined'
+
+    def blob(x, y, ang):
+        r = saw(ang, -3.05, -0.25, 11, 0.07)
+        if 0.3 < ang < 2.8:
+            r *= 1.0 + 0.06 * math.sin(ang)
+        return r
+    ellipse(cv, 41, 50, 35, 31, 'fur', bias=0.08, rough=blob)
+    # 목도리: 가슴을 가로지르는 굵은 띠(살짝 웃는 곡선) + 앞가슴 매듭 + 짧은 꼬리 둘. 세로 뜨개 골.
+    def yc(x):
+        return 62 + 0.0016 * (x - 42) ** 2
+    for y in range(52, 80):
+        for x in range(6, 78):
+            if cv.mat[y][x] is None:
+                continue
+            d = y + 0.5 - yc(x)
+            if -5.0 <= d <= 5.0:
+                lvl = 3 if d < -2.6 else (2 if d < 2.2 else 1)
+                if (x // 2) % 2 == 0:                       # 뜨개 골
+                    lvl -= 1
+                cv.put(x, y, 'scarf', lvl)
+    for (tx, sx) in ((40, -0.35), (47, 0.3)):               # 꼬리 둘(매듭 아래로 벌어진다)
+        for y in range(68, 82):
+            cx = tx + (y - 68) * sx
+            for x in range(int(cx - 2.6), int(cx + 2.6) + 1):
+                lvl = 0 if y >= 80 and x % 2 == 0 else (2 if x < cx else 1)
+                if y >= 80 and x % 2 == 1:
+                    continue
+                cv.put(x, y, 'scarf', lvl)
+    ellipse(cv, 44, 66, 5.2, 4.4, 'scarf', bias=0.05)        # 매듭
+    # 주둥이 + 단추 코(크게)
+    ellipse(cv, 63, 50, 11, 8, 'muzzle', bias=0.05)
+    ellipse(cv, 73, 46, 7, 6.5, 'pink', bias=0.12)
+    # 앞발: 크고 넓은 삽 모양(두더지의 상징) + 발톱 넷
+    paw_y = 76 if determined else 80
+    for (px, py, s_) in ((31, paw_y + 2, 0.9), (55, paw_y, 1.05)):
+        ellipse(cv, px, py, 10 * s_, 7 * s_, 'pink', bias=-0.05)
+        for k in range(4):
+            cx = px - 6.0 * s_ + k * 4.0 * s_
+            ellipse(cv, cx, py - 6.2 * s_, 1.5, 2.6 * s_, 'claw', bias=0.12)
+    outline(cv)
+    inner_edges(cv, mats=('muzzle', 'pink', 'claw', 'scarf'))
+    rim_light(cv)
+    fur_strands(cv, 7)
+    for (x, y) in ((70, 42), (71, 42), (70, 43), (71, 43)):    # 코 반사
+        cv.paint(x, y, RAMP['pink'][3])
+    for (x, y) in ((74, 51), (75, 51), (76, 50), (73, 52)):    # 코 아래 그늘
+        cv.paint(x, y, RAMP['pink'][0])
+    dither_ellipse(cv, 50, 51, 4.6, 2.4, BLUSH, 0.45)
+    # 눈: 낮고 크게(아기 도식). 가까운 눈이 크다(3/4 시점).
+    if face == 'happy':
+        happy_eye2(cv, 51, 43, 5.0)
+        happy_eye2(cv, 65, 40, 3.6)
+    else:
+        ry = 4.2 if determined else 6.4
+        eye2(cv, 51, 43, 5.0, ry, outer=-1)
+        eye2(cv, 65, 40, 3.6, ry * 0.82, look=(0.3, 0.0), outer=1)
+        if determined:   # 윗눈꺼풀을 평평하게 눌러 결의
+            line(cv, [(45, 39), (57, 40)], LID, 2)
+            line(cv, [(61, 37), (69, 37)], LID, 2)
+    if face == 'worried':
+        line(cv, [(45, 33), (54, 31)], RAMP['fur'][0], 2)
+        line(cv, [(62, 30), (68, 32)], RAMP['fur'][0], 2)
+        for (x, y) in ((22, 24), (22, 25), (21, 26), (22, 26), (23, 26), (21, 27), (22, 27), (23, 27), (22, 28)):
+            cv.paint(x, y, (170, 220, 255) if (x, y) != (22, 24) else (230, 248, 255))
+    elif determined:
+        line(cv, [(45, 33), (56, 36)], RAMP['fur'][0], 2)
+        line(cv, [(61, 35), (69, 32)], RAMP['fur'][0], 2)
+    else:
+        line(cv, [(46, 34), (54, 33)], RAMP['fur'][1], 2)
+        line(cv, [(62, 32), (68, 32)], RAMP['fur'][1], 2)
+    if face == 'happy':
+        for (x, y) in ((64, 55), (65, 56), (66, 57), (67, 57), (68, 57), (69, 56), (70, 55)):
+            cv.paint(x, y, MOUTH)
+        for (x, y) in ((66, 58), (67, 58), (68, 58)):
+            cv.paint(x, y, RAMP['pink'][1])
+    else:
+        mouth = {'normal': [(64, 55), (66, 56), (67, 55), (68, 56), (70, 55)],
+                 'worried': [(64, 56), (66, 55), (68, 56), (70, 55)],
+                 'determined': [(65, 56), (70, 56)]}[face]
+        line(cv, mouth, MOUTH, 1)
+    return cv
+
+
+def raccoon2(face):
+    """포포 v2: 뾰족한 볼털, 바깥이 처진 가면, 흰 테두리 귀, 귀 뒤에 꽂은 잔가지 연필(가게 주인)."""
+    cv = Canvas()
+
+    def cheeks(x, y, ang):
+        r = saw(ang, -3.0, -0.2, 10, 0.06)
+        if -0.2 < ang < 1.25:
+            r *= saw(ang, -0.2, 1.25, 7, 0.16, 1.2)
+        if 1.9 < ang < 3.3:
+            r *= saw(ang, 1.9, 3.3, 7, 0.16, 1.2)
+        return r
+    # 연필(노란 몸, 분홍 지우개, 깎은 나무 끝, 검은 심): 귀보다 먼저 그려 귀가 가운데를 가린다 = 귀 뒤에 꽂았다.
+    dx_, dy_ = 0.92, 0.39
+    for k in range(34):
+        x0, y0 = 46 + k * dx_, 4 + k * dy_
+        for w in range(4):
+            x, y = int(x0 - dy_ * (w - 1.5)), int(y0 + dx_ * (w - 1.5))
+            if k < 4:
+                cv.put(x, y, 'pink', 2 if w < 2 else 1)          # 지우개
+            elif k < 5:
+                cv.put(x, y, 'claw', 1)                          # 쇠 띠
+            elif k < 28:
+                cv.put(x, y, 'pencil', 3 if w == 0 else (2 if w < 3 else 1))
+            elif k < 32 and abs(w - 1.5) <= (32 - k) * 0.5:
+                cv.put(x, y, 'twig', 3 if w < 2 else 2)          # 깎은 나무
+            elif k >= 32 and abs(w - 1.5) <= 0.6:
+                cv.put(x, y, 'mask', 1)                          # 심
+    for (ex, ey) in ((20, 22), (60, 16)):
+        ellipse(cv, ex, ey, 10, 11, 'white', bias=0.0)
+        ellipse(cv, ex, ey + 1, 8.6, 9.6, 'grey', bias=0.0)
+        flat(cv, ex + 1, ey + 2, 5.5, 6.5, 'mask', 1)
+    ellipse(cv, 42, 50, 34, 28, 'grey', bias=0.05, rough=cheeks)
+    # 흰 이마·눈썹 무늬, 흰 주둥이
+    ellipse(cv, 30, 32, 9, 4.5, 'white', bias=0.1)
+    ellipse(cv, 55, 29, 8, 4.0, 'white', bias=0.1)
+    ellipse(cv, 55, 60, 17, 12, 'white', bias=0.08)
+    # 검은 가면: 두 눈 둘레 + 콧등으로 이어짐
+    ellipse(cv, 32, 45, 13, 9, 'mask', bias=0.0)
+    ellipse(cv, 57, 42, 11, 8, 'mask', bias=0.0)
+    flat(cv, 45, 46, 6, 3.5, 'mask', 1)
+    # 코
+    ellipse(cv, 66, 54, 6, 4.2, 'nose', bias=0.1)
+    cv.paint(64, 52, RAMP['nose'][2])
+    cv.paint(65, 52, RAMP['nose'][2])
+    outline(cv)
+    rim_light(cv, 'grey')
+    # 눈: 가면 속이라 테두리를 한 단 밝게(눈이 묻히지 않게)
+    if face == 'happy':
+        # 가면이 검어서 감은 눈은 밝은 선으로.
+        for (cx, cy, rx) in ((34, 44, 4.6), (57, 41, 3.8)):
+            pts = [(cx - rx, cy + 1.5), (cx - rx * 0.5, cy - 1.5), (cx, cy - 2.5), (cx + rx * 0.5, cy - 1.5), (cx + rx, cy + 1.5)]
+            line(cv, pts, RAMP['white'][2], 2)
+    else:
+        for (ex, ey, rx, ry) in ((34, 44, 5.0, 5.8), (57, 41, 4.0, 4.8)):
+            dither_ellipse(cv, ex, ey, rx + 1.6, ry + 1.4, RAMP['mask'][3], 0.6)
+        eye(cv, 34, 44, 4.6, 5.4)
+        eye(cv, 57, 41, 3.6, 4.4, look=(0.3, 0.0))
+    # 볼 홍조, 입
+    dither_ellipse(cv, 46, 61, 5.0, 2.6, BLUSH, 0.5)
+    if face == 'happy':
+        for (x, y) in ((60, 63), (61, 64), (62, 64), (63, 64), (64, 63)):
+            cv.paint(x, y, MOUTH)
+        for (x, y) in ((61, 65), (62, 66), (63, 65)):
+            cv.paint(x, y, RAMP['pink'][2])
+    else:
+        line(cv, [(59, 63), (61, 64), (63, 63), (65, 64)], MOUTH, 1)
+    # 털 결(볼·이마)
+    for (x, y) in ((14, 56), (15, 57), (12, 60), (70, 66), (71, 67), (24, 70), (25, 71)):
+        m = cv.mat[y][x]
+        if m and m[0] == 'grey':
+            cv.paint(x, y, RAMP['grey'][1])
+    return cv
+
+
+def momo_back2(face):
+    """모모 v2: 먼 귀 끝이 접혔다(비대칭 = 성격), 뾰족한 볼털, 폭신한 가슴 털, 핀 꽃은 그대로, 속눈썹 있는 큰 눈."""
+    cv = Canvas()
+
+    def fluff(x, y, ang):
+        r = saw(ang, -3.0, -0.3, 10, 0.05)
+        if 0.15 < ang < 1.3:
+            r *= saw(ang, 0.15, 1.3, 6, 0.12, 1.3)
+        if 1.85 < ang < 3.0:
+            r *= saw(ang, 1.85, 3.0, 6, 0.12, 1.3)
+        return r
+    # 먼 귀: 끝 1/3이 바깥(왼쪽)으로 접혀 내려온다
+    ellipse(cv, 26, 25, 7, 14, 'bfur', bias=-0.08, clip=lambda x, y: y < 40)
+    flat(cv, 27, 27, 3.4, 8, 'pink', 0)
+    # 접힌 끝: 귀 꼭대기에서 바깥(왼쪽)으로 꺾여 내려온다. 바깥 털이 보이니 한 단 어둡게, 귀와 붙여 그린다.
+    for y in range(9, 21):
+        for x in range(12, 30):
+            t = (x - 12) / 17.0
+            top = 13 - 6 * math.sin(t * math.pi * 0.9)
+            if top <= y <= top + 5.5 and not (x > 26 and y > 15):
+                cv.put(x, y, 'bfur', 1 if y > top + 2 else 2)
+    ellipse(cv, 50, 18, 8, 18, 'bfur', bias=0.04, clip=lambda x, y: y < 40)
+    flat(cv, 51, 19, 4.0, 13, 'pink', 1)
+    flat(cv, 51, 16, 2.0, 8, 'pink', 2)
+    ellipse(cv, 42, 54, 29, 24, 'bfur', bias=0.05, rough=fluff)
+    def ruff(x, y, ang):
+        return saw(ang, -3.1, -0.05, 9, 0.18, 1.2)
+    ellipse(cv, 40, 92, 22, 10, 'bfur', bias=-0.15)
+    ellipse(cv, 40, 89, 14, 7, 'blight', bias=-0.1, rough=ruff)
+    ellipse(cv, 61, 62, 5.5, 4.5, 'blight', bias=-0.05)
+    ellipse(cv, 66, 58, 2.4, 1.9, 'pink', bias=-0.1)
+    outline(cv)
+    rim_light(cv, 'bfur')
+    fx, fy = 53, 23
+    for (cx, cy) in ((0, -4), (-4, -1), (4, -1), (-3, 4), (3, 4)):
+        flat(cv, fx + cx, fy + cy, 2.8, 2.5, 'bloom', 2)
+        cv.paint(fx + cx - 1, fy + cy - 1, RAMP['bloom'][3])
+        cv.paint(fx + cx + 1, fy + cy + 1, RAMP['bloom'][1])
+    for (ox, oy) in ((-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1), (0, -1)):
+        cv.paint(fx + ox, fy + oy, (255, 222, 120))
+    cv.paint(fx, fy, (236, 180, 70))
+    for (x, y) in ((fx + 6, fy + 3), (fx + 7, fy + 4), (fx + 7, fy + 5), (fx + 6, fy + 5)):
+        cv.paint(x, y, (110, 170, 90))
+    if face == 'happy':
+        happy_eye2(cv, 39, 49, 5.6)
+        happy_eye2(cv, 58, 46, 4.2)
+    else:
+        eye2(cv, 39, 49, 5.6, 6.8, outer=-1, lash=True)
+        eye2(cv, 58, 46, 4.2, 5.6, look=(0.3, 0.0), outer=1, lash=True)
+    if face == 'worried':
+        line(cv, [(33, 39), (44, 36)], RAMP['bfur'][0], 2)
+        line(cv, [(54, 35), (62, 37)], RAMP['bfur'][0], 2)
+        line(cv, [(60, 69), (63, 68), (66, 69)], MOUTH, 1)
+    elif face == 'happy':
+        for (x, y) in ((59, 67), (60, 68), (61, 69), (62, 69), (63, 69), (64, 68), (65, 67)):
+            cv.paint(x, y, MOUTH)
+        for (x, y) in ((61, 70), (62, 70), (63, 70)):
+            cv.paint(x, y, RAMP['pink'][2])
+    else:
+        line(cv, [(34, 39), (43, 38)], RAMP['bfur'][1], 2)
+        line(cv, [(54, 37), (61, 37)], RAMP['bfur'][1], 2)
+        line(cv, [(60, 68), (62, 69), (64, 69), (66, 68)], MOUTH, 1)
+    dither_ellipse(cv, 48, 61, 4.6, 2.4, BLUSH, 0.45)
+    dither_ellipse(cv, 30, 59, 3.2, 1.8, BLUSH, 0.4)
+    return cv
+
+
 def nail_fur(face, fur):
     """털빛을 바꾼 Naïl: 'fur' 경사만 잠깐 바꿔 그리고, 색으로 굳혀 둔다(시트에 넣은 뒤 경사를 되돌려도 남게)."""
     saved = RAMP['fur']
     RAMP['fur'] = FUR_VARIANTS[fur]
-    cv = nail(face)
+    cv = (nail2 if V2 else nail)(face)
     for y in range(H):
         for x in range(W):
             if cv.col[y][x] is None and cv.mat[y][x] is not None:
@@ -1201,11 +1489,12 @@ def to_image(cv):
 
 
 def sheet():
-    frames = [nail(f) for f in ('normal', 'happy', 'worried', 'determined')] + [neighbor()]
-    frames += [raccoon('normal'), raccoon('happy')]
+    nail_, raccoon_, momo_back_ = (nail2, raccoon2, momo_back2) if V2 else (nail, raccoon, momo_back)
+    frames = [nail_(f) for f in ('normal', 'happy', 'worried', 'determined')] + [neighbor()]
+    frames += [raccoon_('normal'), raccoon_('happy')]
     frames += [momo_tainted('cold'), momo_tainted('pained')]
     frames += [bori('tainted'), bori('normal'), bori('happy')]
-    frames += [momo_back('normal'), momo_back('happy'), momo_back('worried')]
+    frames += [momo_back_('normal'), momo_back_('happy'), momo_back_('worried')]
     frames += [halmae('normal'), halmae('happy'), mom()]
     for fur in (1, 2, 3):
         frames += [nail_fur(f, fur) for f in ('normal', 'happy', 'worried', 'determined')]
