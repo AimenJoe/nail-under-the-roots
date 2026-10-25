@@ -328,7 +328,9 @@ strings! {
     // 큰 나무의 재주(docs/decisions/0047)
     tal_burrow, tal_burrow_a, tal_burrow_a_desc, tal_burrow_b, tal_burrow_b_desc, tal_parry, tal_parry_a, tal_parry_a_desc, tal_parry_b, tal_parry_b_desc, tal_drill, tal_drill_a, tal_drill_a_desc, tal_drill_b, tal_drill_b_desc, tal_eat, tal_eat_a, tal_eat_a_desc, tal_eat_b, tal_eat_b_desc, tree_title, tree_light, tree_cost, tree_poor, tree_awake, tree_equip, tree_unequip, tree_on, tree_off, tree_hint, ia_tree, toast_camp_bank, tree_intro,
     // 저널(docs/decisions/0048)
-    cat_story, cat_fight, cat_explore, cat_neighbors, cat_village, j_reward, j_claim, j_claimed, j_progress, j_toast, r_light, r_decor, r_charm, fur_0, fur_1, fur_2, fur_3, puddle_none, ia_puddle, decor_7, decor_8, decor_9, c_bell, c_bell_desc, c_thread, c_thread_desc, c_petal, c_petal_desc, jg_tutorial, jg_tutorial_d, jg_bori, jg_bori_d, jg_camp, jg_camp_d, jg_deeper, jg_deeper_d, jg_deepest, jg_deepest_d, jg_momo1, jg_momo1_d, jg_momo3, jg_momo3_d, jg_kills, jg_kills_d, jg_kills2, jg_kills2_d, jg_ambush, jg_ambush_d, jg_ambush2, jg_ambush2_d, jg_parry, jg_parry_d, jg_parry2, jg_parry2_d, jg_drill, jg_drill_d, jg_slam, jg_slam_d, jg_finisher, jg_finisher_d, jg_chest, jg_chest_d, jg_chest2, jg_chest2_d, jg_spring, jg_spring_d, jg_berry, jg_berry_d, jg_runs, jg_runs_d, jg_falls, jg_falls_d, jg_daily, jg_daily_d, jg_mobs, jg_mobs_d, jg_mobs2, jg_mobs2_d, jg_light, jg_light_d, jg_talent, jg_talent_d, jg_talent2, jg_talent2_d, jg_decor, jg_decor_d, jg_decor2, jg_decor2_d, jg_knot, jg_knot_d,
+    cat_story, cat_fight, cat_explore, cat_neighbors, cat_village, j_reward, j_claim, j_progress, j_toast, r_light, r_decor, r_charm, fur_0, fur_1, fur_2, fur_3, puddle_none, ia_puddle, decor_7, decor_8, decor_9, c_bell, c_bell_desc, c_thread, c_thread_desc, c_petal, c_petal_desc, jg_tutorial, jg_tutorial_d, jg_bori, jg_bori_d, jg_camp, jg_camp_d, jg_deeper, jg_deeper_d, jg_deepest, jg_deepest_d, jg_momo1, jg_momo1_d, jg_momo3, jg_momo3_d, jg_kills, jg_kills_d, jg_kills2, jg_kills2_d, jg_ambush, jg_ambush_d, jg_ambush2, jg_ambush2_d, jg_parry, jg_parry_d, jg_parry2, jg_parry2_d, jg_drill, jg_drill_d, jg_slam, jg_slam_d, jg_finisher, jg_finisher_d, jg_chest, jg_chest_d, jg_chest2, jg_chest2_d, jg_spring, jg_spring_d, jg_berry, jg_berry_d, jg_runs, jg_runs_d, jg_falls, jg_falls_d, jg_daily, jg_daily_d, jg_mobs, jg_mobs_d, jg_mobs2, jg_mobs2_d, jg_light, jg_light_d, jg_talent, jg_talent_d, jg_talent2, jg_talent2_d, jg_decor, jg_decor_d, jg_decor2, jg_decor2_d, jg_knot, jg_knot_d,
+    // 저널 보상이 어디 있나(docs/decisions/0050)
+    j_got_light, j_got_seeds, j_got_decor, j_got_fur, j_got_charm,
 }
 
 pub static KO: Strings = Strings {
@@ -738,7 +740,6 @@ pub static KO: Strings = Strings {
     cat_village: "마을",
     j_reward: "보상: {0}",
     j_claim: "{0} 받기",
-    j_claimed: "받았다",
     j_progress: "{0} / {1}",
     j_toast: "저널: 이룬 목표가 있다! (메뉴 → 저널)",
     r_light: "반딧불 {0}",
@@ -821,6 +822,11 @@ pub static KO: Strings = Strings {
     jg_decor2_d: "포포의 꾸미기 6개를 다 산다.",
     jg_knot: "첫 매듭",
     jg_knot_d: "실뜨기 1단계로 가장 깊은 곳에 닿는다.",
+    j_got_light: "받았다 · 큰 나무에서 재주를 깨우는 데 쓴다",
+    j_got_seeds: "받았다 · 포포의 꾸미기 가게에서 쓴다",
+    j_got_decor: "받았다 · 마을에 놓였다",
+    j_got_fur: "받았다 · 마을 물웅덩이에서 비춰 보며 바꾼다",
+    j_got_charm: "받았다 · 가방에 들어 있다(런마다 들고 시작)",
 };
 
 pub static EN: Strings = Strings {
@@ -1230,7 +1236,6 @@ pub static EN: Strings = Strings {
     cat_village: "Village",
     j_reward: "Reward: {0}",
     j_claim: "{0} Claim",
-    j_claimed: "Claimed",
     j_progress: "{0} / {1}",
     j_toast: "Journal: a goal is complete! (Menu → Journal)",
     r_light: "Glowbugs {0}",
@@ -1313,6 +1318,11 @@ pub static EN: Strings = Strings {
     jg_decor2_d: "Buy all 6 of Popo's decorations.",
     jg_knot: "First Knot",
     jg_knot_d: "Reach the deepest place on Cat's Cradle level 1.",
+    j_got_light: "Claimed · spend them at the great tree",
+    j_got_seeds: "Claimed · spend them at Popo's decor shop",
+    j_got_decor: "Claimed · placed in the village",
+    j_got_fur: "Claimed · switch it at the village puddle",
+    j_got_charm: "Claimed · in your bag (you start every run with it)",
 };
 
 pub static JA: Strings = Strings {
@@ -1722,7 +1732,6 @@ pub static JA: Strings = Strings {
     cat_village: "村",
     j_reward: "ほうび：{0}",
     j_claim: "{0} うけとる",
-    j_claimed: "うけとった",
     j_progress: "{0} / {1}",
     j_toast: "きろく：できた目標がある！（メニュー → きろく）",
     r_light: "ホタル {0}",
@@ -1805,6 +1814,11 @@ pub static JA: Strings = Strings {
     jg_decor2_d: "ポポのかざり6つをぜんぶ買う。",
     jg_knot: "はじめての結び目",
     jg_knot_d: "あやとり1段で、いちばん深いところに着く。",
+    j_got_light: "うけとった・大きな木でわざを起こすのに使う",
+    j_got_seeds: "うけとった・ポポのかざりつけで使う",
+    j_got_decor: "うけとった・村にかざった",
+    j_got_fur: "うけとった・村の水たまりでのぞいてかえる",
+    j_got_charm: "うけとった・どうぐに入れた（毎回持って出る）",
 };
 
 pub static ZH_HANS: Strings = Strings {
@@ -2216,7 +2230,6 @@ pub static ZH_HANS: Strings = Strings {
     cat_village: "村子",
     j_reward: "收获：{0}",
     j_claim: "{0} 领取",
-    j_claimed: "已领取",
     j_progress: "{0} / {1}",
     j_toast: "日志：有达成的目标！（菜单 → 日志）",
     r_light: "萤火虫 {0}",
@@ -2299,6 +2312,11 @@ pub static ZH_HANS: Strings = Strings {
     jg_decor2_d: "买下波波的全部6件装饰。",
     jg_knot: "第一个结",
     jg_knot_d: "在翻花绳第1级到达最深处。",
+    j_got_light: "已领取 · 在大树那里唤醒本领时使用",
+    j_got_seeds: "已领取 · 在波波那里装饰村子时使用",
+    j_got_decor: "已领取 · 已经摆在村子里",
+    j_got_fur: "已领取 · 在村里的水坑照一照就能换",
+    j_got_charm: "已领取 · 已放进背包（每次出发都带着）",
 };
 /// 브라질 포르투갈어(docs/decisions/0033). DeepL 초안 + 사람 손 검토(한국어·영어 대조). 원어민 검수 전.
 pub static PT_BR: Strings = Strings {
@@ -2708,7 +2726,6 @@ pub static PT_BR: Strings = Strings {
     cat_village: "Vila",
     j_reward: "Recompensa: {0}",
     j_claim: "{0} Pegar",
-    j_claimed: "Recebido",
     j_progress: "{0} / {1}",
     j_toast: "Diário: uma meta foi cumprida! (Menu → Diário)",
     r_light: "Vaga-lumes {0}",
@@ -2791,6 +2808,11 @@ pub static PT_BR: Strings = Strings {
     jg_decor2_d: "Compre os 6 enfeites do Popo.",
     jg_knot: "Primeiro nó",
     jg_knot_d: "Chegue ao lugar mais fundo na Cama de gato nível 1.",
+    j_got_light: "Recebido · use na grande árvore",
+    j_got_seeds: "Recebido · use para decorar a vila com o Popo",
+    j_got_decor: "Recebido · já está na vila",
+    j_got_fur: "Recebido · troque na poça da vila",
+    j_got_charm: "Recebido · está na mochila (vai com você toda vez)",
 };
 
 #[cfg(test)]

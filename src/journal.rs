@@ -528,6 +528,24 @@ pub fn claim(p: &mut Profile, g: &Goal) -> Option<Reward> {
     Some(g.reward)
 }
 
+/// 저널로 받은 장신구(docs/decisions/0050): 받으면 바로 가방에, 그 뒤 런마다 들고 시작한다.
+pub fn owned_charms(p: &Profile) -> Vec<usize> {
+    (crate::equipment::BASE_CHARMS..crate::equipment::CHARMS.len())
+        .filter(|i| p.flag(&key_charm(*i)))
+        .collect()
+}
+
+/// 받은 보상이 어디 있는지(저널 상태 줄).
+pub fn reward_place(r: Reward) -> Tr {
+    match r {
+        Light(_) => |s| s.j_got_light,
+        Seeds(_) => |s| s.j_got_seeds,
+        Decor(_) => |s| s.j_got_decor,
+        Fur(_) => |s| s.j_got_fur,
+        Charm(_) => |s| s.j_got_charm,
+    }
+}
+
 /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것).
 pub fn charm_pool(p: &Profile) -> Vec<usize> {
     (0..crate::equipment::CHARMS.len())
@@ -604,8 +622,10 @@ mod tests {
         assert_eq!(fur(&p), 2);
         assert!(!charm_pool(&p).contains(&5));
         p.set(key::BORI_BACK);
+        assert!(owned_charms(&p).is_empty());
         claim(&mut p, by_id("bori").unwrap());
         assert!(charm_pool(&p).contains(&5));
+        assert_eq!(owned_charms(&p), vec![5], "받은 장신구는 들고 시작한다");
         p.add(stat::LIGHT, 300);
         claim(&mut p, by_id("light").unwrap());
         assert!(p.flag(&crate::village::key_decor(6)));

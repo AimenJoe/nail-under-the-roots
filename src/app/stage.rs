@@ -1251,7 +1251,14 @@ impl App {
                 }
             }
             Reward::Fur(_) => self.world.fur = crate::journal::fur(&self.profile),
-            Reward::Charm(_) => self.world.charm_pool = crate::journal::charm_pool(&self.profile),
+            // 장신구는 바로 가방에(0050). 이번 런의 상자에서는 다시 안 나온다.
+            Reward::Charm(c) => {
+                self.world.charm_pool = crate::journal::charm_pool(&self.profile);
+                self.inventory.add_charm(c);
+                if !self.world.charms_found.contains(&c) {
+                    self.world.charms_found.push(c);
+                }
+            }
             Reward::Light(_) | Reward::Seeds(_) => {}
         }
         self.journal_ready = crate::journal::ready_count(&self.profile);

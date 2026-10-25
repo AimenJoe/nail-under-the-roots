@@ -780,6 +780,15 @@ impl App {
             }
             _ => Inventory::new(&[start]),
         };
+        // 저널로 받은 장신구는 런마다 가방에 들고 시작한다(0050). 상자에서는 다시 안 나온다.
+        if s != Scenario::Tutorial {
+            for c in crate::journal::owned_charms(&self.profile) {
+                self.inventory.add_charm(c);
+                if !self.world.charms_found.contains(&c) {
+                    self.world.charms_found.push(c);
+                }
+            }
+        }
         self.gift = None;
         self.gift_queue.clear();
         self.apply_equipped();
@@ -2661,12 +2670,11 @@ impl App {
             Reward::Charm(i) => fill(s.r_charm, &[&tr(crate::equipment::CHARMS[i].name)]),
         };
         let what = fill(s.j_reward, &[&what]);
-        let by = c.bottom() - 26.0;
-        for (k, l) in ui::wrap(ui, &what, dw, FONT_PX).iter().take(1).enumerate() {
-            ui.text(l, dx, by + k as f32 * 13.0, FONT_PX, ui::TEXT);
-        }
+        let by = c.bottom() - 39.0;
+        ui.text(&ui.fit(&what, dw, FONT_PX), dx, by, FONT_PX, ui::TEXT);
+        // 상태: 받은 뒤엔 보상이 어디 있는지(가방·마을·큰 나무…, 0050). 두 줄까지.
         let state = if g.claimed(&self.profile) {
-            s.j_claimed.to_string()
+            tr(crate::journal::reward_place(g.reward)).to_string()
         } else if g.ready(&self.profile) {
             vfill(s.j_claim, &[Verb::Confirm])
         } else {
@@ -2677,7 +2685,9 @@ impl App {
         } else {
             ui::TEXT_DIM
         };
-        ui.text(&ui.fit(&state, dw, FONT_PX), dx, by + 13.0, FONT_PX, sc);
+        for (k, l) in ui::wrap(ui, &state, dw, FONT_PX).iter().take(2).enumerate() {
+            ui.text(l, dx, by + 13.0 + k as f32 * 13.0, FONT_PX, sc);
+        }
     }
 
     fn draw_map(&self, ui: &Ui, c: Rect) {
