@@ -58,7 +58,7 @@
 | 게임패드 | `input.rs`, `web/macroquad-gamepads-0.1.js` | 메뉴는 D패드·왼쪽 스틱 둘 다(스틱은 큰 축 하나, 0.5에서 잡고 0.3에서 풀림, 누르고 있으면 반복). 데스크톱(gilrs)·웹(플러그인). 웹은 비표준 매핑 패드도 받도록 플러그인 패치. Android 13 폰 브라우저 + 실기 패드로 인식 확인(2026-10-25). 데스크톱 실기는 미확인 |
 | 터치(보조) | `input.rs` TouchState, `render.rs` 오버레이, `web/index.html` | 왼쪽 반 떠다니는 스틱 + ATK/DIG/R 버튼. 모바일 브라우저용. 터치 좌표는 DPI로 나눠야 함(macroquad touches()는 물리 픽셀). Android 13 폰 브라우저 실기 확인(2026-10-25) |
 | 디버그 | F1 오버레이(fps, 상태), F2 히트박스 | 기본 꺼짐. 설정에서도 켬/끔 |
-| 그림 | `art.rs`, `biome.rs`, `render.rs`, `tools/art/` | Naïl 스프라이트 v1(직접 그림), 대체 타일, 3/4 벽·y 정렬·그림자, 환경 3종(색조·장식·어둠), 발톱 자국 이펙트, 컷씬 레터박스. Sunnyside 팩은 레포 밖(docs/decisions/0010) |
+| 그림 | `art.rs`, `biome.rs`, `render.rs`, `tools/art/` | Naïl 스프라이트 v2(직접 그림. 얼굴: 동그란 코·볼 홍조, 입 없음, 발톱은 발 줄에만 — v1은 이빨처럼 보였다), 대체 타일, 3/4 벽·y 정렬·그림자, 환경 3종(색조·장식·어둠), 발톱 자국 이펙트, 컷씬 레터박스. Sunnyside 팩은 레포 밖(docs/decisions/0010) |
 | 장비 | `equipment.rs`, `moveset.rs` | 캐릭터별 무기 종류. Naïl은 발톱 4종(새싹·두더지·바위·독), 가방에서 장착, 독 지속 피해. 규칙은 `cargo test`(docs/decisions/0011) |
 | 무브셋 | `moveset.rs` | 콤보를 데이터로(발톱 3타, 실험용 무거운 2타). 타별 회피 캔슬 창 `dodge_cancel_after`. 개발 시나리오 "무거운 무기"로 비교(docs/decisions/0009) |
 | 튜토리얼 | `tutorial.rs` | 플레이로 배움: 이동 → 반짝이는 두더지 발톱 줍기(맨손 시작, 획득 창) → 허수아비 3연타 → 굴파기 → 솟구침 → 웨이브 1(docs/decisions/0012). 한 줄 힌트만. 첫 시작과 개발 시나리오 "튜토리얼" |
@@ -78,7 +78,7 @@
 - [x] Sunnyside World 라이선스 원문 확인·기록(V1, 상업 사용 가능, 2026-10-25)
 - [ ] Sunnyside World 내려받기(Name your own price)
 - [ ] 비공개 에셋 레포 만들기(예: `nail-assets`)에 팩을 넣고, 게임 레포 Secrets에 `ASSETS_REPO`(owner/name)·`ASSETS_TOKEN`(그 레포 읽기 권한 fine-grained 토큰) 등록. 그 뒤 세션에 그 레포를 붙여 주면 칸 매핑을 한다
-- [ ] Naïl 스프라이트 v1 피드백(귀여움·실루엣·발톱 크기). 다음 캐릭터(적 2종) 순서 정하기
+- [ ] Naïl 스프라이트 v2 피드백(얼굴을 고쳤다: 이빨처럼 보이던 발톱을 발로 내림, 동그란 분홍 코, 쓰러지면 × 눈). 다음 캐릭터(적 2종) 순서 정하기
 - [ ] 스토리 초안: 발톱을 주는 지점(docs/decisions/0012의 4번 초안) 확정
 - [ ] 다음 언어 정하기(일본어: 가나만 / 한자 폰트 추가, 중국어 간체: 폰트 필요 — docs/decisions/0013). 영어 문구 검수
 - [ ] 메뉴에서 왼쪽 스틱 탐색 실기 확인(폰 브라우저 + 패드)

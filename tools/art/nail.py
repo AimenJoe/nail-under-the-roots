@@ -33,21 +33,24 @@ P = {
 FILL_NO_OUTLINE = {'s'}
 
 # 채움만. 외곽선 자동. 오른쪽을 본다.
+# 얼굴(v2, 2026-10-25): 동그란 분홍 코 하나 + 2×2 눈(하이라이트) + 볼 홍조. 입은 그리지 않는다.
+# v1은 주둥이 위아래로 크림색 발톱이 붙어 "벌린 입과 이빨"로 읽혔다(징그럽다는 피드백). 서 있을 때 발톱은 발 줄(13)에만,
+# 코 밑(14~15열, 11~13줄)은 비워 턱선을 남긴다. 공격 프레임만 앞발이 앞으로 나온다.
 BASE = """
 ................
 ................
 ................
 .....hhhhh......
-...hhhbbbbbb....
+...hhhhbbbbb....
 ..hhbbbbbbbbb...
-..hbbbbbbbwebb..
-.hbbbbbbbbeeblll
-.bbbbbbbbbrllpp.
-.dbbbbbbbbllllq.
-.ddbbbbbbblpccc.
-.dddbbbbbbppC...
-..dddbbbbbbpccc.
-...pddddddd.pp..
+..hbbbbbbbbbbb..
+.hbbbbbbbwebb...
+.bbbbbbbbeebbl..
+.dbbbbbbbrbbllpp
+.ddbbbbbbbbbllpq
+.dddbbbbbbbbbb..
+..dddbbbbbbbbb..
+...pdddddddpcc..
 ................
 ................
 """
@@ -166,45 +169,43 @@ def walk(a, i):
     if i in (1, 3):
         f = shift(f, dy=-1)  # 통통 튀기
     if i == 1:  # 앞발 내밀기
-        f = shift(f, dx=1, y_from=9, y_to=13)
+        f = shift(f, dx=1, y_from=13, y_to=14)
     if i == 3:  # 뒷발 차기
         put(f, 1, 12, 'pp')
     return f
 
 
 def attack(a, i):
-    f = shift(a, dx=1, y_from=0, y_to=9)  # 상체를 앞으로
-    if i == 0:  # 발 치켜들기
-        put(f, 11, 9, 'lpccc')
-        put(f, 11, 10, 'bpC..')
-        put(f, 11, 11, 'bb...')
-        put(f, 11, 12, 'bbb..')
+    # 발톱은 늘 발 높이(12줄 이하)에서. 코 바로 밑에 크림색을 두면 다시 이빨로 읽힌다.
+    # 머리는 옮기지 않는다(코가 칸 끝에 닿아 있다). 앞으로 나가는 맛은 게임의 전진(lunge)이 낸다.
+    f = list(a)
+    if i == 0:  # 앞발 쭉
+        put(f, 11, 12, 'bpccc')
     elif i == 1:  # 낮게 긁기
-        put(f, 11, 10, 'lb...')
-        put(f, 11, 11, 'bppcc')
-        put(f, 10, 12, 'bbpCcc')
-        put(f, 11, 13, 'dd...')
-    else:  # 마지막 타: 눈 질끈, 몸을 쭉 뻗어 두 발로
-        f = shift(a, dx=1, y_from=0, y_to=14)
-        put(f, 11, 6, 'bbb')
-        put(f, 11, 7, 'eeb')  # 질끈 감은 눈(가로선)
-        put(f, 12, 9, 'lpccc')
-        put(f, 11, 10, 'bpC..')
-        put(f, 11, 11, 'bpccc')
-        put(f, 11, 12, 'bpC..')
+        put(f, 11, 12, 'bb...')
+        put(f, 11, 13, 'bpccc')
+    else:  # 마지막 타: 눈 질끈(가로선), 두 발 다
+        put(f, 9, 7, 'bb')
+        put(f, 9, 8, 'ee')
+        put(f, 10, 12, 'bbpccc')
+        put(f, 11, 13, 'bpccc')
     return f
 
 
 def hurt(a):
     f = shift(a, dx=-1)
-    put(f, 9, 6, 'be')    # > 모양 눈
-    put(f, 9, 7, 'eb')
+    put(f, 8, 7, 'eb')  # > 모양 눈
+    put(f, 8, 8, 'be')
+    put(f, 8, 9, 'eb')
     return f
 
 
 def dead(a):
     f = shift(list(reversed(a)), dy=-2)  # 뒤집혀 누움
-    f = [r.replace('w', 'e') for r in f]
+    # 눈(원래 7~8줄 → 5~6줄)을 × 눈으로. 검은 2×2로 두면 벌린 입처럼 보인다.
+    put(f, 9, 4, 'ebe')
+    put(f, 9, 5, 'beb')
+    put(f, 9, 6, 'ebe')
     return f
 
 

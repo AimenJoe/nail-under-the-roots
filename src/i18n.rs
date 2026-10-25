@@ -28,17 +28,26 @@ impl Lang {
         }
     }
 
-    /// BCP 47 태그("ko-KR", "en-US", "ko")에서 고른다. 모르는 언어는 영어.
-    pub fn from_tag(tag: &str) -> Lang {
+    /// BCP 47 태그("ko-KR", "en-US", "ko", "en_US.UTF-8")가 우리가 가진 언어면 그 언어.
+    pub fn from_tag(tag: &str) -> Option<Lang> {
         let primary = tag
-            .split(['-', '_', '.'])
+            .split(['-', '_', '.', '@'])
             .next()
             .unwrap_or("")
             .to_ascii_lowercase();
         match primary.as_str() {
-            "ko" => Lang::Ko,
-            _ => Lang::En,
+            "ko" => Some(Lang::Ko),
+            "en" => Some(Lang::En),
+            _ => None,
         }
+    }
+
+    /// 기기의 선호 언어 목록(앞이 우선)에서 우리가 가진 첫 언어. 하나도 없으면 영어.
+    pub fn pick<S: AsRef<str>>(preferred: impl IntoIterator<Item = S>) -> Lang {
+        preferred
+            .into_iter()
+            .find_map(|t| Lang::from_tag(t.as_ref()))
+            .unwrap_or(Lang::En)
     }
 
     /// 설정에서 좌우로 넘긴다.
@@ -79,23 +88,28 @@ pub fn fill(template: &str, args: &[&dyn std::fmt::Display]) -> String {
     out
 }
 
-/// 기기 언어를 읽는다. 웹은 브라우저 언어(index.html의 nail_locale 플러그인), 그 밖은 OS 언어.
+/// 기기 언어로 시작 언어를 고른다: 선호 목록에서 우리가 가진 첫 언어, 없으면 영어.
+/// 웹은 브라우저의 navigator.languages(index.html의 nail_locale 플러그인), 그 밖은 OS 선호 언어(sys-locale).
 pub fn detect() -> Lang {
-    detect_tag().map(|t| Lang::from_tag(&t)).unwrap_or(Lang::En)
+    Lang::pick(preferred_tags())
 }
 
+/// 웹: JS가 i번째 선호 언어의 주 언어 코드(두 글자)를 u32 하나로 접어 준다(문자열을 넘기지 않으려고).
+/// 0이면 목록 끝. 없으면(옛 index.html) miniquad가 빈 함수를 끼워 넣어 0이 된다.
 #[cfg(target_arch = "wasm32")]
-fn detect_tag() -> Option<String> {
+fn preferred_tags() -> Vec<String> {
     extern "C" {
-        /// 0 = 모름, 1 = 한국어, 2 = 그 밖. (web/index.html)
-        fn nail_locale() -> u32;
+        fn nail_locale(i: u32) -> u32;
     }
-    // SAFETY: 인자 없는 JS 함수. 없으면(옛 index.html) miniquad가 빈 함수를 끼워 넣어 0이 된다.
-    match unsafe { nail_locale() } {
-        1 => Some("ko".into()),
-        2 => Some("en".into()),
-        _ => None,
-    }
+    (0..8)
+        // SAFETY: 정수 하나를 받고 돌려주는 JS 함수(web/index.html).
+        .map(|i| unsafe { nail_locale(i) })
+        .take_while(|code| *code != 0)
+        .map(|code| {
+            let b = [(code >> 8) as u8, code as u8];
+            String::from_utf8_lossy(&b).into_owned()
+        })
+        .collect()
 }
 
 /// miniquad가 플러그인 버전을 맞춰 보는 함수(mq_js_bundle.js의 init_plugins).
@@ -106,8 +120,8 @@ pub extern "C" fn nail_locale_crate_version() -> u32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn detect_tag() -> Option<String> {
-    sys_locale::get_locale()
+fn preferred_tags() -> Vec<String> {
+    sys_locale::get_locales().collect()
 }
 
 macro_rules! strings {
@@ -387,9 +401,14 @@ mod tests {
     #[test]
     fn fill_reorders() {
         assert_eq!(fill("{1} then {0}", &[&1, &"a"]), "a then 1");
-        assert_eq!(Lang::from_tag("ko-KR"), Lang::Ko);
-        assert_eq!(Lang::from_tag("en_US.UTF-8"), Lang::En);
-        assert_eq!(Lang::from_tag("ja"), Lang::En);
+        assert_eq!(Lang::from_tag("ko-KR"), Some(Lang::Ko));
+        assert_eq!(Lang::from_tag("en_US.UTF-8"), Some(Lang::En));
+        assert_eq!(Lang::from_tag("ja"), None);
+        // 선호 목록에서 가진 첫 언어. 없으면 영어.
+        assert_eq!(Lang::pick(["ja-JP", "ko-KR", "en"]), Lang::Ko);
+        assert_eq!(Lang::pick(["fr-FR", "en-GB", "ko"]), Lang::En);
+        assert_eq!(Lang::pick(["ja", "zh-Hans"]), Lang::En);
+        assert_eq!(Lang::pick(Vec::<String>::new()), Lang::En);
         assert_eq!(Lang::Ko.cycle(1), Lang::En);
         assert_eq!(Lang::Ko.cycle(-1), Lang::En);
     }
