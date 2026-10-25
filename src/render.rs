@@ -59,9 +59,17 @@ pub struct Renderer {
     view_origin: Vec2,
     /// 카메라의 소수점 부분(0..1, 게임 px). 올릴 때 이만큼 화면을 민다.
     subpixel: Vec2,
-    /// 구운 지도(terrain.rs, 0062): 열쇠가 같으면 다시 굽지 않는다.
-    terrain: Option<(u64, Texture2D)>,
+    /// 구운 지도(terrain.rs, 0062): 열쇠가 같으면 다시 굽지 않는다. 최근 장소 셋을 둔다(돌아가면 바로, 0068).
+    terrain: Vec<(u64, Texture2D)>,
+    /// 굽는 중인 지도(0068): 프레임마다 `BAKE_BUDGET`만큼 굽고, 그동안 월드 화면은 검정이다.
+    baking: Option<(u64, crate::terrain::Baker)>,
 }
+
+/// 한 프레임에 지도를 굽는 시간(초). 굽는 동안 화면은 검정이라 프레임이 조금 길어져도 보이지 않는다.
+/// 짧게 자를수록 검정이 길어진다(브라우저 굽기 ≈ 0.15초 → 12ms면 13프레임쯤).
+const BAKE_BUDGET: f64 = 0.012;
+/// 구운 지도를 몇 장까지 둘까(장소 하나 ≈ 2~6MB 텍스처).
+const TERRAIN_KEEP: usize = 3;
 
 impl Renderer {
     pub fn new(fonts: Fonts, art: Option<Art>) -> Self {
@@ -77,8 +85,14 @@ impl Renderer {
             warmed: std::cell::Cell::new(None),
             view_origin: Vec2::ZERO,
             subpixel: Vec2::ZERO,
-            terrain: None,
+            terrain: Vec::new(),
+            baking: None,
         }
+    }
+
+    /// 지도를 굽는 중이다: 앱은 월드 틱을 멈춘다(화면이 검정인 동안 장소 바꾸기가 끝나 버리지 않게, 0068).
+    pub fn baking(&self) -> bool {
+        self.baking.is_some()
     }
 
     /// 월드 패스(내부 해상도). `w`가 없으면 타이틀 배경만 그린다.
@@ -117,16 +131,31 @@ impl Renderer {
                 };
                 let sunny_img = art.sunny.as_ref().map(|s| &s.sheet_img);
                 let key = crate::terrain::key(g, w.biome, &paths) ^ u64::from(sunny_img.is_some());
-                if self.terrain.as_ref().map(|(k, _)| *k) != Some(key) {
-                    let img =
-                        crate::terrain::bake(g, w.biome, &paths, Some(&art.tiles_img), sunny_img);
-                    let tex = Texture2D::from_image(&img);
+                if let Some(i) = self.terrain.iter().position(|(k, _)| *k == key) {
+                    let hit = self.terrain.remove(i);
+                    self.terrain.insert(0, hit);
+                    self.baking = None;
+                } else {
+                    if self.baking.as_ref().map(|(k, _)| *k) != Some(key) {
+                        self.baking = Some((key, crate::terrain::Baker::new(g, w.biome, &paths)));
+                    }
+                    let (_, baker) = self.baking.as_mut().unwrap();
+                    let t0 = get_time();
+                    let done = baker.step(Some(&art.tiles_img), sunny_img, &mut || {
+                        get_time() - t0 > BAKE_BUDGET
+                    });
+                    if !done {
+                        // 아직 굽는 중: 화면은 검정(장소 바꾸기의 어두운 한가운데가 조금 길어진다).
+                        clear_background(BLACK);
+                        return;
+                    }
+                    let (_, baker) = self.baking.take().unwrap();
+                    let tex = Texture2D::from_image(&baker.finish());
                     tex.set_filter(FilterMode::Nearest);
-                    self.terrain = Some((key, tex));
+                    self.terrain.insert(0, (key, tex));
+                    self.terrain.truncate(TERRAIN_KEEP);
                 }
-                if let Some((_, tex)) = &self.terrain {
-                    draw_grid_art(w, cam, tex);
-                }
+                draw_grid_art(w, cam, &self.terrain[0].1);
             } else {
                 draw_room_art(art, w);
             }

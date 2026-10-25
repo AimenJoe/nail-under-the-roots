@@ -247,43 +247,55 @@ pub fn dungeon_paths(d: &crate::dungeon::Dungeon) -> Vec<(Vec2, Vec2)> {
 
 /// 1px마다 벽인가(그림의 모양). 칸 가운데 값을 겹선형으로 잇고 잡음을 더해 0.5에서 자른다.
 /// 잡음 폭(±0.23)이 0.5보다 작아 칸 가운데는 늘 제 칸 쪽이다.
+#[cfg(test)]
 fn shape(g: &Grid) -> Vec<bool> {
-    let (w, h) = (g.w as i32 * T, g.h as i32 * T);
-    let mut solid = vec![false; (w * h) as usize];
-    // 칸마다: 둘레 3×3 칸이 다 같으면(경계가 없으면) 그 값, 아니면 None(1px마다 잰다).
-    let uniform: Vec<Option<bool>> = (0..g.h as i32)
+    let w = g.w as i32 * T;
+    let uniform = shape_uniform(g);
+    let mut solid = vec![false; (w * g.h as i32 * T) as usize];
+    for y in 0..g.h as i32 * T {
+        shape_row(g, &uniform, y, &mut solid);
+    }
+    solid
+}
+
+/// 칸마다: 둘레 3×3 칸이 다 같으면(경계가 없으면) 그 값, 아니면 None(1px마다 잰다).
+fn shape_uniform(g: &Grid) -> Vec<Option<bool>> {
+    (0..g.h as i32)
         .flat_map(|cy| (0..g.w as i32).map(move |cx| (cx, cy)))
         .map(|(cx, cy)| {
             let me = solid_cell(g, cx, cy);
             let same = (-1..=1).all(|dy| (-1..=1).all(|dx| solid_cell(g, cx + dx, cy + dy) == me));
             same.then_some(me)
         })
-        .collect();
-    for y in 0..h {
-        for x in 0..w {
-            let (cx, cy) = (x / T, y / T);
-            let i = (y * w + x) as usize;
-            if let Some(me) = uniform[cy as usize * g.w + cx as usize] {
-                solid[i] = me;
-                continue;
-            }
-            let u = (x as f32 + 0.5) / T as f32 - 0.5;
-            let v = (y as f32 + 0.5) / T as f32 - 0.5;
-            let (ci, cj) = (u.floor() as i32, v.floor() as i32);
-            let (fu, fv) = (u - ci as f32, v - cj as f32);
-            let s = |cx: i32, cy: i32| f32::from(u8::from(solid_cell(g, cx, cy)));
-            let top = s(ci, cj) + (s(ci + 1, cj) - s(ci, cj)) * fu;
-            let bot = s(ci, cj + 1) + (s(ci + 1, cj + 1) - s(ci, cj + 1)) * fu;
-            let f = top + (bot - top) * fv;
-            let n = (vnoise(x as f32, y as f32, 9.0, 1) - 0.5) * 0.34
-                + (vnoise(x as f32, y as f32, 3.5, 2) - 0.5) * 0.12;
-            solid[i] = f + n > 0.5;
-        }
-    }
-    solid
+        .collect()
 }
 
-/// 굽기. `tiles`가 있으면 장식을 찍는다(시험에서는 없이).
+/// 모양 한 줄(y).
+fn shape_row(g: &Grid, uniform: &[Option<bool>], y: i32, solid: &mut [bool]) {
+    let w = g.w as i32 * T;
+    for x in 0..w {
+        let (cx, cy) = (x / T, y / T);
+        let i = (y * w + x) as usize;
+        if let Some(me) = uniform[cy as usize * g.w + cx as usize] {
+            solid[i] = me;
+            continue;
+        }
+        let u = (x as f32 + 0.5) / T as f32 - 0.5;
+        let v = (y as f32 + 0.5) / T as f32 - 0.5;
+        let (ci, cj) = (u.floor() as i32, v.floor() as i32);
+        let (fu, fv) = (u - ci as f32, v - cj as f32);
+        let s = |cx: i32, cy: i32| f32::from(u8::from(solid_cell(g, cx, cy)));
+        let top = s(ci, cj) + (s(ci + 1, cj) - s(ci, cj)) * fu;
+        let bot = s(ci, cj + 1) + (s(ci + 1, cj + 1) - s(ci, cj + 1)) * fu;
+        let f = top + (bot - top) * fv;
+        let n = (vnoise(x as f32, y as f32, 9.0, 1) - 0.5) * 0.34
+            + (vnoise(x as f32, y as f32, 3.5, 2) - 0.5) * 0.12;
+        solid[i] = f + n > 0.5;
+    }
+}
+
+/// 굽기. `tiles`가 있으면 장식을 찍는다(시험에서는 없이). 한 번에 끝까지 굽는다(시험용, 게임은 `Baker`로 나눠 굽는다).
+#[cfg(test)]
 pub fn bake(
     g: &Grid,
     b: Biome,
@@ -291,59 +303,166 @@ pub fn bake(
     tiles: Option<&Image>,
     sunny: Option<&Image>,
 ) -> Image {
-    let (w, h) = (g.w as i32 * T, g.h as i32 * T);
-    let (wu, hu) = (w as usize, h as usize);
-    let pal = palette(b);
-    let idx = |x: i32, y: i32| y as usize * wu + x as usize;
+    let mut k = Baker::new(g, b, paths);
+    k.step(tiles, sunny, &mut || false);
+    k.finish()
+}
 
-    // 1. 모양: 벽인가.
-    let solid = shape(g);
-    let is_solid = |x: i32, y: i32| {
-        if x < 0 || y < 0 || x >= w || y >= h {
-            true
-        } else {
-            solid[idx(x, y)]
-        }
-    };
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Stage {
+    Shape,
+    Depth,
+    Noise,
+    Color,
+    Decor,
+    Done,
+}
 
-    // 2. 벼랑 앞면: 아래가 바닥인 벽의 아래쪽 FACE px. depth = 바닥 위로 몇 번째 줄(0 = 맨 아래).
-    let mut depth = vec![u16::MAX; wu * hu];
-    for x in 0..w {
-        let mut run: u16 = 0;
-        let mut floor_below = false;
-        for y in (0..h).rev() {
-            if !solid[idx(x, y)] {
-                run = 0;
-                floor_below = true;
-                continue;
-            }
-            if floor_below && run < FACE {
-                depth[idx(x, y)] = run;
-            }
-            run = run.saturating_add(1);
+/// 나눠 굽기(0068): 단계마다 줄 단위로 나아가고, `out()`이 참이면 멈췄다가 다음 `step`에서 이어 간다.
+/// 한 프레임에 다 구우면 브라우저에서 0.15초 멈춘다. 프레임마다 몇 ms씩 굽고 그동안 화면은 어둡게 둔다.
+pub struct Baker {
+    g: Grid,
+    b: Biome,
+    paths: Vec<(Vec2, Vec2)>,
+    w: i32,
+    h: i32,
+    pal: Palette,
+    stage: Stage,
+    row: i32,
+    uniform: Vec<Option<bool>>,
+    solid: Vec<bool>,
+    depth: Vec<u16>,
+    path: Vec<bool>,
+    near: Vec<bool>,
+    far: Vec<[u8; 4]>,
+    band_n: Vec<f32>,
+    patch_n: Vec<f32>,
+    img: Image,
+}
+
+fn tint_px(c: Rgb, t: Color) -> [u8; 4] {
+    [
+        (c.0 as f32 * t.r) as u8,
+        (c.1 as f32 * t.g) as u8,
+        (c.2 as f32 * t.b) as u8,
+        255,
+    ]
+}
+
+impl Baker {
+    pub fn new(g: &Grid, b: Biome, paths: &[(Vec2, Vec2)]) -> Self {
+        let (w, h) = (g.w as i32 * T, g.h as i32 * T);
+        let (wu, hu) = (w as usize, h as usize);
+        let pal = palette(b);
+        // 둘레 두 칸 안에 바닥이 없는 벽 칸은 화면에 나오지 않는다(카메라는 방 안): 한 색으로 빨리 채운다.
+        let near: Vec<bool> = (0..g.h as i32)
+            .flat_map(|cy| (0..g.w as i32).map(move |cx| (cx, cy)))
+            .map(|(cx, cy)| (-2..=2).any(|dy| (-2..=2).any(|dx| !solid_cell(g, cx + dx, cy + dy))))
+            .collect();
+        let far = far_pattern(&pal)
+            .into_iter()
+            .map(|c| tint_px(c, b.wall_tint()))
+            .collect();
+        let (hw, hh) = (wu.div_ceil(2), hu.div_ceil(2));
+        Self {
+            g: g.clone(),
+            b,
+            paths: paths.to_vec(),
+            w,
+            h,
+            pal,
+            stage: Stage::Shape,
+            row: 0,
+            uniform: shape_uniform(g),
+            solid: vec![false; wu * hu],
+            depth: vec![u16::MAX; wu * hu],
+            path: vec![false; wu * hu],
+            near,
+            far,
+            band_n: vec![0.0; hw * hh],
+            patch_n: vec![0.0; hw * hh],
+            img: Image::gen_image_color(w as u16, h as u16, Color::new(0.0, 0.0, 0.0, 1.0)),
         }
     }
-    let is_face =
-        |x: i32, y: i32| x >= 0 && y >= 0 && x < w && y < h && depth[idx(x, y)] != u16::MAX;
 
-    // 3. 흙길 표시.
-    let mut path = vec![false; wu * hu];
-    for (a, c) in paths {
-        let len = (*c - *a).length().max(1.0);
-        let steps = len as i32;
-        for k in 0..=steps {
-            let t = k as f32 / steps as f32;
-            let p = *a + (*c - *a) * t;
-            let r = 4.0 + 3.0 * vnoise(p.x, p.y, 14.0, 21);
-            let wob = (vnoise(p.x, p.y, 30.0, 22) - 0.5) * 10.0;
-            let q = p + vec2(wob, wob * 0.5);
-            let ri = r.ceil() as i32;
-            for dy in -ri..=ri {
-                for dx in -ri..=ri {
-                    if (dx * dx + dy * dy) as f32 <= r * r {
-                        let (x, y) = (q.x as i32 + dx, q.y as i32 + dy);
-                        if x >= 0 && y >= 0 && x < w && y < h {
-                            path[idx(x, y)] = true;
+    pub fn finish(self) -> Image {
+        self.img
+    }
+
+    /// 조금 굽는다. 다 구웠으면 true. `out()`은 한 줄마다 묻는다(참이면 이번엔 그만).
+    pub fn step(
+        &mut self,
+        tiles: Option<&Image>,
+        sunny: Option<&Image>,
+        out: &mut dyn FnMut() -> bool,
+    ) -> bool {
+        loop {
+            let (stage, rows) = match self.stage {
+                Stage::Shape => (Stage::Depth, self.h),
+                Stage::Depth => (Stage::Noise, 1),
+                Stage::Noise => (Stage::Color, (self.h as usize).div_ceil(2) as i32),
+                Stage::Color => (Stage::Decor, self.h),
+                Stage::Decor if tiles.is_some() => (Stage::Done, self.g.h as i32),
+                Stage::Decor => (Stage::Done, 0),
+                Stage::Done => return true,
+            };
+            if self.row >= rows {
+                self.stage = stage;
+                self.row = 0;
+                continue;
+            }
+            let y = self.row;
+            match self.stage {
+                Stage::Shape => shape_row(&self.g, &self.uniform, y, &mut self.solid),
+                Stage::Depth => self.depth_and_paths(),
+                Stage::Noise => self.noise_row(y as usize),
+                Stage::Color => self.color_row(y),
+                Stage::Decor => self.decor_row(y, tiles.unwrap(), sunny),
+                Stage::Done => {}
+            }
+            self.row += 1;
+            if out() {
+                return false;
+            }
+        }
+    }
+
+    /// 2. 벼랑 앞면(아래가 바닥인 벽의 아래쪽 FACE px, depth = 바닥 위로 몇 번째 줄) + 3. 흙길.
+    fn depth_and_paths(&mut self) {
+        let (w, h) = (self.w, self.h);
+        let idx = |x: i32, y: i32| y as usize * w as usize + x as usize;
+        for x in 0..w {
+            let mut run: u16 = 0;
+            let mut floor_below = false;
+            for y in (0..h).rev() {
+                if !self.solid[idx(x, y)] {
+                    run = 0;
+                    floor_below = true;
+                    continue;
+                }
+                if floor_below && run < FACE {
+                    self.depth[idx(x, y)] = run;
+                }
+                run = run.saturating_add(1);
+            }
+        }
+        for (a, c) in &self.paths {
+            let len = (*c - *a).length().max(1.0);
+            let steps = len as i32;
+            for k in 0..=steps {
+                let t = k as f32 / steps as f32;
+                let p = *a + (*c - *a) * t;
+                let r = 4.0 + 3.0 * vnoise(p.x, p.y, 14.0, 21);
+                let wob = (vnoise(p.x, p.y, 30.0, 22) - 0.5) * 10.0;
+                let q = p + vec2(wob, wob * 0.5);
+                let ri = r.ceil() as i32;
+                for dy in -ri..=ri {
+                    for dx in -ri..=ri {
+                        if (dx * dx + dy * dy) as f32 <= r * r {
+                            let (x, y) = (q.x as i32 + dx, q.y as i32 + dy);
+                            if x >= 0 && y >= 0 && x < w && y < h {
+                                self.path[idx(x, y)] = true;
+                            }
                         }
                     }
                 }
@@ -351,41 +470,55 @@ pub fn bake(
         }
     }
 
-    // 4. 색.
-    let mut img = Image::gen_image_color(w as u16, h as u16, Color::new(0.0, 0.0, 0.0, 1.0));
-    let ft = b.floor_tint();
-    let wt = b.wall_tint();
-    let tint = |c: Rgb, t: Color| -> [u8; 4] {
-        [
-            (c.0 as f32 * t.r) as u8,
-            (c.1 as f32 * t.g) as u8,
-            (c.2 as f32 * t.b) as u8,
-            255,
-        ]
-    };
-    let checker = |x: i32, y: i32| (x + y) & 1 == 0;
-    // 둘레 두 칸 안에 바닥이 없는 벽 칸은 화면에 나오지 않는다(카메라는 방 안): 한 색으로 빨리 채운다.
-    let near: Vec<bool> = (0..g.h as i32)
-        .flat_map(|cy| (0..g.w as i32).map(move |cx| (cx, cy)))
-        .map(|(cx, cy)| (-2..=2).any(|dy| (-2..=2).any(|dx| !solid_cell(g, cx + dx, cy + dy))))
-        .collect();
-    let far: Vec<[u8; 4]> = far_pattern(&pal).into_iter().map(|c| tint(c, wt)).collect();
-    // 바닥 큰 잡음(띠·얼룩)은 2×2 px마다 한 번만(도트 덩어리, 굽기 시간 ¼). 보이는 칸만.
-    let (hw, hh) = (wu.div_ceil(2), hu.div_ceil(2));
-    let mut band_n = vec![0.0f32; hw * hh];
-    let mut patch_n = vec![0.0f32; hw * hh];
-    for by in 0..hh {
+    /// 바닥 큰 잡음(띠·얼룩)은 2×2 px마다 한 번만(도트 덩어리, 굽기 시간 ¼). 보이는 칸만.
+    fn noise_row(&mut self, by: usize) {
+        let hw = (self.w as usize).div_ceil(2);
         for bx in 0..hw {
             let (x, y) = (bx as i32 * 2, by as i32 * 2);
-            if !near[(y / T) as usize * g.w + (x / T) as usize] {
+            if !self.near[(y / T) as usize * self.g.w + (x / T) as usize] {
                 continue;
             }
             let (xf, yf) = (x as f32, y as f32);
-            band_n[by * hw + bx] = vnoise(xf, yf, 56.0, 3) * 0.7 + vnoise(xf, yf, 17.0, 4) * 0.3;
-            patch_n[by * hw + bx] = vnoise(xf, yf, 36.0, 6) * 0.75 + vnoise(xf, yf, 9.0, 7) * 0.25;
+            self.band_n[by * hw + bx] =
+                vnoise(xf, yf, 56.0, 3) * 0.7 + vnoise(xf, yf, 17.0, 4) * 0.3;
+            self.patch_n[by * hw + bx] =
+                vnoise(xf, yf, 36.0, 6) * 0.75 + vnoise(xf, yf, 9.0, 7) * 0.25;
         }
     }
-    for y in 0..h {
+
+    /// 4. 색 한 줄.
+    fn color_row(&mut self, y: i32) {
+        let Baker {
+            g,
+            b,
+            w,
+            h,
+            pal,
+            solid,
+            depth,
+            path,
+            near,
+            far,
+            band_n,
+            patch_n,
+            img,
+            ..
+        } = self;
+        let (w, h) = (*w, *h);
+        let wu = w as usize;
+        let hw = wu.div_ceil(2);
+        let idx = |x: i32, y: i32| y as usize * wu + x as usize;
+        let is_solid = |x: i32, y: i32| {
+            if x < 0 || y < 0 || x >= w || y >= h {
+                true
+            } else {
+                solid[idx(x, y)]
+            }
+        };
+        let is_face =
+            |x: i32, y: i32| x >= 0 && y >= 0 && x < w && y < h && depth[idx(x, y)] != u16::MAX;
+        let (ft, wt) = (b.floor_tint(), b.wall_tint());
+        let checker = |x: i32, y: i32| (x + y) & 1 == 0;
         for x in 0..w {
             if !near[(y / T) as usize * g.w + (x / T) as usize] {
                 let i = idx(x, y) * 4;
@@ -395,9 +528,9 @@ pub fn bake(
             }
             let c: Rgb = if is_solid(x, y) {
                 if is_face(x, y) {
-                    face_px(&pal, x, y, depth[idx(x, y)], &is_solid, &is_face)
+                    face_px(pal, x, y, depth[idx(x, y)], &is_solid, &is_face)
                 } else {
-                    top_px(&pal, x, y, &is_solid, &is_face)
+                    top_px(pal, x, y, &is_solid, &is_face)
                 }
             } else {
                 // 바닥: 큰 띠(밝음·어두움, 경계는 바둑판으로 섞음).
@@ -469,96 +602,111 @@ pub fn bake(
                 )
             };
             let t = if is_solid(x, y) { wt } else { ft };
-            let px = tint(c, t);
+            let px = tint_px(c, t);
             let i = idx(x, y) * 4;
             img.bytes[i..i + 4].copy_from_slice(&px);
         }
     }
 
-    // 5. 장식(바닥 칸만, 벽 그림 위에는 찍지 않는다).
-    if let Some(tiles) = tiles {
-        for cy in 0..g.h as i32 {
-            for cx in 0..g.w as i32 {
-                if g.get_i(cx, cy) != Cell::Floor {
-                    continue;
-                }
-                let Some((d, ox, oy)) = decor_at(b, cx, cy) else {
-                    continue;
+    /// 5. 장식 한 칸 줄(바닥 칸만, 벽 그림 위에는 찍지 않는다).
+    fn decor_row(&mut self, cy: i32, tiles: &Image, sunny: Option<&Image>) {
+        let Baker {
+            g,
+            b,
+            w,
+            h,
+            solid,
+            img,
+            ..
+        } = self;
+        let (w, h, b) = (*w, *h, *b);
+        let idx = |x: i32, y: i32| y as usize * w as usize + x as usize;
+        let is_solid = |x: i32, y: i32| {
+            if x < 0 || y < 0 || x >= w || y >= h {
+                true
+            } else {
+                solid[idx(x, y)]
+            }
+        };
+        let ft = b.floor_tint();
+        for cx in 0..g.w as i32 {
+            if g.get_i(cx, cy) != Cell::Floor {
+                continue;
+            }
+            let Some((d, ox, oy)) = decor_at(b, cx, cy) else {
+                continue;
+            };
+            // 팩이 있으면 꽃·풀·조약돌은 Sunnyside 그림으로(0066). 칸 가운데 아래에 발을 둔다.
+            // 빛나는 버섯은 굽지 않는다: 어둠 뒤에 팩의 파란 버섯(움직임)으로 그린다.
+            if sunny.is_some() && d == Decor::Mushroom {
+                continue;
+            }
+            if let Some(sheet) = sunny {
+                let pick = hash(cx, cy, 51) as usize;
+                let r = match d {
+                    Decor::FlowerWhite => Some(crate::sunny::FLOWERS_WHITE[pick % 4]),
+                    Decor::FlowerYellow => Some(crate::sunny::FLOWERS_BLUE[pick % 4]),
+                    Decor::FlowerPink => Some(crate::sunny::FLOWERS_RED[pick % 4]),
+                    Decor::Tuft => Some(crate::sunny::GRASS[pick % 8]),
+                    Decor::Pebble => Some(crate::sunny::PEBBLES[pick % 3]),
+                    _ => None,
                 };
-                // 팩이 있으면 꽃·풀·조약돌은 Sunnyside 그림으로(0066). 칸 가운데 아래에 발을 둔다.
-                // 빛나는 버섯은 굽지 않는다: 어둠 뒤에 팩의 파란 버섯(움직임)으로 그린다.
-                if sunny.is_some() && d == Decor::Mushroom {
+                if let Some(r) = r {
+                    let fx = cx * T + 8 + ox as i32 - r.2 as i32 / 2;
+                    let fy = cy * T + 12 + oy as i32 - r.3 as i32;
+                    crate::sunny::stamp(img, sheet, r, fx, fy, ft, is_solid);
+                    // 꽃은 무리로: 둘레에 한두 송이 더.
+                    if matches!(
+                        d,
+                        Decor::FlowerWhite | Decor::FlowerYellow | Decor::FlowerPink
+                    ) {
+                        for k in 0..(pick >> 3) % 3 {
+                            let set = match d {
+                                Decor::FlowerWhite => crate::sunny::FLOWERS_WHITE,
+                                Decor::FlowerYellow => crate::sunny::FLOWERS_BLUE,
+                                _ => crate::sunny::FLOWERS_RED,
+                            };
+                            let q = hash(cx, cy, 52 + k as u32) as i32;
+                            let rr = set[(q as usize >> 4) % 2];
+                            let (dx, dy) = ((q % 11) - 5, ((q >> 8) % 7) - 3);
+                            crate::sunny::stamp(
+                                img,
+                                sheet,
+                                rr,
+                                fx + dx + 3,
+                                fy + dy + 2,
+                                ft,
+                                is_solid,
+                            );
+                        }
+                    }
                     continue;
                 }
-                if let Some(sheet) = sunny {
-                    let pick = hash(cx, cy, 51) as usize;
-                    let r = match d {
-                        Decor::FlowerWhite => Some(crate::sunny::FLOWERS_WHITE[pick % 4]),
-                        Decor::FlowerYellow => Some(crate::sunny::FLOWERS_BLUE[pick % 4]),
-                        Decor::FlowerPink => Some(crate::sunny::FLOWERS_RED[pick % 4]),
-                        Decor::Tuft => Some(crate::sunny::GRASS[pick % 8]),
-                        Decor::Pebble => Some(crate::sunny::PEBBLES[pick % 3]),
-                        _ => None,
-                    };
-                    if let Some(r) = r {
-                        let fx = cx * T + 8 + ox as i32 - r.2 as i32 / 2;
-                        let fy = cy * T + 12 + oy as i32 - r.3 as i32;
-                        crate::sunny::stamp(&mut img, sheet, r, fx, fy, ft, is_solid);
-                        // 꽃은 무리로: 둘레에 한두 송이 더.
-                        if matches!(
-                            d,
-                            Decor::FlowerWhite | Decor::FlowerYellow | Decor::FlowerPink
-                        ) {
-                            for k in 0..(pick >> 3) % 3 {
-                                let set = match d {
-                                    Decor::FlowerWhite => crate::sunny::FLOWERS_WHITE,
-                                    Decor::FlowerYellow => crate::sunny::FLOWERS_BLUE,
-                                    _ => crate::sunny::FLOWERS_RED,
-                                };
-                                let q = hash(cx, cy, 52 + k as u32) as i32;
-                                let rr = set[(q as usize >> 4) % 2];
-                                let (dx, dy) = ((q % 11) - 5, ((q >> 8) % 7) - 3);
-                                crate::sunny::stamp(
-                                    &mut img,
-                                    sheet,
-                                    rr,
-                                    fx + dx + 3,
-                                    fy + dy + 2,
-                                    ft,
-                                    is_solid,
-                                );
-                            }
-                        }
+            }
+            let (col, row) = decor_cell(d);
+            let (bx, by) = (cx * T + ox as i32, cy * T + oy as i32);
+            for sy in 0..T {
+                for sx in 0..T {
+                    let s = tiles.get_pixel(col * T as u32 + sx as u32, row * T as u32 + sy as u32);
+                    if s.a < 0.5 {
                         continue;
                     }
-                }
-                let (col, row) = decor_cell(d);
-                let (bx, by) = (cx * T + ox as i32, cy * T + oy as i32);
-                for sy in 0..T {
-                    for sx in 0..T {
-                        let s =
-                            tiles.get_pixel(col * T as u32 + sx as u32, row * T as u32 + sy as u32);
-                        if s.a < 0.5 {
-                            continue;
-                        }
-                        let (x, y) = (bx + sx, by + sy);
-                        if x < 0 || y < 0 || x >= w || y >= h || is_solid(x, y) {
-                            continue;
-                        }
-                        let px = [
-                            (s.r * ft.r * 255.0) as u8,
-                            (s.g * ft.g * 255.0) as u8,
-                            (s.b * ft.b * 255.0) as u8,
-                            255,
-                        ];
-                        let i = idx(x, y) * 4;
-                        img.bytes[i..i + 4].copy_from_slice(&px);
+                    let (x, y) = (bx + sx, by + sy);
+                    if x < 0 || y < 0 || x >= w || y >= h || is_solid(x, y) {
+                        continue;
                     }
+                    let px = [
+                        (s.r * ft.r * 255.0) as u8,
+                        (s.g * ft.g * 255.0) as u8,
+                        (s.b * ft.b * 255.0) as u8,
+                        255,
+                    ];
+                    let i = idx(x, y) * 4;
+                    img.bytes[i..i + 4].copy_from_slice(&px);
                 }
             }
         }
     }
-    img
 }
 
 /// 벼랑 앞면 한 px: 흙 지층·박힌 돌·늘어진 뿌리, 맨 아래 그늘, 옆 가장자리 테두리.
@@ -720,6 +868,22 @@ mod tests {
                 (g.w * 16, g.h * 16)
             );
         }
+    }
+
+    /// 나눠 구워도(한 줄마다 멈춰도) 한 번에 구운 것과 같은 그림이다(0068).
+    #[test]
+    fn baking_in_steps_matches_one_go() {
+        let g = room();
+        let tiles = Image::gen_image_color(512, 512, Color::new(0.5, 0.6, 0.4, 1.0));
+        let paths = [(vec2(40.0, 60.0), vec2(250.0, 150.0))];
+        let whole = bake(&g, Biome::Meadow, &paths, Some(&tiles), None);
+        let mut k = Baker::new(&g, Biome::Meadow, &paths);
+        let mut steps = 0;
+        while !k.step(Some(&tiles), None, &mut || true) {
+            steps += 1;
+        }
+        assert!(steps > 100, "멈춘 횟수 {steps}");
+        assert_eq!(k.finish().bytes, whole.bytes);
     }
 
     /// 던전 크기(100×60칸) 굽기 시간. `cargo test --release bake_speed -- --ignored --nocapture`.

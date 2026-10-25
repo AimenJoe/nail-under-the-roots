@@ -634,6 +634,12 @@ impl App {
     // ---- 갱신 ---------------------------------------------------------------
 
     fn update_game(&mut self, dt: f32) {
+        // 지도를 굽는 동안(화면 검정, 0068)은 월드를 멈춘다. 끝나면 밝아짐을 처음부터 본다.
+        if self.renderer.baking() {
+            self.acc = 0.0;
+            let _ = self.input.take();
+            return;
+        }
         self.acc += dt;
         if self.gift.is_some() {
             self.update_gift(dt);
