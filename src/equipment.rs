@@ -3,6 +3,7 @@
 
 use macroquad::color::Color;
 
+use crate::i18n::Tr;
 use crate::moveset::{self, Moveset};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,8 +38,8 @@ impl Character {
 }
 
 pub struct Weapon {
-    pub name: &'static str,
-    pub desc: &'static str,
+    pub name: Tr,
+    pub desc: Tr,
     pub kind: WeaponKind,
     pub moveset: &'static Moveset,
     /// 가방 칸 아이콘 색.
@@ -47,29 +48,29 @@ pub struct Weapon {
 
 pub static WEAPONS: [Weapon; 4] = [
     Weapon {
-        name: "새싹 발톱",
-        desc: "가벼움. 4연타가 짧고 빠르게 이어진다. 한 방은 약하다.",
+        name: |s| s.w_sprout,
+        desc: |s| s.w_sprout_desc,
         kind: WeaponKind::Claw,
         moveset: &moveset::SPROUT,
         color: Color::new(0.62, 0.86, 0.48, 1.0),
     },
     Weapon {
-        name: "두더지 발톱",
-        desc: "기본. 3연타, 세 번째가 묵직하다. 언제든 굴파기로 끊는다.",
+        name: |s| s.w_mole,
+        desc: |s| s.w_mole_desc,
         kind: WeaponKind::Claw,
         moveset: &moveset::CLAWS,
         color: Color::new(0.97, 0.93, 0.85, 1.0),
     },
     Weapon {
-        name: "바위 발톱",
-        desc: "무거움. 2연타, 넓고 세게 밀친다. 휘두른 뒤에야 굴파기로 끊는다.",
+        name: |s| s.w_stone,
+        desc: |s| s.w_stone_desc,
         kind: WeaponKind::Claw,
         moveset: &moveset::STONE,
         color: Color::new(0.66, 0.64, 0.62, 1.0),
     },
     Weapon {
-        name: "독 발톱",
-        desc: "맞은 적에게 독을 건다. 마지막 타의 독이 길다. 독은 경직 없이 체력만 깎는다.",
+        name: |s| s.w_venom,
+        desc: |s| s.w_venom_desc,
         kind: WeaponKind::Claw,
         moveset: &moveset::VENOM,
         color: Color::new(0.52, 0.86, 0.36, 1.0),
@@ -84,11 +85,12 @@ mod tests {
     #[test]
     fn finisher_is_strongest_for_every_claw() {
         for w in &WEAPONS {
+            let name = (w.name)(&crate::i18n::KO);
             let hits = w.moveset.hits;
             let last = hits[hits.len() - 1];
             for h in &hits[..hits.len() - 1] {
-                assert!(last.knockback > h.knockback, "{}", w.name);
-                assert!(last.hitstop >= h.hitstop, "{}", w.name);
+                assert!(last.knockback > h.knockback, "{name}");
+                assert!(last.hitstop >= h.hitstop, "{name}");
             }
             assert_eq!(w.kind, WeaponKind::Claw);
         }

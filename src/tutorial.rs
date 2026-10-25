@@ -8,6 +8,7 @@ use macroquad::prelude::*;
 
 use crate::enemy::Kind;
 use crate::equipment::Character;
+use crate::i18n::Tr;
 use crate::world::{Pickup, World};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,14 +47,14 @@ impl Tutorial {
     }
 
     /// 지금 보여 줄 한 줄 힌트.
-    pub fn hint(&self) -> Option<&'static str> {
+    pub fn hint(&self) -> Option<Tr> {
         match self.stage {
-            Stage::Move => Some("스틱 / WASD: 움직여 보자"),
-            Stage::Pickup => Some("반짝이는 것에 다가가 보자"),
-            Stage::Attack => Some("공격(J · X · ATK)을 세 번: 세 번째가 묵직하다"),
-            Stage::Burrow => Some("굴파기(K · A · DIG): 땅속에서는 맞지 않는다"),
-            Stage::Emerge => Some("땅속에서 적 아래로 가서 다시 누르면 솟구친다"),
-            Stage::Outro => Some("뿌리를 따라 내려가자"),
+            Stage::Move => Some(|s| s.tut_move),
+            Stage::Pickup => Some(|s| s.tut_pickup),
+            Stage::Attack => Some(|s| s.tut_attack),
+            Stage::Burrow => Some(|s| s.tut_burrow),
+            Stage::Emerge => Some(|s| s.tut_emerge),
+            Stage::Outro => Some(|s| s.tut_outro),
             Stage::Done => None,
         }
     }

@@ -33,11 +33,11 @@ impl Biome {
         }
     }
 
-    pub fn name(self) -> &'static str {
+    pub fn name(self) -> crate::i18n::Tr {
         match self {
-            Biome::Meadow => "꽃 핀 입구",
-            Biome::Roots => "뿌리 지대",
-            Biome::Deep => "어두운 심층",
+            Biome::Meadow => |s| s.biome_meadow,
+            Biome::Roots => |s| s.biome_roots,
+            Biome::Deep => |s| s.biome_deep,
         }
     }
 

@@ -29,6 +29,13 @@ pub const INPUT_BUFFER: f32 = 0.10;
 /// 스틱 데드존(반지름). Android 빌드에는 gamepads 크레이트가 없어 쓰이지 않는다.
 #[cfg_attr(target_os = "android", allow(dead_code))]
 pub const STICK_DEADZONE: f32 = 0.2;
+/// 메뉴 탐색(스틱): 큰 축이 이만큼 기울면 한 칸, 이 밑으로 돌아와야 다음 칸(히스테리시스).
+/// 데드존을 뺀 뒤 0..1 값 기준. 0.5/0.3은 흔한 UI 내비게이션 기본값 근처(KB gamepad-and-android-input).
+pub const NAV_PRESS: f32 = 0.5;
+pub const NAV_RELEASE: f32 = 0.3;
+/// 누르고 있을 때 반복: 처음 지연, 그 뒤 간격(초).
+pub const NAV_REPEAT_DELAY: f32 = 0.35;
+pub const NAV_REPEAT_EVERY: f32 = 0.1;
 
 // ---- 발톱 3연타 ------------------------------------------------------------
 /// 타별 스윙 길이. 1·2타 빠름, 3타 느림.

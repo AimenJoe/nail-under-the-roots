@@ -17,6 +17,21 @@
   <script src="mq_js_bundle.js"></script>
   <!-- gamepads 크레이트의 macroquad 플러그인. 레포 복사본(web/README.md). 핫링크 금지. -->
   <script src="macroquad-gamepads-0.1.js"></script>
-  <script>load("nail.wasm");</script>
+  <!-- 브라우저 언어 → 게임 언어(src/i18n.rs). 0 모름, 1 한국어, 2 그 밖. -->
+  <script>
+    miniquad_add_plugin({
+      name: "nail_locale",
+      version: 1,
+      register_plugin: function (importObject) {
+        importObject.env.nail_locale = function () {
+          var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+          var first = (langs[0] || "").toLowerCase();
+          if (!first) return 0;
+          return first.indexOf("ko") === 0 ? 1 : 2;
+        };
+      }
+    });
+    load("nail.wasm");
+  </script>
 </body>
 </html>

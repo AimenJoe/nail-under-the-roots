@@ -9,6 +9,7 @@ use macroquad::prelude::*;
 use crate::art::Art;
 use crate::cutscene::{self, Cutscene};
 use crate::equipment::{Character, WEAPONS};
+use crate::i18n::{self, fill, tr, Tr};
 use crate::input::{Actions, Input};
 use crate::render::{self, Renderer};
 use crate::scenario::{self, Scenario};
@@ -18,19 +19,39 @@ use crate::tutorial::Tutorial;
 use crate::ui::{self, Ui, FONT_PX};
 use crate::world::World;
 
-const INTRO_LINES: [&str; 3] = [
-    "큰 나무가 시들어 간다.",
-    "뿌리가 땅속 이웃들을 이상하게 바꿔 놓았다.",
-    "아기 두더지 Naïl은 원인을 찾아 뿌리를 따라 내려간다.",
-];
+const INTRO_LINES: [Tr; 3] = [|s| s.intro_1, |s| s.intro_2, |s| s.intro_3];
 const INTRO_LINE_TIME: f32 = 2.6;
 #[cfg(feature = "dev")]
-const TITLE_ITEMS: [&str; 3] = ["시작", "설정", "개발"];
+const TITLE_ITEMS: [Tr; 3] = [|s| s.title_start, |s| s.title_settings, |s| s.title_dev];
 #[cfg(not(feature = "dev"))]
-const TITLE_ITEMS: [&str; 2] = ["시작", "설정"];
-const PAUSE_TABS: [&str; 5] = ["메뉴", "상태", "가방", "저널", "지도"];
-const PAUSE_MENU: [&str; 4] = ["계속하기", "다시 시작", "설정", "타이틀로"];
-const SETTING_ROWS: [&str; 4] = ["소리", "화면 흔들림", "디버그 정보", "돌아가기"];
+const TITLE_ITEMS: [Tr; 2] = [|s| s.title_start, |s| s.title_settings];
+const PAUSE_TABS: [Tr; 5] = [
+    |s| s.tab_menu,
+    |s| s.tab_status,
+    |s| s.tab_bag,
+    |s| s.tab_journal,
+    |s| s.tab_map,
+];
+const PAUSE_MENU: [Tr; 4] = [
+    |s| s.pm_resume,
+    |s| s.pm_restart,
+    |s| s.pm_settings,
+    |s| s.pm_title,
+];
+const SETTING_ROWS: [Tr; 5] = [
+    |s| s.set_sound,
+    |s| s.set_shake,
+    |s| s.set_debug,
+    |s| s.set_language,
+    |s| s.set_back,
+];
+/// 설정의 "돌아가기" 줄.
+const SETTING_BACK: usize = 4;
+
+/// 표 → 지금 언어의 글 목록(메뉴 그리기용).
+fn trs(items: &[Tr]) -> Vec<&'static str> {
+    items.iter().map(|f| tr(*f)).collect()
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Scene {
@@ -70,8 +91,8 @@ impl Settings {
 }
 
 pub struct Quest {
-    pub title: &'static str,
-    pub desc: &'static str,
+    pub title: Tr,
+    pub desc: Tr,
     pub goal: u32,
     pub progress: u32,
 }
@@ -92,26 +113,26 @@ impl Journal {
         Self {
             quests: vec![
                 Quest {
-                    title: "뿌리를 따라",
-                    desc: "시들어 가는 나무의 뿌리를 따라 더 깊이 내려간다. (층 구조는 3단계에서)",
+                    title: |s| s.q_roots,
+                    desc: |s| s.q_roots_desc,
                     goal: 1,
                     progress: 0,
                 },
                 Quest {
-                    title: "발톱 길들이기",
-                    desc: "발톱 3연타로 적을 세 마리 처치한다. 3타째가 묵직한지 느껴 볼 것.",
+                    title: |s| s.q_claws,
+                    desc: |s| s.q_claws_desc,
                     goal: 3,
                     progress: 0,
                 },
                 Quest {
-                    title: "기습",
-                    desc: "굴파기로 땅속에 들어갔다가 솟구쳐서 적을 처치한다.",
+                    title: |s| s.q_ambush,
+                    desc: |s| s.q_ambush_desc,
                     goal: 1,
                     progress: 0,
                 },
                 Quest {
-                    title: "버티기",
-                    desc: "웨이브 3까지 살아남는다.",
+                    title: |s| s.q_survive,
+                    desc: |s| s.q_survive_desc,
                     goal: 3,
                     progress: 1,
                 },
@@ -515,7 +536,7 @@ impl App {
                     }
                     Some(Hit::SettingRow(i)) => {
                         row = i;
-                        if i == 3 {
+                        if i == SETTING_BACK {
                             adjust = 0;
                         } else {
                             adjust = 1;
@@ -528,8 +549,8 @@ impl App {
                     self.adjust_setting(row, adjust);
                 }
                 let back_chosen = a.cancel
-                    || (a.confirm && self.settings_cursor == 3)
-                    || matches!(tap_hit, Some(Hit::SettingRow(3)));
+                    || (a.confirm && self.settings_cursor == SETTING_BACK)
+                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_BACK)));
                 if back_chosen {
                     self.scene = match back {
                         Back::Title => Scene::Title,
@@ -554,6 +575,7 @@ impl App {
                 self.settings.debug_overlay = !self.settings.debug_overlay;
                 self.world.debug.overlay = self.settings.debug_overlay;
             }
+            3 => i18n::set_lang(i18n::lang().cycle(d)),
             _ => {}
         }
     }
@@ -707,7 +729,7 @@ impl App {
                 if let Some(g) = &self.gift {
                     self.draw_gift(&ui, g);
                 } else if let Some(h) = self.tutorial.as_ref().and_then(|t| t.hint()) {
-                    self.draw_hint(&ui, h);
+                    self.draw_hint(&ui, tr(h));
                 }
                 if !self.world.player.is_alive() {
                     self.draw_dead(&ui);
@@ -748,29 +770,24 @@ impl App {
 
     fn draw_intro(&self, ui: &Ui) {
         let idx = (self.intro_t / INTRO_LINE_TIME) as usize;
-        if let Some(line) = INTRO_LINES.get(idx) {
+        if let Some(line) = INTRO_LINES.get(idx).map(|f| tr(*f)) {
             let p = (self.intro_t - idx as f32 * INTRO_LINE_TIME) / INTRO_LINE_TIME;
             let a = (p * 4.0).min(1.0) * ((1.0 - p) * 4.0).min(1.0);
             ui.text_center(line, 160.0, 84.0, FONT_PX, Color::new(0.92, 0.86, 0.76, a));
         }
-        ui.text_center("확인: 건너뛰기", 160.0, 160.0, FONT_PX, ui::TEXT_DIM);
+        ui.text_center(i18n::s().skip_hint, 160.0, 160.0, FONT_PX, ui::TEXT_DIM);
     }
 
     fn draw_title(&mut self, ui: &Ui) {
         ui.text_center("Naïl", 160.0, 34.0, FONT_PX * 2.0, ui::ACCENT);
         ui.text_center("Under the Roots", 160.0, 60.0, FONT_PX, ui::TEXT);
-        let rects = ui.menu_list(&TITLE_ITEMS, self.title_cursor, 124.0, 92.0, 72.0);
+        let s = i18n::s();
+        let rects = ui.menu_list(&trs(&TITLE_ITEMS), self.title_cursor, 124.0, 92.0, 72.0);
         for (i, r) in rects.into_iter().enumerate() {
             self.hits.push((r, Hit::TitleItem(i)));
         }
-        ui.text_center(
-            "상하 이동 · 확인(Enter/A) · 뒤로(Esc/B)",
-            160.0,
-            150.0,
-            FONT_PX,
-            ui::TEXT_DIM,
-        );
-        ui.text_right("프로토타입 v0.1", 316.0, 166.0, FONT_PX, ui::TEXT_DIM);
+        ui.text_center(s.title_controls, 160.0, 150.0, FONT_PX, ui::TEXT_DIM);
+        ui.text_right(s.version, 316.0, 166.0, FONT_PX, ui::TEXT_DIM);
     }
 
     fn draw_dev(&mut self, ui: &Ui) {
@@ -843,7 +860,7 @@ impl App {
                 );
             }
         }
-        ui.text_center("뒤로(Esc/B): 건너뛰기", 160.0, 1.0, FONT_PX, ui::TEXT_DIM);
+        ui.text_center(i18n::s().cut_skip, 160.0, 1.0, FONT_PX, ui::TEXT_DIM);
         if c.fade > 0.0 {
             draw_rectangle(
                 0.0,
@@ -856,24 +873,26 @@ impl App {
     }
 
     fn draw_settings(&mut self, ui: &Ui) {
-        let panel = Rect::new(56.0, 36.0, 208.0, 104.0);
-        ui.panel(panel, Some("설정"));
+        let panel = Rect::new(56.0, 28.0, 208.0, 116.0);
+        let s = i18n::s();
+        ui.panel(panel, Some(s.settings));
         let values = [
             format!("{}%", self.settings.volume * 10),
             format!("{}%", self.settings.shake * 10),
             if self.settings.debug_overlay {
-                "켬"
+                s.on
             } else {
-                "끔"
+                s.off
             }
             .to_string(),
+            s.lang_name.to_string(),
             String::new(),
         ];
         let row_h = FONT_PX + 6.0;
-        for (i, label) in SETTING_ROWS.iter().enumerate() {
+        for (i, label) in trs(&SETTING_ROWS).into_iter().enumerate() {
             let y = panel.y + 22.0 + i as f32 * row_h;
             let selected = self.settings_cursor == i;
-            if i == 3 {
+            if i == SETTING_BACK {
                 let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, FONT_PX + 4.0);
                 if selected {
                     ui.rect(r, ui::PANEL_LIGHT);
@@ -886,7 +905,7 @@ impl App {
                     FONT_PX,
                     if selected { ui::TEXT } else { ui::TEXT_DIM },
                 );
-                self.hits.push((r, Hit::SettingRow(3)));
+                self.hits.push((r, Hit::SettingRow(SETTING_BACK)));
             } else {
                 let (row, l, r) = ui.setting_row(
                     label,
@@ -902,7 +921,7 @@ impl App {
             }
         }
         ui.text_center(
-            "좌우로 값 바꾸기 · 설정은 아직 저장되지 않음",
+            s.settings_hint,
             160.0,
             panel.bottom() + 6.0,
             FONT_PX,
@@ -956,13 +975,19 @@ impl App {
         let k = (g.t / 0.2).min(1.0);
         let r = Rect::new(56.0, 48.0 + (1.0 - k) * 8.0, 208.0, 74.0);
         ui.panel(r, None);
-        ui.text_center("새 발톱을 얻었다!", 160.0, r.y + 5.0, FONT_PX, ui::ACCENT);
+        ui.text_center(i18n::s().gift_title, 160.0, r.y + 5.0, FONT_PX, ui::ACCENT);
         let icon = Rect::new(r.x + 10.0, r.y + 22.0, 22.0, 22.0);
         ui.rect(icon, ui::PANEL_LIGHT);
         ui.rect_lines(icon, ui::BORDER);
         draw_claw_icon(ui, icon, wp.color);
-        ui.text(wp.name, icon.right() + 8.0, r.y + 22.0, FONT_PX, ui::TEXT);
-        let lines = ui::wrap(ui, wp.desc, r.right() - icon.right() - 16.0, FONT_PX);
+        ui.text(
+            tr(wp.name),
+            icon.right() + 8.0,
+            r.y + 22.0,
+            FONT_PX,
+            ui::TEXT,
+        );
+        let lines = ui::wrap(ui, tr(wp.desc), r.right() - icon.right() - 16.0, FONT_PX);
         for (i, l) in lines.iter().take(2).enumerate() {
             ui.text(
                 l,
@@ -1002,28 +1027,28 @@ impl App {
             screen_height(),
             Color::new(0.0, 0.0, 0.0, 0.55 * k),
         );
+        let s = i18n::s();
         ui.text_center(
-            "쓰러졌다",
+            s.dead,
             160.0,
             64.0,
             FONT_PX * 2.0,
             Color::new(0.9, 0.3, 0.3, k),
         );
         if self.death_t >= t::DEATH_INPUT_LOCK && (get_time() * 2.0) as i64 % 2 == 0 {
-            ui.text_center(
-                "확인: 다시 시작   메뉴: 일시정지",
-                160.0,
-                96.0,
-                FONT_PX,
-                ui::TEXT,
-            );
+            ui.text_center(s.dead_hint, 160.0, 96.0, FONT_PX, ui::TEXT);
         }
     }
 
     fn draw_pause(&mut self, ui: &Ui) {
         let panel = Rect::new(12.0, 10.0, 296.0, 160.0);
         ui.panel(panel, None);
-        let tabs = ui.tabs(&PAUSE_TABS, self.pause_tab, panel.x + 6.0, panel.y + 5.0);
+        let tabs = ui.tabs(
+            &trs(&PAUSE_TABS),
+            self.pause_tab,
+            panel.x + 6.0,
+            panel.y + 5.0,
+        );
         for (i, r) in tabs.into_iter().enumerate() {
             self.hits.push((r, Hit::PauseTab(i)));
         }
@@ -1033,7 +1058,7 @@ impl App {
             ui::BORDER,
         );
         ui.text_right(
-            "Q/E · L1/R1: 탭",
+            i18n::s().tab_hint,
             panel.right() - 6.0,
             panel.y + 7.0,
             FONT_PX,
@@ -1048,7 +1073,7 @@ impl App {
         match self.pause_tab {
             0 => {
                 let rects = ui.menu_list(
-                    &PAUSE_MENU,
+                    &trs(&PAUSE_MENU),
                     self.pause_cursor,
                     content.x + 90.0,
                     content.y + 12.0,
@@ -1071,54 +1096,60 @@ impl App {
             .map(|i| if i < p.hp { '♥' } else { '♡' })
             .collect();
         let secs = self.run_time as u32;
+        let s = i18n::s();
+        let last = &p.moveset.hits[p.moveset.last()];
         let lines = [
+            (Character::Mole.name(), s.mole_desc.to_string()),
+            (s.hp, hearts),
             (
-                Character::Mole.name().to_string(),
-                "아기 두더지. 발톱으로 싸우고 발톱으로 판다.".to_string(),
-            ),
-            ("체력".to_string(), hearts),
-            (
-                "이번 런".to_string(),
-                format!(
-                    "웨이브 {}  처치 {}  시간 {:02}:{:02}",
-                    self.world.wave,
-                    self.world.kills,
-                    secs / 60,
-                    secs % 60
+                s.this_run,
+                fill(
+                    s.run_stats,
+                    &[
+                        &self.world.wave,
+                        &self.world.kills,
+                        &format!("{:02}:{:02}", secs / 60, secs % 60),
+                    ],
                 ),
             ),
-            if p.armed {
-                (
-                    p.moveset.name.to_string(),
-                    format!(
-                        "{}연타. 마지막 타 {:.2}s, 넉백 {}",
-                        p.moveset.hits.len(),
-                        p.moveset.hits[p.moveset.last()].swing,
-                        p.moveset.hits[p.moveset.last()].knockback as i32
+            match self.inventory.equipped.filter(|_| p.armed) {
+                Some(w) => (
+                    tr(WEAPONS[w].name),
+                    fill(
+                        s.combo_stats,
+                        &[
+                            &p.moveset.hits.len(),
+                            &format!("{:.2}", last.swing),
+                            &(last.knockback as i32),
+                        ],
                     ),
-                )
-            } else {
-                (
-                    "맨손".to_string(),
-                    "아직 발톱이 없다. 공격할 수 없다.".to_string(),
-                )
+                ),
+                None => (s.bare_hands, s.bare_hands_desc.to_string()),
             },
             (
-                "굴파기".to_string(),
-                format!(
-                    "땅속 {:.2}s 무적, 솟구침 반경 {}px, 쿨다운 {:.1}s",
-                    t::BURROW_MAX_TIME,
-                    t::EMERGE_RADIUS as i32,
-                    t::BURROW_COOLDOWN
+                s.burrow,
+                fill(
+                    s.burrow_stats,
+                    &[
+                        &format!("{:.2}", t::BURROW_MAX_TIME),
+                        &(t::EMERGE_RADIUS as i32),
+                        &format!("{:.1}", t::BURROW_COOLDOWN),
+                    ],
                 ),
             ),
-            ("특기".to_string(), "(미정 — 2단계)".to_string()),
+            (s.special, s.special_tbd.to_string()),
         ];
         let row_h = FONT_PX + 5.0;
+        // 이름 칸 폭은 언어마다 다르다(무기 이름이 가장 길다). 가장 긴 이름에 맞춘다.
+        let key_w = lines
+            .iter()
+            .map(|(k, _)| ui.text_w(k, FONT_PX))
+            .fold(0.0, f32::max)
+            + 8.0;
         for (i, (k, v)) in lines.iter().enumerate() {
             let y = c.y + i as f32 * row_h;
             ui.text(k, c.x, y, FONT_PX, ui::ACCENT);
-            ui.text(v, c.x + 52.0, y, FONT_PX, ui::TEXT);
+            ui.text(v, c.x + key_w, y, FONT_PX, ui::TEXT);
         }
     }
 
@@ -1153,43 +1184,39 @@ impl App {
             }
             self.hits.push((r, Hit::InvSlot(i)));
         }
+        let s = i18n::s();
         let desc_x = x0 + cols as f32 * (slot + gap) + 8.0;
         let desc_w = c.right() - desc_x;
         match &self.inventory.slots[self.inv_cursor] {
             Some(Item::Weapon(w)) => {
                 let wp = &WEAPONS[*w];
-                ui.text(wp.name, desc_x, y0, FONT_PX, ui::ACCENT);
+                ui.text(tr(wp.name), desc_x, y0, FONT_PX, ui::ACCENT);
                 let mut y = y0 + 16.0;
-                for l in ui::wrap(ui, wp.desc, desc_w, FONT_PX).iter() {
+                for l in ui::wrap(ui, tr(wp.desc), desc_w, FONT_PX).iter() {
                     ui.text(l, desc_x, y, FONT_PX, ui::TEXT);
                     y += 14.0;
                 }
                 let ms = wp.moveset;
                 let last = &ms.hits[ms.last()];
                 ui.text(
-                    &format!("{}연타 · 마지막 타 피해 {}", ms.hits.len(), last.damage),
+                    &fill(s.bag_combo, &[&ms.hits.len(), &last.damage]),
                     desc_x,
                     y + 4.0,
                     FONT_PX,
                     ui::TEXT_DIM,
                 );
                 let hint = if self.inventory.equipped == Some(*w) {
-                    "장착 중"
+                    s.equipped
                 } else {
-                    "확인: 장착"
+                    s.equip_hint
                 };
                 ui.text(hint, desc_x, y + 18.0, FONT_PX, ui::ACCENT);
             }
             None => {
-                ui.text("비어 있음", desc_x, y0, FONT_PX, ui::TEXT_DIM);
-                for (i, l) in ui::wrap(
-                    ui,
-                    "아이템은 2단계(방 클리어 보상 선택)에서 들어온다. 지금은 틀만 있다.",
-                    desc_w,
-                    FONT_PX,
-                )
-                .iter()
-                .enumerate()
+                ui.text(s.empty_slot, desc_x, y0, FONT_PX, ui::TEXT_DIM);
+                for (i, l) in ui::wrap(ui, s.empty_slot_desc, desc_w, FONT_PX)
+                    .iter()
+                    .enumerate()
                 {
                     ui.text(
                         l,
@@ -1202,10 +1229,12 @@ impl App {
             }
         }
         ui.text(
-            &format!(
-                "{} / {} 칸",
-                self.inventory.slots.iter().filter(|s| s.is_some()).count(),
-                self.inventory.slots.len()
+            &fill(
+                s.slots,
+                &[
+                    &self.inventory.slots.iter().filter(|x| x.is_some()).count(),
+                    &self.inventory.slots.len(),
+                ],
             ),
             x0,
             y0 + 3.0 * (slot + gap) + 2.0,
@@ -1237,7 +1266,7 @@ impl App {
                 FONT_PX,
                 if q.done() { ui::ACCENT } else { col },
             );
-            ui.text(q.title, r.x + 16.0, r.y + 2.0, FONT_PX, col);
+            ui.text(tr(q.title), r.x + 16.0, r.y + 2.0, FONT_PX, col);
             ui.text_right(
                 &format!("{}/{}", q.progress, q.goal),
                 r.right() - 4.0,
@@ -1250,21 +1279,22 @@ impl App {
         let q = &self.journal.quests[self.journal_cursor];
         let dx = c.x + 158.0;
         let dw = c.right() - dx;
-        ui.text(q.title, dx, c.y, FONT_PX, ui::ACCENT);
-        for (i, l) in ui::wrap(ui, q.desc, dw, FONT_PX).iter().enumerate() {
+        ui.text(tr(q.title), dx, c.y, FONT_PX, ui::ACCENT);
+        for (i, l) in ui::wrap(ui, tr(q.desc), dw, FONT_PX).iter().enumerate() {
             ui.text(l, dx, c.y + 16.0 + i as f32 * 14.0, FONT_PX, ui::TEXT);
         }
     }
 
     fn draw_map(&self, ui: &Ui, c: Rect) {
+        let s = i18n::s();
         ui.text(
-            &format!("1층 · {}", self.world.biome.name()),
+            &fill(s.map_floor, &[&tr(self.world.biome.name())]),
             c.x,
             c.y,
             FONT_PX,
             ui::ACCENT,
         );
-        ui.text_right("프로토타입: 방 하나", c.right(), c.y, FONT_PX, ui::TEXT_DIM);
+        ui.text_right(s.map_proto, c.right(), c.y, FONT_PX, ui::TEXT_DIM);
         // 방 전체(320×180)를 0.5배로.
         let k = 0.5;
         let origin = vec2(c.x + (c.w - t::VIEW_W * k) / 2.0, c.y + 18.0);
@@ -1299,12 +1329,18 @@ impl App {
         }
         let p = m(self.world.player.pos);
         ui.rect(Rect::new(p.x - 2.0, p.y - 2.0, 4.0, 4.0), ui::ACCENT);
-        ui.text(
-            "층 구조·방 연결은 3단계(런 구조)에서. 지금은 현재 방만.",
-            c.x,
-            origin.y + t::VIEW_H * k + 6.0,
-            FONT_PX,
-            ui::TEXT_DIM,
-        );
+        for (i, l) in ui::wrap(ui, s.map_note, c.w, FONT_PX)
+            .iter()
+            .take(2)
+            .enumerate()
+        {
+            ui.text(
+                l,
+                c.x,
+                origin.y + t::VIEW_H * k + 4.0 + i as f32 * 12.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
     }
 }

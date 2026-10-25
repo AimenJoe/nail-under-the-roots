@@ -6,6 +6,7 @@
 
 use macroquad::prelude::*;
 
+use crate::i18n::{self, Tr};
 use crate::input::Actions;
 use crate::world::World;
 
@@ -26,7 +27,7 @@ pub enum Step {
     /// 대화. 확인으로 넘긴다. 다 찍히기 전에 확인하면 전부 보여 준다.
     Say {
         actor: usize,
-        text: &'static str,
+        text: Tr,
     },
     /// 배우를 목표까지 걷게 한다(px/s).
     Move {
@@ -125,7 +126,7 @@ impl Cutscene {
         self.t += dt;
         let advance = match step {
             Step::Say { text, .. } => {
-                let total = text.chars().count() as f32;
+                let total = i18n::tr(text).chars().count() as f32;
                 let complete = self.shown >= total;
                 if a.confirm || a.attack || a.tap.is_some() {
                     if complete {
@@ -228,6 +229,7 @@ impl Cutscene {
     pub fn dialogue(&self) -> Option<Dialogue<'_>> {
         match self.steps.get(self.idx)? {
             Step::Say { actor, text } => {
+                let text = i18n::tr(*text);
                 let total = text.chars().count();
                 let shown = (self.shown as usize).min(total);
                 let a = &self.actors[*actor];
@@ -279,7 +281,7 @@ pub fn opening(w: &World) -> Cutscene {
         Step::Wait(0.3),
         Step::Say {
             actor: 0,
-            text: "…뿌리가 여기까지 내려와 있어. 흙이 다르게 느껴져.",
+            text: |s| s.op_1,
         },
         Step::Show {
             actor: 1,
@@ -296,22 +298,22 @@ pub fn opening(w: &World) -> Cutscene {
         },
         Step::Say {
             actor: 1,
-            text: "누구야. 여기는 우리 집이었어.",
+            text: |s| s.op_2,
         },
         Step::Say {
             actor: 1,
-            text: "나무가… 나무가 우리를 이렇게 만들었어. 돌아가.",
+            text: |s| s.op_3,
         },
         Step::Say {
             actor: 0,
-            text: "나는 원인을 찾으러 가는 길이야. 길을 비켜 줘.",
+            text: |s| s.op_4,
         },
         Step::Shake(0.4),
         Step::Hide { actor: 1 },
         Step::Wait(0.4),
         Step::Say {
             actor: 0,
-            text: "(발톱을 세운다.)",
+            text: |s| s.op_5,
         },
     ];
     Cutscene::new(actors, steps)

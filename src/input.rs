@@ -11,7 +11,6 @@
 use gamepads::{Button, Gamepads};
 use macroquad::prelude::*;
 
-#[cfg(not(target_os = "android"))]
 use crate::tuning;
 
 /// 게임 로직과 메뉴가 보는 유일한 입력.
@@ -81,7 +80,9 @@ pub struct Input {
     menu_mode: bool,
 }
 
-/// 메뉴 탐색 반복. 방향을 누르고 있으면 처음 한 번, 0.35초 뒤부터 0.1초마다.
+/// 메뉴 탐색: 이동 방향(키·D패드·스틱)을 한 칸 눌림으로 바꾼다. 방향이 잡히는 순간 한 칸,
+/// 누르고 있으면 NAV_REPEAT_DELAY 뒤부터 NAV_REPEAT_EVERY마다. 스틱은 큰 축 하나만 보고,
+/// NAV_PRESS를 넘어야 잡히고 NAV_RELEASE 밑으로 내려와야 풀린다(히스테리시스: 경계에서 떨려도 한 칸만).
 #[derive(Default)]
 struct NavRepeat {
     dir: (i8, i8),
@@ -208,7 +209,8 @@ impl Input {
         }
         now.aim = pad.aim;
 
-        // 메뉴 탐색 에지(반복 포함)는 이동 방향에서 만든다.
+        // 메뉴 탐색 에지(반복 포함)는 이동 방향에서 만든다. 키·D패드의 눌림 에지(아래 read_*)와
+        // 같은 프레임에 겹치면 |=라 한 칸이다. 스틱에는 눌림 에지가 없으므로 첫 칸도 여기서 낸다.
         let nav = self.nav_edges(now.move_dir, get_frame_time());
         now.up |= nav.1 < 0;
         now.down |= nav.1 > 0;
@@ -229,35 +231,19 @@ impl Input {
     }
 
     fn nav_edges(&mut self, mv: Vec2, dt: f32) -> (i8, i8) {
-        let d = (
-            if mv.x > 0.5 {
-                1
-            } else if mv.x < -0.5 {
-                -1
-            } else {
-                0
-            },
-            if mv.y > 0.5 {
-                1
-            } else if mv.y < -0.5 {
-                -1
-            } else {
-                0
-            },
-        );
+        let d = nav_dir(self.nav.dir, mv);
         if d == (0, 0) {
             self.nav = NavRepeat::default();
             return (0, 0);
         }
         if d != self.nav.dir {
-            // 첫 칸은 키/버튼 눌림 에지가 담당한다. 여기서는 반복만.
             self.nav.dir = d;
             self.nav.timer = 0.0;
-            return (0, 0);
+            return d;
         }
         self.nav.timer += dt;
-        if self.nav.timer > 0.35 {
-            self.nav.timer -= 0.1;
+        if self.nav.timer > tuning::NAV_REPEAT_DELAY {
+            self.nav.timer -= tuning::NAV_REPEAT_EVERY;
             return d;
         }
         (0, 0)
@@ -357,6 +343,23 @@ impl Input {
     fn read_gamepads(&mut self) -> (Actions, usize) {
         (Actions::default(), 0)
     }
+}
+
+/// 이동 벡터 → 메뉴 방향 한 축. 지금 잡힌 방향은 NAV_RELEASE까지 유지하고,
+/// 새 방향은 큰 축이 NAV_PRESS를 넘을 때만 잡는다(대각선은 큰 쪽으로).
+fn nav_dir(held: (i8, i8), mv: Vec2) -> (i8, i8) {
+    let along = held.0 as f32 * mv.x + held.1 as f32 * mv.y;
+    if held != (0, 0) && along > tuning::NAV_RELEASE {
+        return held;
+    }
+    if mv.x.abs() >= mv.y.abs() {
+        if mv.x.abs() > tuning::NAV_PRESS {
+            return (mv.x.signum() as i8, 0);
+        }
+    } else if mv.y.abs() > tuning::NAV_PRESS {
+        return (0, mv.y.signum() as i8);
+    }
+    (0, 0)
 }
 
 fn read_keyboard() -> Actions {
@@ -468,4 +471,21 @@ fn apply_deadzone(v: Vec2) -> Vec2 {
     }
     let scaled = ((len - tuning::STICK_DEADZONE) / (1.0 - tuning::STICK_DEADZONE)).min(1.0);
     v / len * scaled
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stick_nav_needs_press_and_holds_until_release() {
+        assert_eq!(nav_dir((0, 0), vec2(0.0, 0.4)), (0, 0));
+        assert_eq!(nav_dir((0, 0), vec2(0.0, 0.7)), (0, 1));
+        // 경계에서 떨려도 유지(히스테리시스).
+        assert_eq!(nav_dir((0, 1), vec2(0.1, 0.4)), (0, 1));
+        assert_eq!(nav_dir((0, 1), vec2(0.0, 0.2)), (0, 0));
+        // 대각선은 큰 축. 잡힌 축이 약해지면 다른 축으로.
+        assert_eq!(nav_dir((0, 0), vec2(0.8, -0.6)), (1, 0));
+        assert_eq!(nav_dir((1, 0), vec2(0.2, 0.9)), (0, 1));
+    }
 }

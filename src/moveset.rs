@@ -33,7 +33,6 @@ pub struct Hit {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Moveset {
-    pub name: &'static str,
     pub hits: &'static [Hit],
     /// 스윙이 끝난 뒤 다음 타 입력이 유효한 시간.
     pub combo_window: f32,
@@ -80,7 +79,6 @@ const fn claw(i: usize) -> Hit {
 
 /// 새싹 발톱(가벼움): 4연타, 짧고 빠르다. 한 방은 약하지만 끊김 없이 이어진다.
 pub static SPROUT: Moveset = Moveset {
-    name: "새싹 발톱",
     hits: &[
         Hit {
             swing: 0.09,
@@ -135,7 +133,6 @@ pub static SPROUT: Moveset = Moveset {
 
 /// 두더지 발톱(기본): 1·2타 빠름, 3타 느리고 묵직. 언제든 굴파기로 끊는다.
 pub static CLAWS: Moveset = Moveset {
-    name: "두더지 발톱",
     hits: &[claw(0), claw(1), claw(2)],
     combo_window: t::CLAW_COMBO_WINDOW,
     move_factor: t::CLAW_MOVE_FACTOR,
@@ -144,7 +141,6 @@ pub static CLAWS: Moveset = Moveset {
 
 /// 바위 발톱(무거움): 2타. 느리고 넓고, 활성 구간이 끝나야 굴파기로 끊는다.
 pub static STONE: Moveset = Moveset {
-    name: "바위 발톱",
     hits: &[
         Hit {
             swing: 0.24,
@@ -181,7 +177,6 @@ pub static STONE: Moveset = Moveset {
 
 /// 독 발톱: 3연타, 한 방은 가볍지만 맞은 적에게 독. 마지막 타는 독이 길다.
 pub static VENOM: Moveset = Moveset {
-    name: "독 발톱",
     hits: &[
         Hit {
             swing: 0.13,

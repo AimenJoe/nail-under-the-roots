@@ -19,6 +19,11 @@ macroquad = { version = "0.4.16", features = ["audio"] }
 [target.'cfg(not(target_os = "android"))'.dependencies]
 gamepads = { version = "0.1.7", default-features = false }
 
+# 기기 언어 감지(docs/decisions/0013). 웹은 wasm-bindgen 없이 index.html 플러그인으로 읽으므로 뺀다.
+# Android는 libc의 시스템 속성(persist.sys.locale)을 읽는다.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+sys-locale = "0.3"
+
 # cargo-quad-apk 설정 (.github/workflows/build-android.yml, docs/decisions/0005)
 [package.metadata.android]
 package_name = "io.github.aimenjoe.nail"
