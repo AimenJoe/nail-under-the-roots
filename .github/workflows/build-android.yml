@@ -114,4 +114,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: target/android-artifacts/release/apk/*.apk
+          # 태그마다 docs/releases/<태그>.md를 먼저 커밋한다(릴리스 본문). 커밋 목록은 아래에 붙는다.
+          body_path: docs/releases/${{ github.ref_name }}.md
           generate_release_notes: true
