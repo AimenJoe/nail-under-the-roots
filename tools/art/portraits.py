@@ -24,6 +24,7 @@
   3. 털 결: 머리 윗선을 들쭉날쭉하게(털 뭉치), 등 쪽에 짧은 어두운 결.
   4. 선택 외곽선(sel-out): 바깥선은 이웃 재질의 가장 어두운 색, 빛 받는 쪽은 한 단 밝게. 검은 선을 피한다.
   5. 눈: 큰 흰 반사 + 작은 반사 + 아래쪽 푸른 반사광. 볼 홍조는 디더.
+비교 시험: NAIL_ART_V2=1(색조 이동·셀 음영, 캐릭터 해석), NAIL_ART_V4=1(v2 + 털 뭉치·삐침·작은 하이라이트, docs/decisions/0071).
 """
 import colorsys
 import math
@@ -117,6 +118,9 @@ BAYER2 = [[0.0, 0.5], [0.75, 0.25]]
 #   색조 이동(그늘은 차갑게 보라·파랑 쪽, 빛은 따뜻하게 노랑 쪽), 디더 없는 단(셀 음영) + 외톨이 픽셀 정리(덩어리),
 #   홍조는 디더 대신 작은 덩어리, 털 결은 무작위 줄을 줄여 덩어리 쪽 몇 가닥만.
 V2 = os.environ.get('NAIL_ART_V2') == '1'
+# v4(비교 시험, 기본 꺼짐): NAIL_ART_V4=1. v2 위에 점 다듬기에서 배운 것을 단계로 얹는다(docs/decisions/0071).
+V4 = os.environ.get('NAIL_ART_V4') == '1'
+V2 = V2 or V4
 
 
 def _toward(h, target, amt):
@@ -175,7 +179,10 @@ def shade_level(nx, ny, n_levels, x, y, bias=0.0):
     if V2:
         # 셀 음영: 빛 쪽 경계를 조금 더 밀어 가운데 단(바탕색)이 넓다. 디더 없음.
         v = (i ** 0.85) * (n_levels - 0.01)
-        return max(0, min(n_levels - 1, int(v)))
+        lvl = max(0, min(n_levels - 1, int(v)))
+        if V4 and lvl == n_levels - 1 and n_levels > 3 and i < V4_TOP:
+            lvl -= 1      # 가장 밝은 단은 빛 바로 밑 작은 덩어리만(넓으면 반들반들한 피부로 읽힌다)
+        return lvl
     v = i * (n_levels - 1)
     lo = int(v)
     frac = v - lo
@@ -255,6 +262,79 @@ def happy_eye(cv, cx, cy, rx):
     line(cv, pts, RAMP['eye'][0], 2)
 
 
+# ---- v4 단계: 털이 대머리·피부로 읽히지 않게 -------------------------------------------------------
+# 점 다듬기(tools/pixel, 0070)로 Naïl 초상화 하나를 고치며 찾은 것(KB pixel-art 가이드 "마지막 한 겹은 점으로").
+#   털은 한 올씩 그리지 않는다. 단 경계를 한쪽으로 기운 털끝 톱니로, 실루엣에 고르지 않은 삐침 몇 개로 보여 준다.
+FURRY = ('fur', 'rfur', 'tfur', 'mfur', 'bfur', 'dfur', 'dtfur', 'mfurd', 'grey')   # 수수(sfur)는 벨벳이라 매끈하게 둔다
+V4_TOP = 0.9
+_lu = math.hypot(LIGHT[0], LIGHT[1])
+_U = (LIGHT[0] / _lu, LIGHT[1] / _lu)      # 화면에서 빛 쪽
+_V = (-_U[1], _U[0])
+
+
+def fur_clumps(cv, period=4.6, amp=3.4, slant=0.12):
+    """털 재질의 단 경계를 털 뭉치로: 빛 방향으로 톱니(비대칭 삼각파)만큼 밀린 자리의 단을 가져온다.
+    경계만 바뀌고 덩어리 안은 그대로다. 톱니 끝이 모두 같은 쪽을 봐서 털이 한 방향으로 자란 것처럼 읽힌다."""
+    src = [row[:] for row in cv.mat]
+    for y in range(H):
+        for x in range(W):
+            m = src[y][x]
+            if not m or m[0] not in FURRY or cv.col[y][x] is not None:
+                continue
+            a = x * _V[0] + y * _V[1]
+            b = x * _U[0] + y * _U[1]
+            k = amp * (((a / period + b * slant) % 1.0) - 0.5)
+            qx, qy = int(round(x + _U[0] * k)), int(round(y + _U[1] * k))
+            if 0 <= qx < W and 0 <= qy < H:
+                q = src[qy][qx]
+                if q and q[0] == m[0] and cv.col[qy][qx] is None:
+                    cv.mat[y][x] = q
+
+
+def silhouette_tufts(cv, spacing=(6, 9, 7, 8), min_run=12):
+    """털 덩어리 윗선·왼쪽 선에 끝이 털 흐름(코에서 뒤로 = 왼쪽 아래)을 보는 작은 삐침. 간격은 일부러 고르지 않게.
+    귀처럼 좁은 곳(가로 덩어리가 min_run보다 짧은 줄)은 건너뛴다."""
+    def fur(x, y):
+        m = cv.mat[y][x] if 0 <= x < W and 0 <= y < H else None
+        return m if m and m[0] in FURRY and cv.col[y][x] is None else None
+
+    def empty(x, y):
+        return 0 <= x < W and 0 <= y < H and cv.mat[y][x] is None
+
+    def run(x, y):
+        n = 0
+        while fur(x + n, y):
+            n += 1
+        m = 0
+        while fur(x - m - 1, y):
+            m += 1
+        return n + m
+    adds = []
+    i, nxt = 0, 4
+    for x in range(2, W - 2):                     # 윗선: 끝이 왼쪽 위
+        top = next((y for y in range(1, H - 30) if fur(x, y)), None)
+        if top is None or not all(empty(x, yy) for yy in range(0, top)):
+            continue
+        if x < nxt or run(x, top + 1) < min_run:
+            continue
+        m = cv.mat[top][x]
+        adds += [(x, top - 1, m), (x - 1, top - 1, m), (x - 2, top - 2, m)]
+        nxt = x + spacing[i % len(spacing)]
+        i += 1
+    i, nxt = 0, 0
+    for y in range(4, H - 12):                    # 왼쪽 선: 끝이 왼쪽 아래
+        left = next((x for x in range(1, W) if cv.mat[y][x] is not None), None)
+        if left is None or not fur(left, y) or y < nxt or run(left, y) < min_run:
+            continue
+        m = cv.mat[y][left]
+        adds += [(left - 1, y, m), (left - 1, y + 1, m), (left - 2, y + 1, m), (left - 2, y + 2, m)]
+        nxt = y + spacing[(i + 1) % len(spacing)]
+        i += 1
+    for x, y, m in adds:
+        if empty(x, y):
+            cv.mat[y][x] = m
+
+
 def cleanup_clusters(cv, passes=2):
     """v2: 같은 재질 안에서 상하좌우 어느 이웃과도 단이 다른 외톨이 픽셀을 둘레에 가장 많은 단으로 바꾼다(덩어리)."""
     for _ in range(passes):
@@ -280,6 +360,9 @@ def cleanup_clusters(cv, passes=2):
 
 def outline(cv):
     """선택 외곽선: 빈 칸이 채운 칸과 닿으면 그 재질의 가장 어두운 색(빛 쪽은 한 단 밝게)."""
+    if V4:
+        fur_clumps(cv)
+        silhouette_tufts(cv)
     if V2:
         cleanup_clusters(cv)
     out = []
@@ -294,6 +377,8 @@ def outline(cv):
                     ramp = RAMP[mat]
                     lit = (dx, dy) in ((1, 0), (0, 1))   # 빈 칸이 왼쪽/위 → 빛 받는 쪽
                     c = ramp[1] if lit and len(ramp) > 3 else ramp[0]
+                    if V4 and lit and mat in FURRY:
+                        c = ramp[max(0, cv.mat[ny][nx][1] - 1)]   # 빛 쪽 실루엣이 가장 어두우면 빛 방향과 어긋난다
                     if mat in ('fur', 'shade', 'root') and not lit:
                         c = OUTLINE_BASE if mat == 'fur' else ramp[0]
                     out.append((x, y, c))
@@ -1252,6 +1337,16 @@ def nail2(face):
                 continue
             d = y + 0.5 - yc(x)
             if -5.0 <= d <= 5.0:
+                if V4:
+                    # 몸을 감은 원통: 위 3분의 1이 가장 밝고 빛에서 먼 오른쪽이 어둡다. 골은 4칸마다 한 줄(2칸 줄무늬는 소음).
+                    ny_ = max(-0.99, min(0.99, ((d + 5.0) / 10.0 - 0.42) * 1.6))
+                    nx_ = (x - 40) / 40 * 0.8
+                    i_ = nx_ * LIGHT[0] + ny_ * LIGHT[1] + math.sqrt(max(0.0, 1 - nx_ * nx_ - ny_ * ny_)) * LIGHT[2]
+                    lvl = 0 if i_ < 0.05 else 1 if i_ < 0.3 else 2 if i_ < 0.62 else 3
+                    if (x + 1) % 4 == 0 and lvl > 0:
+                        lvl -= 1
+                    cv.put(x, y, 'scarf', lvl)
+                    continue
                 lvl = 3 if d < -2.6 else (2 if d < 2.2 else 1)
                 if (x // 2) % 2 == 0:                       # 뜨개 골
                     lvl -= 1
@@ -1274,7 +1369,25 @@ def nail2(face):
         ellipse(cv, px, py, 10 * s_, 7 * s_, 'pink', bias=-0.05)
         for k in range(4):
             cx = px - 6.0 * s_ + k * 4.0 * s_
+            if V4:
+                # 끝이 평평한 2×3 발톱, 오른쪽 그늘. 바깥 발톱은 한 줄 낮게(부채꼴). 뾰족한 크림색 줄은 이빨로 읽힌다.
+                ty = int(py - 7.6 * s_) + (1 if k in (0, 3) else 0)
+                for dy, row in enumerate(((2, 1), (3, 0), (2, 0))):
+                    for dx, lv in enumerate(row):
+                        cv.put(int(cx) + dx, ty + dy, 'claw', lv)
+                continue
             ellipse(cv, cx, py - 6.2 * s_, 1.5, 2.6 * s_, 'claw', bias=0.12)
+    if V4:
+        # 정수리 한 가닥: 얼굴 쪽으로 기운 잎 모양(1px 선은 과일 꼭지로 읽혔다). 바깥선은 outline()이 두른다.
+        top = next(y for y in range(H) if cv.mat[y][40] is not None)
+        for dy, xs in ((-6, (43,)), (-5, (41, 42, 43)), (-4, (40, 41, 42)), (-3, (39, 40, 41, 42)),
+                       (-2, (38, 39, 40, 41)), (-1, (36, 37, 38, 39, 40, 41, 42))):
+            for x in xs:
+                cv.put(x, top + dy, 'fur', 3 if x <= xs[0] + 1 else 2)
+        for y in range(top, top + 2):
+            for x in range(36, 43):
+                if cv.mat[y][x] is None:
+                    cv.put(x, y, 'fur', 2)
     outline(cv)
     inner_edges(cv, mats=('muzzle', 'pink', 'claw', 'scarf'))
     rim_light(cv)
