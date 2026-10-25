@@ -8,6 +8,7 @@ use crate::enemy::{self, Enemy, Kind};
 use crate::input::TouchOverlay;
 use crate::player::{self, Player};
 use crate::tuning as t;
+use crate::ui::Ui;
 use crate::world::{self, FxKind, World};
 
 const VW: u32 = t::VIEW_W as u32;
@@ -21,30 +22,32 @@ const SHADOW: Color = Color::new(0.05, 0.03, 0.06, 0.8);
 pub struct Renderer {
     rt: RenderTarget,
     cam: Camera2D,
+    font: Option<Font>,
 }
 
 impl Renderer {
-    pub fn new() -> Self {
+    pub fn new(font: Option<Font>) -> Self {
         let rt = render_target(VW, VH);
         rt.texture.set_filter(FilterMode::Nearest);
         let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, t::VIEW_W, t::VIEW_H));
         cam.render_target = Some(rt.clone());
-        Self { rt, cam }
+        Self { rt, cam, font }
     }
 
-    /// `alpha`: 마지막 틱 이후 지난 비율(0..1). 위치 보간에 쓴다.
-    pub fn draw(
-        &mut self,
-        w: &World,
-        alpha: f32,
-        gamepad_count: usize,
-        touch: Option<TouchOverlay>,
-    ) {
-        // --- 월드 패스 (내부 해상도) ---
+    /// 월드 패스(내부 해상도). `w`가 없으면 타이틀 배경만 그린다.
+    /// `alpha`: 마지막 틱 이후 지난 비율(0..1), 위치 보간. `shake_mul`: 설정의 흔들림 배율.
+    pub fn begin_world(&mut self, w: Option<&World>, alpha: f32, shake_mul: f32) {
         let center = vec2(t::VIEW_W / 2.0, t::VIEW_H / 2.0);
-        self.cam.target = center + w.feel.shake_offset;
+        let shake = w
+            .map(|w| (w.feel.shake_offset * shake_mul).round())
+            .unwrap_or(Vec2::ZERO);
+        self.cam.target = center + shake;
         set_camera(&self.cam);
         clear_background(BG);
+        let Some(w) = w else {
+            draw_title_background();
+            return;
+        };
         draw_room(w);
         for p in &w.projectiles {
             let pos = lerp(p.prev_pos, p.pos, alpha);
@@ -60,8 +63,10 @@ impl Renderer {
             draw_hitboxes(w, alpha);
         }
         draw_hud_world(w);
+    }
 
-        // --- 화면 패스 (정수 배율 + 레터박스) ---
+    /// 화면 패스: 렌더 타깃을 정수 배율 + 레터박스로 올리고, 그 배치를 돌려준다.
+    pub fn present(&self) -> Ui {
         set_default_camera();
         clear_background(BLACK);
         let scale = (screen_width() / t::VIEW_W)
@@ -83,16 +88,44 @@ impl Renderer {
                 ..Default::default()
             },
         );
-
-        draw_hud_screen(w, scale, x, y, gamepad_count);
-        if let Some(t) = touch {
-            draw_touch_overlay(&t);
+        Ui {
+            scale,
+            ox: x,
+            oy: y,
+            font: self.font.clone(),
         }
+    }
+
+    /// 인게임 HUD(실제 해상도): 웨이브·처치, 디버그 줄.
+    pub fn draw_hud(&self, ui: &Ui, w: &World, gamepad_count: usize) {
+        draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
     }
 }
 
+/// 타이틀 배경: 격자 위에 뿌리 몇 가닥.
+fn draw_title_background() {
+    for gx in (0..VW).step_by(16) {
+        draw_line(gx as f32, 0.0, gx as f32, t::VIEW_H, 1.0, GRID);
+    }
+    for gy in (0..VH).step_by(16) {
+        draw_line(0.0, gy as f32, t::VIEW_W, gy as f32, 1.0, GRID);
+    }
+    let root = Color::new(0.30, 0.22, 0.20, 1.0);
+    for i in 0..5 {
+        let x0 = 40.0 + i as f32 * 60.0;
+        let mut prev = vec2(x0, 0.0);
+        for s in 1..=12 {
+            let y = s as f32 * 15.0;
+            let x = x0 + ((y * 0.05 + i as f32).sin() * 14.0).round();
+            draw_line(prev.x, prev.y, x, y, 2.0 + (12 - s) as f32 * 0.15, root);
+            prev = vec2(x, y);
+        }
+    }
+    draw_rectangle(0.0, t::VIEW_H - 8.0, t::VIEW_W, 8.0, WALL_COLOR);
+}
+
 /// 터치 조작 오버레이(실제 해상도). 터치가 한 번이라도 있었을 때만.
-fn draw_touch_overlay(t: &TouchOverlay) {
+pub fn draw_touch_overlay(t: &TouchOverlay) {
     let line = Color::new(1.0, 1.0, 1.0, 0.35);
     let fill = Color::new(1.0, 1.0, 1.0, 0.12);
     if let Some((origin, pos)) = t.stick {
@@ -362,26 +395,6 @@ fn draw_hud_screen(w: &World, scale: f32, ox: f32, oy: f32, gamepad_count: usize
         GRAY,
     );
     y += line;
-    if !w.player.is_alive() {
-        let msg = "DEAD  -  R / Start: restart";
-        let dim = measure_text(msg, None, (fs * 1.6) as u16, 1.0);
-        draw_text(
-            msg,
-            (screen_width() - dim.width) / 2.0,
-            screen_height() / 2.0,
-            fs * 1.6,
-            RED,
-        );
-    }
-    if w.paused {
-        draw_text(
-            "PAUSED  (Esc / B / Select)",
-            ox + 8.0,
-            screen_height() / 2.0,
-            fs * 1.4,
-            YELLOW,
-        );
-    }
     if !w.debug.overlay {
         return;
     }

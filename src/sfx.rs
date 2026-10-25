@@ -1,6 +1,8 @@
 //! 임시 사운드. 에셋 없이 시작 시 합성한 WAV를 메모리에서 로드한다.
 //! 진짜 사운드가 들어오면 이 파일은 `load_sound(path)`로 바뀐다.
 
+use std::cell::Cell;
+
 use macroquad::audio::{load_sound_from_bytes, play_sound, PlaySoundParams, Sound};
 
 use crate::tuning;
@@ -32,6 +34,8 @@ pub struct Sfx {
     shoot: Sound,
     charge: Sound,
     wall_hit: Sound,
+    /// 설정의 소리 크기(0..1). MASTER_VOLUME에 곱한다.
+    volume: Cell<f32>,
 }
 
 impl Sfx {
@@ -89,10 +93,18 @@ impl Sfx {
                 Layer::tone(0.12, 90.0, 50.0, Wave::Sine, 0.6, 1.5),
             ])
             .await,
+            volume: Cell::new(1.0),
         }
     }
 
+    pub fn set_volume(&self, v: f32) {
+        self.volume.set(v.clamp(0.0, 1.0));
+    }
+
     pub fn play(&self, id: Id) {
+        if self.volume.get() <= 0.0 {
+            return;
+        }
         let s = match id {
             Id::Claw(i) => &self.claw[i.min(2)],
             Id::Burrow => &self.burrow,
@@ -109,7 +121,7 @@ impl Sfx {
             s,
             PlaySoundParams {
                 looped: false,
-                volume: tuning::MASTER_VOLUME,
+                volume: tuning::MASTER_VOLUME * self.volume.get(),
             },
         );
     }

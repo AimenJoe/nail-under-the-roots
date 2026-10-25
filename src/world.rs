@@ -38,9 +38,10 @@ pub struct World {
     pub fx: Vec<Fx>,
     pub feel: Feel,
     pub debug: Debug,
-    pub paused: bool,
     pub wave: u32,
     pub kills: u32,
+    /// 솟구침으로 잡은 수(저널용).
+    pub emerge_kills: u32,
     pub time: f32,
     /// 이번 틱의 공격 히트박스(디버그 표시용).
     pub last_strike: Option<Strike>,
@@ -60,12 +61,12 @@ impl World {
             fx: Vec::new(),
             feel: Feel::default(),
             debug: Debug {
-                overlay: true,
+                overlay: false,
                 hitboxes: false,
             },
-            paused: false,
             wave: 0,
             kills: 0,
+            emerge_kills: 0,
             time: 0.0,
             last_strike: None,
             respawn_timer: t::WAVE_RESPAWN_DELAY,
@@ -77,26 +78,6 @@ impl World {
 
     pub fn tick(&mut self, a: &Actions, sfx: &Sfx) {
         let dt = t::TICK_DT;
-        if a.toggle_debug {
-            self.debug.overlay = !self.debug.overlay;
-        }
-        if a.toggle_hitboxes {
-            self.debug.hitboxes = !self.debug.hitboxes;
-        }
-        if a.restart {
-            let debug = self.debug;
-            *self = World::new();
-            self.debug = debug;
-            return;
-        }
-        if a.cancel {
-            self.paused = !self.paused;
-        }
-        if self.paused {
-            self.freeze_interp();
-            return;
-        }
-
         self.time += dt;
         self.feel.tick(dt);
         if self.feel.hitstop > 0.0 {
@@ -186,6 +167,9 @@ impl World {
                     sfx.play(sfx::Id::EnemyHit);
                 } else {
                     self.kills += 1;
+                    if s.kind == crate::combat::StrikeKind::Emerge {
+                        self.emerge_kills += 1;
+                    }
                     sfx.play(sfx::Id::EnemyDie);
                     self.feel.add_trauma(t::ENEMY_DIE_SHAKE);
                     let color = enemy_color(e.kind);
@@ -286,7 +270,11 @@ impl World {
         }
     }
 
-    /// 보간이 멈춘 화면 위에서 미끄러지지 않게 prev를 현재로 맞춘다.
+    /// 보간이 멈춘 화면(일시정지·히트스톱) 위에서 미끄러지지 않게 prev를 현재로 맞춘다.
+    pub fn freeze(&mut self) {
+        self.freeze_interp();
+    }
+
     fn freeze_interp(&mut self) {
         self.player.prev_pos = self.player.pos;
         for e in &mut self.enemies {

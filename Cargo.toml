@@ -26,6 +26,8 @@ min_sdk_version = 26
 # 실기 핸드헬드는 arm64. 에뮬레이터가 필요해지면 x86_64-linux-android 추가.
 build_targets = ["aarch64-linux-android"]
 fullscreen = true
+# APK에 넣을 에셋 폴더(폰트 등). 코드는 set_pc_assets_folder("assets")로 플랫폼별 경로를 맞춘다.
+assets = "assets"
 # 앱 스토어 업데이트 판정용 정수. 배포할 때마다 올린다.
 version_code = 1
 

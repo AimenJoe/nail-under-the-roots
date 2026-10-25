@@ -1,11 +1,11 @@
-//! 입력 레이어. 키보드·게임패드·터치를 `Actions`로 번역한다.
+//! 입력 레이어. 키보드·게임패드·터치·마우스를 `Actions`로 번역한다.
 //!
 //! 이 파일 밖에서는 `KeyCode`도 `gamepads::Button`도 보지 않는다.
 //! (KB: reference/macroquad/gamepad-and-android-input.md)
 //!
 //! 고정 타임스텝과의 관계: 렌더 프레임마다 `poll()`로 상태를 읽고, "눌림(edge)"은 래치에 모아 둔다.
 //! 로직 틱마다 `take()`가 래치를 소비한다. 프레임에 틱이 두 번이면 첫 틱만 눌림을 받고,
-//! 틱이 없으면(고주사율) 다음 틱까지 눌림이 보존된다.
+//! 틱이 없으면(고주사율) 다음 틱까지 눌림이 보존된다. 메뉴 장면은 프레임마다 한 번 `take()`한다.
 
 #[cfg(not(target_os = "android"))]
 use gamepads::{Button, Gamepads};
@@ -14,7 +14,7 @@ use macroquad::prelude::*;
 #[cfg(not(target_os = "android"))]
 use crate::tuning;
 
-/// 게임 로직이 보는 유일한 입력.
+/// 게임 로직과 메뉴가 보는 유일한 입력.
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Actions {
     /// 이동 방향. 길이 0..=1 (스틱 기울기 반영). 입력 없으면 0.
@@ -23,11 +23,25 @@ pub struct Actions {
     pub aim: Vec2,
     pub attack: bool,
     pub dodge: bool,
+    /// 메뉴 확인. Enter / A(×) / 터치 ATK.
     pub confirm: bool,
+    /// 메뉴 뒤로. Esc / B(○).
     pub cancel: bool,
+    /// 일시정지 메뉴 열기. Esc / Start / Select / 터치 MENU.
+    pub menu: bool,
     pub restart: bool,
+    /// 탭 이동. Q·E / L1·R1.
+    pub tab_prev: bool,
+    pub tab_next: bool,
+    /// 메뉴 탐색 에지. 누르고 있으면 일정 간격으로 반복된다.
+    pub up: bool,
+    pub down: bool,
+    pub left: bool,
+    pub right: bool,
     pub toggle_debug: bool,
     pub toggle_hitboxes: bool,
+    /// 이번 프레임의 탭/클릭 위치(화면 논리 px). 메뉴 모드의 터치와 마우스 왼쪽 클릭.
+    pub tap: Option<Vec2>,
 }
 
 impl Actions {
@@ -36,9 +50,19 @@ impl Actions {
         self.dodge |= o.dodge;
         self.confirm |= o.confirm;
         self.cancel |= o.cancel;
+        self.menu |= o.menu;
         self.restart |= o.restart;
+        self.tab_prev |= o.tab_prev;
+        self.tab_next |= o.tab_next;
+        self.up |= o.up;
+        self.down |= o.down;
+        self.left |= o.left;
+        self.right |= o.right;
         self.toggle_debug |= o.toggle_debug;
         self.toggle_hitboxes |= o.toggle_hitboxes;
+        if self.tap.is_none() {
+            self.tap = o.tap;
+        }
     }
 }
 
@@ -52,10 +76,20 @@ pub struct Input {
     held: Actions,
     pub gamepad_count: usize,
     touch: TouchState,
+    nav: NavRepeat,
+    /// 메뉴 모드: 터치는 가상 스틱·버튼 대신 탭이 된다.
+    menu_mode: bool,
+}
+
+/// 메뉴 탐색 반복. 방향을 누르고 있으면 처음 한 번, 0.35초 뒤부터 0.1초마다.
+#[derive(Default)]
+struct NavRepeat {
+    dir: (i8, i8),
+    timer: f32,
 }
 
 /// 터치 조작(모바일 브라우저 보조). 왼쪽 반은 떠다니는 가상 스틱, 오른쪽 아래는 버튼.
-/// 화면 좌표(실제 픽셀) 기준. 렌더가 `overlay()`로 읽어 그린다.
+/// 화면 좌표(논리 px) 기준. 렌더가 `overlay()`로 읽어 그린다.
 #[derive(Default)]
 struct TouchState {
     /// 한 번이라도 터치가 들어오면 오버레이를 보인다.
@@ -79,7 +113,7 @@ struct TouchStick {
 pub struct TouchOverlay {
     pub stick: Option<(Vec2, Vec2)>,
     pub stick_radius: f32,
-    pub buttons: [TouchButton; 3],
+    pub buttons: [TouchButton; 4],
 }
 
 #[derive(Clone, Copy)]
@@ -113,6 +147,11 @@ fn touch_layout() -> TouchOverlay {
                 radius: r * 0.85,
                 label: "R",
             },
+            TouchButton {
+                center: vec2(r * 1.2, r * 1.2),
+                radius: r * 0.75,
+                label: "MENU",
+            },
         ],
     }
 }
@@ -126,12 +165,21 @@ impl Input {
             held: Actions::default(),
             gamepad_count: 0,
             touch: TouchState::default(),
+            nav: NavRepeat::default(),
+            menu_mode: false,
         }
     }
 
-    /// 터치가 한 번이라도 있었으면 오버레이 정보를 돌려준다.
+    pub fn set_menu_mode(&mut self, on: bool) {
+        if self.menu_mode != on {
+            self.menu_mode = on;
+            self.touch.stick = None;
+        }
+    }
+
+    /// 터치가 한 번이라도 있었고 게임 모드면 오버레이 정보를 돌려준다.
     pub fn overlay(&self) -> Option<TouchOverlay> {
-        if !self.touch.seen {
+        if !self.touch.seen || self.menu_mode {
             return None;
         }
         let mut o = touch_layout();
@@ -144,12 +192,13 @@ impl Input {
         let kb = read_keyboard();
         let (pad, count) = self.read_gamepads();
         self.gamepad_count = count;
-
         let touch = self.read_touch();
+        let mouse = read_mouse();
 
         let mut now = kb;
         now.merge_edges(&pad);
         now.merge_edges(&touch);
+        now.merge_edges(&mouse);
         // 축: 키보드 > 게임패드 > 터치 스틱.
         if now.move_dir == Vec2::ZERO {
             now.move_dir = pad.move_dir;
@@ -159,11 +208,63 @@ impl Input {
         }
         now.aim = pad.aim;
 
+        // 메뉴 탐색 에지(반복 포함)는 이동 방향에서 만든다.
+        let nav = self.nav_edges(now.move_dir, get_frame_time());
+        now.up |= nav.1 < 0;
+        now.down |= nav.1 > 0;
+        now.left |= nav.0 < 0;
+        now.right |= nav.0 > 0;
+
         self.pending.merge_edges(&now);
         self.held = now;
     }
 
-    /// 터치: 왼쪽 반에서 시작한 손가락은 스틱, 버튼 위에서 시작한 손가락은 눌림.
+    /// 로직 틱마다(또는 메뉴에서는 프레임마다) 한 번. 눌림을 소비한다.
+    pub fn take(&mut self) -> Actions {
+        let mut a = self.pending;
+        a.move_dir = self.held.move_dir;
+        a.aim = self.held.aim;
+        self.pending = Actions::default();
+        a
+    }
+
+    fn nav_edges(&mut self, mv: Vec2, dt: f32) -> (i8, i8) {
+        let d = (
+            if mv.x > 0.5 {
+                1
+            } else if mv.x < -0.5 {
+                -1
+            } else {
+                0
+            },
+            if mv.y > 0.5 {
+                1
+            } else if mv.y < -0.5 {
+                -1
+            } else {
+                0
+            },
+        );
+        if d == (0, 0) {
+            self.nav = NavRepeat::default();
+            return (0, 0);
+        }
+        if d != self.nav.dir {
+            // 첫 칸은 키/버튼 눌림 에지가 담당한다. 여기서는 반복만.
+            self.nav.dir = d;
+            self.nav.timer = 0.0;
+            return (0, 0);
+        }
+        self.nav.timer += dt;
+        if self.nav.timer > 0.35 {
+            self.nav.timer -= 0.1;
+            return d;
+        }
+        (0, 0)
+    }
+
+    /// 터치. 게임 모드: 왼쪽 반에서 시작한 손가락은 스틱, 버튼 위에서 시작한 손가락은 눌림.
+    /// 메뉴 모드: 새 손가락은 탭.
     fn read_touch(&mut self) -> Actions {
         let mut a = Actions::default();
         let touches = touches();
@@ -191,17 +292,22 @@ impl Input {
                 if !ended {
                     self.touch.known.push(t.id);
                 }
-                if let Some(b) = layout
+                if self.menu_mode {
+                    a.tap = Some(t.position);
+                } else if let Some(b) = layout
                     .buttons
                     .iter()
                     .find(|b| (t.position - b.center).length() <= b.radius * 1.3)
                 {
                     match b.label {
-                        "ATK" => a.attack = true,
+                        "ATK" => {
+                            a.attack = true;
+                            a.confirm = true;
+                        }
                         "DIG" => a.dodge = true,
-                        _ => a.restart = true,
+                        "R" => a.restart = true,
+                        _ => a.menu = true,
                     }
-                    a.confirm |= b.label == "ATK";
                 } else if t.position.x < half && self.touch.stick.is_none() && !ended {
                     self.touch.stick = Some(TouchStick {
                         id: t.id,
@@ -251,15 +357,6 @@ impl Input {
     fn read_gamepads(&mut self) -> (Actions, usize) {
         (Actions::default(), 0)
     }
-
-    /// 로직 틱마다 한 번. 눌림을 소비한다.
-    pub fn take(&mut self) -> Actions {
-        let mut a = self.pending;
-        a.move_dir = self.held.move_dir;
-        a.aim = self.held.aim;
-        self.pending = Actions::default();
-        a
-    }
 }
 
 fn read_keyboard() -> Actions {
@@ -283,12 +380,33 @@ fn read_keyboard() -> Actions {
         dodge: is_key_pressed(KeyCode::K)
             || is_key_pressed(KeyCode::X)
             || is_key_pressed(KeyCode::Space),
-        confirm: is_key_pressed(KeyCode::Enter),
+        confirm: is_key_pressed(KeyCode::Enter)
+            || is_key_pressed(KeyCode::J)
+            || is_key_pressed(KeyCode::Z),
         cancel: is_key_pressed(KeyCode::Escape),
+        menu: is_key_pressed(KeyCode::Escape),
         restart: is_key_pressed(KeyCode::R),
+        tab_prev: is_key_pressed(KeyCode::Q),
+        tab_next: is_key_pressed(KeyCode::E),
         toggle_debug: is_key_pressed(KeyCode::F1),
         toggle_hitboxes: is_key_pressed(KeyCode::F2),
+        // 눌렀다 뗀 것이 한 프레임 안에 끝나도 메뉴 탐색은 한 칸 움직여야 한다(is_key_down만 보면 놓친다).
+        up: is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W),
+        down: is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S),
+        left: is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A),
+        right: is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D),
+        ..Default::default()
     }
+}
+
+/// 마우스는 보조: 왼쪽 클릭을 탭으로.
+fn read_mouse() -> Actions {
+    let mut a = Actions::default();
+    if is_mouse_button_pressed(MouseButton::Left) {
+        let (x, y) = mouse_position();
+        a.tap = Some(vec2(x, y));
+    }
+    a
 }
 
 /// 연결된 모든 패드를 합친다(1인 게임이라 어느 패드든 같은 플레이어).
@@ -322,15 +440,21 @@ fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
         if aim != Vec2::ZERO {
             a.aim = aim.normalize();
         }
-        // 공격 X/□ 또는 R1, 굴파기 A/× 또는 R2.
+        // 공격 X/□ 또는 R1, 굴파기 A/× 또는 R2. 메뉴에서는 A 확인, B 뒤로.
         a.attack |=
             pad.is_just_pressed(Button::ActionLeft) || pad.is_just_pressed(Button::FrontRightUpper);
         a.dodge |=
             pad.is_just_pressed(Button::ActionDown) || pad.is_just_pressed(Button::FrontRightLower);
         a.confirm |= pad.is_just_pressed(Button::ActionDown);
-        a.cancel |= pad.is_just_pressed(Button::ActionRight)
+        a.cancel |= pad.is_just_pressed(Button::ActionRight);
+        a.menu |= pad.is_just_pressed(Button::RightCenterCluster)
             || pad.is_just_pressed(Button::LeftCenterCluster);
-        a.restart |= pad.is_just_pressed(Button::RightCenterCluster);
+        a.tab_prev |= pad.is_just_pressed(Button::FrontLeftUpper);
+        a.tab_next |= pad.is_just_pressed(Button::FrontRightUpper);
+        a.up |= pad.is_just_pressed(Button::DPadUp);
+        a.down |= pad.is_just_pressed(Button::DPadDown);
+        a.left |= pad.is_just_pressed(Button::DPadLeft);
+        a.right |= pad.is_just_pressed(Button::DPadRight);
     }
     (a, count)
 }

@@ -4,6 +4,7 @@
 
 - 컨셉: [`docs/concept.md`](docs/concept.md)
 - 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md) (1단계 전투 프로토타입, 회색 박스)
+- 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md)
 - 결정 기록: [`docs/decisions/`](docs/decisions/)
 - 지식 베이스: [AimenJoe/KB](https://github.com/AimenJoe/KB) (`maps/gamedev.md`)
 
@@ -16,7 +17,7 @@ cargo run
 
 # 웹
 cargo build --release --target wasm32-unknown-unknown
-mkdir -p dist && cp web/index.html web/*.js dist/ && cp target/wasm32-unknown-unknown/release/nail.wasm dist/
+mkdir -p dist && cp web/index.html web/*.js dist/ && cp target/wasm32-unknown-unknown/release/nail.wasm dist/ && cp -r assets dist/assets
 python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 ```
 
@@ -28,11 +29,14 @@ python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 | 발톱(3연타) | J / Z | X(□) / R1 |
 | 굴파기 → 솟구침 | K / X / Space (다시 누르면 조기 솟구침) | A(×) / R2 |
 | 조준 | (마지막 이동 방향) | 오른쪽 스틱 |
-| 재시작 | R | Start |
-| 일시정지 | Esc | B(○) / Select |
+| 재시작 | R | — (메뉴 → 다시 시작) |
+| 메뉴(일시정지) | Esc | Start / Select |
+| 메뉴 탐색 | 방향키·WASD, Enter 확인, Esc 뒤로, Q/E 탭 | D-pad·스틱, A 확인, B 뒤로, L1/R1 탭 |
 | 디버그 | F1 오버레이, F2 히트박스 | — |
 
-모바일 브라우저(터치): 화면 왼쪽 반을 누른 채 끌면 가상 스틱, 오른쪽 아래 `ATK`·`DIG` 버튼, 오른쪽 위 `R` 재시작. 터치가 한 번이라도 들어오면 오버레이가 보인다. 가로로 들고 플레이.
+흐름: 인트로 → 타이틀(시작·설정) → 게임. 게임 중 메뉴를 열면 탭 다섯 개(메뉴·상태·가방·저널·지도). 가방·지도·저널은 아직 틀만 있다(docs/decisions/0007).
+
+모바일 브라우저(터치): 화면 왼쪽 반을 누른 채 끌면 가상 스틱, 오른쪽 아래 `ATK`·`DIG` 버튼, 오른쪽 위 `R` 재시작, 왼쪽 위 `MENU`. 메뉴 안에서는 항목을 탭한다. 터치가 한 번이라도 들어오면 오버레이가 보인다. 가로로 들고 플레이.
 
 ## 커밋 전
 
