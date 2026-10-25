@@ -1,0 +1,155 @@
+//! 타일 격자와 ASCII 지도(docs/decisions/0019). 필드는 손으로 그린 ASCII, 던전은 생성기가 같은 격자를 채운다.
+//!
+//! 칸 16px. 글자:
+//!   `#` 벽(벼랑)  `.` 바닥  `T` 그루터기  `R` 바위  `D` 던전 입구  `U` 출구(위로)  `S` 저장 지점  `+` 문
+//!   `P` 시작 위치  `o` 스폰 지점(튜토리얼)  `c` 돌격형  `s` 원거리형  (마커 칸은 바닥)
+
+use macroquad::prelude::*;
+
+use crate::enemy::Kind;
+use crate::room::{Prop, PropKind};
+
+pub const TILE: f32 = 16.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cell {
+    Floor,
+    Wall,
+    /// 던전 방의 문. 잠기면 벽처럼 막는다(Room::set_doors_locked).
+    Door,
+    /// 필드의 굴 입구 → 던전.
+    Entrance,
+    /// 던전에서 필드로 올라가는 구멍.
+    Exit,
+    /// 저장 지점(빛나는 버섯 고리). 닿으면 다시 시작할 곳이 된다.
+    Save,
+}
+
+#[derive(Debug, Clone)]
+pub struct Grid {
+    pub w: usize,
+    pub h: usize,
+    cells: Vec<Cell>,
+}
+
+impl Grid {
+    pub fn filled(w: usize, h: usize, c: Cell) -> Self {
+        Self {
+            w,
+            h,
+            cells: vec![c; w * h],
+        }
+    }
+
+    pub fn get(&self, x: usize, y: usize) -> Cell {
+        self.cells[y * self.w + x]
+    }
+
+    /// 범위 밖은 벽.
+    pub fn get_i(&self, x: i32, y: i32) -> Cell {
+        if x < 0 || y < 0 || x as usize >= self.w || y as usize >= self.h {
+            Cell::Wall
+        } else {
+            self.get(x as usize, y as usize)
+        }
+    }
+
+    pub fn set(&mut self, x: usize, y: usize, c: Cell) {
+        if x < self.w && y < self.h {
+            self.cells[y * self.w + x] = c;
+        }
+    }
+
+    /// 이 종류의 칸 가운데 위치들.
+    pub fn find(&self, c: Cell) -> Vec<Vec2> {
+        let mut out = Vec::new();
+        for y in 0..self.h {
+            for x in 0..self.w {
+                if self.get(x, y) == c {
+                    out.push(cell_center(x, y));
+                }
+            }
+        }
+        out
+    }
+}
+
+pub fn cell_center(x: usize, y: usize) -> Vec2 {
+    vec2((x as f32 + 0.5) * TILE, (y as f32 + 0.5) * TILE)
+}
+
+/// ASCII 지도를 읽은 결과.
+pub struct Parsed {
+    pub grid: Grid,
+    pub props: Vec<Prop>,
+    pub start: Vec2,
+    pub spawn_points: Vec<Vec2>,
+    pub enemies: Vec<(Kind, Vec2)>,
+}
+
+/// 줄 길이가 다르면 짧은 줄은 벽으로 채운다.
+pub fn parse(rows: &[&str]) -> Parsed {
+    let h = rows.len();
+    let w = rows.iter().map(|r| r.chars().count()).max().unwrap_or(0);
+    let mut grid = Grid::filled(w, h, Cell::Wall);
+    let mut props = Vec::new();
+    let mut start = cell_center(1, 1);
+    let mut spawn_points = Vec::new();
+    let mut enemies = Vec::new();
+    for (y, row) in rows.iter().enumerate() {
+        for (x, ch) in row.chars().enumerate() {
+            let at = cell_center(x, y);
+            let rect = Rect::new(x as f32 * TILE, y as f32 * TILE, TILE, TILE);
+            let cell = match ch {
+                '#' => Cell::Wall,
+                'D' => Cell::Entrance,
+                'U' => Cell::Exit,
+                'S' => Cell::Save,
+                '+' => Cell::Door,
+                _ => Cell::Floor,
+            };
+            grid.set(x, y, cell);
+            match ch {
+                'T' => props.push(Prop {
+                    rect,
+                    kind: PropKind::Stump,
+                }),
+                'R' => props.push(Prop {
+                    rect,
+                    kind: PropKind::Rock,
+                }),
+                'P' => start = at,
+                'o' => spawn_points.push(at),
+                'c' => enemies.push((Kind::Charger, at)),
+                's' => enemies.push((Kind::Shooter, at)),
+                _ => {}
+            }
+        }
+    }
+    Parsed {
+        grid,
+        props,
+        start,
+        spawn_points,
+        enemies,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_cells_markers_and_props() {
+        let p = parse(&["#####", "#P.c#", "#oTD#", "#####"]);
+        assert_eq!((p.grid.w, p.grid.h), (5, 4));
+        assert_eq!(p.grid.get(0, 0), Cell::Wall);
+        assert_eq!(p.grid.get(3, 2), Cell::Entrance);
+        assert_eq!(p.grid.get(2, 2), Cell::Floor, "소품 칸은 바닥 + 소품");
+        assert_eq!(p.props.len(), 1);
+        assert_eq!(p.start, cell_center(1, 1));
+        assert_eq!(p.enemies.len(), 1);
+        assert_eq!(p.spawn_points.len(), 1);
+        assert_eq!(p.grid.get_i(-1, 0), Cell::Wall);
+    }
+}

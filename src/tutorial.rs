@@ -33,7 +33,10 @@ pub struct Tutorial {
 impl Tutorial {
     pub fn new(w: &mut World) -> Self {
         w.auto_waves = false;
-        w.enemies.clear();
+        // 아레나는 비운다. 필드의 적은 멀리서 자고 있으니 둔다(깬 적만 튜토리얼 상대로 센다).
+        if w.adv.place == crate::adventure::Place::Arena {
+            w.enemies.clear();
+        }
         Self {
             stage: Stage::Move,
             start_pos: w.player.pos,
@@ -100,21 +103,24 @@ impl Tutorial {
                 if w.burrows > self.burrows_at_start {
                     self.enter(Stage::Emerge);
                 }
-                if w.enemies.is_empty() {
+                if no_awake_enemy(w) {
                     // 발톱만으로 잡아 버렸다. 그래도 넘어간다.
                     self.enter(Stage::Outro);
                 }
             }
             Stage::Emerge => {
-                if w.emerge_kills >= 1 || w.enemies.is_empty() {
+                if w.emerge_kills >= 1 || no_awake_enemy(w) {
                     self.enter(Stage::Outro);
                 }
             }
             Stage::Outro => {
                 if self.t > 2.0 {
-                    w.auto_waves = true;
-                    w.wave = 0;
-                    w.next_wave();
+                    // 아레나(웨이브 시험장)면 웨이브 1로. 모험(필드)이면 그냥 걸어서 떠난다.
+                    if w.adv.place == crate::adventure::Place::Arena {
+                        w.auto_waves = true;
+                        w.wave = 0;
+                        w.next_wave();
+                    }
                     self.enter(Stage::Done);
                 }
             }
@@ -128,10 +134,20 @@ impl Tutorial {
     }
 }
 
+/// 튜토리얼이 부른 적이 다 쓰러졌나(필드에서 자는 적은 세지 않는다).
+fn no_awake_enemy(w: &World) -> bool {
+    w.enemies.iter().all(|e| e.asleep)
+}
+
 /// 플레이어 앞 `dist` 지점(방 안으로 잘라서).
 fn ahead(w: &World, dist: f32) -> Vec2 {
     let mut p = w.player.pos + w.player.facing * dist;
-    let r = w.room.inner;
+    // 필드는 지도 전체가 inner라 화면(카메라) 안으로 자른다.
+    let r = if w.room.grid.is_some() {
+        Rect::new(w.adv.cam.x + 16.0, w.adv.cam.y + 32.0, 288.0, 132.0)
+    } else {
+        w.room.inner
+    };
     p.x = p.x.clamp(r.x + 20.0, r.right() - 20.0);
     p.y = p.y.clamp(r.y + 20.0, r.bottom() - 20.0);
     p

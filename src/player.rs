@@ -50,6 +50,7 @@ pub enum Event {
     Die,
     Drill,
     DrillWall,
+    Parry,
 }
 
 pub struct Player {
@@ -81,6 +82,8 @@ pub struct Player {
     combo_timer: f32,
     no_attack: f32,
     swing_id: u32,
+    /// 지금 스윙을 시작하고 흐른 실제 시간(패링 창).
+    swing_age: f32,
 }
 
 impl Player {
@@ -107,6 +110,7 @@ impl Player {
             combo_timer: 0.0,
             no_attack: 0.0,
             swing_id: 0,
+            swing_age: f32::MAX,
         }
     }
 
@@ -127,6 +131,20 @@ impl Player {
             || self.is_burrowed()
             || matches!(self.state, State::Drill { .. })
             || !self.is_alive()
+    }
+
+    /// 패링 창이 열려 있으면 공격 방향. 스윙 시작 직후 PARRY_WINDOW 동안.
+    pub fn parry_dir(&self) -> Option<Vec2> {
+        match self.state {
+            State::Attack { dir, .. } if self.swing_age < t::PARRY_WINDOW => Some(dir),
+            _ => None,
+        }
+    }
+
+    /// 패링 성공: SP를 크게 채운다.
+    pub fn on_parry(&mut self) {
+        self.sp = (self.sp + t::PARRY_SP).min(t::SP_MAX);
+        self.events.push(Event::Parry);
     }
 
     pub fn sp_full(&self) -> bool {
@@ -183,6 +201,7 @@ impl Player {
         self.combo_timer = (self.combo_timer - dt).max(0.0);
         self.burrow_cd = (self.burrow_cd - dt).max(0.0);
         self.no_attack = (self.no_attack - dt).max(0.0);
+        self.swing_age += dt;
 
         let move_dir = a.move_dir;
         if move_dir != Vec2::ZERO && !matches!(self.state, State::Attack { .. }) {
@@ -366,6 +385,7 @@ impl Player {
         };
         self.facing = dir;
         self.swing_id += 1;
+        self.swing_age = 0.0;
         self.vel += dir * self.moveset.hits[idx].lunge;
         self.attack_buf = 0.0;
         self.combo_timer = 0.0;
@@ -555,6 +575,29 @@ mod tests {
         } else {
             panic!("드릴 중이어야 한다");
         }
+    }
+
+    /// 패링 창: 스윙 시작 직후 PARRY_WINDOW 동안만, 공격 방향으로.
+    #[test]
+    fn parry_window_opens_only_at_swing_start() {
+        let room = Room::new();
+        let mut p = Player::new(room.center());
+        assert!(p.parry_dir().is_none());
+        let atk = Actions {
+            attack: true,
+            move_dir: vec2(1.0, 0.0),
+            ..Default::default()
+        };
+        tick(&mut p, &room, &atk);
+        assert_eq!(p.parry_dir(), Some(vec2(1.0, 0.0)));
+        let ticks = (t::PARRY_WINDOW / t::TICK_DT).ceil() as usize + 1;
+        for _ in 0..ticks {
+            tick(&mut p, &room, &Actions::default());
+        }
+        assert!(p.parry_dir().is_none(), "창이 닫혀야 한다");
+        let sp = p.sp;
+        p.on_parry();
+        assert!(p.sp > sp);
     }
 
     #[test]

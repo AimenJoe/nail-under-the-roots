@@ -210,7 +210,7 @@ impl Inventory {
 
 /// 무기 획득 창(JRPG식). 떠 있는 동안 월드는 멈춘다.
 struct Gift {
-    weapon: usize,
+    item: crate::world::Gift,
     t: f32,
 }
 
@@ -268,7 +268,7 @@ pub struct App {
     tutorial: Option<Tutorial>,
     gift: Option<Gift>,
     /// 아직 창을 못 띄운 획득(여러 개가 한꺼번에 들어올 때).
-    gift_queue: Vec<usize>,
+    gift_queue: Vec<crate::world::Gift>,
     pub settings: Settings,
     world: World,
     journal: Journal,
@@ -413,7 +413,15 @@ impl App {
         }
         self.journal.update(&self.world);
         if restart {
-            self.start_game();
+            // 모험(필드·던전)에서 쓰러지면 저장 지점으로. 아레나·개발 시나리오는 처음부터.
+            if self.world.adv.place != crate::adventure::Place::Arena
+                && !self.world.player.is_alive()
+            {
+                self.world.begin_respawn();
+                self.death_t = 0.0;
+            } else {
+                self.start_game();
+            }
         } else if open_pause {
             self.open_pause();
         }
@@ -461,9 +469,13 @@ impl App {
             self.tutorial = Some(Tutorial::new(&mut self.world));
         }
         if matches!(s, Scenario::Normal | Scenario::CutsceneOnly) {
-            self.world.enemies.clear();
+            // 아레나(컷씬만)는 비우고, 필드(첫 시작)는 멀리 자는 적을 둔다. 컷씬 좌표는 왼쪽 위 화면 기준.
+            if self.world.adv.place == crate::adventure::Place::Arena {
+                self.world.enemies.clear();
+            }
             self.world.wave = 0;
             self.world.player.pos = vec2(40.0, 90.0);
+            self.world.snap_cam();
             self.cutscene = Some(cutscene::opening(&self.world));
             self.scene = Scene::Cutscene;
         } else {
@@ -1014,14 +1026,19 @@ impl App {
         if self.gift.is_some() || self.gift_queue.is_empty() {
             return;
         }
-        let w = self.gift_queue.remove(0);
-        self.inventory.add(w);
-        if self.inventory.equipped.is_none() {
-            self.inventory.equipped = Some(w);
-            self.apply_equipped();
+        let item = self.gift_queue.remove(0);
+        match item {
+            crate::world::Gift::Weapon(w) => {
+                self.inventory.add(w);
+                if self.inventory.equipped.is_none() {
+                    self.inventory.equipped = Some(w);
+                    self.apply_equipped();
+                }
+            }
+            crate::world::Gift::Charm(c) => self.inventory.add_charm(c),
         }
         self.world.freeze();
-        self.gift = Some(Gift { weapon: w, t: 0.0 });
+        self.gift = Some(Gift { item, t: 0.0 });
     }
 
     /// 획득 창: 최소 시간이 지나면 확인으로 닫고, 그대로 두어도 닫힌다. 그동안 월드는 멈춘다.
@@ -1039,23 +1056,24 @@ impl App {
     }
 
     fn draw_gift(&self, ui: &Ui, g: &Gift) {
-        let wp = &WEAPONS[g.weapon];
+        let s = i18n::s();
+        let (title, name, desc) = match g.item {
+            crate::world::Gift::Weapon(w) => (s.gift_title, WEAPONS[w].name, WEAPONS[w].desc),
+            crate::world::Gift::Charm(c) => (s.gift_charm, CHARMS[c].name, CHARMS[c].desc),
+        };
         let k = (g.t / 0.2).min(1.0);
         let r = Rect::new(56.0, 42.0 + (1.0 - k) * 8.0, 208.0, 86.0);
         ui.panel(r, None);
-        ui.text_center(i18n::s().gift_title, 160.0, r.y + 5.0, FONT_PX, ui::ACCENT);
+        ui.text_center(title, 160.0, r.y + 5.0, FONT_PX, ui::ACCENT);
         let icon = Rect::new(r.x + 10.0, r.y + 22.0, 22.0, 22.0);
         ui.rect(icon, ui::PANEL_LIGHT);
         ui.rect_lines(icon, ui::BORDER);
-        draw_claw_icon(ui, icon, wp.color);
-        ui.text(
-            tr(wp.name),
-            icon.right() + 8.0,
-            r.y + 22.0,
-            FONT_PX,
-            ui::TEXT,
-        );
-        let lines = ui::wrap(ui, tr(wp.desc), r.right() - icon.right() - 16.0, FONT_PX);
+        match g.item {
+            crate::world::Gift::Weapon(w) => draw_claw_icon(ui, icon, WEAPONS[w].color),
+            crate::world::Gift::Charm(c) => draw_charm_icon(ui, icon, CHARMS[c].color),
+        }
+        ui.text(tr(name), icon.right() + 8.0, r.y + 22.0, FONT_PX, ui::TEXT);
+        let lines = ui::wrap(ui, tr(desc), r.right() - icon.right() - 16.0, FONT_PX);
         for (i, l) in lines.iter().take(3).enumerate() {
             ui.text(
                 l,
@@ -1455,61 +1473,140 @@ impl App {
     }
 
     fn draw_map(&self, ui: &Ui, c: Rect) {
+        use crate::adventure::Place;
         let s = i18n::s();
-        let proto_w = ui.text_w(s.map_proto, FONT_PX);
+        let biome = tr(self.world.biome.name());
+        let title = match self.world.adv.place {
+            Place::Arena => fill(s.map_floor, &[&biome]),
+            Place::Field => fill(s.map_field, &[&biome]),
+            Place::Dungeon => fill(
+                s.map_dungeon,
+                &[
+                    &(self.world.adv.dungeon.as_ref().map_or(0, |d| d.depth) + 1),
+                    &biome,
+                ],
+            ),
+        };
+        ui.text(&ui.fit(&title, c.w, FONT_PX), c.x, c.y, FONT_PX, ui::ACCENT);
+        let area = Rect::new(c.x, c.y + 16.0, c.w, c.h - 32.0);
+        match self.world.adv.place {
+            Place::Dungeon => self.draw_dungeon_map(ui, area),
+            _ => self.draw_room_map(ui, area),
+        }
+        let note = if self.world.adv.place == Place::Arena {
+            s.map_note
+        } else {
+            s.map_legend
+        };
         ui.text(
-            &ui.fit(
-                &fill(s.map_floor, &[&tr(self.world.biome.name())]),
-                c.w - proto_w - 8.0,
-                FONT_PX,
-            ),
+            &ui.fit(note, c.w, FONT_PX),
             c.x,
-            c.y,
+            area.bottom() + 3.0,
             FONT_PX,
-            ui::ACCENT,
+            ui::TEXT_DIM,
         );
-        ui.text_right(s.map_proto, c.right(), c.y, FONT_PX, ui::TEXT_DIM);
-        // 방 전체(320×180)를 0.5배로.
-        let k = 0.5;
-        let origin = vec2(c.x + (c.w - t::VIEW_W * k) / 2.0, c.y + 18.0);
-        let m = |p: Vec2| origin + p * k;
+    }
+
+    /// 아레나·필드: 지금 지도 전체를 칸에 맞게 줄여서. 벽·소품·특별한 칸·적·나.
+    fn draw_room_map(&self, ui: &Ui, area: Rect) {
+        use crate::map::Cell;
         let room = &self.world.room;
-        ui.rect(
-            Rect::new(origin.x, origin.y, t::VIEW_W * k, t::VIEW_H * k),
-            Color::new(0.30, 0.22, 0.20, 1.0),
+        let b = room.inner;
+        let (bw, bh) = match &room.grid {
+            Some(g) => (g.w as f32 * 16.0, g.h as f32 * 16.0),
+            None => (t::VIEW_W, t::VIEW_H),
+        };
+        let k = (area.w / bw).min(area.h / bh);
+        let origin = vec2(
+            area.x + (area.w - bw * k) / 2.0,
+            area.y + (area.h - bh * k) / 2.0,
         );
-        let inner = room.inner;
-        ui.rect(
-            Rect::new(
-                origin.x + inner.x * k,
-                origin.y + inner.y * k,
-                inner.w * k,
-                inner.h * k,
-            ),
-            Color::new(0.12, 0.09, 0.14, 1.0),
-        );
-        for p in &room.pillars {
-            ui.rect(
-                Rect::new(origin.x + p.x * k, origin.y + p.y * k, p.w * k, p.h * k),
-                Color::new(0.30, 0.22, 0.20, 1.0),
-            );
+        let m = |p: Vec2| origin + p * k;
+        let wall = Color::new(0.30, 0.22, 0.20, 1.0);
+        let floor = Color::new(0.12, 0.09, 0.14, 1.0);
+        ui.rect(Rect::new(origin.x, origin.y, bw * k, bh * k), wall);
+        match &room.grid {
+            Some(g) => {
+                let cell = 16.0 * k;
+                for y in 0..g.h {
+                    for x in 0..g.w {
+                        let col = match g.get(x, y) {
+                            Cell::Wall => continue,
+                            Cell::Save => Color::new(0.45, 0.95, 0.5, 1.0),
+                            Cell::Entrance | Cell::Exit => Color::new(0.02, 0.02, 0.02, 1.0),
+                            _ => floor,
+                        };
+                        let p = m(vec2(x as f32 * 16.0, y as f32 * 16.0));
+                        ui.rect(Rect::new(p.x, p.y, cell + 0.05, cell + 0.05), col);
+                    }
+                }
+            }
+            None => {
+                ui.rect(
+                    Rect::new(origin.x + b.x * k, origin.y + b.y * k, b.w * k, b.h * k),
+                    floor,
+                );
+            }
+        }
+        for p in &room.solids {
+            if room.grid.is_none() {
+                ui.rect(
+                    Rect::new(origin.x + p.x * k, origin.y + p.y * k, p.w * k, p.h * k),
+                    wall,
+                );
+            }
         }
         for e in &self.world.enemies {
             let p = m(e.pos);
             ui.rect(
-                Rect::new(p.x - 1.5, p.y - 1.5, 3.0, 3.0),
+                Rect::new(p.x - 1.0, p.y - 1.0, 2.0, 2.0),
                 crate::world::enemy_color(e.kind),
             );
         }
         let p = m(self.world.player.pos);
-        ui.rect(Rect::new(p.x - 2.0, p.y - 2.0, 4.0, 4.0), ui::ACCENT);
-        // 한 줄만(아래는 탭 안내 자리). 길면 자른다.
-        ui.text(
-            &ui.fit(s.map_note, c.w, FONT_PX),
-            c.x,
-            origin.y + t::VIEW_H * k + 4.0,
-            FONT_PX,
-            ui::TEXT_DIM,
-        );
+        ui.rect(Rect::new(p.x - 1.5, p.y - 1.5, 3.0, 3.0), WHITE);
+    }
+
+    /// 던전: 들른 방만 칸으로, 문은 짧은 선. 지금 방은 강조.
+    fn draw_dungeon_map(&self, ui: &Ui, area: Rect) {
+        use crate::dungeon::{RoomKind, DIRS};
+        let Some(d) = &self.world.adv.dungeon else {
+            return;
+        };
+        let (cw, ch, gap) = (30.0, 18.0, 6.0);
+        let origin = vec2(area.center().x - 2.5 * (cw + gap), area.y + 2.0);
+        let at =
+            |r: (i32, i32)| origin + vec2(r.0 as f32 * (cw + gap), r.1 as f32 * (ch + gap) * 0.62);
+        for r in d.rooms.iter().filter(|r| r.visited) {
+            let p = at(r.at);
+            let rect = Rect::new(p.x, p.y, cw, ch * 0.62);
+            let current = r.at == self.world.adv.current_room;
+            let fill_c = match r.kind {
+                RoomKind::Boss => Color::new(0.45, 0.15, 0.18, 1.0),
+                RoomKind::Treasure => Color::new(0.45, 0.38, 0.15, 1.0),
+                RoomKind::Rest => Color::new(0.18, 0.38, 0.22, 1.0),
+                _ => Color::new(0.16, 0.12, 0.18, 1.0),
+            };
+            ui.rect(rect, fill_c);
+            ui.rect_lines(rect, if current { ui::ACCENT } else { ui::BORDER });
+            for (k, (dx, dy)) in DIRS.iter().enumerate() {
+                if r.links[k] {
+                    let c = rect.center();
+                    let e = c + vec2(
+                        *dx as f32 * (cw / 2.0 + gap / 2.0),
+                        *dy as f32 * (ch * 0.31 + gap * 0.31),
+                    );
+                    ui.line(
+                        c + vec2(*dx as f32 * cw / 2.0, *dy as f32 * ch * 0.31),
+                        e,
+                        ui::BORDER,
+                    );
+                }
+            }
+            if current {
+                let c = rect.center();
+                ui.rect(Rect::new(c.x - 1.5, c.y - 1.5, 3.0, 3.0), WHITE);
+            }
+        }
     }
 }

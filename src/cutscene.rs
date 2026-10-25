@@ -208,7 +208,7 @@ impl Cutscene {
             }
             Step::Wait(secs) => self.t >= secs,
             Step::Give(i) => {
-                w.gifts.push(i);
+                w.gifts.push(crate::world::Gift::Weapon(i));
                 true
             }
             Step::Show { actor, at } => {
@@ -264,7 +264,7 @@ impl Cutscene {
                     self.actors[actor].visible = true;
                 }
                 Step::Hide { actor } => self.actors[actor].visible = false,
-                Step::Give(i) => w.gifts.push(i),
+                Step::Give(i) => w.gifts.push(crate::world::Gift::Weapon(i)),
                 Step::Fade { to_clear, .. } => self.fade = if to_clear { 0.0 } else { 1.0 },
                 _ => {}
             }

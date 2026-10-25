@@ -29,6 +29,8 @@ pub enum Id {
     Drill,
     /// 드릴이 벽에 쿵.
     DrillWall,
+    /// 패링(맑은 금속음).
+    Parry,
 }
 
 pub struct Sfx {
@@ -46,6 +48,7 @@ pub struct Sfx {
     heal: Sound,
     drill: Sound,
     drill_wall: Sound,
+    parry: Sound,
     /// 반딧불 음 높이 차례.
     glow_step: Cell<usize>,
     /// 설정의 소리 크기(0..1). MASTER_VOLUME에 곱한다.
@@ -147,6 +150,12 @@ impl Sfx {
                 Layer::tone(0.2, 240.0, 60.0, Wave::Square, 0.4, 1.5),
             ])
             .await,
+            parry: make(&[
+                Layer::tone(0.25, 1980.0, 1900.0, Wave::Sine, 0.45, 1.2),
+                Layer::tone(0.18, 2970.0, 2900.0, Wave::Sine, 0.2, 1.6),
+                Layer::noise(0.04, 0.5, 4.0),
+            ])
+            .await,
             glow_step: Cell::new(0),
             volume: Cell::new(1.0),
         }
@@ -179,6 +188,7 @@ impl Sfx {
             Id::Heal => &self.heal,
             Id::Drill => &self.drill,
             Id::DrillWall => &self.drill_wall,
+            Id::Parry => &self.parry,
         };
         play_sound(
             s,

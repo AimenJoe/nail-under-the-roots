@@ -6,17 +6,21 @@
 //! 범위와 판정 기준: docs/phase-1-combat-prototype.md
 #![allow(clippy::new_without_default)]
 
+mod adventure;
 mod app;
 mod art;
 mod biome;
 mod combat;
 mod cutscene;
+mod dungeon;
 mod enemy;
 mod equipment;
+mod field;
 mod i18n;
 mod input;
 mod items;
 mod loot;
+mod map;
 mod moveset;
 mod player;
 mod render;

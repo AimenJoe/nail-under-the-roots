@@ -275,6 +275,8 @@ strings! {
     dead, dead_hint,
     // 장신구·가방·필살기(docs/decisions/0017, 0018)
     c_shell, c_shell_desc, c_whisker, c_whisker_desc, c_soil, c_soil_desc, c_flint, c_flint_desc, c_amulet, c_amulet_desc, it_berry, it_berry_desc, it_worm, it_worm_desc, toast_seed, toast_revive, quick_hint, special_name, special_desc, charms_label, charms_none, stat_attack, charm_equip, charm_unequip, bag_items, charm_slots,
+    // 모험(docs/decisions/0019)
+    toast_save, toast_respawn, toast_boss, gift_charm, map_field, map_dungeon, map_legend, toast_parry,
 }
 
 pub static KO: Strings = Strings {
@@ -386,6 +388,14 @@ pub static KO: Strings = Strings {
     charm_unequip: "확인: 빼기",
     bag_items: "산딸기 {0}/{1} · 지렁이 {2}/{3}",
     charm_slots: "장신구 {0}/{1}",
+    toast_save: "저장 지점: 쓰러지면 여기서 다시 선다.",
+    toast_respawn: "저장 지점에서 다시 일어났다. 반딧불을 조금 잃었다.",
+    toast_boss: "굴의 주인을 물리쳤다! 출구가 열렸다.",
+    gift_charm: "새 장신구를 얻었다!",
+    map_field: "들판 · {0}",
+    map_dungeon: "굴 {0}층 · {1}",
+    map_legend: "흰 점: 나 · 초록: 저장 · 검정: 굴",
+    toast_parry: "튕겨냈다!",
 };
 
 pub static EN: Strings = Strings {
@@ -497,6 +507,14 @@ pub static EN: Strings = Strings {
     charm_unequip: "Confirm: remove",
     bag_items: "Berries {0}/{1} · Worms {2}/{3}",
     charm_slots: "Charms {0}/{1}",
+    toast_save: "Save point: you will get back up here if you fall.",
+    toast_respawn: "Back at the save point. Lost a few glowbugs.",
+    toast_boss: "Beat the burrow keeper! The exit is open.",
+    gift_charm: "Got a new charm!",
+    map_field: "Field · {0}",
+    map_dungeon: "Burrow F{0} · {1}",
+    map_legend: "White: you · Green: save · Black: burrow",
+    toast_parry: "Parried!",
 };
 
 pub static JA: Strings = Strings {
@@ -608,6 +626,14 @@ pub static JA: Strings = Strings {
     charm_unequip: "決定：はずす",
     bag_items: "野いちご{0}/{1}・ミミズ{2}/{3}",
     charm_slots: "おまもり{0}/{1}",
+    toast_save: "セーブ地点：たおれたらここから。",
+    toast_respawn: "セーブ地点から起き上がった。ホタルを少しなくした。",
+    toast_boss: "穴のぬしをたおした！出口があいた。",
+    gift_charm: "新しいおまもりを手に入れた！",
+    map_field: "野原・{0}",
+    map_dungeon: "穴{0}階・{1}",
+    map_legend: "白：自分・緑：セーブ・黒：穴",
+    toast_parry: "はじいた！",
 };
 
 pub static ZH_HANS: Strings = Strings {
@@ -719,6 +745,14 @@ pub static ZH_HANS: Strings = Strings {
     charm_unequip: "确认：卸下",
     bag_items: "野莓{0}/{1}·蚯蚓{2}/{3}",
     charm_slots: "护符{0}/{1}",
+    toast_save: "存档点：倒下后会在这里重新开始。",
+    toast_respawn: "在存档点重新站起来了。损失了一些萤火虫。",
+    toast_boss: "打倒了洞穴之主！出口打开了。",
+    gift_charm: "获得了新的护符！",
+    map_field: "原野·{0}",
+    map_dungeon: "洞穴{0}层·{1}",
+    map_legend: "白：自己·绿：存档·黑：洞穴",
+    toast_parry: "弹开了！",
 };
 
 #[cfg(test)]

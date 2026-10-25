@@ -151,6 +151,31 @@ pub const REVIVE_PUSH_KNOCKBACK: f32 = 260.0;
 /// 생명의 씨앗으로 늘릴 수 있는 최대 체력 상한(기본 PLAYER_HP 위로).
 pub const LIFE_SEED_MAX: i32 = 5;
 
+// ---- 패링(공격 타이밍, docs/decisions/0020) -----------------------------------------
+/// 스윙을 시작하고 이 시간 안에 앞쪽에서 공격이 닿으면 튕겨낸다(실제 시간, 공격 속도와 무관).
+pub const PARRY_WINDOW: f32 = 0.12;
+/// 앞쪽 판정: 공격 방향과 위협 방향의 내적이 이보다 크면.
+pub const PARRY_FRONT: f32 = 0.2;
+pub const PARRY_SP: f32 = 4.0;
+pub const PARRY_HITSTOP: f32 = 0.12;
+pub const PARRY_SHAKE: f32 = 0.35;
+/// 튕겨낸 돌격형: 긴 경직 + 뒤로 밀림.
+pub const PARRY_STUN: f32 = 1.1;
+pub const PARRY_KNOCKBACK: f32 = 220.0;
+/// 되돌린 투사체: 빨라지고 적을 때린다.
+pub const PARRY_REFLECT_SPEED: f32 = 1.4;
+pub const PARRY_REFLECT_DAMAGE: i32 = 2;
+
+// ---- 모험(필드·던전, src/adventure.rs, docs/decisions/0019) ------------------------------
+/// 장소를 바꿀 때 어두워지는(그리고 밝아지는) 시간.
+pub const FADE_HALF: f32 = 0.3;
+/// 카메라가 목표를 따라가는 빠르기(초당, 지수 감쇠). 던전 방을 넘을 때 이 속도로 미끄러진다.
+pub const CAM_FOLLOW: f32 = 9.0;
+/// 필드의 자는 적이 깨는 거리.
+pub const ENEMY_AGGRO_RADIUS: f32 = 110.0;
+/// 던전 전투방에 들어선 뒤 적이 움직이기 시작하기까지.
+pub const ROOM_WAKE_DELAY: f32 = 0.7;
+
 // ---- 필살기: 드릴 돌진 (player.rs State::Drill, docs/decisions/0018) ---------------------
 /// SP 게이지 최대. 발톱이 맞으면 1, 마지막 타는 2 찬다(장신구로 배율).
 pub const SP_MAX: f32 = 12.0;

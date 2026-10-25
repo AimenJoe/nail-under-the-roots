@@ -57,6 +57,10 @@ pub struct Enemy {
     poison_tick: f32,
     /// 이번 틱에 독으로 쓰러졌다(월드가 처치로 센다).
     pub died_of_poison: bool,
+    /// 필드의 적: 플레이어가 가까이 오거나 맞기 전까지 제자리.
+    pub asleep: bool,
+    /// 던전 방: 이 시간 동안 제자리(들어온 플레이어가 자리 잡게).
+    pub wake_delay: f32,
 }
 
 pub struct Projectile {
@@ -64,6 +68,8 @@ pub struct Projectile {
     pub prev_pos: Vec2,
     pub vel: Vec2,
     pub alive: bool,
+    /// 패링으로 되돌린 것: 적을 때리고 플레이어는 맞지 않는다.
+    pub friendly: bool,
 }
 
 impl Projectile {
@@ -102,6 +108,8 @@ impl Enemy {
             poison: 0.0,
             poison_tick: t::POISON_TICK,
             died_of_poison: false,
+            asleep: false,
+            wake_delay: 0.0,
         }
     }
 
@@ -153,6 +161,20 @@ impl Enemy {
         let to_player = player_pos - self.pos;
         let dist = to_player.length();
         let dir_to_player = to_player.normalize_or_zero();
+        if self.asleep && player_targetable && dist < t::ENEMY_AGGRO_RADIUS {
+            self.asleep = false;
+        }
+        if self.wake_delay > 0.0 {
+            self.wake_delay -= dt;
+        }
+        if self.asleep || self.wake_delay > 0.0 {
+            // 자는 동안은 넉백만.
+            self.pos += self.vel * dt;
+            combat::apply_friction(&mut self.vel, dt);
+            let r = self.radius();
+            room.resolve_circle(&mut self.pos, r);
+            return;
+        }
 
         match self.state {
             State::Stunned { time } => {
@@ -241,6 +263,7 @@ impl Enemy {
                         prev_pos: start,
                         vel: self.facing * t::PROJECTILE_SPEED,
                         alive: true,
+                        friendly: false,
                     });
                     events.push(Event::Shoot);
                     self.fire_cd = t::SHOOTER_FIRE_INTERVAL;
@@ -295,6 +318,8 @@ impl Enemy {
 
     /// 피격. 넉백 방향은 단위 벡터.
     pub fn hurt(&mut self, dmg: i32, knock_dir: Vec2, knockback: f32, stun: f32) {
+        self.asleep = false;
+        self.wake_delay = 0.0;
         self.hp -= dmg;
         self.flash = t::HIT_FLASH;
         self.vel = knock_dir * knockback;

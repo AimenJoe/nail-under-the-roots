@@ -9,7 +9,9 @@ use crate::combat::{Shape, StrikeKind};
 use crate::enemy::{self, Enemy, Kind};
 use crate::input::TouchOverlay;
 use crate::loot;
+use crate::map::Cell;
 use crate::player::{self, Player};
+use crate::room::PropKind;
 use crate::tuning as t;
 use crate::ui::Ui;
 use crate::world::{self, FxKind, World};
@@ -69,7 +71,11 @@ impl Renderer {
         let shake = w
             .map(|w| (w.feel.shake_offset * shake_mul).round())
             .unwrap_or(Vec2::ZERO);
-        self.cam.target = center + shake;
+        // 모험: 카메라 왼쪽 위(보간, 정수 px). 아레나·타이틀은 0.
+        let cam = w
+            .map(|w| lerp(w.adv.prev_cam, w.adv.cam, alpha))
+            .unwrap_or(Vec2::ZERO);
+        self.cam.target = cam + center + shake;
         set_camera(&self.cam);
         let Some(w) = w else {
             clear_background(BG);
@@ -78,11 +84,15 @@ impl Renderer {
         };
         if let Some(art) = &self.art {
             clear_background(w.biome.clear());
-            draw_room_art(art, w);
+            if w.room.grid.is_some() {
+                draw_grid_art(art, w, cam);
+            } else {
+                draw_room_art(art, w);
+            }
             draw_sorted(art, w, alpha);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
-            draw_darkness(art, w, alpha);
+            draw_darkness(art, w, alpha, cam);
         } else {
             clear_background(BG);
             draw_room(w);
@@ -99,7 +109,20 @@ impl Renderer {
         if w.debug.hitboxes {
             draw_hitboxes(w, alpha);
         }
+        // HUD는 화면에 고정(흔들림·스크롤 없이).
+        self.cam.target = center;
+        set_camera(&self.cam);
         draw_hud_world(w);
+        let fade = w.fade_alpha();
+        if fade > 0.0 {
+            draw_rectangle(
+                0.0,
+                0.0,
+                t::VIEW_W,
+                t::VIEW_H,
+                Color::new(0.0, 0.0, 0.0, fade),
+            );
+        }
     }
 
     /// 화면 패스: 렌더 타깃을 정수 배율 + 레터박스로 올리고, 그 배치를 돌려준다.
@@ -382,7 +405,7 @@ fn draw_room(w: &World) {
     );
     draw_rectangle(0.0, 0.0, r.x, t::VIEW_H, WALL_COLOR);
     draw_rectangle(r.right(), 0.0, t::VIEW_W - r.right(), t::VIEW_H, WALL_COLOR);
-    for p in &w.room.pillars {
+    for p in &w.room.solids {
         draw_rectangle(p.x, p.y, p.w, p.h, WALL_COLOR);
         draw_rectangle(p.x + 2.0, p.y + 2.0, p.w - 4.0, p.h - 4.0, world::DIRT);
     }
@@ -517,8 +540,27 @@ fn draw_claw_marks(origin: Vec2, dir: Vec2, r: f32, k: f32, strong: bool, mark: 
 
 fn draw_projectile(p: &enemy::Projectile, alpha: f32) {
     let pos = lerp(p.prev_pos, p.pos, alpha);
-    draw_circle(pos.x, pos.y, p.radius(), world::PROJECTILE);
-    draw_circle_lines(pos.x, pos.y, p.radius() + 0.5, 1.0, WHITE);
+    // 되돌린 투사체는 하얗게 + 꼬리.
+    let c = if p.friendly { WHITE } else { world::PROJECTILE };
+    if p.friendly {
+        let tail = pos - p.vel.normalize_or_zero() * 5.0;
+        draw_line(
+            pos.x,
+            pos.y,
+            tail.x,
+            tail.y,
+            2.0,
+            Color::new(1.0, 1.0, 1.0, 0.5),
+        );
+    }
+    draw_circle(pos.x, pos.y, p.radius(), c);
+    draw_circle_lines(
+        pos.x,
+        pos.y,
+        p.radius() + 0.5,
+        1.0,
+        if p.friendly { world::PROJECTILE } else { WHITE },
+    );
 }
 
 // ---- 그림 에셋 경로 -----------------------------------------------------------
@@ -554,17 +596,34 @@ fn decor_src(d: Decor) -> Rect {
     }
 }
 
-/// 바닥 칸마다 (x, y, 장식). 방 그림은 칸 해시로 정해져 프레임마다 같다.
-fn floor_decor(w: &World) -> Vec<(f32, f32, Decor)> {
-    let r = w.room.inner;
+/// 바닥 칸마다 (x, y, 장식). 방 그림은 칸 해시로 정해져 프레임마다 같다. 격자 방은 보이는 바닥 칸만.
+fn floor_decor(w: &World, cam: Vec2) -> Vec<(f32, f32, Decor)> {
     let mut out = Vec::new();
-    let (cx0, cy0) = ((r.x / 16.0).floor() as i32, (r.y / 16.0).floor() as i32);
-    let (cx1, cy1) = (
-        (r.right() / 16.0).ceil() as i32,
-        (r.bottom() / 16.0).ceil() as i32,
-    );
+    let (cx0, cy0, cx1, cy1) = match &w.room.grid {
+        Some(_) => {
+            let (x0, y0) = (
+                (cam.x / 16.0).floor() as i32 - 1,
+                (cam.y / 16.0).floor() as i32 - 1,
+            );
+            (x0, y0, x0 + 23, y0 + 14)
+        }
+        None => {
+            let r = w.room.inner;
+            (
+                (r.x / 16.0).floor() as i32,
+                (r.y / 16.0).floor() as i32,
+                (r.right() / 16.0).ceil() as i32,
+                (r.bottom() / 16.0).ceil() as i32,
+            )
+        }
+    };
     for cy in cy0..cy1 {
         for cx in cx0..cx1 {
+            if let Some(g) = &w.room.grid {
+                if g.get_i(cx, cy) != Cell::Floor {
+                    continue;
+                }
+            }
             let (roll, pick) = biome::hash01(cx, cy, 7);
             if let Some(d) = w.biome.decor(roll, pick) {
                 out.push((cx as f32 * 16.0, cy as f32 * 16.0, d));
@@ -572,6 +631,177 @@ fn floor_decor(w: &World) -> Vec<(f32, f32, Decor)> {
         }
     }
     out
+}
+
+/// 격자 방(필드·던전) 그림: 보이는 칸만. 벽 칸은 아래가 바닥이면 벼랑 앞면, 아니면 윗면(3/4 시점).
+/// 특별한 칸: 문(열림 = 바닥, 잠김 = 뿌리 창살), 굴 입구, 출구, 저장 지점(빛나는 버섯 고리).
+fn draw_grid_art(art: &Art, w: &World, cam: Vec2) {
+    let Some(g) = &w.room.grid else { return };
+    let tex = &art.tiles;
+    let ft = w.biome.floor_tint();
+    let wt = w.biome.wall_tint();
+    let dirt = w.biome.dirt_floor();
+    let (x0, y0) = (
+        (cam.x / 16.0).floor() as i32 - 1,
+        (cam.y / 16.0).floor() as i32 - 1,
+    );
+    let (x1, y1) = (x0 + 23, y0 + 14);
+    let solid = |c: Cell| c == Cell::Wall || (c == Cell::Door && w.room.doors_locked());
+    for cy in y0..y1 {
+        for cx in x0..x1 {
+            let c = g.get_i(cx, cy);
+            let (px, py) = (cx as f32 * 16.0, cy as f32 * 16.0);
+            if c == Cell::Wall {
+                if g.get_i(cx, cy + 1) != Cell::Wall {
+                    let (roll, _) = biome::hash01(cx, cy, 3);
+                    let roots = match w.biome {
+                        crate::biome::Biome::Meadow => roll < 0.15,
+                        crate::biome::Biome::Roots => roll < 0.55,
+                        crate::biome::Biome::Deep => roll < 0.8,
+                    };
+                    let src = if roots {
+                        tile_src(2, 1)
+                    } else {
+                        tile_src(1, 1)
+                    };
+                    draw_tile(tex, src, px, py, wt);
+                } else {
+                    draw_tile(tex, tile_src(0, 1), px, py, wt);
+                }
+                continue;
+            }
+            let (_, pick) = biome::hash01(cx, cy, 1);
+            let src = if dirt {
+                tile_src(3, 0)
+            } else {
+                tile_src(pick % 3, 0)
+            };
+            draw_tile(tex, src, px, py, ft);
+            // 벼랑 아래 그늘
+            if solid(g.get_i(cx, cy - 1)) {
+                draw_rectangle(px, py, 16.0, 2.0, Color::new(0.0, 0.0, 0.0, 0.25));
+                draw_rectangle(px, py + 2.0, 16.0, 2.0, Color::new(0.0, 0.0, 0.0, 0.12));
+            }
+        }
+    }
+    // 반대 재질 얼룩(바닥만)
+    for cy in y0..y1 {
+        for cx in x0..x1 {
+            if g.get_i(cx, cy) != Cell::Floor {
+                continue;
+            }
+            let (roll, pick) = biome::hash01(cx, cy, 2);
+            if roll < w.biome.patch_chance() {
+                let row = if dirt { 3 } else { 2 };
+                let src = tile_src(2 + pick % 2, row);
+                let ox = ((pick >> 2) % 9) as f32 - 4.0;
+                let oy = ((pick >> 6) % 9) as f32 - 4.0;
+                draw_tile(tex, src, cx as f32 * 16.0 + ox, cy as f32 * 16.0 + oy, ft);
+            }
+        }
+    }
+    for (x, y, d) in floor_decor(w, cam) {
+        draw_tile(tex, decor_src(d), x, y, ft);
+    }
+    // 특별한 칸
+    for cy in y0..y1 {
+        for cx in x0..x1 {
+            let c = g.get_i(cx, cy);
+            let p = vec2(cx as f32 * 16.0 + 8.0, cy as f32 * 16.0 + 8.0);
+            match c {
+                Cell::Door if w.room.doors_locked() => {
+                    let wood = Color::new(0.42, 0.28, 0.20, 1.0);
+                    for k in 0..3 {
+                        let x = p.x - 6.0 + k as f32 * 5.0;
+                        draw_rectangle(x - 1.0, p.y - 8.0, 4.0, 16.0, OUTLINE);
+                        draw_rectangle(x, p.y - 8.0, 2.0, 16.0, wood);
+                    }
+                }
+                Cell::Entrance => {
+                    draw_ellipse(p.x, p.y + 2.0, 12.0, 7.0, 0.0, world::DIRT);
+                    draw_ellipse(
+                        p.x,
+                        p.y + 2.0,
+                        9.0,
+                        5.0,
+                        0.0,
+                        Color::new(0.05, 0.03, 0.06, 1.0),
+                    );
+                    draw_ellipse(
+                        p.x,
+                        p.y + 3.0,
+                        6.0,
+                        3.0,
+                        0.0,
+                        Color::new(0.0, 0.0, 0.0, 1.0),
+                    );
+                }
+                Cell::Exit => {
+                    let pulse = 0.5 + 0.3 * (w.time * 3.0).sin();
+                    draw_ellipse(p.x, p.y + 2.0, 10.0, 6.0, 0.0, world::DIRT);
+                    draw_ellipse(
+                        p.x,
+                        p.y + 2.0,
+                        8.0,
+                        4.5,
+                        0.0,
+                        Color::new(0.95, 0.9, 0.6, pulse),
+                    );
+                    draw_triangle(
+                        vec2(p.x, p.y - 10.0),
+                        vec2(p.x - 4.0, p.y - 5.0),
+                        vec2(p.x + 4.0, p.y - 5.0),
+                        Color::new(1.0, 1.0, 0.8, pulse),
+                    );
+                }
+                Cell::Save => {
+                    let pulse = 0.55 + 0.35 * (w.time * 2.0).sin().abs();
+                    draw_circle(p.x, p.y, 9.0, Color::new(0.55, 1.0, 0.6, 0.12 * pulse));
+                    for k in 0..5 {
+                        let a = k as f32 / 5.0 * std::f32::consts::TAU + 0.3;
+                        let q = p + vec2(a.cos() * 7.0, a.sin() * 4.0);
+                        draw_rectangle(
+                            q.x - 1.0,
+                            q.y - 2.0,
+                            3.0,
+                            2.0,
+                            Color::new(0.6, 1.0, 0.65, pulse),
+                        );
+                        draw_rectangle(q.x, q.y, 1.0, 2.0, Color::new(0.9, 0.85, 0.7, 1.0));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+/// 보물 상자(던전 보물방). 열리면 뚜껑이 젖혀지고 안이 빈다.
+fn draw_chest(r: Rect, opened: bool, time: f32) {
+    let wood = Color::new(0.55, 0.36, 0.22, 1.0);
+    let dark = Color::new(0.36, 0.22, 0.14, 1.0);
+    let gold = Color::new(0.95, 0.80, 0.35, 1.0);
+    let (x, y) = (r.x + 1.0, r.bottom() - 11.0);
+    draw_rectangle(x - 1.0, y - 1.0, 16.0, 12.0, OUTLINE);
+    draw_rectangle(x, y + 3.0, 14.0, 7.0, wood);
+    draw_rectangle(x, y + 8.0, 14.0, 2.0, dark);
+    if opened {
+        draw_rectangle(x, y - 3.0, 14.0, 3.0, dark);
+        draw_rectangle(
+            x + 1.0,
+            y + 3.0,
+            12.0,
+            2.0,
+            Color::new(0.05, 0.03, 0.05, 1.0),
+        );
+    } else {
+        draw_rectangle(x, y, 14.0, 3.0, wood);
+        draw_rectangle(x + 6.0, y + 2.0, 2.0, 3.0, gold);
+        if ((time * 2.0) as i32) % 2 == 0 {
+            draw_rectangle(x + 11.0, y - 3.0, 1.0, 3.0, WHITE);
+            draw_rectangle(x + 10.0, y - 2.0, 3.0, 1.0, WHITE);
+        }
+    }
 }
 
 /// 3/4 방: 바닥(풀·흙) + 장식, 좌·우·아래 벽 윗면, 위쪽은 벽 윗면 + 벼랑 앞면.
@@ -608,7 +838,7 @@ fn draw_room_art(art: &Art, w: &World) {
             }
         }
     }
-    for (x, y, d) in floor_decor(w) {
+    for (x, y, d) in floor_decor(w, Vec2::ZERO) {
         // 빛나는 버섯은 어둠 뒤에 한 번 더 그린다(draw_darkness).
         draw_tile(tex, decor_src(d), x, y, ft);
     }
@@ -664,8 +894,8 @@ enum Drawable {
 /// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
 fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     let mut list: Vec<(f32, Drawable)> = Vec::new();
-    for (i, p) in w.room.pillars.iter().enumerate() {
-        list.push((p.bottom(), Drawable::Pillar(i)));
+    for (i, p) in w.room.props.iter().enumerate() {
+        list.push((p.rect.bottom(), Drawable::Pillar(i)));
     }
     for (i, p) in w.pickups.iter().enumerate() {
         list.push((p.pos.y + 4.0, Drawable::Pickup(i)));
@@ -710,9 +940,16 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     for (_, d) in list {
         match d {
             Drawable::Pillar(i) => {
-                let p = w.room.pillars[i];
-                let src = Rect::new(if i % 2 == 0 { 0.0 } else { 16.0 }, 32.0, 16.0, 32.0);
-                draw_tile(&art.tiles, src, p.x, p.bottom() - 32.0, w.biome.wall_tint());
+                let p = w.room.props[i];
+                let r = p.rect;
+                match p.kind {
+                    PropKind::Stump | PropKind::Rock => {
+                        let col = if p.kind == PropKind::Stump { 0.0 } else { 16.0 };
+                        let src = Rect::new(col, 32.0, 16.0, 32.0);
+                        draw_tile(&art.tiles, src, r.x, r.bottom() - 32.0, w.biome.wall_tint());
+                    }
+                    PropKind::Chest { opened } => draw_chest(r, opened, w.time),
+                }
             }
             Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
             Drawable::Loot(i) => draw_loot(&w.loot[i], alpha, w.time, false),
@@ -925,7 +1162,7 @@ fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {
 }
 
 /// 환경 어둠: 플레이어 주변만 밝고 바깥은 어둡다. 빛나는 버섯은 어둠 위에 다시.
-fn draw_darkness(art: &Art, w: &World, alpha: f32) {
+fn draw_darkness(art: &Art, w: &World, alpha: f32, cam: Vec2) {
     let (dark, radius) = w.biome.darkness();
     if dark <= 0.0 {
         return;
@@ -945,15 +1182,17 @@ fn draw_darkness(art: &Art, w: &World, alpha: f32) {
         },
     );
     let black = Color::new(0.0, 0.0, 0.0, dark);
-    let (vw, vh) = (t::VIEW_W + 8.0, t::VIEW_H + 8.0);
-    draw_rectangle(-8.0, -8.0, vw + 8.0, y0 + 8.0, black);
-    draw_rectangle(-8.0, y0 + s, vw + 8.0, vh - (y0 + s) + 8.0, black);
-    draw_rectangle(-8.0, y0, x0 + 8.0, s, black);
-    draw_rectangle(x0 + s, y0, vw - (x0 + s) + 8.0, s, black);
+    // 보이는 화면(카메라 기준, 흔들림 여유 8px)에서 빛 원 바깥을 덮는다.
+    let (l, tp) = (cam.x - 8.0, cam.y - 8.0);
+    let (r, b) = (cam.x + t::VIEW_W + 8.0, cam.y + t::VIEW_H + 8.0);
+    draw_rectangle(l, tp, r - l, (y0 - tp).max(0.0), black);
+    draw_rectangle(l, y0 + s, r - l, (b - (y0 + s)).max(0.0), black);
+    draw_rectangle(l, y0, (x0 - l).max(0.0), s, black);
+    draw_rectangle(x0 + s, y0, (r - (x0 + s)).max(0.0), s, black);
     for l in &w.loot {
         draw_loot(l, alpha, w.time, true);
     }
-    for (x, y, d) in floor_decor(w) {
+    for (x, y, d) in floor_decor(w, cam) {
         if d == Decor::Mushroom {
             let pulse = 0.65 + 0.25 * ((w.time * 2.0 + x * 0.1).sin());
             draw_tile(
@@ -1180,13 +1419,16 @@ fn draw_hud_screen(w: &World, scale: f32, ox: f32, oy: f32, gamepad_count: usize
     let line = fs * 1.2;
     // 월드 HUD(체력 핍 8px 높이) 아래부터 텍스트.
     let mut y = oy + 9.0 * scale + fs;
-    draw_text(
-        format!("wave {}  kills {}", w.wave, w.kills),
-        ox + 4.0,
-        y,
-        fs,
-        GRAY,
-    );
+    // 웨이브·처치 수는 아레나(웨이브 시험장)에서만.
+    if w.adv.place == crate::adventure::Place::Arena {
+        draw_text(
+            format!("wave {}  kills {}", w.wave, w.kills),
+            ox + 4.0,
+            y,
+            fs,
+            GRAY,
+        );
+    }
     y += line;
     if !w.debug.overlay {
         return;

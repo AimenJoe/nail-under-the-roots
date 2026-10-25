@@ -10,8 +10,14 @@ use crate::world::World;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Scenario {
-    /// 타이틀 "시작": 오프닝 컷씬 뒤 웨이브 1부터.
+    /// 타이틀 "시작": 필드(모험)에서 오프닝 컷씬 → 튜토리얼 → 자유 탐험(docs/decisions/0019).
     Normal,
+    /// 필드에서 바로(컷씬·튜토리얼 없이, 발톱 들고).
+    Field,
+    /// 필드에서 곧장 던전으로.
+    Dungeon,
+    /// 아레나 웨이브(예전 첫 시작). 손맛 시험장.
+    Arena,
     Empty,
     Chargers(u32),
     Shooters(u32),
@@ -39,7 +45,22 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 14] = [
+pub const LIST: [Entry; 17] = [
+    Entry {
+        name: "필드(모험)",
+        desc: "컷씬·튜토리얼 없이 필드에서. 남쪽 굴 입구로 던전, 저장 지점(초록 버섯 고리).",
+        scenario: Scenario::Field,
+    },
+    Entry {
+        name: "던전 바로",
+        desc: "새로 생성한 던전 시작방에서. 전투방은 들어서면 문이 닫힌다. 보스를 잡으면 출구.",
+        scenario: Scenario::Dungeon,
+    },
+    Entry {
+        name: "아레나 웨이브",
+        desc: "예전 첫 시작: 방 하나에서 웨이브 1부터(손맛 시험장).",
+        scenario: Scenario::Arena,
+    },
     Entry {
         name: "환경: 꽃 핀 입구",
         desc: "밝고 꽃이 많은 첫 환경. 돌격형 1 + 원거리형 1.",
@@ -115,7 +136,13 @@ pub const LIST: [Entry; 14] = [
 /// 시나리오에 맞는 월드를 만든다.
 pub fn build(s: Scenario) -> World {
     match s {
-        Scenario::Normal => World::new(),
+        Scenario::Normal | Scenario::Field => World::field(),
+        Scenario::Dungeon => {
+            let mut w = World::field();
+            w.enter_dungeon_now();
+            w
+        }
+        Scenario::Arena => World::new(),
         Scenario::Empty | Scenario::CutsceneOnly | Scenario::Tutorial => World::empty(),
         Scenario::AllClaws => World::new(),
         Scenario::Gear => {

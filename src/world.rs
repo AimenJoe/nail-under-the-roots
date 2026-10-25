@@ -2,6 +2,7 @@
 
 use macroquad::prelude::*;
 
+use crate::adventure::{Adventure, Place};
 use crate::biome::Biome;
 use crate::combat::{Feel, Strike};
 use crate::enemy::{self, Enemy, Kind, Projectile};
@@ -35,6 +36,15 @@ pub struct Fx {
     pub kind: FxKind,
 }
 
+/// 얻은 것(앱이 가방에 넣고 획득 창을 띄운다).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Gift {
+    /// equipment::WEAPONS 번호.
+    Weapon(usize),
+    /// equipment::CHARMS 번호.
+    Charm(usize),
+}
+
 /// 바닥에 놓인 무기. 닿으면 얻는다.
 pub struct Pickup {
     pub pos: Vec2,
@@ -63,8 +73,12 @@ pub struct World {
     pub toast: Option<(Tr, f32)>,
     /// 체력이 깎인 채로 산딸기 없이 지나간 처치 수(불운 보정).
     kills_since_berry: u32,
-    /// 이번 틱에 얻은 무기(WEAPONS 번호). 앱이 가방에 넣고 비운다. 획득물·컷씬 둘 다 여기로.
-    pub gifts: Vec<usize>,
+    /// 이번 틱에 얻은 것. 앱이 가방에 넣고 비운다. 획득물·컷씬·보물 상자 모두 여기로.
+    pub gifts: Vec<Gift>,
+    /// 지금까지 찾은 장신구(같은 걸 두 번 주지 않게).
+    pub charms_found: Vec<usize>,
+    /// 모험 구조: 장소·카메라·던전·저장 지점(adventure.rs).
+    pub adv: Adventure,
     pub feel: Feel,
     pub debug: Debug,
     /// 적을 다 잡으면 다음 웨이브를 자동으로 띄운다. 시나리오는 끌 수 있다.
@@ -106,6 +120,8 @@ impl World {
             toast: None,
             kills_since_berry: 0,
             gifts: Vec::new(),
+            charms_found: Vec::new(),
+            adv: Adventure::default(),
             feel: Feel::default(),
             debug: Debug {
                 overlay: false,
@@ -146,6 +162,11 @@ impl World {
     pub fn tick(&mut self, a: &Actions, sfx: &Sfx) {
         let dt = t::TICK_DT;
         self.time += dt;
+        if self.adventure_pre(sfx) {
+            // 장소를 바꾸는 중(어두워졌다 밝아짐): 로직은 멈춘다.
+            self.freeze_interp();
+            return;
+        }
         self.feel.tick(dt);
         if self.feel.hitstop > 0.0 {
             // 히트스톱: 로직 시계만 멈춘다. 입력은 버퍼에 쌓인다.
@@ -191,7 +212,7 @@ impl World {
                     self.fx.push(ring(p, 4.0, t::DRILL_WALL_RADIUS, 0.25, DIRT));
                     burst(&mut self.fx, p, 18, DIRT, 130.0);
                 }
-                player::Event::Hurt | player::Event::Die => {}
+                player::Event::Hurt | player::Event::Die | player::Event::Parry => {}
             }
         }
         // 드릴 중에는 흙이 튄다.
@@ -232,7 +253,7 @@ impl World {
             }
         });
         for (pos, w) in got {
-            self.gifts.push(w);
+            self.gifts.push(Gift::Weapon(w));
             sfx.play(sfx::Id::Emerge);
             self.fx.push(ring(pos, 4.0, 18.0, 0.3, WHITE));
             burst(&mut self.fx, pos, 14, PROJECTILE, 80.0);
@@ -338,6 +359,33 @@ impl World {
                 self.fx.push(ring(p.pos, 2.0, 6.0, 0.12, PROJECTILE));
             }
         }
+        // 되돌린 투사체 → 적
+        for p in self
+            .projectiles
+            .iter_mut()
+            .filter(|p| p.alive && p.friendly)
+        {
+            for e in self.enemies.iter_mut().filter(|e| e.alive) {
+                let rr = p.radius() + e.radius();
+                if (e.pos - p.pos).length_squared() <= rr * rr {
+                    e.hurt(
+                        t::PARRY_REFLECT_DAMAGE,
+                        p.vel.normalize_or_zero(),
+                        160.0,
+                        0.4,
+                    );
+                    p.alive = false;
+                    sfx.play(sfx::Id::EnemyHit);
+                    self.fx.push(ring(p.pos, 3.0, 12.0, 0.18, WHITE));
+                    if !e.alive {
+                        self.kills += 1;
+                        deaths.push((e.pos, e.kind));
+                        burst(&mut self.fx, e.pos, 12, enemy_color(e.kind), 110.0);
+                    }
+                    break;
+                }
+            }
+        }
 
         // 3. 플레이어 공격 → 적·투사체
         if let Some(s) = strike {
@@ -383,11 +431,27 @@ impl World {
                     burst(&mut self.fx, e.pos, 12, color, 110.0);
                 }
             }
+            let parry = self.player.parry_dir();
+            let mut parried = false;
             for p in &mut self.projectiles {
-                if p.alive && s.shape.overlaps_circle(p.pos, p.radius()) {
-                    p.alive = false;
-                    self.fx.push(ring(p.pos, 2.0, 8.0, 0.12, PROJECTILE));
+                if !p.alive || p.friendly || !s.shape.overlaps_circle(p.pos, p.radius()) {
+                    continue;
                 }
+                // 스윙 첫머리에 맞받으면 되돌린다(패링), 아니면 베어 없앤다.
+                match parry {
+                    Some(dir) if (-p.vel.normalize_or_zero()).dot(dir) > t::PARRY_FRONT => {
+                        p.vel = dir * p.vel.length() * t::PARRY_REFLECT_SPEED;
+                        p.friendly = true;
+                        parried = true;
+                    }
+                    _ => {
+                        p.alive = false;
+                        self.fx.push(ring(p.pos, 2.0, 8.0, 0.12, PROJECTILE));
+                    }
+                }
+            }
+            if parried {
+                self.parry_feedback(sfx);
             }
         }
 
@@ -400,20 +464,32 @@ impl World {
             let pr = self.player.radius();
             let ppos = self.player.pos;
             let mut hurt_from = None;
+            let parry = self.player.parry_dir();
+            let mut parried = false;
             for e in &mut self.enemies {
                 if let Some(dmg) = e.contact_damage() {
                     let rr = pr + e.radius();
                     if (e.pos - ppos).length_squared() <= rr * rr {
+                        let from = (e.pos - ppos).normalize_or_zero();
+                        if parry.is_some_and(|d| d.dot(from) > t::PARRY_FRONT) {
+                            // 패링: 돌진을 받아쳐 크게 멈칫하게 한다. 피해 없음.
+                            e.hurt(0, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                            parried = true;
+                            break;
+                        }
                         e.on_hit_player();
                         hurt_from = Some((e.pos, dmg));
                         break;
                     }
                 }
             }
-            if hurt_from.is_none() {
+            if parried {
+                self.parry_feedback(sfx);
+            }
+            if hurt_from.is_none() && !parried {
                 for p in &mut self.projectiles {
                     let rr = pr + p.radius();
-                    if p.alive && (p.pos - ppos).length_squared() <= rr * rr {
+                    if p.alive && !p.friendly && (p.pos - ppos).length_squared() <= rr * rr {
                         p.alive = false;
                         hurt_from = Some((p.pos, t::PROJECTILE_DAMAGE));
                         break;
@@ -469,14 +545,34 @@ impl World {
         }
         self.fx.retain(|f| f.time < f.dur);
 
-        // 7. 웨이브
-        if self.auto_waves && self.player.is_alive() && self.enemies.is_empty() {
+        // 7. 모험(입구·출구·저장, 던전 방, 카메라)
+        self.adventure_post(sfx);
+
+        // 8. 웨이브(아레나)
+        if self.auto_waves
+            && self.adv.place == Place::Arena
+            && self.player.is_alive()
+            && self.enemies.is_empty()
+        {
             self.respawn_timer -= dt;
             if self.respawn_timer <= 0.0 {
                 self.next_wave();
                 self.respawn_timer = t::WAVE_RESPAWN_DELAY;
             }
         }
+    }
+
+    /// 패링 성공 연출: 번쩍, 히트스톱, SP.
+    fn parry_feedback(&mut self, sfx: &Sfx) {
+        self.player.on_parry();
+        self.feel.add_hitstop(t::PARRY_HITSTOP);
+        self.feel.add_trauma(t::PARRY_SHAKE);
+        let p = self.player.pos + self.player.facing * 8.0;
+        self.fx.push(ring(p, 2.0, 18.0, 0.22, WHITE));
+        self.fx.push(ring(p, 2.0, 10.0, 0.15, PROJECTILE));
+        burst(&mut self.fx, p, 10, WHITE, 120.0);
+        sfx.play(sfx::Id::Parry);
+        self.toast = Some((|s| s.toast_parry, 0.8));
     }
 
     /// 장신구·씨앗으로 능력치를 다시 계산한다.
@@ -569,6 +665,7 @@ impl World {
         for l in &mut self.loot {
             l.prev_pos = l.pos;
         }
+        self.adv.prev_cam = self.adv.cam;
     }
 
     pub fn next_wave(&mut self) {

@@ -27,6 +27,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - 손맛 수치는 `src/tuning.rs` 한 곳에. 콤보(무기별)는 `src/moveset.rs`의 `Moveset` 표, 어떤 캐릭터가 어떤 무기 종류를 쓰는지는 `src/equipment.rs`(docs/decisions/0011). 플레이어 코드에 타별 숫자를 직접 쓰지 않는다(docs/decisions/0009).
 - UI는 커서 없이 동작해야 한다(좌우 이동 + 확인). 마우스는 보조.
 - 모듈 경계: `input`, `player`, `enemy`, `combat`, `room`, `render`, `world`(틱 순서). 각 모듈은 `Actions`와 월드 상태만 본다. 장면·메뉴는 `app`(+`ui`)에만 있고 `world`는 메뉴를 모른다.
+- 모험 구조(docs/decisions/0019): 장소·카메라·던전 오가기는 `adventure`, 격자·ASCII 기호는 `map`, 필드 지도는 `field`(ASCII를 고치면 `cargo test`의 field 테스트로 컷씬 줄·입구·저장 지점 확인), 던전 생성은 `dungeon`(같은 시드 = 같은 던전). 월드 좌표는 지도 전체, 화면은 `world.adv.cam`.
 - 그림 문법은 3/4 탑다운(docs/decisions/0006). 아이소메트릭 아님.
 - 테스트용 방 구성은 `src/scenario.rs`에 한 줄 추가(타이틀 "개발"). 컷씬은 `src/cutscene.rs`의 `Step` 스크립트, JRPG식(docs/decisions/0008).
 - UI 텍스트는 `assets/fonts/Galmuri11-Condensed.ttf`(KS X 1001 2,350자 서브셋)로 실제 해상도에 찍는다. 그 밖의 한자·확장 한글은 안 나온다.
