@@ -264,6 +264,7 @@ impl World {
             room.visited = true;
             if room.kind == RoomKind::Rest {
                 let c = room.rect().center();
+                // 방 가운데에 놓는다(굴러가지 않으니 묶을 필요 없음).
                 for k in 0..3 {
                     self.loot.push(Loot::place(
                         LootKind::Berry,
@@ -318,14 +319,14 @@ impl World {
             self.room.open_chest(i);
             let at = self.room.props[i].rect.center();
             for _ in 0..rand::gen_range(t::CHEST_SEEDS.0, t::CHEST_SEEDS.1 + 1) {
-                self.loot.push(Loot::spawn(LootKind::Seed, at));
+                self.push_loot(Loot::spawn(LootKind::Seed, at));
             }
             let missing: Vec<usize> = (0..crate::equipment::CHARMS.len())
                 .filter(|c| !self.charms_found.contains(c))
                 .collect();
             if missing.is_empty() {
                 for _ in 0..12 {
-                    self.loot.push(Loot::spawn(
+                    self.push_loot(Loot::spawn(
                         LootKind::Glowbug,
                         self.room.props[i].rect.center(),
                     ));
@@ -337,6 +338,22 @@ impl World {
             }
             sfx.play(sfx::Id::Emerge);
         }
+    }
+
+    /// 떨어진 것이 굴러갈 수 있는 곳: 던전이면 지금 방의 안쪽(벽 칸과 문 칸을 뺀 곳), 그 밖은 제한 없음.
+    pub fn loot_bounds(&self) -> Option<Rect> {
+        match self.adv.place {
+            Place::Dungeon => {
+                let r = dungeon::room_rect(self.adv.current_room);
+                Some(Rect::new(r.x + 22.0, r.y + 38.0, r.w - 44.0, r.h - 60.0))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn push_loot(&mut self, l: Loot) {
+        let b = self.loot_bounds();
+        self.loot.push(l.within(b));
     }
 
     /// 카메라가 머무는 사각형.

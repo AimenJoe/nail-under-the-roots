@@ -36,6 +36,8 @@ pub struct Loot {
     pub age: f32,
     /// 그리기 흔들림·깜빡임을 서로 다르게.
     pub phase: f32,
+    /// 굴러갈 수 있는 사각형(던전: 떨어진 방의 안쪽). 문 칸으로 굴러가 주우려다 옆 방으로 넘어가는 일을 막는다.
+    pub bounds: Option<Rect>,
 }
 
 impl Loot {
@@ -52,7 +54,33 @@ impl Loot {
             vz: rand::gen_range(t::LOOT_POP_UP * 0.7, t::LOOT_POP_UP),
             age: 0.0,
             phase: rand::gen_range(0.0, 1.0),
+            bounds: None,
         }
+    }
+
+    /// 이 사각형 밖으로는 굴러가지 않는다. 나온 자리가 밖이면 안으로 옮긴다.
+    pub fn within(mut self, bounds: Option<Rect>) -> Self {
+        self.bounds = bounds;
+        self.keep_inside();
+        self.prev_pos = self.pos;
+        self
+    }
+
+    fn keep_inside(&mut self) {
+        let Some(b) = self.bounds else {
+            return;
+        };
+        let p = vec2(
+            self.pos.x.clamp(b.x, b.right()),
+            self.pos.y.clamp(b.y, b.bottom()),
+        );
+        if p.x != self.pos.x {
+            self.vel.x = -self.vel.x * 0.4;
+        }
+        if p.y != self.pos.y {
+            self.vel.y = -self.vel.y * 0.4;
+        }
+        self.pos = p;
     }
 
     /// 튀지 않고 그 자리에 놓는다(개발 시나리오용).
@@ -100,6 +128,7 @@ impl Loot {
         if room.resolve_circle(&mut self.pos, 2.0) {
             self.vel *= 0.5;
         }
+        self.keep_inside();
         ready && can_take && (player - self.pos).length() <= t::LOOT_COLLECT_RADIUS
     }
 }
@@ -124,6 +153,20 @@ pub fn berry_chance(hp: i32, max_hp: i32, since_heal: u32, kind: Kind) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 던전 방 안쪽에 묶인 것은 문 쪽으로 세게 튀어도 안쪽에 남는다.
+    #[test]
+    fn bounded_loot_stays_inside() {
+        let room = Room::new();
+        let b = Rect::new(40.0, 40.0, 100.0, 60.0);
+        let mut l = Loot::spawn(LootKind::Berry, vec2(10.0, 70.0)).within(Some(b));
+        assert!(b.contains(l.pos), "나온 자리가 밖이면 안으로");
+        l.vel = vec2(-500.0, 0.0);
+        for _ in 0..60 {
+            l.update(t::TICK_DT, vec2(300.0, 300.0), true, &room);
+            assert!(l.pos.x >= b.x && l.pos.x <= b.right());
+        }
+    }
 
     #[test]
     fn no_berry_at_full_hp_or_from_dummy() {

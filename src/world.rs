@@ -740,20 +740,20 @@ impl World {
         let (lo, hi) = loot::glowbugs_for(kind);
         if hi > 0 {
             for _ in 0..rand::gen_range(lo, hi + 1) {
-                self.loot.push(Loot::spawn(LootKind::Glowbug, pos));
+                self.push_loot(Loot::spawn(LootKind::Glowbug, pos));
             }
         }
         if rand::gen_range(0.0, 1.0) < kind.species().seed_chance {
-            self.loot.push(Loot::spawn(LootKind::Seed, pos));
+            self.push_loot(Loot::spawn(LootKind::Seed, pos));
         }
         if kind != Kind::Dummy && rand::gen_range(0.0, 1.0) < t::WORM_CHANCE {
-            self.loot.push(Loot::spawn(LootKind::Worm, pos));
+            self.push_loot(Loot::spawn(LootKind::Worm, pos));
         }
         let max = self.player.stats.max_hp;
         let missing = self.player.hp < max;
         let p = loot::berry_chance(self.player.hp, max, self.kills_since_berry, kind);
         if p > 0.0 && rand::gen_range(0.0, 1.0) < p {
-            self.loot.push(Loot::spawn(LootKind::Berry, pos));
+            self.push_loot(Loot::spawn(LootKind::Berry, pos));
             self.kills_since_berry = 0;
         } else if missing && kind != Kind::Dummy {
             self.kills_since_berry += 1;

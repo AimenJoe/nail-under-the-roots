@@ -34,7 +34,7 @@ pub struct Portrait {
 impl Portrait {
     /// Naïl: 칸 0~3(보통·기쁨·걱정·결의).
     pub const NAIL: Portrait = Portrait { first: 0, faces: 4 };
-    /// 변해 버린 이웃: 칸 4(정체를 모름: 그림자 + 빛나는 눈).
+    /// 변해 버린 이웃: 칸 4(정체를 모름: 그림자 + 빛나는 눈). 정체는 모모(히로인, 나중에 밝혀짐, docs/decisions/0027).
     pub const NEIGHBOR_UNKNOWN: Portrait = Portrait { first: 4, faces: 1 };
     /// 라쿤 포포: 칸 5~6(보통·기쁨).
     pub const POPO: Portrait = Portrait { first: 5, faces: 2 };

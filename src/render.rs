@@ -1115,6 +1115,7 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
         player::State::Burrow { .. } | player::State::Dead
     ) {
         draw_ellipse(pp.x, pp.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+        draw_player_halo(pp, w.time);
     }
     list.sort_by(|a, b| a.0.total_cmp(&b.0));
     for (_, d) in list {
@@ -1569,6 +1570,30 @@ fn draw_critter_at(tex: &Texture2D, row: u32, pos: Vec2, face_left: bool, moving
             flip_x: face_left,
             ..Default::default()
         },
+    );
+}
+
+/// 내 캐릭터 표시: 발밑의 따뜻한 빛 고리(색이 아니라 모양으로도 구별되게). 바닥에 그려 다른 그림을 가리지 않는다.
+/// 적이 많을 때 Naïl을 놓치지 않게(사람 피드백 2026-10-25). 아주 천천히 숨 쉬듯 밝아졌다 어두워진다.
+fn draw_player_halo(p: Vec2, time: f32) {
+    let pulse = 0.5 + 0.5 * (time * 2.2).sin();
+    let a = 0.45 + 0.2 * pulse;
+    draw_ellipse(
+        p.x,
+        p.y + 6.0,
+        9.0,
+        3.5,
+        0.0,
+        Color::new(1.0, 0.92, 0.65, 0.10 + 0.05 * pulse),
+    );
+    draw_ellipse_lines(
+        p.x,
+        p.y + 6.0,
+        9.0,
+        3.5,
+        0.0,
+        1.0,
+        Color::new(1.0, 0.9, 0.6, a),
     );
 }
 

@@ -23,6 +23,18 @@ from PIL import Image
 
 N = 16
 OUTLINE = (43, 29, 42)
+# 물든 적의 외곽선: Naïl(따뜻한 자두색)보다 어둡고 차갑게.
+OUTLINE_TAINTED = (26, 16, 38)
+
+# 값(밝기) 위계: 무리 속에서 Naïl이 먼저 읽히게, 물든 적은 털색을 보라 쪽으로 기울이고 조금 어둡게.
+# 들쥐가 Naïl과 같은 흙갈색이라 섞이면 안 보였다(사람 피드백 2026-10-25). 종 색은 남긴다(회색 생쥐, 주황 다람쥐).
+TAINT = (84, 58, 112)
+TAINT_MIX = 0.28
+TAINT_VALUE = 0.82
+
+
+def taint(rgb):
+    return tuple(int((c * (1 - TAINT_MIX) + t * TAINT_MIX) * TAINT_VALUE) for c, t in zip(rgb, TAINT))
 
 # 공통 색(종마다 털 색만 바꾼다)
 COMMON = {
@@ -335,9 +347,9 @@ def raccoon_frames():
     return [g, breathe(g), walk(g, 0), walk(g, 1), wave, happy]
 
 
-def paint(img, ox, oy, g, pal, silhouette=False):
-    d, b, h, l = pal
-    colors = dict(COMMON, d=d, b=b, h=h, l=l, o=OUTLINE)
+def paint(img, ox, oy, g, pal, silhouette=False, tainted=False):
+    d, b, h, l = (taint(c) for c in pal) if tainted else pal
+    colors = dict(COMMON, d=d, b=b, h=h, l=l, o=OUTLINE_TAINTED if tainted else OUTLINE)
     for y in range(N):
         for x in range(N):
             ch = g[y][x]
@@ -350,14 +362,14 @@ def paint(img, ox, oy, g, pal, silhouette=False):
 def sheet():
     rows = []
     for name, g in SPECIES:
-        rows.append((FUR[name], frames_of(g)))
-    rows.append((FUR['straw'], [DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, lunge(DUMMY), shift(DUMMY, dx=-1)]))
-    rows.append((FUR['raccoon'], raccoon_frames()))
+        rows.append((FUR[name], frames_of(g), True))
+    rows.append((FUR['straw'], [DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, lunge(DUMMY), shift(DUMMY, dx=-1)], False))
+    rows.append((FUR['raccoon'], raccoon_frames(), False))
     img = Image.new('RGBA', (N * 7, N * len(rows) * 2), (0, 0, 0, 0))
-    for ry, (pal, frames) in enumerate(rows):
+    for ry, (pal, frames, tainted) in enumerate(rows):
         for rx, g in enumerate(frames):
             g = outline(g)
-            paint(img, rx * N, ry * N, g, pal)
+            paint(img, rx * N, ry * N, g, pal, tainted=tainted)
             paint(img, rx * N, (ry + len(rows)) * N, g, pal, silhouette=True)
     return img
 
