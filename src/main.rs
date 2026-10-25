@@ -11,12 +11,14 @@ mod combat;
 mod cutscene;
 mod enemy;
 mod input;
+mod moveset;
 mod player;
 mod render;
 mod room;
 mod scenario;
 mod sfx;
 mod tuning;
+mod tutorial;
 mod ui;
 mod world;
 

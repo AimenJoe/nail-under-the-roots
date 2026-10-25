@@ -44,6 +44,10 @@ pub struct World {
     pub kills: u32,
     /// 솟구침으로 잡은 수(저널용).
     pub emerge_kills: u32,
+    /// 콤보 마지막 타가 명중한 수(튜토리얼용).
+    pub finisher_hits: u32,
+    /// 굴파기 횟수(튜토리얼용).
+    pub burrows: u32,
     pub time: f32,
     /// 이번 틱의 공격 히트박스(디버그 표시용).
     pub last_strike: Option<Strike>,
@@ -70,6 +74,8 @@ impl World {
             wave: 0,
             kills: 0,
             emerge_kills: 0,
+            finisher_hits: 0,
+            burrows: 0,
             time: 0.0,
             last_strike: None,
             respawn_timer: t::WAVE_RESPAWN_DELAY,
@@ -111,6 +117,7 @@ impl World {
             match ev {
                 player::Event::Swing(i) => sfx.play(sfx::Id::Claw(*i)),
                 player::Event::Burrow => {
+                    self.burrows += 1;
                     sfx.play(sfx::Id::Burrow);
                     self.fx.push(ring(self.player.pos, 4.0, 12.0, 0.2, DIRT));
                 }
@@ -175,6 +182,9 @@ impl World {
                     dir
                 };
                 e.hurt(s.damage, dir, s.knockback, s.stun);
+                if s.finisher {
+                    self.finisher_hits += 1;
+                }
                 self.feel.add_hitstop(s.hitstop);
                 self.feel.add_trauma(s.shake);
                 let hit_point = e.pos - dir * e.radius() * 0.5;
@@ -347,6 +357,7 @@ pub fn enemy_color(kind: Kind) -> Color {
     match kind {
         Kind::Charger => CHARGER,
         Kind::Shooter => SHOOTER,
+        Kind::Dummy => Color::new(0.55, 0.52, 0.48, 1.0),
     }
 }
 

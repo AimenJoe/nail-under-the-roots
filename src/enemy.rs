@@ -10,6 +10,8 @@ use crate::tuning as t;
 pub enum Kind {
     Charger,
     Shooter,
+    /// 튜토리얼 허수아비. 움직이지도 때리지도 않는다.
+    Dummy,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -78,6 +80,7 @@ impl Enemy {
         let (hp, state) = match kind {
             Kind::Charger => (t::CHARGER_HP, State::Approach),
             Kind::Shooter => (t::SHOOTER_HP, State::Keep),
+            Kind::Dummy => (t::DUMMY_HP, State::Rest { time: f32::MAX }),
         };
         Self {
             kind,
@@ -98,6 +101,7 @@ impl Enemy {
         match self.kind {
             Kind::Charger => t::CHARGER_RADIUS,
             Kind::Shooter => t::SHOOTER_RADIUS,
+            Kind::Dummy => t::CHARGER_RADIUS,
         }
     }
 
@@ -129,6 +133,14 @@ impl Enemy {
     ) {
         self.prev_pos = self.pos;
         self.flash = (self.flash - dt).max(0.0);
+        if self.kind == Kind::Dummy {
+            // 허수아비: 넉백만 받고 제자리로 돌아오지 않는다. 경직은 즉시 푼다.
+            self.pos += self.vel * dt;
+            combat::apply_friction(&mut self.vel, dt);
+            let r = self.radius();
+            room.resolve_circle(&mut self.pos, r);
+            return;
+        }
         let to_player = player_pos - self.pos;
         let dist = to_player.length();
         let dir_to_player = to_player.normalize_or_zero();
@@ -240,6 +252,7 @@ impl Enemy {
         match self.kind {
             Kind::Charger => State::Approach,
             Kind::Shooter => State::Keep,
+            Kind::Dummy => State::Rest { time: f32::MAX },
         }
     }
 

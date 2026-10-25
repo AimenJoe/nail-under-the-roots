@@ -285,6 +285,17 @@ fn draw_enemy(e: &Enemy, alpha: f32, time: f32) {
         Kind::Charger => {
             draw_rectangle(pos.x - r, pos.y - r, r * 2.0, r * 2.0, color);
         }
+        Kind::Dummy => {
+            // 허수아비: 말뚝 + 짚 뭉치
+            draw_rectangle(
+                pos.x - 1.5,
+                pos.y - r,
+                3.0,
+                r * 2.0 + 3.0,
+                Color::new(0.4, 0.3, 0.2, 1.0),
+            );
+            draw_circle(pos.x, pos.y - 2.0, r - 1.0, color);
+        }
         Kind::Shooter => {
             draw_circle(pos.x, pos.y, r, color);
             if let enemy::State::Aim { time: at } = e.state {
@@ -301,6 +312,7 @@ fn draw_enemy(e: &Enemy, alpha: f32, time: f32) {
     let max = match e.kind {
         Kind::Charger => t::CHARGER_HP,
         Kind::Shooter => t::SHOOTER_HP,
+        Kind::Dummy => t::DUMMY_HP,
     };
     for i in 0..max {
         let c = if i < e.hp { WHITE } else { DARKGRAY };

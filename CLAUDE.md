@@ -24,7 +24,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - 입력은 `Actions` 구조체로만. 게임 로직 어디에서도 `KeyCode`를 직접 보지 않는다.
 - 내부 해상도 320×180, 정수 배율. 월드 좌표는 그릴 때 반올림.
 - 로직은 고정 타임스텝(60Hz). 히트스톱은 로직 시계만 멈춘다.
-- 손맛 수치는 `src/tuning.rs` 한 곳에.
+- 손맛 수치는 `src/tuning.rs` 한 곳에. 콤보(무기·캐릭터별)는 `src/moveset.rs`의 `Moveset` 표. 플레이어 코드에 타별 숫자를 직접 쓰지 않는다(docs/decisions/0009).
 - UI는 커서 없이 동작해야 한다(좌우 이동 + 확인). 마우스는 보조.
 - 모듈 경계: `input`, `player`, `enemy`, `combat`, `room`, `render`, `world`(틱 순서). 각 모듈은 `Actions`와 월드 상태만 본다. 장면·메뉴는 `app`(+`ui`)에만 있고 `world`는 메뉴를 모른다.
 - 그림 문법은 3/4 탑다운(docs/decisions/0006). 아이소메트릭 아님.

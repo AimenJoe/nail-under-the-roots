@@ -12,6 +12,7 @@ use crate::render::{self, Renderer};
 use crate::scenario::{self, Scenario};
 use crate::sfx::Sfx;
 use crate::tuning as t;
+use crate::tutorial::Tutorial;
 use crate::ui::{self, Ui, FONT_PX};
 use crate::world::World;
 
@@ -170,6 +171,7 @@ pub struct App {
     /// 지금 플레이 중인 시나리오. "다시 시작"은 이걸 다시 만든다.
     current: Scenario,
     cutscene: Option<Cutscene>,
+    tutorial: Option<Tutorial>,
     pub settings: Settings,
     world: World,
     journal: Journal,
@@ -208,6 +210,7 @@ impl App {
             dev_cursor: 0,
             current: Scenario::Normal,
             cutscene: None,
+            tutorial: None,
             settings,
             world,
             journal: Journal::new(),
@@ -282,6 +285,12 @@ impl App {
         } else {
             self.death_t += dt;
         }
+        if let Some(tu) = self.tutorial.as_mut() {
+            tu.update(&mut self.world, dt);
+            if tu.is_done() {
+                self.tutorial = None;
+            }
+        }
         self.journal.update(&self.world);
         if restart {
             self.start_game();
@@ -309,12 +318,14 @@ impl App {
         self.run_time = 0.0;
         self.acc = 0.0;
         self.death_t = 0.0;
+        self.tutorial = None;
+        // 첫 시작은 컷씬 → 플레이 튜토리얼 → 웨이브 1. 튜토리얼이 끝나야 자동 웨이브가 켜진다.
+        if matches!(s, Scenario::Normal | Scenario::Tutorial) {
+            self.tutorial = Some(Tutorial::new(&mut self.world));
+        }
         if matches!(s, Scenario::Normal | Scenario::CutsceneOnly) {
-            // 컷씬 동안은 적이 없다가, 끝나면 웨이브 1.
-            let auto = self.world.auto_waves;
             self.world.enemies.clear();
             self.world.wave = 0;
-            self.world.auto_waves = auto;
             self.world.player.pos = vec2(40.0, 90.0);
             self.cutscene = Some(cutscene::opening(&self.world));
             self.scene = Scene::Cutscene;
@@ -597,6 +608,9 @@ impl App {
             Scene::Game => {
                 self.renderer
                     .draw_hud(&ui, &self.world, self.input.gamepad_count);
+                if let Some(h) = self.tutorial.as_ref().and_then(|t| t.hint()) {
+                    self.draw_hint(&ui, h);
+                }
                 if !self.world.player.is_alive() {
                     self.draw_dead(&ui);
                 }
@@ -777,6 +791,15 @@ impl App {
         );
     }
 
+    /// 튜토리얼 힌트: 아래 가운데 한 줄.
+    fn draw_hint(&self, ui: &Ui, text: &str) {
+        let w = ui.text_w(text, FONT_PX) + 16.0;
+        let r = Rect::new(160.0 - w / 2.0, 158.0, w, FONT_PX + 8.0);
+        ui.rect(r, ui::PANEL);
+        ui.rect_lines(r, ui::BORDER);
+        ui.text_center(text, 160.0, r.y + 4.0, FONT_PX, ui::TEXT);
+    }
+
     /// 사망 연출: 서서히 어두워지고 글자가 떠오른 뒤, 입력 잠금이 풀리면 안내가 깜빡인다.
     fn draw_dead(&self, ui: &Ui) {
         let k = (self.death_t / t::DEATH_FADE).min(1.0);
@@ -873,11 +896,12 @@ impl App {
                 ),
             ),
             (
-                "발톱".to_string(),
+                p.moveset.name.to_string(),
                 format!(
-                    "3연타. 1·2타 {:.2}s, 3타 {:.2}s(넉백 큼)",
-                    t::CLAW_SWING_TIME[0],
-                    t::CLAW_SWING_TIME[2]
+                    "{}연타. 마지막 타 {:.2}s, 넉백 {}",
+                    p.moveset.hits.len(),
+                    p.moveset.hits[p.moveset.last()].swing,
+                    p.moveset.hits[p.moveset.last()].knockback as i32
                 ),
             ),
             (

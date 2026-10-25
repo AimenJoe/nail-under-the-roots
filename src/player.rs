@@ -7,6 +7,7 @@ use macroquad::prelude::*;
 
 use crate::combat::{self, Shape, Strike, StrikeKind};
 use crate::input::Actions;
+use crate::moveset::{self, Moveset};
 use crate::room::Room;
 use crate::tuning as t;
 
@@ -42,6 +43,8 @@ pub struct Player {
     pub state: State,
     pub burrow_cd: f32,
     pub events: Vec<Event>,
+    /// 콤보 표. 무기·캐릭터에 따라 바뀐다(moveset.rs).
+    pub moveset: &'static Moveset,
     attack_buf: f32,
     dodge_buf: f32,
     combo_next: usize,
@@ -63,6 +66,7 @@ impl Player {
             state: State::Free,
             burrow_cd: 0.0,
             events: Vec::new(),
+            moveset: &moveset::CLAWS,
             attack_buf: 0.0,
             dodge_buf: 0.0,
             combo_next: 0,
@@ -133,25 +137,28 @@ impl Player {
                 }
             }
             State::Attack { idx, time, dir } => {
+                let ms = self.moveset;
+                let hit = ms.hits[idx];
+                let last = ms.last();
                 let time = time + dt;
-                let (a0, a1) = t::CLAW_ACTIVE[idx];
+                let (a0, a1) = hit.active;
                 if time >= a0 && time - dt < a1 {
                     strike = Some(self.claw_strike(idx, dir));
                 }
-                self.pos += move_dir * t::PLAYER_SPEED * t::CLAW_MOVE_FACTOR * dt;
+                self.pos += move_dir * t::PLAYER_SPEED * ms.move_factor * dt;
                 self.state = State::Attack { idx, time, dir };
 
-                if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
-                    // 굴파기는 언제든 스윙을 취소한다.
+                if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
+                    // 굴파기 캔슬: 후딜레이를 끊고 다음 콤보로 섞는다.
                     self.start_burrow();
-                } else if time >= a1 && self.attack_buf > 0.0 && idx < 2 {
+                } else if time >= a1 && self.attack_buf > 0.0 && idx < last {
                     // 활성 구간이 끝났으면 다음 타로 바로 이어진다.
                     self.start_swing(idx + 1, a.aim);
-                } else if time >= t::CLAW_SWING_TIME[idx] + t::CLAW_RECOVERY[idx] {
+                } else if time >= hit.swing + hit.recovery {
                     self.state = State::Free;
-                    if idx < 2 {
+                    if idx < last {
                         self.combo_next = idx + 1;
-                        self.combo_timer = t::CLAW_COMBO_WINDOW;
+                        self.combo_timer = ms.combo_window;
                     } else {
                         self.combo_timer = 0.0;
                     }
@@ -194,7 +201,7 @@ impl Player {
         };
         self.facing = dir;
         self.swing_id += 1;
-        self.vel += dir * t::CLAW_LUNGE;
+        self.vel += dir * self.moveset.hits[idx].lunge;
         self.attack_buf = 0.0;
         self.combo_timer = 0.0;
         self.state = State::Attack {
@@ -233,23 +240,26 @@ impl Player {
             stun: t::EMERGE_STUN,
             hitstop: t::EMERGE_HITSTOP,
             shake: t::EMERGE_SHAKE,
+            finisher: false,
         }
     }
 
     fn claw_strike(&self, idx: usize, dir: Vec2) -> Strike {
+        let h = self.moveset.hits[idx];
         Strike {
             id: self.swing_id,
             kind: StrikeKind::Claw(idx),
             shape: Shape::Sector {
                 origin: self.pos + dir * 2.0,
                 dir,
-                r: t::CLAW_RANGE,
+                r: h.range,
             },
-            damage: t::CLAW_DAMAGE[idx],
-            knockback: t::CLAW_KNOCKBACK[idx],
-            stun: t::CLAW_STUN[idx],
-            hitstop: t::CLAW_HITSTOP[idx],
-            shake: t::CLAW_SHAKE[idx],
+            damage: h.damage,
+            knockback: h.knockback,
+            stun: h.stun,
+            hitstop: h.hitstop,
+            shake: h.shake,
+            finisher: idx == self.moveset.last(),
         }
     }
 

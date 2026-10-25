@@ -19,6 +19,10 @@ pub enum Scenario {
     OneEach,
     /// 오프닝 컷씬만 보고 빈 방.
     CutsceneOnly,
+    /// 컷씬 없이 튜토리얼만.
+    Tutorial,
+    /// 실험용 무거운 무기(2타 콤보)로 웨이브 1부터.
+    Heavy,
 }
 
 pub struct Entry {
@@ -27,7 +31,17 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 7] = [
+pub const LIST: [Entry; 9] = [
+    Entry {
+        name: "튜토리얼",
+        desc: "컷씬 없이 플레이 튜토리얼만(이동→3연타→굴파기→솟구침).",
+        scenario: Scenario::Tutorial,
+    },
+    Entry {
+        name: "무거운 무기(실험)",
+        desc: "2타 콤보 무브셋으로 웨이브 1부터. 무기가 바뀌면 손맛이 얼마나 달라지나.",
+        scenario: Scenario::Heavy,
+    },
     Entry {
         name: "빈 방",
         desc: "적 없음. 이동·굴파기 손맛만 본다.",
@@ -69,7 +83,12 @@ pub const LIST: [Entry; 7] = [
 pub fn build(s: Scenario) -> World {
     match s {
         Scenario::Normal => World::new(),
-        Scenario::Empty | Scenario::CutsceneOnly => World::empty(),
+        Scenario::Empty | Scenario::CutsceneOnly | Scenario::Tutorial => World::empty(),
+        Scenario::Heavy => {
+            let mut w = World::new();
+            w.player.moveset = &crate::moveset::HEAVY;
+            w
+        }
         Scenario::Chargers(n) => {
             let mut w = World::empty();
             for i in 0..n {

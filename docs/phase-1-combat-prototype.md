@@ -58,6 +58,8 @@
 | 게임패드 | `input.rs`, `web/macroquad-gamepads-0.1.js` | 데스크톱(gilrs)·웹(플러그인). 웹은 비표준 매핑 패드도 받도록 플러그인 패치. Android 13 폰 브라우저 + 실기 패드로 인식 확인(2026-10-25). 데스크톱 실기는 미확인 |
 | 터치(보조) | `input.rs` TouchState, `render.rs` 오버레이, `web/index.html` | 왼쪽 반 떠다니는 스틱 + ATK/DIG/R 버튼. 모바일 브라우저용. 터치 좌표는 DPI로 나눠야 함(macroquad touches()는 물리 픽셀). Android 13 폰 브라우저 실기 확인(2026-10-25) |
 | 디버그 | F1 오버레이(fps, 상태), F2 히트박스 | 기본 꺼짐. 설정에서도 켬/끔 |
+| 무브셋 | `moveset.rs` | 콤보를 데이터로(발톱 3타, 실험용 무거운 2타). 타별 회피 캔슬 창 `dodge_cancel_after`. 개발 시나리오 "무거운 무기"로 비교(docs/decisions/0009) |
+| 튜토리얼 | `tutorial.rs` | 플레이로 배움: 이동 → 허수아비 3연타 → 굴파기 → 솟구침 → 웨이브 1. 한 줄 힌트만. 첫 시작과 개발 시나리오 "튜토리얼" |
 | 개발 시나리오 | `scenario.rs` | 타이틀 "개발"(dev feature). 빈 방, 돌격형 1/3, 원거리형 1, 1+1, 웨이브 3부터, 오프닝 컷씬. 판정 2(적 3마리)는 "돌격형 3마리"로 바로 들어간다 |
 | 컷씬 | `cutscene.rs` | JRPG식 대화창·배우 이동·페이드·건너뛰기. 오프닝 하나(docs/decisions/0008) |
 | 게임 틀 | `app.rs`, `ui.rs` | 인트로 → 타이틀(시작·설정) → 게임 ⇄ 일시정지(메뉴·상태·가방·저널·지도). 커서 없는 탐색 + 탭/클릭 보조. 한글 픽셀 폰트. 가방·지도는 틀만, 저널은 튜토리얼 퀘스트 4개(docs/decisions/0007) |
@@ -68,7 +70,8 @@
 ## 사람이 할 일 (다음 세션 전)
 - [x] Netlify Personal access token 발급, GitHub Secrets `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID` 등록 (2026-10-24)
 - [ ] `main`에 머지(또는 push)해서 `deploy-web`이 프로덕션 배포를 하게 한다. PR을 열면 먼저 `pr-<번호>--nail-under-the-roots.netlify.app` 미리보기로 확인할 수 있다
-- [ ] **플레이**(웹 또는 `cargo run`). 위 판정 4개에 예/아니오와 한 줄 이유를 적어 다음 세션에 전달. 가능하면 본인 외 1명 더
+- [ ] **플레이**(웹 또는 `cargo run`). 위 판정 4개에 예/아니오와 한 줄 이유를 적어 다음 세션에 전달. 가능하면 본인 외 1명 더. 튜토리얼이 설명 없이 통하는지(판정 1)도 함께
+- [ ] 2단계 에셋 팩 고르기: `docs/decisions/0010` 후보 중에서(또는 다른 팩). 고르면 라이선스 구매 후 `assets/`에 넣고 `LICENSES.md` 갱신
 - [x] 웹(Android 13 폰 브라우저)에서 터치·게임패드 인식 확인 (2026-10-25)
 - [ ] 데스크톱에서 게임패드 이동/공격/굴파기/재시작, 스틱 데드존 확인
 - [ ] GitHub Secrets에 `ANDROID_DEBUG_KEYSTORE_B64` 등록(README "Android" 절). 등록 전 빌드로 설치한 앱은 기기에서 삭제 후 재설치

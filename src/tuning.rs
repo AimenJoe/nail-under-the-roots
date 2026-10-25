@@ -98,6 +98,9 @@ pub const PROJECTILE_SPEED: f32 = 65.0;
 pub const PROJECTILE_RADIUS: f32 = 3.0;
 pub const PROJECTILE_DAMAGE: i32 = 1;
 
+// ---- 튜토리얼 허수아비 ------------------------------------------------------------
+pub const DUMMY_HP: i32 = 6;
+
 // ---- 공통 전투 ------------------------------------------------------------
 /// 넉백 속도 감쇠(1/s). v *= exp(-k·dt).
 pub const KNOCKBACK_FRICTION: f32 = 9.0;

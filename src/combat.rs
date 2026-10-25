@@ -57,6 +57,8 @@ pub struct Strike {
     pub stun: f32,
     pub hitstop: f32,
     pub shake: f32,
+    /// 콤보의 마지막 타인가(튜토리얼·통계용).
+    pub finisher: bool,
 }
 
 /// 전투감 상태. 수치는 tuning.rs.
