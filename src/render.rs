@@ -48,6 +48,8 @@ pub struct Renderer {
     cam: Camera2D,
     fonts: Fonts,
     art: Option<Art>,
+    /// 글자를 미리 구운 (언어, 배율, dpi). 바뀌면(언어 전환·창 크기) 다시 굽는다.
+    warmed: std::cell::Cell<Option<(crate::i18n::Lang, u32, u32)>>,
 }
 
 impl Renderer {
@@ -61,6 +63,7 @@ impl Renderer {
             cam,
             fonts,
             art,
+            warmed: std::cell::Cell::new(None),
         }
     }
 
@@ -169,13 +172,23 @@ impl Renderer {
                 ..Default::default()
             },
         );
-        Ui {
+        let ui = Ui {
             scale,
             ox: x,
             oy: y,
             font: self.fonts.for_lang(crate::i18n::lang()),
             base: self.fonts.base.clone(),
+        };
+        let key = (
+            crate::i18n::lang(),
+            scale.to_bits(),
+            miniquad::window::dpi_scale().to_bits(),
+        );
+        if self.warmed.get() != Some(key) {
+            self.warmed.set(Some(key));
+            ui.warm(&crate::i18n::s().glyphs(), crate::ui::FONT_PX);
         }
+        ui
     }
 
     /// 컷씬 배우(그림이 있는 이웃). 그림이 없으면 색 동그라미.

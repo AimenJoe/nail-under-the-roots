@@ -48,9 +48,11 @@ impl Ui {
     }
 
     fn params(&self, size: f32, c: Color) -> TextParams<'_> {
+        let (font_size, font_scale) = glyph_plan(size, self.scale, miniquad::window::dpi_scale());
         TextParams {
             font: self.font.as_ref(),
-            font_size: (size * self.scale) as u16,
+            font_size,
+            font_scale,
             color: c,
             ..Default::default()
         }
@@ -70,9 +72,17 @@ impl Ui {
         }
     }
 
+    /// 글자 아틀라스를 미리 굽는다: 이 언어 글자 전부를 지금 크기로 캐시(measure_text가 굽는다, 올리는 건 다음 그리기에서 한 번).
+    /// 안 하면 대화창이 한 글자씩 찍힐 때마다 새 글자 → 아틀라스 텍스처 전체(1024², 4MB)를 다시 올린다.
+    pub fn warm(&self, glyphs: &str, size: f32) {
+        let (font_size, font_scale) = glyph_plan(size, self.scale, miniquad::window::dpi_scale());
+        measure_text(glyphs, self.font.as_ref(), font_size, font_scale);
+    }
+
     /// 글자 폭(논리 px).
     pub fn text_w(&self, s: &str, size: f32) -> f32 {
-        measure_text(s, self.font.as_ref(), (size * self.scale) as u16, 1.0).width / self.scale
+        let (font_size, font_scale) = glyph_plan(size, self.scale, miniquad::window::dpi_scale());
+        measure_text(s, self.font.as_ref(), font_size, font_scale).width / self.scale
     }
 
     /// 폭에 안 맞으면 뒤를 잘라 "…"를 붙인다. 언어마다 길이가 달라 고정 칸에서 넘칠 때의 마지막 안전장치.
@@ -297,9 +307,46 @@ pub fn wrap_with(s: &str, max_w: f32, measure: impl Fn(&str) -> f32) -> Vec<Stri
     lines
 }
 
+/// 글자를 몇 px로 굽고(래스터화) 몇 배로 키워 그릴까: (font_size, font_scale).
+///
+/// 폰트가 12px 픽셀 폰트라, 원래 크기의 정수배로 구워 정수배로 키우면 화면 크기로 바로 굽는 것과 모양이 같다.
+/// macroquad는 `font_size × dpi`로 굽고(text.rs), 새 글자가 생길 때마다 글자 아틀라스 텍스처를 통째로 다시 올린다.
+/// 화면 크기로 구우면 레티나(dpi 2)·배율 4에서 글자 하나가 96px → 아틀라스가 금방 커지고,
+/// 대화창이 한 글자씩 찍힐 때마다 큰 텍스처를 다시 올린다(Safari에서 특히 버벅임). 그래서
+/// 굽는 크기 = size × m(물리 px, m은 정수), 키우는 배 = size × scale × dpi / (size × m)이 정수가 되는 가장 작은 m을 고른다.
+/// 그런 m이 없으면(dpi가 어중간) 예전처럼 화면 크기로 굽는다.
+pub fn glyph_plan(size: f32, scale: f32, dpi: f32) -> (u16, f32) {
+    let whole = |x: f32| (x - x.round()).abs() < 1e-3;
+    let target = size * scale * dpi;
+    for m in 1..=8 {
+        let raster = size * m as f32;
+        let font_size = raster / dpi;
+        let mag = target / raster;
+        if whole(font_size) && font_size >= 1.0 && whole(mag) && mag >= 1.0 {
+            return (font_size.round() as u16, mag.round());
+        }
+    }
+    ((size * scale) as u16, 1.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 굽는 크기는 원래 12 물리 px(가능하면), 키우는 배는 정수. 레티나(dpi 2)·배율 4: 12px로 구워 8배 = 96px.
+    #[test]
+    fn glyphs_bake_small_and_scale_by_whole_numbers() {
+        assert_eq!(glyph_plan(12.0, 4.0, 1.0), (12, 4.0));
+        assert_eq!(glyph_plan(12.0, 4.0, 2.0), (6, 8.0));
+        assert_eq!(glyph_plan(12.0, 3.0, 3.0), (4, 9.0));
+        assert_eq!(
+            glyph_plan(12.0, 4.0, 1.5),
+            (8, 6.0),
+            "12px로 구워 6배 = 72px"
+        );
+        // 정수배가 안 나오면 예전처럼
+        assert_eq!(glyph_plan(12.0, 3.0, 1.25), (36, 1.0));
+    }
 
     fn w(s: &str) -> f32 {
         s.chars().count() as f32

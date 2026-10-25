@@ -234,6 +234,15 @@ macro_rules! strings {
                 vec![$((stringify!($key), self.$key)),*]
             }
 
+            /// 이 언어가 쓰는 글자 전부(겹침 없이). 글자 아틀라스를 미리 굽는 데 쓴다(ui::Ui::warm).
+            pub fn glyphs(&self) -> String {
+                let mut v: Vec<char> = [$(self.$key),*].concat().chars().collect();
+                v.extend("0123456789%/:.,·…!?()[]+-▶▼▲→←♥♡".chars());
+                v.sort_unstable();
+                v.dedup();
+                v.into_iter().filter(|c| !c.is_whitespace()).collect()
+            }
+
             /// 모든 글을 바꾼 새 표(가짜 언어용).
             #[cfg(feature = "dev")]
             fn map(&self, f: impl Fn(&'static str) -> &'static str) -> Strings {

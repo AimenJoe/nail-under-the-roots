@@ -1,324 +1,364 @@
-"""적·이웃 스프라이트 시트 생성기(docs/decisions/0021). 이 파일이 원본이고 PNG는 산출물이다(직접 그린 그림, 프로젝트 소유).
+"""적·이웃 스프라이트 시트 생성기 v2(docs/decisions/0021). 이 파일이 원본이고 PNG는 산출물이다(직접 그린 그림, 프로젝트 소유).
 
 실행: python3 tools/art/critters.py [출력 경로]  (기본 assets/art/critters.png)
-칸 16×16, 오른쪽을 본다(왼쪽은 게임에서 좌우 반전). 발바닥 y=14 근처, 그림자는 게임이 그린다.
+칸 16×16, 오른쪽을 본다(왼쪽은 게임에서 좌우 반전). 발바닥 y=14, 그림자는 게임이 그린다.
   줄 0 들쥐 · 1 생쥐 · 2 시궁쥐 · 3 다람쥐 · 4 청설모 · 5 허수아비 (species.rs의 sheet_row)
-    칸 0·1 서 있기, 2·3 걷기, 4 예고(떨기·웅크림·조준), 5 공격(돌진·뛰기·던지기), 6 맞음
+    칸 0·1 서 있기(숨쉬기), 2·3 걷기, 4 예고(떨기·웅크림·조준), 5 공격(돌진·뛰기·던지기), 6 맞음
   줄 6 라쿤 포포(튜토리얼 안내): 0·1 서 있기, 2·3 걷기, 4 말하기(손 들기), 5 기뻐하기
   줄 7~13: 줄 0~6의 흰 실루엣(피격 번쩍임용)
 
-그리는 법: 부위를 작은 타원으로 놓고(뒤에 있는 것부터), 타원 안 위치로 3단 음영(왼쪽 위 빛).
-외곽선은 자동(이웃 재질의 가장 어두운 색 = 선택 외곽선). 뿌리에 물든 표시: 붉게 빛나는 눈 + 등에 보라 뿌리 가시.
+그리는 법(nail.py와 같다): 채움 색만 글자로 찍고 외곽선('o')은 자동으로 두른다. 종마다 기본 자세 한 장을 손으로 찍고,
+동작은 그 자세를 옮기거나(통통·웅크림·내밀기) 몇 점만 바꿔 만든다(발, 눈, 꼬리).
+v1(타원을 코드로 쌓은 것)은 윤곽이 울퉁불퉁하고 얼룩져 종이 안 읽혔다 → 손으로 찍은 큰 덩어리 + 3단 음영 + 또렷한 눈.
+
+문법(모든 종이 같다):
+  - 몸은 덩어리 하나, 위·왼쪽이 밝고(h) 아래가 어둡다(d). 배·주둥이는 밝은 털(l).
+  - 뿌리 독에 물든 표시 = 붉게 빛나는 눈(e, 반사 w) + 등의 보라 뿌리(v 짙음, V 밝음). 물들지 않은 이웃(포포)은 검은 눈.
+  - 실루엣으로 구별: 들쥐 = 둥근 귀 하나 + 가는 꼬리, 생쥐 = 작은 몸에 큰 귀, 시궁쥐 = 길고 구부정 + 굵은 꼬리 + 등 가시,
+    다람쥐 = 등줄무늬 + 위로 선 꼬리, 청설모 = 귀 술 + 몸보다 큰 꼬리.
 """
 import sys
 
 from PIL import Image
 
 N = 16
-# 재질 → (어두움, 보통, 밝음)
-RAMPS = {
-    # 들쥐: 흙빛 갈색
-    'fm': [(96, 70, 58), (138, 104, 82), (176, 140, 108)],
-    # 생쥐: 회색
-    'hm': [(104, 100, 112), (150, 146, 156), (196, 192, 200)],
-    # 시궁쥐: 짙은 회갈색
-    'sr': [(70, 56, 58), (100, 84, 80), (134, 116, 106)],
-    # 다람쥐: 주황 갈색
-    'ch': [(136, 82, 48), (190, 124, 70), (224, 166, 104)],
-    # 청설모: 잿빛 갈색
-    'rs': [(76, 60, 60), (112, 92, 86), (150, 128, 116)],
-    # 라쿤: 회색
-    'rc': [(92, 92, 104), (140, 140, 150), (186, 186, 194)],
-    'belly': [(178, 158, 136), (214, 196, 170), (236, 224, 204)],
-    'grey_belly': [(176, 172, 176), (214, 210, 214), (238, 234, 236)],
-    'pink': [(176, 92, 112), (226, 136, 152), (250, 186, 194)],
-    'stripe_d': [(52, 34, 30), (66, 44, 36), (82, 56, 44)],
-    'stripe_l': [(214, 200, 176), (238, 226, 204), (250, 244, 230)],
-    'mask': [(30, 26, 36), (44, 40, 52), (60, 56, 70)],
-    'white': [(206, 204, 206), (236, 234, 232), (252, 252, 250)],
-    'root': [(58, 30, 70), (96, 48, 114), (140, 76, 160)],
-    'straw': [(150, 112, 56), (196, 156, 84), (230, 196, 120)],
-    'wood': [(78, 56, 40), (108, 80, 56), (140, 108, 76)],
-    'cloth': [(110, 60, 64), (156, 88, 88), (196, 124, 116)],
+OUTLINE = (43, 29, 42)
+
+# 공통 색(종마다 털 색만 바꾼다)
+COMMON = {
+    'p': (240, 150, 164),   # 분홍(귀 안·코·발·꼬리)
+    'q': (196, 104, 124),   # 분홍 그림자
+    'e': (255, 64, 104),    # 물든 눈(붉은 빛)
+    'w': (255, 214, 226),   # 눈 반사
+    'n': (40, 26, 40),      # 코 끝·검은 눈
+    'v': (98, 46, 120),     # 뿌리(짙음)
+    'V': (156, 86, 178),    # 뿌리(밝음)
+    'k': (52, 34, 32),      # 짙은 줄무늬
+    'c': (248, 238, 218),   # 흰 줄무늬·이빨
+    'W': (255, 255, 255),   # 흰 반사(포포 눈)
+    'r': (236, 132, 140),   # 볼 홍조
 }
-EYE_GLOW = (255, 70, 110)
-EYE_HI = (255, 214, 224)
-EYE_DARK = (24, 16, 30)
-EYE_WHITE = (255, 255, 255)
-NOSE_DARK = (40, 30, 40)
-BLUSH = (236, 126, 132)
+
+FUR = {
+    #           d(그늘)          b(털)            h(밝음)          l(배·주둥이)
+    'field':  [(104, 72, 56), (146, 106, 78), (184, 146, 108), (222, 196, 160)],
+    'house':  [(112, 108, 124), (156, 152, 166), (196, 194, 206), (234, 230, 232)],
+    'sewer':  [(70, 58, 62), (102, 88, 88), (136, 120, 112), (178, 164, 148)],
+    'chip':   [(146, 84, 44), (196, 124, 66), (230, 166, 100), (244, 222, 188)],
+    'red':    [(84, 64, 66), (122, 98, 92), (160, 136, 124), (226, 218, 206)],
+    'raccoon': [(96, 96, 110), (144, 144, 156), (188, 188, 198), (238, 236, 232)],
+    'straw':  [(150, 110, 52), (198, 158, 84), (232, 200, 124), (110, 80, 56)],
+}
 
 
-class Cell:
-    def __init__(self):
-        self.m = [[None] * N for _ in range(N)]   # (재질, 단)
-        self.c = [[None] * N for _ in range(N)]   # 덮어 칠한 색
-
-    def put(self, x, y, mat, lv):
-        x, y = int(x), int(y)
-        if 0 <= x < N and 0 <= y < N:
-            self.m[y][x] = (mat, lv)
-            self.c[y][x] = None
-
-    def paint(self, x, y, rgb):
-        x, y = int(x), int(y)
-        if 0 <= x < N and 0 <= y < N:
-            if self.m[y][x] is None:
-                self.m[y][x] = ('pink', 1)
-            self.c[y][x] = rgb
+def grid(rows):
+    rows = [r.ljust(N, '.')[:N] for r in rows]
+    assert len(rows) == N, len(rows)
+    return [list(r) for r in rows]
 
 
-def blob(cv, cx, cy, rx, ry, mat, flat=None):
-    """음영 타원. 왼쪽 위가 밝고 오른쪽 아래가 어둡다."""
+def copy(g):
+    return [list(r) for r in g]
+
+
+def shift(g, dx=0, dy=0, rows=None):
+    """전체(또는 rows 줄만)를 옮긴다. 밖으로 나가면 잘린다."""
+    out = [['.'] * N for _ in range(N)]
     for y in range(N):
         for x in range(N):
-            dx, dy = (x + 0.5 - cx) / max(rx, 0.1), (y + 0.5 - cy) / max(ry, 0.1)
-            if dx * dx + dy * dy <= 1.0:
-                if flat is not None:
-                    lv = flat
-                else:
-                    lit = -dx * 0.55 - dy * 0.8
-                    lv = 2 if lit > 0.35 else (0 if lit < -0.45 else 1)
-                cv.put(x, y, mat, lv)
+            if g[y][x] == '.':
+                continue
+            if rows is not None and y not in rows:
+                ny, nx = y, x
+            else:
+                ny, nx = y + dy, x + dx
+            if 0 <= nx < N and 0 <= ny < N:
+                out[ny][nx] = g[y][x]
+    return out
 
 
-def outline(cv):
-    """빈 칸이 채운 칸과 4방향으로 닿으면 외곽선. 색은 닿은 재질의 가장 어두운 단보다 더 어둡게."""
-    out = []
+def put(g, x, y, s):
+    for i, ch in enumerate(s):
+        if 0 <= x + i < N and 0 <= y < N and ch != ' ':
+            g[y][x + i] = ch
+
+
+def find(g, chars):
+    return [(x, y) for y in range(N) for x in range(N) if g[y][x] in chars]
+
+
+def clear_row(g, y):
+    g[y] = ['.'] * N
+
+
+def squint(g):
+    """맞음: 붉은 눈을 질끈(짙은 가로줄)."""
+    eyes = find(g, 'ew')
+    if not eyes:
+        return
+    top = min(y for _, y in eyes)
+    for x, y in eyes:
+        g[y][x] = 'n' if y == top else 'b'
+
+
+def outline(g):
+    out = copy(g)
     for y in range(N):
         for x in range(N):
-            if cv.m[y][x] is not None:
+            if g[y][x] != '.':
                 continue
             for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 nx, ny = x + dx, y + dy
-                if 0 <= nx < N and 0 <= ny < N and cv.m[ny][nx] is not None:
-                    mat = cv.m[ny][nx][0]
-                    d = RAMPS[mat][0]
-                    out.append((x, y, tuple(max(0, int(c * 0.55)) for c in d)))
+                if 0 <= nx < N and 0 <= ny < N and g[ny][nx] != '.':
+                    out[y][x] = 'o'
                     break
-    for x, y, c in out:
-        cv.m[y][x] = ('outline', 0)
-        cv.c[y][x] = c
+    return out
 
 
-def to_rgba(cv, silhouette=False):
-    px = {}
+# ---- 기본 자세(손으로 찍음) ----------------------------------------------------------
+# 들쥐: 통통한 몸, 머리 위 둥근 귀 하나, 뾰족한 주둥이, 가는 꼬리가 뒤로 휘어 내려감.
+FIELD = grid([
+    "",
+    "",
+    "",
+    "",
+    "........dd",
+    ".......dqpd",
+    ".......dppd",
+    "....hhhhhhhh",
+    "...hhvVbbbbbhh",
+    "..hbvvbbbbbwebh",
+    "..bbbbbbbbbeebbp",
+    "pdbbbbbbbbbbbll",
+    "p.dbbbbbbbbblll",
+    ".p.ddbbbbbbll",
+    "....pp...pp",
+    "",
+])
+
+# 생쥐: 작은 몸, 머리만 한 큰 귀 둘(먼 귀가 살짝 보임), 큰 눈.
+HOUSE = grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "......ddd",
+    ".....dqqpd.d",
+    ".....dqppddpd",
+    "......hhhhhbd",
+    "....hvVbbbbwbh",
+    "...hbvbbbbbeebp",
+    "p..dbbbbbbbblll",
+    ".p.ddbbbbbblll",
+    "..pp.dddddll",
+    ".....pp..pp",
+    "",
+])
+
+# 시궁쥐: 길고 구부정한 덩치, 작은 귀, 긴 주둥이, 등에 보라 뿌리 가시 셋, 굵은 꼬리.
+SEWER = grid([
+    "",
+    "",
+    "",
+    ".....V.V",
+    "....vVvVv..dd",
+    "...hhvhvhhdqd",
+    "..hbbbbbbbbhdh",
+    ".hbbbbbbbbbbbbh",
+    ".bbbbbbbbbbbwebh",
+    "dbbbbbbbbbbbeebbp",
+    "ddbbbbbbbbbbblll",
+    "q.dbbbbbbbbbllll",
+    "qq.ddbbbbbbbll",
+    ".qq..ddddddd",
+    "....pp....pp",
+    "",
+])
+
+# 다람쥐: 짧은 몸, 등에 짙은·흰 줄무늬, 위로 말려 선 꼬리, 볼이 통통.
+CHIP = grid([
+    "",
+    "..hh",
+    ".hbbh",
+    ".bbkbh",
+    ".bbkbb....dd",
+    "..bbkb...dqpd",
+    "..dbbb..hhhhhh",
+    "...dbkkkkkbbbbbh",
+    "....hcccccbbwebh",
+    "...bbkkkkkbbeebp",
+    "...dbbbbbbbbblll",
+    "....dbbbbbbblll",
+    ".....ddbbbbll",
+    "......dddddl",
+    ".......pp.pp",
+    "",
+])
+
+# 청설모: 잿빛 갈색, 귀 끝 술(짙은 털), 몸보다 큰 꼬리가 등 뒤로 높이 선다, 흰 배.
+RED = grid([
+    ".hhh",
+    "hbbbh",
+    "bbbbbh",
+    "bbdbbb...k.k",
+    "dbbdbb...dkd",
+    ".dbbdb..dqpd",
+    "..dbbbb.hhhhh",
+    "...dbbhhbbbbbh",
+    "....hvVbbbbwebh",
+    "...hbvbbbbbeebbp",
+    "...dbbbbbbbbblll",
+    "....dbbbbbbblll",
+    ".....ddbbbblll",
+    "......ddddll",
+    ".......pp.pp",
+    "",
+])
+
+# 허수아비: 말뚝 + 짚 몸 + 천 머리(단추 눈).
+DUMMY = grid([
+    "",
+    "......cccc",
+    ".....cccccc",
+    ".....cnccnc",
+    ".....cckkcc",
+    "......dhhd",
+    "..llllbbbbllll",
+    "....bbbbbbbb",
+    "...dbbbbbbbbd",
+    "....dbbbbbbd",
+    ".....dbbbbd",
+    "......ll",
+    "......ll",
+    "......ll",
+    ".....llll",
+    "",
+])
+
+# 라쿤 포포: 서서 손을 흔드는 안내자. 동그란 몸, 흰 얼굴에 검은 가면, 맑은 눈, 줄무늬 꼬리.
+RACCOON = grid([
+    "",
+    "....bb...bb",
+    "...bnhb.bnhb",
+    "...bhhhhhhhb",
+    "..bhlllhlllhb",
+    "..bkWnklkWnkb",
+    "..bknnklknnkb",
+    "...lllllnllll",
+    "....llrlllrl",
+    "...dbbbbbbbb",
+    "..dbbbllllbbb",
+    "nbdbbllllllbb",
+    "bnbbbllllllbb",
+    "nb.dbbbbbbbb",
+    "....nn..nn",
+    "",
+])
+
+
+SPECIES = [
+    ('field', FIELD),
+    ('house', HOUSE),
+    ('sewer', SEWER),
+    ('chip', CHIP),
+    ('red', RED),
+]
+
+
+def feet_row(g):
+    rows = [y for y, _ in [(y, 0) for y in range(N)] if any(c == 'p' for c in g[y]) and y >= 13]
+    return max(rows) if rows else 14
+
+
+def walk(g, i):
+    f = copy(g)
+    fy = feet_row(f)
+    feet = [x for x in range(N) if f[fy][x] == 'p']
+    if i == 1:
+        f = shift(f, dy=-1, rows=range(0, fy))   # 몸이 통 튄다(발은 땅에)
+        # 앞발을 앞으로 한 칸
+        for x in sorted(feet, reverse=True)[:2]:
+            f[fy][x] = '.'
+        for x in sorted(feet, reverse=True)[:2]:
+            if x + 1 < N:
+                f[fy][x + 1] = 'p'
+    return f
+
+
+def breathe(g):
+    """숨쉬기: 등 윗줄을 한 칸 내려 납작하게."""
+    top = min(y for _, y in find(g, 'hbdlvVkc'))
+    f = shift(g, dy=1, rows=range(0, top + 1))
+    return f
+
+
+def crouch(g):
+    """예고: 몸을 낮추고(아래로 한 칸) 뿌리가 밝게 선다."""
+    fy = feet_row(g)
+    f = shift(g, dy=1, rows=range(0, fy))
+    for x, y in find(f, 'v'):
+        f[y][x] = 'V'
+    return f
+
+
+def lunge(g):
+    """공격: 앞으로 한 칸 내밀고 뒷발은 남긴다."""
+    fy = feet_row(g)
+    f = shift(g, dx=1, rows=range(0, fy))
+    return f
+
+
+def hurt(g):
+    f = shift(g, dx=-1)
+    squint(f)
+    return f
+
+
+def frames_of(g):
+    return [g, breathe(g), walk(g, 0), walk(g, 1), crouch(g), lunge(g), hurt(g)]
+
+
+def raccoon_frames():
+    g = RACCOON
+    wave = copy(g)            # 말하기: 오른손을 든다
+    put(wave, 13, 8, 'b')
+    put(wave, 13, 7, 'b')
+    put(wave, 14, 6, 'nb')
+    happy = copy(g)           # 기뻐하기: 감은 눈(가면 위 흰 ^ 선) + 양손
+    put(happy, 3, 5, 'kWWk')
+    put(happy, 8, 5, 'kWWk')
+    put(happy, 3, 6, 'kkkk')
+    put(happy, 8, 6, 'kkkk')
+    put(happy, 1, 9, 'b')
+    put(happy, 13, 9, 'b')
+    return [g, breathe(g), walk(g, 0), walk(g, 1), wave, happy]
+
+
+def paint(img, ox, oy, g, pal, silhouette=False):
+    d, b, h, l = pal
+    colors = dict(COMMON, d=d, b=b, h=h, l=l, o=OUTLINE)
     for y in range(N):
         for x in range(N):
-            if cv.m[y][x] is None:
+            ch = g[y][x]
+            if ch == '.':
                 continue
-            if silhouette:
-                px[(x, y)] = (255, 255, 255, 255)
-                continue
-            c = cv.c[y][x]
-            if c is None:
-                mat, lv = cv.m[y][x]
-                c = RAMPS[mat][lv]
-            px[(x, y)] = tuple(c) + (255,)
-    return px
-
-
-# ---- 쥐·다람쥐 ------------------------------------------------------------
-SPECIES = {
-    # body: (가로 반지름, 세로 반지름), head 반지름, ear 반지름, tail: thin/bushy, belly 재질
-    'field_mouse': dict(fur='fm', belly='belly', body=(4.2, 3.0), head=3.0, ear=2.0, tail='thin', size=1.0),
-    'house_mouse': dict(fur='hm', belly='grey_belly', body=(3.0, 2.2), head=2.6, ear=2.2, tail='thin', size=0.8),
-    'sewer_rat': dict(fur='sr', belly='belly', body=(5.4, 3.6), head=3.2, ear=1.5, tail='thick', size=1.2),
-    'chipmunk': dict(fur='ch', belly='belly', body=(3.8, 3.0), head=3.0, ear=1.3, tail='bushy', stripes=True, size=1.0),
-    'red_squirrel': dict(fur='rs', belly='grey_belly', body=(3.8, 3.2), head=3.0, ear=1.4, tail='bushy_big', tufts=True, size=1.0),
-}
-
-
-def rodent(p, frame):
-    cv = Cell()
-    bw, bh = p['body']
-    hr = p['head']
-    cx, cy = 7.0, 14.0 - bh   # 몸 가운데(발이 14에 닿게)
-    hx_off, hy_off = bw * 0.75, -bh * 0.55
-    lean = 0.0
-    if frame == 1:            # 숨쉬기
-        bh *= 0.92
-        cy += 0.3
-    elif frame in (2, 3):     # 걷기: 통통
-        cy -= 0.6 if frame == 3 else 0.0
-    elif frame == 4:          # 예고: 몸을 낮추고 웅크림
-        bw *= 1.08
-        bh *= 0.82
-        cy = 14.0 - bh
-        lean = -0.6
-    elif frame == 5:          # 공격: 앞으로 쭉
-        bw *= 1.15
-        bh *= 0.9
-        cy = 14.0 - bh - 0.5
-        lean = 1.0
-    elif frame == 6:          # 맞음: 뒤로 젖힘
-        lean = -1.2
-        cy -= 0.5
-    cx += lean
-    hx, hy = cx + hx_off + lean * 0.5, cy + hy_off - (0.4 if frame == 5 else 0)
-    fur, belly = p['fur'], p['belly']
-
-    # 꼬리(맨 뒤)
-    tx = cx - bw + 0.5
-    if p['tail'] == 'thin' or p['tail'] == 'thick':
-        w = 1 if p['tail'] == 'thin' else 2
-        pts = [(tx - i, cy + 0.5 - (i * i) * 0.12 - (0.6 if frame in (2, 5) else 0)) for i in range(0, 5)]
-        for (x, y) in pts:
-            for k in range(w):
-                cv.put(x, y + k, 'pink', 1 if k == 0 else 0)
-    else:
-        big = p['tail'] == 'bushy_big'
-        rx, ry = (2.8, 5.0) if big else (2.4, 4.2)
-        sway = (-0.5 if frame in (1, 3) else 0.0) + (1.0 if frame == 4 else 0.0)
-        blob(cv, tx - 1.0 + sway * 0.3, cy - ry * 0.8 + sway, rx, ry, fur)
-        blob(cv, tx - 0.4 + sway * 0.3, cy - ry * 1.5 + sway, rx * 0.8, ry * 0.5, fur)
-    # 뒷발
-    feet_y = 14
-    back_foot = cx - bw * 0.5 + (1 if frame == 2 else 0)
-    front_foot = cx + bw * 0.55 + (1 if frame == 3 else 0) + (1 if frame == 5 else 0)
-    # 몸
-    blob(cv, cx, cy, bw, bh, fur)
-    # 배(아래 앞쪽)
-    blob(cv, cx + bw * 0.35, cy + bh * 0.45, bw * 0.55, bh * 0.45, belly)
-    # 줄무늬(다람쥐): 등 위에 검정·흰 줄
-    if p.get('stripes'):
-        for x in range(int(cx - bw + 1), int(cx + bw * 0.6)):
-            for y in range(N):
-                if cv.m[y][x] and cv.m[y][x][0] == fur:
-                    top = y
-                    break
-            else:
-                continue
-            cv.put(x, top + 1, 'stripe_d', 1)
-            cv.put(x, top + 2, 'stripe_l', 1)
-    # 귀(머리 위 뒤쪽): 먼저 그리고 머리를 덮는다. 바깥은 어두운 단, 안은 분홍.
-    er = p['ear']
-    ex, ey = hx - hr * 0.45, hy - hr * 0.95
-    blob(cv, ex, ey, er, er, fur, flat=0)
-    if er >= 1.8:
-        cv.put(ex, ey, 'pink', 2)
-        cv.put(ex - 1, ey, 'pink', 1)
-        cv.put(ex, ey + 1, 'pink', 1)
-    elif er >= 1.4:
-        cv.put(ex, ey, 'pink', 1)
-    if p.get('tufts'):
-        cv.put(ex, ey - er - 0.2, 'stripe_d', 1)
-        cv.put(ex + 1, ey - er - 1.2, 'stripe_d', 1)
-    # 머리
-    blob(cv, hx, hy, hr, hr * 0.9, fur)
-    # 주둥이
-    blob(cv, hx + hr * 0.7, hy + hr * 0.35, hr * 0.55, hr * 0.42, belly)
-    # 발
-    for fx in (back_foot, front_foot):
-        cv.put(fx, feet_y, 'pink', 0)
-        cv.put(fx + 1, feet_y, 'pink', 1)
-    # 코
-    nx = hx + hr * 1.15
-    cv.paint(nx, hy + hr * 0.15, NOSE_DARK)
-    # 눈: 뿌리 독 = 붉게 빛남(2칸 + 반사). 맞을 때는 질끈(가로줄).
-    ex2, ey2 = hx + hr * 0.25, hy - hr * 0.15
-    if frame == 6:
-        cv.paint(ex2, ey2, EYE_DARK)
-        cv.paint(ex2 + 1, ey2, EYE_DARK)
-    else:
-        for ddx in (0, 1):
-            for ddy in (0, 1):
-                cv.paint(ex2 + ddx, ey2 + ddy, EYE_GLOW if ddy == 1 else EYE_DARK)
-        cv.paint(ex2 + (1 if frame == 4 else 0), ey2, EYE_HI)
-    # 뿌리 가시(등): 보라 뿌리 둘
-    top_x = int(cx - bw * 0.55)
-    for i, dx in enumerate((0, 1, 2)):
-        x = top_x + dx
-        for y in range(N):
-            if cv.m[y][x] and cv.m[y][x][0] in (fur, 'stripe_d', 'stripe_l'):
-                if i == 1:
-                    cv.put(x, y - 1, 'root', 2)
-                cv.put(x, y, 'root', 1)
-                cv.put(x, y + 1, 'root', 0)
-                break
-    outline(cv)
-    return cv
-
-
-def dummy(frame):
-    cv = Cell()
-    lean = {6: -1.0}.get(frame, 0.0)
-    for y in range(6, 15):
-        cv.put(7 + lean * (14 - y) / 8, y, 'wood', 1)
-    blob(cv, 7.5 + lean, 7.0, 4.0, 3.5, 'straw')
-    blob(cv, 7.5 + lean, 3.0, 2.5, 2.3, 'cloth')
-    cv.paint(8.5 + lean, 3, EYE_DARK)
-    outline(cv)
-    return cv
-
-
-def raccoon(frame):
-    """라쿤 포포: 서 있는 안내자. 동그란 몸, 검은 눈 가면, 줄무늬 꼬리. 눈은 맑다(물들지 않음)."""
-    cv = Cell()
-    bob = -0.5 if frame in (1, 3) else 0.0
-    cx, cy = 7.0, 10.6 + bob
-    # 꼬리(뒤): 회색·검정 고리
-    for i, (x, y) in enumerate([(3, 12), (2, 11), (2, 10), (2, 9), (3, 8)]):
-        mat = 'mask' if i % 2 == 0 else 'rc'
-        cv.put(x, y + bob, mat, 1)
-        cv.put(x + 1, y + bob, mat, 2 if mat == 'rc' else 1)
-    # 몸
-    blob(cv, cx, cy, 3.6, 3.6, 'rc')
-    blob(cv, cx + 0.8, cy + 1.0, 2.2, 2.4, 'white', flat=1)
-    # 발
-    step = {2: (1, 0), 3: (0, 1)}.get(frame, (0, 0))
-    cv.put(5 + step[0], 14, 'mask', 1)
-    cv.put(9 + step[1], 14, 'mask', 1)
-    # 팔(말하기: 오른팔을 위로)
-    if frame == 4:
-        cv.put(11, 8 + bob, 'rc', 1)
-        cv.put(12, 7 + bob, 'rc', 1)
-        cv.put(12, 6 + bob, 'mask', 1)
-    elif frame == 5:
-        cv.put(3, 8 + bob, 'rc', 1)
-        cv.put(11, 8 + bob, 'rc', 1)
-    else:
-        cv.put(10, 11 + bob, 'mask', 1)
-    # 머리
-    hx, hy = 8.0, 5.0 + bob
-    blob(cv, hx, hy, 3.6, 3.0, 'rc')
-    # 귀
-    blob(cv, hx - 2.5, hy - 2.6, 1.2, 1.2, 'rc', flat=0)
-    blob(cv, hx + 2.0, hy - 2.8, 1.2, 1.2, 'rc', flat=0)
-    cv.put(hx - 2.5, hy - 2.6, 'white', 2)
-    cv.put(hx + 2.0, hy - 2.8, 'white', 2)
-    # 흰 얼굴 + 검은 가면 띠
-    blob(cv, hx + 0.5, hy + 1.2, 2.6, 1.4, 'white', flat=2)
-    for x in range(int(hx - 2), int(hx + 3)):
-        cv.put(x, hy, 'mask', 1)
-    # 눈(가면 안의 맑은 눈 + 반사)
-    if frame == 5:
-        cv.paint(hx - 1, hy, EYE_WHITE)    # ^^ 대신 반짝
-        cv.paint(hx + 2, hy, EYE_WHITE)
-    else:
-        cv.paint(hx - 1, hy, EYE_DARK)
-        cv.paint(hx + 2, hy, EYE_DARK)
-        cv.paint(hx - 1, hy - 1, EYE_WHITE)
-        cv.paint(hx + 2, hy - 1, EYE_WHITE)
-    # 코
-    cv.paint(hx + 3, hy + 1, NOSE_DARK)
-    cv.paint(hx + 2, hy + 2, BLUSH)
-    outline(cv)
-    return cv
+            c = (255, 255, 255) if silhouette else colors[ch]
+            img.putpixel((ox + x, oy + y), c + (255,))
 
 
 def sheet():
     rows = []
-    for name in ('field_mouse', 'house_mouse', 'sewer_rat', 'chipmunk', 'red_squirrel'):
-        rows.append([rodent(SPECIES[name], f) for f in range(7)])
-    rows.append([dummy(f) for f in range(7)])
-    rows.append([raccoon(f) for f in range(6)])
+    for name, g in SPECIES:
+        rows.append((FUR[name], frames_of(g)))
+    rows.append((FUR['straw'], [DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, lunge(DUMMY), shift(DUMMY, dx=-1)]))
+    rows.append((FUR['raccoon'], raccoon_frames()))
     img = Image.new('RGBA', (N * 7, N * len(rows) * 2), (0, 0, 0, 0))
-    for ry, row in enumerate(rows):
-        for rx, cv in enumerate(row):
-            for sil, oy in ((False, ry), (True, ry + len(rows))):
-                for (x, y), c in to_rgba(cv, sil).items():
-                    img.putpixel((rx * N + x, oy * N + y), c)
+    for ry, (pal, frames) in enumerate(rows):
+        for rx, g in enumerate(frames):
+            g = outline(g)
+            paint(img, rx * N, ry * N, g, pal)
+            paint(img, rx * N, (ry + len(rows)) * N, g, pal, silhouette=True)
     return img
 
 

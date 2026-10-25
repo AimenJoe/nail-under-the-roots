@@ -8,7 +8,7 @@
 | `fonts/OFL-ArkPixel.txt` | Ark Pixel 레포 `LICENSE-OFL` | — | Ark Pixel의 OFL 원문. 일본어·간체 폰트와 함께 배포 |
 | `art/nail.png` | 직접 그림. 원본 `tools/art/nail.py` | 프로젝트 소유 | Naïl 스프라이트 v2(idle·walk·attack·hurt·dead·흙더미·그림자 + 흰 실루엣) |
 | `art/portraits.png` | 직접 그림. 원본 `tools/art/portraits.py` | 프로젝트 소유 | 대화창 초상화 88×88(Naïl 표정 4 + 이웃 그림자 + 라쿤 포포 2) |
-| `art/critters.png` | 직접 그림. 원본 `tools/art/critters.py` | 프로젝트 소유 | 적(물든 들쥐·생쥐·시궁쥐·다람쥐·청설모)·허수아비·라쿤 포포 16×16 + 흰 실루엣 |
+| `art/critters.png` | 직접 그림. 원본 `tools/art/critters.py` | 프로젝트 소유 | 적(물든 들쥐·생쥐·시궁쥐·다람쥐·청설모)·허수아비·라쿤 포포 16×16 + 흰 실루엣. v2 손으로 찍은 자세 |
 | `art/tiles.png` | 직접 그림. 원본 `tools/art/tiles.py` | 프로젝트 소유 | Sunnyside가 들어오기 전 대체 타일(풀·꽃·흙·벼랑·그루터기·바위·버섯·뿌리·얼룩) |
 | `vendor/sunnyside/` (레포 밖) | [Sunnyside World](https://danieldiggle.itch.io/sunnyside) by danieldiggle, ASSET PACK V2.1 | 아래 "Sunnyside World 라이선스 원문" | 공개 레포라 커밋하지 않는다(`.gitignore`, docs/decisions/0010). Name your own price |
 
