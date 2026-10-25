@@ -10,6 +10,8 @@ pub struct Art {
     pub nail_furs: Vec<Option<Texture2D>>,
     /// 대체 타일셋(tools/art/tiles.py).
     pub tiles: Texture2D,
+    /// 같은 타일셋의 CPU 쪽 그림: 지도 굽기(terrain.rs)가 장식을 찍는다.
+    pub tiles_img: Image,
     /// 어둠 마스크(가운데 투명, 바깥 검정). 코드로 만든다.
     pub dark: Texture2D,
     /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이. 아래 CRITTER_ROWS줄은 흰 실루엣.
@@ -75,7 +77,8 @@ impl Art {
 
     pub async fn load() -> Option<Self> {
         let nail = load_texture("art/nail.png").await.ok()?;
-        let tiles = load_texture("art/tiles.png").await.ok()?;
+        let tiles_img = load_image("art/tiles.png").await.ok()?;
+        let tiles = Texture2D::from_image(&tiles_img);
         nail.set_filter(FilterMode::Nearest);
         let mut nail_furs = Vec::new();
         for n in 1..crate::journal::FURS {
@@ -112,6 +115,7 @@ impl Art {
             nail,
             nail_furs,
             tiles,
+            tiles_img,
             dark: dark_mask(),
             critters,
             portraits,

@@ -40,6 +40,7 @@ mod sfx;
 mod species;
 mod story;
 mod talents;
+mod terrain;
 mod tuning;
 mod tutorial;
 mod ui;

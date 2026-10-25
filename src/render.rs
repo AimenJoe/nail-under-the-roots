@@ -59,6 +59,8 @@ pub struct Renderer {
     view_origin: Vec2,
     /// 카메라의 소수점 부분(0..1, 게임 px). 올릴 때 이만큼 화면을 민다.
     subpixel: Vec2,
+    /// 구운 지도(terrain.rs, 0062): 열쇠가 같으면 다시 굽지 않는다.
+    terrain: Option<(u64, Texture2D)>,
 }
 
 impl Renderer {
@@ -75,6 +77,7 @@ impl Renderer {
             warmed: std::cell::Cell::new(None),
             view_origin: Vec2::ZERO,
             subpixel: Vec2::ZERO,
+            terrain: None,
         }
     }
 
@@ -105,8 +108,23 @@ impl Renderer {
         };
         if let Some(art) = &self.art {
             clear_background(w.biome.clear());
-            if w.room.grid.is_some() {
-                draw_grid_art(art, w, cam);
+            if let Some(g) = &w.room.grid {
+                let paths = match &w.adv.dungeon {
+                    Some(d) if w.adv.place == crate::adventure::Place::Dungeon => {
+                        crate::terrain::dungeon_paths(d)
+                    }
+                    _ => Vec::new(),
+                };
+                let key = crate::terrain::key(g, w.biome, &paths);
+                if self.terrain.as_ref().map(|(k, _)| *k) != Some(key) {
+                    let img = crate::terrain::bake(g, w.biome, &paths, Some(&art.tiles_img));
+                    let tex = Texture2D::from_image(&img);
+                    tex.set_filter(FilterMode::Nearest);
+                    self.terrain = Some((key, tex));
+                }
+                if let Some((_, tex)) = &self.terrain {
+                    draw_grid_art(w, cam, tex);
+                }
             } else {
                 draw_room_art(art, w);
             }
@@ -1009,85 +1027,38 @@ fn floor_decor(w: &World, cam: Vec2) -> Vec<(f32, f32, Decor)> {
                     continue;
                 }
             }
-            let (roll, pick) = biome::hash01(cx, cy, 7);
-            if let Some(d) = w.biome.decor(roll, pick) {
-                out.push((cx as f32 * 16.0, cy as f32 * 16.0, d));
+            // 구운 지도와 같은 자리(무리 밀도·어긋남, terrain.rs).
+            if let Some((d, ox, oy)) = crate::terrain::decor_at(w.biome, cx, cy) {
+                out.push((cx as f32 * 16.0 + ox, cy as f32 * 16.0 + oy, d));
             }
         }
     }
     out
 }
 
-/// 격자 방(필드·던전) 그림: 보이는 칸만. 벽 칸은 아래가 바닥이면 벼랑 앞면, 아니면 윗면(3/4 시점).
+/// 격자 방(필드·던전) 그림: 구운 지도(terrain.rs, 0062)의 보이는 부분 + 매 프레임 바뀌는 칸.
 /// 특별한 칸: 문(열림 = 바닥, 잠김 = 뿌리 창살), 굴 입구, 출구, 저장 지점(빛나는 버섯 고리).
-fn draw_grid_art(art: &Art, w: &World, cam: Vec2) {
+fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D) {
     let Some(g) = &w.room.grid else { return };
-    let tex = &art.tiles;
-    let ft = w.biome.floor_tint();
-    let wt = w.biome.wall_tint();
-    let dirt = w.biome.dirt_floor();
+    let view = Rect::new(cam.x.floor() - 1.0, cam.y.floor() - 1.0, RW + 3.0, RH + 3.0);
+    let bounds = Rect::new(0.0, 0.0, baked.width(), baked.height());
+    if let Some(src) = view.intersect(bounds) {
+        draw_texture_ex(
+            baked,
+            src.x,
+            src.y,
+            WHITE,
+            DrawTextureParams {
+                source: Some(src),
+                ..Default::default()
+            },
+        );
+    }
     let (x0, y0) = (
         (cam.x / 16.0).floor() as i32 - 1,
         (cam.y / 16.0).floor() as i32 - 1,
     );
     let (x1, y1) = (x0 + 23, y0 + 14);
-    let solid = |c: Cell| c == Cell::Wall || (c == Cell::Door && w.room.doors_locked());
-    for cy in y0..y1 {
-        for cx in x0..x1 {
-            let c = g.get_i(cx, cy);
-            let (px, py) = (cx as f32 * 16.0, cy as f32 * 16.0);
-            if c == Cell::Wall {
-                if g.get_i(cx, cy + 1) != Cell::Wall {
-                    let (roll, _) = biome::hash01(cx, cy, 3);
-                    let roots = match w.biome {
-                        crate::biome::Biome::Meadow => roll < 0.15,
-                        crate::biome::Biome::Roots => roll < 0.55,
-                        crate::biome::Biome::Deep => roll < 0.8,
-                    };
-                    let src = if roots {
-                        tile_src(2, 1)
-                    } else {
-                        tile_src(1, 1)
-                    };
-                    draw_tile(tex, src, px, py, wt);
-                } else {
-                    draw_tile(tex, tile_src(0, 1), px, py, wt);
-                }
-                continue;
-            }
-            let (_, pick) = biome::hash01(cx, cy, 1);
-            let src = if dirt {
-                tile_src(3, 0)
-            } else {
-                tile_src(pick % 3, 0)
-            };
-            draw_tile(tex, src, px, py, ft);
-            // 벼랑 아래 그늘
-            if solid(g.get_i(cx, cy - 1)) {
-                draw_rectangle(px, py, 16.0, 2.0, Color::new(0.0, 0.0, 0.0, 0.25));
-                draw_rectangle(px, py + 2.0, 16.0, 2.0, Color::new(0.0, 0.0, 0.0, 0.12));
-            }
-        }
-    }
-    // 반대 재질 얼룩(바닥만)
-    for cy in y0..y1 {
-        for cx in x0..x1 {
-            if g.get_i(cx, cy) != Cell::Floor {
-                continue;
-            }
-            let (roll, pick) = biome::hash01(cx, cy, 2);
-            if roll < w.biome.patch_chance() {
-                let row = if dirt { 3 } else { 2 };
-                let src = tile_src(2 + pick % 2, row);
-                let ox = ((pick >> 2) % 9) as f32 - 4.0;
-                let oy = ((pick >> 6) % 9) as f32 - 4.0;
-                draw_tile(tex, src, cx as f32 * 16.0 + ox, cy as f32 * 16.0 + oy, ft);
-            }
-        }
-    }
-    for (x, y, d) in floor_decor(w, cam) {
-        draw_tile(tex, decor_src(d), x, y, ft);
-    }
     // 특별한 칸
     for cy in y0..y1 {
         for cx in x0..x1 {
