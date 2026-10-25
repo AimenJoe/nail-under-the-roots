@@ -20,6 +20,8 @@ pub enum When {
     /// 보리·모모에게 말을 걸었다(0051): 진행에 맞는 한 번짜리 줄이 먼저, 없으면 늘 하는 말(도토 줄은 0052).
     TalkBori,
     TalkMomo,
+    /// 도토에게 말을 걸었다(0053).
+    TalkDoto,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -159,6 +161,19 @@ pub const LINES: &[Line] = &[
         ],
         once: true,
     },
+    // 참 엔딩 뒤 처음 마을에 오면 포포가 한마디(0053).
+    Line {
+        id: "popo_true",
+        when: When::Village,
+        who: Speaker::Popo,
+        text: |s| s.popo_true,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::TRUE_ENDING),
+            Seen("village_intro"),
+        ],
+        once: true,
+    },
     // 반딧불을 처음 마을로 보낸 뒤: 큰 나무 재주를 알려 준다(0047).
     Line {
         id: "tree_intro",
@@ -203,6 +218,55 @@ pub const LINES: &[Line] = &[
         who: Speaker::Bori,
         text: |s| s.bori_t_tree,
         needs: &[Seen("tree_intro")],
+        once: true,
+    },
+    // 0053: 수수·실뜨기·독 발톱·참 엔딩 뒤의 한 번짜리 말.
+    Line {
+        id: "bori_t_susu",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_t_susu,
+        needs: &[Flag(key::SPROUT)],
+        once: true,
+    },
+    Line {
+        id: "bori_t_true",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_t_true,
+        needs: &[Flag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "momo_t_knot",
+        when: When::TalkMomo,
+        who: Speaker::Momo,
+        text: |s| s.momo_t_knot,
+        needs: &[CountAtLeast(crate::journal::KNOTS_OPEN, 3)],
+        once: true,
+    },
+    Line {
+        id: "momo_t_true",
+        when: When::TalkMomo,
+        who: Speaker::Momo,
+        text: |s| s.momo_t_true,
+        needs: &[Flag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "doto_t_venom",
+        when: When::TalkDoto,
+        who: Speaker::Doto,
+        text: |s| s.doto_t_venom,
+        needs: &[Flag(key::VENOM)],
+        once: true,
+    },
+    Line {
+        id: "doto_t_true",
+        when: When::TalkDoto,
+        who: Speaker::Doto,
+        text: |s| s.doto_t_true,
+        needs: &[Flag(key::TRUE_ENDING)],
         once: true,
     },
     Line {
@@ -358,6 +422,20 @@ mod tests {
         assert_eq!(take(&mut p, When::TalkBori).unwrap().id, "bori_t_halmae");
         assert!(take(&mut p, When::TalkBori).is_none());
         assert_eq!(take(&mut p, When::TalkMomo).unwrap().id, "momo_t_deep");
+    }
+
+    /// 0053: 도토의 말은 독 발톱·참 엔딩을 따르고, 실뜨기 셋째 단계가 열리면 모모가 한마디.
+    #[test]
+    fn later_progress_lines_play_once() {
+        let mut p = Profile::default();
+        assert!(take(&mut p, When::TalkDoto).is_none());
+        p.set(key::VENOM);
+        assert_eq!(take(&mut p, When::TalkDoto).unwrap().id, "doto_t_venom");
+        assert!(take(&mut p, When::TalkDoto).is_none());
+        p.add(crate::journal::KNOTS_OPEN, 3);
+        assert_eq!(take(&mut p, When::TalkMomo).unwrap().id, "momo_t_knot");
+        p.set(key::TRUE_ENDING);
+        assert_eq!(take(&mut p, When::TalkDoto).unwrap().id, "doto_t_true");
     }
 
     #[test]

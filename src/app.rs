@@ -34,7 +34,7 @@ enum TitleItem {
     Dev,
 }
 /// 앨범 칸 배치(가로 칸 수).
-const ALBUM_COLS: usize = 4;
+const ALBUM_COLS: usize = 5;
 const PAUSE_TABS: [Tr; 6] = [
     |s| s.tab_menu,
     |s| s.tab_status,
@@ -211,6 +211,8 @@ pub enum Item {
 
 /// 독 발톱(equipment::WEAPONS 번호, 큰 나무에서 깨운다, 0052).
 pub(crate) const VENOM_CLAW: usize = 3;
+/// 새싹 발톱(수수가 만들어 준다, 0053).
+pub(crate) const SPROUT_CLAW: usize = 0;
 
 /// 가방. 지금은 무기만 들어간다. 그 밖의 아이템은 2단계(방 클리어 보상)에서.
 pub struct Inventory {
@@ -762,6 +764,8 @@ impl App {
         });
         self.world.knots = knots;
         self.world.player.eat_cd_mul = knots.eat_cd_mul();
+        self.world.player.parry_mul = knots.parry_mul();
+        self.world.player.burrow_knot = knots.burrow_cd_mul();
         // 저널 보상(0048): 상자에서 나올 장신구, 털빛. 통계 기준은 새 월드에서 0부터.
         self.world.charm_pool = crate::journal::charm_pool(&self.profile);
         self.world.fur = crate::journal::fur(&self.profile);
@@ -793,9 +797,15 @@ impl App {
             }
             _ => Inventory::new(&[start]),
         };
-        // 큰 나무에서 깨운 독 발톱(0052)도 런마다 가방에(끼는 건 가방에서). 맨손 시작(튜토리얼 전)은 빼고.
-        if self.profile.flag(crate::profile::key::VENOM) && self.inventory.equipped.is_some() {
-            self.inventory.add(VENOM_CLAW);
+        // 수수의 새싹 발톱(0053)·큰 나무에서 깨운 독 발톱(0052)도 런마다 가방에(끼는 건 가방에서).
+        // 맨손 시작(튜토리얼 전)은 빼고.
+        for (k, w) in [
+            (crate::profile::key::SPROUT, SPROUT_CLAW),
+            (crate::profile::key::VENOM, VENOM_CLAW),
+        ] {
+            if self.profile.flag(k) && self.inventory.equipped.is_some() {
+                self.inventory.add(w);
+            }
         }
         // 저널로 받은 장신구는 런마다 가방에 들고 시작한다(0050). 상자에서는 다시 안 나온다.
         if s != Scenario::Tutorial {
@@ -1373,7 +1383,10 @@ impl App {
                 {
                     self.draw_hint(&ui, &h);
                 }
-                self.draw_interact_bubble(&ui);
+                // 획득 창이 떠 있으면 말풍선은 숨긴다(창 위에 겹쳤다).
+                if self.gift.is_none() {
+                    self.draw_interact_bubble(&ui);
+                }
                 // 마을: 마을 씨앗·맡긴 반딧불(오른쪽 위 막대 아래).
                 if self.world.adv.place == crate::adventure::Place::Village {
                     let n = self.profile.count(crate::village::KEY_SEEDS);
@@ -1542,7 +1555,8 @@ impl App {
         use crate::knots::{MAX_LEVEL, NAMES};
         let s = i18n::s();
         let open = self.knots_open();
-        let panel = Rect::new(36.0, 8.0, 248.0, 152.0);
+        // 안내 두 줄이 창 밖으로 넘쳐 조작 안내와 겹쳤다: 창을 조금 키우고 매듭 줄 간격을 12로(0053).
+        let panel = Rect::new(36.0, 6.0, 248.0, 160.0);
         ui.panel(panel, Some(s.knot_title));
         let mut y = panel.y + 20.0;
         for l in ui::wrap(ui, s.knot_intro, panel.w - 16.0, FONT_PX)
@@ -1566,7 +1580,9 @@ impl App {
         self.hits.push((row, Hit::KnotGo));
         y += FONT_PX + 8.0;
         // 매듭 목록: 걸림 ● / 열렸지만 안 걸림 ○ / 아직 안 열림 ?
-        for i in 0..MAX_LEVEL {
+        // 열 줄은 창에 안 들어가 다섯 줄씩 두 쪽: 고른 단계가 6 이상이면 6~10(1~5는 다 걸려 있다, 0053).
+        let page: u8 = if self.knot_level > 5 { 5 } else { 0 };
+        for i in page..(page + 5).min(MAX_LEVEL) {
             let n = i + 1;
             let (mark, text, c) = if n > open {
                 ("?", "…".to_string(), ui::TEXT_DIM)
@@ -1578,7 +1594,7 @@ impl App {
             ui.text(mark, panel.x + 10.0, y, FONT_PX, c);
             let t = ui.fit(&text, panel.w - 34.0, FONT_PX);
             ui.text(&t, panel.x + 22.0, y, FONT_PX, c);
-            y += 13.0;
+            y += 12.0;
         }
         let note = if self.profile.flag(crate::profile::key::KNOT_NEW) {
             s.toast_knot_open
@@ -1609,7 +1625,7 @@ impl App {
             .flag(&crate::profile::key::illust(il.spec().file))
     }
 
-    /// 앨범: 4×2 칸에서 고르고, 본 그림은 크게(패닝·입자 그대로). 확인·뒤로·탭으로 닫는다.
+    /// 앨범: 5×2 칸에서 고르고, 본 그림은 크게(패닝·입자 그대로). 확인·뒤로·탭으로 닫는다.
     fn update_album(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
         use crate::illust::Illust;
         if let Some(t) = self.album_view.as_mut() {
@@ -1660,7 +1676,8 @@ impl App {
         }
         let panel = Rect::new(16.0, 8.0, 288.0, 150.0);
         ui.panel(panel, Some(s.title_album));
-        let (cw, ch, gap) = (64.0, 36.0, 6.0);
+        // 5×2칸(그림 9장, 0053). 칸은 16:9.
+        let (cw, ch, gap) = (52.0, 30.0, 5.0);
         let x0 = panel.x + (panel.w - ALBUM_COLS as f32 * cw - (ALBUM_COLS - 1) as f32 * gap) / 2.0;
         let y0 = panel.y + 38.0;
         let mut seen = 0;
@@ -2281,13 +2298,7 @@ impl App {
             (s.stat_aspd, pct(st.attack_speed)),
             (
                 s.stat_dig_cd,
-                fill(
-                    s.fmt_secs,
-                    &[&format!(
-                        "{:.1}",
-                        t::BURROW_COOLDOWN * st.burrow_cd * p.talents.burrow_cd_mul()
-                    )],
-                ),
+                fill(s.fmt_secs, &[&format!("{:.1}", p.burrow_cd_full())]),
             ),
             (&fill(s.stat_gauge, &[&tr(gauge.name())]), pct(st.sp_gain)),
         ];

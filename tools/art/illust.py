@@ -7,7 +7,7 @@
   great_tree   640×560  위(나무) → 아래(땅속)로 패닝
   halmae_deep  704×360  오른쪽으로 64px 패닝
   last_bloom   640×440  위(꽃) → 아래(밑동)로 패닝
-  나머지       640×360
+  나머지       640×360(doto_memory 포함 — 도토가 기억해 내는 장면, 0053)
 대화창·내레이션 띠가 보이는 창의 y 248 아래를 덮는다 → 얼굴·중요한 것은 그 위에.
 
 그리는 법(픽셀 그림 흉내):
@@ -43,6 +43,10 @@ THREAD_WHITE = [(150, 150, 170), (200, 200, 214), (236, 236, 244), (255, 255, 25
 GREEN = [(40, 70, 46), (62, 104, 58), (92, 140, 70), (132, 176, 88)]
 BLOSSOM = [(186, 96, 124), (226, 136, 160), (246, 178, 194), (255, 222, 230)]
 CAP = [(112, 78, 54), (156, 112, 70), (196, 150, 92), (226, 190, 132)]
+# 도토(청설모): 붉은 밤색 털, 크림 배(portraits.py dfur·dlight와 같은 계열). 도토리 갓.
+DFUR = [(70, 36, 30), (112, 62, 42), (160, 96, 60), (200, 134, 86), (230, 170, 116)]
+DLIGHT = [(206, 180, 156), (232, 212, 190), (248, 238, 222)]
+ACORN = [(62, 40, 26), (98, 66, 40), (138, 98, 60), (176, 134, 84)]
 
 
 # ---- 캔버스와 마스크 -----------------------------------------------------------
@@ -692,6 +696,92 @@ def molehill():
     return cv
 
 
+def doto_memory():
+    """도토가 기억해 낸다(0053): 아주 오래전, 가장 깊은 곳. 어린 도토가 흰 실 곁에 빛나는 씨앗을 묻는다.
+    기억이라 색을 바래게(따뜻한 세피아) 하고 가장자리를 어둡게 눌렀다. 중요한 것(도토·씨앗)은 y 248 위."""
+    rng = random.Random(99)
+    cv = Canvas(640, 360)
+    bands(cv, 0, 360, (58, 44, 36), (28, 20, 20), 7)
+    speckle(cv, rng, (0, 0, 640, 360), 110, [(48, 36, 30), (72, 56, 44)])
+    sx, sy = 372, 206
+    glow(cv, sx, sy, 200, (250, 226, 170), 0.2, 5)
+    # 흰 실: 오른쪽 어둠에서 와서 씨앗 자리 둘레에 닿는다(누룩 할매의 실 — 그때는 흰빛)
+    for k in range(9):
+        y0 = 40 + k * 36 + rng.uniform(-10, 10)
+        end = (sx + 26 + rng.uniform(-6, 10), sy + 6 + (k - 4) * 4)
+        wavy_thread(cv, (660, y0), end, rng, 3, 2 if k % 3 else 3, THREAD_WHITE)
+    # 판 구덩이와 흙더미
+    hole = ellipse(cv, sx, sy + 12, 34, 11)
+    cv.paint(hole, (30, 20, 18))
+    heap = ellipse(cv, sx - 64, sy + 22, 30, 14) & (cv.yy <= sy + 26)
+    outline(cv, heap, (34, 24, 20), 2)
+    shade(cv, heap, [(76, 54, 40), (104, 76, 54), (132, 98, 68)])
+    # 씨앗(빛난다)
+    glow(cv, sx, sy + 4, 34, (255, 244, 200), 0.6, 4)
+    seed = ellipse(cv, sx, sy + 4, 13, 10)
+    outline(cv, seed, (60, 38, 24), 2)
+    shade(cv, seed, [(150, 104, 60), (196, 150, 92), (232, 196, 130), (250, 232, 180)])
+    # 꼬리(뒤): 몸 뒤에서 솟아 머리 위로 말린 굵은 털 곡선 하나(공을 쌓으면 눈사람처럼 보였다)
+    tpts = bezier((262, 226), (150, 200), (150, 70), (262, 64), n=80)
+    tail = stroke(cv, tpts, 52, 40)
+    tail |= ellipse(cv, 258, 72, 34, 26)
+    for i in range(0, len(tpts), 4):                 # 털 끝이 삐죽(바깥쪽으로 작은 털 뭉치)
+        x, y = tpts[i]
+        tail |= ellipse(cv, x + rng.uniform(-22, 22), y + rng.uniform(-22, 22), 9, 7)
+    outline(cv, tail, OUTLINE, 2)
+    shade(cv, tail, DFUR, 200, 140, 80, 110, bias=-0.08)
+    for i in range(6, len(tpts) - 4, 5):
+        x, y = tpts[i]
+        m = stroke(cv, bezier((x - 10, y + 6), (x - 4, y), (x + 4, y - 2), (x + 12, y + 2)), 1) & tail
+        cv.paint(m, DFUR[1])
+    # 몸·목·머리를 한 덩어리로, 귀는 모자 뒤로 솟는다
+    body = ellipse(cv, 286, 198, 48, 38, rot=0.2)
+    neck = ellipse(cv, 312, 170, 28, 24)
+    head = ellipse(cv, 330, 146, 30, 26)
+    ear = ellipse(cv, 340, 104, 8, 18, rot=0.2)
+    fig = body | neck | head | ear
+    outline(cv, fig, OUTLINE, 2)
+    shade(cv, fig & ~ear, DFUR, 300, 170, 70, 64, bias=0.05)
+    shade(cv, ear, DFUR)
+    cv.paint(ellipse(cv, 341, 108, 3, 10, rot=0.2), (180, 110, 110))
+    belly = ellipse(cv, 318, 200, 20, 26, rot=0.2) & body
+    shade(cv, belly, DLIGHT)
+    muzzle = ellipse(cv, 352, 156, 14, 11) & head
+    shade(cv, muzzle, DLIGHT)
+    cv.paint(ellipse(cv, 364, 151, 4, 3), (180, 100, 110))
+    # 귀 술
+    for k in range(4):
+        cv.paint(stroke(cv, [(338 + k * 2, 88), (337 + k * 3, 76 - k)], 2), DFUR[0])
+    # 도토리 갓 모자
+    cap = ellipse(cv, 322, 118, 26, 11) & (cv.yy <= 121)
+    stem = stroke(cv, [(322, 108), (324, 100), (328, 96)], 3, 2)
+    outline(cv, cap | stem, (40, 26, 20), 2)
+    shade(cv, cap, ACORN, 322, 114, 26, 10)
+    cv.paint(stem, ACORN[1])
+    for (x, y) in ((306, 113), (314, 110), (322, 109), (330, 110), (338, 113), (310, 117), (326, 116), (318, 114)):
+        cv.paint(ellipse(cv, x, y, 2, 1.5), ACORN[0])
+    # 앞발 둘: 씨앗 위로 흙을 덮는다
+    for (px, py) in ((346, 198), (360, 192)):
+        paw = ellipse(cv, px, py, 9, 7)
+        outline(cv, paw, OUTLINE, 1)
+        shade(cv, paw, DFUR[1:])
+    # 감은 눈(흐뭇함) + 볼
+    eye = [(334 + i * 2, 140 - (3 - abs(i - 3)) * 1.2) for i in range(7)]
+    cv.paint(stroke(cv, eye, 3), (40, 26, 30))
+    cv.paint(ellipse(cv, 342, 156, 7, 4), (236, 150, 150), 0.55)
+    # 흙 부스러기가 떨어진다
+    speckle(cv, rng, (330, 196, 400, 214), 10, [(92, 66, 48), (124, 92, 66)], size=(1.5, 2.5))
+    # 기억의 바램: 세피아로 끌고 가장자리를 누른다
+    g = cv.px.mean(axis=2, keepdims=True)
+    sep = np.concatenate([g * 1.08 + 14, g * 0.94 + 6, g * 0.76], axis=2)
+    cv.px = cv.px * 0.55 + sep * 0.45
+    d = np.sqrt(((cv.xx - 330) / 380) ** 2 + ((cv.yy - 170) / 250) ** 2)
+    k = np.clip((d - 0.55) / 0.45, 0, 1)
+    step = (np.floor(k * 3) / 3)[..., None]
+    cv.px = cv.px * (1 - 0.45 * step)
+    return cv
+
+
 SCENES = {
     'great_tree': great_tree,
     'mother_burrow': mother_burrow,
@@ -701,6 +791,7 @@ SCENES = {
     'last_bloom': last_bloom,
     'sprout': sprout,
     'molehill': molehill,
+    'doto_memory': doto_memory,
 }
 
 

@@ -89,8 +89,9 @@ pub struct Enemy {
     pub hp: i32,
     /// 처음 체력(실뜨기가 바꾼다). 막대·반 아래 판정은 이걸 본다.
     pub max_hp: i32,
-    /// 예고 시간 배율(실뜨기 2단계).
+    /// 예고 시간 배율(실뜨기 2단계)·걷기 배율(실뜨기 6단계).
     pub windup_mul: f32,
+    pub speed_mul: f32,
     /// 실뜨기를 이미 걸었나(월드가 새로 나온 적에 한 번).
     pub knotted: bool,
     pub state: State,
@@ -153,8 +154,17 @@ impl Enemy {
         }
         self.knotted = true;
         self.max_hp = (self.max_hp as f32 * k.enemy_hp_mul()).ceil() as i32;
+        if self.is_boss() {
+            self.max_hp = (self.max_hp as f32 * k.boss_hp_mul()).ceil() as i32;
+        }
         self.hp = self.max_hp;
         self.windup_mul = k.windup_mul();
+        self.speed_mul = k.enemy_speed_mul();
+    }
+
+    /// 걷기(거리 맞추기) 속도(종 수치 × 실뜨기 배율).
+    pub fn speed(&self) -> f32 {
+        self.kind.species().speed * self.speed_mul
     }
 
     pub fn new(kind: Kind, pos: Vec2) -> Self {
@@ -169,6 +179,7 @@ impl Enemy {
             hp,
             max_hp: hp,
             windup_mul: 1.0,
+            speed_mul: 1.0,
             knotted: false,
             state,
             facing: vec2(-1.0, 0.0),
@@ -308,7 +319,7 @@ impl Enemy {
                         // 도토는 너무 가까우면 물러난다(던지는 보스).
                         let away = sp.behavior == Behavior::Doto && dist < sp.keep.0;
                         let dir = if away { -dir_to_player } else { dir_to_player };
-                        self.pos += dir * sp.speed * dt;
+                        self.pos += dir * self.speed() * dt;
                     }
                 }
             }
@@ -343,7 +354,7 @@ impl Enemy {
                     if dist < sp.trigger {
                         self.state = State::Windup { time: 0.0 };
                     } else {
-                        self.pos += dir_to_player * sp.speed * dt;
+                        self.pos += dir_to_player * self.speed() * dt;
                     }
                 }
             }
@@ -394,13 +405,13 @@ impl Enemy {
                     self.facing = dir_to_player;
                     let (near, far) = sp.keep;
                     if dist < near {
-                        self.pos -= dir_to_player * sp.speed * dt;
+                        self.pos -= dir_to_player * self.speed() * dt;
                     } else if dist > far {
-                        self.pos += dir_to_player * sp.speed * dt;
+                        self.pos += dir_to_player * self.speed() * dt;
                     } else if sp.behavior == Behavior::Leaper {
                         // 청설모: 거리 안에서는 옆으로 돈다(가만히 있지 않는다).
                         let side = vec2(-dir_to_player.y, dir_to_player.x);
-                        self.pos += side * sp.speed * 0.6 * dt;
+                        self.pos += side * self.speed() * 0.6 * dt;
                     }
                     self.fire_cd -= dt;
                     if self.fire_cd <= 0.0 {

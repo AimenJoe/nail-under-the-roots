@@ -2008,6 +2008,11 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                             draw_critter_at(tex, art::DOTO_BACK_ROW, n.pos, left, false, w.time);
                         }
                     }
+                    world::Who::Susu => {
+                        if let Some(tex) = art.critters.as_ref() {
+                            draw_critter_at(tex, art::SUSU_ROW, n.pos, left, false, w.time);
+                        }
+                    }
                 }
             }
             Drawable::Tree(at, growth) => draw_great_tree(at, growth, w.time),
@@ -2741,7 +2746,7 @@ fn draw_hud_bars(ui: &Ui, w: &World) {
         let c = if i < w.player.hp { world::MOLE } else { dark };
         ui.rect(Rect::new(3.0 + i as f32 * 7.0, 1.0, 6.0, 6.0), c);
     }
-    let cd = w.player.burrow_cd / (t::BURROW_COOLDOWN * w.player.stats.burrow_cd);
+    let cd = (w.player.burrow_cd / w.player.burrow_cd_full()).min(1.0);
     let bw = 24.0;
     let x = t::VIEW_W - 3.0 - bw;
     ui.rect(Rect::new(x, 2.0, bw, 4.0), dark);

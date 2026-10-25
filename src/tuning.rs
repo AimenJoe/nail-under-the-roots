@@ -167,6 +167,11 @@ pub const KNOT_WINDUP: f32 = 0.8;
 pub const KNOT_BERRY: f32 = 0.6;
 pub const KNOT_PRICE: f32 = 1.5;
 pub const KNOT_EAT_CD: f32 = 1.6;
+/// 실뜨기 6~10(0053): 적 걸음 ×1.15, 길의 주인 체력 ×1.25(1단계에 더해), 패링 창 ×0.75, 굴파기 대기 ×1.25, 지렁이 안 떨어짐.
+pub const KNOT_SPEED: f32 = 1.15;
+pub const KNOT_BOSS_HP: f32 = 1.25;
+pub const KNOT_PARRY: f32 = 0.75;
+pub const KNOT_BURROW_CD: f32 = 1.25;
 /// 마을 씨앗(docs/decisions/0045): 가장 깊은 곳에 닿으면 남은 씨앗 + 이것, 새 실뜨기 단계 + 이것, 오늘의 굴 완주 + 이것.
 pub const VILLAGE_SEEDS_CLEAR: u32 = 5;
 pub const VILLAGE_SEEDS_KNOT: u32 = 10;

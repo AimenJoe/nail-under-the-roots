@@ -29,6 +29,8 @@ pub enum Illust {
     Sprout,
     /// 에필로그: 새싹 아래 마을과 새 두더지 둔덕.
     Molehill,
+    /// 도토가 기억해 낸다: 아주 오래전, 흰 실 곁에 씨앗을 묻던 날(세피아, 0053).
+    DotoMemory,
 }
 
 /// 그림 위에 떠다니는 것.
@@ -56,7 +58,7 @@ pub struct Spec {
 }
 
 impl Illust {
-    pub const ALL: [Illust; 8] = [
+    pub const ALL: [Illust; 9] = [
         Illust::GreatTree,
         Illust::MotherBurrow,
         Illust::BoriFreed,
@@ -65,6 +67,7 @@ impl Illust {
         Illust::LastBloom,
         Illust::Sprout,
         Illust::Molehill,
+        Illust::DotoMemory,
     ];
 
     pub fn index(self) -> usize {
@@ -100,6 +103,7 @@ impl Illust {
             ),
             Illust::Sprout => ("sprout", still, 1.0, Fx::Spores),
             Illust::Molehill => ("molehill", still, 1.0, Fx::Petals),
+            Illust::DotoMemory => ("doto_memory", still, 1.0, Fx::Dust),
         };
         Spec {
             file,

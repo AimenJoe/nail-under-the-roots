@@ -12,7 +12,7 @@ pub struct Art {
     pub tiles: Texture2D,
     /// 어둠 마스크(가운데 투명, 바깥 검정). 코드로 만든다.
     pub dark: Texture2D,
-    /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토. 아래 CRITTER_ROWS줄은 흰 실루엣.
+    /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수. 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
@@ -47,7 +47,7 @@ pub const PORTRAIT_COLS: u32 = 12;
 pub const CELL: f32 = 16.0;
 
 /// critters.png에서 실루엣 줄까지의 거리(그림 줄 수).
-pub const CRITTER_ROWS: u32 = 11;
+pub const CRITTER_ROWS: u32 = 12;
 /// critters.png의 라쿤 줄.
 pub const RACCOON_ROW: u32 = 6;
 /// critters.png의 모모(물든 굴토끼) 줄(docs/decisions/0029).
@@ -57,6 +57,8 @@ pub const MOMO_BLOOM_ROW: u32 = 8;
 /// 도토(물든 청설모, 둘째 길 보스)와 돌아온 도토(docs/decisions/0052).
 pub const DOTO_ROW: u32 = 9;
 pub const DOTO_BACK_ROW: u32 = 10;
+/// 땅강아지 수수(첫 쉼터의 장인, docs/decisions/0053).
+pub const SUSU_ROW: u32 = 11;
 
 impl Art {
     /// 털빛 n의 Naïl 시트(0 또는 없으면 기본).

@@ -654,6 +654,8 @@ impl World {
             match ch {
                 'K' => self.neighbors.push(Npc::standing(Who::Popo, *at)),
                 'b' => self.neighbors.push(Npc::standing(Who::Bori, *at)),
+                // 수수는 첫 쉼터(꽃 핀 입구 바로 아래)에만 있다(0053).
+                'z' if stage == 1 => self.neighbors.push(Npc::standing(Who::Susu, *at)),
                 _ => {}
             }
         }
@@ -1102,6 +1104,22 @@ mod tests {
         assert!(v.neighbors.iter().any(|n| n.who == Who::Doto));
         let v = World::village(crate::village::State::default());
         assert!(!v.neighbors.iter().any(|n| n.who == Who::Doto));
+    }
+
+    /// 수수(0053)는 첫 쉼터에만 서 있고, 곁에서 말을 걸 수 있다.
+    #[test]
+    fn susu_stands_only_in_the_first_camp() {
+        let w = World::camp_start(1);
+        let susu = w
+            .neighbors
+            .iter()
+            .find(|n| n.who == Who::Susu)
+            .expect("수수");
+        let mut w2 = World::camp_start(1);
+        w2.player.pos = susu.pos + vec2(10.0, 0.0);
+        assert_eq!(w2.interactable(), Some(Interact::Talk(Who::Susu)));
+        let w = World::camp_start(2);
+        assert!(!w.neighbors.iter().any(|n| n.who == Who::Susu));
     }
 
     /// 마을의 큰 나무 밑동에 서면 재주 창(0047), 떨어지면 아니다.

@@ -172,6 +172,17 @@ pub const GOALS: &[Goal] = &[
         Some("momo1"),
         Charm(7)
     ),
+    // 수수(0053): 첫 쉼터에서 새싹 발톱을 받는다.
+    goal!(
+        "susu",
+        Story,
+        jg_susu,
+        jg_susu_d,
+        Flag(key::SPROUT),
+        1,
+        Some("camp"),
+        Light(20)
+    ),
     // 도토와 참 엔딩(0052): 도토가 생기면서 넣었다(닿을 수 없는 목표는 넣지 않는다, 0048).
     goal!(
         "doto",
@@ -440,7 +451,7 @@ pub const GOALS: &[Goal] = &[
 ];
 
 /// 실뜨기가 열린 단계(2 = 1단계로 깼다). profile::key::knots_open(Mole)와 같은 문자열.
-const KNOTS_OPEN: &str = "knots.Mole";
+pub const KNOTS_OPEN: &str = "knots.Mole";
 
 pub fn key_claimed(id: &str) -> String {
     format!("journal.{id}")

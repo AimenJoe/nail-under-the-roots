@@ -8,8 +8,8 @@
 use crate::i18n::Tr;
 use crate::tuning as t;
 
-/// 지금 만든 단계 수(계획은 10, 0040).
-pub const MAX_LEVEL: u8 = 5;
+/// 단계 수(0040의 계획대로 10, 6~10은 0053).
+pub const MAX_LEVEL: u8 = 10;
 
 /// 단계별 매듭 이름(1단계부터).
 pub const NAMES: [Tr; MAX_LEVEL as usize] = [
@@ -18,6 +18,11 @@ pub const NAMES: [Tr; MAX_LEVEL as usize] = [
     |s| s.knot_3,
     |s| s.knot_4,
     |s| s.knot_5,
+    |s| s.knot_6,
+    |s| s.knot_7,
+    |s| s.knot_8,
+    |s| s.knot_9,
+    |s| s.knot_10,
 ];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -80,6 +85,51 @@ impl Knots {
             1.0
         }
     }
+
+    /// 6: 물든 이웃이 더 빨리 걷는다(돌진·뛰기 속도는 그대로).
+    pub fn enemy_speed_mul(self) -> f32 {
+        if self.has(6) {
+            t::KNOT_SPEED
+        } else {
+            1.0
+        }
+    }
+
+    /// 7: 길의 주인(보스)이 더 단단하다. 1단계에 곱한다.
+    pub fn boss_hp_mul(self) -> f32 {
+        if self.has(7) {
+            t::KNOT_BOSS_HP
+        } else {
+            1.0
+        }
+    }
+
+    /// 8: 패링 창이 짧다.
+    pub fn parry_mul(self) -> f32 {
+        if self.has(8) {
+            t::KNOT_PARRY
+        } else {
+            1.0
+        }
+    }
+
+    /// 9: 굴파기 대기가 길다.
+    pub fn burrow_cd_mul(self) -> f32 {
+        if self.has(9) {
+            t::KNOT_BURROW_CD
+        } else {
+            1.0
+        }
+    }
+
+    /// 10: 쥬시 지렁이가 떨어지지 않는다(가게에는 있다).
+    pub fn worm_mul(self) -> f32 {
+        if self.has(10) {
+            0.0
+        } else {
+            1.0
+        }
+    }
 }
 
 #[cfg(test)]
@@ -97,6 +147,12 @@ mod tests {
         let five = Knots::new(5);
         assert!(five.berry_mul() < 1.0 && five.price(10) > 10 && five.eat_cd_mul() > 1.0);
         assert_eq!(Knots::new(99).level, MAX_LEVEL);
+        assert_eq!(five.enemy_speed_mul(), 1.0, "6단계 매듭은 아직");
+        let ten = Knots::new(10);
+        assert!(ten.enemy_speed_mul() > 1.0 && ten.boss_hp_mul() > 1.0);
+        assert!(ten.parry_mul() < 1.0 && ten.burrow_cd_mul() > 1.0);
+        assert_eq!(ten.worm_mul(), 0.0);
+        assert_eq!(NAMES.len(), MAX_LEVEL as usize);
     }
 
     /// 적에는 한 번만 건다(월드가 틱마다 불러도 겹치지 않는다).
@@ -111,5 +167,25 @@ mod tests {
         assert_eq!(e.max_hp, (hp as f32 * t::KNOT_ENEMY_HP).ceil() as i32);
         assert_eq!(e.hp, e.max_hp);
         assert!((e.windup() - wind * t::KNOT_WINDUP).abs() < 1e-6);
+    }
+
+    /// 7단계: 보스만 체력이 한 번 더 는다. 6단계: 걸음이 빨라진다.
+    #[test]
+    fn boss_gets_extra_hp_and_mobs_walk_faster() {
+        use crate::enemy::Enemy;
+        use crate::enemy::Kind;
+        let mut b = Enemy::new(Kind::Momo, macroquad::prelude::Vec2::ZERO);
+        let hp = b.max_hp;
+        b.apply_knots(Knots::new(7));
+        let once = (hp as f32 * t::KNOT_ENEMY_HP).ceil();
+        assert_eq!(b.max_hp, (once * t::KNOT_BOSS_HP).ceil() as i32);
+        let mut m = Enemy::new(Kind::FieldMouse, macroquad::prelude::Vec2::ZERO);
+        let sp = m.speed();
+        m.apply_knots(Knots::new(7));
+        assert_eq!(
+            m.max_hp,
+            (crate::species::FIELD_MOUSE.hp as f32 * t::KNOT_ENEMY_HP).ceil() as i32
+        );
+        assert!(m.speed() > sp);
     }
 }

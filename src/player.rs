@@ -85,6 +85,9 @@ pub struct Player {
     pub item_cd: f32,
     /// 먹기 대기 배율(실뜨기 5, docs/decisions/0043).
     pub eat_cd_mul: f32,
+    /// 실뜨기 8·9(0053): 패링 창 배율, 굴파기 대기 배율.
+    pub parry_mul: f32,
+    pub burrow_knot: f32,
     /// 큰 나무의 재주(docs/decisions/0047). 앱이 기록에서 정한다.
     pub talents: crate::talents::Talents,
     /// 받는 피해를 줄이는 비율(0..1). 도움 모드 "포포의 응원"(docs/decisions/0041). 앱이 기록에서 정한다.
@@ -128,6 +131,8 @@ impl Player {
             burrow_cd: 0.0,
             item_cd: 0.0,
             eat_cd_mul: 1.0,
+            parry_mul: 1.0,
+            burrow_knot: 1.0,
             talents: crate::talents::Talents::default(),
             resist: 0.0,
             dmg_acc: 0.0,
@@ -167,10 +172,17 @@ impl Player {
             || !self.is_alive()
     }
 
-    /// 패링 창이 열려 있으면 공격 방향. 스윙 시작 직후 PARRY_WINDOW 동안.
+    /// 굴파기 대기 한 번의 길이(장신구 × 재주 × 실뜨기). 상태 탭·HUD 막대도 이 값을 쓴다.
+    pub fn burrow_cd_full(&self) -> f32 {
+        t::BURROW_COOLDOWN * self.stats.burrow_cd * self.talents.burrow_cd_mul() * self.burrow_knot
+    }
+
+    /// 패링 창이 열려 있으면 공격 방향. 스윙 시작 직후 PARRY_WINDOW 동안(실뜨기 8단계면 짧다).
     pub fn parry_dir(&self) -> Option<Vec2> {
         match self.state {
-            State::Attack { dir, .. } if self.parry_open && self.swing_age < t::PARRY_WINDOW => {
+            State::Attack { dir, .. }
+                if self.parry_open && self.swing_age < t::PARRY_WINDOW * self.parry_mul =>
+            {
                 Some(dir)
             }
             _ => None,
@@ -530,7 +542,7 @@ impl Player {
     fn start_emerge(&mut self) -> Strike {
         self.dodge_buf = 0.0;
         self.attack_buf = 0.0;
-        self.burrow_cd = t::BURROW_COOLDOWN * self.stats.burrow_cd * self.talents.burrow_cd_mul();
+        self.burrow_cd = self.burrow_cd_full();
         self.no_attack = t::EMERGE_NO_ATTACK;
         self.swing_id += 1;
         self.state = State::Emerge { time: 0.0 };

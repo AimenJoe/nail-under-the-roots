@@ -349,6 +349,7 @@ impl App {
             // 보리·모모: 진행에 맞는 한 번짜리 말이 있으면 그것부터(0051).
             Interact::Talk(Who::Bori) if self.say_story(crate::story::When::TalkBori) => {}
             Interact::Talk(Who::Momo) if self.say_story(crate::story::When::TalkMomo) => {}
+            Interact::Talk(Who::Doto) if self.say_story(crate::story::When::TalkDoto) => {}
             Interact::Talk(Who::Bori) => {
                 let lines: [Tr; 3] = [|s| s.bori_1, |s| s.bori_2, |s| s.bori_3];
                 let text = lines[self.talk_n as usize % lines.len()];
@@ -369,6 +370,26 @@ impl App {
                 self.play(cutscene::talk(
                     &self.world,
                     &[(Speaker::Nail, line, Face::Worried)],
+                ));
+            }
+            // 수수: 처음엔 새싹 발톱을 만들어 준다(0053). 개발 시나리오는 기록 없이 이번 런에만.
+            Interact::Talk(Who::Susu)
+                if !self.profile.flag(crate::profile::key::SPROUT)
+                    && !self.inventory.has(super::SPROUT_CLAW) =>
+            {
+                if self.recording() {
+                    self.profile.set(crate::profile::key::SPROUT);
+                    self.save_profile();
+                }
+                self.play(cutscene::susu_meet(&self.world));
+            }
+            Interact::Talk(Who::Susu) => {
+                let lines: [Tr; 3] = [|s| s.susu_v1, |s| s.susu_v2, |s| s.susu_v3];
+                let text = lines[self.talk_n as usize % lines.len()];
+                self.talk_n += 1;
+                self.play(cutscene::talk(
+                    &self.world,
+                    &[(Speaker::Susu, text, Face::Happy)],
                 ));
             }
             Interact::Talk(Who::Doto) => {
@@ -914,7 +935,7 @@ impl App {
         let verb = match i {
             Interact::Talk(Who::Popo) if village => s.ia_decor,
             Interact::Talk(Who::Popo) => s.ia_shop,
-            Interact::Talk(Who::Bori | Who::Momo | Who::Doto) => s.ia_talk,
+            Interact::Talk(Who::Bori | Who::Momo | Who::Doto | Who::Susu) => s.ia_talk,
             Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,
             Interact::Tree => s.ia_tree,

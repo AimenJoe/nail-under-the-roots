@@ -49,6 +49,8 @@ pub enum Who {
     Momo,
     /// 돌아온 도토: 마을 그루터기 밑(docs/decisions/0052).
     Doto,
+    /// 땅강아지 장인 수수: 첫 쉼터. 새싹 발톱을 만들어 준다(docs/decisions/0053).
+    Susu,
 }
 
 /// 이웃 NPC: 서 있거나(쉼터) 플레이어 곁으로 걸어온다(튜토리얼의 포포). 막지 않는다.
@@ -948,7 +950,8 @@ impl World {
         if rand::gen_range(0.0, 1.0) < kind.species().seed_chance {
             self.push_loot(Loot::spawn(LootKind::Seed, pos));
         }
-        if kind != Kind::Dummy && rand::gen_range(0.0, 1.0) < t::WORM_CHANCE {
+        if kind != Kind::Dummy && rand::gen_range(0.0, 1.0) < t::WORM_CHANCE * self.knots.worm_mul()
+        {
             self.push_loot(Loot::spawn(LootKind::Worm, pos));
         }
         let max = self.player.stats.max_hp;

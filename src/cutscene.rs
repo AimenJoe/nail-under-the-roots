@@ -87,6 +87,11 @@ impl Portrait {
         first: 31,
         faces: 2,
     };
+    /// 땅강아지 수수: 칸 33~34(보통·기쁨, docs/decisions/0053).
+    pub const SUSU: Portrait = Portrait {
+        first: 33,
+        faces: 2,
+    };
 
     pub fn frame(self, face: Face) -> u32 {
         // 모모는 칸이 둘(차가움·괴로움)뿐이라 걱정 = 둘째 칸.
@@ -508,6 +513,8 @@ pub enum Speaker {
     /// 물든 도토(둘째 길의 보스, 이름표 "???") / 돌아온 도토(마을, 0052).
     DotoTainted,
     Doto,
+    /// 땅강아지 장인 수수(첫 쉼터, 0053).
+    Susu,
 }
 
 fn speaker_actor(w: &World, who: Speaker) -> Actor {
@@ -537,7 +544,31 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
             ..story_actor("???", DOTO_FUR)
         },
         Speaker::Doto => doto_actor(w.player.pos),
+        Speaker::Susu => susu_actor(w.player.pos),
     }
+}
+
+/// 수수 배우(초상화 칸 33~34). 쉼터의 월드 그림이 서 있으니 배우는 말만 한다.
+fn susu_actor(pos: Vec2) -> Actor {
+    Actor {
+        portrait: Some(Portrait::SUSU),
+        pos,
+        ..story_actor(i18n::s().name_susu, Color::new(0.52, 0.38, 0.28, 1.0))
+    }
+}
+
+/// 수수를 처음 만났다(0053): 같은 "파는 손"을 알아보고 새싹 발톱을 만들어 준다(획득 창).
+pub fn susu_meet(w: &World) -> Cutscene {
+    let actors = vec![nail_actor(w), susu_actor(w.player.pos)];
+    let steps = vec![
+        say(1, Face::Happy, |s| s.susu_1),
+        say(0, Face::Normal, |s| s.susu_2),
+        say(1, Face::Normal, |s| s.susu_3),
+        say(1, Face::Happy, |s| s.susu_4),
+        Step::Give(crate::app::SPROUT_CLAW),
+        say(0, Face::Happy, |s| s.susu_5),
+    ];
+    Cutscene::new(actors, steps)
 }
 
 /// 도토의 색(초상화를 못 읽었을 때 이름표 옆 네모).
@@ -598,6 +629,7 @@ pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
         Speaker::Momo,
         Speaker::DotoTainted,
         Speaker::Doto,
+        Speaker::Susu,
     ];
     let actors = order.iter().map(|s| speaker_actor(w, *s)).collect();
     let steps = lines
@@ -742,7 +774,7 @@ pub fn doto_returns(w: &World, at: Vec2) -> Cutscene {
     let side = if at.x >= w.player.pos.x { 22.0 } else { -22.0 };
     let near = w.player.pos + vec2(side, 0.0);
     let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
-    let steps = vec![
+    let mut steps = vec![
         Step::Wait(0.6),
         say(1, Face::Normal, |s| s.doto_b1),
         Step::Move {
@@ -760,7 +792,15 @@ pub fn doto_returns(w: &World, at: Vec2) -> Cutscene {
         },
         say(0, Face::Worried, |s| s.doto_b2),
         say(1, Face::Happy, |s| s.doto_b3),
+    ];
+    // 기억 속 장면(0053): 오래전 흰 실 곁에 씨앗을 묻던 날. 그림 위에서 말하고, 내레이션으로 맺는다.
+    steps.extend(cut_to(Some(Illust::DotoMemory)));
+    steps.extend([
         say(1, Face::Normal, |s| s.doto_b4),
+        Step::Narrate(|s| s.doto_memory),
+    ]);
+    steps.extend(cut_to(None));
+    steps.extend([
         say(0, Face::Determined, |s| s.doto_b5),
         say(1, Face::Happy, |s| s.doto_b6),
         Step::Move {
@@ -769,8 +809,7 @@ pub fn doto_returns(w: &World, at: Vec2) -> Cutscene {
             speed: 120.0,
         },
         Step::Hide { actor: 1 },
-        Step::Narrate(|s| s.doto_memory),
-    ];
+    ]);
     Cutscene::new(actors, steps)
 }
 

@@ -36,6 +36,8 @@ pub mod key {
     pub const MOMO_WINS: &str = "momo_wins";
     /// 큰 나무에서 독 발톱을 깨웠다(도토 뒤, 0037 8-A·0052): 런마다 가방에 들고 시작한다.
     pub const VENOM: &str = "weapon.venom";
+    /// 수수가 새싹 발톱을 만들어 줬다(첫 쉼터, 0053): 런마다 가방에 들고 시작한다.
+    pub const SPROUT: &str = "weapon.sprout";
 
     /// 실뜨기: 고를 수 있는 가장 높은 단계(캐릭터별), 마지막으로 고른 단계, 새 단계가 열렸다는 표시(0043).
     pub fn knots_open(character: impl std::fmt::Debug) -> String {

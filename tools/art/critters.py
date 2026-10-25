@@ -9,7 +9,8 @@
   줄 8 돌아온 모모(docs/decisions/0046): 같은 칸 순서. 꽃이 피고, 검은 눈, 따뜻한 털, 뿌리 없음
   줄 9 도토(물든 청설모, 둘째 길 보스, docs/decisions/0052): 같은 칸 순서. 도토리 갓 모자, 호박색 빛 눈
   줄 10 돌아온 도토: 검고 맑은 눈, 뿌리 없음, 모자는 그대로
-  줄 11~21: 줄 0~10의 흰 실루엣(피격 번쩍임용)
+  줄 11 땅강아지 수수(첫 쉼터의 장인, 싸우지 않는다, docs/decisions/0053): 0·1 서 있기, 2·3 걷기, 4 파기(삽발 들기), 5 기뻐하기
+  줄 12~23: 줄 0~11의 흰 실루엣(피격 번쩍임용)
 
 그리는 법(nail.py와 같다): 채움 색만 글자로 찍고 외곽선('o')은 자동으로 두른다. 종마다 기본 자세 한 장을 손으로 찍고,
 동작은 그 자세를 옮기거나(통통·웅크림·내밀기) 몇 점만 바꿔 만든다(발, 눈, 꼬리).
@@ -79,6 +80,8 @@ FUR = {
     'momo_bloom': [(104, 84, 74), (150, 124, 106), (190, 164, 140), (228, 212, 192)],
     # 도토(청설모): 다른 청설모 졸개(잿빛 갈색)보다 붉은 밤색. 물든 줄은 taint로 보라 쪽.
     'doto':   [(112, 62, 42), (160, 96, 60), (200, 134, 86), (238, 216, 190)],
+    # 수수(땅강아지): 벨벳 같은 짙은 갈색 + 금빛 윤기. 삽발(앞다리)은 짙은 줄(k)에 흰 이(c).
+    'susu':   [(66, 46, 36), (108, 78, 56), (156, 120, 84), (214, 180, 132)],
 }
 
 
@@ -329,6 +332,27 @@ DOTO_BACK = grid([
     "",
 ])
 
+# 수수(땅강아지, 0053): 오른쪽을 본다. 앞은 둥근 투구 같은 가슴(벨벳, 윤기 h) + 작은 머리·구슬 눈(n·W)·짧은 더듬이(k),
+# 뒤는 마디진 배(d 줄무늬)와 꼬리털 둘. 앞다리는 크고 짙은 삽발(k)에 흰 이(c) — 두더지 발과 같은 "파는 손"(수렴 진화).
+SUSU = grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "..........k..k",
+    "...........kk",
+    "......hhhhhk",
+    "....hhhbbbbhh",
+    "..hhbbbbbbbWnb",
+    ".hbdbdbbbbbbnbb",
+    "hbdbdbdbbbbbbkk",
+    "bdbdbdbdbbbbkkhk",
+    ".ddddddddbbkkhkh",
+    "..p..p..p..pkk",
+    "",
+])
+
 # 허수아비: 말뚝 + 짚 몸 + 천 머리(단추 눈).
 DUMMY = grid([
     "",
@@ -448,6 +472,24 @@ def raccoon_frames():
     return [g, breathe(g), walk(g, 0), walk(g, 1), wave, happy]
 
 
+def susu_frames():
+    g = SUSU
+    dig = shift(g, dy=1, rows=range(0, 14))   # 파기: 몸을 낮추고 삽발을 앞으로 든다
+    for y in range(11, 15):
+        for x in range(12, 16):
+            if dig[y][x] in 'kh':
+                dig[y][x] = 'b' if y < 13 and x < 14 else '.'
+    put(dig, 13, 9, 'kh')
+    put(dig, 13, 10, 'kkh')
+    put(dig, 13, 11, 'kk')
+    happy = copy(g)                            # 기뻐하기: 감은 눈(^), 더듬이가 선다
+    put(happy, 11, 9, 'bk')
+    put(happy, 12, 10, 'b')
+    put(happy, 10, 4, 'k')
+    put(happy, 13, 4, 'k')
+    return [g, breathe(g), walk(g, 0), walk(g, 1), dig, happy]
+
+
 def paint(img, ox, oy, g, pal, silhouette=False, tainted=False):
     d, b, h, l = (taint(c) for c in pal) if tainted else pal
     colors = dict(COMMON, d=d, b=b, h=h, l=l, o=OUTLINE_TAINTED if tainted else OUTLINE)
@@ -470,6 +512,7 @@ def sheet():
     rows.append((FUR['momo_bloom'], frames_of(MOMO_BLOOM), False))
     rows.append((FUR['doto'], frames_of(DOTO), True))
     rows.append((FUR['doto'], frames_of(DOTO_BACK), False))
+    rows.append((FUR['susu'], susu_frames(), False))
     img = Image.new('RGBA', (N * 7, N * len(rows) * 2), (0, 0, 0, 0))
     for ry, (pal, frames, tainted) in enumerate(rows):
         for rx, g in enumerate(frames):
