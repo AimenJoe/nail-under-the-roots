@@ -31,12 +31,22 @@ pub struct Fx {
     pub kind: FxKind,
 }
 
+/// 바닥에 놓인 무기. 닿으면 얻는다.
+pub struct Pickup {
+    pub pos: Vec2,
+    /// equipment::WEAPONS 번호.
+    pub weapon: usize,
+}
+
 pub struct World {
     pub room: Room,
     pub player: Player,
     pub enemies: Vec<Enemy>,
     pub projectiles: Vec<Projectile>,
     pub fx: Vec<Fx>,
+    pub pickups: Vec<Pickup>,
+    /// 이번 틱에 얻은 무기(WEAPONS 번호). 앱이 가방에 넣고 비운다. 획득물·컷씬 둘 다 여기로.
+    pub gifts: Vec<usize>,
     pub feel: Feel,
     pub debug: Debug,
     /// 적을 다 잡으면 다음 웨이브를 자동으로 띄운다. 시나리오는 끌 수 있다.
@@ -69,6 +79,8 @@ impl World {
             enemies: Vec::new(),
             projectiles: Vec::new(),
             fx: Vec::new(),
+            pickups: Vec::new(),
+            gifts: Vec::new(),
             feel: Feel::default(),
             debug: Debug {
                 overlay: false,
@@ -143,6 +155,24 @@ impl World {
                 }
                 player::Event::Hurt | player::Event::Die => {}
             }
+        }
+
+        // 1b. 획득물
+        let ppos = self.player.pos;
+        let mut got = Vec::new();
+        self.pickups.retain(|p| {
+            if (p.pos - ppos).length() <= t::PICKUP_RADIUS {
+                got.push((p.pos, p.weapon));
+                false
+            } else {
+                true
+            }
+        });
+        for (pos, w) in got {
+            self.gifts.push(w);
+            sfx.play(sfx::Id::Emerge);
+            self.fx.push(ring(pos, 4.0, 18.0, 0.3, WHITE));
+            burst(&mut self.fx, pos, 14, PROJECTILE, 80.0);
         }
 
         // 2. 적·투사체

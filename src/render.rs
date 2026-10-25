@@ -457,6 +457,7 @@ fn draw_room_art(art: &Art, w: &World) {
 
 #[derive(Clone, Copy)]
 enum Drawable {
+    Pickup(usize),
     Pillar(usize),
     Player,
     Enemy(usize),
@@ -468,6 +469,10 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     let mut list: Vec<(f32, Drawable)> = Vec::new();
     for (i, p) in w.room.pillars.iter().enumerate() {
         list.push((p.bottom(), Drawable::Pillar(i)));
+    }
+    for (i, p) in w.pickups.iter().enumerate() {
+        list.push((p.pos.y + 4.0, Drawable::Pickup(i)));
+        draw_ellipse(p.pos.x, p.pos.y + 4.0, 5.0, 1.8, 0.0, SHADOW_SOFT);
     }
     let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
     list.push((pp.y + 6.0, Drawable::Player));
@@ -502,12 +507,35 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                 let src = Rect::new(if i % 2 == 0 { 0.0 } else { 16.0 }, 32.0, 16.0, 32.0);
                 draw_tile(&art.tiles, src, p.x, p.bottom() - 32.0, w.biome.wall_tint());
             }
+            Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
             Drawable::Player => draw_nail(art, &w.player, alpha, w.time),
             Drawable::Enemy(i) => draw_enemy(&w.enemies[i], alpha, w.time),
             Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
         }
     }
 }
+
+/// 바닥 무기: 떠오르는 발톱 세 개 + 반짝임.
+fn draw_pickup(p: &world::Pickup, time: f32) {
+    let c = crate::equipment::WEAPONS[p.weapon].color;
+    let dark = Color::new(c.r * 0.55, c.g * 0.55, c.b * 0.55, 1.0);
+    let bob = ((time * 3.0).sin() * 1.5).round();
+    let base = vec2(p.pos.x.round(), p.pos.y.round() - 6.0 + bob);
+    for k in 0..3 {
+        let x = base.x - 4.0 + k as f32 * 3.0;
+        let y = base.y + (k % 2) as f32;
+        draw_rectangle(x - 0.5, y - 1.0, 3.0, 8.0, OUTLINE);
+        draw_rectangle(x, y, 2.0, 6.0, c);
+        draw_rectangle(x, y + 5.0, 2.0, 1.0, dark);
+    }
+    let ph = (time * 2.0).fract();
+    let s = base + vec2(5.0, -3.0) + vec2(0.0, -ph * 4.0);
+    let a = 1.0 - ph;
+    draw_rectangle(s.x, s.y - 1.0, 1.0, 3.0, Color::new(1.0, 1.0, 1.0, a));
+    draw_rectangle(s.x - 1.0, s.y, 3.0, 1.0, Color::new(1.0, 1.0, 1.0, a));
+}
+
+const OUTLINE: Color = Color::new(0.17, 0.11, 0.16, 1.0);
 
 /// Naïl 스프라이트. 상태 → 칸, 좌우 반전, 피격 플래시는 흰 실루엣 줄.
 fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {

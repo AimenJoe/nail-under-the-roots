@@ -7,11 +7,14 @@
 use macroquad::prelude::*;
 
 use crate::enemy::Kind;
-use crate::world::World;
+use crate::equipment::Character;
+use crate::world::{Pickup, World};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stage {
     Move,
+    /// 반짝이는 두더지 발톱을 줍는다. 줍기 전에는 공격이 안 나간다.
+    Pickup,
     Attack,
     Burrow,
     Emerge,
@@ -46,6 +49,7 @@ impl Tutorial {
     pub fn hint(&self) -> Option<&'static str> {
         match self.stage {
             Stage::Move => Some("스틱 / WASD: 움직여 보자"),
+            Stage::Pickup => Some("반짝이는 것에 다가가 보자"),
             Stage::Attack => Some("공격(J · X · ATK)을 세 번: 세 번째가 묵직하다"),
             Stage::Burrow => Some("굴파기(K · A · DIG): 땅속에서는 맞지 않는다"),
             Stage::Emerge => Some("땅속에서 적 아래로 가서 다시 누르면 솟구친다"),
@@ -59,12 +63,23 @@ impl Tutorial {
         match self.stage {
             Stage::Move => {
                 if (w.player.pos - self.start_pos).length() > 40.0 {
-                    // 허수아비는 바로 앞에. 걷다 보면 부딪히는 거리.
-                    let mut p = w.player.pos + w.player.facing * 56.0;
-                    let r = w.room.inner;
-                    p.x = p.x.clamp(r.x + 20.0, r.right() - 20.0);
-                    p.y = p.y.clamp(r.y + 20.0, r.bottom() - 20.0);
-                    w.spawn_enemy(Kind::Dummy, p);
+                    if w.player.armed {
+                        // 이미 무기가 있으면(개발 시나리오) 줍기를 건너뛴다.
+                        spawn_dummy(w);
+                        self.enter(Stage::Attack);
+                    } else {
+                        let p = ahead(w, 40.0);
+                        w.pickups.push(Pickup {
+                            pos: p,
+                            weapon: Character::Mole.starting_weapon(),
+                        });
+                        self.enter(Stage::Pickup);
+                    }
+                }
+            }
+            Stage::Pickup => {
+                if w.player.armed {
+                    spawn_dummy(w);
                     self.enter(Stage::Attack);
                 }
             }
@@ -110,6 +125,21 @@ impl Tutorial {
         self.stage = s;
         self.t = 0.0;
     }
+}
+
+/// 플레이어 앞 `dist` 지점(방 안으로 잘라서).
+fn ahead(w: &World, dist: f32) -> Vec2 {
+    let mut p = w.player.pos + w.player.facing * dist;
+    let r = w.room.inner;
+    p.x = p.x.clamp(r.x + 20.0, r.right() - 20.0);
+    p.y = p.y.clamp(r.y + 20.0, r.bottom() - 20.0);
+    p
+}
+
+/// 허수아비는 바로 앞에. 걷다 보면 부딪히는 거리.
+fn spawn_dummy(w: &mut World) {
+    let p = ahead(w, 56.0);
+    w.spawn_enemy(Kind::Dummy, p);
 }
 
 /// 플레이어에서 떨어진 스폰 지점.

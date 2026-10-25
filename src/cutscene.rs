@@ -39,6 +39,10 @@ pub enum Step {
         dir: Vec2,
     },
     Wait(f32),
+    /// 무기를 준다(equipment::WEAPONS 번호). 스토리 보상. 앱이 가방에 넣고 획득 창을 띄운다.
+    /// 첫 사용처는 2단계 보스 처치 컷씬(docs/decisions/0012). 그때까지 쓰는 스크립트가 없다.
+    #[allow(dead_code)]
+    Give(usize),
     Show {
         actor: usize,
         at: Vec2,
@@ -154,6 +158,10 @@ impl Cutscene {
                 true
             }
             Step::Wait(secs) => self.t >= secs,
+            Step::Give(i) => {
+                w.gifts.push(i);
+                true
+            }
             Step::Show { actor, at } => {
                 self.actors[actor].pos = at;
                 self.actors[actor].visible = true;
@@ -207,6 +215,7 @@ impl Cutscene {
                     self.actors[actor].visible = true;
                 }
                 Step::Hide { actor } => self.actors[actor].visible = false,
+                Step::Give(i) => w.gifts.push(i),
                 Step::Fade { to_clear, .. } => self.fade = if to_clear { 0.0 } else { 1.0 },
                 _ => {}
             }

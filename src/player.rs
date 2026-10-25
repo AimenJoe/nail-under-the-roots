@@ -47,6 +47,8 @@ pub struct Player {
     pub moveset: &'static Moveset,
     /// 스프라이트 좌우(마지막으로 본 가로 방향).
     pub face_left: bool,
+    /// 무기를 들었나. 첫 시작에는 맨손이라 공격이 안 나간다(docs/decisions/0012).
+    pub armed: bool,
     attack_buf: f32,
     dodge_buf: f32,
     combo_next: usize,
@@ -70,6 +72,7 @@ impl Player {
             events: Vec::new(),
             moveset: &moveset::CLAWS,
             face_left: false,
+            armed: true,
             attack_buf: 0.0,
             dodge_buf: 0.0,
             combo_next: 0,
@@ -128,7 +131,7 @@ impl Player {
             State::Free => {
                 if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
                     self.start_burrow();
-                } else if self.attack_buf > 0.0 && self.no_attack <= 0.0 {
+                } else if self.armed && self.attack_buf > 0.0 && self.no_attack <= 0.0 {
                     let idx = if self.combo_timer > 0.0 {
                         self.combo_next
                     } else {

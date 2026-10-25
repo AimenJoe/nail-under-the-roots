@@ -135,22 +135,46 @@ pub enum Item {
 pub struct Inventory {
     pub slots: Vec<Option<Item>>,
     pub cols: usize,
-    /// 장착 중인 무기(WEAPONS 번호).
-    pub equipped: usize,
+    /// 장착 중인 무기(WEAPONS 번호). 맨손이면 None.
+    pub equipped: Option<usize>,
 }
 
 impl Inventory {
-    fn new(character: Character, weapons: &[usize]) -> Self {
-        let mut slots: Vec<Option<Item>> = (0..15).map(|_| None).collect();
-        for (i, w) in weapons.iter().enumerate() {
-            slots[i] = Some(Item::Weapon(*w));
-        }
-        Self {
-            slots,
+    /// `weapons`를 넣고 첫 번째를 장착한다. 비어 있으면 맨손.
+    fn new(weapons: &[usize]) -> Self {
+        let mut inv = Self {
+            slots: (0..15).map(|_| None).collect(),
             cols: 5,
-            equipped: character.starting_weapon(),
+            equipped: None,
+        };
+        for w in weapons {
+            inv.add(*w);
+        }
+        inv.equipped = weapons.first().copied();
+        inv
+    }
+
+    fn has(&self, w: usize) -> bool {
+        self.slots
+            .iter()
+            .any(|s| matches!(s, Some(Item::Weapon(x)) if *x == w))
+    }
+
+    /// 빈 칸에 넣는다. 이미 있으면 그대로.
+    fn add(&mut self, w: usize) {
+        if self.has(w) {
+            return;
+        }
+        if let Some(slot) = self.slots.iter_mut().find(|s| s.is_none()) {
+            *slot = Some(Item::Weapon(w));
         }
     }
+}
+
+/// 무기 획득 창(JRPG식). 떠 있는 동안 월드는 멈춘다.
+struct Gift {
+    weapon: usize,
+    t: f32,
 }
 
 /// 가방 칸의 발톱 아이콘: 크림/무기 색 발톱 세 개.
@@ -192,6 +216,9 @@ pub struct App {
     current: Scenario,
     cutscene: Option<Cutscene>,
     tutorial: Option<Tutorial>,
+    gift: Option<Gift>,
+    /// 아직 창을 못 띄운 획득(여러 개가 한꺼번에 들어올 때).
+    gift_queue: Vec<usize>,
     pub settings: Settings,
     world: World,
     journal: Journal,
@@ -233,10 +260,12 @@ impl App {
             current: Scenario::Normal,
             cutscene: None,
             tutorial: None,
+            gift_queue: Vec::new(),
             settings,
             world,
             journal: Journal::new(),
-            inventory: Inventory::new(Character::Mole, &[Character::Mole.starting_weapon()]),
+            inventory: Inventory::new(&[]),
+            gift: None,
             sfx,
             input: Input::new(),
             renderer: Renderer::new(font, art),
@@ -271,6 +300,8 @@ impl App {
                 let a = self.input.take();
                 if let Some(c) = self.cutscene.as_mut() {
                     c.update(&a, dt, &mut self.world);
+                    // 컷씬에서 받은 무기는 컷씬이 끝난 뒤 창으로 보여 준다.
+                    self.gift_queue.append(&mut self.world.gifts);
                     if c.is_done() {
                         self.cutscene = None;
                         self.scene = Scene::Game;
@@ -291,6 +322,10 @@ impl App {
 
     fn update_game(&mut self, dt: f32) {
         self.acc += dt;
+        if self.gift.is_some() {
+            self.update_gift(dt);
+            return;
+        }
         let mut open_pause = false;
         let mut restart = false;
         while self.acc >= t::TICK_DT {
@@ -319,6 +354,7 @@ impl App {
         } else {
             self.death_t += dt;
         }
+        self.take_gifts();
         if let Some(tu) = self.tutorial.as_mut() {
             tu.update(&mut self.world, dt);
             if tu.is_done() {
@@ -348,13 +384,17 @@ impl App {
         self.world.debug.overlay = self.settings.debug_overlay;
         self.world.debug.hitboxes = hitboxes;
         self.journal = Journal::new();
-        let character = Character::Mole;
-        self.inventory = if s == Scenario::AllClaws {
-            Inventory::new(character, &[0, 1, 2, 3])
-        } else {
-            Inventory::new(character, &[character.starting_weapon()])
+        // 무기는 스토리를 따라 하나씩(docs/decisions/0012). 첫 시작·튜토리얼은 맨손에서 출발해
+        // 튜토리얼에서 두더지 발톱을 줍는다. 개발 시나리오는 테스트를 위해 기본 발톱(또는 전부)을 들고 시작.
+        let start = Character::Mole.starting_weapon();
+        self.inventory = match s {
+            Scenario::Normal | Scenario::Tutorial => Inventory::new(&[]),
+            Scenario::AllClaws => Inventory::new(&[start, 0, 2, 3]),
+            _ => Inventory::new(&[start]),
         };
-        self.world.player.moveset = WEAPONS[self.inventory.equipped].moveset;
+        self.gift = None;
+        self.gift_queue.clear();
+        self.apply_equipped();
         self.run_time = 0.0;
         self.acc = 0.0;
         self.death_t = 0.0;
@@ -595,8 +635,8 @@ impl App {
                     if let Some(Item::Weapon(w)) = self.inventory.slots[self.inv_cursor] {
                         // 캐릭터가 쓸 수 있는 종류만.
                         if WEAPONS[w].kind == Character::Mole.weapon_kind() {
-                            self.inventory.equipped = w;
-                            self.world.player.moveset = WEAPONS[w].moveset;
+                            self.inventory.equipped = Some(w);
+                            self.apply_equipped();
                             self.sfx.play(crate::sfx::Id::Claw(2));
                         }
                     }
@@ -664,7 +704,9 @@ impl App {
                 self.draw_letterbox(&ui);
                 self.renderer
                     .draw_hud(&ui, &self.world, self.input.gamepad_count);
-                if let Some(h) = self.tutorial.as_ref().and_then(|t| t.hint()) {
+                if let Some(g) = &self.gift {
+                    self.draw_gift(&ui, g);
+                } else if let Some(h) = self.tutorial.as_ref().and_then(|t| t.hint()) {
                     self.draw_hint(&ui, h);
                 }
                 if !self.world.player.is_alive() {
@@ -868,6 +910,79 @@ impl App {
         );
     }
 
+    /// 장착 무기를 플레이어에 반영한다. 맨손이면 공격이 안 나간다.
+    fn apply_equipped(&mut self) {
+        match self.inventory.equipped {
+            Some(w) => {
+                self.world.player.moveset = WEAPONS[w].moveset;
+                self.world.player.armed = true;
+            }
+            None => self.world.player.armed = false,
+        }
+    }
+
+    /// 월드가 받은 무기(획득물·컷씬)를 가방에 넣고 획득 창을 띄운다.
+    fn take_gifts(&mut self) {
+        self.gift_queue.append(&mut self.world.gifts);
+        if self.gift.is_some() || self.gift_queue.is_empty() {
+            return;
+        }
+        let w = self.gift_queue.remove(0);
+        self.inventory.add(w);
+        if self.inventory.equipped.is_none() {
+            self.inventory.equipped = Some(w);
+            self.apply_equipped();
+        }
+        self.world.freeze();
+        self.gift = Some(Gift { weapon: w, t: 0.0 });
+    }
+
+    /// 획득 창: 최소 시간이 지나면 확인으로 닫고, 그대로 두어도 닫힌다. 그동안 월드는 멈춘다.
+    fn update_gift(&mut self, dt: f32) {
+        let a = self.input.take();
+        let Some(g) = self.gift.as_mut() else { return };
+        g.t += dt;
+        let close = (g.t >= t::GIFT_MIN && (a.confirm || a.attack || a.tap.is_some()))
+            || g.t >= t::GIFT_AUTO_CLOSE;
+        if close {
+            self.gift = None;
+            self.acc = 0.0;
+            self.take_gifts();
+        }
+    }
+
+    fn draw_gift(&self, ui: &Ui, g: &Gift) {
+        let wp = &WEAPONS[g.weapon];
+        let k = (g.t / 0.2).min(1.0);
+        let r = Rect::new(56.0, 48.0 + (1.0 - k) * 8.0, 208.0, 74.0);
+        ui.panel(r, None);
+        ui.text_center("새 발톱을 얻었다!", 160.0, r.y + 5.0, FONT_PX, ui::ACCENT);
+        let icon = Rect::new(r.x + 10.0, r.y + 22.0, 22.0, 22.0);
+        ui.rect(icon, ui::PANEL_LIGHT);
+        ui.rect_lines(icon, ui::BORDER);
+        draw_claw_icon(ui, icon, wp.color);
+        ui.text(wp.name, icon.right() + 8.0, r.y + 22.0, FONT_PX, ui::TEXT);
+        let lines = ui::wrap(ui, wp.desc, r.right() - icon.right() - 16.0, FONT_PX);
+        for (i, l) in lines.iter().take(2).enumerate() {
+            ui.text(
+                l,
+                icon.right() + 8.0,
+                r.y + 36.0 + i as f32 * 13.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
+        if g.t >= t::GIFT_MIN && (get_time() * 2.0) as i64 % 2 == 0 {
+            ui.text(
+                "▼",
+                r.right() - 14.0,
+                r.bottom() - 14.0,
+                FONT_PX,
+                ui::ACCENT,
+            );
+        }
+    }
+
     /// 튜토리얼 힌트: 아래 가운데 한 줄.
     fn draw_hint(&self, ui: &Ui, text: &str) {
         let w = ui.text_w(text, FONT_PX) + 16.0;
@@ -972,15 +1087,22 @@ impl App {
                     secs % 60
                 ),
             ),
-            (
-                p.moveset.name.to_string(),
-                format!(
-                    "{}연타. 마지막 타 {:.2}s, 넉백 {}",
-                    p.moveset.hits.len(),
-                    p.moveset.hits[p.moveset.last()].swing,
-                    p.moveset.hits[p.moveset.last()].knockback as i32
-                ),
-            ),
+            if p.armed {
+                (
+                    p.moveset.name.to_string(),
+                    format!(
+                        "{}연타. 마지막 타 {:.2}s, 넉백 {}",
+                        p.moveset.hits.len(),
+                        p.moveset.hits[p.moveset.last()].swing,
+                        p.moveset.hits[p.moveset.last()].knockback as i32
+                    ),
+                )
+            } else {
+                (
+                    "맨손".to_string(),
+                    "아직 발톱이 없다. 공격할 수 없다.".to_string(),
+                )
+            },
             (
                 "굴파기".to_string(),
                 format!(
@@ -1025,8 +1147,8 @@ impl App {
             );
             if let Some(Item::Weapon(w)) = item {
                 draw_claw_icon(ui, r, WEAPONS[*w].color);
-                if *w == self.inventory.equipped {
-                    ui.text("E", r.x + 1.0, r.y, FONT_PX, ui::ACCENT);
+                if self.inventory.equipped == Some(*w) {
+                    ui.text("E", r.x + 2.0, r.y + 1.0, FONT_PX, ui::ACCENT);
                 }
             }
             self.hits.push((r, Hit::InvSlot(i)));
@@ -1051,7 +1173,7 @@ impl App {
                     FONT_PX,
                     ui::TEXT_DIM,
                 );
-                let hint = if *w == self.inventory.equipped {
+                let hint = if self.inventory.equipped == Some(*w) {
                     "장착 중"
                 } else {
                     "확인: 장착"

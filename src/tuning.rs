@@ -100,6 +100,13 @@ pub const PROJECTILE_SPEED: f32 = 65.0;
 pub const PROJECTILE_RADIUS: f32 = 3.0;
 pub const PROJECTILE_DAMAGE: i32 = 1;
 
+// ---- 획득 ------------------------------------------------------------
+/// 바닥 무기에 이만큼 다가가면 줍는다.
+pub const PICKUP_RADIUS: f32 = 10.0;
+/// 획득 창: 최소 표시 시간(연타로 바로 닫히지 않게), 자동으로 닫히는 시간.
+pub const GIFT_MIN: f32 = 0.5;
+pub const GIFT_AUTO_CLOSE: f32 = 3.5;
+
 // ---- 독 ------------------------------------------------------------
 /// 독은 이 간격마다 체력 1을 깎는다. 경직·넉백은 없다.
 pub const POISON_TICK: f32 = 0.8;

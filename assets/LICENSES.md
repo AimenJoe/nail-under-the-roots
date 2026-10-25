@@ -6,7 +6,7 @@
 
 | `art/nail.png` | 직접 그림. 원본 `tools/art/nail.py` | 프로젝트 소유 | Naïl 스프라이트 v1(idle·walk·attack·hurt·dead·흙더미·그림자 + 흰 실루엣) |
 | `art/tiles.png` | 직접 그림. 원본 `tools/art/tiles.py` | 프로젝트 소유 | Sunnyside가 들어오기 전 대체 타일(풀·꽃·흙·벼랑·그루터기·바위·버섯·뿌리·얼룩) |
-| `vendor/sunnyside/` (레포 밖) | [Sunnyside World](https://danieldiggle.itch.io/sunnyside) by danieldiggle | **원문 확인 필요.** 검색 요약: 상업 사용·수정 가능, 크레딧 선택, 재판매·재배포 금지, AI 학습 금지 | 공개 레포라 커밋하지 않는다(`.gitignore`). 구매 후 라이선스 원문을 이 행에 옮겨 적는다(docs/decisions/0010) |
+| `vendor/sunnyside/` (레포 밖) | [Sunnyside World](https://danieldiggle.itch.io/sunnyside) by danieldiggle, ASSET PACK V2.1 | 아래 "Sunnyside World 라이선스 원문" | 공개 레포라 커밋하지 않는다(`.gitignore`, docs/decisions/0010). Name your own price |
 
 | `fonts/OFL.md` | Galmuri 레포 `ofl.md` | — | Galmuri 폰트의 OFL 원문. 폰트와 함께 배포해야 한다(예약 폰트 이름 없음) |
 | `THIRD_PARTY_LICENSES.txt` | `tools/licenses.py`가 생성 | — | Rust 크레이트·웹 JS·폰트 고지문 모음. 배포물(웹 `dist/`, APK assets)에 함께 들어간다 |
@@ -18,6 +18,13 @@
 | Galmuri11 Condensed | SIL OFL 1.1 | 가능(게임에 넣어 판매 가능) | 폰트 파일만 따로 팔지 않는다. OFL 원문과 저작권 고지를 함께 배포 |
 | Rust 크레이트 192개 | MIT·Apache-2.0·BSD·ISC·Zlib·Unlicense·Unicode-3.0(전부 허용형, GPL 등 카피레프트 없음) | 가능 | 저작권 고지와 라이선스 원문을 배포물에 포함(`THIRD_PARTY_LICENSES.txt`). 게임 안 크레딧 화면은 나중에 |
 | `web/mq_js_bundle.js`, `web/macroquad-gamepads-0.1.js` | MIT OR Apache-2.0 | 가능 | 위와 같음(고지 파일에 포함) |
-| Sunnyside World(레포 밖) | **원문 미확인.** 검색 요약상 상업 사용 가능 | 원문 확인 후 | 재배포·재판매 금지, AI 학습 금지(요약). 공개 레포에 넣지 않는다 |
+| Sunnyside World(레포 밖) | 작가 라이선스 V1(2026-10-25 페이지에서 원문 확인) | 가능 | 재포장·재판매 금지(수정해도), 튜토리얼·교육 외 재배포 금지, AI 학습 금지. 공개 레포에 넣지 않는다. 크레딧은 필수 아님(넣기로 함) |
+
+## Sunnyside World 라이선스 원문 (V1, 2026-10-25 https://danieldiggle.itch.io/sunnyside 에서 옮김)
+> This asset pack can be used in free and commercial projects. You can modify the assets as you need.
+> Credit is not necessary, but always appreciated.
+> You can redistribute the assets as part of tutorials or educational courses as long as a link to the Sunnyside World itch.io page is included: https://danieldiggle.itch.io/sunnyside.
+> You may not repackage and resell the assets, no matter how much they are modified - this includes as NFT’s.
+> You may not use these assets to train AI.
 
 규칙(CLAUDE.md): 라이선스를 확인하지 않은 에셋은 커밋하지 않는다. 새 에셋을 넣을 때 이 표에 행을 추가한다.
