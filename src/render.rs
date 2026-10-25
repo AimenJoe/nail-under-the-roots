@@ -202,6 +202,9 @@ impl Renderer {
         if self.warmed.get() != Some(key) {
             self.warmed.set(Some(key));
             ui.warm(&crate::i18n::s().glyphs(), crate::ui::FONT_PX);
+            // 두 배 크기 글(타이틀 로고·쓰러짐)도 미리 굽는다. 그리는 도중 아틀라스가 커지면 그 프레임 글이 지워진 텍스처를 본다.
+            let big = format!("Naïl{}", crate::i18n::s().dead);
+            ui.warm(&big, crate::ui::FONT_PX * 2.0);
         }
         ui
     }
