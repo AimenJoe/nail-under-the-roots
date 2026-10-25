@@ -1210,6 +1210,8 @@ impl App {
 
     fn update_pause(&mut self, a: &Actions, tap_hit: Option<Hit>) {
         let n_tabs = PAUSE_TABS.len();
+        // 이번 입력을 받기 전 탭: 좌우로 가방에 막 들어온 프레임에 같은 좌우가 가방 끝에서 또 탭을 넘기지 않게.
+        let came_in = self.pause_tab;
         if a.cancel || a.menu {
             self.scene = Scene::Game;
             return;
@@ -1230,6 +1232,17 @@ impl App {
         }
         if horizontal_tab && a.right {
             self.pause_tab = (self.pause_tab + 1) % n_tabs;
+        }
+        // 좌우로 가방에 들어오면 들어온 쪽 끝 칸(같은 줄)에서 시작한다.
+        if self.pause_tab == 2 && came_in != 2 && (a.left || a.right) {
+            let cols = self.inventory.cols;
+            let n = self.inventory.slots.len();
+            let row_start = self.inv_cursor / cols * cols;
+            self.inv_cursor = if a.right {
+                row_start
+            } else {
+                (row_start + cols - 1).min(n - 1)
+            };
         }
         match self.pause_tab {
             0 => {
@@ -1269,10 +1282,20 @@ impl App {
             2 => {
                 let cols = self.inventory.cols;
                 let n = self.inventory.slots.len();
-                if a.left && !self.inv_cursor.is_multiple_of(cols) {
+                // 좌우 끝에서 한 번 더 밀면 옆 탭으로(다른 탭은 좌우가 곧 탭 넘기기라 같은 손으로 빠져나온다).
+                let lr = came_in == 2;
+                if lr && a.left {
+                    if self.inv_cursor.is_multiple_of(cols) {
+                        self.pause_tab = (self.pause_tab + n_tabs - 1) % n_tabs;
+                        return;
+                    }
                     self.inv_cursor -= 1;
                 }
-                if a.right && self.inv_cursor % cols < cols - 1 && self.inv_cursor + 1 < n {
+                if lr && a.right {
+                    if self.inv_cursor % cols == cols - 1 || self.inv_cursor + 1 >= n {
+                        self.pause_tab = (self.pause_tab + 1) % n_tabs;
+                        return;
+                    }
                     self.inv_cursor += 1;
                 }
                 if a.up && self.inv_cursor >= cols {
