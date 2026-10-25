@@ -332,6 +332,9 @@ impl App {
                 self.world.freeze();
                 self.scene = Scene::Shop;
             }
+            // 보리·모모: 진행에 맞는 한 번짜리 말이 있으면 그것부터(0051).
+            Interact::Talk(Who::Bori) if self.say_story(crate::story::When::TalkBori) => {}
+            Interact::Talk(Who::Momo) if self.say_story(crate::story::When::TalkMomo) => {}
             Interact::Talk(Who::Bori) => {
                 let lines: [Tr; 3] = [|s| s.bori_1, |s| s.bori_2, |s| s.bori_3];
                 let text = lines[self.talk_n as usize % lines.len()];

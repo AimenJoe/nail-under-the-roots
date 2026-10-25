@@ -329,8 +329,8 @@ impl Renderer {
             DrawTextureParams {
                 dest_size: Some(vec2(size, size)),
                 source: Some(art::inset(Rect::new(
-                    frame as f32 * art::PORTRAIT,
-                    0.0,
+                    (frame % art::PORTRAIT_COLS) as f32 * art::PORTRAIT,
+                    (frame / art::PORTRAIT_COLS) as f32 * art::PORTRAIT,
                     art::PORTRAIT,
                     art::PORTRAIT,
                 ))),

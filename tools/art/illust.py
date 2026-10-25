@@ -336,27 +336,51 @@ def great_tree():
     for x, y in ((92, 520), (548, 506), (420, 540)):
         for dx in (0, 9):
             cv.paint(ellipse(cv, x + dx, y, 2.2, 1.6), (230, 60, 90))
-    # 나무 줄기
-    trunk = poly(cv, [(282, ground + 4), (298, 170), (306, 90), (334, 90), (342, 170), (362, ground + 4)])
-    branches = []
-    for (sx, sy, ex, ey, w) in ((310, 150, 170, 60, 14), (330, 140, 470, 50, 14), (320, 100, 250, 20, 10),
-                                (325, 96, 400, 14, 10), (300, 190, 200, 140, 9), (340, 180, 450, 130, 9)):
-        pts = bezier((sx, sy), ((sx + ex) / 2, sy - 10), (ex, (sy + ey) / 2), (ex, ey))
-        branches.append(pts)
-        trunk |= stroke(cv, pts, w, 3)
+    # 나무 줄기: 밑동이 벌어진 줄기 + 갈라지며 가늘어지는 가지(0049). 예전엔 굵기가 같은 곡선 여섯 개라 사슴뿔처럼 보였다.
+    trunk = poly(cv, [(262, ground + 6), (286, ground - 20), (298, 170), (304, 96), (336, 96), (342, 170),
+                      (354, ground - 20), (380, ground + 6)])
+    tips = []
+
+    def grow(x, y, ang, length, width, depth):
+        """가지 하나: 끝으로 갈수록 가늘고, 늙은 나무라 끝이 살짝 처진다. 끝 쪽에서 둘(가끔 셋)로 갈라진다."""
+        nonlocal trunk
+        droop = 0.18 * (1 - depth / 4)
+        ex, ey = x + math.cos(ang) * length, y + math.sin(ang) * length
+        bend = rng.uniform(-0.25, 0.25)
+        c1 = (x + math.cos(ang + bend) * length * 0.4, y + math.sin(ang + bend) * length * 0.4)
+        c2 = (x + math.cos(ang + droop) * length * 0.75, y + math.sin(ang + droop) * length * 0.75 + length * droop * 0.3)
+        pts = bezier((x, y), c1, c2, (ex, ey + length * droop * 0.25), 24)
+        trunk |= stroke(cv, pts, width, max(1.5, width * 0.62))
+        if depth == 0:
+            tips.append(pts[-1])
+            return
+        kids = 3 if rng.random() < 0.3 else 2
+        for k in range(kids):
+            t = rng.uniform(0.62, 0.95)
+            sx, sy = pts[int(t * (len(pts) - 1))]
+            spread = rng.uniform(0.32, 0.62) * (1 if k % 2 == 0 else -1) + (0.1 if k == 2 else 0)
+            grow(sx, sy, ang + spread, length * rng.uniform(0.58, 0.74), width * 0.62, depth - 1)
+
+    for (sx, sy, ang, length, width) in ((310, 168, -2.45, 92, 14), (330, 160, -0.72, 96, 14),
+                                         (318, 104, -1.95, 74, 11), (324, 100, -1.15, 78, 11),
+                                         (302, 206, -2.85, 64, 9), (340, 200, -0.32, 66, 9)):
+        grow(sx, sy, ang, length, width, 3)
     outline(cv, trunk, (30, 20, 24), 2)
+    # 음영: 줄기는 좁은 구(통나무처럼), 가지는 넓은 구(먼 가지가 새까매지지 않게).
+    branch_only = trunk & ~poly(cv, [(262, ground + 6), (286, ground - 20), (298, 170), (304, 96), (336, 96),
+                                     (342, 170), (354, ground - 20), (380, ground + 6)])
     shade(cv, trunk, BARK, 322, 200, 60, 140)
+    shade(cv, branch_only, BARK, 300, 110, 240, 170, bias=0.1)
     # 줄기 결
     for k in range(5):
         x = 300 + k * 9
         cv.paint(stroke(cv, [(x, 290), (x + 3, 200), (x + 1, 130)], 1) & trunk, BARK[0])
-    # 몇 안 남은 마른 잎
-    for pts in branches:
-        for (x, y) in pts[-12::4]:
-            if rng.random() < 0.7:
-                m = ellipse(cv, x + rng.uniform(-8, 8), y + rng.uniform(-6, 6), 5, 3, rot=rng.uniform(0, 3))
-                cv.paint(dilate(m) & ~m, (70, 46, 34))
-                cv.paint(m, rng.choice([(176, 132, 74), (150, 104, 60), (196, 156, 92)]))
+    # 몇 안 남은 마른 잎(가지 끝 몇 군데에만)
+    for (x, y) in tips:
+        if rng.random() < 0.35:
+            m = ellipse(cv, x + rng.uniform(-3, 3), y + rng.uniform(1, 5), 5, 3, rot=rng.uniform(0, 3))
+            cv.paint(dilate(m) & ~m, (70, 46, 34))
+            cv.paint(m, rng.choice([(176, 132, 74), (150, 104, 60), (196, 156, 92)]))
     return cv
 
 

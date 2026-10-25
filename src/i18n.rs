@@ -331,6 +331,12 @@ strings! {
     cat_story, cat_fight, cat_explore, cat_neighbors, cat_village, j_reward, j_claim, j_progress, j_toast, r_light, r_decor, r_charm, fur_0, fur_1, fur_2, fur_3, puddle_none, ia_puddle, decor_7, decor_8, decor_9, c_bell, c_bell_desc, c_thread, c_thread_desc, c_petal, c_petal_desc, jg_tutorial, jg_tutorial_d, jg_bori, jg_bori_d, jg_camp, jg_camp_d, jg_deeper, jg_deeper_d, jg_deepest, jg_deepest_d, jg_momo1, jg_momo1_d, jg_momo3, jg_momo3_d, jg_kills, jg_kills_d, jg_kills2, jg_kills2_d, jg_ambush, jg_ambush_d, jg_ambush2, jg_ambush2_d, jg_parry, jg_parry_d, jg_parry2, jg_parry2_d, jg_drill, jg_drill_d, jg_slam, jg_slam_d, jg_finisher, jg_finisher_d, jg_chest, jg_chest_d, jg_chest2, jg_chest2_d, jg_spring, jg_spring_d, jg_berry, jg_berry_d, jg_runs, jg_runs_d, jg_falls, jg_falls_d, jg_daily, jg_daily_d, jg_mobs, jg_mobs_d, jg_mobs2, jg_mobs2_d, jg_light, jg_light_d, jg_talent, jg_talent_d, jg_talent2, jg_talent2_d, jg_decor, jg_decor_d, jg_decor2, jg_decor2_d, jg_knot, jg_knot_d,
     // 저널 보상이 어디 있나(docs/decisions/0050)
     j_got_light, j_got_seeds, j_got_decor, j_got_fur, j_got_charm,
+    // 상태 탭의 재주(docs/decisions/0047)
+    stat_talents, tal_none,
+    // 도감 설명 쪽(docs/decisions/0051)
+    best_lore,
+    // 이웃 말 걸기(docs/decisions/0051)
+    bori_t_momo, bori_t_halmae, bori_t_falls, bori_t_tree, momo_t_deep, momo_t_bori,
 }
 
 pub static KO: Strings = Strings {
@@ -489,7 +495,7 @@ pub static KO: Strings = Strings {
     fmt_secs: "{0}초",
     fmt_pct: "{0}%",
     fmt_hp: "{0} / {1}",
-    wallet_note: "반딧불은 기술을 깨우고, 씨앗은 상점에서 쓴다(곧).",
+    wallet_note: "반딧불은 쉼터에 닿으면 마을로 가서 큰 나무에서 쓰고, 씨앗은 포포의 가게에서 쓴다.",
     best_unknown: "???",
     best_unseen: "아직 만나지 못했다.",
     best_hp: "체력",
@@ -827,6 +833,15 @@ pub static KO: Strings = Strings {
     j_got_decor: "받았다 · 마을에 놓였다",
     j_got_fur: "받았다 · 마을 물웅덩이에서 비춰 보며 바꾼다",
     j_got_charm: "받았다 · 가방에 들어 있다(런마다 들고 시작)",
+    stat_talents: "재주: {0}",
+    tal_none: "아직 없다 · 마을 큰 나무에서 깨운다",
+    best_lore: "이야기",
+    bori_t_momo: "모모가 돌아왔구나. 어릴 때처럼 귀를 쫑긋 세우고 마을을 뛰어다니더군.",
+    bori_t_halmae: "그 실 덩어리 할매… 처음엔 무서웠는데, 실뜨기 솜씨 하나는 대단하더군.",
+    bori_t_falls: "자주 쓰러지는구나. 돌진은 받아쳐 봐라. 발톱을 휘두르는 첫머리에 맞받으면 크게 멈칫한다.",
+    bori_t_tree: "큰 나무에서 재주를 깨웠느냐? 나무도 너를 알아보는 게지.",
+    momo_t_deep: "가장 깊은 곳에 할매가 있었다며? …우리 가족도 거기 어딘가에 있을까.",
+    momo_t_bori: "보리 아저씨네 마을이랑 우리 굴은 이웃이었어. 아저씨가 자주 당근을 나눠 줬어.",
 };
 
 pub static EN: Strings = Strings {
@@ -985,7 +1000,7 @@ pub static EN: Strings = Strings {
     fmt_secs: "{0}s",
     fmt_pct: "{0}%",
     fmt_hp: "{0} / {1}",
-    wallet_note: "Glowbugs awaken skills; seeds are spent at shops (soon).",
+    wallet_note: "Glowbugs go to the village when you reach a camp and are spent at the great tree. Seeds are spent at Popo's shop.",
     best_unknown: "???",
     best_unseen: "Not met yet.",
     best_hp: "Toughness",
@@ -1323,6 +1338,15 @@ pub static EN: Strings = Strings {
     j_got_decor: "Claimed · placed in the village",
     j_got_fur: "Claimed · switch it at the village puddle",
     j_got_charm: "Claimed · in your bag (you start every run with it)",
+    stat_talents: "Skills: {0}",
+    tal_none: "None yet · awaken them at the village's great tree",
+    best_lore: "Story",
+    bori_t_momo: "Momo's back, eh. Ears up, running around the village just like when she was little.",
+    bori_t_halmae: "That thread-ball granny… scared me at first, but her cat's cradle is something else.",
+    bori_t_falls: "You fall a lot. Try countering charges. Meet one at the start of a swing and it'll reel.",
+    bori_t_tree: "Did you awaken a skill at the great tree? The tree must recognize you.",
+    momo_t_deep: "They say Granny was in the deepest place? …Maybe my family's somewhere down there too.",
+    momo_t_bori: "Uncle Bori's village and our burrow were neighbors. He used to share carrots with us.",
 };
 
 pub static JA: Strings = Strings {
@@ -1481,7 +1505,7 @@ pub static JA: Strings = Strings {
     fmt_secs: "{0}秒",
     fmt_pct: "{0}%",
     fmt_hp: "{0} / {1}",
-    wallet_note: "ホタルはわざをめざめさせ、たねはお店で使う（もうすぐ）。",
+    wallet_note: "ホタルは休み場に着くと村へ送られ、大きな木で使う。たねはポポの店で使う。",
     best_unknown: "???",
     best_unseen: "まだ出会っていない。",
     best_hp: "体力",
@@ -1525,7 +1549,7 @@ pub static JA: Strings = Strings {
     tut_item: "{0}：ラズベリーを食べる",
     mob_chief: "ノネズミの親分",
     mob_chief_lore: "ノネズミの村の年老いた親分。根の毒に染まり、南の空き地を守っている。",
-    mob_chief_atk: "長くふるえてからまっすぐ突進し、かがんでから大きく跳んでたたきつける。弱るとハツカネズミの群れを呼ぶ。こうげき中は打っても止まらない。",
+    mob_chief_atk: "長くふるえてから突進し、かがんで大きく跳んでたたきつける。弱るとハツカネズミを呼ぶ。こうげき中は止まらない。",
     mob_chief_tip: "突進を岩やかべに向けさせると、しばらくふらふら。そのすきにたたこう。",
     toast_chief: "ノネズミの親分をたおした！穴の入り口があいた。",
     toast_camp: "根の下の休み場。HPが満タンになった。",
@@ -1819,6 +1843,15 @@ pub static JA: Strings = Strings {
     j_got_decor: "うけとった・村にかざった",
     j_got_fur: "うけとった・村の水たまりでのぞいてかえる",
     j_got_charm: "うけとった・どうぐに入れた（毎回持って出る）",
+    stat_talents: "わざ：{0}",
+    tal_none: "まだない・村の大きな木で起こす",
+    best_lore: "おはなし",
+    bori_t_momo: "モモがもどったか。小さいころみたいに耳をぴんと立てて、村をかけまわっとる。",
+    bori_t_halmae: "あの糸のかたまりのばあさん…はじめはこわかったが、あやとりのうではたいしたもんだ。",
+    bori_t_falls: "よく倒れるな。突進ははじき返してみろ。ふりはじめで受ければ、大きくひるむぞ。",
+    bori_t_tree: "大きな木でわざを起こしたか？木もおまえを知っとるんだろう。",
+    momo_t_deep: "いちばん深いところにばあちゃんがいたって？…わたしの家族も、そこのどこかにいるのかな。",
+    momo_t_bori: "ボリおじさんの村とわたしたちの穴は、おとなりだったの。おじさん、よくにんじんをわけてくれた。",
 };
 
 pub static ZH_HANS: Strings = Strings {
@@ -1977,7 +2010,7 @@ pub static ZH_HANS: Strings = Strings {
     fmt_secs: "{0}秒",
     fmt_pct: "{0}%",
     fmt_hp: "{0} / {1}",
-    wallet_note: "萤火虫用来唤醒技能，种子在商店使用（以后开放）。",
+    wallet_note: "萤火虫到达营地时会送回村子，在大树那里使用。种子在波波的店里使用。",
     best_unknown: "???",
     best_unseen: "还没有遇到。",
     best_hp: "体力",
@@ -2317,6 +2350,15 @@ pub static ZH_HANS: Strings = Strings {
     j_got_decor: "已领取 · 已经摆在村子里",
     j_got_fur: "已领取 · 在村里的水坑照一照就能换",
     j_got_charm: "已领取 · 已放进背包（每次出发都带着）",
+    stat_talents: "本领：{0}",
+    tal_none: "还没有 · 去村里的大树那里唤醒",
+    best_lore: "故事",
+    bori_t_momo: "茉茉回来了啊。耳朵竖得高高的，像小时候一样在村里跑来跑去。",
+    bori_t_halmae: "那个线团婆婆……一开始有点怕她，不过她翻花绳的手艺真了不起。",
+    bori_t_falls: "你常常倒下啊。试试弹开冲撞。在挥爪的一开始接住，对方会大大地愣住。",
+    bori_t_tree: "在大树那里唤醒本领了吗？大树也认得你了吧。",
+    momo_t_deep: "听说最深处有婆婆在？……我的家人也会在那里的某个地方吗。",
+    momo_t_bori: "波利叔叔的村子和我们的洞穴是邻居。叔叔常常分胡萝卜给我们。",
 };
 /// 브라질 포르투갈어(docs/decisions/0033). DeepL 초안 + 사람 손 검토(한국어·영어 대조). 원어민 검수 전.
 pub static PT_BR: Strings = Strings {
@@ -2475,7 +2517,7 @@ pub static PT_BR: Strings = Strings {
     fmt_secs: "{0}s",
     fmt_pct: "{0}%",
     fmt_hp: "{0} / {1}",
-    wallet_note: "Vaga-lumes despertam habilidades; sementes são gastas na loja.",
+    wallet_note: "Os vaga-lumes vão para a vila quando você chega a um refúgio e são usados na grande árvore. As sementes são gastas na loja do Popo.",
     best_unknown: "???",
     best_unseen: "Ainda não encontrado.",
     best_hp: "Resistência",
@@ -2813,6 +2855,15 @@ pub static PT_BR: Strings = Strings {
     j_got_decor: "Recebido · já está na vila",
     j_got_fur: "Recebido · troque na poça da vila",
     j_got_charm: "Recebido · está na mochila (vai com você toda vez)",
+    stat_talents: "Habilidades: {0}",
+    tal_none: "Nenhuma ainda · desperte na grande árvore da vila",
+    best_lore: "História",
+    bori_t_momo: "A Momo voltou, hein. Orelhas em pé, correndo pela vila como quando era pequena.",
+    bori_t_halmae: "Aquela vovó de fios… me assustou no começo, mas a cama de gato dela é impressionante.",
+    bori_t_falls: "Você cai bastante. Tente aparar as investidas: pegue no começo do golpe e elas ficam tontas.",
+    bori_t_tree: "Despertou uma habilidade na grande árvore? A árvore deve te reconhecer.",
+    momo_t_deep: "Dizem que a vovó estava no lugar mais fundo? …Será que minha família também está lá em algum lugar?",
+    momo_t_bori: "A vila do tio Bori e a nossa toca eram vizinhas. Ele sempre dividia cenouras com a gente.",
 };
 
 #[cfg(test)]

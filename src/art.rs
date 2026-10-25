@@ -14,7 +14,7 @@ pub struct Art {
     pub dark: Texture2D,
     /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모. 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
-    /// 대화창 초상화: 88×88 칸 가로로(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
+    /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
     /// 들쥐 대장·보리(tools/art/chief.py): 32×32, 줄 0 물든 대장, 줄 1 보리, 줄 2·3 흰 실루엣.
     pub chief: Option<Texture2D>,
@@ -41,6 +41,8 @@ pub fn chief_cell(col: u32, row: u32) -> Rect {
 
 /// 초상화 한 칸(원본 px).
 pub const PORTRAIT: f32 = 88.0;
+/// 초상화 시트 한 줄의 칸 수. 칸이 늘어 한 줄이면 2,048px를 넘는다(오래된 폰의 텍스처 한도) → 12칸씩 줄을 바꾼다.
+pub const PORTRAIT_COLS: u32 = 12;
 
 pub const CELL: f32 = 16.0;
 

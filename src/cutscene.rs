@@ -38,8 +38,19 @@ pub struct Portrait {
 }
 
 impl Portrait {
-    /// Naïl: 칸 0~3(보통·기쁨·걱정·결의).
+    /// Naïl: 칸 0~3(보통·기쁨·걱정·결의). 털빛 1~3은 칸 18부터 넷씩(docs/decisions/0048·0051).
     pub const NAIL: Portrait = Portrait { first: 0, faces: 4 };
+
+    /// 털빛을 따르는 Naïl 초상화.
+    pub fn nail(fur: u8) -> Portrait {
+        match fur {
+            1..=3 => Portrait {
+                first: 18 + (fur as u32 - 1) * 4,
+                faces: 4,
+            },
+            _ => Portrait::NAIL,
+        }
+    }
     /// 물든 모모(굴토끼, 히로인): 칸 7 차가움(보통), 칸 8 괴로움(걱정). 이름은 나중에 밝혀진다 — 그때까지 "???"
     /// (docs/decisions/0027, 0029). 칸 4(그림자 + 빛나는 눈)는 시트에 남겨 두었다(정체를 숨길 장면용).
     pub const MOMO_TAINTED: Portrait = Portrait { first: 7, faces: 2 };
@@ -93,6 +104,9 @@ mod portrait_tests {
         assert_eq!(Portrait::MOMO_TAINTED.frame(Face::Worried), 8);
         assert_eq!(Portrait::POPO.frame(Face::Happy), 6);
         assert_eq!(Portrait::NAIL.frame(Face::Determined), 3);
+        assert_eq!(Portrait::nail(0).frame(Face::Happy), 1);
+        assert_eq!(Portrait::nail(1).frame(Face::Normal), 18);
+        assert_eq!(Portrait::nail(3).frame(Face::Determined), 29);
         assert_eq!(Portrait::CHIEF.frame(Face::Worried), 9);
         assert_eq!(Portrait::BORI.frame(Face::Happy), 11);
         assert_eq!(Portrait::MOMO.frame(Face::Worried), 14);
@@ -442,7 +456,7 @@ fn nail_actor(w: &World) -> Actor {
         name: crate::equipment::Character::Mole.name(),
         sprite: None,
         color: crate::world::MOLE,
-        portrait: Some(Portrait::NAIL),
+        portrait: Some(Portrait::nail(w.fur)),
         pos: w.player.pos,
         facing: w.player.facing,
         visible: true,

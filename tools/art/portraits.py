@@ -1,7 +1,7 @@
 """대화창 초상화 생성기(docs/decisions/0015). 이 파일이 원본이고 PNG는 산출물이다(직접 그린 그림, 프로젝트 소유).
 
 실행: python3 tools/art/portraits.py [출력 경로]  (기본 assets/art/portraits.png)
-칸 88×88, 게임 픽셀의 2배 밀도(대화창의 44×44 칸에 찍는다 → 화면 배율 4면 원본 1px = 화면 2px).
+칸 88×88(한 줄 12칸, 칸 번호는 왼쪽 위부터), 게임 픽셀의 2배 밀도(대화창의 44×44 칸에 찍는다 → 화면 배율 4면 원본 1px = 화면 2px).
   칸 0~3: Naïl 보통·기쁨·걱정·결의
   칸 4  : 변해 버린 이웃(아직 정체를 모름: 그림자 + 빛나는 눈 + 뿌리)
   칸 5~6: 라쿤 포포(튜토리얼 안내) 보통·기쁨
@@ -11,6 +11,7 @@
   칸 12~14: 돌아온 모모 보통·기쁨·걱정 — 따뜻한 회갈색, 검은 눈, 핀 꽃, 뿌리 없음(docs/decisions/0049)
   칸 15~16: 누룩 할매 보통·기쁨 — 흰 실 덩어리 몸, 머리에 버섯 갓 셋, 감은 눈
   칸 17  : 엄마 두더지 — Naïl보다 크고 털이 짙다, 다정하게 감은 눈
+  칸 18~29: Naïl 털빛 1~3(잿빛·밤빛·모래빛) × 표정 4(저널 보상, docs/decisions/0048) — 털 경사만 바꾼다
 
 그리는 법(손 도트를 흉내 낸 절차):
   1. 부위를 타원으로 놓고 칸마다 재질을 정한다(뒤에 놓인 것부터).
@@ -70,6 +71,12 @@ RAMP = {
 RED_EYE = [(80, 14, 34), (190, 34, 72), (255, 84, 116), (255, 222, 230)]
 GLOW_EYE = [(40, 70, 36), (110, 190, 70), (190, 245, 120), (240, 255, 210)]
 OUTLINE_BASE = (43, 29, 42)
+# Naïl 털빛(nail.py FURS와 같은 색 방향, 초상화 5단 경사).
+FUR_VARIANTS = {
+    1: [(48, 46, 56), (76, 74, 86), (108, 106, 118), (140, 138, 150), (176, 174, 184)],   # 잿빛
+    2: [(46, 28, 30), (72, 46, 42), (102, 66, 54), (132, 94, 74), (162, 124, 98)],       # 밤빛
+    3: [(110, 78, 56), (150, 112, 76), (188, 150, 102), (216, 182, 132), (240, 214, 170)],  # 모래빛
+}
 BLUSH = (236, 120, 128)
 MOUTH = (96, 52, 60)
 WHITE = (255, 255, 255)
@@ -803,6 +810,20 @@ def mom():
     return cv
 
 
+def nail_fur(face, fur):
+    """털빛을 바꾼 Naïl: 'fur' 경사만 잠깐 바꿔 그리고, 색으로 굳혀 둔다(시트에 넣은 뒤 경사를 되돌려도 남게)."""
+    saved = RAMP['fur']
+    RAMP['fur'] = FUR_VARIANTS[fur]
+    cv = nail(face)
+    for y in range(H):
+        for x in range(W):
+            if cv.col[y][x] is None and cv.mat[y][x] is not None:
+                mat, lvl = cv.mat[y][x]
+                cv.col[y][x] = RAMP[mat][lvl] if mat in RAMP else OUTLINE_BASE
+    RAMP['fur'] = saved
+    return cv
+
+
 def to_image(cv):
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     px = img.load()
@@ -824,9 +845,14 @@ def sheet():
     frames += [bori('tainted'), bori('normal'), bori('happy')]
     frames += [momo_back('normal'), momo_back('happy'), momo_back('worried')]
     frames += [halmae('normal'), halmae('happy'), mom()]
-    out = Image.new('RGBA', (W * len(frames), H), (0, 0, 0, 0))
+    for fur in (1, 2, 3):
+        frames += [nail_fur(f, fur) for f in ('normal', 'happy', 'worried', 'determined')]
+    # 한 줄 12칸(src/art.rs PORTRAIT_COLS): 한 줄로 늘어놓으면 2,048px를 넘어 오래된 폰에서 텍스처가 안 올라간다.
+    cols = 12
+    rows = (len(frames) + cols - 1) // cols
+    out = Image.new('RGBA', (W * cols, H * rows), (0, 0, 0, 0))
     for i, cv in enumerate(frames):
-        out.paste(to_image(cv), (i * W, 0))
+        out.paste(to_image(cv), ((i % cols) * W, (i // cols) * H))
     return out
 
 

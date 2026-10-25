@@ -17,6 +17,9 @@ pub enum When {
     RunStart,
     /// 큰 나무 아래 마을에 왔다(0045).
     Village,
+    /// 보리·모모에게 말을 걸었다(0051): 진행에 맞는 한 번짜리 줄이 먼저, 없으면 늘 하는 말.
+    TalkBori,
+    TalkMomo,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -156,6 +159,55 @@ pub const LINES: &[Line] = &[
         ],
         once: true,
     },
+    // 말 걸기(0051): 이야기가 진행되면 이웃의 말이 바뀐다(한 번씩).
+    Line {
+        id: "bori_t_momo",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_t_momo,
+        needs: &[Flag(key::MOMO_BACK)],
+        once: true,
+    },
+    Line {
+        id: "bori_t_halmae",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_t_halmae,
+        needs: &[Flag(key::HALF_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "bori_t_falls",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_t_falls,
+        needs: &[DeathsAtLeast(5)],
+        once: true,
+    },
+    Line {
+        id: "bori_t_tree",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_t_tree,
+        needs: &[Seen("tree_intro")],
+        once: true,
+    },
+    Line {
+        id: "momo_t_deep",
+        when: When::TalkMomo,
+        who: Speaker::Momo,
+        text: |s| s.momo_t_deep,
+        needs: &[Flag(key::HALF_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "momo_t_bori",
+        when: When::TalkMomo,
+        who: Speaker::Momo,
+        text: |s| s.momo_t_bori,
+        needs: &[Flag(key::BORI_BACK)],
+        once: true,
+    },
     // 반쪽 엔딩 뒤 첫 런: 할매 이야기(한 번).
     Line {
         id: "after_half",
@@ -262,6 +314,21 @@ mod tests {
         p.set(key::MOMO_BACK);
         assert_eq!(take(&mut p, When::Village).unwrap().id, "popo_momo");
         assert!(take(&mut p, When::Village).is_none());
+    }
+
+    #[test]
+    fn talk_lines_follow_progress_once_then_fall_back() {
+        let mut p = Profile::default();
+        assert!(
+            take(&mut p, When::TalkBori).is_none(),
+            "진행이 없으면 늘 하는 말"
+        );
+        p.set(key::HALF_ENDING);
+        p.set(key::MOMO_BACK);
+        assert_eq!(take(&mut p, When::TalkBori).unwrap().id, "bori_t_momo");
+        assert_eq!(take(&mut p, When::TalkBori).unwrap().id, "bori_t_halmae");
+        assert!(take(&mut p, When::TalkBori).is_none());
+        assert_eq!(take(&mut p, When::TalkMomo).unwrap().id, "momo_t_deep");
     }
 
     #[test]

@@ -307,6 +307,8 @@ enum Hit {
     ControlCell(usize, usize),
     JournalItem(usize),
     BestiaryItem(usize),
+    /// 도감 설명(누르면 다음 쪽).
+    BestiaryPage,
     DevItem(usize),
     /// 길 지도: 고를 수 있는 칸(choices 번호).
     RouteNode(usize),
@@ -338,6 +340,8 @@ pub struct App {
     inv_cursor: usize,
     journal_cursor: usize,
     bestiary_cursor: usize,
+    /// 도감 설명 쪽(0 이야기 · 1 공격 · 2 요령). 칸마다 두 줄로 자르던 것을 쪽으로 나눴다(0051).
+    bestiary_page: usize,
     /// 조작 설정: 줄, 열(0 키보드 · 1 패드), 다시 붙이는 중이면 남은 시간.
     controls_cursor: usize,
     controls_col: usize,
@@ -431,6 +435,7 @@ impl App {
             inv_cursor: 0,
             journal_cursor: 0,
             bestiary_cursor: 0,
+            bestiary_page: 0,
             controls_cursor: 0,
             controls_col: 0,
             rebind: None,
@@ -504,15 +509,18 @@ impl App {
     }
 
     /// 짧은 한마디(런 사이). 맞는 줄이 있으면 대화 컷씬.
-    fn say_story(&mut self, when: crate::story::When) {
-        if let Some(l) = crate::story::take(&mut self.profile, when) {
-            crate::profile::save(&self.profile);
-            let c = cutscene::talk(&self.world, &[(l.who, l.text, cutscene::Face::Happy)]);
-            if self.cutscene.is_none() {
-                self.cutscene = Some(c);
-                self.scene = Scene::Cutscene;
-            }
+    /// 표에서 지금 할 한마디를 골라 튼다. 말했으면 true.
+    fn say_story(&mut self, when: crate::story::When) -> bool {
+        let Some(l) = crate::story::take(&mut self.profile, when) else {
+            return false;
+        };
+        crate::profile::save(&self.profile);
+        let c = cutscene::talk(&self.world, &[(l.who, l.text, cutscene::Face::Happy)]);
+        if self.cutscene.is_none() {
+            self.cutscene = Some(c);
+            self.scene = Scene::Cutscene;
         }
+        true
     }
 
     /// 프레임마다 한 번: 입력 → 장면 갱신 → 그리기.
@@ -1243,6 +1251,10 @@ impl App {
                 }
                 if let Some(Hit::BestiaryItem(i)) = tap_hit {
                     self.bestiary_cursor = i;
+                }
+                // 확인(또는 설명을 누르기) = 설명 쪽 넘기기. 좌우는 일시정지에서 탭을 바꾼다.
+                if a.confirm || tap_hit == Some(Hit::BestiaryPage) {
+                    self.bestiary_page = (self.bestiary_page + 1) % 3;
                 }
             }
             _ => {}
@@ -2261,7 +2273,10 @@ impl App {
                 s.stat_dig_cd,
                 fill(
                     s.fmt_secs,
-                    &[&format!("{:.1}", t::BURROW_COOLDOWN * st.burrow_cd)],
+                    &[&format!(
+                        "{:.1}",
+                        t::BURROW_COOLDOWN * st.burrow_cd * p.talents.burrow_cd_mul()
+                    )],
                 ),
             ),
             (&fill(s.stat_gauge, &[&tr(gauge.name())]), pct(st.sp_gain)),
@@ -2294,9 +2309,15 @@ impl App {
                 );
             }
         }
-        // 체력 하트(숫자 옆에 그림으로도)
+        // 체력 하트(숫자 옆에 그림으로도). 숫자 바로 뒤에 둔다: 고정 자리면 일본어처럼 이름 칸이 넓은 언어에서 숫자를 덮었다.
         let hy = c.y + 2.0;
-        let hx0 = c.x + 92.0;
+        let key_w = left
+            .iter()
+            .map(|(k, _)| ui.text_w(k, FONT_PX))
+            .fold(0.0, f32::max)
+            .min(col_w * 0.55)
+            + 6.0;
+        let hx0 = c.x + key_w + ui.text_w(&left[0].1, FONT_PX) + 5.0;
         for i in 0..st.max_hp.min(10) {
             let col = if i < p.hp {
                 Color::new(0.93, 0.33, 0.40, 1.0)
@@ -2326,8 +2347,28 @@ impl App {
         for (j, l) in lines.iter().take(n).enumerate() {
             ui.text(l, dx, y0 + j as f32 * 12.0, FONT_PX, ui::TEXT);
         }
-        // 화폐 설명(필살기 설명 아래, 칸이 남으면 두 줄까지).
+        // 낀 재주(0047): 자리 순서로. 없으면 어디서 깨우는지.
         let mut y = y0 + n as f32 * 12.0 + 2.0;
+        let picked: Vec<&str> = crate::talents::TABLE
+            .iter()
+            .zip(p.talents.pick)
+            .filter(|(_, side)| *side > 0)
+            .map(|((_, sides), side)| tr(sides[side as usize - 1].name))
+            .collect();
+        let talents = if picked.is_empty() {
+            s.tal_none.to_string()
+        } else {
+            picked.join(" · ")
+        };
+        for l in ui::wrap(ui, &fill(s.stat_talents, &[&talents]), c.w, FONT_PX)
+            .iter()
+            .take(2)
+        {
+            ui.text(l, c.x, y, FONT_PX, ui::ACCENT);
+            y += 12.0;
+        }
+        // 화폐 설명(칸이 남으면).
+        y += 2.0;
         for l in ui::wrap(ui, s.wallet_note, c.w, FONT_PX) {
             if y + FONT_PX > c.bottom() + 4.0 {
                 break;
@@ -2428,21 +2469,35 @@ impl App {
                 ui::TEXT,
             );
         }
-        let mut y = c.y + 51.0;
-        let lore = ui::wrap(ui, tr(sp.lore), w, FONT_PX);
-        for l in lore.iter().take(2) {
-            ui.text(l, x, y, FONT_PX, ui::TEXT);
-            y += 12.0;
+        // 설명은 쪽 하나에 한 갈래(이야기·공격·요령)를 칸 끝까지. 그래도 넘치면 마지막 줄에 "…".
+        let y0 = c.y + 49.0;
+        let page = self.bestiary_page.min(2);
+        let (label, text) = [
+            (s.best_lore, sp.lore),
+            (s.best_atk, sp.attack),
+            (s.best_tip, sp.tip),
+        ][page];
+        ui.text(label, x, y0, FONT_PX, ui::ACCENT);
+        ui.text_right(
+            &format!("{}/3 · {}", page + 1, crate::input::verb(Verb::Confirm)),
+            c.right(),
+            y0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+        let top = y0 + 13.0;
+        let rows = (((c.bottom() + 2.0 - top) / 12.0).floor() as usize).max(1);
+        let lines = ui::wrap(ui, tr(text), w, FONT_PX);
+        for (i, l) in lines.iter().take(rows).enumerate() {
+            let l = if i + 1 == rows && lines.len() > rows {
+                ui.fit(&format!("{l}…"), w, FONT_PX)
+            } else {
+                l.clone()
+            };
+            ui.text(&l, x, top + i as f32 * 12.0, FONT_PX, ui::TEXT);
         }
-        for (label, text) in [(s.best_atk, sp.attack), (s.best_tip, sp.tip)] {
-            let lw = ui.text_w(label, FONT_PX) + 5.0;
-            ui.text(label, x, y, FONT_PX, ui::ACCENT);
-            let lines = ui::wrap(ui, tr(text), w - lw, FONT_PX);
-            for l in lines.iter().take(2) {
-                ui.text(l, x + lw, y, FONT_PX, ui::TEXT);
-                y += 12.0;
-            }
-        }
+        self.hits
+            .push((Rect::new(x, y0, w, c.bottom() - y0), Hit::BestiaryPage));
     }
 
     fn draw_inventory(&mut self, ui: &Ui, c: Rect) {
