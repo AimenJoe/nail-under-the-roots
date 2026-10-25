@@ -259,6 +259,7 @@ impl App {
                 .add(&crate::daily::key_clear(crate::daily::today()), 1);
             self.profile
                 .add(crate::village::KEY_SEEDS, t::VILLAGE_SEEDS_DAILY);
+            self.profile.add(crate::journal::stat::DAILY_CLEARS, 1);
             crate::profile::save(&self.profile);
             self.title_cursor = 0;
             self.title_note = Some((|s| s.toast_daily_clear, 5.0));
@@ -368,6 +369,23 @@ impl App {
                 self.knot_level = self.knot_level.min(open);
                 self.world.freeze();
                 self.scene = Scene::KnotPick;
+            }
+            // 물웅덩이: 열린 털빛을 차례로 비춰 본다(저널 보상, 0048).
+            Interact::Puddle => {
+                let n = crate::journal::next_fur(&self.profile, self.world.fur);
+                let none = n == self.world.fur;
+                self.world.fur = n;
+                self.profile.set_count(crate::journal::KEY_FUR, n as u32);
+                crate::profile::save(&self.profile);
+                self.world.toast = Some((
+                    if none {
+                        |s| s.puddle_none
+                    } else {
+                        crate::journal::fur_name(n)
+                    },
+                    2.0,
+                ));
+                self.sfx.play(crate::sfx::Id::Glowbug);
             }
             // 큰 나무: 반딧불로 재주를 깨운다(0047).
             Interact::Tree => {
@@ -874,6 +892,7 @@ impl App {
             Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,
             Interact::Tree => s.ia_tree,
+            Interact::Puddle => s.ia_puddle,
             Interact::Gate if village => s.ia_descend,
             Interact::Gate => s.ia_route,
         };
@@ -1014,6 +1033,7 @@ impl App {
             return 0;
         }
         self.profile.add(crate::talents::KEY_LIGHT, n);
+        self.profile.add(crate::journal::stat::LIGHT, n);
         self.world.glowbugs = 0;
         crate::profile::save(&self.profile);
         n
@@ -1185,5 +1205,56 @@ impl App {
             ui::PANEL,
         );
         ui.text_center(&hint, 160.0, panel.bottom() + 3.0, FONT_PX, ui::TEXT_DIM);
+    }
+
+    /// 런 통계를 기록에 쌓고(첫 시작만), 받을 수 있는 저널 목표가 새로 생기면 알린다(0048). 저장은 다른 저장 때 같이.
+    pub(super) fn sync_journal(&mut self, dt: f32) {
+        let now = super::Tally::of(&self.world);
+        let mut changed = false;
+        if self.recording() && now != self.tally {
+            for (i, k) in super::Tally::KEYS.iter().enumerate() {
+                let d = now.0[i].saturating_sub(self.tally.0[i]);
+                if d > 0 {
+                    self.profile.add(k, d);
+                    changed = true;
+                }
+            }
+        }
+        self.tally = now;
+        // 깃발(이야기)로 이루는 목표도 있으니 가끔은 그냥 센다.
+        self.journal_check -= dt;
+        if changed || self.journal_check <= 0.0 {
+            self.journal_check = 1.0;
+            let ready = crate::journal::ready_count(&self.profile);
+            if ready > self.journal_ready {
+                self.world.toast = Some((|s| s.j_toast, 3.0));
+                self.sfx.play(crate::sfx::Id::Heal);
+            }
+            self.journal_ready = ready;
+        }
+    }
+
+    /// 저널 탭에서 고른 목표의 보상을 받는다. 월드에 바로 보이는 것(꾸미기·털빛·장신구 풀)도 고친다.
+    pub(super) fn claim_journal(&mut self) {
+        use crate::journal::{claim, visible, Reward};
+        let Some(g) = visible(&self.profile).get(self.journal_cursor).copied() else {
+            return;
+        };
+        let Some(r) = claim(&mut self.profile, g) else {
+            return;
+        };
+        crate::profile::save(&self.profile);
+        match r {
+            Reward::Decor(i) => {
+                if let Some(v) = self.world.adv.village.as_mut() {
+                    v.decor[i] = true;
+                }
+            }
+            Reward::Fur(_) => self.world.fur = crate::journal::fur(&self.profile),
+            Reward::Charm(_) => self.world.charm_pool = crate::journal::charm_pool(&self.profile),
+            Reward::Light(_) | Reward::Seeds(_) => {}
+        }
+        self.journal_ready = crate::journal::ready_count(&self.profile);
+        self.sfx.play(crate::sfx::Id::Heal);
     }
 }

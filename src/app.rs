@@ -170,60 +170,35 @@ impl Settings {
     }
 }
 
-pub struct Quest {
-    pub title: Tr,
-    pub desc: Tr,
-    pub goal: u32,
-    pub progress: u32,
-}
+/// 런 통계를 기록에 쌓을 때의 기준(저널, docs/decisions/0048). 월드가 새로 만들어지면 0부터.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+struct Tally([u32; 9]);
 
-impl Quest {
-    pub fn done(&self) -> bool {
-        self.progress >= self.goal
-    }
-}
+impl Tally {
+    const KEYS: [&'static str; 9] = [
+        crate::journal::stat::KILLS,
+        crate::journal::stat::EMERGE_KILLS,
+        crate::journal::stat::PARRIES,
+        crate::journal::stat::DRILLS,
+        crate::journal::stat::SLAMS,
+        crate::journal::stat::FINISHERS,
+        crate::journal::stat::EATEN,
+        crate::journal::stat::CHESTS,
+        crate::journal::stat::SPRINGS,
+    ];
 
-/// 저널. 지금은 프로토타입 통계에 묶인 튜토리얼 퀘스트뿐.
-pub struct Journal {
-    pub quests: Vec<Quest>,
-}
-
-impl Journal {
-    fn new() -> Self {
-        Self {
-            quests: vec![
-                Quest {
-                    title: |s| s.q_roots,
-                    desc: |s| s.q_roots_desc,
-                    goal: 1,
-                    progress: 0,
-                },
-                Quest {
-                    title: |s| s.q_claws,
-                    desc: |s| s.q_claws_desc,
-                    goal: 3,
-                    progress: 0,
-                },
-                Quest {
-                    title: |s| s.q_ambush,
-                    desc: |s| s.q_ambush_desc,
-                    goal: 1,
-                    progress: 0,
-                },
-                Quest {
-                    title: |s| s.q_survive,
-                    desc: |s| s.q_survive_desc,
-                    goal: 3,
-                    progress: 1,
-                },
-            ],
-        }
-    }
-
-    fn update(&mut self, w: &World) {
-        self.quests[1].progress = w.kills.min(self.quests[1].goal);
-        self.quests[2].progress = w.emerge_kills.min(self.quests[2].goal);
-        self.quests[3].progress = w.wave.min(self.quests[3].goal);
+    fn of(w: &World) -> Self {
+        Self([
+            w.kills,
+            w.emerge_kills,
+            w.parries,
+            w.drills,
+            w.slams,
+            w.finisher_hits,
+            w.items_used,
+            w.chests,
+            w.springs,
+        ])
     }
 }
 
@@ -377,7 +352,11 @@ pub struct App {
     gift_queue: Vec<crate::world::Gift>,
     pub settings: Settings,
     world: World,
-    journal: Journal,
+    /// 저널: 런 통계 기준, 받을 수 있는 수(새로 생기면 알림), 목록 스크롤, 다시 세기까지(0048).
+    tally: Tally,
+    journal_ready: usize,
+    journal_scroll: usize,
+    journal_check: f32,
     inventory: Inventory,
     sfx: Sfx,
     input: Input,
@@ -462,7 +441,10 @@ impl App {
             gift_queue: Vec::new(),
             settings,
             world,
-            journal: Journal::new(),
+            tally: Tally::default(),
+            journal_ready: 0,
+            journal_scroll: 0,
+            journal_check: 0.0,
             inventory: Inventory::new(&[]),
             gift: None,
             sfx,
@@ -672,7 +654,7 @@ impl App {
                 }
             }
         }
-        self.journal.update(&self.world);
+        self.sync_journal(t::TICK_DT);
         self.take_adventure_events();
         if let Some(i) = interact {
             if self.scene == Scene::Game {
@@ -732,7 +714,8 @@ impl App {
         }
         self.world.debug.overlay = self.settings.debug_overlay;
         self.world.debug.hitboxes = hitboxes;
-        self.journal = Journal::new();
+        self.journal_cursor = 0;
+        self.journal_scroll = 0;
         // 무기는 스토리를 따라 하나씩(docs/decisions/0012). 첫 시작·튜토리얼은 맨손에서 출발해
         // 튜토리얼에서 두더지 발톱을 줍는다. 개발 시나리오는 테스트를 위해 기본 발톱(또는 전부)을 들고 시작.
         let start = Character::Mole.starting_weapon();
@@ -768,6 +751,11 @@ impl App {
         });
         self.world.knots = knots;
         self.world.player.eat_cd_mul = knots.eat_cd_mul();
+        // 저널 보상(0048): 상자에서 나올 장신구, 털빛. 통계 기준은 새 월드에서 0부터.
+        self.world.charm_pool = crate::journal::charm_pool(&self.profile);
+        self.world.fur = crate::journal::fur(&self.profile);
+        self.tally = Tally::of(&self.world);
+        self.journal_ready = crate::journal::ready_count(&self.profile);
         // 큰 나무의 재주(0047): 튜토리얼만 빼고 모든 시작에(개발 시나리오도 고른 재주로 시험한다).
         if s != Scenario::Tutorial {
             self.world.player.talents = self.talents();
@@ -1219,15 +1207,21 @@ impl App {
                 }
             }
             3 => {
-                let n = self.journal.quests.len();
+                let n = crate::journal::visible(&self.profile).len().max(1);
                 if a.up {
                     self.journal_cursor = (self.journal_cursor + n - 1) % n;
                 }
                 if a.down {
                     self.journal_cursor = (self.journal_cursor + 1) % n;
                 }
+                let mut take = a.confirm;
                 if let Some(Hit::JournalItem(i)) = tap_hit {
+                    // 고른 칸을 한 번 더 누르면 받는다.
+                    take = i == self.journal_cursor;
                     self.journal_cursor = i;
+                }
+                if take {
+                    self.claim_journal();
                 }
             }
             4 => {
@@ -1477,7 +1471,7 @@ impl App {
     /// 기록 → 마을 모습.
     fn village_state(&self) -> crate::village::State {
         use crate::profile::key;
-        let mut decor = [false; 6];
+        let mut decor = [false; crate::village::DECOR_ALL];
         for (i, d) in decor.iter_mut().enumerate() {
             *d = self.profile.flag(&crate::village::key_decor(i));
         }
@@ -2580,47 +2574,110 @@ impl App {
         );
     }
 
+    /// 저널 탭(0048): 왼쪽 목록(◆ 받을 수 있음, ■ 받았음, □ 하는 중), 오른쪽 갈래·글·보상·상태.
     fn draw_journal(&mut self, ui: &Ui, c: Rect) {
+        use crate::journal::{visible, Reward};
+        let s = i18n::s();
+        let goals = visible(&self.profile);
+        if goals.is_empty() {
+            return;
+        }
+        self.journal_cursor = self.journal_cursor.min(goals.len() - 1);
         let row_h = FONT_PX + 4.0;
-        for (i, q) in self.journal.quests.iter().enumerate() {
-            let r = Rect::new(c.x, c.y + i as f32 * row_h, 150.0, row_h);
-            let selected = i == self.journal_cursor;
+        let rows = ((c.h / row_h).floor() as usize).max(1);
+        if self.journal_cursor < self.journal_scroll {
+            self.journal_scroll = self.journal_cursor;
+        }
+        if self.journal_cursor >= self.journal_scroll + rows {
+            self.journal_scroll = self.journal_cursor + 1 - rows;
+        }
+        let list_w = 150.0;
+        for (k, g) in goals
+            .iter()
+            .enumerate()
+            .skip(self.journal_scroll)
+            .take(rows)
+        {
+            let r = Rect::new(
+                c.x,
+                c.y + (k - self.journal_scroll) as f32 * row_h,
+                list_w,
+                row_h,
+            );
+            let selected = k == self.journal_cursor;
             if selected {
                 ui.rect(r, ui::PANEL_LIGHT);
             }
-            let mark = if q.done() { "■" } else { "□" };
-            let col = if q.done() {
+            let (mark, mc) = if g.claimed(&self.profile) {
+                ("■", ui::TEXT_DIM)
+            } else if g.ready(&self.profile) {
+                ("◆", ui::ACCENT)
+            } else {
+                ("□", ui::TEXT_DIM)
+            };
+            let col = if g.claimed(&self.profile) {
                 ui::TEXT_DIM
-            } else if selected {
+            } else if selected || g.ready(&self.profile) {
                 ui::TEXT
             } else {
-                ui::TEXT_DIM
+                Color::new(0.78, 0.72, 0.64, 1.0)
             };
-            ui.text(
-                mark,
-                r.x + 2.0,
-                r.y + 2.0,
-                FONT_PX,
-                if q.done() { ui::ACCENT } else { col },
-            );
-            let title = ui.fit(tr(q.title), r.w - 46.0, FONT_PX);
-            ui.text(&title, r.x + 16.0, r.y + 2.0, FONT_PX, col);
-            ui.text_right(
-                &format!("{}/{}", q.progress, q.goal),
-                r.right() - 4.0,
-                r.y + 2.0,
-                FONT_PX,
-                col,
-            );
-            self.hits.push((r, Hit::JournalItem(i)));
+            ui.text(mark, r.x + 2.0, r.y + 2.0, FONT_PX, mc);
+            let prog = format!("{}/{}", g.progress(&self.profile), g.goal);
+            let pw = ui.text_w(&prog, FONT_PX);
+            let title = ui.fit(tr(g.title), r.w - 22.0 - pw, FONT_PX);
+            ui.text(&title, r.x + 14.0, r.y + 2.0, FONT_PX, col);
+            ui.text_right(&prog, r.right() - 3.0, r.y + 2.0, FONT_PX, col);
+            self.hits.push((r, Hit::JournalItem(k)));
         }
-        let q = &self.journal.quests[self.journal_cursor];
-        let dx = c.x + 158.0;
+        // 목록이 더 있으면 ▲▼.
+        if self.journal_scroll > 0 {
+            ui.text_right("▲", c.x + list_w, c.y - 10.0, FONT_PX, ui::TEXT_DIM);
+        }
+        if self.journal_scroll + rows < goals.len() {
+            ui.text_right("▼", c.x + list_w, c.bottom() - 2.0, FONT_PX, ui::TEXT_DIM);
+        }
+        let g = goals[self.journal_cursor];
+        let dx = c.x + list_w + 8.0;
         let dw = c.right() - dx;
-        ui.text(tr(q.title), dx, c.y, FONT_PX, ui::ACCENT);
-        for (i, l) in ui::wrap(ui, tr(q.desc), dw, FONT_PX).iter().enumerate() {
-            ui.text(l, dx, c.y + 16.0 + i as f32 * 14.0, FONT_PX, ui::TEXT);
+        ui.text(tr(g.cat.name()), dx, c.y, FONT_PX, ui::TEXT_DIM);
+        ui.text(
+            &ui.fit(tr(g.title), dw, FONT_PX),
+            dx,
+            c.y + 13.0,
+            FONT_PX,
+            ui::ACCENT,
+        );
+        let mut y = c.y + 29.0;
+        for l in ui::wrap(ui, tr(g.desc), dw, FONT_PX).iter().take(3) {
+            ui.text(l, dx, y, FONT_PX, ui::TEXT);
+            y += 13.0;
         }
+        let what = match g.reward {
+            Reward::Light(n) => fill(s.r_light, &[&n]),
+            Reward::Seeds(n) => fill(s.village_seeds, &[&n]),
+            Reward::Decor(i) => fill(s.r_decor, &[&tr(crate::village::decor_name(i))]),
+            Reward::Fur(n) => tr(crate::journal::fur_name(n)).to_string(),
+            Reward::Charm(i) => fill(s.r_charm, &[&tr(crate::equipment::CHARMS[i].name)]),
+        };
+        let what = fill(s.j_reward, &[&what]);
+        let by = c.bottom() - 26.0;
+        for (k, l) in ui::wrap(ui, &what, dw, FONT_PX).iter().take(1).enumerate() {
+            ui.text(l, dx, by + k as f32 * 13.0, FONT_PX, ui::TEXT);
+        }
+        let state = if g.claimed(&self.profile) {
+            s.j_claimed.to_string()
+        } else if g.ready(&self.profile) {
+            vfill(s.j_claim, &[Verb::Confirm])
+        } else {
+            fill(s.j_progress, &[&g.progress(&self.profile), &g.goal])
+        };
+        let sc = if g.ready(&self.profile) {
+            ui::ACCENT
+        } else {
+            ui::TEXT_DIM
+        };
+        ui.text(&ui.fit(&state, dw, FONT_PX), dx, by + 13.0, FONT_PX, sc);
     }
 
     fn draw_map(&self, ui: &Ui, c: Rect) {

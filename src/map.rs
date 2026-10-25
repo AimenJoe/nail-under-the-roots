@@ -146,7 +146,7 @@ pub fn parse(rows: &[&str]) -> Parsed {
                 }),
                 _ => {}
             }
-            if matches!(ch, 'K' | 'b' | 'M' | 'H' | 'Y' | '1'..='6') {
+            if matches!(ch, 'K' | 'b' | 'M' | 'H' | 'Y' | 'W' | '1'..='9') {
                 marks.push((ch, at));
             }
         }

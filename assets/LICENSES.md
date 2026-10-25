@@ -7,8 +7,9 @@
 | `fonts/NailCJK-ja.ttf`, `fonts/NailCJK-zh-Hans.ttf` | [TakWolf/ark-pixel-font](https://github.com/TakWolf/ark-pixel-font) develop `816fb3cc6df3`(2026-10-25)의 12px 글자 원본 PNG | SIL Open Font License 1.1 (원문 `fonts/OFL-ArkPixel.txt`, 예약 폰트 이름 없음) | `tools/fonts/build_cjk.py`가 그 언어 표에 쓰인 글자만 뽑아 TTF로 다시 지은 수정본. OFL에 맞춰 이름을 바꿨다(Nail CJK 12 JA/SC). Ark는 제작자 창작(README). 표의 기호가 Ark에 없으면 Galmuri11 Condensed(OFL)에서 빌린다(지금은 없음) |
 | `fonts/OFL-ArkPixel.txt` | Ark Pixel 레포 `LICENSE-OFL` | — | Ark Pixel의 OFL 원문. 일본어·간체 폰트와 함께 배포 |
 | `art/nail.png` | 직접 그림. 원본 `tools/art/nail.py` | © 2026 Beardworks | Naïl 스프라이트 v2(idle·walk·attack·hurt·dead·흙더미·그림자 + 흰 실루엣) |
+| `art/nail_fur1~3.png` | 직접 그림. 원본 `tools/art/nail.py`(털 색만 바꿈) | © 2026 Beardworks | 털빛 잿빛·밤빛·모래빛(저널 보상, docs/decisions/0048) |
 | `art/portraits.png` | 직접 그림. 원본 `tools/art/portraits.py` | © 2026 Beardworks | 대화창 초상화 88×88(Naïl 표정 4 + 이웃 그림자 + 라쿤 포포 2 + 물든 모모 2 + 들쥐 대장·보리 3) |
-| `art/critters.png` | 직접 그림. 원본 `tools/art/critters.py` | © 2026 Beardworks | 적(물든 들쥐·생쥐·시궁쥐·다람쥐·청설모)·허수아비·라쿤 포포·물든 모모 16×16 + 흰 실루엣. v2 손으로 찍은 자세 |
+| `art/critters.png` | 직접 그림. 원본 `tools/art/critters.py` | © 2026 Beardworks | 적(물든 들쥐·생쥐·시궁쥐·다람쥐·청설모)·허수아비·라쿤 포포·물든 모모·돌아온 모모 16×16 + 흰 실루엣. v2 손으로 찍은 자세 |
 | `art/chief.png` | 직접 그림. 원본 `tools/art/chief.py` | © 2026 Beardworks | 튜토리얼 보스 들쥐 대장(물든 모습 8칸)·돌아온 보리(5칸) 32×32 + 흰 실루엣 |
 | `art/illust/*.png` | 직접 그림(임시). 원본 `tools/art/illust.py` | © 2026 Beardworks | 컷씬 일러스트 8장 640×360(2배 밀도, 일부는 패닝용으로 더 큼). 사람이 그린 그림으로 바꾸면 이 행을 작가·계약으로 고친다(docs/art/cutscene-illustrations.md) |
 | `art/tiles.png` | 직접 그림. 원본 `tools/art/tiles.py` | © 2026 Beardworks | Sunnyside가 들어오기 전 대체 타일(풀·꽃·흙·벼랑·그루터기·바위·버섯·뿌리·얼룩) |

@@ -142,6 +142,13 @@ pub struct World {
     /// 모모(0046): 첫 길 끝에서 싸우나(앱이 기록에서 정하고, 모모에게 쓰러지면 이번 런엔 끈다), 지금까지 이긴 수(빈 자리의 꽃잎).
     pub momo_fight: bool,
     pub momo_wins: u8,
+    /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것, 0048)와 Naïl의 털빛(그리기만).
+    pub charm_pool: Vec<usize>,
+    pub fur: u8,
+    /// 런 통계(저널, 0048): 연 상자, 들른 샘, 드릴 벽 쿵.
+    pub chests: u32,
+    pub springs: u32,
+    pub slams: u32,
     /// 지금 환경. `biome_by_wave`면 웨이브가 깊이를 대신해 바뀐다.
     pub biome: Biome,
     pub biome_by_wave: bool,
@@ -200,6 +207,11 @@ impl World {
             knots: crate::knots::Knots::default(),
             momo_fight: false,
             momo_wins: 0,
+            charm_pool: (0..crate::equipment::BASE_CHARMS).collect(),
+            fur: 0,
+            chests: 0,
+            springs: 0,
+            slams: 0,
             biome: Biome::Meadow,
             biome_by_wave: true,
             wave: 0,
@@ -291,6 +303,7 @@ impl World {
                     self.feel.add_trauma(0.35);
                 }
                 player::Event::DrillWall => {
+                    self.slams += 1;
                     sfx.stop(sfx::Id::Drill(self.player.talents.pick[2] as usize));
                     sfx.play(sfx::Id::DrillWall);
                     let p = self.player.pos + self.player.facing * 6.0;

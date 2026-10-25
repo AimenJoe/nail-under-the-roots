@@ -86,6 +86,8 @@ pub enum Interact {
     Seat,
     /// 마을의 큰 나무 밑동: 재주 깨우기(0047).
     Tree,
+    /// 마을 물웅덩이: 털빛 바꾸기(0048).
+    Puddle,
     Gate,
 }
 
@@ -299,6 +301,9 @@ impl World {
         if self.tree_base().is_some_and(near) {
             return Some(Interact::Tree);
         }
+        if self.puddle().is_some_and(near) {
+            return Some(Interact::Puddle);
+        }
         let gates = self
             .room
             .grid
@@ -321,6 +326,16 @@ impl World {
             .map(|(_, at)| *at + vec2(0.0, 14.0))
     }
 
+    /// 마을 물웅덩이(W).
+    fn puddle(&self) -> Option<Vec2> {
+        self.adv.village?;
+        self.adv
+            .marks
+            .iter()
+            .find(|(c, _)| *c == 'W')
+            .map(|(_, at)| *at)
+    }
+
     /// 확인 말풍선을 띄울 자리(이웃·자리·길 위).
     pub fn interact_anchor(&self) -> Option<Vec2> {
         let p = self.player.pos;
@@ -341,6 +356,9 @@ impl World {
         }
         if let Some(b) = self.tree_base() {
             consider(b, 14.0);
+        }
+        if let Some(b) = self.puddle() {
+            consider(b, 8.0);
         }
         if let Some(g) = &self.room.grid {
             for q in g.find(Cell::Gate) {
@@ -711,6 +729,7 @@ impl World {
                 // 길의 샘: 체력을 가득 채운다.
                 self.player.heal(self.player.stats.max_hp);
                 sfx.play(sfx::Id::Heal);
+                self.springs += 1;
                 self.toast = Some((|s| s.toast_spring, 2.5));
             }
             if room.kind == RoomKind::Rest {
@@ -788,7 +807,11 @@ impl World {
             for _ in 0..rand::gen_range(t::CHEST_SEEDS.0, t::CHEST_SEEDS.1 + 1) {
                 self.push_loot(Loot::spawn(LootKind::Seed, at));
             }
-            let missing: Vec<usize> = (0..crate::equipment::CHARMS.len())
+            self.chests += 1;
+            let missing: Vec<usize> = self
+                .charm_pool
+                .iter()
+                .copied()
                 .filter(|c| !self.charms_found.contains(c))
                 .collect();
             if missing.is_empty() {

@@ -117,7 +117,7 @@ impl Renderer {
             draw_fx(w);
             draw_darkness(art, w, alpha, cam);
             if draw_super_dim(w, cam) {
-                draw_nail(art, &w.player, alpha, w.time);
+                draw_nail(art, &w.player, w.fur, alpha, w.time);
                 draw_player_fx(&w.player, alpha);
             }
         } else {
@@ -1369,6 +1369,32 @@ fn draw_dig_mound(pos: Vec2, ut: f32, windup: f32, time: f32) {
     }
 }
 
+/// 마을 물웅덩이(0048): 파란 타원 + 떠다니는 반짝임 둘.
+fn draw_puddle(at: Vec2, time: f32) {
+    let (x, y) = (at.x.round(), at.y.round() + 3.0);
+    draw_ellipse(x, y, 11.0, 5.0, 0.0, Color::new(0.20, 0.30, 0.28, 1.0));
+    draw_ellipse(x, y, 10.0, 4.0, 0.0, Color::new(0.38, 0.62, 0.78, 1.0));
+    draw_ellipse(
+        x - 2.0,
+        y - 1.0,
+        5.0,
+        1.5,
+        0.0,
+        Color::new(0.62, 0.82, 0.92, 1.0),
+    );
+    for k in 0..2 {
+        let ph = (time * 0.7 + k as f32 * 0.5).fract();
+        let c = Color::new(1.0, 1.0, 1.0, 0.8 * (1.0 - ph));
+        draw_rectangle(
+            (x - 5.0 + k as f32 * 7.0 + ph * 3.0).round(),
+            y - 1.0 + k as f32,
+            1.0,
+            1.0,
+            c,
+        );
+    }
+}
+
 /// 빈 자리(모모를 기다리는 그루터기). 꽃잎 셋 가운데 모모를 이긴 만큼 분홍(0046).
 fn draw_seat(r: Rect, petals: u8) {
     let bark = Color::new(0.42, 0.28, 0.20, 1.0);
@@ -1619,6 +1645,71 @@ fn draw_decor(i: usize, at: Vec2, time: f32) {
                 );
             }
         }
+        // 저널 전용(0048). 6 반딧불 병: 유리병 안에서 빛이 떠다닌다.
+        6 => {
+            let glass = Color::new(0.70, 0.85, 0.90, 0.45);
+            draw_rectangle(x - 6.0, y - 13.0, 12.0, 14.0, OUTLINE);
+            draw_rectangle(x - 5.0, y - 12.0, 10.0, 12.0, glass);
+            draw_rectangle(x - 3.0, y - 16.0, 6.0, 4.0, OUTLINE);
+            draw_rectangle(x - 2.0, y - 15.0, 4.0, 2.0, wood);
+            draw_circle(x, y - 6.0, 10.0, Color::new(0.85, 1.0, 0.55, 0.10));
+            for k in 0..4 {
+                let a = time * (1.2 + k as f32 * 0.3) + k as f32 * 1.7;
+                let p = vec2(x + a.cos() * 3.0, y - 6.0 + (a * 1.3).sin() * 4.0);
+                let c = Color::new(0.85, 1.0, 0.55, 0.6 + 0.4 * (a * 2.0).sin().abs());
+                draw_rectangle(p.x.round(), p.y.round(), 1.0, 1.0, c);
+            }
+        }
+        // 7 들꽃 화분.
+        7 => {
+            let pot = Color::new(0.72, 0.42, 0.30, 1.0);
+            draw_rectangle(x - 6.0, y - 6.0, 12.0, 8.0, OUTLINE);
+            draw_rectangle(x - 5.0, y - 5.0, 10.0, 6.0, pot);
+            draw_rectangle(
+                x - 5.0,
+                y - 5.0,
+                10.0,
+                1.0,
+                Color::new(0.86, 0.56, 0.40, 1.0),
+            );
+            let cols = [
+                Color::new(1.0, 0.66, 0.77, 1.0),
+                Color::new(0.80, 0.70, 1.0, 1.0),
+                Color::new(1.0, 0.92, 0.55, 1.0),
+            ];
+            for (k, (dx, h)) in [(-3.0f32, 11.0f32), (0.0, 14.0), (3.0, 10.0)]
+                .into_iter()
+                .enumerate()
+            {
+                let sway = (time * 1.5 + k as f32).sin().round();
+                draw_line(
+                    x + dx,
+                    y - 5.0,
+                    x + dx + sway,
+                    y - h,
+                    1.0,
+                    Color::new(0.40, 0.65, 0.30, 1.0),
+                );
+                draw_rectangle(x + dx + sway - 1.0, y - h - 1.0, 3.0, 3.0, cols[k]);
+            }
+        }
+        // 8 실 그네: 두 기둥에 흰 실, 천천히 흔들린다.
+        8 => {
+            draw_rectangle(x - 9.0, y - 20.0, 2.0, 22.0, wood);
+            draw_rectangle(x + 7.0, y - 20.0, 2.0, 22.0, wood);
+            draw_rectangle(x - 9.0, y - 21.0, 18.0, 2.0, wood);
+            let swing = (time * 1.2).sin() * 2.0;
+            let thread = Color::new(0.92, 0.90, 0.96, 1.0);
+            draw_line(x - 4.0, y - 19.0, x - 4.0 + swing, y - 6.0, 1.0, thread);
+            draw_line(x + 4.0, y - 19.0, x + 4.0 + swing, y - 6.0, 1.0, thread);
+            draw_rectangle(
+                (x - 5.0 + swing).round(),
+                y - 6.0,
+                10.0,
+                2.0,
+                Color::new(0.78, 0.60, 0.38, 1.0),
+            );
+        }
         _ => {
             draw_rectangle(x - 17.0, y - 16.0, 2.0, 18.0, wood);
             draw_rectangle(x + 15.0, y - 16.0, 2.0, 18.0, wood);
@@ -1784,7 +1875,9 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
         for (c, at) in &w.adv.marks {
             match c {
                 'Y' => list.push((at.y + 8.0, Drawable::Tree(*at, v.growth))),
-                '1'..='6' => {
+                // 물웅덩이는 바닥: 맨 먼저.
+                'W' => draw_puddle(*at, w.time),
+                '1'..='9' => {
                     let i = (*c as u8 - b'1') as usize;
                     if v.decor[i] {
                         list.push((at.y + 6.0, Drawable::Decor(i, *at)));
@@ -1841,7 +1934,7 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
             }
             Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
             Drawable::Loot(i) => draw_loot(&w.loot[i], alpha, w.time, false),
-            Drawable::Player => draw_nail(art, &w.player, alpha, w.time),
+            Drawable::Player => draw_nail(art, &w.player, w.fur, alpha, w.time),
             Drawable::Enemy(i) => draw_enemy(Some(art), &w.enemies[i], alpha, w.time),
             Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
             Drawable::Npc => {
@@ -2093,7 +2186,7 @@ fn draw_pickup(p: &world::Pickup, time: f32) {
 const OUTLINE: Color = Color::new(0.17, 0.11, 0.16, 1.0);
 
 /// Naïl 스프라이트. 상태 → 칸, 좌우 반전, 피격 플래시는 흰 실루엣 줄.
-fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {
+fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     let pos = lerp(p.prev_pos, p.pos, alpha);
     let moving = (p.pos - p.prev_pos).length() > 0.05;
     let (col, row) = match p.state {
@@ -2118,7 +2211,7 @@ fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {
         WHITE
     };
     draw_texture_ex(
-        &art.nail,
+        art.nail_fur(fur),
         pos.x - 8.0,
         pos.y - 8.0,
         tint,

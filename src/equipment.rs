@@ -180,8 +180,10 @@ pub struct Charm {
 
 /// 동시에 낄 수 있는 장신구 수.
 pub const CHARM_SLOTS: usize = 2;
+/// 처음부터 상자에서 나오는 장신구 수. 그 뒤는 저널로 연다(docs/decisions/0048).
+pub const BASE_CHARMS: usize = 5;
 
-pub static CHARMS: [Charm; 5] = [
+pub static CHARMS: [Charm; 8] = [
     Charm {
         name: |s| s.c_shell,
         desc: |s| s.c_shell_desc,
@@ -227,6 +229,40 @@ pub static CHARMS: [Charm; 5] = [
             ..NO_MODS
         },
         color: Color::new(0.95, 0.80, 0.35, 1.0),
+    },
+    // 저널로 연다(0048). 옆으로: 얻는 만큼 잃는다.
+    // 들쥐 방울(보리를 되찾으면): 분노가 빨리 차고 발톱이 조금 느리다.
+    Charm {
+        name: |s| s.c_bell,
+        desc: |s| s.c_bell_desc,
+        mods: Mods {
+            sp_gain: 1.3,
+            attack_speed: 0.9,
+            ..NO_MODS
+        },
+        color: Color::new(0.90, 0.74, 0.30, 1.0),
+    },
+    // 할매의 실(가장 깊은 곳): 굴을 자주 파지만 분노가 느리다.
+    Charm {
+        name: |s| s.c_thread,
+        desc: |s| s.c_thread_desc,
+        mods: Mods {
+            burrow_cd: 0.7,
+            sp_gain: 0.8,
+            ..NO_MODS
+        },
+        color: Color::new(0.90, 0.88, 0.96, 1.0),
+    },
+    // 모모의 꽃잎(모모가 돌아오면): 체력 +2, 발톱이 느리다.
+    Charm {
+        name: |s| s.c_petal,
+        desc: |s| s.c_petal_desc,
+        mods: Mods {
+            max_hp: 2,
+            attack_speed: 0.85,
+            ..NO_MODS
+        },
+        color: Color::new(1.0, 0.66, 0.77, 1.0),
     },
 ];
 

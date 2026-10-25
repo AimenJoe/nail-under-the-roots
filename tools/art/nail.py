@@ -1,6 +1,6 @@
 """Naïl(아기 두더지) 스프라이트 시트 생성기. 이 파일이 원본이고 PNG는 산출물이다(직접 그린 그림, 프로젝트 소유).
 
-실행: python3 tools/art/nail.py [출력 경로]  (기본 assets/art/nail.png)
+실행: python3 tools/art/nail.py [출력 경로]  (기본 assets/art/nail.png, 털빛 1~3은 같은 폴더의 nail_fur<n>.png)
 칸 16×16, 오른쪽을 본다(왼쪽은 게임에서 좌우 반전). 발바닥 y=14, 그림자는 게임이 그린다.
   줄 0: idle 2, walk 4
   줄 1: attack 3(1타·2타·마지막 타), hurt, dead
@@ -31,6 +31,14 @@ P = {
     's': (24, 16, 28, 90),  # 그림자(반투명)
 }
 FILL_NO_OUTLINE = {'s'}
+
+# 털빛(저널 보상, docs/decisions/0048): 털 네 단계(d·b·h·l)만 바꾼다. 코·눈·발톱·흙은 그대로.
+# 물든 적보다 밝게(값 위계, critters.py 머리말) — 밤빛도 물든 들쥐보다 밝은 쪽으로 맞췄다.
+FURS = {
+    1: {'d': (72, 70, 78), 'b': (108, 106, 116), 'h': (146, 144, 154), 'l': (198, 194, 198)},   # 잿빛
+    2: {'d': (70, 44, 38), 'b': (104, 66, 54), 'h': (140, 96, 76), 'l': (190, 152, 124)},     # 밤빛
+    3: {'d': (150, 112, 70), 'b': (190, 150, 98), 'h': (220, 186, 132), 'l': (242, 222, 184)},  # 모래빛
+}
 
 # 채움만. 외곽선 자동. 오른쪽을 본다.
 # 얼굴(v2, 2026-10-25): 동그란 분홍 코 하나 + 2×2 눈(하이라이트) + 볼 홍조. 입은 그리지 않는다.
@@ -209,12 +217,12 @@ def dead(a):
     return f
 
 
-def paint(img, ox, oy, rows, silhouette=False):
+def paint(img, ox, oy, rows, silhouette=False, pal=P):
     for y, r in enumerate(rows):
         for x, ch in enumerate(r):
             if ch == '.':
                 continue
-            c = P[ch]
+            c = pal[ch]
             if silhouette and ch not in FILL_NO_OUTLINE:
                 c = (255, 255, 255)
             if len(c) == 3:
@@ -222,7 +230,8 @@ def paint(img, ox, oy, rows, silhouette=False):
             img.putpixel((ox + x, oy + y), c)
 
 
-def sheet():
+def sheet(fur=0):
+    pal = dict(P, **FURS.get(fur, {}))
     a = grid(BASE)
     rows = [
         [a, idle_b(a), walk(a, 0), walk(a, 1), walk(a, 2), walk(a, 3)],
@@ -233,10 +242,14 @@ def sheet():
     for ry, row in enumerate(rows):
         for rx, f in enumerate(row):
             f = outline(f)
-            paint(img, rx * 16, ry * 16, f)
-            paint(img, rx * 16, (ry + 3) * 16, f, silhouette=True)
+            paint(img, rx * 16, ry * 16, f, pal=pal)
+            paint(img, rx * 16, (ry + 3) * 16, f, silhouette=True, pal=pal)
     return img
 
 
 if __name__ == '__main__':
-    sheet().save(sys.argv[1] if len(sys.argv) > 1 else 'assets/art/nail.png')
+    import os
+    out = sys.argv[1] if len(sys.argv) > 1 else 'assets/art/nail.png'
+    sheet().save(out)
+    for n in FURS:
+        sheet(n).save(os.path.join(os.path.dirname(out), f'nail_fur{n}.png'))

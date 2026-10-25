@@ -6,6 +6,8 @@ use macroquad::prelude::*;
 pub struct Art {
     /// Naïl 시트: 16×16 칸, 줄 0 idle·walk, 줄 1 attack·hurt·dead, 줄 2 흙더미·그림자, 줄 3~5 흰 실루엣.
     pub nail: Texture2D,
+    /// 털빛 1~3(tools/art/nail.py, 저널 보상 docs/decisions/0048). 없으면 기본 털.
+    pub nail_furs: Vec<Option<Texture2D>>,
     /// 대체 타일셋(tools/art/tiles.py).
     pub tiles: Texture2D,
     /// 어둠 마스크(가운데 투명, 바깥 검정). 코드로 만든다.
@@ -52,10 +54,27 @@ pub const MOMO_ROW: u32 = 7;
 pub const MOMO_BLOOM_ROW: u32 = 8;
 
 impl Art {
+    /// 털빛 n의 Naïl 시트(0 또는 없으면 기본).
+    pub fn nail_fur(&self, n: u8) -> &Texture2D {
+        (n as usize)
+            .checked_sub(1)
+            .and_then(|i| self.nail_furs.get(i))
+            .and_then(|t| t.as_ref())
+            .unwrap_or(&self.nail)
+    }
+
     pub async fn load() -> Option<Self> {
         let nail = load_texture("art/nail.png").await.ok()?;
         let tiles = load_texture("art/tiles.png").await.ok()?;
         nail.set_filter(FilterMode::Nearest);
+        let mut nail_furs = Vec::new();
+        for n in 1..crate::journal::FURS {
+            let t = load_texture(&format!("art/nail_fur{n}.png")).await.ok();
+            if let Some(t) = &t {
+                t.set_filter(FilterMode::Nearest);
+            }
+            nail_furs.push(t);
+        }
         tiles.set_filter(FilterMode::Nearest);
         let portraits = load_texture("art/portraits.png").await.ok();
         if let Some(p) = &portraits {
@@ -81,6 +100,7 @@ impl Art {
         }
         Some(Self {
             nail,
+            nail_furs,
             tiles,
             dark: dark_mask(),
             critters,
