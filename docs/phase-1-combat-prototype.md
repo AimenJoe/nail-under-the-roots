@@ -67,6 +67,7 @@
 - [ ] `main`에 머지(또는 push)해서 `deploy-web`이 프로덕션 배포를 하게 한다. PR을 열면 먼저 `pr-<번호>--nail-under-the-roots.netlify.app` 미리보기로 확인할 수 있다
 - [ ] **플레이**(웹 또는 `cargo run`). 위 판정 4개에 예/아니오와 한 줄 이유를 적어 다음 세션에 전달. 가능하면 본인 외 1명 더
 - [ ] 게임패드를 꽂고 데스크톱·웹에서 이동/공격/굴파기/재시작, 스틱 데드존 확인
+- [ ] GitHub Secrets에 `ANDROID_DEBUG_KEYSTORE_B64` 등록(README "Android" 절). 등록 전 빌드로 설치한 앱은 기기에서 삭제 후 재설치
 - [ ] Actions의 `build-android` 아티팩트 APK를 Android 기기(가능하면 핸드헬드)에 설치해 실행되는지, D-pad로 움직이는지 확인
 - [ ] (데스크톱 실행용) Linux면 `libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev libudev-dev pkg-config`
 

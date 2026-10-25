@@ -53,6 +53,28 @@ jobs:
           ls "$ANDROID_HOME/build-tools" "$ANDROID_HOME/platforms"
           java -version
 
+      # 서명 키를 빌드마다 바꾸면 기기에서 이전 빌드 위에 설치할 수 없다("패키지가 유효하지 않음").
+      # 우선순위: Secrets의 키 → Actions 캐시에 남은 키 → 새로 생성(경고). docs/decisions/0005 후속.
+      - name: Restore debug keystore from cache
+        id: ks-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+      - name: Install debug keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
+        run: |
+          mkdir -p ~/.android
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+            echo "keystore: from secret ANDROID_DEBUG_KEYSTORE_B64"
+          elif [ -f ~/.android/debug.keystore ]; then
+            echo "keystore: from Actions cache"
+          else
+            echo "::warning::ANDROID_DEBUG_KEYSTORE_B64 시크릿이 없어 새 디버그 키를 만든다. 이전 빌드 위에 설치하려면 기기에서 먼저 삭제해야 한다."
+          fi
+
       - name: Build APK (release, debug-signed)
         run: |
           export NDK_HOME="$ANDROID_NDK_HOME"
@@ -65,6 +87,7 @@ jobs:
           APK=target/android-artifacts/release/apk/nail.apk
           echo "build-tools: $BT"
           "$BT/apksigner" verify --verbose --print-certs "$APK"
+          keytool -list -keystore ~/.android/debug.keystore -storepass android 2>/dev/null | grep -i "fingerprint" || true
           "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdkVersion|native-code|launchable-activity|application-label|uses-feature|uses-gl-es" || true
           unzip -l "$APK"
           sha256sum "$APK"

@@ -30,3 +30,9 @@
 ## 재검토 조건
 - `gamepads`가 miniquad용 Android 백엔드를 얻거나, miniquad 포크가 완성되면 3번을 되돌린다.
 - 스토어 배포가 필요해지면 릴리스 키 서명 단계를 추가하고 `version_code` 자동 증가를 넣는다.
+
+## 후속 (2026-10-25): 서명 키 고정
+첫 실기 설치에서 "패키지가 유효하지 않음"이 났다. CI 검증(`apksigner verify`)은 통과했으므로 APK 자체는 멀쩡하고, 원인은 **빌드마다 keytool로 새 디버그 키를 만들어** 서명하기 때문에 이전 빌드 위에 설치할 수 없는 것이다(cargo-quad-apk는 `~/.android/debug.keystore`가 없으면 생성한다. 러너는 매번 새 VM).
+- 워크플로에 키 복원 단계를 넣었다: Secrets `ANDROID_DEBUG_KEYSTORE_B64` → Actions 캐시(`android-debug-keystore-v1`) → 새 생성(경고).
+- 디버그 키는 사이드로드 전용이다. 스토어 배포 키는 따로 만들고 Secrets로만 다룬다.
+- 검증 단계에 키스토어 지문 출력을 추가해 빌드 간 키가 같은지 로그로 확인한다.
