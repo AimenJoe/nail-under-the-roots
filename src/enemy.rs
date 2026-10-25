@@ -52,6 +52,11 @@ pub struct Enemy {
     /// 마지막으로 맞은 스윙 번호. 같은 스윙에 두 번 맞지 않는다.
     pub last_hit_by: u32,
     fire_cd: f32,
+    /// 남은 독(초)과 다음 독 피해까지 남은 시간.
+    pub poison: f32,
+    poison_tick: f32,
+    /// 이번 틱에 독으로 쓰러졌다(월드가 처치로 센다).
+    pub died_of_poison: bool,
 }
 
 pub struct Projectile {
@@ -94,6 +99,9 @@ impl Enemy {
             alive: true,
             last_hit_by: 0,
             fire_cd: t::SHOOTER_FIRE_INTERVAL * 0.5,
+            poison: 0.0,
+            poison_tick: t::POISON_TICK,
+            died_of_poison: false,
         }
     }
 
@@ -133,6 +141,7 @@ impl Enemy {
     ) {
         self.prev_pos = self.pos;
         self.flash = (self.flash - dt).max(0.0);
+        self.tick_poison(dt);
         if self.kind == Kind::Dummy {
             // 허수아비: 넉백만 받고 제자리로 돌아오지 않는다. 경직은 즉시 푼다.
             self.pos += self.vel * dt;
@@ -256,6 +265,34 @@ impl Enemy {
         }
     }
 
+    /// 독을 건다. 이미 걸려 있으면 더 긴 쪽.
+    pub fn apply_poison(&mut self, secs: f32) {
+        if self.poison <= 0.0 {
+            self.poison_tick = t::POISON_TICK;
+        }
+        self.poison = self.poison.max(secs);
+    }
+
+    fn tick_poison(&mut self, dt: f32) {
+        if self.poison <= 0.0 || !self.alive {
+            return;
+        }
+        self.poison -= dt;
+        self.poison_tick -= dt;
+        if self.poison_tick <= 0.0 {
+            self.poison_tick += t::POISON_TICK;
+            self.hp -= 1;
+            self.flash = t::HIT_FLASH * 0.5;
+            if self.hp <= 0 {
+                self.alive = false;
+                self.died_of_poison = true;
+            }
+        }
+        if self.poison < 0.0 {
+            self.poison = 0.0;
+        }
+    }
+
     /// 피격. 넉백 방향은 단위 벡터.
     pub fn hurt(&mut self, dmg: i32, knock_dir: Vec2, knockback: f32, stun: f32) {
         self.hp -= dmg;
@@ -277,5 +314,39 @@ impl Enemy {
             State::Aim { .. } => "aim",
             State::Stunned { .. } => "stunned",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn poison_ticks_down_hp_and_kills() {
+        let mut e = Enemy::new(Kind::Charger, vec2(100.0, 100.0));
+        assert_eq!(e.hp, t::CHARGER_HP);
+        e.apply_poison(t::VENOM_POISON_FINISHER);
+        let dt = t::TICK_DT;
+        let mut secs = 0.0;
+        while e.alive && secs < 10.0 {
+            e.tick_poison(dt);
+            secs += dt;
+        }
+        // 2.5초 독 = 0.8초마다 1 → 3틱, 체력 3인 돌격형은 쓰러진다.
+        assert!(!e.alive);
+        assert!(e.died_of_poison);
+        assert!(secs <= t::VENOM_POISON_FINISHER + dt);
+    }
+
+    #[test]
+    fn short_poison_deals_one_tick() {
+        let mut e = Enemy::new(Kind::Charger, vec2(0.0, 0.0));
+        e.apply_poison(t::VENOM_POISON);
+        for _ in 0..600 {
+            e.tick_poison(t::TICK_DT);
+        }
+        assert_eq!(e.hp, t::CHARGER_HP - 1);
+        assert_eq!(e.poison, 0.0);
+        assert!(e.alive);
     }
 }

@@ -8,6 +8,7 @@ use macroquad::prelude::*;
 
 use crate::art::Art;
 use crate::cutscene::{self, Cutscene};
+use crate::equipment::{Character, WEAPONS};
 use crate::input::{Actions, Input};
 use crate::render::{self, Renderer};
 use crate::scenario::{self, Scenario};
@@ -125,24 +126,42 @@ impl Journal {
     }
 }
 
-pub struct Item {
-    pub name: String,
-    pub desc: String,
+pub enum Item {
+    /// equipment::WEAPONS 번호.
+    Weapon(usize),
 }
 
-/// 가방. 빈 칸만 있는 틀. 아이템은 2단계(방 클리어 보상)에서 들어온다.
+/// 가방. 지금은 무기만 들어간다. 그 밖의 아이템은 2단계(방 클리어 보상)에서.
 pub struct Inventory {
     pub slots: Vec<Option<Item>>,
     pub cols: usize,
+    /// 장착 중인 무기(WEAPONS 번호).
+    pub equipped: usize,
 }
 
 impl Inventory {
-    fn new() -> Self {
+    fn new(character: Character, weapons: &[usize]) -> Self {
+        let mut slots: Vec<Option<Item>> = (0..15).map(|_| None).collect();
+        for (i, w) in weapons.iter().enumerate() {
+            slots[i] = Some(Item::Weapon(*w));
+        }
         Self {
-            slots: (0..15).map(|_| None).collect(),
+            slots,
             cols: 5,
+            equipped: character.starting_weapon(),
         }
     }
+}
+
+/// 가방 칸의 발톱 아이콘: 크림/무기 색 발톱 세 개.
+fn draw_claw_icon(ui: &Ui, r: Rect, color: Color) {
+    let dark = Color::new(color.r * 0.6, color.g * 0.6, color.b * 0.6, 1.0);
+    for k in 0..3 {
+        let x = r.x + 6.0 + k as f32 * 4.0;
+        ui.rect(Rect::new(x, r.y + 6.0 + (k % 2) as f32, 2.0, 8.0), color);
+        ui.rect(Rect::new(x, r.y + 13.0 + (k % 2) as f32, 2.0, 2.0), dark);
+    }
+    ui.rect(Rect::new(r.x + 5.0, r.y + 15.0, 12.0, 2.0), dark);
 }
 
 /// 직전 프레임에 그린, 탭/클릭에 반응하는 요소.
@@ -217,7 +236,7 @@ impl App {
             settings,
             world,
             journal: Journal::new(),
-            inventory: Inventory::new(),
+            inventory: Inventory::new(Character::Mole, &[Character::Mole.starting_weapon()]),
             sfx,
             input: Input::new(),
             renderer: Renderer::new(font, art),
@@ -329,7 +348,13 @@ impl App {
         self.world.debug.overlay = self.settings.debug_overlay;
         self.world.debug.hitboxes = hitboxes;
         self.journal = Journal::new();
-        self.inventory = Inventory::new();
+        let character = Character::Mole;
+        self.inventory = if s == Scenario::AllClaws {
+            Inventory::new(character, &[0, 1, 2, 3])
+        } else {
+            Inventory::new(character, &[character.starting_weapon()])
+        };
+        self.world.player.moveset = WEAPONS[self.inventory.equipped].moveset;
         self.run_time = 0.0;
         self.acc = 0.0;
         self.death_t = 0.0;
@@ -561,8 +586,20 @@ impl App {
                 if a.down && self.inv_cursor + cols < n {
                     self.inv_cursor += cols;
                 }
+                let mut equip = a.confirm;
                 if let Some(Hit::InvSlot(i)) = tap_hit {
+                    equip = self.inv_cursor == i;
                     self.inv_cursor = i;
+                }
+                if equip {
+                    if let Some(Item::Weapon(w)) = self.inventory.slots[self.inv_cursor] {
+                        // 캐릭터가 쓸 수 있는 종류만.
+                        if WEAPONS[w].kind == Character::Mole.weapon_kind() {
+                            self.inventory.equipped = w;
+                            self.world.player.moveset = WEAPONS[w].moveset;
+                            self.sfx.play(crate::sfx::Id::Claw(2));
+                        }
+                    }
                 }
             }
             3 => {
@@ -646,13 +683,15 @@ impl App {
         }
     }
 
-    /// 컷씬 레터박스: 위아래 검은 띠 + 안쪽으로 번지는 그림자. 대화창·건너뛰기 안내는 그 위에.
+    /// 컷씬 레터박스: 화면 가장자리 비네트 + 위아래 검은 띠 + 안쪽으로 번지는 그림자.
+    /// 대화창·건너뛰기 안내는 그 위에. 조작이 돌아오면 같은 속도로 걷힌다.
     fn draw_letterbox(&self, ui: &Ui) {
         if self.letterbox <= 0.0 {
             return;
         }
         let k = self.letterbox;
         let e = k * k * (3.0 - 2.0 * k);
+        self.renderer.draw_vignette(ui, t::CUTSCENE_VIGNETTE * e);
         let bar = (t::LETTERBOX_BAR * e).round();
         let soft = 8.0;
         ui.rect(Rect::new(0.0, 0.0, 320.0, bar), BLACK);
@@ -919,7 +958,7 @@ impl App {
         let secs = self.run_time as u32;
         let lines = [
             (
-                "Naïl".to_string(),
+                Character::Mole.name().to_string(),
                 "아기 두더지. 발톱으로 싸우고 발톱으로 판다.".to_string(),
             ),
             ("체력".to_string(), hearts),
@@ -984,19 +1023,40 @@ impl App {
                     ui::BORDER
                 },
             );
-            if item.is_some() {
-                ui.rect(Rect::new(r.x + 6.0, r.y + 6.0, 10.0, 10.0), ui::ACCENT);
+            if let Some(Item::Weapon(w)) = item {
+                draw_claw_icon(ui, r, WEAPONS[*w].color);
+                if *w == self.inventory.equipped {
+                    ui.text("E", r.x + 1.0, r.y, FONT_PX, ui::ACCENT);
+                }
             }
             self.hits.push((r, Hit::InvSlot(i)));
         }
         let desc_x = x0 + cols as f32 * (slot + gap) + 8.0;
         let desc_w = c.right() - desc_x;
         match &self.inventory.slots[self.inv_cursor] {
-            Some(it) => {
-                ui.text(&it.name, desc_x, y0, FONT_PX, ui::ACCENT);
-                for (i, l) in ui::wrap(ui, &it.desc, desc_w, FONT_PX).iter().enumerate() {
-                    ui.text(l, desc_x, y0 + 16.0 + i as f32 * 14.0, FONT_PX, ui::TEXT);
+            Some(Item::Weapon(w)) => {
+                let wp = &WEAPONS[*w];
+                ui.text(wp.name, desc_x, y0, FONT_PX, ui::ACCENT);
+                let mut y = y0 + 16.0;
+                for l in ui::wrap(ui, wp.desc, desc_w, FONT_PX).iter() {
+                    ui.text(l, desc_x, y, FONT_PX, ui::TEXT);
+                    y += 14.0;
                 }
+                let ms = wp.moveset;
+                let last = &ms.hits[ms.last()];
+                ui.text(
+                    &format!("{}연타 · 마지막 타 피해 {}", ms.hits.len(), last.damage),
+                    desc_x,
+                    y + 4.0,
+                    FONT_PX,
+                    ui::TEXT_DIM,
+                );
+                let hint = if *w == self.inventory.equipped {
+                    "장착 중"
+                } else {
+                    "확인: 장착"
+                };
+                ui.text(hint, desc_x, y + 18.0, FONT_PX, ui::ACCENT);
             }
             None => {
                 ui.text("비어 있음", desc_x, y0, FONT_PX, ui::TEXT_DIM);

@@ -100,6 +100,13 @@ pub const PROJECTILE_SPEED: f32 = 65.0;
 pub const PROJECTILE_RADIUS: f32 = 3.0;
 pub const PROJECTILE_DAMAGE: i32 = 1;
 
+// ---- 독 ------------------------------------------------------------
+/// 독은 이 간격마다 체력 1을 깎는다. 경직·넉백은 없다.
+pub const POISON_TICK: f32 = 0.8;
+/// 독 발톱 1·2타가 거는 독(초), 마지막 타가 거는 독(초).
+pub const VENOM_POISON: f32 = 0.9;
+pub const VENOM_POISON_FINISHER: f32 = 2.5;
+
 // ---- 튜토리얼 허수아비 ------------------------------------------------------------
 pub const DUMMY_HP: i32 = 6;
 
@@ -128,6 +135,8 @@ pub const DEATH_INPUT_LOCK: f32 = 1.2;
 /// 레터박스 띠 높이(논리 px)와 내려오는/걷히는 시간.
 pub const LETTERBOX_BAR: f32 = 18.0;
 pub const LETTERBOX_TIME: f32 = 0.4;
+/// 컷씬 중 화면 가장자리 비네트 세기(0..1).
+pub const CUTSCENE_VIGNETTE: f32 = 0.75;
 
 // ---- 웨이브 ------------------------------------------------------------
 pub const WAVE_RESPAWN_DELAY: f32 = 1.2;

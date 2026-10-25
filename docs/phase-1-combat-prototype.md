@@ -59,6 +59,7 @@
 | 터치(보조) | `input.rs` TouchState, `render.rs` 오버레이, `web/index.html` | 왼쪽 반 떠다니는 스틱 + ATK/DIG/R 버튼. 모바일 브라우저용. 터치 좌표는 DPI로 나눠야 함(macroquad touches()는 물리 픽셀). Android 13 폰 브라우저 실기 확인(2026-10-25) |
 | 디버그 | F1 오버레이(fps, 상태), F2 히트박스 | 기본 꺼짐. 설정에서도 켬/끔 |
 | 그림 | `art.rs`, `biome.rs`, `render.rs`, `tools/art/` | Naïl 스프라이트 v1(직접 그림), 대체 타일, 3/4 벽·y 정렬·그림자, 환경 3종(색조·장식·어둠), 발톱 자국 이펙트, 컷씬 레터박스. Sunnyside 팩은 레포 밖(docs/decisions/0010) |
+| 장비 | `equipment.rs`, `moveset.rs` | 캐릭터별 무기 종류. Naïl은 발톱 4종(새싹·두더지·바위·독), 가방에서 장착, 독 지속 피해. 규칙은 `cargo test`(docs/decisions/0011) |
 | 무브셋 | `moveset.rs` | 콤보를 데이터로(발톱 3타, 실험용 무거운 2타). 타별 회피 캔슬 창 `dodge_cancel_after`. 개발 시나리오 "무거운 무기"로 비교(docs/decisions/0009) |
 | 튜토리얼 | `tutorial.rs` | 플레이로 배움: 이동 → 허수아비 3연타 → 굴파기 → 솟구침 → 웨이브 1. 한 줄 힌트만. 첫 시작과 개발 시나리오 "튜토리얼" |
 | 개발 시나리오 | `scenario.rs` | 타이틀 "개발"(dev feature). 빈 방, 돌격형 1/3, 원거리형 1, 1+1, 웨이브 3부터, 오프닝 컷씬. 판정 2(적 3마리)는 "돌격형 3마리"로 바로 들어간다 |

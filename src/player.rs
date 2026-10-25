@@ -247,6 +247,7 @@ impl Player {
             hitstop: t::EMERGE_HITSTOP,
             shake: t::EMERGE_SHAKE,
             finisher: false,
+            poison: 0.0,
         }
     }
 
@@ -266,6 +267,7 @@ impl Player {
             hitstop: h.hitstop,
             shake: h.shake,
             finisher: idx == self.moveset.last(),
+            poison: h.poison,
         }
     }
 

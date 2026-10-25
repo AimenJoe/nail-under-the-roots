@@ -22,8 +22,8 @@ pub enum Scenario {
     CutsceneOnly,
     /// 컷씬 없이 튜토리얼만.
     Tutorial,
-    /// 실험용 무거운 무기(2타 콤보)로 웨이브 1부터.
-    Heavy,
+    /// 발톱 4종을 가방에 넣고 웨이브 1부터. 가방에서 바꿔 끼며 비교.
+    AllClaws,
     /// 환경 확인: 지정 환경에서 돌격형 1 + 원거리형 1.
     InBiome(Biome),
 }
@@ -56,9 +56,9 @@ pub const LIST: [Entry; 12] = [
         scenario: Scenario::Tutorial,
     },
     Entry {
-        name: "무거운 무기(실험)",
-        desc: "2타 콤보 무브셋으로 웨이브 1부터. 무기가 바뀌면 손맛이 얼마나 달라지나.",
-        scenario: Scenario::Heavy,
+        name: "발톱 4종 비교",
+        desc: "새싹·두더지·바위·독 발톱이 가방에. 메뉴 → 가방에서 확인으로 바꿔 낀다.",
+        scenario: Scenario::AllClaws,
     },
     Entry {
         name: "빈 방",
@@ -102,11 +102,7 @@ pub fn build(s: Scenario) -> World {
     match s {
         Scenario::Normal => World::new(),
         Scenario::Empty | Scenario::CutsceneOnly | Scenario::Tutorial => World::empty(),
-        Scenario::Heavy => {
-            let mut w = World::new();
-            w.player.moveset = &crate::moveset::HEAVY;
-            w
-        }
+        Scenario::AllClaws => World::new(),
         Scenario::Chargers(n) => {
             let mut w = World::empty();
             for i in 0..n {

@@ -110,6 +110,27 @@ impl Renderer {
         }
     }
 
+    /// 화면 가장자리 비네트(컷씬). 게임 화면 위에 타원형으로 덮는다. 그림 에셋이 없으면 생략.
+    pub fn draw_vignette(&self, ui: &Ui, amount: f32) {
+        let Some(art) = &self.art else { return };
+        if amount <= 0.0 {
+            return;
+        }
+        let (w, h) = (t::VIEW_W * ui.scale, t::VIEW_H * ui.scale);
+        // 마스크는 가운데 35% 반지름까지 투명. 화면을 조금 넘게 늘려 모서리가 가장 어둡게.
+        let (dw, dh) = (w * 1.25, h * 1.45);
+        draw_texture_ex(
+            &art.dark,
+            ui.ox + (w - dw) / 2.0,
+            ui.oy + (h - dh) / 2.0,
+            Color::new(1.0, 1.0, 1.0, amount),
+            DrawTextureParams {
+                dest_size: Some(vec2(dw, dh)),
+                ..Default::default()
+            },
+        );
+    }
+
     /// 인게임 HUD(실제 해상도): 웨이브·처치, 디버그 줄.
     pub fn draw_hud(&self, ui: &Ui, w: &World, gamepad_count: usize) {
         draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
@@ -247,7 +268,7 @@ fn draw_player_fx(p: &Player, alpha: f32) {
                         Color::new(1.0, 1.0, 1.0, 0.25 * (1.0 - k)),
                     );
                 }
-                draw_claw_marks(origin, dir, hit.range, k, finisher);
+                draw_claw_marks(origin, dir, hit.range, k, finisher, p.moveset.mark);
             } else if at < a0 {
                 draw_sector_lines(
                     origin,
@@ -267,15 +288,20 @@ fn draw_player_fx(p: &Player, alpha: f32) {
 }
 
 /// 발톱 자국: 전방 호를 따라 세 줄. 휘두르는 동안 펼쳐지고 끝에서 옅어진다.
-fn draw_claw_marks(origin: Vec2, dir: Vec2, r: f32, k: f32, strong: bool) {
+fn draw_claw_marks(origin: Vec2, dir: Vec2, r: f32, k: f32, strong: bool, mark: Color) {
     let base = dir.y.atan2(dir.x);
     let span = std::f32::consts::FRAC_PI_2 * 0.95;
     let reveal = (k * 1.6).min(1.0);
     let fade = 1.0 - ((k - 0.6) / 0.4).clamp(0.0, 1.0);
     let col = if strong {
-        Color::new(1.0, 1.0, 1.0, fade)
+        Color::new(
+            (mark.r + 1.0) * 0.5,
+            (mark.g + 1.0) * 0.5,
+            (mark.b + 1.0) * 0.5,
+            fade,
+        )
     } else {
-        Color::new(0.97, 0.93, 0.85, 0.9 * fade)
+        Color::new(mark.r, mark.g, mark.b, 0.9 * fade)
     };
     let thick = if strong { 2.0 } else { 1.0 };
     let steps = 10;
@@ -566,6 +592,21 @@ fn draw_enemy(e: &Enemy, alpha: f32, time: f32) {
     let base = world::enemy_color(e.kind);
     let r = e.radius();
     let mut color = if e.flash > 0.0 { WHITE } else { base };
+    if e.poison > 0.0 && e.flash <= 0.0 {
+        // 독: 초록빛이 돌고 거품이 오른다.
+        color = Color::new(base.r * 0.6, base.g * 0.6 + 0.35, base.b * 0.5, 1.0);
+        for k in 0..2 {
+            let ph = (time * 1.6 + k as f32 * 0.5 + e.pos.x * 0.01).fract();
+            let bx = pos.x + (k as f32 * 2.0 - 1.0) * (r * 0.5) + (ph * 9.0).sin();
+            let by = pos.y - r - ph * 8.0;
+            draw_circle(
+                bx.round(),
+                by.round(),
+                1.0,
+                Color::new(0.55, 0.9, 0.35, 1.0 - ph),
+            );
+        }
+    }
     match e.state {
         enemy::State::Windup { time: wt } => {
             // 예고: 떨림 + 점점 밝아짐

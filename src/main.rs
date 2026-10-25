@@ -12,6 +12,7 @@ mod biome;
 mod combat;
 mod cutscene;
 mod enemy;
+mod equipment;
 mod input;
 mod moveset;
 mod player;

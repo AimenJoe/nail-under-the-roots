@@ -158,6 +158,16 @@ impl World {
                 &mut self.enemy_events,
             );
         }
+        // 독으로 쓰러진 적
+        for e in self.enemies.iter_mut().filter(|e| e.died_of_poison) {
+            e.died_of_poison = false;
+            self.kills += 1;
+            sfx.play(sfx::Id::EnemyDie);
+            let color = enemy_color(e.kind);
+            self.fx
+                .push(ring(e.pos, e.radius(), e.radius() * 3.0, 0.25, POISON));
+            burst(&mut self.fx, e.pos, 10, color, 90.0);
+        }
         for ev in &self.enemy_events {
             match ev {
                 enemy::Event::Charge => sfx.play(sfx::Id::Charge),
@@ -190,6 +200,9 @@ impl World {
                     dir
                 };
                 e.hurt(s.damage, dir, s.knockback, s.stun);
+                if s.poison > 0.0 && e.alive {
+                    e.apply_poison(s.poison);
+                }
                 if s.finisher {
                     self.finisher_hits += 1;
                 }
@@ -363,6 +376,7 @@ pub const DIRT: Color = Color::new(0.55, 0.40, 0.28, 1.0);
 pub const CHARGER: Color = Color::new(0.85, 0.30, 0.30, 1.0);
 pub const SHOOTER: Color = Color::new(0.60, 0.40, 0.85, 1.0);
 pub const PROJECTILE: Color = Color::new(1.0, 0.85, 0.30, 1.0);
+pub const POISON: Color = Color::new(0.55, 0.90, 0.35, 1.0);
 
 pub fn enemy_color(kind: Kind) -> Color {
     match kind {

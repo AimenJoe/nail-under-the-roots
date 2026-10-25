@@ -1,8 +1,10 @@
-//! 무브셋: 무기·캐릭터마다 다른 콤보를 데이터로. 플레이어 코드는 이 표만 읽는다.
+//! 무브셋: 무기마다 다른 콤보를 데이터로. 플레이어 코드는 이 표만 읽는다.
 //!
 //! 규칙(docs/decisions/0009): 마지막 타가 가장 강하고 느리다. 굴파기(회피)는 각 타의 `dodge_cancel_after` 뒤에
 //! 스윙을 끊을 수 있어 후딜레이를 취소하고 다음 콤보로 섞는다. 공격 입력은 활성 구간이 끝난 뒤 다음 타로 이어진다.
-//! 수치의 출처는 tuning.rs(발톱). 새 무기는 여기에 `Moveset` 상수 하나.
+//! 어떤 캐릭터가 어떤 무기를 쓰는지는 equipment.rs(docs/decisions/0011). 새 무기는 여기에 `Moveset` 하나 + 장비 표 한 줄.
+
+use macroquad::color::Color;
 
 use crate::tuning as t;
 
@@ -25,6 +27,8 @@ pub struct Hit {
     pub lunge: f32,
     /// 이 시간 뒤부터 굴파기로 끊을 수 있다. 0 = 언제나.
     pub dodge_cancel_after: f32,
+    /// 맞은 적에게 거는 독(초). 0 = 없음. 독은 POISON_TICK마다 1씩 깎는다.
+    pub poison: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -35,6 +39,8 @@ pub struct Moveset {
     pub combo_window: f32,
     /// 공격 중 이동 속도 배율.
     pub move_factor: f32,
+    /// 발톱 자국 색.
+    pub mark: Color,
 }
 
 impl Moveset {
@@ -42,6 +48,21 @@ impl Moveset {
         self.hits.len() - 1
     }
 }
+
+const BASE: Hit = Hit {
+    swing: 0.12,
+    active: (0.02, 0.08),
+    recovery: 0.0,
+    damage: 1,
+    knockback: 90.0,
+    stun: 0.15,
+    hitstop: 0.05,
+    shake: 0.15,
+    range: t::CLAW_RANGE,
+    lunge: t::CLAW_LUNGE,
+    dodge_cancel_after: 0.0,
+    poison: 0.0,
+};
 
 const fn claw(i: usize) -> Hit {
     Hit {
@@ -53,29 +74,81 @@ const fn claw(i: usize) -> Hit {
         stun: t::CLAW_STUN[i],
         hitstop: t::CLAW_HITSTOP[i],
         shake: t::CLAW_SHAKE[i],
-        range: t::CLAW_RANGE,
-        lunge: t::CLAW_LUNGE,
-        dodge_cancel_after: 0.0,
+        ..BASE
     }
 }
 
-/// Naïl의 발톱 3연타. 1·2타 빠름, 3타 느리고 묵직. 언제든 굴파기로 끊는다.
+/// 새싹 발톱(가벼움): 4연타, 짧고 빠르다. 한 방은 약하지만 끊김 없이 이어진다.
+pub static SPROUT: Moveset = Moveset {
+    name: "새싹 발톱",
+    hits: &[
+        Hit {
+            swing: 0.09,
+            active: (0.015, 0.06),
+            knockback: 55.0,
+            stun: 0.10,
+            hitstop: 0.03,
+            shake: 0.08,
+            range: 12.0,
+            lunge: 32.0,
+            ..BASE
+        },
+        Hit {
+            swing: 0.09,
+            active: (0.015, 0.06),
+            knockback: 55.0,
+            stun: 0.10,
+            hitstop: 0.03,
+            shake: 0.08,
+            range: 12.0,
+            lunge: 32.0,
+            ..BASE
+        },
+        Hit {
+            swing: 0.09,
+            active: (0.015, 0.06),
+            knockback: 55.0,
+            stun: 0.10,
+            hitstop: 0.03,
+            shake: 0.08,
+            range: 12.0,
+            lunge: 32.0,
+            ..BASE
+        },
+        Hit {
+            swing: 0.16,
+            active: (0.04, 0.11),
+            recovery: 0.08,
+            knockback: 150.0,
+            stun: 0.30,
+            hitstop: 0.07,
+            shake: 0.28,
+            range: 13.0,
+            lunge: 50.0,
+            ..BASE
+        },
+    ],
+    combo_window: 0.28,
+    move_factor: 0.6,
+    mark: Color::new(0.80, 0.98, 0.70, 1.0),
+};
+
+/// 두더지 발톱(기본): 1·2타 빠름, 3타 느리고 묵직. 언제든 굴파기로 끊는다.
 pub static CLAWS: Moveset = Moveset {
-    name: "발톱",
+    name: "두더지 발톱",
     hits: &[claw(0), claw(1), claw(2)],
     combo_window: t::CLAW_COMBO_WINDOW,
     move_factor: t::CLAW_MOVE_FACTOR,
+    mark: Color::new(0.97, 0.93, 0.85, 1.0),
 };
 
-/// 실험용 무거운 무기(2타). 느리고 넓고, 활성 구간이 끝나야 굴파기로 끊을 수 있다.
-/// 무기가 바뀌면 손맛이 얼마나 달라지는지 보는 용도.
-pub static HEAVY: Moveset = Moveset {
-    name: "무거운 발톱(실험)",
+/// 바위 발톱(무거움): 2타. 느리고 넓고, 활성 구간이 끝나야 굴파기로 끊는다.
+pub static STONE: Moveset = Moveset {
+    name: "바위 발톱",
     hits: &[
         Hit {
             swing: 0.24,
             active: (0.10, 0.18),
-            recovery: 0.0,
             damage: 2,
             knockback: 170.0,
             stun: 0.3,
@@ -84,6 +157,7 @@ pub static HEAVY: Moveset = Moveset {
             range: 18.0,
             lunge: 55.0,
             dodge_cancel_after: 0.18,
+            ..BASE
         },
         Hit {
             swing: 0.36,
@@ -97,8 +171,52 @@ pub static HEAVY: Moveset = Moveset {
             range: 20.0,
             lunge: 75.0,
             dodge_cancel_after: 0.26,
+            ..BASE
         },
     ],
     combo_window: 0.35,
     move_factor: 0.25,
+    mark: Color::new(0.78, 0.76, 0.74, 1.0),
+};
+
+/// 독 발톱: 3연타, 한 방은 가볍지만 맞은 적에게 독. 마지막 타는 독이 길다.
+pub static VENOM: Moveset = Moveset {
+    name: "독 발톱",
+    hits: &[
+        Hit {
+            swing: 0.13,
+            knockback: 70.0,
+            stun: 0.12,
+            hitstop: 0.04,
+            shake: 0.12,
+            lunge: 40.0,
+            poison: t::VENOM_POISON,
+            ..BASE
+        },
+        Hit {
+            swing: 0.13,
+            knockback: 70.0,
+            stun: 0.12,
+            hitstop: 0.04,
+            shake: 0.12,
+            lunge: 40.0,
+            poison: t::VENOM_POISON,
+            ..BASE
+        },
+        Hit {
+            swing: 0.22,
+            active: (0.05, 0.14),
+            recovery: 0.12,
+            knockback: 160.0,
+            stun: 0.30,
+            hitstop: 0.08,
+            shake: 0.30,
+            lunge: 45.0,
+            poison: t::VENOM_POISON_FINISHER,
+            ..BASE
+        },
+    ],
+    combo_window: 0.30,
+    move_factor: 0.45,
+    mark: Color::new(0.62, 0.92, 0.40, 1.0),
 };
