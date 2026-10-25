@@ -107,7 +107,7 @@ pub const LIST: [Entry; 28] = [
     },
     Entry {
         name: "환경: 어두운 심층",
-        desc: "빛은 Naïl 주변뿐. 이끼와 빛나는 버섯.",
+        desc: "빛은 나일 주변뿐. 이끼와 빛나는 버섯.",
         scenario: Scenario::InBiome(Biome::Deep),
     },
     Entry {

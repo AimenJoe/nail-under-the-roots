@@ -26,7 +26,7 @@ pub enum WeaponKind {
 impl Character {
     pub fn name(self) -> &'static str {
         match self {
-            Character::Mole => "Naïl",
+            Character::Mole => crate::i18n::s().name_nail,
             Character::Momo => crate::i18n::s().name_momo,
         }
     }
