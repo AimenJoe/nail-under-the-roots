@@ -84,6 +84,8 @@ pub enum Interact {
     Talk(Who),
     /// 빈 자리(모모가 돌아올 곳).
     Seat,
+    /// 마을의 큰 나무 밑동: 재주 깨우기(0047).
+    Tree,
     Gate,
 }
 
@@ -294,6 +296,9 @@ impl World {
         {
             return Some(Interact::Seat);
         }
+        if self.tree_base().is_some_and(near) {
+            return Some(Interact::Tree);
+        }
         let gates = self
             .room
             .grid
@@ -304,6 +309,16 @@ impl World {
             return Some(Interact::Gate);
         }
         None
+    }
+
+    /// 마을 큰 나무의 밑동(나무 칸 바로 아래, 걸어서 닿는 곳).
+    fn tree_base(&self) -> Option<Vec2> {
+        self.adv.village?;
+        self.adv
+            .marks
+            .iter()
+            .find(|(c, _)| *c == 'Y')
+            .map(|(_, at)| *at + vec2(0.0, 14.0))
     }
 
     /// 확인 말풍선을 띄울 자리(이웃·자리·길 위).
@@ -323,6 +338,9 @@ impl World {
             if pr.kind == PropKind::Seat {
                 consider(pr.rect.center(), 12.0);
             }
+        }
+        if let Some(b) = self.tree_base() {
+            consider(b, 14.0);
         }
         if let Some(g) = &self.room.grid {
             for q in g.find(Cell::Gate) {
@@ -1019,6 +1037,17 @@ mod tests {
         };
         assert_eq!(kinds(&a), kinds(&b));
         assert_eq!((a.adv.place, a.adv.stage), (Place::Camp, 1));
+    }
+
+    /// 마을의 큰 나무 밑동에 서면 재주 창(0047), 떨어지면 아니다.
+    #[test]
+    fn village_tree_base_is_interactable() {
+        let mut w = World::village(crate::village::State::default());
+        let y = w.adv.marks.iter().find(|(c, _)| *c == 'Y').unwrap().1;
+        w.player.pos = y + vec2(0.0, 16.0);
+        assert_eq!(w.interactable(), Some(Interact::Tree));
+        w.player.pos = y + vec2(0.0, 80.0);
+        assert_ne!(w.interactable(), Some(Interact::Tree));
     }
 
     #[test]

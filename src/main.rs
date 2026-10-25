@@ -37,6 +37,7 @@ mod scenario;
 mod sfx;
 mod species;
 mod story;
+mod talents;
 mod tuning;
 mod tutorial;
 mod ui;

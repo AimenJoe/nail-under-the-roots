@@ -831,7 +831,7 @@ fn draw_player_fx(p: &Player, alpha: f32) {
         }
         player::State::Emerge { time: et } => {
             let p01 = et / t::EMERGE_TIME;
-            let r = 6.0 + (t::EMERGE_RADIUS - 6.0) * p01;
+            let r = 6.0 + (p.talents.emerge_radius() - 6.0) * p01;
             draw_circle_lines(pos.x, pos.y, r, 1.5, Color::new(1.0, 1.0, 1.0, 1.0 - p01));
         }
         _ => {}

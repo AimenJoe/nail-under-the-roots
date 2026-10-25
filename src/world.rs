@@ -269,7 +269,7 @@ impl World {
                     self.fx.push(ring(
                         self.player.pos,
                         6.0,
-                        t::EMERGE_RADIUS + 4.0,
+                        self.player.talents.emerge_radius() + 4.0,
                         0.22,
                         DIRT,
                     ));
@@ -278,7 +278,7 @@ impl World {
                 }
                 player::Event::DrillRev => {
                     // 부아아…: 소리 하나가 시동부터 돌진 끝까지 간다.
-                    sfx.play(sfx::Id::Drill);
+                    sfx.play(sfx::Id::Drill(self.player.talents.pick[2] as usize));
                     self.fx
                         .push(ring(self.player.pos, 22.0, 3.0, t::DRILL_REV, RAGE));
                 }
@@ -291,7 +291,7 @@ impl World {
                     self.feel.add_trauma(0.35);
                 }
                 player::Event::DrillWall => {
-                    sfx.stop(sfx::Id::Drill);
+                    sfx.stop(sfx::Id::Drill(self.player.talents.pick[2] as usize));
                     sfx.play(sfx::Id::DrillWall);
                     let p = self.player.pos + self.player.facing * 6.0;
                     self.fx
@@ -672,7 +672,9 @@ impl World {
                         let from = (e.pos - ppos).normalize_or_zero();
                         if parry.is_some_and(|d| d.dot(from) > t::PARRY_FRONT) {
                             // 패링: 돌진을 받아쳐 크게 멈칫하게 한다. 피해 없음.
-                            e.hurt(0, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                            // 되받아치기(재주, 0047)면 피해도 준다.
+                            let counter = self.player.talents.parry_counter();
+                            e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
                             parried = true;
                             break;
                         }
@@ -800,7 +802,7 @@ impl World {
             return;
         }
         match c {
-            Consumable::Berry => p.heal(t::BERRY_HEAL),
+            Consumable::Berry => p.heal(p.talents.berry_heal()),
             Consumable::Worm => p.heal(p.stats.max_hp),
         }
         sfx.play(sfx::Id::Heal);

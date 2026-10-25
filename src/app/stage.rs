@@ -207,6 +207,10 @@ impl App {
                         self.profile.raise(crate::profile::key::DEEPEST, n);
                         self.save_profile();
                     }
+                    // 쉼터에 닿으면 들고 온 반딧불은 마을로 간다(쓰러져 잃는 건 그 뒤에 주운 것만, 0047).
+                    if self.bank_glowbugs() > 0 {
+                        self.world.toast = Some((|s| s.toast_camp_bank, 3.0));
+                    }
                     self.play(cutscene::camp_arrive(&self.world, n));
                 }
                 AdvEvent::RouteOpen => self.open_route(false),
@@ -248,6 +252,7 @@ impl App {
     /// 가장 깊은 곳(0042): 클리어를 남기고 엔딩을 튼다. 끝나면 타이틀로(런이 끝났다).
     pub(super) fn reach_deepest(&mut self) {
         use crate::profile::key;
+        self.bank_glowbugs();
         // 오늘의 굴은 이야기 엔딩 없이 기록만 남기고 타이틀로.
         if self.current == crate::scenario::Scenario::Daily {
             self.profile
@@ -363,6 +368,13 @@ impl App {
                 self.knot_level = self.knot_level.min(open);
                 self.world.freeze();
                 self.scene = Scene::KnotPick;
+            }
+            // 큰 나무: 반딧불로 재주를 깨운다(0047).
+            Interact::Tree => {
+                self.tree_cursor = (0, 0);
+                self.shop_msg = None;
+                self.world.freeze();
+                self.scene = Scene::Tree;
             }
             // 마을의 뿌리 길: 내려가면 런이 시작된다.
             Interact::Gate if village => self.start(crate::scenario::Scenario::Normal),
@@ -861,6 +873,7 @@ impl App {
             Interact::Talk(Who::Bori | Who::Momo) => s.ia_talk,
             Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,
+            Interact::Tree => s.ia_tree,
             Interact::Gate if village => s.ia_descend,
             Interact::Gate => s.ia_route,
         };
@@ -992,5 +1005,185 @@ impl App {
         let hint = super::vfill(s.decor_hint, &[Verb::Confirm, Verb::Back]);
         let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
         ui.text_center(&hint, 160.0, panel.bottom() + 4.0, FONT_PX, ui::TEXT_DIM);
+    }
+
+    /// 들고 있는 반딧불을 마을(큰 나무)로 보낸다: 쉼터에 닿을 때·런이 끝날 때(0047). 첫 시작만. 보낸 수.
+    pub(super) fn bank_glowbugs(&mut self) -> u32 {
+        let n = self.world.glowbugs;
+        if !self.recording() || n == 0 {
+            return 0;
+        }
+        self.profile.add(crate::talents::KEY_LIGHT, n);
+        self.world.glowbugs = 0;
+        crate::profile::save(&self.profile);
+        n
+    }
+
+    /// 기록 → 이번 런에 낄 재주(깨운 갈래만).
+    pub(super) fn talents(&self) -> crate::talents::Talents {
+        use crate::talents::{key_awake, key_pick, Talents, SLOTS};
+        let mut k = Talents::default();
+        for (i, slot) in SLOTS.iter().enumerate() {
+            let side = self.profile.count(&key_pick(*slot)).min(2) as u8;
+            if side > 0 && self.profile.flag(&key_awake(*slot, side as usize - 1)) {
+                k.pick[i] = side;
+            }
+        }
+        k
+    }
+
+    /// 큰 나무의 재주(0047): 위아래 = 자리, 좌우 = 갈래, 확인 = 깨우기(반딧불)·끼기·빼기. 닫기: 뒤로·✕·바깥.
+    pub(super) fn update_tree(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
+        use crate::talents::{key_awake, key_pick, KEY_LIGHT, SLOTS, TABLE};
+        if let Some((_, t)) = self.shop_msg.as_mut() {
+            *t -= dt;
+            if *t <= 0.0 {
+                self.shop_msg = None;
+            }
+        }
+        let (mut row, mut side) = self.tree_cursor;
+        let n = SLOTS.len();
+        if a.up {
+            row = (row + n - 1) % n;
+        }
+        if a.down {
+            row = (row + 1) % n;
+        }
+        if a.left || a.right {
+            side = 1 - side;
+        }
+        let mut act = a.confirm;
+        if let Some(Hit::TreeCell(r, c)) = tap_hit {
+            (row, side) = (r, c);
+            act = true;
+        }
+        if (row, side) != self.tree_cursor {
+            self.shop_msg = None;
+        }
+        self.tree_cursor = (row, side);
+        if act {
+            let slot = SLOTS[row];
+            let pick = key_pick(slot);
+            if !self.profile.flag(&key_awake(slot, side)) {
+                let cost = TABLE[row].1[side].cost;
+                let have = self.profile.count(KEY_LIGHT);
+                if have < cost {
+                    self.shop_msg = Some((|s| s.tree_poor, 3.0));
+                } else {
+                    self.profile.set_count(KEY_LIGHT, have - cost);
+                    self.profile.set(&key_awake(slot, side));
+                    self.profile.set_count(&pick, side as u32 + 1);
+                    self.shop_msg = Some((|s| s.tree_awake, 2.5));
+                    self.sfx.play(crate::sfx::Id::Heal);
+                }
+            } else if self.profile.count(&pick) == side as u32 + 1 {
+                self.profile.set_count(&pick, 0);
+                self.shop_msg = Some((|s| s.tree_unequip, 2.0));
+            } else {
+                self.profile.set_count(&pick, side as u32 + 1);
+                self.shop_msg = Some((|s| s.tree_equip, 2.0));
+                self.sfx.play(crate::sfx::Id::Emerge);
+            }
+            crate::profile::save(&self.profile);
+            self.world.player.talents = self.talents();
+        }
+        if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
+            self.shop_msg = None;
+            self.scene = Scene::Game;
+        }
+    }
+
+    pub(super) fn draw_tree(&mut self, ui: &Ui) {
+        use crate::talents::{key_awake, key_pick, KEY_LIGHT, SLOTS, TABLE};
+        let s = i18n::s();
+        let panel = Rect::new(20.0, 8.0, 280.0, 156.0);
+        ui.panel(panel, Some(s.tree_title));
+        self.close_button(ui, panel);
+        let have = self.profile.count(KEY_LIGHT);
+        ui.text_right(
+            &fill(s.tree_light, &[&have]),
+            panel.right() - 20.0,
+            panel.y + 3.0,
+            FONT_PX,
+            ui::TEXT,
+        );
+        let row_h = 21.0;
+        let y0 = panel.y + 20.0;
+        let x0 = panel.x + 70.0;
+        let cell_w = ((panel.right() - 6.0 - x0 - 4.0) / 2.0).floor();
+        for (r, slot) in SLOTS.iter().enumerate() {
+            let y = y0 + r as f32 * row_h;
+            let (slot_name, sides) = &TABLE[r];
+            let label = ui.fit(tr(*slot_name), x0 - panel.x - 10.0, FONT_PX);
+            ui.text(&label, panel.x + 6.0, y + 4.0, FONT_PX, ui::TEXT_DIM);
+            let pick = self.profile.count(&key_pick(*slot));
+            for (c, tal) in sides.iter().enumerate() {
+                let cell = Rect::new(x0 + c as f32 * (cell_w + 4.0), y, cell_w, row_h - 2.0);
+                self.hits.push((cell, Hit::TreeCell(r, c)));
+                let awake = self.profile.flag(&key_awake(*slot, c));
+                let on = pick == c as u32 + 1 && awake;
+                let focus = self.tree_cursor == (r, c);
+                ui.rect(cell, if focus { ui::PANEL_LIGHT } else { ui::PANEL });
+                ui.rect_lines(cell, if focus || on { ui::ACCENT } else { ui::BORDER });
+                let (mark, mc) = match (awake, on) {
+                    (_, true) => ("●", ui::ACCENT),
+                    (true, false) => ("○", ui::TEXT),
+                    _ => ("", ui::TEXT_DIM),
+                };
+                let cost = if awake {
+                    String::new()
+                } else {
+                    tal.cost.to_string()
+                };
+                let cw = if cost.is_empty() {
+                    0.0
+                } else {
+                    ui.text_w(&cost, FONT_PX) + 4.0
+                };
+                ui.text(mark, cell.x + 3.0, cell.y + 3.0, FONT_PX, mc);
+                let name = ui.fit(tr(tal.name), cell.w - 16.0 - cw, FONT_PX);
+                let tc = if awake { ui::TEXT } else { ui::TEXT_DIM };
+                ui.text(&name, cell.x + 13.0, cell.y + 3.0, FONT_PX, tc);
+                if !cost.is_empty() {
+                    let cc = if have >= tal.cost {
+                        ui::ACCENT
+                    } else {
+                        ui::TEXT_DIM
+                    };
+                    ui.text_right(&cost, cell.right() - 3.0, cell.y + 3.0, FONT_PX, cc);
+                }
+            }
+        }
+        // 고른 칸의 설명 + 상태(또는 방금 한 일).
+        let (r, c) = self.tree_cursor;
+        let tal = &TABLE[r].1[c];
+        let dy = y0 + SLOTS.len() as f32 * row_h + 3.0;
+        for (k, l) in ui::wrap(ui, tr(tal.desc), panel.w - 12.0, FONT_PX)
+            .iter()
+            .take(2)
+            .enumerate()
+        {
+            ui.text(l, panel.x + 6.0, dy + k as f32 * 12.0, FONT_PX, ui::TEXT);
+        }
+        let awake = self.profile.flag(&key_awake(SLOTS[r], c));
+        let state = match self.shop_msg {
+            Some((m, _)) => tr(m).to_string(),
+            None if !awake => fill(s.tree_cost, &[&tal.cost]),
+            None if self.profile.count(&key_pick(SLOTS[r])) == c as u32 + 1 => {
+                s.tree_on.to_string()
+            }
+            None => s.tree_off.to_string(),
+        };
+        let state = ui.fit(&state, panel.w - 12.0, FONT_PX);
+        ui.text(&state, panel.x + 6.0, dy + 26.0, FONT_PX, ui::ACCENT);
+        let hint = super::vfill(s.tree_hint, &[Verb::Confirm, Verb::Back]);
+        let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
+        // 뒤의 마을 그림 위에서도 읽히게 띠를 깐다.
+        let hw = ui.text_w(&hint, FONT_PX) + 8.0;
+        ui.rect(
+            Rect::new(160.0 - hw / 2.0, panel.bottom() + 2.0, hw, FONT_PX + 2.0),
+            ui::PANEL,
+        );
+        ui.text_center(&hint, 160.0, panel.bottom() + 3.0, FONT_PX, ui::TEXT_DIM);
     }
 }

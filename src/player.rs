@@ -85,6 +85,8 @@ pub struct Player {
     pub item_cd: f32,
     /// 먹기 대기 배율(실뜨기 5, docs/decisions/0043).
     pub eat_cd_mul: f32,
+    /// 큰 나무의 재주(docs/decisions/0047). 앱이 기록에서 정한다.
+    pub talents: crate::talents::Talents,
     /// 받는 피해를 줄이는 비율(0..1). 도움 모드 "포포의 응원"(docs/decisions/0041). 앱이 기록에서 정한다.
     pub resist: f32,
     /// 줄인 피해의 소수 부분을 모아 둔다(체력은 정수라 1이 차면 그때 깎는다).
@@ -126,6 +128,7 @@ impl Player {
             burrow_cd: 0.0,
             item_cd: 0.0,
             eat_cd_mul: 1.0,
+            talents: crate::talents::Talents::default(),
             resist: 0.0,
             dmg_acc: 0.0,
             events: Vec::new(),
@@ -176,7 +179,7 @@ impl Player {
 
     /// 패링 성공: SP를 크게 채운다. 다음 창은 바로 열 수 있다.
     pub fn on_parry(&mut self) {
-        self.sp = (self.sp + t::PARRY_SP).min(t::SP_MAX);
+        self.sp = (self.sp + self.talents.parry_sp()).min(t::SP_MAX);
         self.parry_cd = 0.0;
         self.events.push(Event::Parry);
     }
@@ -191,7 +194,7 @@ impl Player {
         if finisher {
             g += t::SP_FINISHER_BONUS;
         }
-        self.sp = (self.sp + g * self.stats.sp_gain).min(t::SP_MAX);
+        self.sp = (self.sp + g * self.stats.sp_gain * self.talents.sp_gain_mul()).min(t::SP_MAX);
     }
 
     /// 장비가 바뀌었다. 최대 체력이 줄면 체력도 따라 줄인다.
@@ -244,7 +247,10 @@ impl Player {
     /// 먹는 중이면 얼마나 먹었나(0..1).
     pub fn eat_progress(&self) -> Option<(Consumable, f32)> {
         match self.state {
-            State::Eat { item, time } => Some((item, (time / item.eat_time()).min(1.0))),
+            State::Eat { item, time } => Some((
+                item,
+                (time / (item.eat_time() * self.talents.eat_time_mul())).min(1.0),
+            )),
             _ => None,
         }
     }
@@ -329,7 +335,7 @@ impl Player {
                 self.pos += move_dir * t::PLAYER_SPEED * t::BURROW_SPEED_FACTOR * dt;
                 self.state = State::Burrow { time };
                 let early = (self.dodge_buf > 0.0 && time > 0.05) || self.attack_buf > 0.0;
-                if time >= t::BURROW_MAX_TIME || early {
+                if time >= self.talents.burrow_time() || early {
                     strike = Some(self.start_emerge());
                 }
             }
@@ -389,7 +395,7 @@ impl Player {
                         poison: 0.0,
                     });
                 }
-                self.state = if time >= t::DRILL_REV + t::DRILL_TIME {
+                self.state = if time >= t::DRILL_REV + t::DRILL_TIME * self.talents.drill_mul() {
                     State::Recover {
                         time: t::DRILL_RECOVER,
                     }
@@ -415,7 +421,7 @@ impl Player {
                 if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
                     // 굴파기로 끊는다: 먹지 않은 것으로. 대기는 이미 흐르고 있다.
                     self.start_burrow();
-                } else if time >= item.eat_time() {
+                } else if time >= item.eat_time() * self.talents.eat_time_mul() {
                     self.events.push(Event::Ate(item));
                     self.state = State::Free;
                 } else {
@@ -524,7 +530,7 @@ impl Player {
     fn start_emerge(&mut self) -> Strike {
         self.dodge_buf = 0.0;
         self.attack_buf = 0.0;
-        self.burrow_cd = t::BURROW_COOLDOWN * self.stats.burrow_cd;
+        self.burrow_cd = t::BURROW_COOLDOWN * self.stats.burrow_cd * self.talents.burrow_cd_mul();
         self.no_attack = t::EMERGE_NO_ATTACK;
         self.swing_id += 1;
         self.state = State::Emerge { time: 0.0 };
@@ -534,7 +540,7 @@ impl Player {
             kind: StrikeKind::Emerge,
             shape: Shape::Circle {
                 center: self.pos,
-                r: t::EMERGE_RADIUS,
+                r: self.talents.emerge_radius(),
             },
             damage: t::EMERGE_DAMAGE,
             knockback: t::EMERGE_KNOCKBACK,

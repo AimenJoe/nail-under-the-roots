@@ -134,6 +134,8 @@ enum Scene {
     KnotPick,
     /// 마을 꾸미기 가게(마을의 포포, docs/decisions/0045).
     Decor,
+    /// 큰 나무의 재주: 반딧불로 깨우고 고른다(마을, docs/decisions/0047).
+    Tree,
 }
 
 /// 컷씬이 끝난 뒤 갈 곳.
@@ -347,6 +349,8 @@ enum Hit {
     KnotLeft,
     KnotRight,
     KnotGo,
+    /// 큰 나무의 재주 칸(자리, 갈래).
+    TreeCell(usize, usize),
 }
 
 pub struct App {
@@ -409,6 +413,8 @@ pub struct App {
     after_cutscene: AfterCut,
     /// 마을 꾸미기 가게의 커서.
     decor_cursor: usize,
+    /// 재주 창 커서(자리, 갈래).
+    tree_cursor: (usize, usize),
     /// 이번 런의 실뜨기 단계(고르는 화면의 커서이기도 하다).
     knot_level: u8,
     /// 타이틀 아래 잠깐 띄우는 글(오늘의 굴 완주 등)과 남은 시간.
@@ -482,6 +488,7 @@ impl App {
             album_view: None,
             after_cutscene: AfterCut::Game,
             decor_cursor: 0,
+            tree_cursor: (0, 0),
             knot_level: 0,
             title_note: None,
         }
@@ -761,6 +768,10 @@ impl App {
         });
         self.world.knots = knots;
         self.world.player.eat_cd_mul = knots.eat_cd_mul();
+        // 큰 나무의 재주(0047): 튜토리얼만 빼고 모든 시작에(개발 시나리오도 고른 재주로 시험한다).
+        if s != Scenario::Tutorial {
+            self.world.player.talents = self.talents();
+        }
         // 모모(0046): 이긴 수는 기록에서(빈 자리의 꽃잎). 첫 길 끝에서 싸우는 건 첫 시작에서만, 돌아오기 전까지.
         // 개발 시나리오 "모모"는 시나리오가 정한 값을 그대로 쓴다.
         if matches!(s, Scenario::Normal | Scenario::Village) {
@@ -999,6 +1010,7 @@ impl App {
             Scene::Album => self.update_album(a, tap_hit, dt),
             Scene::KnotPick => self.update_knot_pick(a, tap_hit),
             Scene::Decor => self.update_decor(a, tap_hit, dt),
+            Scene::Tree => self.update_tree(a, tap_hit, dt),
             Scene::Game | Scene::Cutscene => {}
         }
     }
@@ -1141,12 +1153,17 @@ impl App {
                 };
                 match chosen {
                     Some(0) => self.scene = Scene::Game,
-                    Some(1) => self.start_game(),
+                    Some(1) => {
+                        // 다시 하기·타이틀로: 런이 끝난다. 들고 있던 반딧불은 마을로(0047).
+                        self.bank_glowbugs();
+                        self.start_game();
+                    }
                     Some(2) => {
                         self.settings_cursor = 0;
                         self.scene = Scene::Settings { back: Back::Pause };
                     }
                     Some(3) => {
+                        self.bank_glowbugs();
                         self.title_cursor = 0;
                         self.scene = Scene::Title;
                     }
@@ -1241,6 +1258,7 @@ impl App {
                 | Scene::Shop
                 | Scene::KnotPick
                 | Scene::Decor
+                | Scene::Tree
                 | Scene::Settings { back: Back::Pause }
                 | Scene::Controls { back: Back::Pause }
         );
@@ -1292,6 +1310,10 @@ impl App {
                 ui.dim();
                 self.draw_decor(&ui);
             }
+            Scene::Tree => {
+                ui.dim();
+                self.draw_tree(&ui);
+            }
             Scene::Dev => self.draw_dev(&ui),
             Scene::Cutscene => {
                 self.draw_letterbox(&ui);
@@ -1328,11 +1350,14 @@ impl App {
                     self.draw_hint(&ui, &h);
                 }
                 self.draw_interact_bubble(&ui);
-                // 마을: 마을 씨앗(오른쪽 위 막대 아래).
+                // 마을: 마을 씨앗·맡긴 반딧불(오른쪽 위 막대 아래).
                 if self.world.adv.place == crate::adventure::Place::Village {
                     let n = self.profile.count(crate::village::KEY_SEEDS);
                     let t = fill(i18n::s().village_seeds, &[&n]);
                     ui.text_right(&t, 316.0, 14.0, FONT_PX, ui::TEXT);
+                    let l = self.profile.count(crate::talents::KEY_LIGHT);
+                    let t = fill(i18n::s().tree_light, &[&l]);
+                    ui.text_right(&t, 316.0, 27.0, FONT_PX, ui::TEXT);
                 }
                 if !self.world.player.is_alive() {
                     self.draw_dead(&ui);

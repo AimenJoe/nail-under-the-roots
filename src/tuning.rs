@@ -274,6 +274,27 @@ pub const CHIEF_SUMMONS: u32 = 2;
 /// 공격이 아닐 때 맞으면 멈칫하는 시간 배율(보통 적의 경직 × 이것).
 pub const CHIEF_STUN_MUL: f32 = 0.35;
 
+// ---- 큰 나무의 재주(src/talents.rs, docs/decisions/0047) -------------------------------
+/// 굴파기 A 깊은 굴: 땅속 시간·솟구침 반지름·대기 배율. B 얕은 굴.
+pub const TAL_DEEP_TIME: f32 = 0.6;
+pub const TAL_DEEP_RADIUS: f32 = 22.0;
+pub const TAL_DEEP_CD: f32 = 1.4;
+pub const TAL_SHALLOW_TIME: f32 = 0.2;
+pub const TAL_SHALLOW_RADIUS: f32 = 12.0;
+pub const TAL_SHALLOW_CD: f32 = 0.55;
+/// 패링 A 되받아치기: 튕겨낸 돌격에 주는 피해(게이지는 0). B 빛 모으기: 패링 한 번에 차는 게이지.
+pub const TAL_PARRY_COUNTER: i32 = 2;
+pub const TAL_PARRY_SP: f32 = 8.0;
+/// 드릴 A 긴 드릴: 돌진 시간 배율·게이지 배율. B 짧은 드릴.
+pub const TAL_LONG_DRILL: f32 = 1.5;
+pub const TAL_LONG_DRILL_SP: f32 = 0.75;
+pub const TAL_SHORT_DRILL: f32 = 0.55;
+pub const TAL_SHORT_DRILL_SP: f32 = 1.6;
+/// 먹기 A 꼭꼭 씹기: 먹는 시간 배율·산딸기 회복. B 한입에: 먹는 시간 배율.
+pub const TAL_CHEW_TIME: f32 = 2.0;
+pub const TAL_CHEW_HEAL: i32 = 2;
+pub const TAL_GULP_TIME: f32 = 0.4;
+
 // ---- 모모(첫 길의 보스, 세 번, docs/decisions/0046) -----------------------------------
 /// 뒷발 차기(짧은 돌진) 시간. 높이 뛰기 체공은 종 표의 dash_time.
 pub const MOMO_KICK_TIME: f32 = 0.2;

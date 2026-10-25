@@ -143,6 +143,19 @@ pub const LINES: &[Line] = &[
         ],
         once: true,
     },
+    // 반딧불을 처음 마을로 보낸 뒤: 큰 나무 재주를 알려 준다(0047).
+    Line {
+        id: "tree_intro",
+        when: When::Village,
+        who: Speaker::Popo,
+        text: |s| s.tree_intro,
+        needs: &[
+            Flag(key::TUTORIAL),
+            CountAtLeast(crate::talents::KEY_LIGHT, 1),
+            Seen("village_intro"),
+        ],
+        once: true,
+    },
     // 반쪽 엔딩 뒤 첫 런: 할매 이야기(한 번).
     Line {
         id: "after_half",

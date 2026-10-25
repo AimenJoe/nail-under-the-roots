@@ -26,7 +26,8 @@ pub enum Id {
     /// 회복(먹기·되살아남).
     Heal,
     /// 필살기 드릴: 시동부터 돌진 끝까지 하나("부아아앙"). 벽에 부딪히면 끊는다.
-    Drill,
+    /// 번호 = 드릴 재주 갈래(0 보통, 1 긴 드릴, 2 짧은 드릴, docs/decisions/0047) — 돌진 길이마다 소리를 따로 만든다.
+    Drill(usize),
     /// 드릴이 벽에 쿵.
     DrillWall,
     /// 패링(맑은 금속음).
@@ -46,7 +47,7 @@ pub struct Sfx {
     wall_hit: Sound,
     glowbug: [Sound; 4],
     heal: Sound,
-    drill: Sound,
+    drill: [Sound; 3],
     drill_wall: Sound,
     parry: Sound,
     /// 반딧불 음 높이 차례.
@@ -138,7 +139,19 @@ impl Sfx {
                 Layer::tone(0.3, 1046.0, 1318.0, Wave::Sine, 0.15, 1.5),
             ])
             .await,
-            drill: load_samples(&engine(tuning::DRILL_REV, tuning::DRILL_TIME)).await,
+            drill: [
+                load_samples(&engine(tuning::DRILL_REV, tuning::DRILL_TIME)).await,
+                load_samples(&engine(
+                    tuning::DRILL_REV,
+                    tuning::DRILL_TIME * tuning::TAL_LONG_DRILL,
+                ))
+                .await,
+                load_samples(&engine(
+                    tuning::DRILL_REV,
+                    tuning::DRILL_TIME * tuning::TAL_SHORT_DRILL,
+                ))
+                .await,
+            ],
             drill_wall: make(&[
                 Layer::noise(0.3, 0.9, 1.5),
                 Layer::tone(0.35, 120.0, 35.0, Wave::Sine, 1.0, 1.2),
@@ -197,7 +210,7 @@ impl Sfx {
                 &self.glowbug[i]
             }
             Id::Heal => &self.heal,
-            Id::Drill => &self.drill,
+            Id::Drill(i) => &self.drill[i.min(2)],
             Id::DrillWall => &self.drill_wall,
             Id::Parry => &self.parry,
         }
