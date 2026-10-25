@@ -13,6 +13,20 @@
 </head>
 <body>
   <canvas id="glcanvas" tabindex="1"></canvas>
+  <!-- WebGL 컨텍스트 옵션: 번들은 옵션 없이 getContext("webgl"/"webgl2")를 불러 브라우저 기본값(안티에일리어싱 켬,
+       투명 배경)이 된다. 고배율 화면(아이폰 dpr 3 → 캔버스 약 2532×1170)에서 매 프레임 4배 샘플을 칠하고 합치는 비용이 크고,
+       도트 그림에는 쓸모가 없다. 번들 복사본은 고치지 않고 여기서 옵션만 끼운다(docs/decisions/0026). -->
+  <script>
+    (function () {
+      var orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+        if (this.id === "glcanvas" && (type === "webgl" || type === "webgl2")) {
+          attrs = Object.assign({ antialias: false, alpha: false, powerPreference: "high-performance" }, attrs || {});
+        }
+        return orig.call(this, type, attrs);
+      };
+    })();
+  </script>
   <!-- 레포 복사본. macroquad 버전을 올리면 같은 태그의 js/mq_js_bundle.js 로 함께 갱신 (web/README.md) -->
   <script src="mq_js_bundle.js"></script>
   <!-- gamepads 크레이트의 macroquad 플러그인. 레포 복사본(web/README.md). 핫링크 금지. -->

@@ -1572,6 +1572,10 @@ fn draw_critter_at(tex: &Texture2D, row: u32, pos: Vec2, face_left: bool, moving
     );
 }
 
+/// 공격 예고의 불투명도(시작, 공격 직전). 채움은 바닥이 비치게 옅게, 테두리가 주로 읽힌다.
+const TELEGRAPH_FILL: (f32, f32) = (0.03, 0.16);
+const TELEGRAPH_EDGE: (f32, f32) = (0.15, 0.5);
+
 /// 공격 예고(바닥, 적·플레이어보다 먼저 그린다): 맞을 자리를 붉게, 공격 순간이 가까울수록 진하게.
 /// - 돌격형(떨기): 돌진할 길(몸 폭 × 돌진 거리, 벽에서 끊김)을 띠로. 방향은 지금 보는 쪽(떨기 끝에 굳는다).
 /// - 던지기(조준): 도토리가 날아갈 줄.
@@ -1592,13 +1596,21 @@ fn draw_telegraphs(w: &World, alpha: f32) {
             enemy::State::Leap { .. } => (1.0, 2),
             _ => continue,
         };
-        let blink = k > 0.85 && ((w.time * 20.0) as i32) % 2 == 0;
+        // 투명하게: 바닥이 비쳐 보여야 화면이 붉게 덮이지 않는다(사람 피드백 "너무 샛빨갛다", 2026-10-25).
+        // 채움은 아주 옅게(최대 16%), 테두리가 주로 읽힌다. 깜빡임도 흰 번쩍이 아니라 조금 더 진한 붉은빛.
+        let blink = k > 0.85 && ((w.time * 16.0) as i32) % 2 == 0;
+        let edge_a = TELEGRAPH_EDGE.0 + (TELEGRAPH_EDGE.1 - TELEGRAPH_EDGE.0) * k;
         let edge = if blink {
-            Color::new(1.0, 0.85, 0.85, 0.9)
+            Color::new(1.0, 0.62, 0.6, TELEGRAPH_EDGE.1 + 0.12)
         } else {
-            Color::new(1.0, 0.25, 0.3, 0.25 + 0.6 * k)
+            Color::new(0.95, 0.38, 0.38, edge_a)
         };
-        let fill = Color::new(1.0, 0.2, 0.25, 0.06 + 0.26 * k);
+        let fill = Color::new(
+            0.95,
+            0.35,
+            0.35,
+            TELEGRAPH_FILL.0 + (TELEGRAPH_FILL.1 - TELEGRAPH_FILL.0) * k,
+        );
         match kind {
             0 => {
                 let dir = e.facing.normalize_or(vec2(1.0, 0.0));
@@ -1627,7 +1639,7 @@ fn draw_telegraphs(w: &World, alpha: f32) {
                     let p1 = start + dir * (d + 3.0).min(len);
                     // 줄은 1px라 띠보다 잘 안 보인다: 처음부터 조금 진하게.
                     let fade = 1.0 - d / 150.0 * 0.5;
-                    let c = Color::new(edge.r, edge.g, edge.b, edge.a.max(0.5) * fade);
+                    let c = Color::new(edge.r, edge.g, edge.b, edge.a.max(0.3) * fade);
                     draw_line(p0.x, p0.y, p1.x, p1.y, 1.0, c);
                     d += 5.0;
                 }
