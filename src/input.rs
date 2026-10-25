@@ -173,6 +173,16 @@ impl Input {
         self.touch.seen = true;
         let layout = touch_layout();
         let half = screen_width() * 0.5;
+        // macroquad 0.4.16: screen_width()·mouse_position()은 DPI로 나눈 논리 픽셀인데 touches()만 물리 픽셀이다.
+        // 고해상도 폰(DPR 2~3)에서 버튼 판정이 빗나가는 원인. 같은 단위로 맞춘다.
+        let dpi = screen_dpi_scale().max(0.01);
+        let touches: Vec<Touch> = touches
+            .into_iter()
+            .map(|mut t| {
+                t.position /= dpi;
+                t
+            })
+            .collect();
         for t in &touches {
             let ended = matches!(t.phase, TouchPhase::Ended | TouchPhase::Cancelled);
             let is_new = !self.touch.known.contains(&t.id);
