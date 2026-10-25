@@ -271,7 +271,7 @@ impl App {
         if go && self.world.choose_node(choices[self.route_cursor]) {
             self.sfx.play(crate::sfx::Id::Burrow);
             self.scene = Scene::Game;
-        } else if (a.cancel || a.menu) && self.route_cancel {
+        } else if (a.cancel || a.menu || tap_hit == Some(Hit::Close)) && self.route_cancel {
             self.scene = Scene::Game;
         }
     }
@@ -283,6 +283,7 @@ impl App {
         let s = i18n::s();
         let panel = Rect::new(8.0, 4.0, 304.0, 160.0);
         ui.panel(panel, Some(&fill(s.route_title, &[&r.stage])));
+        let can_close = self.route_cancel;
         let area = Rect::new(panel.x + 6.0, panel.y + 22.0, panel.w - 12.0, 88.0);
         let choices = r.choices();
         let sel = choices.get(self.route_cursor.min(choices.len().saturating_sub(1)));
@@ -381,6 +382,9 @@ impl App {
                 );
             }
         }
+        if can_close {
+            self.close_button(ui, panel);
+        }
         let hint = if self.route_cancel {
             fill(s.route_hint_back, &[&input::prompt(Act::Attack)])
         } else {
@@ -419,7 +423,7 @@ impl App {
                 self.shop_msg = None;
             }
         }
-        if a.cancel || a.menu {
+        if a.cancel || a.menu || tap_hit == Some(Hit::Close) {
             self.scene = Scene::Game;
             return;
         }
@@ -489,11 +493,12 @@ impl App {
         let s = i18n::s();
         let panel = Rect::new(44.0, 14.0, 232.0, 150.0);
         ui.panel(panel, Some(s.shop_title));
-        // 가진 씨앗(오른쪽 위)
+        self.close_button(ui, panel);
+        // 가진 씨앗(오른쪽 위, 닫기 단추 왼쪽)
         let seeds = fill(s.shop_seeds, &[&self.world.seeds]);
         ui.text_right(
             &seeds,
-            panel.right() - 6.0,
+            panel.right() - 20.0,
             panel.y + 3.0,
             FONT_PX,
             ui::TEXT,
@@ -563,6 +568,30 @@ impl App {
             FONT_PX,
             ui::TEXT_DIM,
         );
+    }
+
+    /// 닫기 단추(패널 오른쪽 위 ✕)와 패널 바깥 탭 = 닫기. 터치에는 뒤로 버튼이 없어서(사람 피드백 2026-10-25).
+    /// 그림은 작게(10px), 누르는 칸은 크게(24px = 가로 폰에서 48pt 이상). 패널 안 빈 곳 탭은 닫지 않는다(실수 방지).
+    /// 탭 판정은 먼저 넣은 것이 이기므로, 항목 칸을 넣은 뒤에 부른다.
+    fn close_button(&mut self, ui: &Ui, panel: Rect) {
+        let c = vec2(panel.right() - 9.0, panel.y + 9.0);
+        let x = Color::new(0.85, 0.78, 0.70, 1.0);
+        ui.rect(Rect::new(c.x - 6.0, c.y - 6.0, 12.0, 12.0), ui::PANEL_LIGHT);
+        ui.rect_lines(Rect::new(c.x - 6.0, c.y - 6.0, 12.0, 12.0), ui::BORDER);
+        ui.line(c + vec2(-3.0, -3.0), c + vec2(3.0, 3.0), x);
+        ui.line(c + vec2(-3.0, 3.0), c + vec2(3.0, -3.0), x);
+        self.hits
+            .push((Rect::new(c.x - 12.0, c.y - 12.0, 24.0, 24.0), Hit::Close));
+        // 패널 바깥 네 쪽(화면 밖까지 넉넉히).
+        let big = 2000.0;
+        for r in [
+            Rect::new(-big, -big, big * 3.0, big + panel.y),
+            Rect::new(-big, panel.bottom(), big * 3.0, big),
+            Rect::new(-big, panel.y, big + panel.x, panel.h),
+            Rect::new(panel.right(), panel.y, big, panel.h),
+        ] {
+            self.hits.push((r, Hit::Close));
+        }
     }
 
     /// 쉼터: 말 걸 수 있는 것 위에 "버튼 + 할 일" 말풍선.

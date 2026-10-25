@@ -270,7 +270,7 @@ fn draw_charm_icon(ui: &Ui, r: Rect, color: Color) {
 }
 
 /// 직전 프레임에 그린, 탭/클릭에 반응하는 요소.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Hit {
     TitleItem(usize),
     PauseTab(usize),
@@ -287,6 +287,8 @@ enum Hit {
     /// 길 지도: 고를 수 있는 칸(choices 번호).
     RouteNode(usize),
     ShopItem(usize),
+    /// 닫기 단추·패널 바깥(가게·길 지도).
+    Close,
 }
 
 pub struct App {
