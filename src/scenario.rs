@@ -39,6 +39,10 @@ pub enum Scenario {
     Gear,
     /// 적 다섯 종을 한 마리씩(생쥐는 떼). 도감·그림 확인(docs/decisions/0021).
     AllSpecies,
+    /// 튜토리얼 보스: 필드 공터 앞에서, 문은 열려 있다(docs/decisions/0032).
+    Boss,
+    /// 첫 쉼터에서 씨앗 40개로(가게·길 지도, docs/decisions/0030, 0031).
+    Camp,
 }
 
 pub struct Entry {
@@ -47,7 +51,17 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 18] = [
+pub const LIST: [Entry; 20] = [
+    Entry {
+        name: "튜토리얼 보스",
+        desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
+        scenario: Scenario::Boss,
+    },
+    Entry {
+        name: "쉼터",
+        desc: "첫 쉼터, 씨앗 40. 포포 가게·보리·빈 자리, 아래 뿌리 길에서 길 지도.",
+        scenario: Scenario::Camp,
+    },
     Entry {
         name: "필드(모험)",
         desc: "컷씬·튜토리얼 없이 필드에서. 남쪽 굴 입구로 던전, 저장 지점(초록 버섯 고리).",
@@ -143,7 +157,29 @@ pub const LIST: [Entry; 18] = [
 /// 시나리오에 맞는 월드를 만든다.
 pub fn build(s: Scenario) -> World {
     match s {
-        Scenario::Normal | Scenario::Field => World::field(),
+        Scenario::Normal => World::field(),
+        Scenario::Field => {
+            let mut w = World::field();
+            w.open_glade();
+            w
+        }
+        Scenario::Boss => {
+            let mut w = World::field();
+            w.open_glade();
+            if let Some(g) = w.adv.glade {
+                w.player.pos = vec2(g.center().x, g.y - 40.0);
+                w.player.prev_pos = w.player.pos;
+            }
+            w.snap_cam();
+            w
+        }
+        Scenario::Camp => {
+            let mut w = World::camp_start(1);
+            w.seeds = 40;
+            // 첫 쉼터 안내 컷씬은 건너뛴다(바로 확인).
+            w.adv.events.clear();
+            w
+        }
         Scenario::Dungeon => {
             let mut w = World::field();
             w.enter_dungeon_now();
@@ -166,7 +202,10 @@ pub fn build(s: Scenario) -> World {
         }
         Scenario::AllSpecies => {
             let mut w = World::empty();
-            for (i, k) in crate::species::BESTIARY.iter().enumerate() {
+            let mobs = crate::species::BESTIARY
+                .iter()
+                .filter(|k| **k != Kind::Chief);
+            for (i, k) in mobs.enumerate() {
                 let p = spawn_point(&w, i);
                 w.spawn_mob(*k, p);
             }

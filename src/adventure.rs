@@ -6,19 +6,27 @@
 //! - 쓰러지고 목숨(지렁이)도 없으면: 앱이 확인을 받으면 마지막 저장 지점(필드)에서 체력 가득으로. 반딧불 30%를 잃는다.
 //!   던전은 버린다(다음에 새로). 장신구·씨앗·무기·가방은 남는다.
 //! - 아레나: 화면 하나짜리 시험장(웨이브·개발 시나리오). 카메라는 움직이지 않는다.
+//!
+//! 스테이지 고리(docs/decisions/0030~0032):
+//!   필드(튜토리얼) → 남쪽 공터의 들쥐 대장 → 굴 입구 → 쉼터 1 → 길 지도에서 고른 굴 … → 그 길의 보스 → 쉼터 2 → …
+//! - 공터: 튜토리얼이 끝나야 문이 열린다. 안으로 들어서면 문이 닫히고 대장이 깨어난다. 이기면 문이 열리고 입구가 산다.
+//! - 쉼터: 들어오면 체력 가득, 저장 고리가 다시 설 곳(home)이 된다. 뿌리 길 곁에서 확인 → 길 지도(앱 화면).
+//! - 길의 굴: 끝방을 마치면 출구(U). 출구를 밟으면 다음 갈래를 고르고(보스 굴이면 다음 쉼터로) 곧장 내려간다.
+//!   쉼터는 맡겨 두고 굴만 바꾼다. 쓰러지면 쉼터로, 길은 새로 짠다(로그라이트).
 
 use macroquad::prelude::*;
 
 use crate::biome::Biome;
-use crate::dungeon::{self, Dungeon, RoomKind};
-use crate::enemy::Enemy;
+use crate::dungeon::{self, Dungeon, Goal, Params, RoomKind};
+use crate::enemy::{Enemy, Kind};
 use crate::field;
 use crate::loot::{Loot, LootKind};
 use crate::map::Cell;
 use crate::room::{PropKind, Room};
+use crate::route::{NodeKind, Route};
 use crate::sfx::{self, Sfx};
 use crate::tuning as t;
-use crate::world::{Gift, World};
+use crate::world::{Gift, Npc, Who, World};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Place {
@@ -26,13 +34,50 @@ pub enum Place {
     Arena,
     Field,
     Dungeon,
+    /// 쉼터(camp.rs).
+    Camp,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Transition {
-    EnterDungeon,
     ExitDungeon,
     Respawn,
+    /// 다음 쉼터로(필드의 굴 입구, 길의 보스를 이긴 뒤).
+    EnterCamp,
+    /// 길 지도에서 고른 굴로.
+    EnterNode,
+}
+
+/// 필드 공터의 보스(들쥐 대장).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum BossFight {
+    /// 공터 문이 닫혀 있다(튜토리얼 중).
+    #[default]
+    Locked,
+    /// 문이 열렸고 대장이 잔다.
+    Waiting,
+    Fight,
+    Done,
+}
+
+/// 앱에 알릴 일(컷씬·화면). 앱이 비운다.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum AdvEvent {
+    BossIntro,
+    BossBeaten,
+    /// 길 지도를 연다(쉼터의 뿌리 길, 굴의 출구).
+    RouteOpen,
+    /// 쉼터에 처음 닿음(번호).
+    CampArrive(u32),
+}
+
+/// 확인 버튼으로 하는 일(쉼터).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Interact {
+    Talk(Who),
+    /// 빈 자리(모모가 돌아올 곳).
+    Seat,
+    Gate,
 }
 
 /// 어두워졌다(반) → 장소를 바꾸고 → 밝아진다(반). 그동안 로직은 멈춘다.
@@ -43,11 +88,14 @@ pub struct Fade {
     swapped: bool,
 }
 
-/// 던전에 있는 동안 맡겨 둔 필드.
+/// 던전에 있는 동안 맡겨 둔 필드·쉼터.
 struct Stash {
     room: Room,
     enemies: Vec<Enemy>,
     loot: Vec<Loot>,
+    neighbors: Vec<Npc>,
+    place: Place,
+    biome: Biome,
 }
 
 #[derive(Default)]
@@ -68,6 +116,24 @@ pub struct Adventure {
     pub prev_cam: Vec2,
     boss_cleared: bool,
     seed: u64,
+    /// 몇 번째 쉼터까지 왔나(0 = 아직 필드).
+    pub stage: u32,
+    /// 쓰러지면 돌아갈 곳(필드 또는 쉼터). save_pos는 이 장소의 좌표.
+    pub home: Place,
+    /// 지금 쉼터에서 다음 쉼터까지의 길.
+    pub route: Option<Route>,
+    /// 지금 들어와 있는 길의 칸(없으면 필드에서 들어온 예전 던전).
+    pub node: Option<(usize, usize)>,
+    pub boss: BossFight,
+    /// 공터(던전 방과 같은 20×12칸 사각형)와 대장이 자던 곳·마지막으로 있던 곳.
+    pub glade: Option<Rect>,
+    boss_home: Vec2,
+    pub boss_last: Vec2,
+    pub events: Vec<AdvEvent>,
+    /// 직전 틱에 서 있던 칸(출구를 밟는 순간에만 길 지도를 연다).
+    last_cell: Option<Cell>,
+    /// 이 쉼터에서 뿌리 심장을 샀나(쉼터마다 하나).
+    pub heart_sold: bool,
 }
 
 impl World {
@@ -87,12 +153,119 @@ impl World {
             }
         }
         w.adv.place = Place::Field;
+        w.adv.home = Place::Field;
         w.adv.save_pos = p.start;
         w.adv.entrance_pos = entrance.unwrap_or(p.start);
         w.adv.seed = (macroquad::miniquad::date::now() * 1000.0) as u64;
+        // 공터: 문 칸(두 칸 폭)의 왼쪽 위에서 9칸 왼쪽이 방의 왼쪽 벽(던전 방과 같은 모양).
+        let doors = w
+            .room
+            .grid
+            .as_ref()
+            .map(|g| g.find(Cell::Door))
+            .unwrap_or_default();
+        if let Some(d) = doors.iter().copied().reduce(|a, b| a.min(b)) {
+            let tl = d - vec2(8.0, 8.0);
+            w.adv.glade = Some(Rect::new(
+                tl.x - 9.0 * 16.0,
+                tl.y,
+                dungeon::ROOM_W as f32 * 16.0,
+                dungeon::ROOM_H as f32 * 16.0,
+            ));
+        }
+        if let Some(c) = w.enemies.iter().find(|e| e.kind == Kind::Chief) {
+            w.adv.boss_home = c.pos;
+            w.adv.boss_last = c.pos;
+        }
+        w.adv.boss = BossFight::Locked;
+        w.room.set_doors_locked(true);
         w.biome = Biome::Meadow;
         w.snap_cam();
         w
+    }
+
+    /// 튜토리얼이 끝났다(또는 튜토리얼 없이 시작): 공터 문을 연다.
+    pub fn open_glade(&mut self) {
+        if self.adv.boss == BossFight::Locked {
+            self.adv.boss = BossFight::Waiting;
+            if self.adv.place == Place::Field {
+                self.room.set_doors_locked(false);
+            }
+        }
+    }
+
+    /// 쉼터에서 시작하는 모험 월드(개발 시나리오).
+    pub fn camp_start(stage: u32) -> World {
+        let mut w = World::field();
+        w.adv.boss = BossFight::Done;
+        w.adv.stage = stage.saturating_sub(1);
+        w.enter_camp();
+        w
+    }
+
+    /// 앱이 부른다: 길 지도에서 칸을 골랐다. 고를 수 있는 칸이면 어두워졌다가 그 굴로.
+    pub fn choose_node(&mut self, at: (usize, usize)) -> bool {
+        let ok = self.adv.route.as_mut().is_some_and(|r| r.pick(at));
+        if ok {
+            self.start_fade(Transition::EnterNode);
+        }
+        ok
+    }
+
+    /// 확인 버튼이 지금 할 일(쉼터에서 이웃·빈 자리·뿌리 길 곁).
+    pub fn interactable(&self) -> Option<Interact> {
+        if self.adv.place != Place::Camp || !self.player.is_alive() || self.adv.fade.is_some() {
+            return None;
+        }
+        let p = self.player.pos;
+        let near = |q: Vec2| (q - p).length() < t::INTERACT_RADIUS;
+        if let Some(n) = self.neighbors.iter().find(|n| near(n.pos)) {
+            return Some(Interact::Talk(n.who));
+        }
+        if self
+            .room
+            .props
+            .iter()
+            .any(|pr| pr.kind == PropKind::Seat && near(pr.rect.center()))
+        {
+            return Some(Interact::Seat);
+        }
+        let gates = self
+            .room
+            .grid
+            .as_ref()
+            .map(|g| g.find(Cell::Gate))
+            .unwrap_or_default();
+        if gates.iter().any(|g| near(*g)) {
+            return Some(Interact::Gate);
+        }
+        None
+    }
+
+    /// 확인 말풍선을 띄울 자리(이웃·자리·길 위).
+    pub fn interact_anchor(&self) -> Option<Vec2> {
+        let p = self.player.pos;
+        let mut best: Option<(f32, Vec2)> = None;
+        let mut consider = |q: Vec2, up: f32| {
+            let d = (q - p).length();
+            if d < t::INTERACT_RADIUS && best.is_none_or(|b| d < b.0) {
+                best = Some((d, q - vec2(0.0, up)));
+            }
+        };
+        for n in &self.neighbors {
+            consider(n.pos, if n.who == Who::Bori { 26.0 } else { 16.0 });
+        }
+        for pr in &self.room.props {
+            if pr.kind == PropKind::Seat {
+                consider(pr.rect.center(), 12.0);
+            }
+        }
+        if let Some(g) = &self.room.grid {
+            for q in g.find(Cell::Gate) {
+                consider(q, 16.0);
+            }
+        }
+        self.interactable().and(best.map(|b| b.1))
     }
 
     /// 틱 앞: 장소를 바꾸는 중이면 진행하고 true(이번 틱 로직은 건너뛴다).
@@ -104,9 +277,10 @@ impl World {
         if !f.swapped && f.t >= t::FADE_HALF {
             f.swapped = true;
             match f.kind {
-                Transition::EnterDungeon => self.enter_dungeon(),
                 Transition::ExitDungeon => self.exit_dungeon(),
                 Transition::Respawn => self.respawn_at_save(),
+                Transition::EnterCamp => self.enter_camp(),
+                Transition::EnterNode => self.enter_node(),
             }
             sfx.play(sfx::Id::Emerge);
         }
@@ -124,22 +298,115 @@ impl World {
         if self.adv.place == Place::Arena {
             return;
         }
-        if self.player.is_alive() && self.adv.fade.is_none() {
-            match self.room.cell_at(self.player.pos) {
-                Some(Cell::Entrance) if self.adv.place == Place::Field => {
-                    self.start_fade(Transition::EnterDungeon)
-                }
-                Some(Cell::Exit) if self.adv.place == Place::Dungeon => {
-                    self.start_fade(Transition::ExitDungeon)
-                }
-                Some(Cell::Save) => self.touch_save(sfx),
-                _ => {}
+        if self.cell_triggers() {
+            sfx.play(sfx::Id::Heal);
+        }
+        if self.adv.place == Place::Field {
+            if let Some(id) = self.field_boss() {
+                sfx.play(id);
             }
         }
         if self.adv.place == Place::Dungeon {
             self.dungeon_rooms(sfx);
         }
         self.update_cam();
+    }
+
+    /// 발밑 칸: 입구·출구(장소 바꾸기, 길 지도), 저장 지점. 저장 지점을 새로 밟았으면 true(소리).
+    fn cell_triggers(&mut self) -> bool {
+        let cell = self.room.cell_at(self.player.pos);
+        let stepped = cell != self.adv.last_cell;
+        self.adv.last_cell = cell;
+        if self.player.is_alive() && self.adv.fade.is_none() {
+            match cell {
+                // 굴 입구는 공터의 대장을 이긴 뒤에야 산다. 그 아래는 쉼터.
+                Some(Cell::Entrance)
+                    if self.adv.place == Place::Field && self.adv.boss == BossFight::Done =>
+                {
+                    self.start_fade(Transition::EnterCamp)
+                }
+                Some(Cell::Exit) if self.adv.place == Place::Dungeon => match self.adv.node {
+                    None => self.start_fade(Transition::ExitDungeon),
+                    Some(at) => {
+                        let boss = self
+                            .adv
+                            .route
+                            .as_ref()
+                            .is_some_and(|r| r.node(at).kind == NodeKind::Boss);
+                        if boss {
+                            self.start_fade(Transition::EnterCamp);
+                        } else if stepped {
+                            self.adv.events.push(AdvEvent::RouteOpen);
+                        }
+                    }
+                },
+                Some(Cell::Save) => return self.touch_save(),
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// 공터의 대장: 안으로 들어서면 문을 닫고 깨운다. 쓰러지면 문을 열고 보리가 돌아온다(컷씬은 앱). 낼 소리를 돌려준다.
+    fn field_boss(&mut self) -> Option<sfx::Id> {
+        let glade = self.adv.glade?;
+        let inside = Rect::new(
+            glade.x + 24.0,
+            glade.y + 40.0,
+            glade.w - 48.0,
+            glade.h - 64.0,
+        );
+        match self.adv.boss {
+            BossFight::Waiting if inside.contains(self.player.pos) && self.player.is_alive() => {
+                self.room.set_doors_locked(true);
+                for e in self.enemies.iter_mut().filter(|e| e.kind == Kind::Chief) {
+                    e.asleep = false;
+                    e.wake_delay = t::ROOM_WAKE_DELAY * 1.5;
+                }
+                self.adv.boss = BossFight::Fight;
+                self.adv.events.push(AdvEvent::BossIntro);
+                self.feel.add_trauma(0.35);
+                return Some(sfx::Id::WallHit);
+            }
+            BossFight::Fight => {
+                match self.enemies.iter().find(|e| e.kind == Kind::Chief) {
+                    Some(c) => self.adv.boss_last = c.pos,
+                    None => {
+                        // 공터에 남은 부하도 정신이 든다(흩어진다).
+                        self.enemies.retain(|e| !glade.contains(e.pos));
+                        self.room.set_doors_locked(false);
+                        self.adv.boss = BossFight::Done;
+                        let at = self.adv.boss_last;
+                        self.loot
+                            .push(Loot::place(LootKind::RootHeart, at + vec2(0.0, 18.0)));
+                        for _ in 0..t::BOSS_SEEDS {
+                            self.loot.push(Loot::spawn(LootKind::Seed, at));
+                        }
+                        self.adv.events.push(AdvEvent::BossBeaten);
+                        self.toast = Some((|s| s.toast_chief, 3.0));
+                        return Some(sfx::Id::Emerge);
+                    }
+                }
+            }
+            _ => {}
+        }
+        None
+    }
+
+    /// 쓰러져서 다시 서면 공터 싸움을 처음부터(대장은 다시 잔다, 부하는 사라진다).
+    fn reset_field_boss(&mut self) {
+        if self.adv.boss != BossFight::Fight {
+            return;
+        }
+        if let Some(glade) = self.adv.glade {
+            self.enemies
+                .retain(|e| !glade.contains(e.pos) && e.kind != Kind::Chief);
+        }
+        let mut c = Enemy::new(Kind::Chief, self.adv.boss_home);
+        c.asleep = true;
+        self.enemies.push(c);
+        self.room.set_doors_locked(false);
+        self.adv.boss = BossFight::Waiting;
     }
 
     pub fn start_fade(&mut self, kind: Transition) {
@@ -172,16 +439,16 @@ impl World {
         self.start_fade(Transition::Respawn);
     }
 
-    fn touch_save(&mut self, sfx: &Sfx) {
+    fn touch_save(&mut self) -> bool {
         // 저장 지점 칸 가운데.
         let at = (self.player.pos / 16.0).floor() * 16.0 + vec2(8.0, 8.0);
         if (self.adv.save_pos - at).length() < 1.0 {
-            return;
+            return false;
         }
         self.adv.save_pos = at;
         self.player.heal(self.player.stats.max_hp);
-        sfx.play(sfx::Id::Heal);
         self.toast = Some((|s| s.toast_save, 2.5));
+        true
     }
 
     /// 개발 시나리오용: 어두워지는 연출 없이 바로 던전으로.
@@ -190,14 +457,47 @@ impl World {
     }
 
     fn enter_dungeon(&mut self) {
+        let prm = Params::classic(self.adv.depth);
+        let biome = if self.adv.depth == 0 {
+            Biome::Roots
+        } else {
+            Biome::Deep
+        };
+        self.adv.node = None;
+        self.build_dungeon(&prm, biome);
+    }
+
+    /// 길에서 고른 칸의 굴로. 쉼터에서 오면 쉼터를 맡기고, 굴에서 오면 굴만 바꾼다.
+    fn enter_node(&mut self) {
+        let Some((at, prm, biome)) = self
+            .adv
+            .route
+            .as_ref()
+            .and_then(|r| r.at.map(|at| (at, r.params(at), r.node(at).biome)))
+        else {
+            return;
+        };
+        self.adv.node = Some(at);
+        self.build_dungeon(&prm, biome);
+    }
+
+    fn build_dungeon(&mut self, prm: &Params, biome: Biome) {
         self.adv.seed = self.adv.seed.wrapping_add(0x9E37_79B9);
-        let (d, room) = dungeon::generate(self.adv.seed, self.adv.depth);
-        let field_room = std::mem::replace(&mut self.room, room);
-        self.adv.field = Some(Stash {
-            room: field_room,
-            enemies: std::mem::take(&mut self.enemies),
-            loot: std::mem::take(&mut self.loot),
-        });
+        let (d, room) = dungeon::generate(self.adv.seed, prm);
+        let old_room = std::mem::replace(&mut self.room, room);
+        if self.adv.place != Place::Dungeon {
+            self.adv.field = Some(Stash {
+                room: old_room,
+                enemies: std::mem::take(&mut self.enemies),
+                loot: std::mem::take(&mut self.loot),
+                neighbors: std::mem::take(&mut self.neighbors),
+                place: self.adv.place,
+                biome: self.biome,
+            });
+        } else {
+            self.enemies.clear();
+            self.loot.clear();
+        }
         self.projectiles.clear();
         self.player.pos = d.start_pos();
         self.player.prev_pos = self.player.pos;
@@ -205,24 +505,66 @@ impl World {
         self.adv.dungeon = Some(d);
         self.adv.place = Place::Dungeon;
         self.adv.boss_cleared = false;
-        self.biome = if self.adv.depth == 0 {
-            Biome::Roots
-        } else {
-            Biome::Deep
-        };
+        self.adv.last_cell = None;
+        self.biome = biome;
         self.snap_cam();
     }
 
+    /// 맡겨 둔 필드·쉼터로 돌아온다.
     fn restore_field(&mut self) {
         if let Some(s) = self.adv.field.take() {
             self.room = s.room;
             self.enemies = s.enemies;
             self.loot = s.loot;
+            self.neighbors = s.neighbors;
+            self.adv.place = s.place;
+            self.biome = s.biome;
         }
         self.projectiles.clear();
         self.adv.dungeon = None;
-        self.adv.place = Place::Field;
-        self.biome = Biome::Meadow;
+        self.adv.node = None;
+    }
+
+    /// 다음 쉼터: 필드·굴은 버리고 쉼터를 새로 짓는다. 체력 가득, 저장 고리가 다시 설 곳, 새 길.
+    fn enter_camp(&mut self) {
+        let p = crate::camp::parse();
+        self.adv.field = None;
+        self.adv.dungeon = None;
+        self.adv.node = None;
+        self.adv.stage += 1;
+        let stage = self.adv.stage;
+        self.room = Room::from_grid(p.grid, p.props, p.spawn_points);
+        self.enemies.clear();
+        self.loot.clear();
+        self.projectiles.clear();
+        self.npc = None;
+        self.neighbors.clear();
+        for (ch, at) in &p.marks {
+            match ch {
+                'K' => self.neighbors.push(Npc::standing(Who::Popo, *at)),
+                'b' => self.neighbors.push(Npc::standing(Who::Bori, *at)),
+                _ => {}
+            }
+        }
+        self.player.pos = p.start;
+        self.player.prev_pos = p.start;
+        self.player.hp = self.player.stats.max_hp;
+        self.adv.save_pos = self
+            .room
+            .grid
+            .as_ref()
+            .and_then(|g| g.find(Cell::Save).first().copied())
+            .unwrap_or(p.start);
+        self.adv.home = Place::Camp;
+        self.adv.place = Place::Camp;
+        self.adv.heart_sold = false;
+        self.adv.seed = self.adv.seed.wrapping_add(0x0051_A7E5);
+        self.adv.route = Some(Route::generate(self.adv.seed, stage));
+        self.adv.last_cell = None;
+        self.adv.events.push(AdvEvent::CampArrive(stage));
+        self.biome = Biome::Roots;
+        self.toast = Some((|s| s.toast_camp, 2.5));
+        self.snap_cam();
     }
 
     fn exit_dungeon(&mut self) {
@@ -238,6 +580,15 @@ impl World {
     fn respawn_at_save(&mut self) {
         if self.adv.place == Place::Dungeon {
             self.restore_field();
+        }
+        if self.adv.place == Place::Field {
+            self.reset_field_boss();
+        }
+        if self.adv.home == Place::Camp {
+            // 길은 새로 짠다(같은 쉼터에서 다시 고른다).
+            let stage = self.adv.stage;
+            self.adv.seed = self.adv.seed.wrapping_add(0x7F4A_7C15);
+            self.adv.route = Some(Route::generate(self.adv.seed, stage));
         }
         self.player.revive();
         self.player.hp = self.player.stats.max_hp;
@@ -257,11 +608,18 @@ impl World {
         if at != self.adv.current_room && d.room(at).is_some() {
             self.adv.current_room = at;
         }
+        let goal = d.goal;
         let Some(room) = d.room_mut(self.adv.current_room) else {
             return;
         };
         if !room.visited {
             room.visited = true;
+            if room.kind == RoomKind::Rest && goal == Goal::Spring {
+                // 길의 샘: 체력을 가득 채운다.
+                self.player.heal(self.player.stats.max_hp);
+                sfx.play(sfx::Id::Heal);
+                self.toast = Some((|s| s.toast_spring, 2.5));
+            }
             if room.kind == RoomKind::Rest {
                 let c = room.rect().center();
                 // 방 가운데에 놓는다(굴러가지 않으니 묶을 필요 없음).
@@ -299,14 +657,20 @@ impl World {
                 if let Some(g) = self.room.grid.as_mut() {
                     g.set((c.x / 16.0) as usize, (c.y / 16.0) as usize, Cell::Exit);
                 }
-                self.loot
-                    .push(Loot::place(LootKind::RootHeart, c + vec2(0.0, 24.0)));
-                for _ in 0..t::BOSS_SEEDS {
-                    self.loot
-                        .push(Loot::spawn(LootKind::Seed, c + vec2(0.0, 24.0)));
+                let at = c + vec2(0.0, 24.0);
+                if goal == Goal::Boss {
+                    self.loot.push(Loot::place(LootKind::RootHeart, at));
+                    for _ in 0..t::BOSS_SEEDS {
+                        self.loot.push(Loot::spawn(LootKind::Seed, at));
+                    }
+                    self.adv.boss_cleared = true;
+                    self.toast = Some((|s| s.toast_boss, 3.0));
+                } else {
+                    for _ in 0..t::PACK_SEEDS {
+                        self.loot.push(Loot::spawn(LootKind::Seed, at));
+                    }
+                    self.toast = Some((|s| s.toast_goal, 2.5));
                 }
-                self.adv.boss_cleared = true;
-                self.toast = Some((|s| s.toast_boss, 3.0));
             }
         }
         // 보물 상자: 닿으면 연다 → 씨앗 한 줌 + 아직 없는 장신구 하나(다 있으면 반딧불).
@@ -360,7 +724,12 @@ impl World {
     pub fn cam_bounds(&self) -> Rect {
         match self.adv.place {
             Place::Arena => Rect::new(0.0, 0.0, t::VIEW_W, t::VIEW_H),
-            Place::Field => self.room.inner,
+            Place::Field => match (self.adv.boss, self.adv.glade) {
+                // 대장과 싸우는 동안은 공터를 한 방처럼 보여 준다.
+                (BossFight::Fight, Some(g)) => g,
+                _ => self.room.inner,
+            },
+            Place::Camp => self.room.inner,
             Place::Dungeon => dungeon::room_rect(self.adv.current_room),
         }
     }
@@ -428,6 +797,92 @@ mod tests {
         assert_eq!(w.adv.place, Place::Field);
         assert!((w.player.pos - w.adv.entrance_pos).length() < 40.0);
         assert_eq!(w.adv.depth, 0, "보스를 안 잡았으면 깊이 그대로");
+    }
+
+    /// 공터: 튜토리얼 전엔 문이 닫혀 있고, 들어서면 싸움, 대장이 쓰러지면 입구 → 쉼터.
+    #[test]
+    fn glade_boss_then_camp_then_route() {
+        let mut w = World::field();
+        let glade = w.adv.glade.expect("공터");
+        assert!(w.room.doors_locked() && w.adv.boss == BossFight::Locked);
+        w.open_glade();
+        assert!(!w.room.doors_locked());
+        w.player.pos = glade.center();
+        w.field_boss();
+        assert_eq!(w.adv.boss, BossFight::Fight);
+        assert!(w.room.doors_locked());
+        assert!(w.adv.events.contains(&AdvEvent::BossIntro));
+        // 쓰러져서 다시 서면 처음부터.
+        w.respawn_at_save();
+        assert_eq!(w.adv.boss, BossFight::Waiting);
+        assert!(!w.room.doors_locked());
+        assert_eq!(
+            w.enemies.iter().filter(|e| e.kind == Kind::Chief).count(),
+            1
+        );
+        // 다시 들어가 이긴다.
+        w.player.pos = glade.center();
+        w.field_boss();
+        w.enemies.retain(|e| e.kind != Kind::Chief);
+        w.field_boss();
+        assert_eq!(w.adv.boss, BossFight::Done);
+        assert!(w.adv.events.contains(&AdvEvent::BossBeaten));
+        assert!(glade.contains(w.adv.boss_last));
+        // 입구 → 쉼터.
+        w.enter_camp();
+        assert_eq!(
+            (w.adv.place, w.adv.home, w.adv.stage),
+            (Place::Camp, Place::Camp, 1)
+        );
+        assert!(w.enemies.is_empty());
+        assert!(w.neighbors.iter().any(|n| n.who == Who::Popo));
+        // 길: 첫 칸을 고르면 굴, 쓰러지면 쉼터로(길은 새로).
+        let first = w.adv.route.as_ref().unwrap().choices()[0];
+        assert!(w.choose_node(first));
+        w.enter_node();
+        assert_eq!(w.adv.place, Place::Dungeon);
+        assert!(w.neighbors.is_empty(), "이웃은 쉼터에 맡겨 둔다");
+        w.player.hp = 0;
+        w.respawn_at_save();
+        assert_eq!(w.adv.place, Place::Camp);
+        assert!(w.adv.route.as_ref().unwrap().at.is_none());
+        assert_eq!(w.player.pos, w.adv.save_pos);
+        assert!(!w.neighbors.is_empty());
+    }
+
+    /// 길의 굴: 출구를 밟는 순간 길 지도를 한 번 연다. 보스 칸의 출구는 다음 쉼터로.
+    #[test]
+    fn route_exit_opens_map_then_boss_exit_goes_to_next_camp() {
+        let mut w = World::camp_start(1);
+        w.adv.events.clear();
+        let first = w.adv.route.as_ref().unwrap().choices()[0];
+        assert!(w.choose_node(first));
+        w.adv.fade = None;
+        w.enter_node();
+        // 출구 칸 하나를 시작방에 놓고 밟는다(끝방을 깬 것과 같다).
+        let p = w.player.pos;
+        if let Some(g) = w.room.grid.as_mut() {
+            g.set((p.x / 16.0) as usize, (p.y / 16.0) as usize, Cell::Exit);
+        }
+        w.cell_triggers();
+        assert_eq!(w.adv.events, vec![AdvEvent::RouteOpen]);
+        w.cell_triggers();
+        assert_eq!(w.adv.events.len(), 1, "서 있는 동안 다시 열지 않는다");
+        // 보스 칸까지 건너뛰고 출구 → 다음 쉼터.
+        let r = w.adv.route.as_mut().unwrap();
+        let boss = (r.layers.len() - 1, 0);
+        r.at = Some((boss.0 - 1, r.layers[boss.0 - 1].len() - 1));
+        assert!(w.choose_node(boss));
+        w.adv.fade = None;
+        w.enter_node();
+        let p = w.player.pos;
+        if let Some(g) = w.room.grid.as_mut() {
+            g.set((p.x / 16.0) as usize, (p.y / 16.0) as usize, Cell::Exit);
+        }
+        w.cell_triggers();
+        assert_eq!(w.adv.fade.map(|f| f.kind), Some(Transition::EnterCamp));
+        w.enter_camp();
+        assert_eq!((w.adv.place, w.adv.stage), (Place::Camp, 2));
     }
 
     #[test]

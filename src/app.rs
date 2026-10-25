@@ -6,6 +6,8 @@
 
 use macroquad::prelude::*;
 
+mod stage;
+
 use crate::art::Art;
 use crate::cutscene::{self, Cutscene};
 use crate::equipment::{Character, CHARMS, CHARM_SLOTS, WEAPONS};
@@ -89,6 +91,10 @@ enum Scene {
     Cutscene,
     Game,
     Pause,
+    /// 길 지도(쉼터의 뿌리 길, 굴의 출구, docs/decisions/0031).
+    Route,
+    /// 포포의 가게(쉼터, docs/decisions/0030).
+    Shop,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -278,6 +284,9 @@ enum Hit {
     JournalItem(usize),
     BestiaryItem(usize),
     DevItem(usize),
+    /// 길 지도: 고를 수 있는 칸(choices 번호).
+    RouteNode(usize),
+    ShopItem(usize),
 }
 
 pub struct App {
@@ -318,6 +327,14 @@ pub struct App {
     hits: Vec<(Rect, Hit)>,
     /// 직전 프레임의 (scale, ox, oy). 탭 좌표를 논리 좌표로 바꿀 때.
     last_ui: (f32, f32, f32),
+    /// 길 지도: 고른 칸, 뒤로 닫을 수 있나(쉼터에서 열었을 때만).
+    route_cursor: usize,
+    route_cancel: bool,
+    /// 가게: 고른 줄, 방금 한 일(글, 남은 시간).
+    shop_cursor: usize,
+    shop_msg: Option<(Tr, f32)>,
+    /// 보리에게 말 건 횟수(말이 돌아간다).
+    talk_n: u32,
 }
 
 impl App {
@@ -370,6 +387,11 @@ impl App {
             letterbox: 0.0,
             hits: Vec::new(),
             last_ui: (1.0, 0.0, 0.0),
+            route_cursor: 0,
+            route_cancel: false,
+            shop_cursor: 0,
+            shop_msg: None,
+            talk_n: 0,
         }
     }
 
@@ -424,8 +446,16 @@ impl App {
         let mut open_pause = false;
         let mut open_map = false;
         let mut restart = false;
+        let mut interact = None;
         while self.acc >= t::TICK_DT {
-            let a = self.input.take();
+            let mut a = self.input.take();
+            // 쉼터: 말 걸 것 곁에서 공격 버튼 = 말 걸기(휘두르지 않는다).
+            if a.attack && interact.is_none() {
+                if let Some(i) = self.world.interactable() {
+                    a.attack = false;
+                    interact = Some(i);
+                }
+            }
             if a.toggle_debug {
                 self.settings.debug_overlay = !self.settings.debug_overlay;
                 self.world.debug.overlay = self.settings.debug_overlay;
@@ -467,6 +497,15 @@ impl App {
             }
         }
         self.journal.update(&self.world);
+        self.take_adventure_events();
+        if let Some(i) = interact {
+            if self.scene == Scene::Game {
+                self.interact(i);
+            }
+        }
+        if self.scene != Scene::Game {
+            return;
+        }
         if restart {
             // 모험(필드·던전)에서 쓰러지면 저장 지점으로. 아레나·개발 시나리오는 처음부터.
             if self.world.adv.place != crate::adventure::Place::Arena
@@ -676,6 +715,8 @@ impl App {
             }
             Scene::Controls { back } => self.update_controls(a, tap_hit, back, dt),
             Scene::Pause => self.update_pause(a, tap_hit),
+            Scene::Route => self.update_route(a, tap_hit),
+            Scene::Shop => self.update_shop(a, tap_hit, dt),
             Scene::Game | Scene::Cutscene => {}
         }
     }
@@ -906,6 +947,8 @@ impl App {
             Scene::Game
                 | Scene::Pause
                 | Scene::Cutscene
+                | Scene::Route
+                | Scene::Shop
                 | Scene::Settings { back: Back::Pause }
                 | Scene::Controls { back: Back::Pause }
         );
@@ -924,15 +967,20 @@ impl App {
                 if !actor.visible {
                     continue;
                 }
+                let pos = self.renderer.to_view(actor.pos);
                 match actor.sprite {
-                    Some(row) => self.renderer.draw_actor_sprite(
+                    Some(cutscene::Sprite::Critter(row)) => self.renderer.draw_actor_sprite(
                         row,
-                        actor.pos,
+                        pos,
                         actor.facing,
                         c.moving(i),
                         actor.color,
                     ),
-                    None => render::draw_actor(actor.pos, actor.facing, actor.color),
+                    Some(cutscene::Sprite::Bori) => {
+                        self.renderer
+                            .draw_bori_actor(pos, actor.facing, c.moving(i))
+                    }
+                    None => render::draw_actor(pos, actor.facing, actor.color),
                 }
             }
         }
@@ -966,11 +1014,19 @@ impl App {
                 self.draw_letterbox(&ui);
                 self.renderer
                     .draw_hud(&ui, &self.world, self.input.gamepad_count);
+                // 보스와 싸우는 동안은 힌트 대신 보스 막대(같은 자리).
+                let boss = self.world.enemies.iter().any(|e| e.is_boss() && !e.asleep);
                 if let Some(g) = &self.gift {
                     self.draw_gift(&ui, g);
-                } else if let Some(h) = self.tutorial.as_ref().and_then(|t| t.hint()) {
+                } else if let Some(h) = self
+                    .tutorial
+                    .as_ref()
+                    .and_then(|t| t.hint())
+                    .filter(|_| !boss)
+                {
                     self.draw_hint(&ui, &h);
                 }
+                self.draw_interact_bubble(&ui);
                 if !self.world.player.is_alive() {
                     self.draw_dead(&ui);
                 }
@@ -980,6 +1036,16 @@ impl App {
                     .draw_hud(&ui, &self.world, self.input.gamepad_count);
                 ui.dim();
                 self.draw_pause(&ui);
+            }
+            Scene::Route => {
+                ui.dim();
+                self.draw_route(&ui);
+            }
+            Scene::Shop => {
+                self.renderer
+                    .draw_hud(&ui, &self.world, self.input.gamepad_count);
+                ui.dim();
+                self.draw_shop(&ui);
             }
         }
         if let Some(o) = self.input.overlay() {
@@ -1652,12 +1718,13 @@ impl App {
         let pic = Rect::new(x, c.y, 34.0, 34.0);
         ui.rect(pic, Color::new(0.10, 0.08, 0.12, 0.9));
         ui.rect_lines(pic, ui::BORDER);
-        self.renderer.draw_critter(
-            ui,
-            Rect::new(pic.x + 1.0, pic.y + 1.0, 32.0, 32.0),
-            sp.sheet_row,
-            ((get_time() * 2.0) as u32) % 2,
-        );
+        let inner = Rect::new(pic.x + 1.0, pic.y + 1.0, 32.0, 32.0);
+        let frame = ((get_time() * 2.0) as u32) % 2;
+        if k == crate::enemy::Kind::Chief {
+            self.renderer.draw_chief_icon(ui, inner, frame);
+        } else {
+            self.renderer.draw_critter(ui, inner, sp.sheet_row, frame);
+        }
         let tx = pic.right() + 6.0;
         ui.text(tr(sp.name), tx, c.y, FONT_PX, ui::ACCENT);
         let (hp, pow, spd) = species::words(sp);
@@ -1888,6 +1955,7 @@ impl App {
         let title = match self.world.adv.place {
             Place::Arena => fill(s.map_floor, &[&biome]),
             Place::Field => fill(s.map_field, &[&biome]),
+            Place::Camp => fill(s.map_camp, &[&self.world.adv.stage]),
             Place::Dungeon => fill(
                 s.map_dungeon,
                 &[

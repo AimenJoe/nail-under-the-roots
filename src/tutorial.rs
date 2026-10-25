@@ -1,6 +1,7 @@
 //! 체계적인 튜토리얼: 라쿤 포포가 단계마다 짧게 말하고(대화창), 그 자리에서 해 본다(docs/decisions/0023).
 //!
 //! 단계: 이동 → 발톱 줍기 → 3연타 → 굴파기 → 솟구치기 → 패링 → 필살기 → 아이템 → 메뉴·저장 안내.
+//! 그 뒤(모험이면): 공터 문이 열리고 "남쪽 공터의 대장" 힌트가 대장을 이길 때까지 남는다(docs/decisions/0032).
 //! 각 단계는 (1) 포포의 말(`take_talk`로 앱이 컷씬을 띄운다) (2) 상황 만들기(허수아비·연습 다람쥐·게이지·산딸기)
 //! (3) 월드 통계로 판정(이동 거리, 마지막 타 명중, 굴파기·솟구침·패링·필살기·먹기 횟수).
 //! 화면 아래 힌트는 "[3/9] X 세 번…"처럼 몇 번째인지와 지금 버튼 이름을 보인다. 연습 동안은 맞아도 체력이 줄지 않는다.
@@ -28,6 +29,8 @@ pub enum Stage {
     Special,
     Item,
     Wrap,
+    /// 튜토리얼 보스: 공터 문을 열고, 대장을 이길 때까지 힌트를 남긴다(번호 없음).
+    Boss,
     Done,
 }
 
@@ -97,6 +100,7 @@ impl Tutorial {
             Stage::Special => (|s| s.tut_special, Some(Act::Special)),
             Stage::Item => (|s| s.tut_item, Some(Act::UseItem)),
             Stage::Wrap => (|s| s.tut_outro, None),
+            Stage::Boss => return Some(crate::i18n::s().tut_boss.to_string()),
             Stage::Done => return None,
         };
         let body = match arg {
@@ -113,6 +117,7 @@ impl Tutorial {
         if w.npc.is_none() {
             let p = w.player.pos + vec2(30.0, 10.0);
             w.npc = Some(Npc {
+                who: crate::world::Who::Popo,
                 pos: p,
                 prev_pos: p,
                 face_left: true,
@@ -213,6 +218,7 @@ impl Tutorial {
                         (|s| s.popo_item2, Face::Normal, None),
                         (|s| s.popo_menu, Face::Normal, Some(Act::Map)),
                         (|s| s.popo_save, Face::Normal, None),
+                        (|s| s.popo_glade, Face::Normal, None),
                         (|s| s.popo_bye, Face::Happy, None),
                     ]);
                     self.enter(Stage::Wrap, 0);
@@ -225,12 +231,20 @@ impl Tutorial {
                     if let Some(n) = w.npc.as_mut() {
                         n.target = None;
                     }
-                    // 아레나(웨이브 시험장)면 웨이브 1로. 모험(필드)이면 그냥 걸어서 떠난다.
+                    // 아레나(웨이브 시험장)면 웨이브 1로. 모험(필드)이면 공터 문을 열고 대장에게 간다.
                     if w.adv.place == crate::adventure::Place::Arena {
                         w.auto_waves = true;
                         w.wave = 0;
                         w.next_wave();
+                        self.enter(Stage::Done, 0);
+                    } else {
+                        w.open_glade();
+                        self.enter(Stage::Boss, 0);
                     }
+                }
+            }
+            Stage::Boss => {
+                if w.adv.boss == crate::adventure::BossFight::Done {
                     self.enter(Stage::Done, 0);
                 }
             }

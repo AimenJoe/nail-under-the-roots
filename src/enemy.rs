@@ -22,6 +22,8 @@ pub enum Kind {
     RedSquirrel,
     /// 튜토리얼 허수아비. 움직이지도 때리지도 않는다.
     Dummy,
+    /// 튜토리얼 보스: 들쥐 대장(보리). 돌진 · 뛰어 찍기 · 부하 부르기(docs/decisions/0032).
+    Chief,
 }
 
 impl Kind {
@@ -50,6 +52,8 @@ pub enum State {
     Leap { time: f32, from: Vec2, to: Vec2 },
     /// 공통: 경직(남은 시간).
     Stunned { time: f32 },
+    /// 대장: 울부짖어 부하를 부른다(예고 뒤 Event::Summon).
+    Howl { time: f32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,6 +64,8 @@ pub enum Event {
     /// 뛰기형이 튀어 오름 / 내려앉음.
     Leap,
     Land,
+    /// 대장이 부하를 부른다(월드가 생쥐를 둘레에 낳는다).
+    Summon,
 }
 
 pub struct Enemy {
@@ -84,6 +90,9 @@ pub struct Enemy {
     pub asleep: bool,
     /// 던전 방: 이 시간 동안 제자리(들어온 플레이어가 자리 잡게).
     pub wake_delay: f32,
+    /// 대장: 다음 공격 차례(돌진·뛰기가 번갈아), 부른 횟수.
+    pattern: u32,
+    summons: u32,
 }
 
 pub struct Projectile {
@@ -131,6 +140,8 @@ impl Enemy {
             died_of_poison: false,
             asleep: false,
             wake_delay: 0.0,
+            pattern: 0,
+            summons: 0,
         }
     }
 
@@ -206,7 +217,8 @@ impl Enemy {
         let to_player = player_pos - self.pos;
         let dist = to_player.length();
         let dir_to_player = to_player.normalize_or_zero();
-        if self.asleep && player_targetable && dist < t::ENEMY_AGGRO_RADIUS {
+        // 보스는 가까이 와도 깨지 않는다(공터에 들어서면 모험이 깨운다).
+        if self.asleep && player_targetable && dist < t::ENEMY_AGGRO_RADIUS && !self.is_boss() {
             self.asleep = false;
         }
         if self.wake_delay > 0.0 {
@@ -228,6 +240,25 @@ impl Enemy {
                     self.state = self.idle_state();
                 } else {
                     self.state = State::Stunned { time };
+                }
+            }
+            State::Approach if sp.behavior == Behavior::Chief => {
+                if player_targetable {
+                    self.facing = dir_to_player;
+                    self.state = self.chief_next(dist, player_pos);
+                    if matches!(self.state, State::Approach) {
+                        self.pos += dir_to_player * sp.speed * dt;
+                    }
+                }
+            }
+            State::Howl { time } => {
+                let time = time + dt;
+                if time >= sp.windup * t::CHIEF_HOWL_MUL {
+                    self.summons += 1;
+                    events.push(Event::Summon);
+                    self.state = State::Rest { time: sp.rest };
+                } else {
+                    self.state = State::Howl { time };
                 }
             }
             State::Approach => {
@@ -364,6 +395,48 @@ impl Enemy {
         idle_of(self.sp().behavior)
     }
 
+    /// 대장의 다음 수: 체력이 반 아래면 세 번에 한 번 부하를 부르고(두 번까지), 아니면 돌진과 뛰어 찍기를 번갈아.
+    /// 멀면 걸어서 다가간다(Approach 그대로).
+    fn chief_next(&mut self, dist: f32, player_pos: Vec2) -> State {
+        let sp = self.sp();
+        let hurt = self.hp * 2 <= sp.hp;
+        if hurt && self.summons < t::CHIEF_SUMMONS && self.pattern % 3 == 2 {
+            self.pattern += 1;
+            return State::Howl { time: 0.0 };
+        }
+        if self.pattern.is_multiple_of(2) {
+            if dist < sp.trigger {
+                self.pattern += 1;
+                return State::Windup { time: 0.0 };
+            }
+        } else if dist < sp.trigger * 1.3 {
+            self.pattern += 1;
+            return State::Crouch {
+                time: 0.0,
+                target: player_pos,
+            };
+        }
+        State::Approach
+    }
+
+    /// 공격 동작 중(예고 포함): 대장은 맞아도 멈추지 않는다(슈퍼아머). 피하고 빈틈에 때리는 보스.
+    fn armored(&self) -> bool {
+        self.sp().behavior == Behavior::Chief
+            && matches!(
+                self.state,
+                State::Windup { .. }
+                    | State::Charge { .. }
+                    | State::Crouch { .. }
+                    | State::Leap { .. }
+                    | State::Howl { .. }
+            )
+    }
+
+    /// 보스(체력 막대를 화면에 따로 그린다).
+    pub fn is_boss(&self) -> bool {
+        self.sp().behavior == Behavior::Chief
+    }
+
     /// 독을 건다. 이미 걸려 있으면 더 긴 쪽.
     pub fn apply_poison(&mut self, secs: f32) {
         if self.poison <= 0.0 {
@@ -393,13 +466,31 @@ impl Enemy {
     }
 
     /// 피격. 넉백 방향은 단위 벡터. 무거운 종은 덜 밀린다. 체공 중엔 떨어진다(그 자리에서 경직).
+    /// 대장: 공격 중엔 멈추지 않고, 아닐 때도 짧게만 멈칫한다. 피해 0(패링·밀어내기)은 그대로 멈춘다 — 패링이 보상.
     pub fn hurt(&mut self, dmg: i32, knock_dir: Vec2, knockback: f32, stun: f32) {
         self.asleep = false;
         self.wake_delay = 0.0;
         self.hp -= dmg;
         self.flash = t::HIT_FLASH;
         self.vel = knock_dir * knockback * self.sp().knock_mul;
-        self.state = State::Stunned { time: stun };
+        if self.is_boss() && dmg > 0 {
+            if !self.armored() {
+                let left = match self.state {
+                    // 벽에 박고 어질어질한 동안은 그 시간을 지킨다(빈틈을 맞아서 줄이지 않는다).
+                    State::Rest { time } => time,
+                    _ => 0.0,
+                };
+                self.state = if left > stun * t::CHIEF_STUN_MUL {
+                    State::Rest { time: left }
+                } else {
+                    State::Stunned {
+                        time: stun * t::CHIEF_STUN_MUL,
+                    }
+                };
+            }
+        } else {
+            self.state = State::Stunned { time: stun };
+        }
         if self.hp <= 0 {
             self.alive = false;
         }
@@ -416,13 +507,14 @@ impl Enemy {
             State::Crouch { .. } => "crouch",
             State::Leap { .. } => "LEAP",
             State::Stunned { .. } => "stunned",
+            State::Howl { .. } => "HOWL",
         }
     }
 }
 
 fn idle_of(b: Behavior) -> State {
     match b {
-        Behavior::Charger => State::Approach,
+        Behavior::Charger | Behavior::Chief => State::Approach,
         Behavior::Shooter | Behavior::Leaper => State::Keep,
         Behavior::Dummy => State::Rest { time: f32::MAX },
     }
@@ -459,6 +551,42 @@ mod tests {
         }
         assert!(saw.0 && saw.1 && saw.2, "{saw:?}");
         assert!(ev.contains(&Event::Land));
+    }
+
+    /// 대장: 돌진과 뛰어 찍기를 번갈아 하고, 공격 중엔 맞아도 멈추지 않으며, 체력이 반 아래면 부하를 부른다.
+    #[test]
+    fn chief_alternates_armors_and_summons() {
+        let room = Room::new();
+        let mut e = Enemy::new(Kind::Chief, room.center());
+        let player = room.center() + vec2(60.0, 0.0);
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let mut saw = (false, false);
+        for _ in 0..600 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            match e.state {
+                State::Windup { .. } => {
+                    if !saw.0 {
+                        e.hurt(1, vec2(1.0, 0.0), 100.0, 0.3);
+                        assert!(
+                            matches!(e.state, State::Windup { .. }),
+                            "예고 중엔 안 끊긴다"
+                        );
+                    }
+                    saw.0 = true;
+                }
+                State::Crouch { .. } => saw.1 = true,
+                _ => {}
+            }
+        }
+        assert!(saw.0 && saw.1, "{saw:?}");
+        assert!(!ev.contains(&Event::Summon), "체력이 많으면 부르지 않는다");
+        e.hp = e.sp().hp / 2;
+        e.alive = true;
+        for _ in 0..1800 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+        }
+        let n = ev.iter().filter(|x| **x == Event::Summon).count();
+        assert!(n >= 1 && n as u32 <= t::CHIEF_SUMMONS, "{n}");
     }
 
     #[test]

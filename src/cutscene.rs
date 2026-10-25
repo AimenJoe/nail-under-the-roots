@@ -12,6 +12,11 @@ use crate::world::World;
 
 /// 글자가 찍히는 속도(초당 글자 수).
 const CHARS_PER_SEC: f32 = 40.0;
+/// 컷씬이 시작되고 이 시간 동안은 확인을 버린다. 싸우다 바로 이어지는 장면(보스 처치)에서
+/// 공격 연타가 대사를 다 넘겨 버리지 않게(헤드리스 확인에서 실제로 그랬다).
+const START_GUARD: f32 = 1.0;
+/// 대사 한 줄이 뜨고 이 시간 안의 확인도 버린다(연타로 줄을 건너뛰지 않게).
+const LINE_GUARD: f32 = 0.3;
 
 /// 대화 표정. 초상화 시트(assets/art/portraits.png, tools/art/portraits.py)의 칸을 고른다.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,6 +44,13 @@ impl Portrait {
     pub const MOMO_TAINTED: Portrait = Portrait { first: 7, faces: 2 };
     /// 라쿤 포포: 칸 5~6(보통·기쁨).
     pub const POPO: Portrait = Portrait { first: 5, faces: 2 };
+    /// 물든 들쥐 대장: 칸 9 하나(노려봄).
+    pub const CHIEF: Portrait = Portrait { first: 9, faces: 1 };
+    /// 돌아온 보리: 칸 10~11(보통·기쁨).
+    pub const BORI: Portrait = Portrait {
+        first: 10,
+        faces: 2,
+    };
 
     pub fn frame(self, face: Face) -> u32 {
         // 모모는 칸이 둘(차가움·괴로움)뿐이라 걱정 = 둘째 칸.
@@ -65,14 +77,25 @@ mod portrait_tests {
         assert_eq!(Portrait::MOMO_TAINTED.frame(Face::Worried), 8);
         assert_eq!(Portrait::POPO.frame(Face::Happy), 6);
         assert_eq!(Portrait::NAIL.frame(Face::Determined), 3);
+        assert_eq!(Portrait::CHIEF.frame(Face::Worried), 9);
+        assert_eq!(Portrait::BORI.frame(Face::Happy), 11);
     }
+}
+
+/// 배우의 월드 그림.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sprite {
+    /// critters.png의 줄.
+    Critter(u32),
+    /// chief.png의 돌아온 보리.
+    Bori,
 }
 
 #[derive(Clone)]
 pub struct Actor {
     pub name: &'static str,
-    /// 월드 그림: critters.png의 줄(없으면 색 동그라미).
-    pub sprite: Option<u32>,
+    /// 월드 그림(없으면 색 동그라미).
+    pub sprite: Option<Sprite>,
     pub color: Color,
     pub portrait: Option<Portrait>,
     pub pos: Vec2,
@@ -131,6 +154,8 @@ pub struct Cutscene {
     /// 검은 화면 알파(0 = 안 보임).
     pub fade: f32,
     done: bool,
+    /// 컷씬이 시작되고 흐른 시간.
+    age: f32,
 }
 
 /// 렌더용: 지금 열린 대화창.
@@ -158,6 +183,7 @@ impl Cutscene {
             shown: 0.0,
             fade,
             done: false,
+            age: 0.0,
         }
     }
 
@@ -192,11 +218,13 @@ impl Cutscene {
             return;
         };
         self.t += dt;
+        self.age += dt;
         let advance = match step {
             Step::Say { text, arg, .. } => {
                 let total = say_text(text, arg).chars().count() as f32;
                 let complete = self.shown >= total;
-                if a.confirm || a.attack || a.tap.is_some() {
+                let pressed = a.confirm || a.attack || a.tap.is_some();
+                if pressed && self.age >= START_GUARD && self.t >= LINE_GUARD {
                     if complete {
                         true
                     } else {
@@ -342,7 +370,7 @@ fn say(actor: usize, face: Face, text: Tr) -> Step {
 fn popo_actor(pos: Vec2, visible: bool) -> Actor {
     Actor {
         name: i18n::s().popo_name,
-        sprite: Some(crate::art::RACCOON_ROW),
+        sprite: Some(Sprite::Critter(crate::art::RACCOON_ROW)),
         color: Color::new(0.55, 0.55, 0.60, 1.0),
         portrait: Some(Portrait::POPO),
         pos,
@@ -382,6 +410,122 @@ pub fn popo_talk(w: &World, lines: &[(Tr, Face, Option<Act>)]) -> Cutscene {
     Cutscene::new(actors, steps)
 }
 
+/// 대화에 나오는 이(쉼터·보스 장면). 배우는 보이지 않고 말만 한다(월드가 그 이웃을 그린다).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Speaker {
+    Nail,
+    Popo,
+    /// 물든 들쥐 대장(이름표 "들쥐 대장").
+    Chief,
+    Bori,
+}
+
+fn speaker_actor(w: &World, who: Speaker) -> Actor {
+    let hidden = |name, portrait, color| Actor {
+        name,
+        sprite: None,
+        color,
+        portrait: Some(portrait),
+        pos: w.player.pos,
+        facing: vec2(1.0, 0.0),
+        visible: false,
+    };
+    let fur = Color::new(0.62, 0.45, 0.36, 1.0);
+    match who {
+        Speaker::Nail => nail_actor(w),
+        Speaker::Popo => popo_actor(w.player.pos, false),
+        Speaker::Chief => hidden(i18n::tr(crate::species::CHIEF.name), Portrait::CHIEF, fur),
+        Speaker::Bori => hidden(i18n::s().bori_name, Portrait::BORI, fur),
+    }
+}
+
+/// 여러 이웃이 번갈아 말하는 짧은 대화(쉼터·보스 장면). 배우 순서 = `Speaker` 순서.
+pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
+    let order = [Speaker::Nail, Speaker::Popo, Speaker::Chief, Speaker::Bori];
+    let actors = order.iter().map(|s| speaker_actor(w, *s)).collect();
+    let steps = lines
+        .iter()
+        .map(|(who, text, face)| {
+            say(
+                order.iter().position(|s| s == who).unwrap_or(0),
+                *face,
+                *text,
+            )
+        })
+        .collect();
+    Cutscene::new(actors, steps)
+}
+
+/// 공터에 들어섰다: 대장이 깨어나 길을 막는다.
+pub fn boss_intro(w: &World) -> Cutscene {
+    talk(
+        w,
+        &[
+            (Speaker::Chief, |s| s.chief_intro_1, Face::Normal),
+            (Speaker::Nail, |s| s.chief_intro_2, Face::Determined),
+        ],
+    )
+}
+
+/// 대장을 이겼다: 보리로 돌아와 고맙다 하고, 굴 입구로 먼저 내려간다.
+pub fn boss_beaten(w: &World, at: Vec2, entrance: Vec2) -> Cutscene {
+    let mut actors: Vec<Actor> = [Speaker::Nail, Speaker::Bori]
+        .iter()
+        .map(|s| speaker_actor(w, *s))
+        .collect();
+    actors[1].sprite = Some(Sprite::Bori);
+    actors[1].pos = at;
+    actors[1].visible = true;
+    actors[1].facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
+    // 보리가 Naïl 곁으로 걸어온다(카메라는 Naïl을 따르니, 멀리 쓰러지면 대화창 뒤에 가려진다).
+    let side = if at.x >= w.player.pos.x { 26.0 } else { -26.0 };
+    let near = w.player.pos + vec2(side, 0.0);
+    let steps = vec![
+        Step::Wait(0.6),
+        Step::Move {
+            actor: 1,
+            to: near,
+            speed: 45.0,
+        },
+        Step::Face {
+            actor: 1,
+            dir: vec2(-side, 0.0),
+        },
+        Step::Face {
+            actor: 0,
+            dir: vec2(side, 0.0),
+        },
+        say(1, Face::Normal, |s| s.chief_beaten_1),
+        say(0, Face::Worried, |s| s.chief_beaten_2),
+        say(1, Face::Happy, |s| s.chief_beaten_3),
+        say(1, Face::Normal, |s| s.chief_beaten_4),
+        Step::Move {
+            actor: 1,
+            to: entrance,
+            speed: 50.0,
+        },
+        Step::Hide { actor: 1 },
+        say(0, Face::Determined, |s| s.chief_beaten_5),
+    ];
+    Cutscene::new(actors, steps)
+}
+
+/// 쉼터에 닿았다. 첫 쉼터는 포포·보리가 쉼터를 알려 주고, 그 뒤로는 보리 한마디.
+pub fn camp_arrive(w: &World, stage: u32) -> Cutscene {
+    if stage <= 1 {
+        talk(
+            w,
+            &[
+                (Speaker::Popo, |s| s.camp_1, Face::Happy),
+                (Speaker::Popo, |s| s.camp_2, Face::Normal),
+                (Speaker::Bori, |s| s.camp_3, Face::Normal),
+            ],
+        )
+    } else {
+        talk(w, &[(Speaker::Bori, |s| s.camp_again, Face::Happy)])
+    }
+}
+
 // ---- 스크립트 ---------------------------------------------------------------
 
 /// 오프닝: Naïl이 첫 방에 들어서고, 물든 이웃(모모, 아직 이름 모름)이 길을 막는다.
@@ -393,7 +537,7 @@ pub fn opening(w: &World) -> Cutscene {
         nail,
         Actor {
             name: "???",
-            sprite: Some(crate::art::MOMO_ROW),
+            sprite: Some(Sprite::Critter(crate::art::MOMO_ROW)),
             color: neighbor,
             portrait: Some(Portrait::MOMO_TAINTED),
             pos: vec2(280.0, 90.0),

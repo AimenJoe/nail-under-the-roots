@@ -4,7 +4,7 @@
 
 - 컨셉: [`docs/concept.md`](docs/concept.md)
 - 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md) (1단계 전투 프로토타입, 회색 박스)
-- 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 캐릭터·대체 타일은 직접 그림(원본 `tools/art/*.py`, `python3 tools/art/nail.py && python3 tools/art/tiles.py`로 PNG 재생성). 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
+- 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 캐릭터·대체 타일은 직접 그림(원본 `tools/art/*.py`, `python3 tools/art/<이름>.py`로 PNG 재생성 — nail·critters·chief·portraits·tiles). 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
 - 결정 기록: [`docs/decisions/`](docs/decisions/)
 - 지식 베이스: [AimenJoe/KB](https://github.com/AimenJoe/KB) (`maps/gamedev.md`)
 
@@ -48,6 +48,7 @@ python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 - **적 = 물든 이웃**: 들쥐·생쥐 떼·시궁쥐(돌격), 다람쥐(도토리), 청설모(뛰어 덮치기). 종류 표는 `src/species.rs`, 그림은 `tools/art/critters.py`. 메뉴 → 도감에 만난 이웃이 말로 된 능력(체력·힘·빠르기)과 이야기·요령으로 적힌다(docs/decisions/0021). 개발 시나리오 "적 다섯 종".
 - **공격 예고**: 적이 공격을 준비하면 맞을 자리(돌진 길·도토리 줄·착지 고리)가 바닥에 붉게, 공격 순간이 가까울수록 진하게 깜빡인다(docs/decisions/0025).
 - **화폐**: 반딧불(기술 해금, 많이) · 씨앗(상점, 드물게·상자·보스). 둘 다 HUD 왼쪽 위(docs/decisions/0021).
+- **스테이지 고리**: 필드 남쪽 공터의 튜토리얼 보스(들쥐 대장 보리) → 굴 아래 쉼터(체력 가득·저장·포포 가게·이웃) → 뿌리 길 곁에서 공격 버튼 = 길 지도 → 갈래마다 다른 굴(굴·둥지·저장고·샘) → 그 길의 보스 → 다음 쉼터(docs/decisions/0030~0032). 개발 시나리오 "튜토리얼 보스", "쉼터".
 - **모험**: 필드(연속 스크롤, 자는 적, 저장 지점)에서 굴 입구로 절차적 던전(화면 방, 들어서면 문이 닫히고 다 잡으면 열림, 보물·휴식·보스방)으로. 쓰러지면 저장 지점에서 다시(docs/decisions/0019). 개발 시나리오 "필드(모험)", "던전 바로", "아레나 웨이브".
 - **패링**: 공격을 적 공격이 닿기 직전(스윙 첫 0.12초)에 앞쪽으로 맞추면 돌진은 크게 멈칫, 투사체는 되돌아간다. SP가 크게 찬다(docs/decisions/0020).
 - **필살기 드릴 돌진**: 분노가 차면 L/B. 시동(적이 멈추고 화면이 어두워짐) → 부아아앙 화면 한 폭 돌진, 연타로 적을 벽까지 끌고 가 쾅(docs/decisions/0018, 0024). 개발 시나리오 "장신구·필살기 확인".

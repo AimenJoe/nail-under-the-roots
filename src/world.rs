@@ -36,14 +36,37 @@ pub struct Fx {
     pub kind: FxKind,
 }
 
-/// 이웃 NPC(지금은 라쿤 포포 하나): 서 있거나 플레이어 곁으로 걸어온다. 막지 않는다.
+/// 이웃이 누구인가(그림·말).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Who {
+    /// 라쿤 포포: 튜토리얼 안내, 쉼터의 가게.
+    Popo,
+    /// 들쥐 대장 보리: 튜토리얼 보스였다가 돌아온 이웃(docs/decisions/0032).
+    Bori,
+}
+
+/// 이웃 NPC: 서 있거나(쉼터) 플레이어 곁으로 걸어온다(튜토리얼의 포포). 막지 않는다.
 #[derive(Debug, Clone, Copy)]
 pub struct Npc {
+    pub who: Who,
     pub pos: Vec2,
     pub prev_pos: Vec2,
     pub face_left: bool,
     /// 따라갈 곳(없으면 제자리).
     pub target: Option<Vec2>,
+}
+
+impl Npc {
+    /// 제자리에 서 있는 이웃(쉼터).
+    pub fn standing(who: Who, pos: Vec2) -> Self {
+        Self {
+            who,
+            pos,
+            prev_pos: pos,
+            face_left: false,
+            target: None,
+        }
+    }
 }
 
 /// 얻은 것(앱이 가방에 넣고 획득 창을 띄운다).
@@ -89,8 +112,10 @@ pub struct World {
     kills_since_berry: u32,
     /// 이번 틱에 얻은 것. 앱이 가방에 넣고 비운다. 획득물·컷씬·보물 상자 모두 여기로.
     pub gifts: Vec<Gift>,
-    /// 이웃 NPC(튜토리얼의 포포).
+    /// 따라다니는 이웃(튜토리얼의 포포).
     pub npc: Option<Npc>,
+    /// 제자리의 이웃(쉼터의 포포·보리, 공터에서 돌아온 보리).
+    pub neighbors: Vec<Npc>,
     /// 연습: 맞아도 체력이 줄지 않는다(튜토리얼).
     pub no_damage: bool,
     /// 튜토리얼용 통계: 패링·아이템 먹기·필살기(튀어 나간 수)·솟구침 명중.
@@ -150,6 +175,7 @@ impl World {
             charms_found: Vec::new(),
             seen: Vec::new(),
             npc: None,
+            neighbors: Vec::new(),
             no_damage: false,
             parries: 0,
             items_used: 0,
@@ -437,6 +463,7 @@ impl World {
                 .push(ring(e.pos, e.radius(), e.radius() * 3.0, 0.25, POISON));
             burst(&mut self.fx, e.pos, 10, color, 90.0);
         }
+        let mut summon = false;
         for ev in &self.enemy_events {
             match ev {
                 enemy::Event::Charge => sfx.play(sfx::Id::Charge),
@@ -450,6 +477,30 @@ impl World {
                     sfx.play(sfx::Id::WallHit);
                     self.feel.add_trauma(0.12);
                 }
+                enemy::Event::Summon => summon = true,
+            }
+        }
+        // 대장이 울부짖으면 양옆에 생쥐 떼(셋).
+        if summon {
+            sfx.play(sfx::Id::Shoot);
+            self.feel.add_trauma(0.2);
+            let chief: Vec<Vec2> = self
+                .enemies
+                .iter()
+                .filter(|e| e.is_boss())
+                .map(|e| e.pos)
+                .collect();
+            for c in chief {
+                let side = if self.player.pos.x > c.x { -1.0 } else { 1.0 };
+                let mut p = c + vec2(side * 34.0, 0.0);
+                self.room.resolve_circle(&mut p, 8.0);
+                for off in crate::species::pack_offsets(Kind::HouseMouse) {
+                    let mut e = Enemy::new(Kind::HouseMouse, p + off);
+                    e.wake_delay = 0.4;
+                    self.enemies.push(e);
+                }
+                self.fx.push(ring(p, 4.0, 18.0, 0.3, DIRT));
+                burst(&mut self.fx, p, 10, DIRT, 70.0);
             }
         }
         for p in self.projectiles.iter_mut().filter(|_| !frozen) {
@@ -777,6 +828,9 @@ impl World {
             l.prev_pos = l.pos;
         }
         if let Some(n) = self.npc.as_mut() {
+            n.prev_pos = n.pos;
+        }
+        for n in &mut self.neighbors {
             n.prev_pos = n.pos;
         }
         self.adv.prev_cam = self.adv.cam;

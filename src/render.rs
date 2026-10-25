@@ -50,6 +50,9 @@ pub struct Renderer {
     art: Option<Art>,
     /// 글자를 미리 구운 (언어, 배율, dpi). 바뀌면(언어 전환·창 크기) 다시 굽는다.
     warmed: std::cell::Cell<Option<(crate::i18n::Lang, u32, u32)>>,
+    /// 이번 프레임 월드 화면의 왼쪽 위(월드 좌표, 흔들림 포함). 월드 패스 뒤에는 카메라가 화면 고정이라
+    /// 컷씬 배우는 이걸 빼서 그린다(`to_view`).
+    view_origin: Vec2,
 }
 
 impl Renderer {
@@ -64,6 +67,7 @@ impl Renderer {
             fonts,
             art,
             warmed: std::cell::Cell::new(None),
+            view_origin: Vec2::ZERO,
         }
     }
 
@@ -79,6 +83,7 @@ impl Renderer {
             .map(|w| lerp(w.adv.prev_cam, w.adv.cam, alpha))
             .unwrap_or(Vec2::ZERO);
         self.cam.target = cam + center + shake;
+        self.view_origin = cam + shake;
         set_camera(&self.cam);
         let Some(w) = w else {
             clear_background(BG);
@@ -191,6 +196,12 @@ impl Renderer {
             ui.warm(&crate::i18n::s().glyphs(), crate::ui::FONT_PX);
         }
         ui
+    }
+
+    /// 월드 좌표 → 이번 프레임 화면 좌표(월드 패스가 끝난 뒤 그리는 컷씬 배우용).
+    /// 오프닝은 카메라가 (0, 0)인 첫 화면이라 그냥 써도 맞았지만, 지도 다른 곳의 컷씬(보스 처치)은 화면 밖으로 나갔다.
+    pub fn to_view(&self, p: Vec2) -> Vec2 {
+        p - self.view_origin
     }
 
     /// 컷씬 배우(그림이 있는 이웃). 그림이 없으면 색 동그라미.
@@ -323,8 +334,69 @@ impl Renderer {
                 Color::new(0.92, 0.86, 0.76, a),
             );
         }
+        draw_boss_bar(ui, w);
         draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
     }
+
+    /// 도감 그림(대장): chief.png 줄 0의 `frame`칸을 `r`에 정수 배율로.
+    pub fn draw_chief_icon(&self, ui: &Ui, r: Rect, frame: u32) {
+        let Some(tex) = self.art.as_ref().and_then(|a| a.chief.as_ref()) else {
+            return;
+        };
+        let k = ((r.w / art::CHIEF_CELL).floor() * ui.scale)
+            .max(ui.scale * 0.5)
+            .floor();
+        let size = art::CHIEF_CELL * k.max(1.0);
+        let p = ui.px(vec2(r.x, r.y));
+        let (bw, bh) = (r.w * ui.scale, r.h * ui.scale);
+        draw_texture_ex(
+            tex,
+            (p.x + (bw - size) / 2.0).round(),
+            (p.y + (bh - size) / 2.0).round(),
+            WHITE,
+            DrawTextureParams {
+                source: Some(art::chief_cell(frame, art::CHIEF_TAINTED)),
+                dest_size: Some(vec2(size, size)),
+                ..Default::default()
+            },
+        );
+    }
+
+    /// 컷씬 배우: 돌아온 보리.
+    pub fn draw_bori_actor(&self, pos: Vec2, facing: Vec2, moving: bool) {
+        if let Some(art) = &self.art {
+            draw_bori_at(art, pos, facing.x < 0.0, moving, get_time() as f32);
+        }
+    }
+}
+
+/// 보스 체력 막대(화면 아래 가운데): 이름 + 막대. 깨어 있는 보스가 있을 때만.
+fn draw_boss_bar(ui: &Ui, w: &World) {
+    let Some(b) = w.enemies.iter().find(|e| e.is_boss() && !e.asleep) else {
+        return;
+    };
+    let name = crate::i18n::tr(b.sp().name);
+    let bar = Rect::new(90.0, 168.0, 140.0, 5.0);
+    let nw = ui.text_w(name, crate::ui::FONT_PX) + 10.0;
+    ui.rect(
+        Rect::new(160.0 - nw / 2.0, 152.0, nw, crate::ui::FONT_PX + 3.0),
+        Color::new(0.07, 0.05, 0.09, 0.75),
+    );
+    ui.text_center(name, 160.0, 153.0, crate::ui::FONT_PX, crate::ui::ACCENT);
+    ui.rect(
+        Rect::new(bar.x - 1.0, bar.y - 1.0, bar.w + 2.0, bar.h + 2.0),
+        OUTLINE,
+    );
+    ui.rect(bar, Color::new(0.20, 0.10, 0.14, 1.0));
+    let k = (b.hp.max(0) as f32 / b.sp().hp as f32).clamp(0.0, 1.0);
+    ui.rect(
+        Rect::new(bar.x, bar.y, (bar.w * k).round(), bar.h),
+        Color::new(0.85, 0.30, 0.38, 1.0),
+    );
+    ui.rect(
+        Rect::new(bar.x, bar.y, (bar.w * k).round(), 1.0),
+        Color::new(1.0, 0.6, 0.62, 1.0),
+    );
 }
 
 /// 퀵 슬롯(왼쪽 아래): 산딸기·지렁이 두 칸, 고른 칸은 테두리 강조, 개수, 먹기 키 안내.
@@ -928,6 +1000,45 @@ fn draw_grid_art(art: &Art, w: &World, cam: Vec2) {
                         Color::new(1.0, 1.0, 0.8, pulse),
                     );
                 }
+                Cell::Gate => {
+                    // 뿌리 길: 뿌리가 감싼 큰 구멍 + 팻말.
+                    let root = Color::new(0.42, 0.30, 0.24, 1.0);
+                    draw_ellipse(p.x, p.y + 2.0, 15.0, 8.0, 0.0, OUTLINE);
+                    draw_ellipse(p.x, p.y + 2.0, 13.0, 6.5, 0.0, world::DIRT);
+                    draw_ellipse(
+                        p.x,
+                        p.y + 3.0,
+                        10.0,
+                        4.5,
+                        0.0,
+                        Color::new(0.03, 0.02, 0.04, 1.0),
+                    );
+                    for k in 0..4 {
+                        let a = std::f32::consts::PI * (0.1 + k as f32 * 0.27);
+                        let q = p + vec2(a.cos() * 13.0, 2.0 - a.sin() * 6.5);
+                        draw_line(q.x, q.y, q.x + a.cos() * 4.0, q.y - 3.0, 2.0, root);
+                    }
+                    let pulse = 0.4 + 0.3 * (w.time * 2.0).sin().abs();
+                    draw_ellipse(
+                        p.x,
+                        p.y + 3.0,
+                        4.0,
+                        1.5,
+                        0.0,
+                        Color::new(0.7, 0.9, 1.0, pulse * 0.4),
+                    );
+                    // 팻말(왼쪽 위)
+                    let s = p + vec2(-17.0, -10.0);
+                    draw_rectangle(s.x, s.y + 4.0, 1.0, 9.0, root);
+                    draw_rectangle(s.x - 4.0, s.y - 1.0, 10.0, 6.0, OUTLINE);
+                    draw_rectangle(s.x - 3.0, s.y, 8.0, 4.0, Color::new(0.66, 0.50, 0.32, 1.0));
+                    draw_triangle(
+                        vec2(s.x + 6.0, s.y - 1.0),
+                        vec2(s.x + 6.0, s.y + 5.0),
+                        vec2(s.x + 9.0, s.y + 2.0),
+                        OUTLINE,
+                    );
+                }
                 Cell::Save => {
                     let pulse = 0.55 + 0.35 * (w.time * 2.0).sin().abs();
                     draw_circle(p.x, p.y, 9.0, Color::new(0.55, 1.0, 0.6, 0.12 * pulse));
@@ -976,6 +1087,129 @@ fn draw_chest(r: Rect, opened: bool, time: f32) {
             draw_rectangle(x + 10.0, y - 2.0, 3.0, 1.0, WHITE);
         }
     }
+}
+
+/// 돌아온 보리(chief.png 줄 1, 32×32). 발이 `pos.y + 6` 근처.
+pub fn draw_bori_at(art: &Art, pos: Vec2, face_left: bool, moving: bool, time: f32) {
+    let Some(tex) = art.chief.as_ref() else {
+        draw_circle(pos.x, pos.y, 10.0, Color::new(0.62, 0.45, 0.36, 1.0));
+        return;
+    };
+    let frame = if moving {
+        2 + ((time * 6.0) as u32) % 2
+    } else {
+        ((time * 1.5) as u32) % 2
+    };
+    draw_texture_ex(
+        tex,
+        (pos.x - 16.0).round(),
+        (pos.y - 24.0).round(),
+        WHITE,
+        DrawTextureParams {
+            source: Some(art::chief_cell(frame, art::CHIEF_BORI)),
+            dest_size: Some(vec2(32.0, 32.0)),
+            flip_x: face_left,
+            ..Default::default()
+        },
+    );
+}
+
+/// 쉼터 모닥불: 돌 둘레 + 장작 + 흔들리는 불꽃 + 바닥 빛.
+fn draw_campfire(r: Rect, time: f32) {
+    let c = vec2(r.center().x, r.bottom() - 5.0);
+    let flick = (time * 9.0).sin() * 0.5 + (time * 13.7).sin() * 0.5;
+    draw_circle(
+        c.x,
+        c.y - 2.0,
+        22.0 + flick,
+        Color::new(1.0, 0.65, 0.3, 0.07),
+    );
+    draw_circle(
+        c.x,
+        c.y - 2.0,
+        13.0 + flick * 0.5,
+        Color::new(1.0, 0.7, 0.35, 0.08),
+    );
+    let stone = Color::new(0.45, 0.42, 0.44, 1.0);
+    for k in 0..7 {
+        let a = k as f32 / 7.0 * std::f32::consts::TAU;
+        let p = c + vec2(a.cos() * 7.0, a.sin() * 3.0);
+        draw_rectangle((p.x - 1.5).round(), (p.y - 1.0).round(), 3.0, 2.0, OUTLINE);
+        draw_rectangle((p.x - 1.0).round(), (p.y - 1.0).round(), 2.0, 1.0, stone);
+    }
+    let wood = Color::new(0.45, 0.30, 0.20, 1.0);
+    draw_line(c.x - 5.0, c.y + 1.0, c.x + 5.0, c.y - 2.0, 2.0, wood);
+    draw_line(c.x - 5.0, c.y - 2.0, c.x + 5.0, c.y + 1.0, 2.0, wood);
+    let h = 7.0 + flick * 1.5;
+    draw_triangle(
+        vec2(c.x - 4.0, c.y - 1.0),
+        vec2(c.x + 4.0, c.y - 1.0),
+        vec2(c.x + flick, c.y - h - 3.0),
+        Color::new(0.95, 0.45, 0.2, 1.0),
+    );
+    draw_triangle(
+        vec2(c.x - 2.5, c.y - 1.0),
+        vec2(c.x + 2.5, c.y - 1.0),
+        vec2(c.x + flick * 0.5, c.y - h),
+        Color::new(1.0, 0.85, 0.35, 1.0),
+    );
+    // 불티
+    for k in 0..3 {
+        let ph = (time * 0.9 + k as f32 * 0.33).fract();
+        let x = c.x + ((k as f32 * 2.1 + time * 2.0).sin() * 4.0);
+        draw_rectangle(
+            x.round(),
+            (c.y - 8.0 - ph * 16.0).round(),
+            1.0,
+            1.0,
+            Color::new(1.0, 0.8, 0.4, 1.0 - ph),
+        );
+    }
+}
+
+/// 포포의 가게 좌판: 나무 상자 + 줄무늬 차양 + 산딸기·지렁이 단지.
+fn draw_stall(r: Rect) {
+    let wood = Color::new(0.55, 0.36, 0.22, 1.0);
+    let dark = Color::new(0.36, 0.22, 0.14, 1.0);
+    let (x, y) = (r.x, r.bottom() - 12.0);
+    draw_rectangle(x - 1.0, y - 1.0, 18.0, 13.0, OUTLINE);
+    draw_rectangle(x, y, 16.0, 11.0, wood);
+    draw_rectangle(x, y + 8.0, 16.0, 3.0, dark);
+    // 차양(위로 솟은 막대 둘 + 줄무늬 천)
+    draw_rectangle(x, y - 14.0, 1.0, 14.0, dark);
+    draw_rectangle(x + 15.0, y - 14.0, 1.0, 14.0, dark);
+    for k in 0..4 {
+        let c = if k % 2 == 0 {
+            Color::new(0.85, 0.35, 0.35, 1.0)
+        } else {
+            Color::new(0.95, 0.88, 0.75, 1.0)
+        };
+        draw_rectangle(x - 1.0 + k as f32 * 4.5, y - 17.0, 4.5, 4.0, c);
+    }
+    draw_rectangle(x - 1.0, y - 13.0, 18.0, 1.0, OUTLINE);
+    // 물건
+    draw_circle(x + 4.0, y - 1.0, 2.0, world::BERRY);
+    draw_circle(x + 7.0, y - 1.0, 2.0, world::BERRY);
+    draw_rectangle(x + 10.0, y - 3.0, 4.0, 3.0, world::SEED);
+}
+
+/// 빈 자리: 통나무 의자 + 시든 꽃잎 하나(모모가 돌아올 곳).
+fn draw_seat(r: Rect) {
+    let bark = Color::new(0.42, 0.28, 0.20, 1.0);
+    let ring = Color::new(0.75, 0.58, 0.40, 1.0);
+    let (x, y) = (r.x + 1.0, r.bottom() - 9.0);
+    draw_rectangle(x - 1.0, y - 1.0, 16.0, 10.0, OUTLINE);
+    draw_rectangle(x, y + 2.0, 14.0, 6.0, bark);
+    draw_ellipse(x + 7.0, y + 2.0, 7.0, 2.5, 0.0, ring);
+    draw_ellipse_lines(x + 7.0, y + 2.0, 4.0, 1.2, 0.0, 1.0, bark);
+    // 시든 꽃잎
+    draw_rectangle(
+        x + 10.0,
+        y + 1.0,
+        2.0,
+        1.0,
+        Color::new(0.69, 0.50, 0.55, 1.0),
+    );
 }
 
 /// 3/4 방: 바닥(풀·흙) + 장식, 좌·우·아래 벽 윗면, 위쪽은 벽 윗면 + 벼랑 앞면.
@@ -1064,6 +1298,7 @@ enum Drawable {
     Enemy(usize),
     Projectile(usize),
     Npc,
+    Neighbor(usize),
 }
 
 /// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
@@ -1092,6 +1327,12 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
         let q = lerp(n.prev_pos, n.pos, alpha);
         list.push((q.y + 6.0, Drawable::Npc));
         draw_ellipse(q.x, q.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+    }
+    for (i, n) in w.neighbors.iter().enumerate() {
+        let big = n.who == world::Who::Bori;
+        list.push((n.pos.y + 6.0, Drawable::Neighbor(i)));
+        let rx = if big { 12.0 } else { 6.0 };
+        draw_ellipse(n.pos.x, n.pos.y + 6.0, rx, 2.5, 0.0, SHADOW_SOFT);
     }
     for (i, e) in w.enemies.iter().enumerate() {
         let ep = lerp(e.prev_pos, e.pos, alpha);
@@ -1130,6 +1371,9 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                         draw_tile(&art.tiles, src, r.x, r.bottom() - 32.0, w.biome.wall_tint());
                     }
                     PropKind::Chest { opened } => draw_chest(r, opened, w.time),
+                    PropKind::Campfire => draw_campfire(r, w.time),
+                    PropKind::Stall => draw_stall(r),
+                    PropKind::Seat => draw_seat(r),
                 }
             }
             Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
@@ -1142,6 +1386,18 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                     let q = lerp(n.prev_pos, n.pos, alpha);
                     let moving = (n.pos - n.prev_pos).length() > 0.05;
                     draw_critter_at(tex, art::RACCOON_ROW, q, n.face_left, moving, w.time);
+                }
+            }
+            Drawable::Neighbor(i) => {
+                let n = &w.neighbors[i];
+                let left = (w.player.pos.x < n.pos.x) != n.face_left;
+                match n.who {
+                    world::Who::Popo => {
+                        if let Some(tex) = art.critters.as_ref() {
+                            draw_critter_at(tex, art::RACCOON_ROW, n.pos, left, false, w.time);
+                        }
+                    }
+                    world::Who::Bori => draw_bori_at(art, n.pos, left, false, w.time),
                 }
             }
         }
@@ -1498,6 +1754,20 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         }
         _ => {}
     }
+    if let enemy::State::Howl { time: ht } = e.state {
+        frame = 7;
+        // 울음: 퍼지는 고리 둘.
+        for k in 0..2 {
+            let ph = ((ht * 2.5) + k as f32 * 0.5).fract();
+            draw_circle_lines(
+                pos.x,
+                pos.y - 4.0,
+                r + 4.0 + ph * 22.0,
+                1.0,
+                Color::new(1.0, 0.85, 0.8, 0.6 * (1.0 - ph)),
+            );
+        }
+    }
     if e.asleep {
         frame = 1;
         // 자는 중: Z가 떠오른다.
@@ -1509,6 +1779,23 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         draw_line(z.x, z.y + 3.0, z.x + 3.0, z.y + 3.0, 1.0, c);
     }
     let flash = e.flash > 0.0;
+    if let (true, Some(tex)) = (e.is_boss(), art.and_then(|a| a.chief.as_ref())) {
+        // 대장: 32×32(발바닥 y=30).
+        let row = art::CHIEF_TAINTED + if flash { art::CHIEF_ROWS } else { 0 };
+        draw_texture_ex(
+            tex,
+            (pos.x - 16.0).round(),
+            (pos.y + r - 30.0).round(),
+            if flash { WHITE } else { tint },
+            DrawTextureParams {
+                source: Some(art::chief_cell(frame, row)),
+                dest_size: Some(vec2(32.0, 32.0)),
+                flip_x: e.facing.x < 0.0,
+                ..Default::default()
+            },
+        );
+        return;
+    }
     match art.and_then(|a| a.critters.as_ref()) {
         Some(tex) => {
             let row = sp.sheet_row + if flash { art::CRITTER_ROWS } else { 0 };
@@ -1536,8 +1823,8 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             draw_circle(nose.x.round(), nose.y.round(), 1.5, BLACK);
         }
     }
-    // 체력 점(맞은 적만: 처음부터 숫자를 늘어놓지 않는다)
-    if e.hp < sp.hp || sp.behavior == crate::species::Behavior::Dummy {
+    // 체력 점(맞은 적만: 처음부터 숫자를 늘어놓지 않는다). 보스는 화면 아래 막대.
+    if !e.is_boss() && (e.hp < sp.hp || sp.behavior == crate::species::Behavior::Dummy) {
         let max = sp.hp;
         for i in 0..max {
             let c = if i < e.hp { WHITE } else { DARKGRAY };
@@ -1613,7 +1900,9 @@ fn draw_telegraphs(w: &World, alpha: f32) {
         let sp = e.sp();
         let pos = lerp(e.prev_pos, e.pos, alpha);
         let (k, kind) = match e.state {
-            enemy::State::Windup { time } if sp.behavior == Behavior::Charger => {
+            enemy::State::Windup { time }
+                if matches!(sp.behavior, Behavior::Charger | Behavior::Chief) =>
+            {
                 ((time / sp.windup).min(1.0), 0)
             }
             enemy::State::Aim { time } => ((time / sp.windup).min(1.0), 1),

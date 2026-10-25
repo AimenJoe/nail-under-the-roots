@@ -6,6 +6,8 @@
   칸 4  : 변해 버린 이웃(아직 정체를 모름: 그림자 + 빛나는 눈 + 뿌리)
   칸 5~6: 라쿤 포포(튜토리얼 안내) 보통·기쁨
   칸 7~8: 모모(굴토끼, 히로인) 물든 모습 — 차가움·괴로움(docs/decisions/0029)
+  칸 9  : 들쥐 대장(튜토리얼 보스) 물든 모습 — 노려봄(docs/decisions/0032)
+  칸 10~11: 돌아온 보리(같은 들쥐) 보통·기쁨. 흉터는 남는다
 
 그리는 법(손 도트를 흉내 낸 절차):
   1. 부위를 타원으로 놓고 칸마다 재질을 정한다(뒤에 놓인 것부터).
@@ -45,7 +47,14 @@ RAMP = {
     'mear':   [(50, 28, 56), (76, 42, 80), (104, 62, 104)],
     'vroot':  [(40, 20, 52), (70, 38, 88), (108, 62, 132), (150, 96, 174)],
     'mflower': [(96, 62, 78), (130, 88, 104), (162, 118, 130), (188, 150, 156)],
+    # 보리(늙은 들쥐 대장): 붉은 기 도는 갈색. 물들면 자두빛으로 기울고 어두워진다(critters.py taint와 같은 방향).
+    'rfur':   [(62, 40, 34), (98, 66, 50), (134, 94, 70), (170, 128, 94), (204, 164, 124)],
+    'tfur':   [(42, 28, 40), (66, 46, 58), (92, 66, 76), (118, 88, 96), (144, 112, 118)],
+    'rmuz':   [(150, 118, 100), (188, 158, 130), (216, 192, 160), (238, 220, 192)],
+    'tmuz':   [(104, 84, 96), (132, 110, 120), (158, 136, 144), (182, 162, 166)],
+    'scar':   [(150, 110, 104), (196, 160, 150), (226, 200, 188)],
 }
+RED_EYE = [(80, 14, 34), (190, 34, 72), (255, 84, 116), (255, 222, 230)]
 GLOW_EYE = [(40, 70, 36), (110, 190, 70), (190, 245, 120), (240, 255, 210)]
 OUTLINE_BASE = (43, 29, 42)
 BLUSH = (236, 120, 128)
@@ -527,6 +536,105 @@ def momo_tainted(face):
     return cv
 
 
+# ---- 들쥐 대장 / 보리 ---------------------------------------------------------------------
+def bori(face):
+    """들쥐 대장(보리): 크고 둥근 귀(먼 귀는 찢겨 이가 빠짐), 길쭉한 주둥이와 앞니, 가까운 눈을 지나는 흉터.
+    face: 'tainted'(물듦: 붉은 눈, 머리 위 뿌리 왕관, 찌푸림) / 'normal' / 'happy'(돌아온 보리)."""
+    cv = Canvas()
+    tainted = face == 'tainted'
+    fur, muz = ('tfur', 'tmuz') if tainted else ('rfur', 'rmuz')
+    # 먼 귀(뒤, 왼쪽 위): 가장자리가 찢겨 V자로 빠졌다.
+    ellipse(cv, 22, 22, 12, 13, fur, bias=-0.1)
+    flat(cv, 23, 23, 7, 8, 'pink', 1)
+    for y in range(8, 16):
+        for x in range(17 - (y - 8) // 2, 19 + (y - 8) // 2):
+            if y < 13 or abs(x - 18) < 15 - y:
+                cv.mat[y][x] = None
+    # 가까운 귀(오른쪽 위): 크고 둥글다.
+    ellipse(cv, 60, 18, 14, 15, fur, bias=0.06)
+    flat(cv, 61, 20, 9, 10, 'pink', 2)
+    # 머리: 볼털이 아래로 삐죽.
+
+    def cheeks(x, y, ang):
+        r = tuft(x, y, ang)
+        if 0.3 < ang < 1.4 or 1.8 < ang < 2.9:
+            r *= 1.0 + 0.08 * (0.5 + 0.5 * math.sin(ang * 8.0))
+        return r
+    ellipse(cv, 38, 54, 31, 26, fur, bias=0.05, rough=cheeks)
+    # 어깨(아래로 잘림)
+    ellipse(cv, 34, 94, 26, 12, fur, bias=-0.15)
+    # 길쭉한 주둥이와 코
+    ellipse(cv, 62, 60, 17, 11, muz, bias=0.05)
+    ellipse(cv, 77, 55, 4.2, 3.4, 'pink', bias=-0.1)
+    if tainted:
+        # 머리 위 뿌리 왕관: 가지 셋이 위로 솟는다.
+        for (pts, w) in (
+            ([(30, 32), (28, 22), (24, 12), (26, 5)], 3),
+            ([(38, 30), (40, 20), (38, 10)], 2),
+            ([(46, 32), (50, 24), (48, 16)], 2),
+            ([(24, 12), (19, 9)], 2),
+            ([(10, 60), (18, 66), (16, 76)], 2),
+        ):
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+                n = int(max(abs(x1 - x0), abs(y1 - y0))) * 2 + 1
+                for i in range(n + 1):
+                    t = i / n
+                    x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+                    for oy in range(-(w // 2), w // 2 + 1):
+                        for ox in range(-(w // 2), w // 2 + 1):
+                            if ox * ox + oy * oy <= (w / 2) ** 2 + 0.5:
+                                cv.put(int(x + ox), int(y + oy), 'vroot', 2 if ox < 0 else 1)
+    outline(cv)
+    rim_light(cv, fur)
+    if tainted:
+        for (x, y) in ((26, 6), (38, 11), (48, 17), (28, 20), (16, 70)):
+            cv.paint(x, y, RAMP['vroot'][3])
+    # 앞니(쥐): 코 아래 흰 두 칸.
+    for (x, y) in ((70, 66), (71, 66), (72, 66), (70, 67), (71, 67), (72, 67), (70, 68), (72, 68)):
+        cv.paint(x, y, RAMP['claw'][2])
+    cv.paint(71, 68, RAMP['claw'][0])
+    # 수염
+    for pts in (((72, 58), (84, 55)), ((73, 61), (86, 61)), ((72, 64), (84, 67))):
+        line(cv, list(pts), RAMP[muz][3], 1)
+    # 눈
+    eyes = ((40, 44, 5.4, 6.4), (58, 41, 4.2, 5.2))
+    if tainted:
+        for (ex, ey, rx, ry) in eyes:
+            for y in range(int(ey - ry - 1), int(ey + ry + 2)):
+                for x in range(int(ex - rx - 1), int(ex + rx + 2)):
+                    dx, dy = (x + 0.5 - ex) / rx, (y + 0.5 - ey) / ry
+                    d = dx * dx + dy * dy
+                    if d <= 1.0:
+                        cv.paint(x, y, RED_EYE[0] if d > 0.7 else (RED_EYE[1] if dy > 0.1 else RED_EYE[2]))
+            cv.paint(int(ex - rx * 0.4), int(ey - ry * 0.4), RED_EYE[3])
+            cv.paint(int(ex - rx * 0.4) + 1, int(ey - ry * 0.4), RED_EYE[3])
+        # 찌푸린 눈썹(안쪽이 내려감)
+        line(cv, [(32, 33), (46, 38)], RAMP[fur][0], 2)
+        line(cv, [(53, 35), (63, 32)], RAMP[fur][0], 2)
+        # 이를 드러낸 입
+        line(cv, [(60, 70), (64, 71), (69, 70)], MOUTH, 1)
+    elif face == 'happy':
+        happy_eye(cv, 40, 45, 5.0)
+        happy_eye(cv, 58, 42, 3.8)
+        dither_ellipse(cv, 48, 60, 5.0, 2.6, BLUSH, 0.5)
+        for (x, y) in ((60, 70), (61, 71), (62, 72), (63, 72), (64, 72), (65, 71), (66, 70)):
+            cv.paint(x, y, MOUTH)
+        for (x, y) in ((62, 73), (63, 73), (64, 73)):
+            cv.paint(x, y, RAMP['pink'][2])
+    else:
+        eye(cv, 40, 44, 5.0, 6.0)
+        eye(cv, 58, 41, 3.8, 4.8, look=(0.3, 0.0))
+        line(cv, [(33, 35), (46, 35)], RAMP[fur][1], 2)
+        line(cv, [(53, 33), (62, 33)], RAMP[fur][1], 2)
+        dither_ellipse(cv, 48, 60, 4.5, 2.2, BLUSH, 0.35)
+        line(cv, [(61, 71), (64, 72), (67, 71)], MOUTH, 1)
+    # 흉터: 가까운 눈 위에서 아래로 비스듬히(눈은 비켜 간다).
+    for (x, y) in ((33, 30), (34, 32), (35, 34), (36, 36), (44, 52), (45, 54), (46, 56)):
+        cv.paint(x, y, RAMP['scar'][2])
+        cv.paint(x + 1, y + 1, RAMP['scar'][0])
+    return cv
+
+
 def to_image(cv):
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     px = img.load()
@@ -545,6 +653,7 @@ def sheet():
     frames = [nail(f) for f in ('normal', 'happy', 'worried', 'determined')] + [neighbor()]
     frames += [raccoon('normal'), raccoon('happy')]
     frames += [momo_tainted('cold'), momo_tainted('pained')]
+    frames += [bori('tainted'), bori('normal'), bori('happy')]
     out = Image.new('RGBA', (W * len(frames), H), (0, 0, 0, 0))
     for i, cv in enumerate(frames):
         out.paste(to_image(cv), (i * W, 0))

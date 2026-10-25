@@ -18,6 +18,8 @@ pub enum Behavior {
     Leaper,
     /// 허수아비.
     Dummy,
+    /// 들쥐 대장(튜토리얼 보스): 돌진 ↔ 뛰어 찍기, 체력 반 아래면 생쥐를 부른다. 공격 중엔 안 멈춘다(enemy.rs).
+    Chief,
 }
 
 pub struct Species {
@@ -189,13 +191,42 @@ pub static DUMMY: Species = Species {
     ..BASE
 };
 
+/// 들쥐 대장(튜토리얼 보스, docs/decisions/0032). 원래는 들쥐 마을의 대장 보리. 뿌리에 물들어 남쪽 공터를 지킨다.
+/// 손맛: 예고가 길고(0.75초) 크게 보이는 대신, 맞아도 공격을 멈추지 않는다. 벽에 박으면 2초 넘게 어질어질(때릴 때).
+/// 그림은 32×32 따로(assets/art/chief.png). `sheet_row`는 쓰지 않는다.
+pub static CHIEF: Species = Species {
+    name: |s| s.mob_chief,
+    lore: |s| s.mob_chief_lore,
+    attack: |s| s.mob_chief_atk,
+    tip: |s| s.mob_chief_tip,
+    behavior: Behavior::Chief,
+    hp: 36,
+    radius: 11.0,
+    speed: 34.0,
+    damage: 1,
+    knock_mul: 0.15,
+    trigger: 120.0,
+    windup: 0.75,
+    dash_speed: 250.0,
+    dash_time: 0.6,
+    rest: 0.9,
+    wall_rest: 2.2,
+    land_radius: 26.0,
+    glowbugs: (20, 24),
+    seed_chance: 1.0,
+    color: Color::new(0.62, 0.45, 0.36, 1.0),
+    sheet_row: 0,
+    ..BASE
+};
+
 /// 도감 순서(허수아비는 빼고).
-pub const BESTIARY: [Kind; 5] = [
+pub const BESTIARY: [Kind; 6] = [
     Kind::FieldMouse,
     Kind::HouseMouse,
     Kind::SewerRat,
     Kind::Chipmunk,
     Kind::RedSquirrel,
+    Kind::Chief,
 ];
 
 pub fn of(kind: Kind) -> &'static Species {
@@ -206,6 +237,7 @@ pub fn of(kind: Kind) -> &'static Species {
         Kind::Chipmunk => &CHIPMUNK,
         Kind::RedSquirrel => &RED_SQUIRREL,
         Kind::Dummy => &DUMMY,
+        Kind::Chief => &CHIEF,
     }
 }
 

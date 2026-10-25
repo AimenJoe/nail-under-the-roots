@@ -2,7 +2,9 @@
 //!
 //! 칸 16px. 글자:
 //!   `#` 벽(벼랑)  `.` 바닥  `T` 그루터기  `R` 바위  `D` 던전 입구  `U` 출구(위로)  `S` 저장 지점  `+` 문
-//!   `P` 시작 위치  `o` 스폰 지점(튜토리얼)  적: `c` 들쥐  `m` 생쥐 떼  `r` 시궁쥐  `s` 다람쥐  `q` 청설모  (마커 칸은 바닥)
+//!   `P` 시작 위치  `o` 스폰 지점(튜토리얼)  적: `c` 들쥐  `m` 생쥐 떼  `r` 시궁쥐  `s` 다람쥐  `q` 청설모  `B` 들쥐 대장(보스)
+//!   쉼터(docs/decisions/0030): `G` 뿌리 길(길 지도)  `F` 모닥불  `k` 가게 좌판  `K` 포포 자리  `b` 보리 자리  `M` 빈 자리(통나무)
+//!   (마커 칸은 바닥)
 
 use macroquad::prelude::*;
 
@@ -23,6 +25,8 @@ pub enum Cell {
     Exit,
     /// 저장 지점(빛나는 버섯 고리). 닿으면 다시 시작할 곳이 된다.
     Save,
+    /// 쉼터의 뿌리 길: 곁에서 확인하면 길 지도가 열린다(밟아도 바닥).
+    Gate,
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +89,8 @@ pub struct Parsed {
     pub start: Vec2,
     pub spawn_points: Vec<Vec2>,
     pub enemies: Vec<(Kind, Vec2)>,
+    /// 이웃 자리 표시(`K` `b` `M`)와 그 칸 가운데.
+    pub marks: Vec<(char, Vec2)>,
 }
 
 /// 줄 길이가 다르면 짧은 줄은 벽으로 채운다.
@@ -96,6 +102,7 @@ pub fn parse(rows: &[&str]) -> Parsed {
     let mut start = cell_center(1, 1);
     let mut spawn_points = Vec::new();
     let mut enemies = Vec::new();
+    let mut marks = Vec::new();
     for (y, row) in rows.iter().enumerate() {
         for (x, ch) in row.chars().enumerate() {
             let at = cell_center(x, y);
@@ -106,6 +113,7 @@ pub fn parse(rows: &[&str]) -> Parsed {
                 'U' => Cell::Exit,
                 'S' => Cell::Save,
                 '+' => Cell::Door,
+                'G' => Cell::Gate,
                 _ => Cell::Floor,
             };
             grid.set(x, y, cell);
@@ -125,7 +133,19 @@ pub fn parse(rows: &[&str]) -> Parsed {
                 'r' => enemies.push((Kind::SewerRat, at)),
                 's' => enemies.push((Kind::Chipmunk, at)),
                 'q' => enemies.push((Kind::RedSquirrel, at)),
+                'B' => enemies.push((Kind::Chief, at)),
+                'F' | 'k' | 'M' => props.push(Prop {
+                    rect,
+                    kind: match ch {
+                        'F' => PropKind::Campfire,
+                        'k' => PropKind::Stall,
+                        _ => PropKind::Seat,
+                    },
+                }),
                 _ => {}
+            }
+            if matches!(ch, 'K' | 'b' | 'M') {
+                marks.push((ch, at));
             }
         }
     }
@@ -135,6 +155,7 @@ pub fn parse(rows: &[&str]) -> Parsed {
         start,
         spawn_points,
         enemies,
+        marks,
     }
 }
 

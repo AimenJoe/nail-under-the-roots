@@ -20,6 +20,12 @@ pub enum PropKind {
     Chest {
         opened: bool,
     },
+    /// 쉼터의 모닥불(docs/decisions/0030).
+    Campfire,
+    /// 쉼터 포포의 가게 좌판.
+    Stall,
+    /// 쉼터의 빈 자리(통나무). 돌아올 이웃의 자리.
+    Seat,
 }
 
 #[derive(Debug, Clone, Copy)]

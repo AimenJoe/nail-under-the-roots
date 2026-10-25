@@ -243,3 +243,22 @@ pub const SPAWN_MIN_DIST: f32 = 70.0;
 
 // ---- 사운드 ------------------------------------------------------------
 pub const MASTER_VOLUME: f32 = 0.5;
+
+// ---- 보스(들쥐 대장, docs/decisions/0032) ------------------------------------------
+/// 울부짖기 예고 = 예고 시간 × 이 배율.
+pub const CHIEF_HOWL_MUL: f32 = 1.6;
+/// 부하를 부르는 최대 횟수(한 번에 생쥐 떼 하나 = 셋).
+pub const CHIEF_SUMMONS: u32 = 2;
+/// 공격이 아닐 때 맞으면 멈칫하는 시간 배율(보통 적의 경직 × 이것).
+pub const CHIEF_STUN_MUL: f32 = 0.35;
+
+// ---- 쉼터·상점(docs/decisions/0030) ---------------------------------------------------
+/// 상점 값(씨앗). 산딸기 · 쥬시 지렁이 · 뿌리 심장(최대 체력 +1, 쉼터마다 하나) · 장신구.
+pub const PRICE_BERRY: u32 = 3;
+pub const PRICE_WORM: u32 = 10;
+pub const PRICE_HEART: u32 = 14;
+pub const PRICE_CHARM: u32 = 12;
+/// 길 지도의 끝 무리(굴·둥지)를 잡으면 나오는 씨앗.
+pub const PACK_SEEDS: u32 = 3;
+/// 이웃 곁에서 말 걸기 버튼이 먹히는 거리(px).
+pub const INTERACT_RADIUS: f32 = 22.0;

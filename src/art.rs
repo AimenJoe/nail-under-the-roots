@@ -14,6 +14,25 @@ pub struct Art {
     pub critters: Option<Texture2D>,
     /// 대화창 초상화: 88×88 칸 가로로(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
+    /// 들쥐 대장·보리(tools/art/chief.py): 32×32, 줄 0 물든 대장, 줄 1 보리, 줄 2·3 흰 실루엣.
+    pub chief: Option<Texture2D>,
+}
+
+/// chief.png 한 칸.
+pub const CHIEF_CELL: f32 = 32.0;
+/// chief.png의 줄: 물든 대장 / 돌아온 보리. 실루엣은 + CHIEF_ROWS.
+pub const CHIEF_TAINTED: u32 = 0;
+pub const CHIEF_BORI: u32 = 1;
+pub const CHIEF_ROWS: u32 = 2;
+
+/// chief.png의 칸 사각형.
+pub fn chief_cell(col: u32, row: u32) -> Rect {
+    inset(Rect::new(
+        col as f32 * CHIEF_CELL,
+        row as f32 * CHIEF_CELL,
+        CHIEF_CELL,
+        CHIEF_CELL,
+    ))
 }
 
 /// 초상화 한 칸(원본 px).
@@ -42,12 +61,17 @@ impl Art {
         if let Some(c) = &critters {
             c.set_filter(FilterMode::Nearest);
         }
+        let chief = load_texture("art/chief.png").await.ok();
+        if let Some(c) = &chief {
+            c.set_filter(FilterMode::Nearest);
+        }
         Some(Self {
             nail,
             tiles,
             dark: dark_mask(),
             critters,
             portraits,
+            chief,
         })
     }
 }

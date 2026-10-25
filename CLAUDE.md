@@ -27,7 +27,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - 손맛 수치는 `src/tuning.rs` 한 곳에. 적 종류별 수치·도감 글은 `src/species.rs` 표(docs/decisions/0021). 콤보(무기별)는 `src/moveset.rs`의 `Moveset` 표, 어떤 캐릭터가 어떤 무기 종류를 쓰는지는 `src/equipment.rs`(docs/decisions/0011). 플레이어 코드에 타별 숫자를 직접 쓰지 않는다(docs/decisions/0009).
 - UI는 커서 없이 동작해야 한다(좌우 이동 + 확인). 마우스는 보조.
 - 모듈 경계: `input`, `player`, `enemy`, `combat`, `room`, `render`, `world`(틱 순서). 각 모듈은 `Actions`와 월드 상태만 본다. 장면·메뉴는 `app`(+`ui`)에만 있고 `world`는 메뉴를 모른다.
-- 모험 구조(docs/decisions/0019): 장소·카메라·던전 오가기는 `adventure`, 격자·ASCII 기호는 `map`, 필드 지도는 `field`(ASCII를 고치면 `cargo test`의 field 테스트로 컷씬 줄·입구·저장 지점 확인), 던전 생성은 `dungeon`(같은 시드 = 같은 던전). 월드 좌표는 지도 전체, 화면은 `world.adv.cam`.
+- 모험 구조(docs/decisions/0019): 장소·카메라·던전 오가기는 `adventure`, 격자·ASCII 기호는 `map`, 필드 지도는 `field`(ASCII를 고치면 `cargo test`의 field 테스트로 컷씬 줄·입구·저장 지점 확인), 던전 생성은 `dungeon`(같은 시드 = 같은 던전). 월드 좌표는 지도 전체, 화면은 `world.adv.cam`. 스테이지 고리(0030~0032): 쉼터 지도는 `camp`, 길 지도(갈래)는 `route`, 굴 모양은 `dungeon::Params`, 길 지도·가게·말 걸기 화면은 `app/stage.rs`. 월드 패스 뒤 그리는 컷씬 배우는 `Renderer::to_view`로 화면 좌표.
 - 그림 문법은 3/4 탑다운(docs/decisions/0006). 아이소메트릭 아님.
 - 테스트용 방 구성은 `src/scenario.rs`에 한 줄 추가(타이틀 "개발"). 컷씬은 `src/cutscene.rs`의 `Step` 스크립트, JRPG식(docs/decisions/0008). 튜토리얼은 `src/tutorial.rs`의 단계 + 포포의 말(docs/decisions/0023).
 - 설정 저장은 `src/prefs.rs`(웹 localStorage 정수 칸). 칸 형식을 바꾸면 `MAGIC`을 올린다.
@@ -49,7 +49,7 @@ CI: `deploy-web.yml`이 위 세 줄을 돌리고 Netlify 시크릿이 있으면 
 ## 하지 않는 것
 - `mq_js_bundle.js`나 게임패드 JS 플러그인을 외부 URL로 핫링크하지 않는다. `web/`에 복사본.
 - 에셋 팩을 라이선스 확인 없이 커밋하지 않는다. `assets/LICENSES.md`에 기록. **이 레포는 공개다. 유료·제3자 팩 원본은 `assets/vendor/`(gitignore)에만 두고 커밋하지 않는다**(docs/decisions/0010). 팩 이미지를 AI 도구에 넣지 않는다.
-- 직접 그린 그림은 PNG를 손으로 고치지 않는다. `tools/art/*.py`를 고치고 다시 생성한다(Naïl `nail.py`, 적·이웃 `critters.py`, 초상화 `portraits.py`, 타일 `tiles.py`).
+- 직접 그린 그림은 PNG를 손으로 고치지 않는다. `tools/art/*.py`를 고치고 다시 생성한다(Naïl `nail.py`, 적·이웃 `critters.py`, 보스 `chief.py`, 초상화 `portraits.py`, 타일 `tiles.py`).
 - 1단계 범위 밖(에셋, 허브, 저장, 두 번째 캐릭터)을 판정 전에 만들지 않는다.
 - `cargo-quad-apk` 커밋(`build-android.yml`의 `CARGO_QUAD_APK_REV`)과 `web/*.js` 복사본은 의도적으로만 올린다. 올리면 CI 콘솔/로그를 확인한다.
 - 언어: 문서·커밋 메시지 한국어, 코드 식별자 영어.

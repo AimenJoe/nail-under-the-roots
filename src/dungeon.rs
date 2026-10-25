@@ -76,6 +76,7 @@ pub struct Dungeon {
     pub rooms: Vec<DRoom>,
     pub start: (i32, i32),
     pub depth: u32,
+    pub goal: Goal,
 }
 
 impl Dungeon {
@@ -121,11 +122,68 @@ impl Rng {
     }
 }
 
+/// 끝방(시작에서 가장 먼 방)이 무엇인가. 끝방을 마치면 출구(U)가 열린다.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Goal {
+    /// 보스방: 큰 무리 + 뿌리 심장 + 씨앗.
+    Boss,
+    /// 끝 무리: 다 잡으면 씨앗 한 줌(길 지도의 굴·둥지).
+    Pack,
+    /// 상자방이 끝(저장고). 출구는 처음부터.
+    Treasure,
+    /// 샘(쉼방)이 끝. 싸움 없이 체력을 채운다. 출구는 처음부터.
+    Spring,
+}
+
+/// 굴 모양(길 지도의 칸 종류가 정한다, route.rs).
+#[derive(Debug, Clone, Copy)]
+pub struct Params {
+    pub depth: u32,
+    /// 방 수(시작방 포함).
+    pub rooms: usize,
+    pub goal: Goal,
+    /// 막다른 방 하나를 보물방으로.
+    pub treasure: bool,
+    /// 막다른 방 하나를 쉼방으로.
+    pub rest: bool,
+    /// 적 뽑기에 더하는 깊이(둥지 = 센 무리).
+    pub tough: u32,
+    /// 시작방에 돌아가는 출구(필드에서 들어온 던전만).
+    pub start_exit: bool,
+}
+
+impl Params {
+    pub fn new(depth: u32) -> Self {
+        Self {
+            depth,
+            rooms: 4,
+            goal: Goal::Pack,
+            treasure: false,
+            rest: false,
+            tough: 0,
+            start_exit: false,
+        }
+    }
+
+    /// 필드의 굴 입구로 들어가는 예전 던전(개발 시나리오 "던전 바로").
+    pub fn classic(depth: u32) -> Self {
+        Self {
+            rooms: 7 + depth.min(3) as usize,
+            goal: Goal::Boss,
+            treasure: true,
+            rest: true,
+            start_exit: true,
+            ..Self::new(depth)
+        }
+    }
+}
+
 /// 던전 하나를 만든다: (던전 상태, 그 격자로 지은 Room).
-pub fn generate(seed: u64, depth: u32) -> (Dungeon, Room) {
+pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
     let mut rng = Rng::new(seed);
     let start = (GRID / 2, GRID - 1);
-    let target = 7 + depth.min(3) as usize;
+    let depth = prm.depth;
+    let target = prm.rooms.max(2);
     let mut rooms: Vec<DRoom> = vec![DRoom {
         at: start,
         kind: RoomKind::Start,
@@ -158,8 +216,8 @@ pub fn generate(seed: u64, depth: u32) -> (Dungeon, Room) {
             enemies: Vec::new(),
         });
     }
-    // 고리 하나: 이웃인데 안 이어진 쌍
-    'outer: for _ in 0..20 {
+    // 고리 하나: 이웃인데 안 이어진 쌍(큰 굴만)
+    'outer: for _ in 0..if target >= 5 { 20 } else { 0 } {
         let i = rng.below(rooms.len() as u64) as usize;
         let d = rng.below(4) as usize;
         let (dx, dy) = DIRS[d];
@@ -175,7 +233,14 @@ pub fn generate(seed: u64, depth: u32) -> (Dungeon, Room) {
     // 시작에서의 거리(BFS) → 보스
     let dist = distances(&rooms, start);
     let boss = (0..rooms.len()).max_by_key(|&i| dist[i]).unwrap_or(0);
-    rooms[boss].kind = RoomKind::Boss;
+    rooms[boss].kind = match prm.goal {
+        Goal::Boss | Goal::Pack => RoomKind::Boss,
+        Goal::Treasure => RoomKind::Treasure,
+        Goal::Spring => RoomKind::Rest,
+    };
+    if matches!(prm.goal, Goal::Treasure | Goal::Spring) {
+        rooms[boss].cleared = true;
+    }
     let leaves: Vec<usize> = (0..rooms.len())
         .filter(|&i| {
             i != boss
@@ -183,15 +248,21 @@ pub fn generate(seed: u64, depth: u32) -> (Dungeon, Room) {
                 && rooms[i].links.iter().filter(|l| **l).count() == 1
         })
         .collect();
-    if let Some(&t) = leaves.first() {
-        rooms[t].kind = RoomKind::Treasure;
-        rooms[t].cleared = true;
+    let mut leaf = leaves.iter().copied();
+    if prm.treasure {
+        if let Some(t) = leaf.next() {
+            rooms[t].kind = RoomKind::Treasure;
+            rooms[t].cleared = true;
+        }
     }
-    if let Some(&r) = leaves.get(1) {
-        rooms[r].kind = RoomKind::Rest;
-        rooms[r].cleared = true;
+    if prm.rest {
+        if let Some(r) = leaf.next() {
+            rooms[r].kind = RoomKind::Rest;
+            rooms[r].cleared = true;
+        }
     }
 
+    let goal_at = rooms[boss].at;
     // 격자
     let mut grid = Grid::filled(GRID as usize * ROOM_W, GRID as usize * ROOM_H, Cell::Wall);
     let mut props = Vec::new();
@@ -221,9 +292,17 @@ pub fn generate(seed: u64, depth: u32) -> (Dungeon, Room) {
             grid.set(ox + ROOM_W - 1, oy + 6, Cell::Door);
             grid.set(ox + ROOM_W - 1, oy + 7, Cell::Door);
         }
+        let is_goal = room.at == goal_at;
+        // 끝방이 상자방·샘이면 출구는 처음부터(구석, 문 앞 길을 막지 않게).
+        if is_goal && matches!(prm.goal, Goal::Treasure | Goal::Spring) {
+            grid.set(ox + 16, oy + 3, Cell::Exit);
+        }
         match room.kind {
-            // 출구는 구석(문 앞 길을 막지 않게).
-            RoomKind::Start => grid.set(ox + 3, oy + 3, Cell::Exit),
+            RoomKind::Start => {
+                if prm.start_exit {
+                    grid.set(ox + 3, oy + 3, Cell::Exit);
+                }
+            }
             RoomKind::Treasure => props.push(Prop {
                 rect: cell_rect(ox + 9, oy + 6),
                 kind: PropKind::Chest { opened: false },
@@ -246,13 +325,13 @@ pub fn generate(seed: u64, depth: u32) -> (Dungeon, Room) {
                         });
                     }
                 }
-                let count = if room.kind == RoomKind::Boss {
-                    5 + depth as usize
-                } else {
-                    2 + depth.min(2) as usize + rng.below(2) as usize
+                let count = match (room.kind, prm.goal) {
+                    (RoomKind::Boss, Goal::Boss) => 5 + depth as usize,
+                    (RoomKind::Boss, _) => 3 + depth.min(2) as usize + prm.tough as usize,
+                    _ => 2 + depth.min(2) as usize + rng.below(2) as usize,
                 };
                 for k in 0..count {
-                    let kind = crate::species::roll(rng.unit(), depth);
+                    let kind = crate::species::roll(rng.unit(), depth + prm.tough);
                     // 방 가장자리 쪽에(가운데는 들어오는 플레이어 자리).
                     let corner = [
                         (4, 4),
@@ -275,6 +354,7 @@ pub fn generate(seed: u64, depth: u32) -> (Dungeon, Room) {
         rooms,
         start,
         depth,
+        goal: prm.goal,
     };
     (dungeon, Room::from_grid(grid, props, Vec::new()))
 }
@@ -312,7 +392,7 @@ mod tests {
     #[test]
     fn generates_connected_dungeon_with_one_boss() {
         for seed in 1..40 {
-            let (d, room) = generate(seed, 1);
+            let (d, room) = generate(seed, &Params::classic(1));
             assert!(d.rooms.len() >= 8, "seed {seed}");
             assert_eq!(
                 d.rooms.iter().filter(|r| r.kind == RoomKind::Boss).count(),
@@ -339,8 +419,8 @@ mod tests {
 
     #[test]
     fn same_seed_same_dungeon() {
-        let (a, _) = generate(7, 2);
-        let (b, _) = generate(7, 2);
+        let (a, _) = generate(7, &Params::classic(2));
+        let (b, _) = generate(7, &Params::classic(2));
         let sig = |d: &Dungeon| {
             d.rooms
                 .iter()
