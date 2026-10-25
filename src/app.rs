@@ -36,6 +36,8 @@ enum TitleItem {
     Dev,
 }
 /// 앨범 칸 배치(가로 칸 수).
+/// 상태 탭 글 한 줄 높이 = 위아래로 한 번 내리는 양.
+const STATUS_LINE: f32 = 12.0;
 const ALBUM_COLS: usize = 5;
 const PAUSE_TABS: [Tr; 6] = [
     |s| s.tab_menu,
@@ -322,6 +324,8 @@ enum Hit {
     BestiaryItem(usize),
     /// 도감 설명(누르면 다음 쪽).
     BestiaryPage,
+    /// 상태 탭 ▲(-1)·▼(+1).
+    StatusScroll(i8),
     DevItem(usize),
     /// 길 지도: 고를 수 있는 칸(choices 번호).
     RouteNode(usize),
@@ -359,6 +363,9 @@ pub struct App {
     bestiary_cursor: usize,
     /// 도감 설명 쪽(0 이야기 · 1 공격 · 2 요령). 칸마다 두 줄로 자르던 것을 쪽으로 나눴다(0051).
     bestiary_page: usize,
+    /// 상태 탭을 내린 만큼(논리 px)과 내릴 수 있는 끝. 끝은 그릴 때 잰다.
+    status_scroll: f32,
+    status_max: f32,
     /// 조작 설정: 줄, 열(0 키보드 · 1 패드), 다시 붙이는 중이면 남은 시간.
     controls_cursor: usize,
     controls_col: usize,
@@ -460,6 +467,8 @@ impl App {
             journal_cursor: 0,
             bestiary_cursor: 0,
             bestiary_page: 0,
+            status_scroll: 0.0,
+            status_max: 0.0,
             controls_cursor: 0,
             controls_col: 0,
             rebind: None,
@@ -739,6 +748,7 @@ impl App {
         self.world.freeze();
         self.pause_tab = 0;
         self.pause_cursor = 0;
+        self.status_scroll = 0.0;
         self.scene = Scene::Pause;
     }
 
@@ -1311,6 +1321,17 @@ impl App {
                 if take {
                     self.claim_journal();
                 }
+            }
+            1 => {
+                // 글이 칸보다 길면 위아래로 한 줄씩 내린다(언어·재주·장신구에 따라 길이가 다르다).
+                let mut step = 0.0;
+                if a.up || tap_hit == Some(Hit::StatusScroll(-1)) {
+                    step = -STATUS_LINE;
+                }
+                if a.down || tap_hit == Some(Hit::StatusScroll(1)) {
+                    step = STATUS_LINE;
+                }
+                self.status_scroll = (self.status_scroll + step).clamp(0.0, self.status_max);
             }
             4 => {
                 let n = crate::species::BESTIARY.len();
@@ -2347,8 +2368,9 @@ impl App {
         }
     }
 
-    /// 상태 탭: 캐릭터 능력치는 숫자로(두 칸 표), 그 아래 필살기 설명과 이번 판 기록.
-    fn draw_status(&self, ui: &Ui, c: Rect) {
+    /// 상태 탭: 캐릭터 능력치는 숫자로(두 칸 표), 그 아래 필살기·장신구·재주·화폐 설명.
+    /// 글은 자르지 않고 줄을 바꾼다. 칸보다 길면 위아래(또는 ▲▼)로 내린다.
+    fn draw_status(&mut self, ui: &Ui, c: Rect) {
         let w = &self.world;
         let p = &w.player;
         let s = i18n::s();
@@ -2383,24 +2405,33 @@ impl App {
             ),
             (&fill(s.stat_gauge, &[&tr(gauge.name())]), pct(st.sp_gain)),
         ];
-        let right: [(&str, String); 4] = [
+        let right: [(&str, String); 3] = [
             (s.stat_weapon, weapon),
-            (s.charms_label, charms),
             (s.glowbugs, w.glowbugs.to_string()),
             (s.seeds, w.seeds.to_string()),
         ];
+        // 내린 만큼 위로 민 y. 칸 안에 다 들어오는 줄만 그린다.
+        let off = self.status_scroll;
+        let at = |y: f32| -> Option<f32> {
+            let v = y - off;
+            (v >= -0.5 && v + FONT_PX <= c.h + 0.5).then_some(c.y + v)
+        };
         let row_h = FONT_PX + 1.0;
         let col_w = c.w / 2.0 - 4.0;
-        for (col, rows) in [(0usize, &left[..]), (1, &right[..])] {
-            let x = c.x + col as f32 * (col_w + 8.0);
-            let key_w = rows
-                .iter()
+        let key_w_of = |rows: &[(&str, String)]| {
+            rows.iter()
                 .map(|(k, _)| ui.text_w(k, FONT_PX))
                 .fold(0.0, f32::max)
                 .min(col_w * 0.55)
-                + 6.0;
+                + 6.0
+        };
+        for (col, rows) in [(0usize, &left[..]), (1, &right[..])] {
+            let x = c.x + col as f32 * (col_w + 8.0);
+            let key_w = key_w_of(rows);
             for (i, (k, v)) in rows.iter().enumerate() {
-                let y = c.y + i as f32 * row_h;
+                let Some(y) = at(i as f32 * row_h) else {
+                    continue;
+                };
                 ui.text(&ui.fit(k, key_w - 6.0, FONT_PX), x, y, FONT_PX, ui::ACCENT);
                 ui.text(
                     &ui.fit(v, col_w - key_w, FONT_PX),
@@ -2412,30 +2443,43 @@ impl App {
             }
         }
         // 체력 하트(숫자 옆에 그림으로도). 숫자 바로 뒤에 둔다: 고정 자리면 일본어처럼 이름 칸이 넓은 언어에서 숫자를 덮었다.
-        let hy = c.y + 2.0;
-        let key_w = left
-            .iter()
-            .map(|(k, _)| ui.text_w(k, FONT_PX))
-            .fold(0.0, f32::max)
-            .min(col_w * 0.55)
-            + 6.0;
-        let hx0 = c.x + key_w + ui.text_w(&left[0].1, FONT_PX) + 5.0;
-        for i in 0..st.max_hp.min(10) {
-            let col = if i < p.hp {
-                Color::new(0.93, 0.33, 0.40, 1.0)
-            } else {
-                ui::TEXT_DIM
-            };
-            ui.rect(Rect::new(hx0 + i as f32 * 5.0, hy + 2.0, 4.0, 3.0), col);
-            ui.rect(
-                Rect::new(hx0 + i as f32 * 5.0 + 1.0, hy + 5.0, 2.0, 1.0),
-                col,
-            );
+        if let Some(hy) = at(0.0) {
+            let hx0 = c.x + key_w_of(&left) + ui.text_w(&left[0].1, FONT_PX) + 5.0;
+            for i in 0..st.max_hp.min(10) {
+                let col = if i < p.hp {
+                    Color::new(0.93, 0.33, 0.40, 1.0)
+                } else {
+                    ui::TEXT_DIM
+                };
+                ui.rect(Rect::new(hx0 + i as f32 * 5.0, hy + 2.0, 4.0, 3.0), col);
+                ui.rect(
+                    Rect::new(hx0 + i as f32 * 5.0 + 1.0, hy + 5.0, 2.0, 1.0),
+                    col,
+                );
+            }
         }
-        // 필살기
-        let y0 = c.y + 5.0 * row_h + 4.0;
-        ui.line(vec2(c.x, y0 - 2.0), vec2(c.right(), y0 - 2.0), ui::BORDER);
-        ui.text(s.special_name, c.x, y0, FONT_PX, gauge.color());
+        let mut y = 5.0 * row_h + 4.0;
+        if let Some(ry) = at(y) {
+            ui.line(vec2(c.x, ry - 2.0), vec2(c.right(), ry - 2.0), ui::BORDER);
+        }
+        // 이름(색) + 설명(이름 뒤 칸에 줄 바꿈). 필살기·장신구가 쓴다.
+        let labeled = |y: &mut f32, name: &str, color: Color, body: &str| {
+            if let Some(ly) = at(*y) {
+                ui.text(name, c.x, ly, FONT_PX, color);
+            }
+            let dx = c.x + ui.text_w(name, FONT_PX) + 6.0;
+            let lines = ui::wrap(ui, body, c.right() - dx, FONT_PX);
+            for l in &lines {
+                if let Some(ly) = at(*y) {
+                    ui.text(l, dx, ly, FONT_PX, ui::TEXT);
+                }
+                *y += STATUS_LINE;
+            }
+            if lines.is_empty() {
+                *y += STATUS_LINE;
+            }
+            *y += 2.0;
+        };
         let desc = fill(
             s.special_desc,
             &[
@@ -2443,14 +2487,9 @@ impl App {
                 &crate::input::prompt(crate::input::Act::Special),
             ],
         );
-        let dx = c.x + ui.text_w(s.special_name, FONT_PX) + 6.0;
-        let lines = ui::wrap(ui, &desc, c.right() - dx, FONT_PX);
-        let n = lines.len().min(3);
-        for (j, l) in lines.iter().take(n).enumerate() {
-            ui.text(l, dx, y0 + j as f32 * 12.0, FONT_PX, ui::TEXT);
-        }
+        labeled(&mut y, s.special_name, gauge.color(), &desc);
+        labeled(&mut y, s.charms_label, ui::ACCENT, &charms);
         // 낀 재주(0047): 자리 순서로. 없으면 어디서 깨우는지.
-        let mut y = y0 + n as f32 * 12.0 + 2.0;
         let picked: Vec<&str> = crate::talents::TABLE
             .iter()
             .zip(p.talents.pick)
@@ -2462,21 +2501,35 @@ impl App {
         } else {
             picked.join(" · ")
         };
-        for l in ui::wrap(ui, &fill(s.stat_talents, &[&talents]), c.w, FONT_PX)
-            .iter()
-            .take(2)
-        {
-            ui.text(l, c.x, y, FONT_PX, ui::ACCENT);
-            y += 12.0;
-        }
-        // 화폐 설명(칸이 남으면).
-        y += 2.0;
-        for l in ui::wrap(ui, s.wallet_note, c.w, FONT_PX) {
-            if y + FONT_PX > c.bottom() + 4.0 {
-                break;
+        let block = |y: &mut f32, text: &str, color: Color| {
+            for l in ui::wrap(ui, text, c.w, FONT_PX) {
+                if let Some(ly) = at(*y) {
+                    ui.text(&l, c.x, ly, FONT_PX, color);
+                }
+                *y += STATUS_LINE;
             }
-            ui.text(&l, c.x, y, FONT_PX, ui::TEXT_DIM);
-            y += 12.0;
+            *y += 2.0;
+        };
+        block(&mut y, &fill(s.stat_talents, &[&talents]), ui::ACCENT);
+        // 화폐 설명.
+        block(&mut y, s.wallet_note, ui::TEXT_DIM);
+        // 다 그린 높이로 내릴 수 있는 끝을 잰다(언어를 바꾸거나 재주를 끼면 달라진다).
+        self.status_max = (y - 2.0 - c.h).max(0.0);
+        self.status_scroll = self.status_scroll.min(self.status_max);
+        let ax = c.right() - 8.0;
+        if off > 0.0 {
+            ui.text("▲", ax, c.y - 9.0, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(ax - 4.0, c.y - 12.0, 16.0, 14.0),
+                Hit::StatusScroll(-1),
+            ));
+        }
+        if off < self.status_max {
+            ui.text("▼", ax, c.bottom() - 3.0, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(ax - 4.0, c.bottom() - 6.0, 16.0, 14.0),
+                Hit::StatusScroll(1),
+            ));
         }
     }
 
