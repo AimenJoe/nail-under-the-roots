@@ -1085,6 +1085,8 @@ impl App {
     }
 
     fn draw_title(&mut self, ui: &Ui) {
+        // 뒤의 뿌리 선이 가는 글자 획과 겹치면 끊겨(깨져) 보인다(사람 피드백). 타이틀 글에는 어두운 테두리.
+        let ui = &ui.with_outline();
         ui.text_center("Naïl", 160.0, 34.0, FONT_PX * 2.0, ui::ACCENT);
         ui.text_center("Under the Roots", 160.0, 60.0, FONT_PX, ui::TEXT);
         let s = i18n::s();
@@ -1094,6 +1096,7 @@ impl App {
         }
         ui.text_center(s.title_controls, 160.0, 150.0, FONT_PX, ui::TEXT_DIM);
         ui.text_right(s.version, 316.0, 166.0, FONT_PX, ui::TEXT_DIM);
+        ui.text(s.copyright, 4.0, 166.0, FONT_PX, ui::TEXT_DIM);
     }
 
     fn draw_dev(&mut self, ui: &Ui) {

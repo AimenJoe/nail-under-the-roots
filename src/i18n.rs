@@ -268,7 +268,7 @@ strings! {
     lang_name,
     // 인트로·타이틀
     intro_1, intro_2, intro_3, skip_hint,
-    title_start, title_settings, title_dev, title_controls, version,
+    title_start, title_settings, title_dev, title_controls, version, copyright,
     // 설정
     settings, set_sound, set_shake, set_debug, set_language, set_back, on, off, settings_hint,
     // 일시정지
@@ -321,6 +321,7 @@ pub static KO: Strings = Strings {
     title_dev: "개발",
     title_controls: "상하 이동 · 확인(Enter/A) · 뒤로(Esc/B)",
     version: "프로토타입 v0.1",
+    copyright: "© 2026 Beardworks",
     settings: "설정",
     set_sound: "소리",
     set_shake: "화면 흔들림",
@@ -584,6 +585,7 @@ pub static EN: Strings = Strings {
     title_dev: "Dev",
     title_controls: "Up/Down: move · Confirm (Enter/A) · Back (Esc/B)",
     version: "Prototype v0.1",
+    copyright: "© 2026 Beardworks",
     settings: "Settings",
     set_sound: "Sound",
     set_shake: "Screen shake",
@@ -847,6 +849,7 @@ pub static JA: Strings = Strings {
     title_dev: "開発",
     title_controls: "上下：えらぶ・決定（Enter/A）・もどる（Esc/B）",
     version: "プロトタイプ v0.1",
+    copyright: "© 2026 Beardworks",
     settings: "設定",
     set_sound: "音量",
     set_shake: "画面のゆれ",
@@ -1110,6 +1113,7 @@ pub static ZH_HANS: Strings = Strings {
     title_dev: "开发",
     title_controls: "上下：选择·确认（Enter/A）·返回（Esc/B）",
     version: "原型 v0.1",
+    copyright: "© 2026 Beardworks",
     settings: "设置",
     set_sound: "音量",
     set_shake: "画面震动",
@@ -1374,6 +1378,7 @@ pub static PT_BR: Strings = Strings {
     title_dev: "Dev",
     title_controls: "Cima/Baixo: mover · Confirmar (Enter/A) · Voltar (Esc/B)",
     version: "Protótipo v0.1",
+    copyright: "© 2026 Beardworks",
     settings: "Opções",
     set_sound: "Som",
     set_shake: "Tremor da tela",

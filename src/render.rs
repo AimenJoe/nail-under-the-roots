@@ -192,6 +192,7 @@ impl Renderer {
             oy: y,
             font: self.fonts.for_lang(crate::i18n::lang()),
             base: self.fonts.base.clone(),
+            outline: false,
         };
         let key = (
             crate::i18n::lang(),

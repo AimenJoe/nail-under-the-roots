@@ -1,6 +1,7 @@
 [package]
 name = "nail"
 version = "0.1.0"
+authors = ["Beardworks"]
 edition = "2021"
 description = "Naïl: Under the Roots — 귀여운 탑다운 액션 로그라이트"
 publish = false

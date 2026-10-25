@@ -12,6 +12,8 @@ pub const BORDER: Color = Color::new(0.55, 0.40, 0.28, 1.0);
 pub const TEXT: Color = Color::new(0.92, 0.86, 0.76, 1.0);
 pub const TEXT_DIM: Color = Color::new(0.52, 0.48, 0.46, 1.0);
 pub const ACCENT: Color = Color::new(0.90, 0.71, 0.47, 1.0);
+/// 글자 테두리(배경색보다 어둡게).
+pub const OUTLINE_TEXT: Color = Color::new(0.05, 0.03, 0.06, 1.0);
 pub const DIM_OVERLAY: Color = Color::new(0.0, 0.0, 0.0, 0.55);
 
 /// 한 프레임의 화면 배치. 렌더러의 `present()`가 만든다.
@@ -24,6 +26,8 @@ pub struct Ui {
     pub font: Option<Font>,
     /// 한국어 폰트(Galmuri). 번역하지 않는 개발 화면은 언어와 상관없이 이걸로 찍는다.
     pub base: Option<Font>,
+    /// 글자에 1게임 px 어두운 테두리(`with_outline`). 바쁜 배경 위의 글(타이틀)용.
+    pub outline: bool,
 }
 
 impl Ui {
@@ -61,7 +65,28 @@ impl Ui {
     /// 왼쪽 위 기준으로 글자를 찍는다. `size`는 논리 px(12 또는 24).
     pub fn text(&self, s: &str, x: f32, y: f32, size: f32, c: Color) {
         let p = self.px(vec2(x, y + size * 0.8));
+        if self.outline {
+            // 상하좌우 1게임 px에 어두운 글자를 먼저: 가는 획(Galmuri Condensed)이 뒤의 선과 겹쳐 끊겨 보이지 않게.
+            let k = self.scale;
+            let dark = Color::new(OUTLINE_TEXT.r, OUTLINE_TEXT.g, OUTLINE_TEXT.b, c.a);
+            for (dx, dy) in [(-k, 0.0), (k, 0.0), (0.0, -k), (0.0, k)] {
+                draw_text_ex(
+                    s,
+                    (p.x + dx).round(),
+                    (p.y + dy).round(),
+                    self.params(size, dark),
+                );
+            }
+        }
         draw_text_ex(s, p.x.round(), p.y.round(), self.params(size, c));
+    }
+
+    /// 같은 배치에 글자 테두리를 켠 것.
+    pub fn with_outline(&self) -> Ui {
+        Ui {
+            outline: true,
+            ..self.clone()
+        }
     }
 
     /// 같은 배치에 기본 폰트(개발 화면용).
