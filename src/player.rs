@@ -1,6 +1,8 @@
-//! 플레이어(Naïl). 이동, 발톱 3연타, 굴파기, 필살기 드릴. `Actions`와 `Room`만 본다.
+//! 플레이어. Naïl: 이동, 발톱 3연타, 굴파기, 필살기 드릴. 모모(0056): 발차기 3연타, 깡충(회피), 이어 뛰기(특기).
+//! `Actions`와 `Room`만 본다. 캐릭터는 `kit`로 고른다(회피·특기만 다르고 나머지 틀은 같다, 0003).
 //!
-//! 상태 기계: Free ⇄ Attack / Burrow → Emerge → Free, Free·Attack → Drill → Recover → Free, Free → Eat → Free. 피격·사망은 어느 상태에서나.
+//! 상태 기계: Free ⇄ Attack / Burrow → Emerge → Free(모모는 Hop → Free), Free·Attack → Drill → Recover → Free
+//! (모모는 Chain × 3 → Recover), Free → Eat → Free. 피격·사망은 어느 상태에서나.
 //! 모든 행동은 바로 다시 나가지 않는다(docs/decisions/0038): 발톱 = 스윙·후딜레이, 굴파기 = 대기, 필살기 = 게이지, 먹기 = 먹는 시간 + 대기, 패링 창 = 대기.
 //! 수치는 `stats`(장비·장신구가 정한 것, equipment::Stats)를 거친다.
 //! 명세 초안: docs/phase-1-combat-prototype.md. 수치: tuning.rs.
@@ -39,6 +41,17 @@ pub enum State {
     Recover {
         time: f32,
     },
+    /// 모모의 깡충(회피): `dir`로 HOP_DIST만큼 뛴다. 공중에서는 안 맞는다.
+    Hop {
+        time: f32,
+        dir: Vec2,
+    },
+    /// 모모의 이어 뛰기(특기): 남은 뛰기 수, 이번 뛰기 시간·방향. 착지마다 둘레에 피해.
+    Chain {
+        left: u32,
+        time: f32,
+        dir: Vec2,
+    },
     /// 퀵 아이템을 먹는 중. 다 먹으면 `Event::Ate`(가방에서 꺼내 회복하는 건 월드). 맞으면 끊긴다.
     Eat {
         item: Consumable,
@@ -63,6 +76,9 @@ pub enum Event {
     Parry,
     /// 다 먹었다(월드가 가방에서 꺼내 회복).
     Ate(Consumable),
+    /// 모모가 뛰어오름 / 내려앉음(이어 뛰기 착지는 true).
+    Hop,
+    Land(bool),
 }
 
 pub struct Player {
@@ -99,6 +115,8 @@ pub struct Player {
     pub moveset: &'static Moveset,
     /// 스프라이트 좌우(마지막으로 본 가로 방향).
     pub face_left: bool,
+    /// 어떤 캐릭터의 몸인가(회피·특기·그림, 0056).
+    pub kit: crate::equipment::Character,
     /// 무기를 들었나. 첫 시작에는 맨손이라 공격이 안 나간다(docs/decisions/0012).
     pub armed: bool,
     attack_buf: f32,
@@ -139,6 +157,7 @@ impl Player {
             events: Vec::new(),
             moveset: &moveset::CLAWS,
             face_left: false,
+            kit: crate::equipment::Character::Mole,
             armed: true,
             attack_buf: 0.0,
             dodge_buf: 0.0,
@@ -168,8 +187,90 @@ impl Player {
     pub fn is_invulnerable(&self) -> bool {
         self.invuln > 0.0
             || self.is_burrowed()
-            || matches!(self.state, State::Drill { .. })
+            || matches!(
+                self.state,
+                State::Drill { .. } | State::Hop { .. } | State::Chain { .. }
+            )
             || !self.is_alive()
+    }
+
+    fn momo(&self) -> bool {
+        self.kit == crate::equipment::Character::Momo
+    }
+
+    /// 뛰는 높이(그리기용 px, 바닥 = 0).
+    pub fn height(&self) -> f32 {
+        let (time, dur, h) = match self.state {
+            State::Hop { time, .. } => (time, t::HOP_TIME, t::HOP_HEIGHT),
+            State::Chain { time, .. } => (time, t::CHAIN_HOP_TIME, t::CHAIN_HOP_HEIGHT),
+            _ => return 0.0,
+        };
+        let k = (time / dur).clamp(0.0, 1.0);
+        4.0 * h * k * (1.0 - k)
+    }
+
+    /// 회피 시작(캐릭터마다): 굴파기 / 깡충.
+    fn start_dodge(&mut self, move_dir: Vec2) {
+        if self.momo() {
+            self.start_hop(move_dir);
+        } else {
+            self.start_burrow();
+        }
+    }
+
+    /// 특기 시작(캐릭터마다): 드릴 / 이어 뛰기.
+    fn start_special(&mut self, move_dir: Vec2) {
+        if self.momo() {
+            self.start_chain(move_dir);
+        } else {
+            self.start_drill(move_dir);
+        }
+    }
+
+    fn start_hop(&mut self, move_dir: Vec2) {
+        let dir = move_dir.normalize_or(self.facing);
+        self.dodge_buf = 0.0;
+        self.attack_buf = 0.0;
+        self.combo_timer = 0.0;
+        self.vel = Vec2::ZERO;
+        self.facing = dir;
+        self.state = State::Hop { time: 0.0, dir };
+        self.events.push(Event::Hop);
+    }
+
+    fn start_chain(&mut self, move_dir: Vec2) {
+        let dir = move_dir.normalize_or(self.facing);
+        self.sp = 0.0;
+        self.attack_buf = 0.0;
+        self.dodge_buf = 0.0;
+        self.combo_timer = 0.0;
+        self.vel = Vec2::ZERO;
+        self.facing = dir;
+        self.state = State::Chain {
+            left: t::CHAIN_HOPS,
+            time: 0.0,
+            dir,
+        };
+        self.events.push(Event::Hop);
+    }
+
+    fn stomp_strike(&mut self) -> Strike {
+        self.swing_id += 1;
+        Strike {
+            id: self.swing_id,
+            kind: StrikeKind::Stomp,
+            shape: Shape::Circle {
+                center: self.pos,
+                r: t::CHAIN_RADIUS,
+            },
+            damage: t::CHAIN_DAMAGE + self.stats.damage,
+            knockback: t::CHAIN_KNOCKBACK,
+            stun: t::CHAIN_STUN,
+            hitstop: t::CHAIN_HITSTOP,
+            shake: t::CHAIN_SHAKE,
+            finisher: false,
+            poison: 0.0,
+        }
     }
 
     /// 콩이의 등딱지에 발톱이 튕겼다(0054): 휘두르기가 끊기고 뒤로 밀려나며, 잠깐 다시 못 휘두른다. 피해는 없다.
@@ -304,9 +405,9 @@ impl Player {
             State::Dead => {}
             State::Free => {
                 if a.special && self.armed && self.sp_full() {
-                    self.start_drill(move_dir);
+                    self.start_special(move_dir);
                 } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
-                    self.start_burrow();
+                    self.start_dodge(move_dir);
                 } else if self.armed && self.attack_buf > 0.0 && self.no_attack <= 0.0 {
                     let idx = if self.combo_timer > 0.0 {
                         self.combo_next
@@ -334,13 +435,13 @@ impl Player {
 
                 if a.special && self.sp_full() && time >= a1 {
                     // 필살기도 휘두른 뒤(활성 구간 뒤)라면 캔슬로 낼 수 있다.
-                    self.start_drill(move_dir);
+                    self.start_special(move_dir);
                 } else if self.dodge_buf > 0.0
                     && self.burrow_cd <= 0.0
                     && time >= hit.dodge_cancel_after
                 {
-                    // 굴파기 캔슬: 후딜레이를 끊고 다음 콤보로 섞는다.
-                    self.start_burrow();
+                    // 굴파기(깡충) 캔슬: 후딜레이를 끊고 다음 콤보로 섞는다.
+                    self.start_dodge(move_dir);
                 } else if time >= a1 && self.attack_buf > 0.0 && idx < last {
                     // 활성 구간이 끝났으면 다음 타로 바로 이어진다.
                     self.start_swing(idx + 1, a.aim);
@@ -361,6 +462,42 @@ impl Player {
                 let early = (self.dodge_buf > 0.0 && time > 0.05) || self.attack_buf > 0.0;
                 if time >= self.talents.burrow_time() || early {
                     strike = Some(self.start_emerge());
+                }
+            }
+            State::Hop { time, dir } => {
+                let time = time + dt;
+                self.pos += dir * (t::HOP_DIST / t::HOP_TIME) * dt;
+                if time >= t::HOP_TIME {
+                    self.burrow_cd = self.burrow_cd_full();
+                    self.events.push(Event::Land(false));
+                    self.state = State::Free;
+                } else {
+                    self.state = State::Hop { time, dir };
+                }
+            }
+            State::Chain { left, time, dir } => {
+                let time = time + dt;
+                self.pos += dir * (t::CHAIN_HOP_DIST / t::CHAIN_HOP_TIME) * dt;
+                if time >= t::CHAIN_HOP_TIME {
+                    strike = Some(self.stomp_strike());
+                    self.events.push(Event::Land(true));
+                    if left > 1 {
+                        // 다음 뛰기: 입력 쪽으로 다시 겨눈다(없으면 그대로).
+                        let dir = move_dir.normalize_or(dir);
+                        self.facing = dir;
+                        self.events.push(Event::Hop);
+                        self.state = State::Chain {
+                            left: left - 1,
+                            time: 0.0,
+                            dir,
+                        };
+                    } else {
+                        self.state = State::Recover {
+                            time: t::CHAIN_RECOVER,
+                        };
+                    }
+                } else {
+                    self.state = State::Chain { left, time, dir };
                 }
             }
             State::Emerge { time } => {
@@ -443,8 +580,8 @@ impl Player {
                 let time = time + dt;
                 self.pos += move_dir * t::PLAYER_SPEED * t::EAT_MOVE_FACTOR * dt;
                 if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
-                    // 굴파기로 끊는다: 먹지 않은 것으로. 대기는 이미 흐르고 있다.
-                    self.start_burrow();
+                    // 굴파기(깡충)로 끊는다: 먹지 않은 것으로. 대기는 이미 흐르고 있다.
+                    self.start_dodge(move_dir);
                 } else if time >= item.eat_time() * self.talents.eat_time_mul() {
                     self.events.push(Event::Ate(item));
                     self.state = State::Free;
@@ -647,6 +784,50 @@ mod tests {
     fn tick(p: &mut Player, room: &Room, a: &Actions) -> (Option<Strike>, Vec<Event>) {
         let s = p.update(a, room, t::TICK_DT);
         (s, p.events.clone())
+    }
+
+    /// 모모(0056): 회피 버튼 = 깡충(공중 무적, HOP_DIST만큼), 특기 = 이어 뛰기(기 게이지, 착지 셋 = 쿵 셋).
+    #[test]
+    fn momo_hops_and_chain_hops() {
+        let room = Room::new();
+        let mut p = Player::new(room.center());
+        p.kit = crate::equipment::Character::Momo;
+        p.moveset = &moveset::KICKS;
+        let x0 = p.pos.x;
+        let hop = Actions {
+            move_dir: vec2(1.0, 0.0),
+            dodge: true,
+            ..Default::default()
+        };
+        let none = Actions::default();
+        tick(&mut p, &room, &hop);
+        assert!(matches!(p.state, State::Hop { .. }) && p.is_invulnerable());
+        assert!(!p.is_burrowed(), "땅속이 아니다(적이 계속 노린다)");
+        let mut landed = false;
+        for _ in 0..40 {
+            let (_, ev) = tick(&mut p, &room, &none);
+            landed |= ev.contains(&Event::Land(false));
+        }
+        assert!(landed && p.state == State::Free);
+        assert!((p.pos.x - x0 - t::HOP_DIST).abs() < 3.0, "{}", p.pos.x - x0);
+        assert!(p.burrow_cd > 0.0, "깡충도 대기가 있다");
+        // 이어 뛰기: 게이지가 차야 나가고, 착지마다 쿵.
+        p.sp = t::SP_MAX;
+        let go = Actions {
+            special: true,
+            ..Default::default()
+        };
+        tick(&mut p, &room, &go);
+        assert!(matches!(p.state, State::Chain { .. }) && p.sp == 0.0);
+        let mut stomps = 0;
+        for _ in 0..120 {
+            if let (Some(s), _) = tick(&mut p, &room, &none) {
+                assert_eq!(s.kind, StrikeKind::Stomp);
+                stomps += 1;
+            }
+        }
+        assert_eq!(stomps, t::CHAIN_HOPS as usize);
+        assert_eq!(p.state, State::Free);
     }
 
     /// 필살기: SP가 차야 나가고, 벽에 부딪히면 충격파(DrillWall) + 경직.

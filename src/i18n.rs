@@ -347,6 +347,8 @@ strings! {
     mob_kongi, mob_kongi_lore, mob_kongi_atk, mob_kongi_tip, name_kongi, kongi_meet_1, kongi_meet_1b, kongi_b1, kongi_b2, kongi_b3, kongi_b4, kongi_b5, kongi_b6, kongi_v1, kongi_v2, kongi_v3, toast_shell, toast_guard_break, jg_kongi, jg_kongi_d,
     // 실의 꿈(docs/decisions/0055)
     dream_title, dream_intro, dream_locked, dream_all, dream_none, dream_legend, dream_hint, toast_dream_in, toast_dream_next, toast_dream_win, toast_dream_best, toast_dream_wake, ia_dream, halmae_dream, jg_dream, jg_dream_d, jg_dream2, jg_dream2_d,
+    // 모모와 내려가기(docs/decisions/0056)
+    w_kick, w_kick_desc, toast_shell_momo, stat_hop_cd, pick_title, pick_nail, pick_momo, pick_clears, pick_hint, mend_1, mend_2, mend_3, mend_4, run_momo, halmae_petal, jg_momo_deep, jg_momo_deep_d,
 }
 
 pub static KO: Strings = Strings {
@@ -940,6 +942,23 @@ pub static KO: Strings = Strings {
     jg_dream_d: "꿈에서 길의 주인 넷을 모두 이긴다.",
     jg_dream2: "끝나지 않는 실",
     jg_dream2_d: "넷을 이어서 꾸는 꿈을 끝까지 깬다.",
+    w_kick: "튼튼한 뒷발",
+    w_kick_desc: "콩콩 두 번 밟고 뒷발로 찬다. 마지막 발차기가 멀리 날린다.",
+    toast_shell_momo: "등딱지에 튕겼다! 이어 뛰기로 밟아 열자",
+    stat_hop_cd: "깡충 대기",
+    pick_title: "누구와 내려갈까?",
+    pick_nail: "발톱 콤보. 굴파기로 피하기. 드릴 돌진.",
+    pick_momo: "뒷발차기. 깡충 피하기. 이어 뛰기로 세 번 밟기.",
+    pick_clears: "끝까지 {0}번",
+    pick_hint: "{0} 내려가기 · {1} 돌아가기",
+    mend_1: "가장 깊은 곳. 흰 실 사이에 부드러운 털 뭉치와 시든 꽃잎 하나가 걸려 있었다.",
+    mend_2: "…엄마 꽃이야. 다들 여기를 지나갔구나.",
+    mend_3: "기다려. 언젠가 꼭 찾으러 올게.",
+    mend_4: "모모는 꽃잎을 품에 안고 마을로 돌아갔다.",
+    run_momo: "모모, 오늘은 네가 가는구나. 뒷발 힘 믿고 깡충깡충 다녀와!",
+    halmae_petal: "그 꽃잎… 내 실이 굴토끼들을 품고 있단다. 아직 아픈 꿈을 꾸는 중이지. 언젠가 깨워 주렴.",
+    jg_momo_deep: "꽃잎을 따라",
+    jg_momo_deep_d: "모모와 함께 가장 깊은 곳에 닿는다.",
 };
 
 pub static EN: Strings = Strings {
@@ -1533,6 +1552,23 @@ pub static EN: Strings = Strings {
     jg_dream_d: "Beat all four path keepers in the dream.",
     jg_dream2: "Endless Thread",
     jg_dream2_d: "Clear the dream of all four in a row.",
+    w_kick: "Strong Hind Legs",
+    w_kick_desc: "Two quick stomps, then a back kick. The last kick sends foes flying.",
+    toast_shell_momo: "Bounced off the shell! Chain-hop onto it to crack it",
+    stat_hop_cd: "Hop cooldown",
+    pick_title: "Who's going down?",
+    pick_nail: "Claw combos. Burrow to dodge. Drill dash.",
+    pick_momo: "Hind-leg kicks. Hop to dodge. Chain-hop for three stomps.",
+    pick_clears: "Reached the end: {0}",
+    pick_hint: "{0} go down · {1} back",
+    mend_1: "The deepest place. Caught in the white threads were tufts of soft fur and one wilted petal.",
+    mend_2: "…It's Mom's flower. They all passed through here.",
+    mend_3: "Wait for me. Someday I'll come find you.",
+    mend_4: "Momo held the petal close and carried it back to the village.",
+    run_momo: "Momo, it's your turn today! Trust those hind legs and hop on back safe!",
+    halmae_petal: "That petal… my threads are holding the rabbits, dear. They're still dreaming a painful dream. Wake them someday, won't you?",
+    jg_momo_deep: "Following the Petal",
+    jg_momo_deep_d: "Reach the deepest place with Momo.",
 };
 
 pub static JA: Strings = Strings {
@@ -2126,6 +2162,23 @@ pub static JA: Strings = Strings {
     jg_dream_d: "夢の中で道のぬし四つをぜんぶやっつける。",
     jg_dream2: "終わらない糸",
     jg_dream2_d: "四つをつづけて見る夢を最後までやりとげる。",
+    w_kick: "じょうぶな後ろ足",
+    w_kick_desc: "二回ふみつけて、後ろ足でける。最後のけりは遠くへとばす。",
+    toast_shell_momo: "こうらにはじかれた！つづけジャンプでふんで開けよう",
+    stat_hop_cd: "ジャンプ待ち",
+    pick_title: "だれと下りる？",
+    pick_nail: "ツメのコンボ。穴ほりでよける。ドリルで突進。",
+    pick_momo: "後ろ足げり。ジャンプでよける。つづけて三回ふむ。",
+    pick_clears: "最後まで {0}回",
+    pick_hint: "{0} 下りる ・ {1} もどる",
+    mend_1: "いちばん深い場所。白い糸のあいだに、やわらかい毛のかたまりと、しおれた花びらがひとつかかっていた。",
+    mend_2: "…お母さんの花だ。みんな、ここを通ったんだね。",
+    mend_3: "待ってて。いつか、きっとむかえに来るから。",
+    mend_4: "モモは花びらをだきしめて、村へ帰った。",
+    run_momo: "モモ、今日はきみが行くんだね。後ろ足を信じて、ぴょんぴょん行ってらっしゃい！",
+    halmae_petal: "その花びら…わたしの糸がアナウサギたちをつつんでいるんだよ。まだ痛い夢を見ているのさ。いつか起こしてあげておくれ。",
+    jg_momo_deep: "花びらをたどって",
+    jg_momo_deep_d: "モモといっしょに、いちばん深い場所にたどりつく。",
 };
 
 pub static ZH_HANS: Strings = Strings {
@@ -2721,6 +2774,24 @@ pub static ZH_HANS: Strings = Strings {
     jg_dream_d: "在梦里打赢全部四位路之主。",
     jg_dream2: "不断的丝",
     jg_dream2_d: "把连续四场的梦做到最后。",
+    w_kick: "结实的后腿",
+    w_kick_desc: "先踩两下，再用后腿踢。最后一踢能把敌人踢飞。",
+    toast_shell_momo: "被壳弹开了！用连跳踩开它",
+    stat_hop_cd: "跳跃冷却",
+    pick_title: "和谁一起下去？",
+    pick_nail: "爪子连击。钻地闪避。钻头冲刺。",
+    pick_momo: "后腿踢。跳跃闪避。连跳踩三下。",
+    pick_clears: "到达最深处 {0}次",
+    pick_hint: "{0} 下去 · {1} 返回",
+    mend_1: "最深处。白色的丝线间，挂着几团柔软的毛和一片枯萎的花瓣。",
+    mend_2: "……是妈妈的花。大家都从这里经过了啊。",
+    mend_3: "等着我。总有一天，我一定会来找你们。",
+    mend_4: "茉茉把花瓣抱在怀里，带回了村子。",
+    run_momo: "茉茉，今天轮到你了呀。相信你的后腿，蹦蹦跳跳地去吧！",
+    halmae_petal:
+        "那片花瓣……我的丝线正裹着穴兔们呢。它们还在做着痛苦的梦。总有一天，去把它们叫醒吧。",
+    jg_momo_deep: "追随花瓣",
+    jg_momo_deep_d: "和茉茉一起到达最深处。",
 };
 /// 브라질 포르투갈어(docs/decisions/0033). DeepL 초안 + 사람 손 검토(한국어·영어 대조). 원어민 검수 전.
 pub static PT_BR: Strings = Strings {
@@ -3314,6 +3385,23 @@ pub static PT_BR: Strings = Strings {
     jg_dream_d: "Vença os quatro donos da trilha no sonho.",
     jg_dream2: "Fio sem fim",
     jg_dream2_d: "Complete o sonho dos quatro seguidos.",
+    w_kick: "Patas traseiras fortes",
+    w_kick_desc: "Duas pisadas rápidas e um coice. O último chute arremessa longe.",
+    toast_shell_momo: "Resvalou no casco! Pule em cadeia para quebrá-lo",
+    stat_hop_cd: "Rec. pulo",
+    pick_title: "Quem vai descer?",
+    pick_nail: "Combos de garra. Cava para desviar. Investida de broca.",
+    pick_momo: "Coices. Pula para desviar. Pulo em cadeia: três pisadas.",
+    pick_clears: "Chegou ao fim: {0}",
+    pick_hint: "{0} descer · {1} voltar",
+    mend_1: "O lugar mais profundo. Presos nos fios brancos, tufos de pelo macio e uma pétala murcha.",
+    mend_2: "…É a flor da mamãe. Todos passaram por aqui.",
+    mend_3: "Me esperem. Um dia eu volto para buscar vocês.",
+    mend_4: "Momo abraçou a pétala e a levou de volta para a vila.",
+    run_momo: "Momo, hoje é a sua vez! Confia nessas patas e volta saltitando!",
+    halmae_petal: "Essa pétala… meus fios estão segurando os coelhos, querida. Eles ainda sonham um sonho doloroso. Um dia, acorde-os, tá?",
+    jg_momo_deep: "Seguindo a pétala",
+    jg_momo_deep_d: "Chegue ao lugar mais profundo com a Momo.",
 };
 
 #[cfg(test)]

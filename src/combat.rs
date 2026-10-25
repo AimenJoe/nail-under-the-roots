@@ -47,6 +47,8 @@ pub enum StrikeKind {
     Drill,
     /// 드릴이 벽에 부딪힌 충격파.
     DrillWall,
+    /// 모모의 이어 뛰기 착지(0056).
+    Stomp,
 }
 
 /// 플레이어가 이번 틱에 휘두르는 공격 하나.

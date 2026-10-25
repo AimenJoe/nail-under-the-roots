@@ -474,12 +474,18 @@ fn popo_actor(pos: Vec2, visible: bool) -> Actor {
     }
 }
 
+/// 플레이어 배우: 이번 런에 내려간 캐릭터(Naïl 또는 모모, 0056). 몸은 월드가 그린다.
 fn nail_actor(w: &World) -> Actor {
+    let momo = w.character == crate::equipment::Character::Momo;
     Actor {
-        name: crate::equipment::Character::Mole.name(),
+        name: w.character.name(),
         sprite: None,
-        color: crate::world::MOLE,
-        portrait: Some(Portrait::nail(w.fur)),
+        color: if momo { MOMO_PETAL } else { crate::world::MOLE },
+        portrait: Some(if momo {
+            Portrait::MOMO
+        } else {
+            Portrait::nail(w.fur)
+        }),
         pos: w.player.pos,
         facing: w.player.facing,
         visible: true,
@@ -1119,6 +1125,26 @@ pub fn ending_half(w: &World) -> Cutscene {
 /// 참 엔딩 + 에필로그: 참 엔딩 조건(모모·도토)이 다 섰을 때.
 pub fn ending_true(w: &World) -> Cutscene {
     Cutscene::new(story_actors(w), true_ending_steps())
+}
+
+/// 모모로 가장 깊은 곳에 닿았다(0056): 흰 실 속의 굴토끼 털과 시든 꽃잎. 모모는 꽃잎을 마을로 가져간다.
+pub fn ending_momo(w: &World) -> Cutscene {
+    let steps = vec![
+        Step::Illust(Some(Illust::MomoDeep)),
+        Step::Fade {
+            to_clear: true,
+            secs: 1.0,
+        },
+        Step::Narrate(|s| s.mend_1),
+        say(0, Face::Worried, |s| s.mend_2),
+        say(0, Face::Normal, |s| s.mend_3),
+        Step::Narrate(|s| s.mend_4),
+        Step::Fade {
+            to_clear: false,
+            secs: 1.0,
+        },
+    ];
+    Cutscene::new(vec![nail_actor(w)], steps)
 }
 
 /// 개발: 아직 게임에 자리가 없는 이야기 장면을 이어서(모모 → 반쪽 엔딩 → 참 엔딩·에필로그).

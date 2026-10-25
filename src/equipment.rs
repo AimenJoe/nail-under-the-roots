@@ -1,5 +1,6 @@
 //! 장비: 캐릭터마다 쓸 수 있는 무기 종류가 다르다(docs/decisions/0011).
-//! 두더지 Naïl은 발톱만. 다른 캐릭터(2단계 보스 → 3단계 플레이어블)는 자기 무기 종류를 갖는다.
+//! 두더지 Naïl은 발톱만, 굴토끼 모모는 뒷발만(docs/decisions/0056). 캐릭터마다 회피·특기도 다르다(player.rs).
+//! 다른 캐릭터(보스 → 동료 → 플레이어블, 0003)는 자기 무기 종류를 갖는다.
 //!
 //! 능력치(docs/decisions/0017): 기본값 + 장신구(2칸, 아무 캐릭터나) + 뿌리 심장(최대 체력 영구 +1).
 //! 플레이어 코드는 `Stats`만 본다. 무기는 콤보 모양(moveset), 장신구는 수치 보정.
@@ -12,23 +13,28 @@ use crate::moveset::{self, Moveset};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Character {
     Mole,
+    /// 돌아온 모모(0046) → 플레이어블(0056): 발차기 3연타, 회피 = 깡충(공중 무적), 특기 = 이어 뛰기(기 게이지).
+    Momo,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WeaponKind {
     Claw,
+    Kick,
 }
 
 impl Character {
     pub fn name(self) -> &'static str {
         match self {
             Character::Mole => "Naïl",
+            Character::Momo => crate::i18n::s().name_momo,
         }
     }
 
     pub fn weapon_kind(self) -> WeaponKind {
         match self {
             Character::Mole => WeaponKind::Claw,
+            Character::Momo => WeaponKind::Kick,
         }
     }
 
@@ -36,6 +42,7 @@ impl Character {
     pub fn gauge(self) -> Gauge {
         match self {
             Character::Mole => Gauge::Rage,
+            Character::Momo => Gauge::Ki,
         }
     }
 
@@ -43,6 +50,7 @@ impl Character {
     pub fn starting_weapon(self) -> usize {
         match self {
             Character::Mole => 1,
+            Character::Momo => 4,
         }
     }
 }
@@ -51,7 +59,6 @@ impl Character {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Gauge {
     Rage,
-    #[allow(dead_code)]
     Ki,
 }
 
@@ -80,7 +87,7 @@ pub struct Weapon {
     pub color: Color,
 }
 
-pub static WEAPONS: [Weapon; 4] = [
+pub static WEAPONS: [Weapon; 5] = [
     Weapon {
         name: |s| s.w_sprout,
         desc: |s| s.w_sprout_desc,
@@ -108,6 +115,13 @@ pub static WEAPONS: [Weapon; 4] = [
         kind: WeaponKind::Claw,
         moveset: &moveset::VENOM,
         color: Color::new(0.52, 0.86, 0.36, 1.0),
+    },
+    Weapon {
+        name: |s| s.w_kick,
+        desc: |s| s.w_kick_desc,
+        kind: WeaponKind::Kick,
+        moveset: &moveset::KICKS,
+        color: Color::new(1.0, 0.80, 0.86, 1.0),
     },
 ];
 
@@ -270,9 +284,9 @@ pub static CHARMS: [Charm; 8] = [
 mod tests {
     use super::*;
 
-    /// 규칙(docs/decisions/0009): 모든 발톱의 마지막 타가 가장 세게 밀치고 가장 오래 멈춘다.
+    /// 규칙(docs/decisions/0009): 모든 무기(발톱·뒷발)의 마지막 타가 가장 세게 밀치고 가장 오래 멈춘다.
     #[test]
-    fn finisher_is_strongest_for_every_claw() {
+    fn finisher_is_strongest_for_every_weapon() {
         for w in &WEAPONS {
             let name = (w.name)(&crate::i18n::KO);
             let hits = w.moveset.hits;
@@ -281,7 +295,14 @@ mod tests {
                 assert!(last.knockback > h.knockback, "{name}");
                 assert!(last.hitstop >= h.hitstop, "{name}");
             }
-            assert_eq!(w.kind, WeaponKind::Claw);
+        }
+    }
+
+    /// 캐릭터의 첫 무기는 그 캐릭터가 쓰는 종류다(0056).
+    #[test]
+    fn starting_weapon_matches_character() {
+        for ch in [Character::Mole, Character::Momo] {
+            assert_eq!(WEAPONS[ch.starting_weapon()].kind, ch.weapon_kind());
         }
     }
 

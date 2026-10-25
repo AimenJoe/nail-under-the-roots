@@ -65,6 +65,22 @@ pub const BURROW_MAX_TIME: f32 = 0.35;
 pub const BURROW_SPEED_FACTOR: f32 = 1.3;
 /// 쿨다운(솟구친 순간부터).
 pub const BURROW_COOLDOWN: f32 = 0.6;
+/// 모모의 회피 깡충(0056): 체공 시간·거리·높이(그림). 공중에서는 안 맞고 적·탄·묻힌 도토리를 넘는다. 대기는 굴파기 대기와 같은 값을 쓴다.
+pub const HOP_TIME: f32 = 0.34;
+pub const HOP_DIST: f32 = 56.0;
+pub const HOP_HEIGHT: f32 = 10.0;
+/// 모모의 특기 이어 뛰기(0056): 기 게이지를 다 써서 세 번 뛴다. 뛸 때마다 입력 쪽으로 다시 겨누고, 착지마다 둘레에 피해.
+pub const CHAIN_HOPS: u32 = 3;
+pub const CHAIN_HOP_TIME: f32 = 0.30;
+pub const CHAIN_HOP_DIST: f32 = 60.0;
+pub const CHAIN_HOP_HEIGHT: f32 = 16.0;
+pub const CHAIN_RADIUS: f32 = 28.0;
+pub const CHAIN_DAMAGE: i32 = 2;
+pub const CHAIN_KNOCKBACK: f32 = 180.0;
+pub const CHAIN_STUN: f32 = 0.5;
+pub const CHAIN_HITSTOP: f32 = 0.06;
+pub const CHAIN_SHAKE: f32 = 0.35;
+pub const CHAIN_RECOVER: f32 = 0.25;
 /// 솟구침 범위 공격 반지름.
 pub const EMERGE_RADIUS: f32 = 16.0;
 /// 솟구침 동작 시간(이동 불가).

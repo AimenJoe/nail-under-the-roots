@@ -2305,7 +2305,56 @@ fn draw_pickup(p: &world::Pickup, time: f32) {
 const OUTLINE: Color = Color::new(0.17, 0.11, 0.16, 1.0);
 
 /// Naïl 스프라이트. 상태 → 칸, 좌우 반전, 피격 플래시는 흰 실루엣 줄.
+/// 모모를 플레이어로(0056): 돌아온 모모 줄(critters MOMO_BLOOM_ROW). 칸 0·1 서기, 2·3 걷기, 4 웅크림, 5 차기·뛰기, 6 맞음.
+/// 뛸 때는 그림만 높이만큼 위로(그림자는 바닥에 남아 착지 자리를 보인다).
+fn draw_momo_player(art: &Art, p: &Player, alpha: f32, time: f32) {
+    let Some(tex) = art.critters.as_ref() else {
+        return;
+    };
+    let pos = lerp(p.prev_pos, p.pos, alpha) - vec2(0.0, p.height().round());
+    let moving = (p.pos - p.prev_pos).length() > 0.05;
+    let frame = match p.state {
+        player::State::Dead => 6,
+        player::State::Hop { time: ht, .. } | player::State::Chain { time: ht, .. } => {
+            if ht < 0.05 {
+                4
+            } else {
+                5
+            }
+        }
+        player::State::Attack { .. } => 5,
+        player::State::Recover { .. } => 4,
+        _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => 6,
+        _ if moving => 2 + ((time * 10.0) as u32) % 2,
+        _ => ((time * 2.0) as u32) % 2,
+    };
+    let flash = p.flash > 0.0;
+    let row = art::MOMO_BLOOM_ROW + if flash { art::CRITTER_ROWS } else { 0 };
+    let blink = p.invuln > 0.0 && ((time * 24.0) as i32) % 2 == 0 && !flash;
+    let tint = if blink {
+        Color::new(1.0, 1.0, 1.0, 0.35)
+    } else {
+        WHITE
+    };
+    draw_texture_ex(
+        tex,
+        (pos.x - 8.0).round(),
+        (pos.y - 9.0).round(),
+        tint,
+        DrawTextureParams {
+            source: Some(art::cell(frame, row)),
+            dest_size: Some(vec2(16.0, 16.0)),
+            flip_x: p.face_left,
+            ..Default::default()
+        },
+    );
+}
+
 fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
+    if p.kit == crate::equipment::Character::Momo {
+        draw_momo_player(art, p, alpha, time);
+        return;
+    }
     let pos = lerp(p.prev_pos, p.pos, alpha);
     let moving = (p.pos - p.prev_pos).length() > 0.05;
     let (col, row) = match p.state {
@@ -2823,6 +2872,7 @@ fn draw_hitboxes(w: &World, alpha: f32) {
             StrikeKind::Emerge => ORANGE,
             StrikeKind::Drill => SKYBLUE,
             StrikeKind::DrillWall => RED,
+            StrikeKind::Stomp => PINK,
         };
         match s.shape {
             Shape::Circle { center, r } => draw_circle_lines(center.x, center.y, r, 1.0, col),
@@ -2923,6 +2973,8 @@ fn short_state(s: &player::State) -> &'static str {
         player::State::Drill { .. } => "drill",
         player::State::Recover { .. } => "recover",
         player::State::Eat { .. } => "eat",
+        player::State::Hop { .. } => "hop",
+        player::State::Chain { .. } => "chain",
         player::State::Dead => "dead",
     }
 }

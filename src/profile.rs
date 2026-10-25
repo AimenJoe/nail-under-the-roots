@@ -41,6 +41,9 @@ pub mod key {
     /// 콩이를 이겼다(셋째 길, 0054): 마을에 온다. 그때 받은 바위 발톱은 런마다 가방에.
     pub const KONGI_BACK: &str = "kongi";
     pub const STONE: &str = "weapon.stone";
+    /// 마을 뿌리 길에서 마지막으로 고른 캐릭터(0 = Naïl, 1 = 모모, 0056). 모모로 가장 깊은 곳에 닿았다.
+    pub const CHAR_PICK: &str = "char_pick";
+    pub const MOMO_DEEP: &str = "momo_deep";
 
     /// 실뜨기: 고를 수 있는 가장 높은 단계(캐릭터별), 마지막으로 고른 단계, 새 단계가 열렸다는 표시(0043).
     pub fn knots_open(character: impl std::fmt::Debug) -> String {

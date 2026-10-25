@@ -139,6 +139,47 @@ pub static CLAWS: Moveset = Moveset {
     mark: Color::new(0.97, 0.93, 0.85, 1.0),
 };
 
+/// 모모의 뒷발(0056): 앞발 톡톡 둘 + 몸을 돌려 뒷발 차기(보스 모모의 차기). 마지막 타가 멀리 밀친다.
+pub static KICKS: Moveset = Moveset {
+    hits: &[
+        Hit {
+            swing: 0.11,
+            active: (0.02, 0.07),
+            knockback: 80.0,
+            stun: 0.14,
+            range: 13.0,
+            lunge: 30.0,
+            ..BASE
+        },
+        Hit {
+            swing: 0.12,
+            active: (0.03, 0.08),
+            knockback: 95.0,
+            stun: 0.16,
+            range: 14.0,
+            lunge: 36.0,
+            ..BASE
+        },
+        Hit {
+            swing: 0.26,
+            active: (0.10, 0.17),
+            recovery: 0.12,
+            damage: 2,
+            knockback: 260.0,
+            stun: 0.40,
+            hitstop: 0.10,
+            shake: 0.45,
+            range: 17.0,
+            lunge: 22.0,
+            dodge_cancel_after: 0.17,
+            ..BASE
+        },
+    ],
+    combo_window: 0.30,
+    move_factor: 0.5,
+    mark: Color::new(1.0, 0.82, 0.88, 1.0),
+};
+
 /// 바위 발톱(무거움): 2타. 느리고 넓고, 활성 구간이 끝나야 굴파기로 끊는다.
 pub static STONE: Moveset = Moveset {
     hits: &[

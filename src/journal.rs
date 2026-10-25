@@ -194,6 +194,17 @@ pub const GOALS: &[Goal] = &[
         Some("deeper"),
         Light(40)
     ),
+    // 모모와 가장 깊은 곳(0056): 모모를 골라 끝까지.
+    goal!(
+        "momo_deep",
+        Story,
+        jg_momo_deep,
+        jg_momo_deep_d,
+        Flag(key::MOMO_DEEP),
+        1,
+        Some("momo3"),
+        Light(40)
+    ),
     // 실의 꿈(0055): 꿈에서 넷을 다 이기기 → 이어서 꾸기.
     goal!(
         "dream",

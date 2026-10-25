@@ -539,8 +539,8 @@ def momo_bloom():
     return cv
 
 
-def halmae_deep():
-    rng = random.Random(55)
+def deep_place(rng):
+    """가장 깊은 곳: 사방으로 뻗은 실 + 할매(실 덩어리와 버섯 갓). halmae_deep·momo_deep이 같이 쓴다."""
     cv = Canvas(704, 360)
     bands(cv, 0, 360, (16, 14, 30), (34, 24, 44), 6)
     speckle(cv, rng, (0, 0, 704, 360), 90, [(28, 22, 40), (40, 30, 52)])
@@ -584,8 +584,61 @@ def halmae_deep():
     cv.paint(stroke(cv, smile, 3), (70, 56, 90))
     for ex in (fx - 40, fx + 40):
         cv.paint(ellipse(cv, ex, fy + 14, 9, 5), (236, 160, 176), 0.6)
+    return cv
+
+
+def halmae_deep():
+    cv = deep_place(random.Random(55))
     # 작은 Naïl(왼쪽 아래, 할매를 올려다본다)
     mole(cv, 210, 236, 22, facing=1, eyes='open')
+    return cv
+
+
+def rabbit(cv, cx, cy, s, facing=1, eyes='open'):
+    """작은 굴토끼(모모): 둥근 몸 + 머리 + 긴 귀 둘, 귀 밑동에 꽃. s = 몸 가로 반지름."""
+    f = facing
+    body = ellipse(cv, cx, cy, s, s * 0.82)
+    head = ellipse(cv, cx + f * s * 0.5, cy - s * 0.55, s * 0.62, s * 0.56)
+    ear_a = ellipse(cv, cx + f * s * 0.28, cy - s * 1.55, s * 0.2, s * 0.68, rot=-0.22 * f)
+    ear_b = ellipse(cv, cx + f * s * 0.72, cy - s * 1.5, s * 0.2, s * 0.68, rot=0.28 * f)
+    tail = ellipse(cv, cx - f * s * 0.95, cy + s * 0.1, s * 0.26, s * 0.24)
+    sil = body | head | ear_a | ear_b | tail
+    outline(cv, sil, r=1)
+    shade(cv, body | head | ear_a | ear_b, RABBIT, cx + f * s * 0.2, cy - s * 0.3, s * 1.3, s * 1.2)
+    cv.paint(ellipse(cv, cx + f * s * 0.28, cy - s * 1.5, s * 0.08, s * 0.48, rot=-0.22 * f)
+             | ellipse(cv, cx + f * s * 0.72, cy - s * 1.45, s * 0.08, s * 0.48, rot=0.28 * f), PINK[1])
+    shade(cv, tail, RABBIT_LIGHT)
+    cv.paint(ellipse(cv, cx + f * s * 0.35, cy + s * 0.25, s * 0.42, s * 0.36), RABBIT_LIGHT[1])
+    ex, ey = cx + f * s * 0.78, cy - s * 0.62
+    er = max(1.5, s * 0.09)
+    if eyes == 'open':
+        cv.paint(ellipse(cv, ex, ey, er, er * 1.15), (22, 14, 30))
+        cv.paint(ellipse(cv, ex - er * 0.35, ey - er * 0.45, max(1, er * 0.4), max(1, er * 0.4)), (255, 255, 255))
+    cv.paint(ellipse(cv, cx + f * s * 1.08, cy - s * 0.45, s * 0.08, s * 0.07), PINK[0])
+    cv.paint(ellipse(cv, cx + f * s * 0.82, cy - s * 0.32, s * 0.12, s * 0.06), (236, 132, 140), 0.55)
+    flower(cv, cx + f * s * 0.5, cy - s * 1.05, s * 0.24)
+    return sil
+
+
+def momo_deep():
+    """모모로 가장 깊은 곳(0056): 실에 걸린 굴토끼 털 뭉치와 시든 꽃잎, 그것을 보는 작은 모모."""
+    rng = random.Random(55)
+    cv = deep_place(rng)
+    # 실에 걸린 털 뭉치(굴토끼 가족)
+    for (x, y) in ((132, 92), (560, 70), (610, 238), (470, 300), (88, 300)):
+        for _ in range(7):
+            cv.paint(ellipse(cv, x + rng.uniform(-6, 6), y + rng.uniform(-4, 4), rng.uniform(3, 5), rng.uniform(2, 4)),
+                     rng.choice(RABBIT_LIGHT))
+        cv.paint(ellipse(cv, x, y, 3, 2), RABBIT[3])
+    # 시든 꽃잎 하나: 실 끝에 늘어져 매달렸다(가장자리가 갈색)
+    px, py = 262, 176
+    cv.paint(stroke(cv, [(px - 18, py - 40), (px - 6, py - 18), (px, py - 6)], 1), THREAD_WHITE[2])
+    petal = ellipse(cv, px + 2, py + 6, 7, 12, rot=0.5)
+    outline(cv, petal, (90, 50, 60), 1)
+    shade(cv, petal, [(150, 96, 100), (196, 140, 146), (226, 176, 180)], px, py, 8, 12)
+    cv.paint(ellipse(cv, px + 6, py + 14, 3, 3) & petal, (140, 100, 80))
+    # 작은 모모(왼쪽 아래, 꽃잎을 올려다본다)
+    rabbit(cv, 210, 250, 20, facing=1)
     return cv
 
 
@@ -788,6 +841,7 @@ SCENES = {
     'bori_freed': bori_freed,
     'momo_bloom': momo_bloom,
     'halmae_deep': halmae_deep,
+    'momo_deep': momo_deep,
     'last_bloom': last_bloom,
     'sprout': sprout,
     'molehill': molehill,

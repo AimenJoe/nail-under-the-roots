@@ -7,6 +7,7 @@
 use macroquad::prelude::*;
 
 mod dream;
+mod pick;
 mod stage;
 
 use crate::art::Art;
@@ -139,6 +140,8 @@ enum Scene {
     Tree,
     /// 실의 꿈 고르기(마을의 실 고리, docs/decisions/0055).
     DreamPick,
+    /// 누구와 내려갈까(마을의 뿌리 길, 모모가 돌아온 뒤, docs/decisions/0056).
+    CharPick,
 }
 
 /// 컷씬이 끝난 뒤 갈 곳.
@@ -340,6 +343,8 @@ enum Hit {
     TreeCell(usize, usize),
     /// 실의 꿈 줄.
     DreamRow(usize),
+    /// 캐릭터 고르기 칸.
+    CharCard(usize),
 }
 
 pub struct App {
@@ -415,6 +420,8 @@ pub struct App {
     dream: Option<dream::DreamRun>,
     /// 꿈에서 깬 직후 고르기 창이 입력을 받지 않는 남은 시간(싸우던 연타가 다음 꿈을 열지 않게).
     dream_lock: f32,
+    /// 캐릭터 고르기 창의 칸(0 = Naïl, 1 = 모모).
+    char_cursor: usize,
     /// 이번 런의 실뜨기 단계(고르는 화면의 커서이기도 하다).
     knot_level: u8,
     /// 타이틀 아래 잠깐 띄우는 글(오늘의 굴 완주 등)과 남은 시간.
@@ -496,6 +503,7 @@ impl App {
             dream_cursor: 0,
             dream: None,
             dream_lock: 0.0,
+            char_cursor: 0,
             knot_level: 0,
             title_note: None,
         }
@@ -749,9 +757,19 @@ impl App {
         self.world.debug.hitboxes = hitboxes;
         self.journal_cursor = 0;
         self.journal_scroll = 0;
+        // 캐릭터(0056): 런(첫 시작·오늘의 굴·실의 꿈)은 뿌리 길에서 고른 캐릭터, 그 밖(마을·개발)은 Naïl.
+        // 고른 캐릭터(0056): 보통 런·오늘의 굴, 개발의 가장 깊은 곳(모모 끝 장면 보기).
+        // 실의 꿈은 Naïl만: 꿈 목록에 모모가 있다.
+        let ch = if matches!(s, Scenario::Normal | Scenario::Daily | Scenario::Deepest) {
+            self.picked()
+        } else {
+            Character::Mole
+        };
+        self.world.character = ch;
+        self.world.player.kit = ch;
         // 무기는 스토리를 따라 하나씩(docs/decisions/0012). 첫 시작·튜토리얼은 맨손에서 출발해
         // 튜토리얼에서 두더지 발톱을 줍는다. 개발 시나리오는 테스트를 위해 기본 발톱(또는 전부)을 들고 시작.
-        let start = Character::Mole.starting_weapon();
+        let start = ch.starting_weapon();
         // 튜토리얼을 마친 기록이 있으면 오프닝·튜토리얼을 건너뛰고 발톱을 든 채 시작한다(0041).
         let veteran = s == Scenario::Normal && self.profile.flag(crate::profile::key::TUTORIAL);
         if s == Scenario::Normal {
@@ -778,7 +796,7 @@ impl App {
         self.apply_assist();
         // 실뜨기는 첫 시작에만(개발 시나리오는 0단계).
         let knots = crate::knots::Knots::new(if s == Scenario::Normal {
-            self.knot_level
+            self.knot_level.min(self.knots_open())
         } else {
             0
         });
@@ -800,7 +818,10 @@ impl App {
         if matches!(s, Scenario::Normal | Scenario::Village) {
             use crate::profile::key;
             self.world.momo_wins = self.profile.count(key::MOMO_WINS).min(t::MOMO_FIGHTS) as u8;
-            self.world.momo_fight = s == Scenario::Normal && !self.profile.flag(key::MOMO_BACK);
+            // 모모로 내려가면 모모 보스는 없다(0056).
+            self.world.momo_fight = s == Scenario::Normal
+                && !self.profile.flag(key::MOMO_BACK)
+                && ch != Character::Momo;
             // 도토(0052)도 첫 시작에서만, 기억해 내기 전까지.
             self.world.doto_fight = s == Scenario::Normal && !self.profile.flag(key::DOTO_MEMORY);
             // 콩이(0054)도 첫 시작에서만, 이기기 전까지.
@@ -826,7 +847,10 @@ impl App {
             (crate::profile::key::STONE, STONE_CLAW),
             (crate::profile::key::VENOM, VENOM_CLAW),
         ] {
-            if self.profile.flag(k) && self.inventory.equipped.is_some() {
+            if self.profile.flag(k)
+                && self.inventory.equipped.is_some()
+                && WEAPONS[w].kind == ch.weapon_kind()
+            {
                 self.inventory.add(w);
             }
         }
@@ -1062,6 +1086,7 @@ impl App {
             Scene::Decor => self.update_decor(a, tap_hit, dt),
             Scene::Tree => self.update_tree(a, tap_hit, dt),
             Scene::DreamPick => self.update_dream_pick(a, tap_hit, dt),
+            Scene::CharPick => self.update_char_pick(a, tap_hit),
             Scene::Game | Scene::Cutscene => {}
         }
     }
@@ -1245,7 +1270,7 @@ impl App {
                     match self.inventory.slots[self.inv_cursor] {
                         Some(Item::Weapon(w)) => {
                             // 캐릭터가 쓸 수 있는 종류만.
-                            if WEAPONS[w].kind == Character::Mole.weapon_kind() {
+                            if WEAPONS[w].kind == self.world.character.weapon_kind() {
                                 self.inventory.equipped = Some(w);
                                 self.apply_equipped();
                                 self.sfx.play(crate::sfx::Id::Claw(2));
@@ -1321,6 +1346,7 @@ impl App {
                 | Scene::Decor
                 | Scene::Tree
                 | Scene::DreamPick
+                | Scene::CharPick
                 | Scene::Settings { back: Back::Pause }
                 | Scene::Controls { back: Back::Pause }
         );
@@ -1379,6 +1405,10 @@ impl App {
             Scene::DreamPick => {
                 ui.dim();
                 self.draw_dream_pick(&ui);
+            }
+            Scene::CharPick => {
+                ui.dim();
+                self.draw_char_pick(&ui);
             }
             Scene::Dev => self.draw_dev(&ui),
             Scene::Cutscene => {
@@ -1527,9 +1557,19 @@ impl App {
         }
     }
 
-    /// 실뜨기에서 고를 수 있는 가장 높은 단계.
+    /// 뿌리 길에서 고른 캐릭터(0056). 모모는 돌아온 뒤에만.
+    fn picked(&self) -> Character {
+        use crate::profile::key;
+        if self.profile.count(key::CHAR_PICK) == 1 && self.profile.flag(key::MOMO_BACK) {
+            Character::Momo
+        } else {
+            Character::Mole
+        }
+    }
+
+    /// 실뜨기에서 고를 수 있는 가장 높은 단계(고른 캐릭터의 것, 0040).
     fn knots_open(&self) -> u8 {
-        let k = crate::profile::key::knots_open(Character::Mole);
+        let k = crate::profile::key::knots_open(self.picked());
         (self.profile.count(&k) as u8).min(crate::knots::MAX_LEVEL)
     }
 
@@ -1558,7 +1598,10 @@ impl App {
             doto: self.profile.flag(key::DOTO_MEMORY),
             kongi: self.profile.flag(key::KONGI_BACK),
             decor,
-            growth: crate::village::growth(self.profile.count(&key::clears(Character::Mole))),
+            growth: crate::village::growth(
+                self.profile.count(&key::clears(Character::Mole))
+                    + self.profile.count(&key::clears(Character::Momo)),
+            ),
         }
     }
 
@@ -2331,7 +2374,11 @@ impl App {
             (s.stat_power, (base_dmg + st.damage).to_string()),
             (s.stat_aspd, pct(st.attack_speed)),
             (
-                s.stat_dig_cd,
+                if w.character == Character::Momo {
+                    s.stat_hop_cd
+                } else {
+                    s.stat_dig_cd
+                },
                 fill(s.fmt_secs, &[&format!("{:.1}", p.burrow_cd_full())]),
             ),
             (&fill(s.stat_gauge, &[&tr(gauge.name())]), pct(st.sp_gain)),

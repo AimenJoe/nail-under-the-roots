@@ -341,6 +341,26 @@ impl World {
                     self.feel.flash = t::DRILL_WALL_FLASH;
                 }
                 player::Event::Ate(c) => ate = Some(*c),
+                // 모모(0056): 뛰어오를 때 흙먼지, 내려앉을 때 작은 고리(이어 뛰기는 크게 + 흔들림).
+                player::Event::Hop => {
+                    self.burrows += 1;
+                    sfx.play(sfx::Id::Charge);
+                    burst(&mut self.fx, self.player.pos, 6, DIRT, 50.0);
+                }
+                player::Event::Land(big) => {
+                    let p = self.player.pos;
+                    if *big {
+                        sfx.play(sfx::Id::WallHit);
+                        self.feel.add_trauma(0.25);
+                        self.fx
+                            .push(ring(p, 4.0, t::CHAIN_RADIUS + 4.0, 0.25, PETAL));
+                        self.fx.push(ring(p, 2.0, t::CHAIN_RADIUS, 0.2, DIRT));
+                        burst(&mut self.fx, p, 12, DIRT, 110.0);
+                        burst(&mut self.fx, p, 6, PETAL, 80.0);
+                    } else {
+                        self.fx.push(ring(p, 2.0, 9.0, 0.15, DIRT));
+                    }
+                }
                 player::Event::Hurt | player::Event::Die | player::Event::Parry => {}
             }
         }
@@ -735,7 +755,14 @@ impl World {
                 let p = (self.player.pos + from) * 0.5;
                 self.fx.push(ring(p, 2.0, 14.0, 0.2, SHELL));
                 burst(&mut self.fx, p, 8, SHELL, 100.0);
-                self.toast = Some((|s| s.toast_shell, 2.0));
+                self.toast = Some((
+                    if self.character == crate::equipment::Character::Momo {
+                        |s| s.toast_shell_momo
+                    } else {
+                        |s| s.toast_shell
+                    },
+                    2.0,
+                ));
             }
             if let Some(at) = broke_at {
                 sfx.play(sfx::Id::DrillWall);
@@ -1092,6 +1119,8 @@ pub const GLOW: Color = Color::new(0.85, 1.0, 0.45, 1.0);
 pub const SEED: Color = Color::new(0.86, 0.68, 0.40, 1.0);
 /// 산딸기.
 pub const BERRY: Color = Color::new(0.93, 0.30, 0.38, 1.0);
+/// 모모의 꽃잎(이어 뛰기 착지, 0056).
+pub const PETAL: Color = Color::new(1.0, 0.70, 0.82, 1.0);
 /// 콩이의 등딱지(튕김·열림 번쩍임, 0054).
 pub const SHELL: Color = Color::new(0.75, 0.90, 1.0, 1.0);
 

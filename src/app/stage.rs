@@ -295,12 +295,14 @@ impl App {
             self.scene = Scene::Title;
             return;
         }
+        let ch = self.world.character;
+        let momo = ch == crate::equipment::Character::Momo;
         let true_end = self.profile.flag(key::MOMO_BACK) && self.profile.flag(key::DOTO_MEMORY);
         if self.recording() {
-            use crate::equipment::Character;
-            self.profile.add(&key::clears(Character::Mole), 1);
+            self.profile.add(&key::clears(ch), 1);
             // 실뜨기: 열린 가장 높은 단계로 닿았으면 다음 단계를 연다(첫 클리어가 1단계를 연다, 0043).
-            let open_key = key::knots_open(Character::Mole);
+            // 캐릭터마다 따로 연다(0056).
+            let open_key = key::knots_open(ch);
             let open = self.profile.count(&open_key);
             let level = self.world.knots.level as u32;
             if level >= open && open < crate::knots::MAX_LEVEL as u32 {
@@ -314,14 +316,19 @@ impl App {
                 crate::village::KEY_SEEDS,
                 self.world.seeds + t::VILLAGE_SEEDS_CLEAR,
             );
-            self.profile.set(if true_end {
+            // 모모의 끝은 Naïl의 이야기 엔딩을 대신하지 않는다(0056).
+            self.profile.set(if momo {
+                key::MOMO_DEEP
+            } else if true_end {
                 key::TRUE_ENDING
             } else {
                 key::HALF_ENDING
             });
             self.save_profile();
         }
-        let c = if true_end {
+        let c = if momo {
+            cutscene::ending_momo(&self.world)
+        } else if true_end {
             cutscene::ending_true(&self.world)
         } else {
             cutscene::ending_half(&self.world)
@@ -468,6 +475,12 @@ impl App {
                 self.scene = Scene::Tree;
             }
             // 마을의 뿌리 길: 내려가면 런이 시작된다.
+            // 모모가 돌아왔으면 누구와 내려갈지 고른다(0056).
+            Interact::Gate if village && self.profile.flag(crate::profile::key::MOMO_BACK) => {
+                self.char_cursor = self.picked_index();
+                self.world.freeze();
+                self.scene = Scene::CharPick;
+            }
             Interact::Gate if village => self.start(crate::scenario::Scenario::Normal),
             Interact::Gate => self.open_route(true),
         }

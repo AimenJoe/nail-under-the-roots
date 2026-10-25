@@ -148,6 +148,20 @@ pub const LINES: &[Line] = &[
         ],
         once: true,
     },
+    // 모모가 가장 깊은 곳에서 꽃잎을 가져왔다(0056): 할매가 실 속 굴토끼들 이야기를 한다.
+    Line {
+        id: "halmae_petal",
+        when: When::Village,
+        who: Speaker::Halmae,
+        text: |s| s.halmae_petal,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::HALF_ENDING),
+            Flag(key::MOMO_DEEP),
+            Seen("halmae_arrive"),
+        ],
+        once: true,
+    },
     // 실의 꿈(0055): 할매가 온 뒤, 이긴 길의 주인이 있으면 실 고리를 알려 준다.
     Line {
         id: "halmae_dream",
@@ -334,6 +348,19 @@ pub const LINES: &[Line] = &[
         who: Speaker::Popo,
         text: |s| s.run_again,
         needs: &[Flag(key::TUTORIAL)],
+        once: false,
+    },
+    // 모모와 내려갈 때(0056): 포포가 모모를 배웅한다. 줄이 셋이라 again_bori보다 앞선다.
+    Line {
+        id: "again_momo",
+        when: When::RunStart,
+        who: Speaker::Popo,
+        text: |s| s.run_momo,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::MOMO_BACK),
+            CountAtLeast(key::CHAR_PICK, 1),
+        ],
         once: false,
     },
     Line {
