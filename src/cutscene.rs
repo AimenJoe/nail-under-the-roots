@@ -7,6 +7,7 @@
 use macroquad::prelude::*;
 
 use crate::i18n::{self, Tr};
+use crate::illust::Illust;
 use crate::input::{Act, Actions};
 use crate::world::World;
 
@@ -141,6 +142,11 @@ pub enum Step {
         secs: f32,
     },
     Shake(f32),
+    /// 화면 전체 일러스트를 띄운다(`None`이면 내린다). 대화·내레이션은 그 위에 뜬다(docs/decisions/0039).
+    /// 바꾸는 순간은 보통 `Fade`로 가린다.
+    Illust(Option<Illust>),
+    /// 내레이션: 이름·초상화 없이 아래에 글만. 넘기기는 대화와 같다.
+    Narrate(Tr),
 }
 
 pub struct Cutscene {
@@ -156,6 +162,9 @@ pub struct Cutscene {
     done: bool,
     /// 컷씬이 시작되고 흐른 시간.
     age: f32,
+    /// 지금 떠 있는 일러스트와 뜬 뒤 흐른 시간(패닝·입자).
+    pub illust: Option<Illust>,
+    pub illust_t: f32,
 }
 
 /// 렌더용: 지금 열린 대화창.
@@ -167,11 +176,14 @@ pub struct Dialogue {
     pub text: String,
     pub shown_chars: usize,
     pub complete: bool,
+    /// 내레이션(이름표·초상화 없음).
+    pub narration: bool,
 }
 
 impl Cutscene {
     pub fn new(actors: Vec<Actor>, steps: Vec<Step>) -> Self {
-        let fade = match steps.first() {
+        // 첫 그림을 정하는 스텝 뒤에 밝아지기가 오면 검은 화면에서 시작한다.
+        let fade = match steps.iter().find(|s| !matches!(s, Step::Illust(_))) {
             Some(Step::Fade { to_clear: true, .. }) => 1.0,
             _ => 0.0,
         };
@@ -184,6 +196,8 @@ impl Cutscene {
             fade,
             done: false,
             age: 0.0,
+            illust: None,
+            illust_t: 0.0,
         }
     }
 
@@ -219,22 +233,14 @@ impl Cutscene {
         };
         self.t += dt;
         self.age += dt;
+        self.illust_t += dt;
         let advance = match step {
-            Step::Say { text, arg, .. } => {
-                let total = say_text(text, arg).chars().count() as f32;
-                let complete = self.shown >= total;
-                let pressed = a.confirm || a.attack || a.tap.is_some();
-                if pressed && self.age >= START_GUARD && self.t >= LINE_GUARD {
-                    if complete {
-                        true
-                    } else {
-                        self.shown = total;
-                        false
-                    }
-                } else {
-                    self.shown = (self.shown + CHARS_PER_SEC * dt).min(total);
-                    false
-                }
+            Step::Say { text, arg, .. } => self.type_text(&say_text(text, arg), a, dt),
+            Step::Narrate(text) => self.type_text(i18n::tr(text), a, dt),
+            Step::Illust(il) => {
+                self.illust = il;
+                self.illust_t = 0.0;
+                true
             }
             Step::Move { actor, to, speed } => {
                 let p = self.actor_pos(w, actor);
@@ -289,6 +295,24 @@ impl Cutscene {
         w.freeze();
     }
 
+    /// 글이 한 자씩 찍힌다. 다 찍히기 전에 누르면 전부, 다 찍힌 뒤 누르면 다음(true).
+    fn type_text(&mut self, text: &str, a: &Actions, dt: f32) -> bool {
+        let total = text.chars().count() as f32;
+        let complete = self.shown >= total;
+        let pressed = a.confirm || a.attack || a.tap.is_some();
+        if pressed && self.age >= START_GUARD && self.t >= LINE_GUARD {
+            if complete {
+                true
+            } else {
+                self.shown = total;
+                false
+            }
+        } else {
+            self.shown = (self.shown + CHARS_PER_SEC * dt).min(total);
+            false
+        }
+    }
+
     fn set_facing(&mut self, w: &mut World, actor: usize, dir: Vec2) {
         if dir == Vec2::ZERO {
             return;
@@ -314,6 +338,7 @@ impl Cutscene {
                 Step::Hide { actor } => self.actors[actor].visible = false,
                 Step::Give(i) => w.gifts.push(crate::world::Gift::Weapon(i)),
                 Step::Fade { to_clear, .. } => self.fade = if to_clear { 0.0 } else { 1.0 },
+                Step::Illust(il) => self.illust = il,
                 _ => {}
             }
         }
@@ -341,6 +366,21 @@ impl Cutscene {
                     text,
                     shown_chars: shown,
                     complete: shown >= total,
+                    narration: false,
+                })
+            }
+            Step::Narrate(text) => {
+                let text = i18n::tr(*text).to_string();
+                let total = text.chars().count();
+                let shown = (self.shown as usize).min(total);
+                Some(Dialogue {
+                    name: "",
+                    color: WHITE,
+                    portrait: None,
+                    text,
+                    shown_chars: shown,
+                    complete: shown >= total,
+                    narration: true,
                 })
             }
             _ => None,
@@ -480,8 +520,12 @@ pub fn boss_beaten(w: &World, at: Vec2, entrance: Vec2) -> Cutscene {
     // 보리가 Naïl 곁으로 걸어온다(카메라는 Naïl을 따르니, 멀리 쓰러지면 대화창 뒤에 가려진다).
     let side = if at.x >= w.player.pos.x { 26.0 } else { -26.0 };
     let near = w.player.pos + vec2(side, 0.0);
-    let steps = vec![
-        Step::Wait(0.6),
+    // 쓰러진 자리에서 실이 풀리는 일러스트(0039) → 월드로 돌아와 보리가 걸어온다.
+    let mut steps = vec![Step::Wait(0.6)];
+    steps.extend(cut_to(Some(Illust::BoriFreed)));
+    steps.extend([Step::Narrate(|s| s.bori_free)]);
+    steps.extend(cut_to(None));
+    steps.extend([
         Step::Move {
             actor: 1,
             to: near,
@@ -506,7 +550,7 @@ pub fn boss_beaten(w: &World, at: Vec2, entrance: Vec2) -> Cutscene {
         },
         Step::Hide { actor: 1 },
         say(0, Face::Determined, |s| s.chief_beaten_5),
-    ];
+    ]);
     Cutscene::new(actors, steps)
 }
 
@@ -545,12 +589,26 @@ pub fn opening(w: &World) -> Cutscene {
             visible: false,
         },
         popo_actor(vec2(150.0, 150.0), false),
+        story_actor(i18n::s().name_mom, Color::new(0.48, 0.34, 0.30, 1.0)),
     ];
-    let steps = vec![
+    let mut steps = vec![
+        // 일러스트(0037·0039): 시드는 큰 나무 → 땅속의 보라 실 → 어미가 Naïl을 굴 밖으로.
+        Step::Illust(Some(Illust::GreatTree)),
         Step::Fade {
             to_clear: true,
-            secs: 0.8,
+            secs: 1.0,
         },
+        Step::Narrate(|s| s.op_n1),
+        Step::Narrate(|s| s.op_n2),
+    ];
+    steps.extend(cut_to(Some(Illust::MotherBurrow)));
+    steps.extend([
+        Step::Narrate(|s| s.op_n3),
+        say(3, Face::Normal, |s| s.op_mom_1),
+        say(0, Face::Determined, |s| s.op_mom_2),
+    ]);
+    steps.extend(cut_to(None));
+    steps.extend([
         Step::Move {
             actor: 0,
             to: vec2(110.0, 90.0),
@@ -594,6 +652,136 @@ pub fn opening(w: &World) -> Cutscene {
         },
         say(2, Face::Happy, |s| s.popo_hi),
         say(2, Face::Normal, |s| s.popo_hi2),
-    ];
+    ]);
     Cutscene::new(actors, steps)
+}
+
+/// 장면 전환: 어두워졌다가 그림을 바꾸고(`None`이면 월드로) 밝아진다.
+fn cut_to(il: Option<Illust>) -> [Step; 3] {
+    [
+        Step::Fade {
+            to_clear: false,
+            secs: 0.5,
+        },
+        Step::Illust(il),
+        Step::Fade {
+            to_clear: true,
+            secs: 0.6,
+        },
+    ]
+}
+
+/// 일러스트 장면에서만 말하는 이(월드에 그림이 없다). 초상화는 아직 없어 색 네모(docs/art/cutscene-illustrations.md).
+fn story_actor(name: &'static str, color: Color) -> Actor {
+    Actor {
+        name,
+        sprite: None,
+        color,
+        portrait: None,
+        pos: Vec2::ZERO,
+        facing: vec2(1.0, 0.0),
+        visible: false,
+    }
+}
+
+/// 모모·엔딩 장면의 배우: 0 Naïl, 1 모모, 2 누룩 할매.
+fn story_actors(w: &World) -> Vec<Actor> {
+    vec![
+        nail_actor(w),
+        story_actor(i18n::s().name_momo, Color::new(0.80, 0.62, 0.66, 1.0)),
+        story_actor(i18n::s().name_halmae, Color::new(0.86, 0.84, 0.92, 1.0)),
+    ]
+}
+
+/// 모모가 돌아온다: 세 번째 승리 뒤(0037). 꽃이 피고 이름을 말한다.
+fn momo_steps() -> Vec<Step> {
+    let mut v = vec![
+        Step::Illust(Some(Illust::MomoBloom)),
+        Step::Fade {
+            to_clear: true,
+            secs: 0.8,
+        },
+        Step::Narrate(|s| s.momo_r1),
+        say(1, Face::Normal, |s| s.momo_r2),
+        say(0, Face::Worried, |s| s.momo_r3),
+        say(1, Face::Normal, |s| s.momo_r4),
+        say(1, Face::Happy, |s| s.momo_r5),
+    ];
+    v.extend(cut_to(None));
+    v
+}
+
+/// 반쪽 엔딩: 가장 깊은 곳에 처음 닿았다. 할매는 실을 거두지만 놓지 않는다.
+fn half_ending_steps() -> Vec<Step> {
+    vec![
+        Step::Illust(Some(Illust::HalmaeDeep)),
+        Step::Fade {
+            to_clear: true,
+            secs: 1.0,
+        },
+        Step::Narrate(|s| s.half_1),
+        say(2, Face::Normal, |s| s.half_2),
+        say(0, Face::Worried, |s| s.half_3),
+        say(2, Face::Normal, |s| s.half_4),
+        Step::Narrate(|s| s.half_5),
+        Step::Fade {
+            to_clear: false,
+            secs: 1.0,
+        },
+    ]
+}
+
+/// 참 엔딩 + 에필로그: 씨앗을 심고, 큰 나무의 마지막 꽃, 흰 실과 새싹, 새 두더지 둔덕.
+fn true_ending_steps() -> Vec<Step> {
+    let mut v = vec![
+        Step::Illust(Some(Illust::HalmaeDeep)),
+        Step::Fade {
+            to_clear: true,
+            secs: 1.0,
+        },
+        Step::Narrate(|s| s.true_1),
+    ];
+    v.extend(cut_to(Some(Illust::LastBloom)));
+    v.extend([
+        Step::Narrate(|s| s.true_2),
+        say(2, Face::Normal, |s| s.true_3),
+    ]);
+    v.extend(cut_to(Some(Illust::Sprout)));
+    v.push(Step::Narrate(|s| s.true_4));
+    v.extend(cut_to(Some(Illust::Molehill)));
+    v.extend([
+        Step::Narrate(|s| s.epi_1),
+        Step::Narrate(|s| s.epi_2),
+        Step::Fade {
+            to_clear: false,
+            secs: 1.5,
+        },
+    ]);
+    v
+}
+
+/// 모모가 돌아오는 장면. 모모 보스가 생기면 세 번째 승리 뒤에 부른다.
+#[allow(dead_code)]
+pub fn momo_returns(w: &World) -> Cutscene {
+    Cutscene::new(story_actors(w), momo_steps())
+}
+
+/// 반쪽 엔딩. 깊은 곳 마지막 방이 생기면 부른다.
+#[allow(dead_code)]
+pub fn ending_half(w: &World) -> Cutscene {
+    Cutscene::new(story_actors(w), half_ending_steps())
+}
+
+/// 참 엔딩 + 에필로그.
+#[allow(dead_code)]
+pub fn ending_true(w: &World) -> Cutscene {
+    Cutscene::new(story_actors(w), true_ending_steps())
+}
+
+/// 개발: 아직 게임에 자리가 없는 이야기 장면을 이어서(모모 → 반쪽 엔딩 → 참 엔딩·에필로그).
+pub fn story_preview(w: &World) -> Cutscene {
+    let mut steps = momo_steps();
+    steps.extend(half_ending_steps());
+    steps.extend(true_ending_steps());
+    Cutscene::new(story_actors(w), steps)
 }

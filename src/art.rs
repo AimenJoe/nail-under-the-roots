@@ -16,6 +16,8 @@ pub struct Art {
     pub portraits: Option<Texture2D>,
     /// 들쥐 대장·보리(tools/art/chief.py): 32×32, 줄 0 물든 대장, 줄 1 보리, 줄 2·3 흰 실루엣.
     pub chief: Option<Texture2D>,
+    /// 컷씬 일러스트(illust::Illust::ALL 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
+    pub illust: Vec<Option<Texture2D>>,
 }
 
 /// chief.png 한 칸.
@@ -65,6 +67,16 @@ impl Art {
         if let Some(c) = &chief {
             c.set_filter(FilterMode::Nearest);
         }
+        let mut illust = Vec::new();
+        for il in crate::illust::Illust::ALL {
+            let t = load_texture(&format!("art/illust/{}.png", il.spec().file))
+                .await
+                .ok();
+            if let Some(t) = &t {
+                t.set_filter(FilterMode::Nearest);
+            }
+            illust.push(t);
+        }
         Some(Self {
             nail,
             tiles,
@@ -72,6 +84,7 @@ impl Art {
             critters,
             portraits,
             chief,
+            illust,
         })
     }
 }

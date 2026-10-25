@@ -18,6 +18,7 @@ mod enemy;
 mod equipment;
 mod field;
 mod i18n;
+mod illust;
 mod input;
 mod items;
 mod loading;

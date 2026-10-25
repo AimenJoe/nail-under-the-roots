@@ -27,6 +27,8 @@ pub enum Scenario {
     OneEach,
     /// 오프닝 컷씬만 보고 빈 방.
     CutsceneOnly,
+    /// 아직 게임에 자리가 없는 이야기 일러스트 장면(모모·엔딩, docs/decisions/0039).
+    StoryPreview,
     /// 컷씬 없이 튜토리얼만.
     Tutorial,
     /// 발톱 4종을 가방에 넣고 웨이브 1부터. 가방에서 바꿔 끼며 비교.
@@ -51,7 +53,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 20] = [
+pub const LIST: [Entry; 21] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -152,6 +154,11 @@ pub const LIST: [Entry; 20] = [
         desc: "컷씬 재생 확인. 끝나면 빈 방.",
         scenario: Scenario::CutsceneOnly,
     },
+    Entry {
+        name: "이야기 일러스트",
+        desc: "모모가 돌아옴 → 반쪽 엔딩 → 참 엔딩·에필로그. 아직 게임에 자리가 없는 장면(임시 그림).",
+        scenario: Scenario::StoryPreview,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -186,7 +193,9 @@ pub fn build(s: Scenario) -> World {
             w
         }
         Scenario::Arena => World::new(),
-        Scenario::Empty | Scenario::CutsceneOnly | Scenario::Tutorial => World::empty(),
+        Scenario::Empty | Scenario::CutsceneOnly | Scenario::StoryPreview | Scenario::Tutorial => {
+            World::empty()
+        }
         Scenario::AllClaws => World::new(),
         Scenario::Gear => {
             let mut w = build(Scenario::Chargers(2));

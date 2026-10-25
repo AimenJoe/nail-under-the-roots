@@ -607,6 +607,10 @@ impl App {
             self.world.snap_cam();
             self.cutscene = Some(cutscene::opening(&self.world));
             self.scene = Scene::Cutscene;
+        } else if s == Scenario::StoryPreview {
+            self.world.wave = 0;
+            self.cutscene = Some(cutscene::story_preview(&self.world));
+            self.scene = Scene::Cutscene;
         } else {
             self.scene = Scene::Game;
         }
@@ -1210,7 +1214,40 @@ impl App {
     /// JRPG식 대화창: 아래 전체 폭, 이름표, 초상 자리, 타자 효과, ▼.
     fn draw_cutscene(&mut self, ui: &Ui) {
         let Some(c) = &self.cutscene else { return };
-        if let Some(d) = c.dialogue() {
+        // 일러스트는 월드·레터박스 위, 대화창 아래(docs/decisions/0039).
+        if let Some(il) = c.illust {
+            self.renderer.draw_illust(ui, il, c.illust_t);
+        }
+        if let Some(d) = c.dialogue().filter(|d| d.narration) {
+            // 내레이션: 이름·초상화 없이 아래쪽 어두운 띠에 가운데 맞춤.
+            let b = Rect::new(8.0, 132.0, 304.0, 42.0);
+            ui.rect(b, Color::new(0.04, 0.03, 0.06, 0.72));
+            // 줄은 다 찍힌 글로 나누고(찍히는 동안 줄이 바뀌지 않게) 앞에서부터 찍힌 만큼만 보인다.
+            let full = ui::wrap(ui, &d.text, b.w - 24.0, FONT_PX);
+            let top = b.y + (b.h - full.len().min(3) as f32 * 13.0) / 2.0;
+            let mut left = d.shown_chars;
+            for (i, l) in full.iter().take(3).enumerate() {
+                let n = l.chars().count().min(left);
+                left -= n;
+                let part: String = l.chars().take(n).collect();
+                ui.text(
+                    &part,
+                    160.0 - ui.text_w(l, FONT_PX) / 2.0,
+                    top + i as f32 * 13.0,
+                    FONT_PX,
+                    Color::new(0.94, 0.90, 0.82, 1.0),
+                );
+            }
+            if d.complete && (get_time() * 2.0) as i64 % 2 == 0 {
+                ui.text(
+                    "▼",
+                    b.right() - 14.0,
+                    b.bottom() - 13.0,
+                    FONT_PX,
+                    ui::ACCENT,
+                );
+            }
+        } else if let Some(d) = c.dialogue() {
             let b = Rect::new(8.0, 124.0, 304.0, 50.0);
             ui.panel(b, None);
             // 이름표

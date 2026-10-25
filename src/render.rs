@@ -246,6 +246,48 @@ impl Renderer {
 
     /// 대화창 초상화를 논리 사각형 `r`(44×44) 안에 찍는다. 원본 1px = 게임 픽셀 반(화면 배율의 절반, 정수).
     /// 배율이 홀수면 내림이라 조금 작아지지만 픽셀은 고르게 남는다. 그림이 없으면 false.
+    /// 컷씬 일러스트를 게임 화면 전체에(docs/decisions/0039). 원본 1px = 화면 배율/2 px(초상화와 같은 2배 밀도).
+    /// 홀수 배율에서는 원본 픽셀이 1.5배처럼 고르지 않게 늘어난다 — 그래서 임시 그림은 1px 디더를 쓰지 않는다.
+    /// `t`는 그림이 뜬 뒤 흐른 시간(패닝·입자).
+    pub fn draw_illust(&self, ui: &Ui, il: crate::illust::Illust, t: f32) {
+        use crate::illust::{self, VIEW_H, VIEW_W};
+        let o = ui.px(vec2(0.0, 0.0));
+        let k = ui.scale / 2.0;
+        let (w, h) = (VIEW_W * k, VIEW_H * k);
+        let spec = il.spec();
+        let tex = self
+            .art
+            .as_ref()
+            .and_then(|a| a.illust.get(il.index()))
+            .and_then(|t| t.as_ref());
+        match tex {
+            Some(tex) => {
+                let pan = illust::pan_at(&spec, t);
+                draw_texture_ex(
+                    tex,
+                    o.x,
+                    o.y,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(vec2(w, h)),
+                        source: Some(Rect::new(pan.x, pan.y, VIEW_W, VIEW_H)),
+                        ..Default::default()
+                    },
+                );
+            }
+            None => draw_rectangle(o.x, o.y, w, h, Color::new(0.08, 0.06, 0.10, 1.0)),
+        }
+        for p in illust::particles(spec.fx, t) {
+            draw_rectangle(
+                (o.x + p.pos.x * k).round(),
+                (o.y + p.pos.y * k).round(),
+                (p.size * k).max(1.0).round(),
+                (p.size * k).max(1.0).round(),
+                p.color,
+            );
+        }
+    }
+
     pub fn draw_portrait(&self, ui: &Ui, r: Rect, frame: u32) -> bool {
         let Some(tex) = self.art.as_ref().and_then(|a| a.portraits.as_ref()) else {
             return false;
