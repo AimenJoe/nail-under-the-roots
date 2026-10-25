@@ -15,6 +15,8 @@
   칸 30  : 도토(물든 청설모, 둘째 길 보스) — 도토리 갓 모자, 호박색 빛 눈, 꼬리를 감은 뿌리(docs/decisions/0052)
   칸 31~32: 돌아온 도토 보통·기쁨 — 붉은 밤색 털, 검은 눈, 모자는 그대로
   칸 33~34: 땅강아지 수수 보통·기쁨 — 벨벳 투구 같은 가슴, 이마에 올린 보안경, 큰 삽발(docs/decisions/0053)
+  칸 35  : 콩이(물든 세띠아르마딜로, 셋째 길 보스) — 띠 무늬 등딱지, 머리 방패, 옅은 하늘빛 눈, 뿌리(docs/decisions/0054)
+  칸 36~37: 돌아온 콩이 보통·기쁨
 
 그리는 법(손 도트를 흉내 낸 절차):
   1. 부위를 타원으로 놓고 칸마다 재질을 정한다(뒤에 놓인 것부터).
@@ -81,9 +83,15 @@ RAMP = {
     'shovel': [(40, 26, 22), (70, 46, 34), (104, 72, 50), (140, 104, 72)],
     'brass':  [(120, 84, 36), (176, 132, 60), (224, 184, 96)],
     'lens':   [(90, 140, 160), (150, 200, 214), (220, 244, 250)],
+    # 콩이(아르마딜로): 등딱지·머리 방패(잿빛 황갈색), 맨살(분홍빛 회색). 물들면 자두빛으로.
+    'kshell': [(70, 60, 56), (104, 92, 84), (140, 126, 112), (176, 160, 140), (206, 192, 170)],
+    'kskin':  [(150, 110, 110), (186, 146, 140), (214, 180, 170), (236, 214, 204)],
+    'ktshell': [(52, 44, 58), (80, 68, 84), (108, 94, 108), (138, 122, 134), (166, 152, 160)],
+    'ktskin': [(116, 90, 110), (146, 118, 134), (176, 150, 160), (204, 184, 190)],
 }
 RED_EYE = [(80, 14, 34), (190, 34, 72), (255, 84, 116), (255, 222, 230)]
 GLOW_EYE = [(40, 70, 36), (110, 190, 70), (190, 245, 120), (240, 255, 210)]
+SKY_EYE = [(30, 60, 96), (90, 170, 230), (170, 220, 255), (235, 250, 255)]
 AMBER_EYE = [(96, 52, 12), (224, 132, 32), (255, 192, 84), (255, 240, 200)]
 OUTLINE_BASE = (43, 29, 42)
 # Naïl 털빛(nail.py FURS와 같은 색 방향, 초상화 5단 경사).
@@ -924,6 +932,85 @@ def susu(face):
     return cv
 
 
+# ---- 콩이(세띠아르마딜로) -----------------------------------------------------------------
+def kongi(face):
+    """콩이(0054): 깊은 곳 입구의 문지기. 뒤로 둥근 띠 무늬 등딱지, 위로 선 두 귀, 머리 방패, 긴 주둥이, 작은 눈.
+    face: 'tainted'(물든 모습 — 옅은 하늘빛 눈, 앙다문 입, 등딱지를 감은 뿌리) / 'normal' / 'happy'."""
+    cv = Canvas()
+    bad = face == 'tainted'
+    shell, skin = ('ktshell', 'ktskin') if bad else ('kshell', 'kskin')
+    # 등딱지(뒤)와 어깨 띠
+    ellipse(cv, 22, 62, 27, 28, shell, bias=-0.05)
+    ellipse(cv, 40, 88, 26, 10, shell, bias=-0.15)
+    # 귀(뒤 → 앞), 머리, 주둥이
+    ellipse(cv, 42, 26, 4.5, 11, skin, bias=-0.1, clip=lambda x, y: y < 38)
+    ellipse(cv, 52, 23, 5, 12, skin, bias=0.0, clip=lambda x, y: y < 38)
+    flat(cv, 52, 25, 2, 7, 'pink', 0 if bad else 1)
+    ellipse(cv, 52, 54, 19, 15, skin, bias=0.05)
+    ellipse(cv, 68, 60, 10, 7, skin, bias=0.0)
+    ellipse(cv, 77, 60, 7, 4.5, skin, bias=-0.05)
+    # 머리 방패: 정수리에서 주둥이 위까지 길게 덮는 판(비니처럼 보이지 않게 앞으로 가늘어진다)
+    ellipse(cv, 54, 44, 18, 7, shell, bias=0.15, clip=lambda x, y: y < 48)
+    ellipse(cv, 70, 54, 11, 3.5, shell, bias=0.1, clip=lambda x, y: y < 56)
+    if bad:
+        for (pts, w) in (
+            ([(4, 52), (14, 44), (26, 46), (38, 40)], 3),
+            ([(10, 80), (22, 74), (34, 78), (46, 74)], 2),
+        ):
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+                n = int(max(abs(x1 - x0), abs(y1 - y0))) * 2 + 1
+                for i in range(n + 1):
+                    t = i / n
+                    x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+                    for oy in range(-(w // 2), w // 2 + 1):
+                        for ox in range(-(w // 2), w // 2 + 1):
+                            if ox * ox + oy * oy <= (w / 2) ** 2 + 0.5:
+                                cv.put(int(x + ox), int(y + oy), 'vroot', 2 if oy < 0 else 1)
+    outline(cv)
+    rim_light(cv, shell)
+    # 등딱지 띠: 세로 홈(어두운 선) + 띠마다 밝은 윗가장자리
+    for bx in (8, 15, 22, 29, 36):
+        for y in range(34, 88):
+            for x in (bx + (y - 60) // 14,):
+                m = cv.mat[y][x] if 0 <= x < 88 else None
+                if m and m[0] == shell and cv.col[y][x] is None:
+                    cv.paint(x, y, RAMP[shell][max(0, m[1] - 2)])
+                    if x + 1 < 88 and cv.mat[y][x + 1] and cv.mat[y][x + 1][0] == shell:
+                        cv.paint(x + 1, y, RAMP[shell][min(4, m[1] + 1)])
+    # 머리 방패 비늘 점
+    for (x, y) in ((42, 40), (48, 38), (54, 38), (60, 40), (45, 44), (51, 43), (57, 43)):
+        if cv.mat[y][x] and cv.mat[y][x][0] == shell:
+            cv.paint(x, y, RAMP[shell][1])
+    # 코끝
+    for (x, y) in ((83, 59), (84, 60), (83, 61), (84, 59)):
+        cv.paint(x, y, RAMP['nose'][0])
+    if bad:
+        for (x, y) in ((14, 43), (26, 45), (22, 73), (34, 77)):
+            cv.paint(x, y, RAMP['vroot'][3])
+        for (ex, ey, rx, ry) in ((58, 52, 3.4, 3.8),):
+            for y in range(int(ey - ry - 1), int(ey + ry + 2)):
+                for x in range(int(ex - rx - 1), int(ex + rx + 2)):
+                    dx, dy = (x + 0.5 - ex) / rx, (y + 0.5 - ey) / ry
+                    d = dx * dx + dy * dy
+                    if d <= 1.0:
+                        c = SKY_EYE[0] if d > 0.7 else (RAMP['eye'][0] if d < 0.18 else SKY_EYE[1 if dy < 0.1 else 2])
+                        cv.paint(x, y, c)
+            cv.paint(int(ex - 1), int(ey - 2), WHITE)
+        line(cv, [(52, 45), (62, 48)], RAMP[shell][0], 2)                # 찌푸린 눈썹
+        line(cv, [(66, 66), (70, 67), (74, 66)], MOUTH, 1)
+        dither_ellipse(cv, 58, 61, 3.5, 1.8, (150, 96, 120), 0.35)
+    else:
+        if face == 'happy':
+            happy_eye(cv, 58, 53, 3.4)
+            for (x, y) in ((66, 66), (67, 67), (68, 68), (69, 68), (70, 68), (71, 67), (72, 66)):
+                cv.paint(x, y, MOUTH)
+        else:
+            eye(cv, 58, 52, 3.2, 3.8, look=(0.2, 0.0))
+            line(cv, [(66, 66), (69, 67), (72, 66)], MOUTH, 1)
+        dither_ellipse(cv, 57, 61, 4.0, 2.0, BLUSH, 0.5)
+    return cv
+
+
 # ---- 누룩 할매 ---------------------------------------------------------------------------
 def halmae(face):
     """누룩 할매(0045·0049): 흰 실이 뭉친 둥근 몸(뽕나무버섯의 균사, 0037), 머리에 버섯 갓 셋, 늘 감은 눈.
@@ -1048,6 +1135,7 @@ def sheet():
         frames += [nail_fur(f, fur) for f in ('normal', 'happy', 'worried', 'determined')]
     frames += [doto('tainted'), doto('normal'), doto('happy')]
     frames += [susu('normal'), susu('happy')]
+    frames += [kongi('tainted'), kongi('normal'), kongi('happy')]
     # 한 줄 12칸(src/art.rs PORTRAIT_COLS): 한 줄로 늘어놓으면 2,048px를 넘어 오래된 폰에서 텍스처가 안 올라간다.
     cols = 12
     rows = (len(frames) + cols - 1) // cols

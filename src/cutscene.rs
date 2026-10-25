@@ -92,6 +92,15 @@ impl Portrait {
         first: 33,
         faces: 2,
     };
+    /// 물든 콩이: 칸 35 하나. 돌아온 콩이: 칸 36~37(보통·기쁨, docs/decisions/0054).
+    pub const KONGI_TAINTED: Portrait = Portrait {
+        first: 35,
+        faces: 1,
+    };
+    pub const KONGI: Portrait = Portrait {
+        first: 36,
+        faces: 2,
+    };
 
     pub fn frame(self, face: Face) -> u32 {
         // 모모는 칸이 둘(차가움·괴로움)뿐이라 걱정 = 둘째 칸.
@@ -515,6 +524,9 @@ pub enum Speaker {
     Doto,
     /// 땅강아지 장인 수수(첫 쉼터, 0053).
     Susu,
+    /// 물든 콩이(셋째 길의 보스, 이름표 "???") / 돌아온 콩이(마을, 0054).
+    KongiTainted,
+    Kongi,
 }
 
 fn speaker_actor(w: &World, who: Speaker) -> Actor {
@@ -545,7 +557,79 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
         },
         Speaker::Doto => doto_actor(w.player.pos),
         Speaker::Susu => susu_actor(w.player.pos),
+        Speaker::KongiTainted => Actor {
+            sprite: Some(Sprite::Critter(crate::art::KONGI_ROW)),
+            portrait: Some(Portrait::KONGI_TAINTED),
+            pos: w.player.pos,
+            ..story_actor("???", KONGI_SHELL)
+        },
+        Speaker::Kongi => kongi_actor(w.player.pos),
     }
+}
+
+/// 콩이의 색(초상화를 못 읽었을 때 이름표 옆 네모).
+const KONGI_SHELL: Color = Color::new(0.62, 0.56, 0.50, 1.0);
+
+/// 돌아온 콩이 배우(월드 그림 = 맑은 눈, 초상화 칸 36~37).
+fn kongi_actor(pos: Vec2) -> Actor {
+    Actor {
+        sprite: Some(Sprite::Critter(crate::art::KONGI_BACK_ROW)),
+        portrait: Some(Portrait::KONGI),
+        pos,
+        ..story_actor(i18n::s().name_kongi, KONGI_SHELL)
+    }
+}
+
+/// 셋째 길 끝 방에 콩이가 있다(0054): 깊은 곳의 문을 막는다. "아무도 떠나지 마"(0037)의 문지기판.
+pub fn kongi_meet(w: &World) -> Cutscene {
+    talk(
+        w,
+        &[
+            (Speaker::KongiTainted, |s| s.kongi_meet_1, Face::Normal),
+            (Speaker::Nail, |s| s.kongi_meet_1b, Face::Determined),
+        ],
+    )
+}
+
+/// 콩이를 이겼다(0054): 맑은 눈으로 돌아와 이름을 말하고, 붙잡는 것만이 지키는 게 아니었다며 바위 발톱을 준다. 먼저 마을로 간다.
+pub fn kongi_returns(w: &World, at: Vec2) -> Cutscene {
+    let mut kongi = kongi_actor(at);
+    kongi.visible = true;
+    kongi.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
+    let actors = vec![nail_actor(w), kongi];
+    let side = if at.x >= w.player.pos.x { 22.0 } else { -22.0 };
+    let near = w.player.pos + vec2(side, 0.0);
+    let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
+    let steps = vec![
+        Step::Wait(0.6),
+        say(1, Face::Normal, |s| s.kongi_b1),
+        Step::Move {
+            actor: 1,
+            to: near,
+            speed: 35.0,
+        },
+        Step::Face {
+            actor: 1,
+            dir: vec2(-side, 0.0),
+        },
+        Step::Face {
+            actor: 0,
+            dir: vec2(side, 0.0),
+        },
+        say(0, Face::Worried, |s| s.kongi_b2),
+        say(1, Face::Normal, |s| s.kongi_b3),
+        say(1, Face::Normal, |s| s.kongi_b4),
+        Step::Give(crate::app::STONE_CLAW),
+        say(0, Face::Happy, |s| s.kongi_b5),
+        say(1, Face::Happy, |s| s.kongi_b6),
+        Step::Move {
+            actor: 1,
+            to: near + away * 150.0,
+            speed: 90.0,
+        },
+        Step::Hide { actor: 1 },
+    ];
+    Cutscene::new(actors, steps)
 }
 
 /// 수수 배우(초상화 칸 33~34). 쉼터의 월드 그림이 서 있으니 배우는 말만 한다.
@@ -630,6 +714,8 @@ pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
         Speaker::DotoTainted,
         Speaker::Doto,
         Speaker::Susu,
+        Speaker::KongiTainted,
+        Speaker::Kongi,
     ];
     let actors = order.iter().map(|s| speaker_actor(w, *s)).collect();
     let steps = lines

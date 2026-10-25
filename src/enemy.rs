@@ -1,5 +1,5 @@
 //! 적: 뿌리에 물든 땅속 이웃. 종류(`Kind`)마다 행동 하나와 수치가 `species.rs` 표에 있다.
-//! 행동: 돌격(쥐들), 던지기(다람쥐), 뛰어 덮치기(청설모), 보스 셋(대장·모모·도토). 플레이어 위치와 `Room`만 본다.
+//! 행동: 돌격(쥐들), 던지기(다람쥐), 뛰어 덮치기(청설모), 보스 넷(대장·모모·도토·콩이). 플레이어 위치와 `Room`만 본다.
 
 use macroquad::prelude::*;
 
@@ -28,6 +28,8 @@ pub enum Kind {
     Momo,
     /// 둘째 길의 보스: 물든 청설모 도토. 던지고, 뛰고, 묻는다(docs/decisions/0052).
     Doto,
+    /// 셋째 길의 보스: 물든 세띠아르마딜로 콩이. 굴러 튕기고, 웅크려 버틴다(docs/decisions/0054).
+    Kongi,
 }
 
 impl Kind {
@@ -62,6 +64,8 @@ pub enum State {
     Under { time: f32 },
     /// 모모: 튀어나옴. 첫머리에만 둘레 피해.
     Pop { time: f32 },
+    /// 콩이: 웅크려 버티기. 발톱은 등딱지에 튕긴다(`guarding`).
+    Guard { time: f32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -305,7 +309,7 @@ impl Enemy {
             State::Approach
                 if matches!(
                     sp.behavior,
-                    Behavior::Chief | Behavior::Momo | Behavior::Doto
+                    Behavior::Chief | Behavior::Momo | Behavior::Doto | Behavior::Kongi
                 ) =>
             {
                 if player_targetable {
@@ -313,6 +317,7 @@ impl Enemy {
                     self.state = match sp.behavior {
                         Behavior::Chief => self.chief_next(dist, player_pos),
                         Behavior::Momo => self.momo_next(dist, player_pos, events),
+                        Behavior::Kongi => self.kongi_next(dist),
                         _ => self.doto_next(dist, player_pos),
                     };
                     if matches!(self.state, State::Approach) {
@@ -382,7 +387,21 @@ impl Enemy {
                 } else {
                     sp.dash_time
                 };
-                if room.resolve_circle(&mut self.pos, r) {
+                let before = self.pos;
+                let hit_wall = room.resolve_circle(&mut self.pos, r);
+                if hit_wall && sp.behavior == Behavior::Kongi && self.chain > 0 {
+                    // 콩이: 벽에 튕긴다(반사 + 플레이어 쪽으로 조금 꺾기). 다 튕기면 아래처럼 어질어질.
+                    self.chain -= 1;
+                    let n = (self.pos - before).normalize_or(-dir);
+                    let bounced = dir - 2.0 * dir.dot(n) * n;
+                    let aim = (player_pos - self.pos).normalize_or(bounced);
+                    let new_dir = (bounced * (1.0 - t::KONGI_BOUNCE_AIM)
+                        + aim * t::KONGI_BOUNCE_AIM)
+                        .normalize_or(bounced);
+                    self.facing = new_dir;
+                    events.push(Event::WallHit);
+                    self.state = State::Charge { time, dir: new_dir };
+                } else if hit_wall {
                     self.state = State::Rest { time: sp.wall_rest };
                     self.flash = t::HIT_FLASH;
                     events.push(Event::WallHit);
@@ -478,6 +497,19 @@ impl Enemy {
                 } else {
                     self.state = State::Under { time };
                 }
+            }
+            State::Guard { time } => {
+                let time = time + dt;
+                if player_targetable {
+                    self.facing = dir_to_player;
+                }
+                self.state = if time >= t::KONGI_GUARD_TIME {
+                    State::Rest {
+                        time: sp.rest * 0.5,
+                    }
+                } else {
+                    State::Guard { time }
+                };
             }
             State::Pop { time } => {
                 let time = time + dt;
@@ -614,6 +646,71 @@ impl Enemy {
         }
     }
 
+    /// 콩이의 다음 수(0054): 구르기 ↔ 웅크려 버티기. 구르기는 거리 안에서, 버티기는 가까이 걸어온 뒤. 아니면 걸어온다.
+    fn kongi_next(&mut self, dist: f32) -> State {
+        let sp = self.sp();
+        match self.pattern % 2 {
+            0 if dist < sp.trigger => {
+                self.pattern += 1;
+                self.chain = self.kongi_bounces();
+                State::Windup { time: 0.0 }
+            }
+            1 if dist < t::KONGI_GUARD_NEAR => {
+                self.pattern += 1;
+                State::Guard { time: 0.0 }
+            }
+            _ => State::Approach,
+        }
+    }
+
+    fn kongi_bounces(&self) -> u32 {
+        if self.hurt_half() {
+            t::KONGI_BOUNCES_HURT
+        } else {
+            t::KONGI_BOUNCES
+        }
+    }
+
+    /// 콩이가 공으로 말려 있다(웅크림·버티기·구르기): 발톱은 등딱지에 튕긴다.
+    pub fn guarding(&self) -> bool {
+        self.sp().behavior == Behavior::Kongi
+            && matches!(
+                self.state,
+                State::Windup { .. } | State::Charge { .. } | State::Guard { .. }
+            )
+    }
+
+    /// 발톱이 등딱지에 튕겼다(패링 거울): 버티던 중이면 곧바로 굴러 온다(예고는 짧게).
+    pub fn shell_hit(&mut self) {
+        self.asleep = false;
+        self.wake_delay = 0.0;
+        self.flash = t::HIT_FLASH * 0.5;
+        if let State::Guard { .. } = self.state {
+            self.chain = self.kongi_bounces();
+            self.state = State::Windup {
+                time: self.windup() * t::KONGI_COUNTER_SKIP,
+            };
+        }
+    }
+
+    /// 솟구치기·드릴이 등딱지를 열었다: 오래 어질어질(피해는 따로 `hurt`).
+    pub fn break_guard(&mut self) {
+        self.chain = 0;
+        self.state = State::Stunned {
+            time: t::KONGI_BREAK_STUN,
+        };
+    }
+
+    /// 패링에 받아쳐졌다: 구르던 콩이는 멈춰 어질어질(다른 보스는 `hurt`가 다룬다).
+    pub fn on_parried(&mut self) {
+        if self.sp().behavior == Behavior::Kongi && matches!(self.state, State::Charge { .. }) {
+            self.chain = 0;
+            self.state = State::Rest {
+                time: self.sp().wall_rest,
+            };
+        }
+    }
+
     /// 체력이 반 아래(보스가 한 수 세진다).
     fn hurt_half(&self) -> bool {
         self.hp * 2 <= self.max_hp
@@ -631,6 +728,7 @@ impl Enemy {
                     | State::Howl { .. }
                     | State::Pop { .. }
                     | State::Aim { .. }
+                    | State::Guard { .. }
             )
     }
 
@@ -638,7 +736,7 @@ impl Enemy {
     pub fn is_boss(&self) -> bool {
         matches!(
             self.sp().behavior,
-            Behavior::Chief | Behavior::Momo | Behavior::Doto
+            Behavior::Chief | Behavior::Momo | Behavior::Doto | Behavior::Kongi
         )
     }
 
@@ -715,13 +813,16 @@ impl Enemy {
             State::Howl { .. } => "HOWL",
             State::Under { .. } => "under",
             State::Pop { .. } => "POP",
+            State::Guard { .. } => "GUARD",
         }
     }
 }
 
 fn idle_of(b: Behavior) -> State {
     match b {
-        Behavior::Charger | Behavior::Chief | Behavior::Momo | Behavior::Doto => State::Approach,
+        Behavior::Charger | Behavior::Chief | Behavior::Momo | Behavior::Doto | Behavior::Kongi => {
+            State::Approach
+        }
         Behavior::Shooter | Behavior::Leaper => State::Keep,
         Behavior::Dummy => State::Rest { time: f32::MAX },
     }
@@ -854,6 +955,44 @@ mod tests {
         let (fan, ev) = run(species::DOTO.hp / 2);
         assert_eq!(fan, t::DOTO_FAN_HURT);
         assert!(ev.contains(&Event::Bury(t::DOTO_MINES_HURT)));
+    }
+
+    /// 콩이: 구르면 벽에 튕기고(튕긴 수만큼 WallHit), 다 튕기면 어질어질. 버티는 동안은 말려 있고, 치면 바로 굴러 온다.
+    #[test]
+    fn kongi_rolls_bounces_and_guards() {
+        let room = Room::new();
+        let player = room.center() + vec2(60.0, 0.0);
+        let mut e = Enemy::new(Kind::Kongi, room.center());
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let (mut rolled, mut guarded, mut dizzy) = (false, false, false);
+        for _ in 0..900 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            match e.state {
+                State::Charge { .. } => {
+                    rolled = true;
+                    assert!(e.guarding() && e.contact_damage().is_some());
+                }
+                State::Guard { .. } => {
+                    guarded = true;
+                    assert!(e.guarding() && e.contact_damage().is_none());
+                }
+                State::Rest { .. } if rolled => {
+                    dizzy = true;
+                    assert!(!e.guarding(), "어질어질할 때가 틈");
+                }
+                _ => {}
+            }
+        }
+        assert!(rolled && guarded && dizzy, "{rolled} {guarded} {dizzy}");
+        let walls = ev.iter().filter(|x| **x == Event::WallHit).count();
+        assert!(walls > t::KONGI_BOUNCES as usize, "튕김 {walls}");
+        // 버티는 중에 치면 바로 굴러 올 채비(짧은 예고).
+        let mut g = Enemy::new(Kind::Kongi, room.center());
+        g.state = State::Guard { time: 0.2 };
+        g.shell_hit();
+        assert!(matches!(g.state, State::Windup { time } if time > 0.0));
+        g.break_guard();
+        assert!(matches!(g.state, State::Stunned { .. }) && !g.guarding());
     }
 
     #[test]

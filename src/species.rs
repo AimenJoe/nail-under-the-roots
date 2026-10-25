@@ -26,6 +26,9 @@ pub enum Behavior {
     /// 도토(둘째 길의 보스, 0052): 도토리 부채꼴 던지기(되받아칠 수 있다) → 높이 뛰기 → 도토리 묻기(터지기 전에 비키거나 파낸다).
     /// 거리를 두려 한다. 체력이 반 아래면 던지는 수·묻는 수가 는다.
     Doto,
+    /// 콩이(셋째 길의 보스, 0054): 공으로 굴러 벽에 튕기기 ↔ 웅크려 버티기(발톱은 튕긴다, 치면 바로 굴러 온다 — 패링 거울).
+    /// 솟구치기·드릴은 등딱지를 뚫고 오래 어질어질하게 한다. 구르기 뒤 어질어질할 때가 틈. 반 아래면 더 많이 튕긴다.
+    Kongi,
 }
 
 pub struct Species {
@@ -280,8 +283,34 @@ pub static DOTO: Species = Species {
     ..BASE
 };
 
+/// 콩이(물든 세띠아르마딜로, 0037·0054). 셋째 길 끝 "깊은 곳의 문"을 지킨다. 아무도 더 내려가지 못하게 몸을 만다.
+/// 손맛: 무겁고 느리게 걷지만 구르면 빠르다. 넉백을 거의 안 받는다. 벽에 다 튕기고 나면 길게 어질어질(때릴 때).
+pub static KONGI: Species = Species {
+    name: |s| s.mob_kongi,
+    lore: |s| s.mob_kongi_lore,
+    attack: |s| s.mob_kongi_atk,
+    tip: |s| s.mob_kongi_tip,
+    behavior: Behavior::Kongi,
+    hp: 40,
+    radius: 9.0,
+    speed: 30.0,
+    damage: 1,
+    knock_mul: 0.12,
+    trigger: 130.0,
+    windup: 0.7,
+    dash_speed: 230.0,
+    dash_time: 2.4,
+    rest: 0.8,
+    wall_rest: 1.8,
+    glowbugs: (24, 28),
+    seed_chance: 1.0,
+    color: Color::new(0.55, 0.50, 0.46, 1.0),
+    sheet_row: crate::art::KONGI_ROW,
+    ..BASE
+};
+
 /// 도감 순서(허수아비는 빼고).
-pub const BESTIARY: [Kind; 8] = [
+pub const BESTIARY: [Kind; 9] = [
     Kind::FieldMouse,
     Kind::HouseMouse,
     Kind::SewerRat,
@@ -290,6 +319,7 @@ pub const BESTIARY: [Kind; 8] = [
     Kind::Chief,
     Kind::Momo,
     Kind::Doto,
+    Kind::Kongi,
 ];
 
 pub fn of(kind: Kind) -> &'static Species {
@@ -303,6 +333,7 @@ pub fn of(kind: Kind) -> &'static Species {
         Kind::Chief => &CHIEF,
         Kind::Momo => &MOMO,
         Kind::Doto => &DOTO,
+        Kind::Kongi => &KONGI,
     }
 }
 

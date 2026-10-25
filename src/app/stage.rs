@@ -222,6 +222,8 @@ impl App {
                 AdvEvent::MomoBeaten => self.momo_beaten(),
                 AdvEvent::DotoIntro => self.play(cutscene::doto_meet(&self.world)),
                 AdvEvent::DotoBeaten => self.doto_beaten(),
+                AdvEvent::KongiIntro => self.play(cutscene::kongi_meet(&self.world)),
+                AdvEvent::KongiBeaten => self.kongi_beaten(),
             }
         }
     }
@@ -261,6 +263,19 @@ impl App {
         }
         let at = self.world.adv.boss_last;
         self.play(cutscene::doto_returns(&self.world, at));
+    }
+
+    /// 콩이를 이겼다(0054): 문을 열고 바위 발톱을 준다(장면 속 획득 창). 그 뒤 마을에 온다.
+    fn kongi_beaten(&mut self) {
+        use crate::profile::key;
+        self.world.kongi_fight = false;
+        if self.recording() {
+            self.profile.set(key::KONGI_BACK);
+            self.profile.set(key::STONE);
+            self.save_profile();
+        }
+        let at = self.world.adv.boss_last;
+        self.play(cutscene::kongi_returns(&self.world, at));
     }
 
     /// 가장 깊은 곳(0042): 클리어를 남기고 엔딩을 튼다. 끝나면 타이틀로(런이 끝났다).
@@ -390,6 +405,15 @@ impl App {
                 self.play(cutscene::talk(
                     &self.world,
                     &[(Speaker::Susu, text, Face::Happy)],
+                ));
+            }
+            Interact::Talk(Who::Kongi) => {
+                let lines: [Tr; 3] = [|s| s.kongi_v1, |s| s.kongi_v2, |s| s.kongi_v3];
+                let text = lines[self.talk_n as usize % lines.len()];
+                self.talk_n += 1;
+                self.play(cutscene::talk(
+                    &self.world,
+                    &[(Speaker::Kongi, text, Face::Happy)],
                 ));
             }
             Interact::Talk(Who::Doto) => {
@@ -935,7 +959,7 @@ impl App {
         let verb = match i {
             Interact::Talk(Who::Popo) if village => s.ia_decor,
             Interact::Talk(Who::Popo) => s.ia_shop,
-            Interact::Talk(Who::Bori | Who::Momo | Who::Doto | Who::Susu) => s.ia_talk,
+            Interact::Talk(Who::Bori | Who::Momo | Who::Doto | Who::Susu | Who::Kongi) => s.ia_talk,
             Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,
             Interact::Tree => s.ia_tree,

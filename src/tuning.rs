@@ -328,6 +328,22 @@ pub const DOTO_MINE_SPREAD: f32 = 34.0;
 /// 묻힌 도토리: 터지기까지(흙이 부풀며 고리가 좁혀 온다), 터지는 둘레. 발톱으로 미리 파내면 안 터진다.
 pub const DOTO_MINE_FUSE: f32 = 1.3;
 pub const DOTO_MINE_RADIUS: f32 = 14.0;
+// ---- 콩이(셋째 길의 보스, docs/decisions/0054) -----------------------------------------
+/// 구르기: 벽에 몇 번 튕기나(체력이 반 아래면 더). 튕길 때 플레이어 쪽으로 이만큼 꺾는다.
+pub const KONGI_BOUNCES: u32 = 2;
+pub const KONGI_BOUNCES_HURT: u32 = 4;
+pub const KONGI_BOUNCE_AIM: f32 = 0.3;
+/// 웅크려 버티기 시간. 그동안 발톱은 등딱지에 튕긴다. 치면 바로 굴러 온다(예고의 이 비율에서 시작).
+pub const KONGI_GUARD_TIME: f32 = 1.4;
+/// 버티기는 발톱이 닿을 만큼 다가온 뒤에(미끼: 치면 튕기고 바로 굴러 온다).
+pub const KONGI_GUARD_NEAR: f32 = 40.0;
+pub const KONGI_COUNTER_SKIP: f32 = 0.5;
+/// 등딱지에 튕긴 Naïl: 밀려나는 세기, 그동안 다시 못 휘두르는 시간.
+pub const KONGI_RECOIL: f32 = 170.0;
+pub const KONGI_RECOIL_LOCK: f32 = 0.35;
+/// 솟구치기(아래 배)·드릴로 등딱지를 열면 이만큼 어질어질.
+pub const KONGI_BREAK_STUN: f32 = 1.6;
+
 /// 깨운 독 발톱(큰 나무, 0052)의 값(반딧불).
 pub const VENOM_AWAKE_COST: u32 = 120;
 

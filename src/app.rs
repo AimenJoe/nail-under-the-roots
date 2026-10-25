@@ -213,6 +213,8 @@ pub enum Item {
 pub(crate) const VENOM_CLAW: usize = 3;
 /// 새싹 발톱(수수가 만들어 준다, 0053).
 pub(crate) const SPROUT_CLAW: usize = 0;
+/// 바위 발톱(콩이가 준다, 0054).
+pub(crate) const STONE_CLAW: usize = 2;
 
 /// 가방. 지금은 무기만 들어간다. 그 밖의 아이템은 2단계(방 클리어 보상)에서.
 pub struct Inventory {
@@ -783,6 +785,8 @@ impl App {
             self.world.momo_fight = s == Scenario::Normal && !self.profile.flag(key::MOMO_BACK);
             // 도토(0052)도 첫 시작에서만, 기억해 내기 전까지.
             self.world.doto_fight = s == Scenario::Normal && !self.profile.flag(key::DOTO_MEMORY);
+            // 콩이(0054)도 첫 시작에서만, 이기기 전까지.
+            self.world.kongi_fight = s == Scenario::Normal && !self.profile.flag(key::KONGI_BACK);
         }
         self.inventory = match s {
             Scenario::Normal if veteran => Inventory::new(&[start]),
@@ -801,6 +805,7 @@ impl App {
         // 맨손 시작(튜토리얼 전)은 빼고.
         for (k, w) in [
             (crate::profile::key::SPROUT, SPROUT_CLAW),
+            (crate::profile::key::STONE, STONE_CLAW),
             (crate::profile::key::VENOM, VENOM_CLAW),
         ] {
             if self.profile.flag(k) && self.inventory.equipped.is_some() {
@@ -1523,6 +1528,7 @@ impl App {
             halmae: self.profile.flag(key::HALF_ENDING) || self.profile.flag(key::TRUE_ENDING),
             momo: self.profile.flag(key::MOMO_BACK),
             doto: self.profile.flag(key::DOTO_MEMORY),
+            kongi: self.profile.flag(key::KONGI_BACK),
             decor,
             growth: crate::village::growth(self.profile.count(&key::clears(Character::Mole))),
         }
@@ -2405,12 +2411,31 @@ impl App {
         let s = i18n::s();
         let seen = &self.world.seen;
         let list_w = 74.0;
-        // 목록이 아래 "만난 이웃 n/m" 줄에 닿지 않게(종이 늘면 줄 간격을 줄인다).
-        let row_h = ((c.h - FONT_PX - 6.0) / BESTIARY.len() as f32)
+        // 목록이 아래 "만난 이웃 n/m" 줄에 닿지 않게. 줄 간격은 13 아래로 줄이지 않는다(9종에서 일본어가 겹쳤다, 0054).
+        // 다 안 들어가면 고른 줄을 따라 넘긴다(▲▼).
+        let avail = c.h - FONT_PX - 6.0;
+        let row_h = (avail / BESTIARY.len() as f32)
             .floor()
-            .min(FONT_PX + 4.0);
-        for (i, k) in BESTIARY.iter().enumerate() {
-            let r = Rect::new(c.x, c.y + i as f32 * row_h, list_w, row_h - 1.0);
+            .clamp(13.0, FONT_PX + 4.0);
+        let fits = ((avail / row_h).floor() as usize).max(1);
+        let first = self
+            .bestiary_cursor
+            .saturating_sub(fits - 1)
+            .min(BESTIARY.len().saturating_sub(fits));
+        if first > 0 {
+            ui.text("▲", c.x + list_w - 8.0, c.y - 9.0, FONT_PX, ui::TEXT_DIM);
+        }
+        if first + fits < BESTIARY.len() {
+            ui.text(
+                "▼",
+                c.x + list_w - 8.0,
+                c.y + fits as f32 * row_h - 3.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
+        for (i, k) in BESTIARY.iter().enumerate().skip(first).take(fits) {
+            let r = Rect::new(c.x, c.y + (i - first) as f32 * row_h, list_w, row_h - 1.0);
             let known = seen.contains(k);
             let name = if known {
                 tr(k.species().name)

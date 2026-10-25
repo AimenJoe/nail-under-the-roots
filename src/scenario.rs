@@ -57,6 +57,8 @@ pub enum Scenario {
     Momo(u8),
     /// 둘째 길 끝 굴(도토가 지킨다)에 바로(docs/decisions/0052).
     Doto,
+    /// 셋째 길 끝 굴(콩이가 지킨다)에 바로(docs/decisions/0054).
+    Kongi,
 }
 
 pub struct Entry {
@@ -65,7 +67,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 27] = [
+pub const LIST: [Entry; 28] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -201,6 +203,11 @@ pub const LIST: [Entry; 27] = [
         desc: "둘째 길 끝 굴. 끝방의 도토: 도토리 부채꼴·높이 뛰기·도토리 묻기. 이기면 기억해 내는 장면(기록은 남기지 않는다).",
         scenario: Scenario::Doto,
     },
+    Entry {
+        name: "콩이",
+        desc: "셋째 길 끝 굴. 끝방의 콩이: 굴러 튕기기·웅크려 버티기(발톱은 튕김, 솟구치기·드릴은 뚫음). 이기면 바위 발톱.",
+        scenario: Scenario::Kongi,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -233,9 +240,14 @@ pub fn build(s: Scenario) -> World {
             w.adv.events.clear();
             w
         }
-        Scenario::Momo(_) | Scenario::Doto => {
+        Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi => {
             let doto = s == Scenario::Doto;
-            let mut w = World::camp_start(if doto { 2 } else { 1 });
+            let stage = match s {
+                Scenario::Doto => 2,
+                Scenario::Kongi => crate::tuning::FINAL_STAGE,
+                _ => 1,
+            };
+            let mut w = World::camp_start(stage);
             w.seeds = 40;
             w.adv.events.clear();
             if let Scenario::Momo(wins) = s {
@@ -243,6 +255,7 @@ pub fn build(s: Scenario) -> World {
                 w.momo_wins = wins;
             }
             w.doto_fight = doto;
+            w.kongi_fight = s == Scenario::Kongi;
             w.enter_route_boss_now();
             // 끝방 문 안쪽에 바로 선다(들어서면 잠기고 모모가 말한다).
             let boss = w.adv.dungeon.as_ref().and_then(|d| {

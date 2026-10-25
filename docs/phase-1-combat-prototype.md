@@ -85,6 +85,7 @@
 | 마을 | `village.rs`, `adventure.rs`(World::village, Place::Village), `render.rs`(큰 나무·꾸미기·할매), `app/stage.rs`(꾸미기 가게·할매·뿌리 길) | 튜토리얼 뒤 시작·엔딩 뒤 돌아오는 허브. 큰 나무 잎 = 깬 횟수, 포포 꾸미기 가게(마을 씨앗 6가지), 보리·할매(실뜨기)·빈 자리(0045) |
 | 모모 보스(세 번) | `enemy.rs`(Momo·Under·Pop), `species.rs`(MOMO), `dungeon.rs`(Params::boss), `adventure.rs`(MomoIntro·MomoBeaten), `app/stage.rs`(momo_beaten), `cutscene.rs`(momo_meet·momo_flee·momo_returns), `tools/art/critters.py`(MOMO_BLOOM) | 첫 길 끝방. 만날수록 한 수씩(뛰기·차기 → 굴 숨기 → 이어 뛰기), 쓰러지면 그 런은 보통 무리. 이길 때마다 빈 자리 꽃잎, 세 번째에 돌아와 마을 그루터기에 앉음(참 엔딩 조건 `momo`). 보스 막대를 화면 위로(0046) |
 | 도토 보스(한 번) | `enemy.rs`(Doto·doto_next·Bury), `species.rs`(DOTO), `world.rs`(Mine·mines), `render.rs`(draw_mine), `adventure.rs`(DotoIntro·DotoBeaten), `app/stage.rs`(doto_beaten·큰 나무 독 발톱 줄), `cutscene.rs`(doto_meet·doto_returns), `tools/art/critters.py`(DOTO·DOTO_BACK), `portraits.py`(칸 30~32) | 둘째 길 끝방. 도토리 부채꼴(패링으로 되받기) → 높이 뛰기 → 도토리 묻기(발밑 + 둘레, 고리 둘, 파내기·굴로 넘김), 반 아래면 수가 늚. 이기면 씨앗 자리를 기억(`doto_memory`, 참 엔딩 조건 둘째), 마을 그루터기 밑. 큰 나무에서 독 발톱 깨우기(120, 런마다 가방에), 저널 목표 둘(0052) |
+| 콩이 보스(한 번) | `enemy.rs`(Kongi·Guard·kongi_next·shell_hit·break_guard·on_parried), `species.rs`(KONGI), `world.rs`(등딱지 튕김·열기), `player.rs`(recoil), `adventure.rs`(KongiIntro·KongiBeaten), `app/stage.rs`(kongi_beaten), `cutscene.rs`(kongi_meet·kongi_returns), `tools/art/critters.py`(KONGI)·`portraits.py`(칸 35~37) | 셋째 길 끝방. 구르기(벽에 튕기고 어질어질) ↔ 웅크려 버티기(발톱은 튕기고 바로 굴러 옴 — 패링 거울), 솟구치기·드릴로 등딱지 열기, 패링하면 구르기 멈춤. 이기면 바위 발톱(런마다 가방에), 마을 바위 곁, 저널 "깊은 곳의 문", 도감 목록 넘기기(0054) |
 | 작은 것들(0053) | `camp.rs`(z), `cutscene.rs`(susu_meet·Portrait::SUSU), `app/stage.rs`(수수 말 걸기), `illust.rs`·`tools/art/illust.py`(doto_memory), `knots.rs`(6~10), `story.rs`(TalkDoto·진행 줄), `tools/art/critters.py`(SUSU)·`portraits.py`(칸 33~34) | 첫 쉼터의 땅강아지 수수가 새싹 발톱을 만들어 줌(런마다 가방에, 저널 "파는 손"), 도토 기억 일러스트(앨범 9장 5×2), 실뜨기 10단계(걸음·보스 체력·패링 창·굴파기 대기·지렁이), 진행을 따르는 이웃 말 7줄 |
 | 반딧불·큰 나무 재주 | `talents.rs`, `app/stage.rs`(bank_glowbugs·update_tree·draw_tree), `player.rs`·`world.rs`(재주 배율), `adventure.rs`(Interact::Tree), `sfx.rs`(드릴 소리 셋) | 쉼터·런 끝에 반딧불을 마을로. 마을 큰 나무에서 자리 넷 × 갈래 둘(굴파기·패링·드릴·먹기), 깨우기는 반딧불, 바꿔 끼기는 공짜(0047) |
 | 임시 그림 다듬기 | `tools/art/portraits.py`(칸 12~17), `tools/art/illust.py`(bands, momo_bloom), `cutscene.rs`(Portrait::MOMO·HALMAE·MOM) | 돌아온 모모·누룩 할매·엄마 초상화, 일러스트 띠 경계 2×2 섞기, 모모 일러스트 몸·눈(0049) |
@@ -130,6 +131,7 @@
 - [ ] 0037 이야기 뼈대 읽고 어색한 곳 표시(누룩 할매·도토·수수·콩이 이름, 반쪽/참 엔딩 조건, 어미 장면 길이)
 - [ ] **행동 대기**(0038): 먹는 시간 0.35초(지렁이 0.6)·먹기 대기 1.5초가 답답한지/쉬운지, 공격 연타 중 패링이 덜 걸리는 게 공정한지(대기 0.45초), 퀵 슬롯 덮개·터치 버튼 테두리가 읽히는지
 - [ ] **도토**(개발 "도토", 0052): 체력 34·묻은 도토리 1.3초·둘레 14가 공정한지, 부채꼴 사이가 피할 만한지, 고리 둘(어디·언제)이 읽히는지, 그림(모자·꼬리), 기억해 내는 장면 길이, 독 발톱 값 120
+- [ ] **콩이**(개발 "콩이", 0054): 체력 40·튕김 2/4번이 공정한지, 버티기를 보고 솟구치기·드릴을 떠올리는지, 등딱지 튕김 알림, 그림, 바위 발톱을 받는 장면
 - [ ] **작은 것들**(0053): 수수 그림·말투(개발 "쉼터"에서 말 걸기), 도토 기억 일러스트 분위기(개발 "도토"를 이겨서), 실뜨기 6~10단계 어려움
 - [ ] **컷씬 일러스트**(0039): 새 게임 오프닝(큰 나무 → 엄마), 튜토리얼 보스 처치(보리), 개발 "이야기 일러스트"(모모·엔딩)를 보고 장면 길이·패닝 속도·내레이션·그림 분위기 판정. 사람이 그릴지(본인/외주) 정하면 `docs/art/cutscene-illustrations.md`를 넘긴다(계약 체크리스트 포함)
 - [x] **다회차**(0040): 지금 만들기로(2026-10-25) → 기록 저장과 첫 조각(0041)

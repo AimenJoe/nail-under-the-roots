@@ -2013,6 +2013,11 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                             draw_critter_at(tex, art::SUSU_ROW, n.pos, left, false, w.time);
                         }
                     }
+                    world::Who::Kongi => {
+                        if let Some(tex) = art.critters.as_ref() {
+                            draw_critter_at(tex, art::KONGI_BACK_ROW, n.pos, left, false, w.time);
+                        }
+                    }
                 }
             }
             Drawable::Tree(at, growth) => draw_great_tree(at, growth, w.time),
@@ -2449,6 +2454,28 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             );
         }
     }
+    // 콩이(0054): 말려 있으면 공(칸 4·5). 구를 때는 두 칸을 번갈아 띠가 돈다. 버틸 때는 등딱지에 빛이 돈다.
+    if e.kind == crate::enemy::Kind::Kongi {
+        match e.state {
+            enemy::State::Charge { .. } => frame = 4 + ((time * 14.0) as u32) % 2,
+            enemy::State::Windup { .. } => frame = 4,
+            enemy::State::Guard { .. } => {
+                frame = 4;
+                let ph = (time * 2.5).fract();
+                let a = std::f32::consts::PI * (1.1 + ph * 0.8);
+                let g = pos + vec2(a.cos(), a.sin() * 0.8) * (r - 1.0) - vec2(0.0, 2.0);
+                draw_rectangle(g.x.round(), g.y.round(), 1.0, 1.0, world::SHELL);
+                draw_circle_lines(
+                    pos.x.round(),
+                    (pos.y - 2.0).round(),
+                    r + 3.0,
+                    1.0,
+                    Color::new(0.75, 0.90, 1.0, 0.35 + 0.25 * (time * 6.0).sin().abs()),
+                );
+            }
+            _ => {}
+        }
+    }
     if e.asleep {
         frame = 1;
         // 자는 중: Z가 떠오른다.
@@ -2583,7 +2610,10 @@ fn draw_telegraphs(w: &World, alpha: f32) {
         let pos = lerp(e.prev_pos, e.pos, alpha);
         let (k, kind) = match e.state {
             enemy::State::Windup { time }
-                if matches!(sp.behavior, Behavior::Charger | Behavior::Chief) =>
+                if matches!(
+                    sp.behavior,
+                    Behavior::Charger | Behavior::Chief | Behavior::Kongi
+                ) =>
             {
                 ((time / e.windup()).min(1.0), 0)
             }

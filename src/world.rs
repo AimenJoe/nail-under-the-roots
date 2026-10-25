@@ -51,6 +51,8 @@ pub enum Who {
     Doto,
     /// 땅강아지 장인 수수: 첫 쉼터. 새싹 발톱을 만들어 준다(docs/decisions/0053).
     Susu,
+    /// 돌아온 콩이: 마을 위쪽 바위 곁(docs/decisions/0054).
+    Kongi,
 }
 
 /// 이웃 NPC: 서 있거나(쉼터) 플레이어 곁으로 걸어온다(튜토리얼의 포포). 막지 않는다.
@@ -156,6 +158,8 @@ pub struct World {
     /// 도토(0052): 둘째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다). 묻힌 도토리.
     pub doto_fight: bool,
     pub mines: Vec<Mine>,
+    /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
+    pub kongi_fight: bool,
     /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것, 0048)와 Naïl의 털빛(그리기만).
     pub charm_pool: Vec<usize>,
     pub fur: u8,
@@ -223,6 +227,7 @@ impl World {
             momo_wins: 0,
             doto_fight: false,
             mines: Vec::new(),
+            kongi_fight: false,
             charm_pool: (0..crate::equipment::BASE_CHARMS).collect(),
             fur: 0,
             chests: 0,
@@ -655,6 +660,8 @@ impl World {
         // 3. 플레이어 공격 → 적·투사체
         if let Some(s) = strike {
             let origin = self.player.pos;
+            let mut shell_from = None;
+            let mut broke_at = None;
             for e in &mut self.enemies {
                 if e.last_hit_by == s.id
                     || !e.hittable()
@@ -663,6 +670,13 @@ impl World {
                     continue;
                 }
                 e.last_hit_by = s.id;
+                // 콩이의 등딱지(0054): 발톱은 튕긴다(패링 거울). 솟구치기(아래 배)·드릴은 뚫고 연다.
+                let guarded = e.guarding();
+                if guarded && matches!(s.kind, crate::combat::StrikeKind::Claw(_)) {
+                    e.shell_hit();
+                    shell_from = Some(e.pos);
+                    continue;
+                }
                 let dir = (e.pos - origin).normalize_or_zero();
                 let dir = if dir == Vec2::ZERO {
                     self.player.facing
@@ -673,6 +687,10 @@ impl World {
                     dir
                 };
                 e.hurt(s.damage, dir, s.knockback, s.stun);
+                if guarded && e.alive {
+                    e.break_guard();
+                    broke_at = Some(e.pos);
+                }
                 if matches!(s.kind, crate::combat::StrikeKind::Claw(_)) {
                     self.player.gain_sp(s.finisher);
                 }
@@ -704,6 +722,24 @@ impl World {
                         .push(ring(e.pos, e.radius(), e.radius() * 3.0, 0.25, color));
                     burst(&mut self.fx, e.pos, 12, color, 110.0);
                 }
+            }
+            if let Some(from) = shell_from {
+                self.player
+                    .recoil(from, t::KONGI_RECOIL, t::KONGI_RECOIL_LOCK);
+                sfx.play(sfx::Id::WallHit);
+                self.feel.add_hitstop(t::PARRY_HITSTOP * 0.6);
+                self.feel.add_trauma(0.2);
+                let p = (self.player.pos + from) * 0.5;
+                self.fx.push(ring(p, 2.0, 14.0, 0.2, SHELL));
+                burst(&mut self.fx, p, 8, SHELL, 100.0);
+                self.toast = Some((|s| s.toast_shell, 2.0));
+            }
+            if let Some(at) = broke_at {
+                sfx.play(sfx::Id::DrillWall);
+                self.feel.add_trauma(0.3);
+                self.fx.push(ring(at, 4.0, 24.0, 0.3, SHELL));
+                burst(&mut self.fx, at, 14, SHELL, 130.0);
+                self.toast = Some((|s| s.toast_guard_break, 2.0));
             }
             let parry = self.player.parry_dir();
             let mut parried = false;
@@ -767,6 +803,7 @@ impl World {
                             // 되받아치기(재주, 0047)면 피해도 준다.
                             let counter = self.player.talents.parry_counter();
                             e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                            e.on_parried();
                             parried = true;
                             break;
                         }
@@ -1049,6 +1086,8 @@ pub const GLOW: Color = Color::new(0.85, 1.0, 0.45, 1.0);
 pub const SEED: Color = Color::new(0.86, 0.68, 0.40, 1.0);
 /// 산딸기.
 pub const BERRY: Color = Color::new(0.93, 0.30, 0.38, 1.0);
+/// 콩이의 등딱지(튕김·열림 번쩍임, 0054).
+pub const SHELL: Color = Color::new(0.75, 0.90, 1.0, 1.0);
 
 pub fn enemy_color(kind: Kind) -> Color {
     kind.species().color

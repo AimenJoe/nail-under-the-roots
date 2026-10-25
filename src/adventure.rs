@@ -79,6 +79,9 @@ pub enum AdvEvent {
     /// 둘째 길 끝 방에 도토가 있다 / 도토를 이겼다(0052).
     DotoIntro,
     DotoBeaten,
+    /// 셋째 길 끝 방에 콩이가 있다 / 콩이를 이겼다(0054).
+    KongiIntro,
+    KongiBeaten,
 }
 
 /// 확인 버튼으로 하는 일(쉼터).
@@ -232,6 +235,7 @@ impl World {
                 'H' if v.halmae => w.neighbors.push(Npc::standing(Who::Halmae, *at)),
                 'M' if v.momo => w.neighbors.push(Npc::standing(Who::Momo, *at)),
                 'd' if v.doto => w.neighbors.push(Npc::standing(Who::Doto, *at)),
+                'g' if v.kongi => w.neighbors.push(Npc::standing(Who::Kongi, *at)),
                 _ => {}
             }
         }
@@ -588,6 +592,10 @@ impl World {
         if self.doto_fight && stage == 2 && kind == NodeKind::Boss {
             prm.boss = Some(Kind::Doto);
         }
+        // 셋째 길(마지막 길)의 끝은 콩이가 지킨다. 이기면 출구가 가장 깊은 곳으로(0054).
+        if self.kongi_fight && stage == t::FINAL_STAGE && kind == NodeKind::Boss {
+            prm.boss = Some(Kind::Kongi);
+        }
         self.adv.node = Some(at);
         self.build_dungeon(&prm, biome);
     }
@@ -698,6 +706,9 @@ impl World {
         if self.enemies.iter().any(|e| e.kind == Kind::Doto) {
             self.doto_fight = false;
         }
+        if self.enemies.iter().any(|e| e.kind == Kind::Kongi) {
+            self.kongi_fight = false;
+        }
         self.mines.clear();
         if self.adv.place == Place::Dungeon {
             self.restore_field();
@@ -734,7 +745,7 @@ impl World {
         if let Some(m) = self
             .enemies
             .iter()
-            .find(|e| matches!(e.kind, Kind::Momo | Kind::Doto))
+            .find(|e| matches!(e.kind, Kind::Momo | Kind::Doto | Kind::Kongi))
         {
             self.adv.boss_last = m.pos;
         }
@@ -781,6 +792,10 @@ impl World {
                         self.adv.boss_last = e.pos;
                         self.adv.events.push(AdvEvent::DotoIntro);
                     }
+                    if kind == Kind::Kongi {
+                        self.adv.boss_last = e.pos;
+                        self.adv.events.push(AdvEvent::KongiIntro);
+                    }
                     self.enemies.push(e);
                 }
             }
@@ -809,6 +824,9 @@ impl World {
                     } else if named == Some(Kind::Doto) {
                         // 도토는 제정신이 돌아와 씨앗 자리를 기억해 낸다(장면은 앱).
                         self.adv.events.push(AdvEvent::DotoBeaten);
+                    } else if named == Some(Kind::Kongi) {
+                        // 콩이는 문을 열고 바위 발톱을 준다(장면은 앱).
+                        self.adv.events.push(AdvEvent::KongiBeaten);
                     } else {
                         self.toast = Some((|s| s.toast_boss, 3.0));
                     }
@@ -1104,6 +1122,27 @@ mod tests {
         assert!(v.neighbors.iter().any(|n| n.who == Who::Doto));
         let v = World::village(crate::village::State::default());
         assert!(!v.neighbors.iter().any(|n| n.who == Who::Doto));
+    }
+
+    /// 콩이(0054): 마지막 길 끝 굴만 콩이가 지키고(싸울 때만), 이긴 뒤엔 마을에 있다.
+    #[test]
+    fn kongi_guards_the_last_path_and_then_lives_in_the_village() {
+        for (stage, fight, want) in [
+            (t::FINAL_STAGE, true, true),
+            (t::FINAL_STAGE, false, false),
+            (2, true, false),
+        ] {
+            let mut w = World::camp_start(stage);
+            w.kongi_fight = fight;
+            w.enter_route_boss_now();
+            let boss = w.adv.dungeon.as_ref().and_then(|d| d.boss);
+            assert_eq!(boss == Some(Kind::Kongi), want, "길 {stage}, 싸움 {fight}");
+        }
+        let v = World::village(crate::village::State {
+            kongi: true,
+            ..Default::default()
+        });
+        assert!(v.neighbors.iter().any(|n| n.who == Who::Kongi));
     }
 
     /// 수수(0053)는 첫 쉼터에만 서 있고, 곁에서 말을 걸 수 있다.

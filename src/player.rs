@@ -172,6 +172,18 @@ impl Player {
             || !self.is_alive()
     }
 
+    /// 콩이의 등딱지에 발톱이 튕겼다(0054): 휘두르기가 끊기고 뒤로 밀려나며, 잠깐 다시 못 휘두른다. 피해는 없다.
+    pub fn recoil(&mut self, from: Vec2, push: f32, lock: f32) {
+        if matches!(self.state, State::Attack { .. }) {
+            self.state = State::Free;
+        }
+        self.combo_timer = 0.0;
+        self.attack_buf = 0.0;
+        self.no_attack = self.no_attack.max(lock);
+        let away = (self.pos - from).normalize_or(-self.facing);
+        self.vel = away * push;
+    }
+
     /// 굴파기 대기 한 번의 길이(장신구 × 재주 × 실뜨기). 상태 탭·HUD 막대도 이 값을 쓴다.
     pub fn burrow_cd_full(&self) -> f32 {
         t::BURROW_COOLDOWN * self.stats.burrow_cd * self.talents.burrow_cd_mul() * self.burrow_knot

@@ -183,6 +183,17 @@ pub const GOALS: &[Goal] = &[
         Some("camp"),
         Light(20)
     ),
+    // 콩이(0054): 셋째 길 끝 문지기.
+    goal!(
+        "kongi",
+        Story,
+        jg_kongi,
+        jg_kongi_d,
+        Flag(key::KONGI_BACK),
+        1,
+        Some("deeper"),
+        Light(40)
+    ),
     // 도토와 참 엔딩(0052): 도토가 생기면서 넣었다(닿을 수 없는 목표는 넣지 않는다, 0048).
     goal!(
         "doto",

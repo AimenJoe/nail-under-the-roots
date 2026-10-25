@@ -10,7 +10,10 @@
   줄 9 도토(물든 청설모, 둘째 길 보스, docs/decisions/0052): 같은 칸 순서. 도토리 갓 모자, 호박색 빛 눈
   줄 10 돌아온 도토: 검고 맑은 눈, 뿌리 없음, 모자는 그대로
   줄 11 땅강아지 수수(첫 쉼터의 장인, 싸우지 않는다, docs/decisions/0053): 0·1 서 있기, 2·3 걷기, 4 파기(삽발 들기), 5 기뻐하기
-  줄 12~23: 줄 0~11의 흰 실루엣(피격 번쩍임용)
+  줄 12 콩이(물든 세띠아르마딜로, 셋째 길 보스, docs/decisions/0054): 0·1 서 있기, 2·3 걷기, 4 웅크림(공), 5 구르기(공, 띠가 돈다), 6 맞음.
+       물든 눈은 옅은 하늘빛(모모 초록·도토 호박색·졸개 붉은 눈과 다르다)
+  줄 13 돌아온 콩이: 검고 맑은 눈, 뿌리 없음
+  줄 14~27: 줄 0~13의 흰 실루엣(피격 번쩍임용)
 
 그리는 법(nail.py와 같다): 채움 색만 글자로 찍고 외곽선('o')은 자동으로 두른다. 종마다 기본 자세 한 장을 손으로 찍고,
 동작은 그 자세를 옮기거나(통통·웅크림·내밀기) 몇 점만 바꿔 만든다(발, 눈, 꼬리).
@@ -61,6 +64,7 @@ COMMON = {
     'Y': (255, 226, 120),   # 꽃 가운데
     'A': (255, 168, 48),    # 도토의 물든 눈(호박색 빛 — 모모의 초록, 졸개의 붉은 눈과 다르다)
     'a': (255, 236, 180),   # 그 반사
+    'B': (150, 220, 255),   # 콩이의 물든 눈(옅은 하늘빛)
     'u': (98, 64, 38),      # 도토리 갓(짙음)
     'U': (160, 112, 64),    # 도토리 갓(밝음)
 }
@@ -82,6 +86,8 @@ FUR = {
     'doto':   [(112, 62, 42), (160, 96, 60), (200, 134, 86), (238, 216, 190)],
     # 수수(땅강아지): 벨벳 같은 짙은 갈색 + 금빛 윤기. 삽발(앞다리)은 짙은 줄(k)에 흰 이(c).
     'susu':   [(66, 46, 36), (108, 78, 56), (156, 120, 84), (214, 180, 132)],
+    # 콩이(세띠아르마딜로): 잿빛 도는 황갈색 등딱지(띠 = d·h 번갈아), 분홍빛 도는 맨살(l·p).
+    'kongi':  [(92, 80, 74), (138, 122, 106), (186, 168, 142), (222, 190, 170)],
 }
 
 
@@ -127,7 +133,7 @@ def clear_row(g, y):
 
 def squint(g):
     """맞음: 붉은 눈을 질끈(짙은 가로줄)."""
-    eyes = find(g, 'ewgGWAa')
+    eyes = find(g, 'ewgGWAaB')
     if not eyes:
         return
     top = min(y for _, y in eyes)
@@ -353,6 +359,66 @@ SUSU = grid([
     "",
 ])
 
+# 콩이(세띠아르마딜로, 0054): 오른쪽을 본다. 둥근 등딱지에 세로 띠(d·h 번갈아), 앞쪽에 작은 머리 방패·뾰족한 주둥이·작은 귀(l),
+# 짧은 다리, 뒤에 짧고 굵은 꼬리. 물든 눈은 옅은 하늘빛(B), 등 위에 보라 뿌리.
+KONGI = grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "...hhhhhh",
+    ".hhbhbhvhh",
+    "hbhbhbVbhbh..l",
+    "hbdbdbdbdbdbhhh",
+    "dbdbdbdbdbdbbBll",
+    "dbdbdbdbdbdbllln",
+    ".dddddddddddl",
+    "..l.l....l.l",
+    "..pp.p...pp.p",
+    "",
+    "",
+])
+
+KONGI_BACK = grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "...hhhhhh",
+    ".hhbhbhbhh",
+    "hbhbhbhbhbh..l",
+    "hbdbdbdbdbdbhhh",
+    "dbdbdbdbdbdbbnll",
+    "dbdbdbdbdbdbrlln",
+    ".dddddddddddl",
+    "..l.l....l.l",
+    "..pp.p...pp.p",
+    "",
+    "",
+])
+
+# 공으로 말린 콩이(웅크림·구르기). 띠 위상만 바꿔 구르는 느낌을 낸다.
+KONGI_BALL = [grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    ".....hhhhh",
+    "....h" + band[0:6] + "h",
+    "...h" + band[1:9] + "h",
+    "...h" + band[0:8] + "d",
+    "..h" + band[1:11] + "d",
+    "...d" + band[0:8] + "d",
+    "...d" + band[1:9] + "d",
+    "....d" + band[0:6] + "d",
+    ".....ddddd",
+    "",
+    "",
+]) for band in ("bdbdbdbdbdbd", "dbdbdbdbdbdb")]
+
 # 허수아비: 말뚝 + 짚 몸 + 천 머리(단추 눈).
 DUMMY = grid([
     "",
@@ -490,6 +556,19 @@ def susu_frames():
     return [g, breathe(g), walk(g, 0), walk(g, 1), dig, happy]
 
 
+def kongi_frames(g):
+    """콩이: 서 있기·걷기는 보통, 예고·구르기는 공(띠가 엇갈린 두 장), 맞음은 공에서 몸을 편 채 뒤로."""
+    roots = [(x, y) for x, y in find(g, 'vV')]
+    balls = []
+    for b in KONGI_BALL:
+        bb = copy(b)
+        for (x, y) in roots[:1]:
+            if bb[y][x] != '.':
+                bb[y][x] = 'v'
+        balls.append(bb)
+    return [g, breathe(g), walk(g, 0), walk(g, 1), balls[0], balls[1], hurt(g)]
+
+
 def paint(img, ox, oy, g, pal, silhouette=False, tainted=False):
     d, b, h, l = (taint(c) for c in pal) if tainted else pal
     colors = dict(COMMON, d=d, b=b, h=h, l=l, o=OUTLINE_TAINTED if tainted else OUTLINE)
@@ -513,6 +592,8 @@ def sheet():
     rows.append((FUR['doto'], frames_of(DOTO), True))
     rows.append((FUR['doto'], frames_of(DOTO_BACK), False))
     rows.append((FUR['susu'], susu_frames(), False))
+    rows.append((FUR['kongi'], kongi_frames(KONGI), True))
+    rows.append((FUR['kongi'], kongi_frames(KONGI_BACK), False))
     img = Image.new('RGBA', (N * 7, N * len(rows) * 2), (0, 0, 0, 0))
     for ry, (pal, frames, tainted) in enumerate(rows):
         for rx, g in enumerate(frames):
