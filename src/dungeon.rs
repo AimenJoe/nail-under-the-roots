@@ -302,6 +302,8 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
         if is_goal && matches!(prm.goal, Goal::Treasure | Goal::Spring) {
             grid.set(ox + 16, oy + 3, Cell::Exit);
         }
+        // 방 모양(0063): 모서리·가장자리 혹·바위 무리. 굴 모양 난수와 따로라 같은 시드면 방 배치·적은 그대로다.
+        shape_room(&mut grid, ox, oy, room.kind, seed ^ hash_at(room.at));
         match room.kind {
             RoomKind::Start => {
                 if prm.start_exit {
@@ -319,7 +321,8 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                     let x = 2 + rng.below(16) as usize;
                     let y = 3 + rng.below(7) as usize;
                     let lane = (8..=11).contains(&x) || (5..=8).contains(&y);
-                    if !lane {
+                    // 방 모양이 벽으로 만든 칸에는 놓지 않는다(난수는 그대로 써서 뒤의 적 배치가 같다).
+                    if !lane && grid.get(ox + x, oy + y) == Cell::Floor {
                         props.push(Prop {
                             rect: cell_rect(ox + x, oy + y),
                             kind: if rng.chance(0.5) {
@@ -368,6 +371,136 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
         boss: prm.boss,
     };
     (dungeon, Room::from_grid(grid, props, Vec::new()))
+}
+
+/// 적·보스·상자·출구·시작 자리(방 안 칸). 방 모양이 이 칸과 그 둘레 한 칸을 벽으로 만들지 않는다.
+const KEEP: [(usize, usize); 14] = [
+    (4, 4),
+    (15, 4),
+    (4, 9),
+    (15, 9),
+    (10, 3),
+    (10, 10),
+    (3, 7),
+    (16, 7),
+    (10, 4),
+    (9, 6),
+    (16, 3),
+    (3, 3),
+    (10, 6),
+    (10, 8),
+];
+
+fn hash_at(at: (i32, i32)) -> u64 {
+    (at.0 as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ (at.1 as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
+}
+
+/// 네모난 방을 굴처럼(0063): 모서리를 메우고, 가장자리에 1~2칸 혹을 내고, 가운데 쪽에 바위 무리를 하나 둔다.
+/// 문 앞 십자 길(가로 5~8줄, 세로 8~11칸)과 `KEEP` 자리(둘레 한 칸까지)는 건드리지 않는다.
+/// 다 만든 뒤 모든 바닥이 방 가운데에서 이어지는지 보고, 안 이어지면 네모로 되돌린다.
+fn shape_room(grid: &mut Grid, ox: usize, oy: usize, kind: RoomKind, seed: u64) {
+    let mut rng = Rng::new(seed | 1);
+    let lane = |x: usize, y: usize| (8..=11).contains(&x) || (5..=8).contains(&y);
+    let kept = |x: usize, y: usize| {
+        KEEP.iter()
+            .any(|&(kx, ky)| kx.abs_diff(x) <= 1 && ky.abs_diff(y) <= 1)
+    };
+    let free = |x: usize, y: usize| {
+        (1..=18).contains(&x) && (2..=10).contains(&y) && !lane(x, y) && !kept(x, y)
+    };
+    let before: Vec<Cell> = (0..ROOM_H)
+        .flat_map(|y| (0..ROOM_W).map(move |x| (x, y)))
+        .map(|(x, y)| grid.get(ox + x, oy + y))
+        .collect();
+    let mut wall = |x: usize, y: usize| {
+        if free(x, y) {
+            grid.set(ox + x, oy + y, Cell::Wall);
+        }
+    };
+    // 모서리: 한 칸은 늘, 계단 한 칸 더는 반쯤.
+    for (cx, cy, sx, sy) in [
+        (1, 2, 1i32, 1i32),
+        (18, 2, -1, 1),
+        (1, 10, 1, -1),
+        (18, 10, -1, -1),
+    ] {
+        wall(cx, cy);
+        if rng.chance(0.6) {
+            wall((cx as i32 + sx) as usize, cy);
+        }
+        if rng.chance(0.6) {
+            wall(cx, (cy as i32 + sy) as usize);
+        }
+    }
+    // 가장자리 혹: 위·아래 가장자리는 가로로, 왼·오른쪽은 세로로 2~4칸, 깊이 1(가끔 2).
+    for edge in 0..4 {
+        let n = 1 + rng.below(3);
+        for _ in 0..n {
+            let len = 2 + rng.below(3) as usize;
+            let deep = if rng.chance(0.3) { 2 } else { 1 };
+            match edge {
+                0 | 1 => {
+                    let x0 = 2 + rng.below(14) as usize;
+                    for x in x0..(x0 + len).min(18) {
+                        for d in 0..deep {
+                            let y = if edge == 0 { 2 + d } else { 10 - d };
+                            wall(x, y);
+                        }
+                    }
+                }
+                _ => {
+                    let y0 = 3 + rng.below(6) as usize;
+                    for y in y0..(y0 + len).min(10) {
+                        for d in 0..deep {
+                            let x = if edge == 2 { 1 + d } else { 18 - d };
+                            wall(x, y);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // 바위 무리(싸우는 방·보스방): 사분면 하나에 2~4칸.
+    if matches!(kind, RoomKind::Combat | RoomKind::Boss) && rng.chance(0.7) {
+        let (qx, qy) = (rng.below(2), rng.below(2));
+        let (bx, by) = (
+            if qx == 0 { 4 } else { 13 } + rng.below(3) as usize,
+            if qy == 0 { 3 } else { 8 } + rng.below(2) as usize,
+        );
+        wall(bx, by);
+        for _ in 0..1 + rng.below(3) {
+            let (dx, dy) = DIRS[rng.below(4) as usize];
+            wall((bx as i32 + dx) as usize, (by as i32 + dy) as usize);
+        }
+    }
+    // 모든 바닥이 가운데에서 이어지는가.
+    let open = |g: &Grid, x: usize, y: usize| g.get(ox + x, oy + y) != Cell::Wall;
+    let mut seen = vec![false; ROOM_W * ROOM_H];
+    let mut q = std::collections::VecDeque::from([(10usize, 6usize)]);
+    seen[6 * ROOM_W + 10] = true;
+    while let Some((x, y)) = q.pop_front() {
+        for (dx, dy) in DIRS {
+            let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+            if nx < 0 || ny < 0 || nx >= ROOM_W as i32 || ny >= ROOM_H as i32 {
+                continue;
+            }
+            let (nx, ny) = (nx as usize, ny as usize);
+            if !seen[ny * ROOM_W + nx] && open(grid, nx, ny) {
+                seen[ny * ROOM_W + nx] = true;
+                q.push_back((nx, ny));
+            }
+        }
+    }
+    let cut_off =
+        (0..ROOM_H).any(|y| (0..ROOM_W).any(|x| open(grid, x, y) && !seen[y * ROOM_W + x]));
+    if cut_off {
+        for y in 0..ROOM_H {
+            for x in 0..ROOM_W {
+                grid.set(ox + x, oy + y, before[y * ROOM_W + x]);
+            }
+        }
+    }
 }
 
 fn cell_rect(x: usize, y: usize) -> Rect {
@@ -446,6 +579,49 @@ mod tests {
             // 시작 위치는 바닥.
             assert_eq!(room.cell_at(d.start_pos()), Some(Cell::Floor));
         }
+    }
+
+    /// 방 모양(0063): 적·상자·출구 자리와 문 앞 길은 바닥이고, 방 안 바닥은 다 이어지며, 대부분 방은 네모가 아니다.
+    #[test]
+    fn shaped_rooms_keep_spawns_and_stay_connected() {
+        let mut shaped = 0;
+        let mut total = 0;
+        for seed in 1..60 {
+            let (d, room) = generate(seed, &Params::classic(2));
+            let g = room.grid.as_ref().unwrap();
+            for r in &d.rooms {
+                let (ox, oy) = (r.at.0 as usize * ROOM_W, r.at.1 as usize * ROOM_H);
+                for &(x, y) in &KEEP {
+                    assert_ne!(
+                        g.get(ox + x, oy + y),
+                        Cell::Wall,
+                        "seed {seed} 방 {:?} 자리 ({x}, {y})",
+                        r.at
+                    );
+                }
+                for (_, p) in &r.enemies {
+                    assert_ne!(room.cell_at(*p), Some(Cell::Wall), "적은 바닥에");
+                }
+                // 문 앞 십자 길.
+                for x in 1..19 {
+                    for y in 5..=8 {
+                        assert_ne!(g.get(ox + x, oy + y), Cell::Wall, "가로 길 seed {seed}");
+                    }
+                }
+                let walls = (2..=10)
+                    .flat_map(|y| (1..=18).map(move |x| (x, y)))
+                    .filter(|&(x, y)| g.get(ox + x, oy + y) == Cell::Wall)
+                    .count();
+                total += 1;
+                if walls > 0 {
+                    shaped += 1;
+                }
+            }
+        }
+        assert!(
+            shaped * 10 >= total * 8,
+            "대부분 방이 네모가 아니다: {shaped}/{total}"
+        );
     }
 
     #[test]
