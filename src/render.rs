@@ -1579,6 +1579,88 @@ fn draw_tree_motes(base: Vec2, time: f32) {
     }
 }
 
+/// 큰 나무(마을), 팩 그림판(0065): 우리 줄기·뿌리 위에 Sunnyside 둥근 나무의 잎을 무더기로 쌓는다.
+/// 잎 무더기 수 = 잎 단계(1 → 3, 2 → 7, 3 → 10, 4 → 12). 3부터 꽃. 무더기마다 흔들림이 어긋난다.
+fn draw_great_tree_sunny(sunny: &art::Sunny, at: Vec2, growth: u8, time: f32) {
+    let bark = Color::new(0.45, 0.29, 0.22, 1.0);
+    let bark_hi = Color::new(0.58, 0.39, 0.28, 1.0);
+    let bark_lo = Color::new(0.32, 0.20, 0.17, 1.0);
+    let (x, base) = (at.x.round(), at.y + 8.0);
+    // 뿌리: 벼랑 위로 뻗는 굵은 뿌리 넷.
+    for (dx, dy) in [(-30.0, 4.0), (-14.0, 6.0), (14.0, 6.0), (30.0, 4.0)] {
+        draw_line(x + dx * 0.3, base - 4.0, x + dx, base + dy, 6.0, OUTLINE);
+        draw_line(x + dx * 0.3, base - 4.0, x + dx, base + dy, 4.0, bark);
+        draw_line(
+            x + dx * 0.3,
+            base - 5.0,
+            x + dx * 0.9,
+            base + dy - 1.0,
+            1.0,
+            bark_hi,
+        );
+    }
+    // 줄기: 아래가 넓다.
+    // 마을 지도에서 큰 나무는 위쪽 가장자리 가까이 선다: 잎 꼭대기가 밑동 위 60px 안에 들어와야 화면에 다 보인다.
+    let top = base - 22.0;
+    draw_triangle(
+        vec2(x - 16.0, base),
+        vec2(x + 16.0, base),
+        vec2(x, base - 12.0),
+        OUTLINE,
+    );
+    draw_rectangle(x - 13.0, top, 26.0, base - top, OUTLINE);
+    draw_rectangle(x - 12.0, top, 24.0, base - top, bark);
+    draw_rectangle(x - 12.0, top, 5.0, base - top, bark_hi);
+    draw_rectangle(x + 7.0, top, 5.0, base - top, bark_lo);
+    for k in 0..2 {
+        let yy = top + 8.0 + k as f32 * 6.0;
+        draw_rectangle(x - 4.0 + (k % 2) as f32 * 6.0, yy, 1.0, 5.0, bark_lo);
+    }
+    // 잎 무더기(뒤 → 앞). (가운데에서 x, 잎 아래 끝의 줄기 꼭대기 기준 y, 나오는 단계)
+    let crowns: [(f32, f32, u8); 12] = [
+        (-12.0, -16.0, 4),
+        (12.0, -17.0, 4),
+        (-26.0, -8.0, 3),
+        (0.0, -9.0, 3),
+        (26.0, -8.0, 3),
+        (-38.0, 1.0, 2),
+        (-13.0, 0.0, 2),
+        (13.0, 0.0, 2),
+        (38.0, 1.0, 2),
+        (-25.0, 8.0, 1),
+        (0.0, 7.0, 1),
+        (25.0, 8.0, 1),
+    ];
+    let (tw, _) = art::SUNNY_TREE;
+    for (i, (dx, dy, need)) in crowns.iter().enumerate() {
+        if growth < *need {
+            continue;
+        }
+        let f = ((time * 2.5 + i as f32 * 0.37) as u32 % 4) as f32;
+        let (cx, cy) = (
+            (x + dx - tw / 2.0).round(),
+            (top + dy - art::SUNNY_CROWN_H).round(),
+        );
+        draw_texture_ex(
+            &sunny.tree,
+            cx,
+            cy,
+            WHITE,
+            DrawTextureParams {
+                source: Some(Rect::new(f * tw, 0.0, tw, art::SUNNY_CROWN_H)),
+                ..Default::default()
+            },
+        );
+        if growth >= 3 && i % 2 == 0 {
+            // 꽃(분홍 셋, 직접 찍음).
+            for (bx, by) in [(10.0, 6.0), (19.0, 10.0), (14.0, 14.0)] {
+                draw_rectangle(cx + bx, cy + by, 2.0, 2.0, Color::new(1.0, 0.76, 0.84, 1.0));
+                draw_rectangle(cx + bx, cy + by, 1.0, 1.0, WHITE);
+            }
+        }
+    }
+}
+
 /// 큰 나무(마을, 0045): 벼랑 위로 솟은 줄기와 뿌리. 잎은 깬 횟수만큼 돌아온다(0 = 마른 잎 몇 장, 3부터 꽃).
 fn draw_great_tree(at: Vec2, growth: u8, time: f32) {
     let bark = Color::new(0.40, 0.27, 0.21, 1.0);
@@ -2047,6 +2129,25 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                 let p = w.room.props[i];
                 let r = p.rect;
                 match p.kind {
+                    // 들판의 나무(T): 팩이 있으면 흔들리는 둥근 나무. 충돌은 밑동 한 칸 그대로.
+                    PropKind::Stump
+                        if w.biome == crate::biome::Biome::Meadow && art.sunny.is_some() =>
+                    {
+                        if let Some(sunny) = &art.sunny {
+                            let (tw, th) = art::SUNNY_TREE;
+                            let f = ((w.time * 3.0 + r.x * 0.07) as u32 % 4) as f32;
+                            draw_texture_ex(
+                                &sunny.tree,
+                                (r.center().x - tw / 2.0).round(),
+                                (r.bottom() - th + 3.0).round(),
+                                WHITE,
+                                DrawTextureParams {
+                                    source: Some(Rect::new(f * tw, 0.0, tw, th)),
+                                    ..Default::default()
+                                },
+                            );
+                        }
+                    }
                     PropKind::Stump | PropKind::Rock => {
                         let col = if p.kind == PropKind::Stump { 0.0 } else { 16.0 };
                         let src = Rect::new(col, 32.0, 16.0, 32.0);
@@ -2105,7 +2206,10 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                 }
             }
             Drawable::Tree(at, growth) => {
-                draw_great_tree(at, growth, w.time);
+                match art.sunny.as_ref() {
+                    Some(sunny) if growth > 0 => draw_great_tree_sunny(sunny, at, growth, w.time),
+                    _ => draw_great_tree(at, growth, w.time),
+                }
                 if w.adv.village.is_some_and(|v| v.tree_ready) {
                     draw_tree_motes(at + vec2(0.0, 14.0), w.time);
                 }

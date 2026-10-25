@@ -12,6 +12,8 @@ pub struct Art {
     pub tiles: Texture2D,
     /// 같은 타일셋의 CPU 쪽 그림: 지도 굽기(terrain.rs)가 장식을 찍는다.
     pub tiles_img: Image,
+    /// Sunnyside World(레포 밖 `assets/vendor/`, 0010·0064). 없으면(공개 CI 빌드) 직접 그린 그림으로.
+    pub sunny: Option<Sunny>,
     /// 어둠 마스크(가운데 투명, 바깥 검정). 코드로 만든다.
     pub dark: Texture2D,
     /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이. 아래 CRITTER_ROWS줄은 흰 실루엣.
@@ -25,6 +27,28 @@ pub struct Art {
 }
 
 /// chief.png 한 칸.
+/// Sunnyside 팩에서 쓰는 그림. 팩 원본은 공개 레포에 넣지 않는다(0010).
+pub struct Sunny {
+    /// 둥근 나무 4칸(32×34, 바람에 흔들림).
+    pub tree: Texture2D,
+}
+
+/// 팩 폴더(assets 기준).
+const SUNNY: &str = "vendor/sunnyside/Sunnyside_World_ASSET_PACK_V2.1/Sunnyside_World_Assets";
+/// 둥근 나무 한 칸 크기와 잎(윗부분) 높이.
+pub const SUNNY_TREE: (f32, f32) = (32.0, 34.0);
+pub const SUNNY_CROWN_H: f32 = 22.0;
+
+async fn load_sunny() -> Option<Sunny> {
+    let tree = load_texture(&format!(
+        "{SUNNY}/Elements/Plants/spr_deco_tree_01_strip4.png"
+    ))
+    .await
+    .ok()?;
+    tree.set_filter(FilterMode::Nearest);
+    Some(Sunny { tree })
+}
+
 pub const CHIEF_CELL: f32 = 32.0;
 /// chief.png의 줄: 물든 대장 / 돌아온 보리. 실루엣은 + CHIEF_ROWS.
 pub const CHIEF_TAINTED: u32 = 0;
@@ -116,6 +140,7 @@ impl Art {
             nail_furs,
             tiles,
             tiles_img,
+            sunny: load_sunny().await,
             dark: dark_mask(),
             critters,
             portraits,
