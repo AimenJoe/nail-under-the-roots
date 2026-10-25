@@ -108,6 +108,7 @@
 - [ ] `main`에 머지(또는 push)해서 `deploy-web`이 프로덕션 배포를 하게 한다. PR을 열면 먼저 `pr-<번호>--nail-under-the-roots.netlify.app` 미리보기로 확인할 수 있다
 - [x] **플레이 판정**(2026-10-25): 판정·손맛 좋은 편, 지금 이대로. 남은 것: 본인 외 1명 더
 - [ ] **v0.1.0**(2026-10-25 태그, `docs/releases/v0.1.0.md`): 웹 링크·Release의 APK를 본인 외 한 사람에게 건네고 판정 기준 4개를 묻는다
+- [ ] **v0.1.1**(0058·0059): Android Chrome에서 글자가 제 색으로 나오는지, 타이틀 버전이 "v0.1.1 · <커밋>"인지, APK를 덮어 설치했을 때 기록이 남는지
 - [x] 환경 에셋 팩: Sunnyside World로 결정(2026-10-25, docs/decisions/0010)
 - [x] Sunnyside World 라이선스 원문 확인·기록(V1, 상업 사용 가능, 2026-10-25)
 - [ ] Sunnyside World 내려받기(Name your own price)
