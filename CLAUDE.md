@@ -21,7 +21,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 **프로젝트 기록(TODO, 튜닝 수치, 결정)은 이 레포에, 프로젝트가 사라져도 유용한 지식은 KB에.** KB에 새 지식을 쓸 때는 KB의 `CLAUDE.md` 규칙(frontmatter, verified, 지도 링크, `tools/kb.py check`)을 따른다.
 
 ## 코드 규칙
-- 입력은 `Actions` 구조체로만. 게임 로직 어디에서도 `KeyCode`를 직접 보지 않는다. 게임 동작의 키·버튼은 `input::Bindings`(설정에서 바꿈, docs/decisions/0022), 화면에 버튼 이름을 쓸 때는 `input::prompt(Act)` — 글에 키 이름을 박지 않는다.
+- 입력은 `Actions` 구조체로만. 게임 로직 어디에서도 `KeyCode`를 직접 보지 않는다. 게임 동작의 키·버튼은 `input::Bindings`(설정에서 바꿈, docs/decisions/0022), 화면에 버튼 이름을 쓸 때는 `input::prompt(Act)`, 메뉴 동사(확인·뒤로 …)는 `input::verb(Verb)` — 글에 키 이름을 박지 않는다. 둘 다 지금 쓰는 장치(키보드·패드·터치)를 따른다(docs/decisions/0036).
 - 내부 해상도 320×180, 정수 배율. 월드 좌표는 그릴 때 반올림. 카메라만은 반올림하지 않는다: 정수 부분으로 그리고 소수점은 화면에서 민다(렌더 타깃 1px 여분, docs/decisions/0034). HUD는 화면 패스에.
 - 로직은 고정 타임스텝(60Hz). 히트스톱은 로직 시계만 멈춘다.
 - 손맛 수치는 `src/tuning.rs` 한 곳에. 적 종류별 수치·도감 글은 `src/species.rs` 표(docs/decisions/0021). 콤보(무기별)는 `src/moveset.rs`의 `Moveset` 표, 어떤 캐릭터가 어떤 무기 종류를 쓰는지는 `src/equipment.rs`(docs/decisions/0011). 플레이어 코드에 타별 숫자를 직접 쓰지 않는다(docs/decisions/0009).

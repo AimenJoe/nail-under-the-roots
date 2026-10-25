@@ -12,7 +12,7 @@
 //! 로직 틱마다 `take()`가 래치를 소비한다. 프레임에 틱이 두 번이면 첫 틱만 눌림을 받고,
 //! 틱이 없으면(고주사율) 다음 틱까지 눌림이 보존된다. 메뉴 장면은 프레임마다 한 번 `take()`한다.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::RwLock;
 
 #[cfg(not(target_os = "android"))]
@@ -237,7 +237,115 @@ impl Bindings {
 
 static BINDINGS: RwLock<Bindings> = RwLock::new(Bindings::DEFAULT);
 /// 마지막으로 패드를 썼나(안내를 패드 이름으로).
-static PAD_ACTIVE: AtomicBool = AtomicBool::new(false);
+/// 지금 쓰는 조작 장치. 안내 글(버튼 이름·"확인" 같은 동사)이 이걸 따른다(사람 피드백 2026-10-25).
+/// 마지막으로 실제로 누른 장치: 키를 누르면 키보드, 패드를 만지면 패드, 화면을 만지면 터치.
+/// 마우스 클릭은 바꾸지 않는다 — 모바일 브라우저는 터치마다 가짜 마우스 클릭도 만든다.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Device {
+    Keys,
+    Pad,
+    Touch,
+}
+
+static DEVICE: AtomicU8 = AtomicU8::new(0);
+
+pub fn device() -> Device {
+    match DEVICE.load(Ordering::Relaxed) {
+        1 => Device::Pad,
+        2 => Device::Touch,
+        _ => Device::Keys,
+    }
+}
+
+fn set_device(d: Device) {
+    DEVICE.store(d as u8, Ordering::Relaxed);
+}
+
+/// 처음 장치: 손가락이 주 포인터인 기기(폰·태블릿 브라우저, Android)면 터치. 아무것도 누르기 전의 첫 화면(인트로)용.
+fn initial_device() -> Device {
+    #[cfg(target_arch = "wasm32")]
+    {
+        extern "C" {
+            fn nail_coarse_pointer() -> u32;
+        }
+        // SAFETY: 인자 없이 정수를 돌려주는 JS 함수(web/index.html의 nail_device 플러그인).
+        if unsafe { nail_coarse_pointer() } != 0 {
+            return Device::Touch;
+        }
+        Device::Keys
+    }
+    #[cfg(target_os = "android")]
+    {
+        Device::Touch
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+    {
+        Device::Keys
+    }
+}
+
+/// miniquad가 플러그인 버전을 맞춰 보는 함수(mq_js_bundle.js의 init_plugins).
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn nail_device_crate_version() -> u32 {
+    1
+}
+
+/// 메뉴·안내 글의 동사 자리. 장치마다 이름이 다르다(키 이름, 패드 버튼, 터치는 낱말).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Verb {
+    /// 메뉴에서 고르기(확인).
+    Confirm,
+    /// 메뉴에서 뒤로·닫기.
+    Back,
+    /// 게임 중 일시정지 메뉴.
+    Menu,
+    /// 게임 중 걷기.
+    Walk,
+    /// 메뉴에서 위아래로 고르기.
+    Pick,
+    /// 설정 값 좌우로 바꾸기.
+    Change,
+    /// 일시정지 탭 넘기기.
+    Tabs,
+    /// 컷씬 건너뛰기.
+    Skip,
+    /// 쓰러진 뒤 다시 시작(게임 중 확인 = 공격 버튼).
+    Restart,
+}
+
+/// 동사 자리의 지금 장치 이름.
+pub fn verb(v: Verb) -> &'static str {
+    let s = crate::i18n::s();
+    match device() {
+        Device::Keys => match v {
+            Verb::Confirm | Verb::Restart => "Enter",
+            Verb::Back | Verb::Menu | Verb::Skip => "Esc",
+            Verb::Walk => "WASD",
+            Verb::Pick => "↑↓",
+            Verb::Change => "←→",
+            Verb::Tabs => "Q/E",
+        },
+        Device::Pad => match v {
+            Verb::Confirm | Verb::Restart => Pad::South.label(),
+            Verb::Back | Verb::Skip => Pad::East.label(),
+            Verb::Menu => Pad::Start.label(),
+            Verb::Walk => s.v_stick,
+            Verb::Pick => "↑↓",
+            Verb::Change => "←→",
+            Verb::Tabs => "LB/RB",
+        },
+        Device::Touch => match v {
+            Verb::Confirm | Verb::Pick | Verb::Tabs => s.v_touch,
+            Verb::Back => s.v_touch_out,
+            Verb::Menu => "MENU",
+            Verb::Walk => s.v_drag,
+            Verb::Change => "◀▶",
+            Verb::Skip => s.v_touch_here,
+            Verb::Restart => "ATK",
+        },
+    }
+}
 
 pub fn bindings() -> Bindings {
     BINDINGS.read().map(|b| *b).unwrap_or(Bindings::DEFAULT)
@@ -249,13 +357,21 @@ pub fn set_bindings(b: Bindings) {
     }
 }
 
-/// 화면 안내용 버튼 이름. 패드를 쓰고 있으면 패드, 아니면 키.
+/// 화면 안내용 버튼 이름: 지금 쓰는 장치(키·패드·터치 버튼 글자)에 맞춰.
 pub fn prompt(a: Act) -> &'static str {
     let b = bindings();
-    if PAD_ACTIVE.load(Ordering::Relaxed) {
-        b.pad(a).label()
-    } else {
-        b.key_label(a)
+    match device() {
+        Device::Pad => b.pad(a).label(),
+        Device::Keys => b.key_label(a),
+        Device::Touch => match a {
+            Act::Attack => "ATK",
+            Act::Dodge => "DIG",
+            Act::Special => "SP",
+            Act::UseItem => "ITEM",
+            Act::ItemPrev | Act::ItemNext => "<>",
+            // 터치에는 지도 버튼이 없다: 메뉴 → 지도 탭.
+            Act::Map => "MENU",
+        },
     }
 }
 
@@ -458,6 +574,7 @@ fn layout_for(w: f32, h: f32) -> TouchOverlay {
 
 impl Input {
     pub fn new() -> Self {
+        set_device(initial_device());
         Self {
             #[cfg(not(target_os = "android"))]
             pads: Gamepads::new(),
@@ -492,13 +609,16 @@ impl Input {
         let kb = read_keyboard();
         let (pad, count) = self.read_gamepads();
         self.gamepad_count = count;
-        // 안내 글: 패드를 만지면 패드 이름, 키를 누르면 키 이름.
+        // 안내 글: 패드를 만지면 패드 이름, 키를 누르면 키 이름, 화면을 만지면 터치 글.
         if pad.move_dir != Vec2::ZERO || any_edge(&pad) {
-            PAD_ACTIVE.store(true, Ordering::Relaxed);
+            set_device(Device::Pad);
         } else if kb.move_dir != Vec2::ZERO || any_edge(&kb) {
-            PAD_ACTIVE.store(false, Ordering::Relaxed);
+            set_device(Device::Keys);
         }
         let touch = self.read_touch();
+        if touch.tap.is_some() || touch.move_dir != Vec2::ZERO || any_edge(&touch) {
+            set_device(Device::Touch);
+        }
         let mouse = read_mouse();
 
         let mut now = kb;
@@ -896,5 +1016,36 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// 안내 글: 장치마다 동사·버튼 이름이 바뀐다. 터치는 터치 버튼 글자·낱말, 키보드는 키, 패드는 패드 버튼.
+    #[test]
+    fn hints_follow_the_device() {
+        let all = [
+            Verb::Confirm,
+            Verb::Back,
+            Verb::Menu,
+            Verb::Walk,
+            Verb::Pick,
+            Verb::Change,
+            Verb::Tabs,
+            Verb::Skip,
+            Verb::Restart,
+        ];
+        set_device(Device::Keys);
+        assert_eq!(verb(Verb::Confirm), "Enter");
+        assert_eq!(verb(Verb::Walk), "WASD");
+        set_device(Device::Pad);
+        assert_eq!(verb(Verb::Confirm), Pad::South.label());
+        assert_eq!(verb(Verb::Tabs), "LB/RB");
+        set_device(Device::Touch);
+        assert_eq!(prompt(Act::Attack), "ATK");
+        assert_eq!(prompt(Act::Dodge), "DIG");
+        assert_eq!(verb(Verb::Confirm), crate::i18n::s().v_touch);
+        for d in [Device::Keys, Device::Pad, Device::Touch] {
+            set_device(d);
+            assert!(all.iter().all(|v| !verb(*v).is_empty()), "{d:?}");
+        }
+        set_device(Device::Keys);
     }
 }

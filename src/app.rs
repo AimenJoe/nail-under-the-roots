@@ -12,7 +12,7 @@ use crate::art::Art;
 use crate::cutscene::{self, Cutscene};
 use crate::equipment::{Character, CHARMS, CHARM_SLOTS, WEAPONS};
 use crate::i18n::{self, fill, tr, Tr};
-use crate::input::{Actions, Input};
+use crate::input::{self, Actions, Device, Input, Verb};
 use crate::render::{self, Renderer};
 use crate::scenario::{self, Scenario};
 use crate::sfx::Sfx;
@@ -68,6 +68,23 @@ const CONTROL_RESET: usize = 7;
 const CONTROL_BACK: usize = 8;
 /// 다시 붙이기: 이만큼 아무것도 안 누르면 그만둔다.
 const REBIND_TIMEOUT: f32 = 5.0;
+
+/// 안내 글의 동사 자리(`{0}`, `{1}` …)를 지금 장치(키보드·패드·터치)의 이름으로 채운다.
+fn vfill(t: &str, verbs: &[Verb]) -> String {
+    let names: Vec<&str> = verbs.iter().map(|v| input::verb(*v)).collect();
+    let args: Vec<&dyn std::fmt::Display> =
+        names.iter().map(|n| n as &dyn std::fmt::Display).collect();
+    fill(t, &args)
+}
+
+/// 터치 전용 글이 있으면 터치일 때 그것, 아니면 동사를 채운 글.
+fn device_hint(t: &str, touch: &str, verbs: &[Verb]) -> String {
+    if input::device() == Device::Touch {
+        touch.to_string()
+    } else {
+        vfill(t, verbs)
+    }
+}
 
 /// 표 → 지금 언어의 글 목록(메뉴 그리기용).
 fn trs(items: &[Tr]) -> Vec<&'static str> {
@@ -292,6 +309,8 @@ enum Hit {
     ShopNo,
     /// 닫기 단추·패널 바깥(가게·길 지도).
     Close,
+    /// 컷씬 건너뛰기 안내.
+    Skip,
 }
 
 pub struct App {
@@ -422,7 +441,12 @@ impl App {
         match self.scene {
             Scene::Game => self.update_game(dt),
             Scene::Cutscene => {
-                let a = self.input.take();
+                let mut a = self.input.take();
+                // 건너뛰기 안내를 누르면 뒤로와 같다(터치).
+                if a.tap.is_some_and(|p| self.hit_at(p) == Some(Hit::Skip)) {
+                    a.cancel = true;
+                    a.tap = None;
+                }
                 if let Some(c) = self.cutscene.as_mut() {
                     c.update(&a, dt, &mut self.world);
                     // 컷씬에서 받은 무기는 컷씬이 끝난 뒤 창으로 보여 준다.
@@ -1089,7 +1113,8 @@ impl App {
             let a = (p * 4.0).min(1.0) * ((1.0 - p) * 4.0).min(1.0);
             ui.text_center(line, 160.0, 84.0, FONT_PX, Color::new(0.92, 0.86, 0.76, a));
         }
-        ui.text_center(i18n::s().skip_hint, 160.0, 160.0, FONT_PX, ui::TEXT_DIM);
+        let hint = vfill(i18n::s().skip_hint, &[Verb::Confirm]);
+        ui.text_center(&hint, 160.0, 160.0, FONT_PX, ui::TEXT_DIM);
     }
 
     fn draw_title(&mut self, ui: &Ui) {
@@ -1102,7 +1127,12 @@ impl App {
         for (i, r) in rects.into_iter().enumerate() {
             self.hits.push((r, Hit::TitleItem(i)));
         }
-        ui.text_center(s.title_controls, 160.0, 150.0, FONT_PX, ui::TEXT_DIM);
+        let hint = device_hint(
+            s.title_controls,
+            s.title_controls_touch,
+            &[Verb::Pick, Verb::Confirm, Verb::Back],
+        );
+        ui.text_center(&hint, 160.0, 150.0, FONT_PX, ui::TEXT_DIM);
         ui.text_right(s.version, 316.0, 166.0, FONT_PX, ui::TEXT_DIM);
         ui.text(s.copyright, 4.0, 166.0, FONT_PX, ui::TEXT_DIM);
     }
@@ -1172,7 +1202,7 @@ impl App {
     }
 
     /// JRPG식 대화창: 아래 전체 폭, 이름표, 초상 자리, 타자 효과, ▼.
-    fn draw_cutscene(&self, ui: &Ui) {
+    fn draw_cutscene(&mut self, ui: &Ui) {
         let Some(c) = &self.cutscene else { return };
         if let Some(d) = c.dialogue() {
             let b = Rect::new(8.0, 124.0, 304.0, 50.0);
@@ -1210,7 +1240,12 @@ impl App {
                 );
             }
         }
-        ui.text_center(i18n::s().cut_skip, 160.0, 1.0, FONT_PX, ui::TEXT_DIM);
+        // 건너뛰기 안내는 누를 수도 있다(터치에는 뒤로 버튼이 없다).
+        let skip = vfill(i18n::s().cut_skip, &[Verb::Skip]);
+        ui.text_center(&skip, 160.0, 1.0, FONT_PX, ui::TEXT_DIM);
+        let sw = ui.text_w(&skip, FONT_PX) + 16.0;
+        self.hits
+            .push((Rect::new(160.0 - sw / 2.0, 0.0, sw, 18.0), Hit::Skip));
         if c.fade > 0.0 {
             draw_rectangle(
                 0.0,
@@ -1276,7 +1311,8 @@ impl App {
                 self.hits.push((row, Hit::SettingRow(i)));
             }
         }
-        for (i, l) in ui::wrap(ui, s.settings_hint, 300.0, FONT_PX)
+        let settings_hint = vfill(s.settings_hint, &[Verb::Change]);
+        for (i, l) in ui::wrap(ui, &settings_hint, 300.0, FONT_PX)
             .iter()
             .take(2)
             .enumerate()
@@ -1511,7 +1547,8 @@ impl App {
             Color::new(0.9, 0.3, 0.3, k),
         );
         if self.death_t >= t::DEATH_INPUT_LOCK && (get_time() * 2.0) as i64 % 2 == 0 {
-            ui.text_center(s.dead_hint, 160.0, 96.0, FONT_PX, ui::TEXT);
+            let hint = vfill(s.dead_hint, &[Verb::Restart, Verb::Menu]);
+            ui.text_center(&hint, 160.0, 96.0, FONT_PX, ui::TEXT);
         }
     }
 
@@ -1534,8 +1571,9 @@ impl App {
             ui::BORDER,
         );
         // 탭 안내는 패널 밖 오른쪽 아래. 탭 줄에 두면 탭 이름이 긴 언어에서 겹치고, 패널 안에 두면 내용과 겹친다.
+        let s = i18n::s();
         ui.text_right(
-            i18n::s().tab_hint,
+            &device_hint(s.tab_hint, s.tab_hint_touch, &[Verb::Tabs]),
             panel.right() - 2.0,
             panel.bottom() + 2.0,
             FONT_PX,
@@ -1841,11 +1879,11 @@ impl App {
                     ui::TEXT_DIM,
                 );
                 let hint = if self.inventory.equipped == Some(*w) {
-                    s.equipped
+                    s.equipped.to_string()
                 } else {
-                    s.equip_hint
+                    vfill(s.equip_hint, &[Verb::Confirm])
                 };
-                ui.text(hint, desc_x, y + 18.0, FONT_PX, ui::ACCENT);
+                ui.text(&hint, desc_x, y + 18.0, FONT_PX, ui::ACCENT);
             }
             Some(Item::Charm(c)) => {
                 let ch = &CHARMS[*c];
@@ -1867,7 +1905,8 @@ impl App {
                 } else {
                     s.charm_equip
                 };
-                ui.text(hint, desc_x, y + 18.0, FONT_PX, ui::ACCENT);
+                let hint = vfill(hint, &[Verb::Confirm]);
+                ui.text(&hint, desc_x, y + 18.0, FONT_PX, ui::ACCENT);
             }
             None => {
                 ui.text(s.empty_slot, desc_x, y0, FONT_PX, ui::TEXT_DIM);

@@ -11,7 +11,7 @@ use crate::adventure::{AdvEvent, Interact};
 use crate::cutscene::{self, Cutscene, Face, Speaker};
 use crate::equipment::CHARMS;
 use crate::i18n::{self, fill, tr, Tr};
-use crate::input::{self, Act, Actions};
+use crate::input::{self, Act, Actions, Verb};
 use crate::items::Consumable;
 use crate::route::{NodeKind, Route};
 use crate::tuning as t;
@@ -387,9 +387,17 @@ impl App {
             self.close_button(ui, panel);
         }
         let hint = if self.route_cancel {
-            fill(s.route_hint_back, &[&input::prompt(Act::Attack)])
+            super::device_hint(
+                s.route_hint_back,
+                s.route_hint_back_touch,
+                &[Verb::Confirm, Verb::Pick, Verb::Back],
+            )
         } else {
-            fill(s.route_hint, &[&input::prompt(Act::Attack)])
+            super::device_hint(
+                s.route_hint,
+                s.route_hint_touch,
+                &[Verb::Confirm, Verb::Pick],
+            )
         };
         let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
         ui.text_right(
@@ -608,7 +616,7 @@ impl App {
                 ui.text(l, panel.x + 8.0, y + k as f32 * 11.0, FONT_PX, ui::TEXT_DIM);
             }
         }
-        let hint = fill(s.shop_hint, &[&input::prompt(Act::Attack)]);
+        let hint = super::vfill(s.shop_hint, &[Verb::Confirm, Verb::Back]);
         let hint = ui.fit(&hint, panel.w, FONT_PX);
         ui.text_right(
             &hint,

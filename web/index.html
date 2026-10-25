@@ -125,6 +125,16 @@
         importObject.env.nail_load_ready = function () { window.__nailLoading.ready(); };
       }
     });
+    // 처음 안내 글의 장치(src/input.rs): 주 포인터가 굵으면(손가락) 터치로 시작. 키·패드를 누르면 그쪽으로 바뀐다.
+    miniquad_add_plugin({
+      name: "nail_device",
+      version: 1,
+      register_plugin: function (importObject) {
+        importObject.env.nail_coarse_pointer = function () {
+          try { return window.matchMedia("(pointer: coarse)").matches ? 1 : 0; } catch (e) { return 0; }
+        };
+      }
+    });
     load("nail.wasm");
   </script>
 </body>
