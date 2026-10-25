@@ -179,6 +179,8 @@ pub struct App {
     renderer: Renderer,
     acc: f32,
     run_time: f32,
+    /// 쓰러진 뒤 흐른 시간. 사망 연출과 입력 잠금.
+    death_t: f32,
     hits: Vec<(Rect, Hit)>,
     /// 직전 프레임의 (scale, ox, oy). 탭 좌표를 논리 좌표로 바꿀 때.
     last_ui: (f32, f32, f32),
@@ -215,6 +217,7 @@ impl App {
             renderer: Renderer::new(font),
             acc: 0.0,
             run_time: 0.0,
+            death_t: 0.0,
             hits: Vec::new(),
             last_ui: (1.0, 0.0, 0.0),
         }
@@ -265,7 +268,10 @@ impl App {
             if a.menu {
                 open_pause = true;
             }
-            if a.restart || (!self.world.player.is_alive() && (a.confirm || a.attack)) {
+            let dead = !self.world.player.is_alive();
+            // 쓰러진 직후의 연타는 버린다. 잠금이 풀린 뒤 새로 누른 확인만 재시작.
+            let unlocked = dead && self.death_t >= t::DEATH_INPUT_LOCK;
+            if a.restart || (unlocked && (a.confirm || a.attack)) {
                 restart = true;
             }
             self.world.tick(&a, &self.sfx);
@@ -273,6 +279,8 @@ impl App {
         }
         if self.world.player.is_alive() {
             self.run_time += dt;
+        } else {
+            self.death_t += dt;
         }
         self.journal.update(&self.world);
         if restart {
@@ -300,6 +308,7 @@ impl App {
         self.inventory = Inventory::new();
         self.run_time = 0.0;
         self.acc = 0.0;
+        self.death_t = 0.0;
         if matches!(s, Scenario::Normal | Scenario::CutsceneOnly) {
             // 컷씬 동안은 적이 없다가, 끝나면 웨이브 1.
             let auto = self.world.auto_waves;
@@ -768,21 +777,32 @@ impl App {
         );
     }
 
+    /// 사망 연출: 서서히 어두워지고 글자가 떠오른 뒤, 입력 잠금이 풀리면 안내가 깜빡인다.
     fn draw_dead(&self, ui: &Ui) {
+        let k = (self.death_t / t::DEATH_FADE).min(1.0);
+        draw_rectangle(
+            0.0,
+            0.0,
+            screen_width(),
+            screen_height(),
+            Color::new(0.0, 0.0, 0.0, 0.55 * k),
+        );
         ui.text_center(
             "쓰러졌다",
             160.0,
             64.0,
             FONT_PX * 2.0,
-            Color::new(0.9, 0.3, 0.3, 1.0),
+            Color::new(0.9, 0.3, 0.3, k),
         );
-        ui.text_center(
-            "확인(Enter/A/ATK): 다시 시작   메뉴(Esc/Start/MENU): 메뉴",
-            160.0,
-            96.0,
-            FONT_PX,
-            ui::TEXT,
-        );
+        if self.death_t >= t::DEATH_INPUT_LOCK && (get_time() * 2.0) as i64 % 2 == 0 {
+            ui.text_center(
+                "확인: 다시 시작   메뉴: 일시정지",
+                160.0,
+                96.0,
+                FONT_PX,
+                ui::TEXT,
+            );
+        }
     }
 
     fn draw_pause(&mut self, ui: &Ui) {
