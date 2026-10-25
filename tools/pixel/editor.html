@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pxl 편집기</title>
+<!-- tools/pixel/pxl.py와 같은 .pxl 형식을 읽고 쓴다. 파일 하나, 바깥 의존성 없음. 브라우저로 열면 된다. -->
+<style>
+  :root { --bg:#1d1814; --panel:#2a231d; --line:#3d342b; --text:#ece5da; --muted:#a99c8b; --hi:#f2cd5c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui, sans-serif; display:grid; grid-template-columns:300px 1fr; height:100vh; }
+  aside { background:var(--panel); border-right:1px solid var(--line); padding:12px; overflow:auto; display:grid; gap:12px; align-content:start; }
+  h1 { font-size:15px; margin:0; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; }
+  button, label.btn { background:#3a3028; color:var(--text); border:1px solid var(--line); padding:4px 8px; cursor:pointer; font:inherit; }
+  button.on { border-color:var(--hi); color:var(--hi); }
+  .pal { display:grid; grid-template-columns:repeat(6, 1fr); gap:3px; }
+  .sw { aspect-ratio:1; border:1px solid #0006; cursor:pointer; position:relative; font:10px monospace; color:#fff; text-shadow:0 0 2px #000; display:flex; align-items:end; justify-content:end; padding:1px; }
+  .sw.on { outline:2px solid var(--hi); outline-offset:1px; }
+  .sw.clear { background:repeating-conic-gradient(#666 0 25%, #999 0 50%) 0 0/8px 8px; }
+  main { overflow:auto; position:relative; }
+  canvas { image-rendering:pixelated; display:block; }
+  #view { margin:16px; cursor:crosshair; }
+  .muted { color:var(--muted); font-size:12px; }
+  #pos { font-family:monospace; }
+  input[type=color] { width:40px; height:26px; padding:0; border:0; background:none; }
+  #previews { display:flex; gap:8px; align-items:end; flex-wrap:wrap; }
+  #previews canvas { max-width:100%; }
+  #previews canvas { background:#3a3228; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>pxl 편집기</h1>
+  <div class="row">
+    <label class="btn">열기<input type="file" id="open" accept=".pxl,.png" hidden></label>
+    <button id="save">.pxl 저장</button>
+    <button id="png">PNG</button>
+  </div>
+  <div class="row">
+    <button data-tool="pen" class="on" title="B">연필</button>
+    <button data-tool="fill" title="G">채우기</button>
+    <button data-tool="pick" title="I · 오른쪽 클릭">스포이트</button>
+  </div>
+  <div class="row">
+    <button id="mirror" title="M">좌우 대칭</button>
+    <button id="grid" class="on" title="#">격자</button>
+    <button id="undo" title="Ctrl+Z">되돌리기</button>
+  </div>
+  <div class="row"><span>확대</span><input id="zoom" type="range" min="2" max="24" value="8"></div>
+  <div>
+    <div class="row" style="justify-content:space-between"><b>팔레트</b><span class="muted">숫자키 1–9</span></div>
+    <div class="pal" id="pal"></div>
+  </div>
+  <div class="row"><input type="color" id="newcol" value="#c08060"><button id="addcol">색 추가</button><button id="setcol">이 색으로 바꾸기</button></div>
+  <div class="muted" id="cur"></div>
+  <div><b>실제 크기</b><div id="previews"><canvas id="p1"></canvas><canvas id="p2"></canvas></div></div>
+  <div class="muted">
+    새 그림: <input id="w" size="3" value="32">×<input id="h" size="3" value="32"> <button id="new">만들기</button>
+  </div>
+  <div class="muted">
+    왼쪽 클릭 = 칠하기, 오른쪽 클릭 = 색 집기, 화면 이동은 스크롤. 단축키 B·G·I·M·#, Ctrl+Z.<br>
+    PNG를 열면 색을 글자로 바꿔 들여온다. 저장한 .pxl은 <code>tools/pixel/pxl.py render</code>로 PNG가 된다.
+  </div>
+  <div class="muted" id="pos"></div>
+</aside>
+<main><canvas id="view"></canvas></main>
+<script>
+const KEYS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$%&*+=?<>~^:;,'\"|/\\()[]{}-";
+let doc = blank(32, 32);
+let cur = "a", tool = "pen", mirror = false, showGrid = true, zoom = 8;
+const undo = [];
+const $ = (id) => document.getElementById(id);
+
+function blank(w, h) {
+  return { w, h, notes: [], palette: { ".": { rgba: [0,0,0,0], name: "투명" }, a: { rgba: [43,29,42,255], name: "외곽선" } },
+           grid: Array.from({ length: h }, () => Array(w).fill(".")) };
+}
+function parse(text) {
+  const d = { w: 0, h: 0, notes: [], palette: {}, grid: [] };
+  let mode = null;
+  for (const ln of text.split(/\r?\n/)) {
+    if (mode !== "grid") {
+      if (!ln.trim()) continue;
+      if (ln.startsWith("#")) { d.notes.push(ln); continue; }
+      if (ln.startsWith("size")) { const [, w, h] = ln.split(/\s+/); d.w = +w; d.h = +h; continue; }
+      if (ln.trim() === "palette") { mode = "palette"; continue; }
+      if (ln.trim() === "grid") { mode = "grid"; continue; }
+      if (mode === "palette") {
+        const m = ln.match(/^(\S)\s+(\S+)\s*(.*)$/);
+        if (!m) continue;
+        let rgba = [0,0,0,0];
+        if (m[2] !== "transparent") {
+          const v = m[2].replace("#", "");
+          rgba = [parseInt(v.slice(0,2),16), parseInt(v.slice(2,4),16), parseInt(v.slice(4,6),16), v.length === 8 ? parseInt(v.slice(6,8),16) : 255];
+        }
+        d.palette[m[1]] = { rgba, name: m[3] };
+      }
+    } else if (ln.length) d.grid.push([...ln]);
+  }
+  if (!d.w) { d.w = Math.max(...d.grid.map((r) => r.length)); d.h = d.grid.length; }
+  while (d.grid.length < d.h) d.grid.push([]);
+  d.grid = d.grid.slice(0, d.h).map((r) => { const a = r.slice(0, d.w); while (a.length < d.w) a.push("."); return a; });
+  if (!d.palette["."]) d.palette["."] = { rgba: [0,0,0,0], name: "투명" };
+  return d;
+}
+const hex2 = (n) => n.toString(16).padStart(2, "0");
+function serialize(d) {
+  const out = [...d.notes, `size ${d.w} ${d.h}`, "palette"];
+  for (const [k, { rgba, name }] of Object.entries(d.palette)) {
+    const v = rgba[3] === 0 ? "transparent" : "#" + rgba.slice(0,3).map(hex2).join("") + (rgba[3] !== 255 ? hex2(rgba[3]) : "");
+    out.push(`${k} ${v} ${name || ""}`.trimEnd());
+  }
+  out.push("grid", ...d.grid.map((r) => r.join("")));
+  return out.join("\n") + "\n";
+}
+function fromImage(img) {
+  const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+  const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+  const data = g.getImageData(0, 0, c.width, c.height).data;
+  const d = { w: c.width, h: c.height, notes: ["# PNG에서 가져옴"], palette: { ".": { rgba: [0,0,0,0], name: "투명" } }, grid: [] };
+  const seen = new Map();
+  const cols = [];
+  for (let i = 0; i < data.length; i += 4) if (data[i+3]) { const k = data.slice(i, i+4).join(","); if (!seen.has(k)) { seen.set(k, null); cols.push([...data.slice(i, i+4)]); } }
+  cols.sort((a, b) => a[0]+a[1]+a[2] - (b[0]+b[1]+b[2]));
+  if (cols.length > KEYS.length) { alert(`색이 ${cols.length}개라 너무 많다. pxl.py import --colors로 줄여서 열 것.`); return null; }
+  cols.forEach((c, i) => { seen.set(c.join(","), KEYS[i]); d.palette[KEYS[i]] = { rgba: c, name: "" }; });
+  for (let y = 0; y < d.h; y++) { const r = []; for (let x = 0; x < d.w; x++) { const i = (y*d.w + x)*4; r.push(data[i+3] ? seen.get([...data.slice(i, i+4)].join(",")) : "."); } d.grid.push(r); }
+  return d;
+}
+
+function css(k) { const c = doc.palette[k]?.rgba || [0,0,0,0]; return `rgba(${c[0]},${c[1]},${c[2]},${c[3]/255})`; }
+function draw() {
+  const v = $("view"), g = v.getContext("2d");
+  v.width = doc.w * zoom; v.height = doc.h * zoom;
+  for (let y = 0; y < doc.h; y++) for (let x = 0; x < doc.w; x++) {
+    const k = doc.grid[y][x];
+    if (doc.palette[k]?.rgba[3] === 0 || k === ".") { g.fillStyle = (x + y) % 2 ? "#5a5048" : "#4a4038"; } else g.fillStyle = css(k);
+    g.fillRect(x*zoom, y*zoom, zoom, zoom);
+  }
+  if (showGrid && zoom >= 5) {
+    for (let i = 0; i <= doc.w; i++) { g.fillStyle = i % 8 ? "#0002" : "#fff3"; g.fillRect(i*zoom, 0, 1, v.height); }
+    for (let j = 0; j <= doc.h; j++) { g.fillStyle = j % 8 ? "#0002" : "#fff3"; g.fillRect(0, j*zoom, v.width, 1); }
+  }
+  if (mirror) { g.fillStyle = "#f2cd5c88"; g.fillRect(doc.w*zoom/2 - 1, 0, 2, v.height); }
+  for (const [id, s] of [["p1", 1], ["p2", 2]]) {
+    const p = $(id), pg = p.getContext("2d"); p.width = doc.w*s; p.height = doc.h*s;
+    for (let y = 0; y < doc.h; y++) for (let x = 0; x < doc.w; x++) { const k = doc.grid[y][x]; if (k !== ".") { pg.fillStyle = css(k); pg.fillRect(x*s, y*s, s, s); } }
+  }
+}
+function drawPalette() {
+  const p = $("pal"); p.textContent = "";
+  for (const [k, { name }] of Object.entries(doc.palette)) {
+    const s = document.createElement("div");
+    s.className = "sw" + (k === cur ? " on" : "") + (k === "." ? " clear" : "");
+    if (k !== ".") s.style.background = css(k);
+    s.textContent = k; s.title = `${k} ${name || ""}`;
+    s.onclick = () => { cur = k; drawPalette(); };
+    p.append(s);
+  }
+  const c = doc.palette[cur];
+  $("cur").textContent = c ? `지금 색: ${cur} ${c.rgba[3] ? "#" + c.rgba.slice(0,3).map(hex2).join("") : "투명"} ${c.name || ""}` : "";
+}
+function snapshot() { undo.push(doc.grid.map((r) => r.slice())); if (undo.length > 200) undo.shift(); }
+function setPx(x, y, k) {
+  if (x < 0 || y < 0 || x >= doc.w || y >= doc.h) return;
+  doc.grid[y][x] = k;
+  if (mirror) doc.grid[y][doc.w - 1 - x] = k;
+}
+function fill(x, y, k) {
+  const from = doc.grid[y][x]; if (from === k) return;
+  const st = [[x, y]];
+  while (st.length) {
+    const [cx, cy] = st.pop();
+    if (cx < 0 || cy < 0 || cx >= doc.w || cy >= doc.h || doc.grid[cy][cx] !== from) continue;
+    setPx(cx, cy, k);
+    st.push([cx+1, cy], [cx-1, cy], [cx, cy+1], [cx, cy-1]);
+  }
+}
+function cell(e) { const r = $("view").getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / zoom), Math.floor((e.clientY - r.top) / zoom)]; }
+let down = false, last = null;
+$("view").addEventListener("contextmenu", (e) => e.preventDefault());
+$("view").addEventListener("pointerdown", (e) => {
+  const [x, y] = cell(e);
+  if (e.button === 2 || tool === "pick") { cur = doc.grid[y]?.[x] ?? cur; drawPalette(); return; }
+  if (e.button !== 0) return;
+  snapshot();
+  if (tool === "fill") { fill(x, y, cur); draw(); return; }
+  down = true; last = [x, y]; setPx(x, y, cur); draw();
+  $("view").setPointerCapture(e.pointerId);
+});
+$("view").addEventListener("pointermove", (e) => {
+  const [x, y] = cell(e);
+  const k = doc.grid[y]?.[x];
+  $("pos").textContent = k !== undefined ? `(${x}, ${y}) ${k} ${doc.palette[k]?.name || ""}` : "";
+  if (!down) return;
+  // 빠르게 끌어도 빈칸이 없게 선을 잇는다(브레젠험).
+  let [x0, y0] = last; const dx = Math.abs(x - x0), dy = -Math.abs(y - y0), sx = x0 < x ? 1 : -1, sy = y0 < y ? 1 : -1; let err = dx + dy;
+  for (;;) { setPx(x0, y0, cur); if (x0 === x && y0 === y) break; const e2 = 2*err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+  last = [x, y]; draw();
+});
+addEventListener("pointerup", () => { down = false; });
+
+document.querySelectorAll("[data-tool]").forEach((b) => b.onclick = () => setTool(b.dataset.tool));
+function setTool(t) { tool = t; document.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("on", b.dataset.tool === t)); }
+$("mirror").onclick = () => { mirror = !mirror; $("mirror").classList.toggle("on", mirror); draw(); };
+$("grid").onclick = () => { showGrid = !showGrid; $("grid").classList.toggle("on", showGrid); draw(); };
+$("undo").onclick = () => { const g = undo.pop(); if (g) { doc.grid = g; draw(); } };
+$("zoom").oninput = (e) => { zoom = +e.target.value; draw(); };
+$("new").onclick = () => { doc = blank(+$("w").value || 32, +$("h").value || 32); undo.length = 0; cur = "a"; drawPalette(); draw(); };
+$("addcol").onclick = () => {
+  const k = [...KEYS].find((c) => !doc.palette[c]); if (!k) return;
+  const v = $("newcol").value.slice(1);
+  doc.palette[k] = { rgba: [parseInt(v.slice(0,2),16), parseInt(v.slice(2,4),16), parseInt(v.slice(4,6),16), 255], name: "" };
+  cur = k; drawPalette();
+};
+$("setcol").onclick = () => {
+  if (cur === ".") return;
+  const v = $("newcol").value.slice(1);
+  doc.palette[cur].rgba = [parseInt(v.slice(0,2),16), parseInt(v.slice(2,4),16), parseInt(v.slice(4,6),16), 255];
+  drawPalette(); draw();
+};
+$("open").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  let d = null;
+  if (f.name.endsWith(".png")) { const img = new Image(); img.src = URL.createObjectURL(f); await img.decode(); d = fromImage(img); }
+  else d = parse(await f.text());
+  if (d) { doc = d; undo.length = 0; cur = Object.keys(doc.palette).find((k) => k !== ".") || "."; drawPalette(); draw(); }
+  e.target.value = "";
+};
+function download(name, blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); }
+$("save").onclick = () => download("그림.pxl", new Blob([serialize(doc)], { type: "text/plain" }));
+$("png").onclick = () => $("p1").toBlob((b) => download("그림.png", b));
+addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); $("undo").click(); return; }
+  const m = { b: "pen", g: "fill", i: "pick" }[e.key]; if (m) setTool(m);
+  if (e.key === "m") $("mirror").click();
+  if (e.key === "#") $("grid").click();
+  if (/^[1-9]$/.test(e.key)) { const ks = Object.keys(doc.palette); if (ks[+e.key - 1]) { cur = ks[+e.key - 1]; drawPalette(); } }
+});
+drawPalette(); draw();
+</script>
+</body>
+</html>
