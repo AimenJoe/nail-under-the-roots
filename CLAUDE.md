@@ -45,7 +45,7 @@ cargo check --target aarch64-linux-android   # NDK 없이 됨. Android에서만 
 cargo test                                   # 규칙 테스트(무브셋·독). 리눅스면 libx11-dev 등 필요(README)
 python3 tools/licenses.py                    # 의존성을 바꿨을 때만. assets/THIRD_PARTY_LICENSES.txt 갱신
 ```
-CI: `deploy-web.yml`이 위 세 줄을 돌리고 Netlify 시크릿이 있으면 배포한다. `build-android.yml`이 APK를 만들어 아티팩트(태그면 Release)로 올린다. 로컬에 Android SDK/NDK는 두지 않는다(docs/decisions/0005).
+CI: `deploy-web.yml`이 위 세 줄을 돌리고 Netlify 시크릿이 있으면 배포한다. `build-android.yml`이 APK를 만들어 아티팩트(태그면 Release)로 올린다. 릴리스는 `Cargo.toml` 버전을 올리고 `docs/releases/v<버전>.md`를 함께 main에 push하면 `release.yml`이 태그·APK·Release를 만든다(세션 프록시는 태그 push를 받지 않는다). 로컬에 Android SDK/NDK는 두지 않는다(docs/decisions/0005).
 
 ## 하지 않는 것
 - `mq_js_bundle.js`나 게임패드 JS 플러그인을 외부 URL로 핫링크하지 않는다. `web/`에 복사본.

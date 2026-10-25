@@ -84,7 +84,7 @@ python3 tools/licenses.py                         # 의존성을 바꿨을 때�
 - `build-android.yml`이 `src/`·`Cargo.*`가 바뀐 push마다 `cargo quad-apk build --release`로 **디버그 키 서명 APK**를 만들어 Actions 아티팩트(`nail-apk-<sha>`)로 올린다. Actions 탭 → 해당 실행 → Artifacts에서 받는다.
 - `v*` 태그를 push하면 같은 APK가 GitHub Release에 첨부된다: `git tag v0.1.0 && git push origin v0.1.0`.
 - 실기 설치: 아티팩트 **zip을 풀어** 안의 `nail.apk`만 설치한다(`nail.apk.idsig`는 무시). `adb install -r nail.apk` 또는 사이드로드(알 수 없는 출처 허용). arm64 전용, Android 8.0+.
-- **릴리스**: `docs/releases/<태그>.md`(릴리스 본문)를 먼저 커밋하고 `v*` 태그를 push하면 `build-android`가 APK를 GitHub Release에 붙인다. 본문 파일이 없으면 그 단계가 실패한다.
+- **릴리스 = 버전 올리기**: `Cargo.toml`의 `version`(과 `[package.metadata.android]`의 `version_code`)을 올리고 `docs/releases/v<버전>.md`(릴리스 본문)를 함께 main에 push하면 `release.yml`이 태그 `v<버전>`을 만들고 `build-android`를 불러 APK를 GitHub Release에 붙인다. 태그가 이미 있거나 본문이 없으면 아무것도 안 한다. Actions 탭에서 `release`를 손으로 돌려도 된다. 손으로 `v*` 태그를 push해도 예전처럼 Release가 생긴다(본문 파일은 있어야 한다).
 - **서명 키 고정**: 레포 Secrets에 `ANDROID_DEBUG_KEYSTORE_B64`(디버그 키스토어의 base64, 비밀번호 `android`)가 있어야 모든 빌드가 같은 키로 서명되어 기기에서 덮어 설치가 된다. 없으면 Actions 캐시의 키를 쓰고, 그것도 없으면 새 키를 만들어 경고를 남긴다. 키가 바뀐 APK는 **기기에서 앱을 삭제한 뒤** 설치해야 한다("패키지가 유효하지 않음"의 흔한 원인). 키 만들기: `keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000 && base64 -w0 debug.keystore`.
 - 로컬에서 만들려면 Android SDK(build-tools, platforms;android-36)·NDK·JDK 17과 `cargo install --git https://github.com/not-fl3/cargo-quad-apk --rev <build-android.yml의 CARGO_QUAD_APK_REV>`, 그리고 `ANDROID_HOME`·`NDK_HOME` 환경 변수가 필요하다. 보통은 CI에 맡긴다(docs/decisions/0005).
 - 아직 Android에서 게임패드 **버튼**은 안 들어온다(D-pad만). docs/decisions/0002의 2단계 스파이크 범위.
