@@ -1080,7 +1080,13 @@ impl App {
                 self.draw_shop(&ui);
             }
         }
-        if let Some(o) = self.input.overlay() {
+        if let Some(mut o) = self.input.overlay() {
+            let p = &self.world.player;
+            let burrow = crate::tuning::BURROW_COOLDOWN * p.stats.burrow_cd;
+            o.buttons[crate::input::TOUCH_DIG].ready = 1.0 - p.burrow_cd / burrow;
+            o.buttons[crate::input::TOUCH_SP].ready = p.sp / crate::tuning::SP_MAX;
+            o.buttons[crate::input::TOUCH_ITEM].ready =
+                1.0 - p.item_cd / crate::tuning::ITEM_COOLDOWN;
             render::draw_touch_overlay(&o);
         }
     }

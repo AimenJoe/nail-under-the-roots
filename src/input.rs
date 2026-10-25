@@ -507,7 +507,14 @@ pub struct TouchButton {
     pub center: Vec2,
     pub radius: f32,
     pub label: &'static str,
+    /// 다시 쓸 수 있기까지의 진행(1 = 지금 쓸 수 있음). 앱이 월드의 대기를 넣는다(docs/decisions/0038).
+    pub ready: f32,
 }
+
+/// `TouchOverlay::buttons`에서 대기를 보여 주는 칸.
+pub const TOUCH_DIG: usize = 1;
+pub const TOUCH_SP: usize = 4;
+pub const TOUCH_ITEM: usize = 5;
 
 /// 버튼 배치(논리 px). 화면 짧은 변 기준으로 손가락 크기에 맞춘다.
 fn touch_layout() -> TouchOverlay {
@@ -536,37 +543,44 @@ fn layout_for(w: f32, h: f32) -> TouchOverlay {
                 center: atk,
                 radius: atk_r,
                 label: "ATK",
+                ready: 1.0,
             },
             TouchButton {
                 center: dig,
                 radius: dig_r,
                 label: "DIG",
+                ready: 1.0,
             },
             TouchButton {
                 center: vec2(w - r * 1.4, r * 1.4),
                 radius: r * 0.85,
                 label: "R",
+                ready: 1.0,
             },
             TouchButton {
                 center: vec2(r * 1.2, r * 1.2),
                 radius: r * 0.75,
                 label: "MENU",
+                ready: 1.0,
             },
             TouchButton {
                 center: sp,
                 radius: sp_r,
                 label: "SP",
+                ready: 1.0,
             },
             TouchButton {
                 // 아이템: 굴파기와 필살기 사이, 왼쪽 위 대각선.
                 center: vec2(dig.x + r * 0.2, sp.y + r * 0.4),
                 radius: r * 0.8,
                 label: "ITEM",
+                ready: 1.0,
             },
             TouchButton {
                 center: vec2(dig.x - r * 2.0, sp.y - r * 0.2),
                 radius: r * 0.55,
                 label: "<>",
+                ready: 1.0,
             },
         ],
     }

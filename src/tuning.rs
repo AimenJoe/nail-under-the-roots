@@ -123,6 +123,13 @@ pub const WORM_CHANCE: f32 = 0.035;
 pub const BERRY_MAX: u8 = 5;
 /// 쥬시 지렁이 = 목숨. 들고 있다가 쓰러지면 저절로 먹고 일어난다. 최대 목숨 = 1 + 이것.
 pub const WORM_MAX: u8 = 2;
+/// 먹는 데 걸리는 시간(docs/decisions/0038). 이 동안 걸음이 느려지고 공격은 못 한다. 다 먹어야 회복된다.
+/// 맞으면 끊기고 먹지 않은 것으로(아이템은 그대로). 굴파기로는 끊을 수 있다(먹지 않음).
+pub const BERRY_EAT_TIME: f32 = 0.35;
+pub const WORM_EAT_TIME: f32 = 0.6;
+pub const EAT_MOVE_FACTOR: f32 = 0.5;
+/// 먹기 시작부터 다음 먹기까지(끊겨도, 지렁이로 일어나도 같다). 같은 행동이 바로 다시 나가지 않게.
+pub const ITEM_COOLDOWN: f32 = 1.5;
 /// 쓰러졌다 일어날 때 체력(최대의 비율, 올림)과 무적 시간.
 pub const REVIVE_HP_FRAC: f32 = 0.6;
 pub const REVIVE_INVULN: f32 = 2.0;
@@ -140,6 +147,9 @@ pub const ROOT_HEART_MAX: i32 = 5;
 pub const PARRY_WINDOW: f32 = 0.12;
 /// 앞쪽 판정: 공격 방향과 위협 방향의 내적이 이보다 크면.
 pub const PARRY_FRONT: f32 = 0.2;
+/// 패링 창이 열린 순간부터 다음 창이 열릴 수 있기까지(docs/decisions/0038). 연타로 창을 이어 붙이지 못하게.
+/// 성공하면 바로 다시 열 수 있다(여럿을 연달아 튕겨내는 건 보상).
+pub const PARRY_COOLDOWN: f32 = 0.45;
 pub const PARRY_SP: f32 = 4.0;
 pub const PARRY_HITSTOP: f32 = 0.12;
 pub const PARRY_SHAKE: f32 = 0.35;

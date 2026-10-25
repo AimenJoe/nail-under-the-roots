@@ -495,6 +495,15 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
                 }
             }
         }
+        // 다음 먹기까지: 위에서부터 어둡게 덮였다가 걷힌다(0038).
+        let cd = w.player.item_cd / t::ITEM_COOLDOWN;
+        if cd > 0.0 {
+            let h = (size * cd).round();
+            ui.rect(
+                Rect::new(r.x, r.y, size, h),
+                Color::new(0.0, 0.0, 0.0, 0.55),
+            );
+        }
         ui.text(
             &n.to_string(),
             r.right() - 6.0,
@@ -564,9 +573,27 @@ pub fn draw_touch_overlay(t: &TouchOverlay) {
         draw_circle(knob.x, knob.y, t.stick_radius * 0.4, fill);
         draw_circle_lines(knob.x, knob.y, t.stick_radius * 0.4, 2.0, line);
     }
+    let faint = Color::new(1.0, 1.0, 1.0, 0.15);
     for b in &t.buttons {
         draw_circle(b.center.x, b.center.y, b.radius, fill);
-        draw_circle_lines(b.center.x, b.center.y, b.radius, 2.0, line);
+        // 기다리는 중이면 테두리가 시계 방향으로 다시 차오른다(굴파기·필살기·아이템, 0038).
+        let ready = b.ready.clamp(0.0, 1.0);
+        if ready < 1.0 {
+            draw_circle_lines(b.center.x, b.center.y, b.radius, 2.0, faint);
+            draw_arc(
+                b.center.x,
+                b.center.y,
+                48,
+                b.radius,
+                -90.0,
+                2.0,
+                360.0 * ready,
+                line,
+            );
+        } else {
+            draw_circle_lines(b.center.x, b.center.y, b.radius, 2.0, line);
+        }
+        let line = if ready < 1.0 { faint } else { line };
         let fs = b.radius * 0.6;
         let dim = measure_text(b.label, None, fs as u16, 1.0);
         draw_text(
@@ -637,6 +664,9 @@ fn draw_player(p: &Player, alpha: f32, time: f32) {
 /// 공격 이펙트(발톱 자국 세 줄)와 솟구침 고리. 무브셋 수치를 따른다.
 fn draw_player_fx(p: &Player, alpha: f32) {
     let pos = lerp(p.prev_pos, p.pos, alpha);
+    if let Some((item, k)) = p.eat_progress() {
+        draw_eating(pos, p.face_left, item, k);
+    }
     match p.state {
         player::State::Attack { idx, time: at, dir } => {
             let hit = p.moveset.hits[idx];
@@ -1572,6 +1602,38 @@ fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool) {
     }
 }
 
+/// 먹는 중: 입 앞에 든 산딸기(베어 물수록 작아진다)·지렁이 + 머리 위 작은 진행 막대.
+/// 회복은 다 먹어야 된다는 걸 보여 준다(0038). 맞으면 상태가 바뀌어 사라진다.
+fn draw_eating(pos: Vec2, face_left: bool, item: crate::items::Consumable, k: f32) {
+    let side = if face_left { -1.0 } else { 1.0 };
+    let bob = if ((k * 8.0) as i32) % 2 == 0 {
+        0.0
+    } else {
+        1.0
+    };
+    let m = vec2(pos.x + side * 6.0, pos.y - 1.0 + bob);
+    match item {
+        crate::items::Consumable::Berry => {
+            // 세 입: 3 → 2 → 1칸 너비.
+            let wpx = 3.0 - (k * 3.0).floor().min(2.0);
+            // 입 쪽부터 베어 문다.
+            let x = if face_left {
+                m.x - 2.0
+            } else {
+                m.x - 1.0 + (3.0 - wpx)
+            };
+            draw_rectangle(x - 1.0, m.y - 2.0, wpx + 2.0, 5.0, OUTLINE);
+            draw_rectangle(x, m.y - 1.0, wpx, 3.0, world::BERRY);
+        }
+        crate::items::Consumable::Worm => {
+            draw_worm(m + vec2(side * 1.0, 0.0), k * 20.0, 0.6);
+        }
+    }
+    let (bw, y) = (10.0, pos.y - 14.0);
+    draw_rectangle(pos.x - bw / 2.0 - 1.0, y - 1.0, bw + 2.0, 3.0, OUTLINE);
+    draw_rectangle(pos.x - bw / 2.0, y, (bw * k).round(), 1.0, world::BERRY);
+}
+
 /// 쥬시 지렁이: 꿈틀대는 분홍 마디 + 반들거리는 하이라이트. `k`는 크기 배율(1 = 월드, HUD는 더 크게).
 pub fn draw_worm(p: Vec2, ph: f32, k: f32) {
     let body = Color::new(0.95, 0.55, 0.62, 1.0);
@@ -2185,6 +2247,7 @@ fn short_state(s: &player::State) -> &'static str {
         player::State::Emerge { .. } => "emerge",
         player::State::Drill { .. } => "drill",
         player::State::Recover { .. } => "recover",
+        player::State::Eat { .. } => "eat",
         player::State::Dead => "dead",
     }
 }

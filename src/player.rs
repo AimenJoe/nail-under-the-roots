@@ -1,6 +1,7 @@
 //! 플레이어(Naïl). 이동, 발톱 3연타, 굴파기, 필살기 드릴. `Actions`와 `Room`만 본다.
 //!
-//! 상태 기계: Free ⇄ Attack / Burrow → Emerge → Free, Free·Attack → Drill → Recover → Free. 피격·사망은 어느 상태에서나.
+//! 상태 기계: Free ⇄ Attack / Burrow → Emerge → Free, Free·Attack → Drill → Recover → Free, Free → Eat → Free. 피격·사망은 어느 상태에서나.
+//! 모든 행동은 바로 다시 나가지 않는다(docs/decisions/0038): 발톱 = 스윙·후딜레이, 굴파기 = 대기, 필살기 = 게이지, 먹기 = 먹는 시간 + 대기, 패링 창 = 대기.
 //! 수치는 `stats`(장비·장신구가 정한 것, equipment::Stats)를 거친다.
 //! 명세 초안: docs/phase-1-combat-prototype.md. 수치: tuning.rs.
 
@@ -9,6 +10,7 @@ use macroquad::prelude::*;
 use crate::combat::{self, Shape, Strike, StrikeKind};
 use crate::equipment::Stats;
 use crate::input::Actions;
+use crate::items::Consumable;
 use crate::moveset::{self, Moveset};
 use crate::room::Room;
 use crate::tuning as t;
@@ -37,6 +39,11 @@ pub enum State {
     Recover {
         time: f32,
     },
+    /// 퀵 아이템을 먹는 중. 다 먹으면 `Event::Ate`(가방에서 꺼내 회복하는 건 월드). 맞으면 끊긴다.
+    Eat {
+        item: Consumable,
+        time: f32,
+    },
     Dead,
 }
 
@@ -54,6 +61,8 @@ pub enum Event {
     Drill,
     DrillWall,
     Parry,
+    /// 다 먹었다(월드가 가방에서 꺼내 회복).
+    Ate(Consumable),
 }
 
 pub struct Player {
@@ -72,6 +81,8 @@ pub struct Player {
     pub flash: f32,
     pub state: State,
     pub burrow_cd: f32,
+    /// 다음 먹기까지 남은 시간(먹기 시작 순간부터 ITEM_COOLDOWN).
+    pub item_cd: f32,
     pub events: Vec<Event>,
     /// 콤보 표. 무기·캐릭터에 따라 바뀐다(moveset.rs).
     pub moveset: &'static Moveset,
@@ -81,6 +92,10 @@ pub struct Player {
     pub armed: bool,
     attack_buf: f32,
     dodge_buf: f32,
+    item_buf: f32,
+    /// 다음 패링 창이 열릴 수 있기까지. 지금 스윙에 창이 있나는 `parry_open`.
+    parry_cd: f32,
+    parry_open: bool,
     combo_next: usize,
     combo_timer: f32,
     no_attack: f32,
@@ -103,12 +118,16 @@ impl Player {
             flash: 0.0,
             state: State::Free,
             burrow_cd: 0.0,
+            item_cd: 0.0,
             events: Vec::new(),
             moveset: &moveset::CLAWS,
             face_left: false,
             armed: true,
             attack_buf: 0.0,
             dodge_buf: 0.0,
+            item_buf: 0.0,
+            parry_cd: 0.0,
+            parry_open: false,
             combo_next: 0,
             combo_timer: 0.0,
             no_attack: 0.0,
@@ -139,14 +158,17 @@ impl Player {
     /// 패링 창이 열려 있으면 공격 방향. 스윙 시작 직후 PARRY_WINDOW 동안.
     pub fn parry_dir(&self) -> Option<Vec2> {
         match self.state {
-            State::Attack { dir, .. } if self.swing_age < t::PARRY_WINDOW => Some(dir),
+            State::Attack { dir, .. } if self.parry_open && self.swing_age < t::PARRY_WINDOW => {
+                Some(dir)
+            }
             _ => None,
         }
     }
 
-    /// 패링 성공: SP를 크게 채운다.
+    /// 패링 성공: SP를 크게 채운다. 다음 창은 바로 열 수 있다.
     pub fn on_parry(&mut self) {
         self.sp = (self.sp + t::PARRY_SP).min(t::SP_MAX);
+        self.parry_cd = 0.0;
         self.events.push(Event::Parry);
     }
 
@@ -179,6 +201,8 @@ impl Player {
         self.hp = hp.clamp(1, self.stats.max_hp);
         self.state = State::Free;
         self.invuln = t::REVIVE_INVULN;
+        // 지렁이를 먹고 일어났다 = 먹기. 바로 또 먹지 못한다.
+        self.item_cd = t::ITEM_COOLDOWN;
         self.vel = Vec2::ZERO;
         self.combo_timer = 0.0;
     }
@@ -190,6 +214,29 @@ impl Player {
         }
         if a.dodge {
             self.dodge_buf = t::INPUT_BUFFER;
+        }
+        if a.use_item {
+            self.item_buf = t::INPUT_BUFFER;
+        }
+    }
+
+    /// 먹기를 눌렀고(버퍼) 지금 먹기 시작할 수 있나. 무엇을 먹을지·먹을 필요가 있는지는 월드가 본다.
+    pub fn wants_to_eat(&self) -> bool {
+        self.item_buf > 0.0 && self.item_cd <= 0.0 && self.state == State::Free
+    }
+
+    /// 먹기 시작. 대기는 지금부터 센다(끊겨도 그대로).
+    pub fn start_eat(&mut self, item: Consumable) {
+        self.item_buf = 0.0;
+        self.item_cd = t::ITEM_COOLDOWN;
+        self.state = State::Eat { item, time: 0.0 };
+    }
+
+    /// 먹는 중이면 얼마나 먹었나(0..1).
+    pub fn eat_progress(&self) -> Option<(Consumable, f32)> {
+        match self.state {
+            State::Eat { item, time } => Some((item, (time / item.eat_time()).min(1.0))),
+            _ => None,
         }
     }
 
@@ -203,6 +250,8 @@ impl Player {
         self.flash = (self.flash - dt).max(0.0);
         self.combo_timer = (self.combo_timer - dt).max(0.0);
         self.burrow_cd = (self.burrow_cd - dt).max(0.0);
+        self.item_cd = (self.item_cd - dt).max(0.0);
+        self.parry_cd = (self.parry_cd - dt).max(0.0);
         self.no_attack = (self.no_attack - dt).max(0.0);
         self.swing_age += dt;
 
@@ -351,10 +400,24 @@ impl Player {
                     State::Recover { time }
                 };
             }
+            State::Eat { item, time } => {
+                let time = time + dt;
+                self.pos += move_dir * t::PLAYER_SPEED * t::EAT_MOVE_FACTOR * dt;
+                if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
+                    // 굴파기로 끊는다: 먹지 않은 것으로. 대기는 이미 흐르고 있다.
+                    self.start_burrow();
+                } else if time >= item.eat_time() {
+                    self.events.push(Event::Ate(item));
+                    self.state = State::Free;
+                } else {
+                    self.state = State::Eat { item, time };
+                }
+            }
         }
 
         self.attack_buf = (self.attack_buf - dt).max(0.0);
         self.dodge_buf = (self.dodge_buf - dt).max(0.0);
+        self.item_buf = (self.item_buf - dt).max(0.0);
 
         self.pos += self.vel * dt;
         combat::apply_friction(&mut self.vel, dt);
@@ -401,6 +464,11 @@ impl Player {
         self.facing = dir;
         self.swing_id += 1;
         self.swing_age = 0.0;
+        // 패링 창은 대기가 끝났을 때만 열린다. 연타하면 몇 번에 한 번만(docs/decisions/0038).
+        self.parry_open = self.parry_cd <= 0.0;
+        if self.parry_open {
+            self.parry_cd = t::PARRY_COOLDOWN;
+        }
         self.vel += dir * self.moveset.hits[idx].lunge;
         self.attack_buf = 0.0;
         self.combo_timer = 0.0;
@@ -509,7 +577,7 @@ impl Player {
             self.state = State::Dead;
             self.events.push(Event::Die);
         } else {
-            // 공격·솟구침 중이었으면 끊긴다.
+            // 공격·솟구침·먹기 중이었으면 끊긴다(먹던 것은 먹지 않은 것으로).
             self.state = State::Free;
             self.combo_timer = 0.0;
             self.events.push(Event::Hurt);
@@ -633,6 +701,95 @@ mod tests {
     }
 
     /// 패링 창: 스윙 시작 직후 PARRY_WINDOW 동안만, 공격 방향으로.
+    /// 연타로 패링 창을 이어 붙이지 못한다: 창은 PARRY_COOLDOWN마다 한 번. 성공하면 바로 다시(0038).
+    #[test]
+    fn mashing_attack_does_not_chain_parry_windows() {
+        let room = Room::new();
+        let mut p = Player::new(room.center());
+        let atk = Actions {
+            attack: true,
+            ..Default::default()
+        };
+        // 1초 동안 매 틱 공격을 누른다: 창이 열려 있던 시간의 비율.
+        let ticks = (1.0 / t::TICK_DT) as usize;
+        let mut open = 0;
+        for _ in 0..ticks {
+            tick(&mut p, &room, &atk);
+            if p.parry_dir().is_some() {
+                open += 1;
+            }
+        }
+        let frac = open as f32 / ticks as f32;
+        let most = t::PARRY_WINDOW / t::PARRY_COOLDOWN + 0.05;
+        assert!(frac <= most, "연타 창 비율 {frac} > {most}");
+        assert!(open > 0, "연타해도 가끔은 걸린다");
+
+        // 성공하면 다음 스윙에 바로 창이 열린다.
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &atk);
+        assert!(p.parry_dir().is_some());
+        p.on_parry();
+        for _ in 0..((0.13 / t::TICK_DT) as usize) {
+            tick(&mut p, &room, &Actions::default());
+        }
+        tick(&mut p, &room, &atk);
+        assert!(p.parry_dir().is_some(), "튕겨낸 뒤엔 대기 없이");
+    }
+
+    /// 먹기: 먹는 시간이 지나야 Ate, 맞으면 끊기고, 대기 동안은 다시 못 먹는다(0038).
+    #[test]
+    fn eating_takes_time_breaks_on_hit_and_has_a_cooldown() {
+        let room = Room::new();
+        let mut p = Player::new(room.center());
+        let eat = Actions {
+            use_item: true,
+            ..Default::default()
+        };
+        p.buffer(&eat);
+        assert!(p.wants_to_eat());
+        p.start_eat(Consumable::Berry);
+        let need = (Consumable::Berry.eat_time() / t::TICK_DT).ceil() as usize;
+        for _ in 0..need - 1 {
+            let (_, ev) = tick(&mut p, &room, &Actions::default());
+            assert!(
+                !ev.contains(&Event::Ate(Consumable::Berry)),
+                "먹는 중엔 아직"
+            );
+        }
+        let (_, ev) = tick(&mut p, &room, &Actions::default());
+        assert!(ev.contains(&Event::Ate(Consumable::Berry)));
+        assert_eq!(p.state, State::Free);
+        // 다 먹었어도 대기가 남아 있다.
+        p.buffer(&eat);
+        assert!(!p.wants_to_eat(), "같은 행동이 바로 다시 나가면 안 된다");
+        let wait = (t::ITEM_COOLDOWN / t::TICK_DT).ceil() as usize;
+        for _ in 0..wait {
+            tick(&mut p, &room, &Actions::default());
+        }
+        p.buffer(&eat);
+        assert!(p.wants_to_eat());
+
+        // 먹다가 맞으면 끊긴다(Ate 없음).
+        p.start_eat(Consumable::Worm);
+        tick(&mut p, &room, &Actions::default());
+        assert!(p.take_damage(p.pos + vec2(10.0, 0.0), 1));
+        assert_eq!(p.state, State::Free);
+        for _ in 0..((t::WORM_EAT_TIME / t::TICK_DT) as usize + 2) {
+            let (_, ev) = tick(&mut p, &room, &Actions::default());
+            assert!(!ev.contains(&Event::Ate(Consumable::Worm)));
+        }
+
+        // 굴파기로 끊을 수 있다.
+        let mut p = Player::new(room.center());
+        p.start_eat(Consumable::Berry);
+        let dig = Actions {
+            dodge: true,
+            ..Default::default()
+        };
+        tick(&mut p, &room, &dig);
+        assert!(p.is_burrowed());
+    }
+
     #[test]
     fn parry_window_opens_only_at_swing_start() {
         let room = Room::new();

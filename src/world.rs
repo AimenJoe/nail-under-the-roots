@@ -239,6 +239,7 @@ impl World {
         // 1. 플레이어
         let strike = self.player.update(a, &self.room, dt);
         self.last_strike = strike;
+        let mut ate = None;
         for ev in &self.player.events {
             match ev {
                 player::Event::Swing(i) => sfx.play(sfx::Id::Claw(*i)),
@@ -286,8 +287,12 @@ impl World {
                     burst(&mut self.fx, p, 10, RAGE, 120.0);
                     self.feel.flash = t::DRILL_WALL_FLASH;
                 }
+                player::Event::Ate(c) => ate = Some(*c),
                 player::Event::Hurt | player::Event::Die | player::Event::Parry => {}
             }
+        }
+        if let Some(c) = ate {
+            self.finish_eating(c, sfx);
         }
         // 드릴: 시동 중엔 불꽃이 모이고, 돌진 중엔 흙이 튀고 화면이 계속 떨린다.
         if let player::State::Drill { dir, time, .. } = self.player.state {
@@ -324,8 +329,8 @@ impl World {
         if a.item_prev || a.item_next {
             self.bag.cycle(a.item_next);
         }
-        if a.use_item && self.player.is_alive() {
-            self.use_quick_item(sfx);
+        if self.player.wants_to_eat() {
+            self.start_eating();
         }
         if let Some((_, time)) = self.toast.as_mut() {
             *time -= dt;
@@ -739,14 +744,21 @@ impl World {
             .set_stats(Stats::compute(&self.charms, self.root_hearts));
     }
 
-    /// 퀵 슬롯 아이템을 먹는다. 체력이 가득이면 먹지 않는다(아깝지 않게).
-    fn use_quick_item(&mut self, sfx: &Sfx) {
+    /// 퀵 슬롯 아이템을 먹기 시작한다. 체력이 가득이거나 슬롯이 비었으면 먹지 않는다(아깝지 않게).
+    /// 회복은 다 먹었을 때(`Event::Ate`, docs/decisions/0038).
+    fn start_eating(&mut self) {
         let p = &mut self.player;
-        if p.hp >= p.stats.max_hp {
+        let c = self.bag.selected;
+        if p.hp >= p.stats.max_hp || self.bag.count(c) == 0 {
             return;
         }
-        let c = self.bag.selected;
-        if !self.bag.take(c) {
+        p.start_eat(c);
+    }
+
+    /// 다 먹었다: 가방에서 꺼내 회복. 먹는 사이 체력이 가득 찼으면(샘 등) 꺼내지 않는다.
+    fn finish_eating(&mut self, c: Consumable, sfx: &Sfx) {
+        let p = &mut self.player;
+        if p.hp >= p.stats.max_hp || !self.bag.take(c) {
             return;
         }
         match c {

@@ -4,6 +4,7 @@
 //! - 쥬시 지렁이: 먹으면 체력 가득. 들고 있다가 쓰러지면 저절로 먹고 일어난다(목숨). 최대 WORM_MAX개 → 최대 목숨 1 + WORM_MAX.
 //!
 //! 고르기(퀵 슬롯 넘기기)와 먹기는 버튼 두 개. 하나뿐이면 넘기기는 아무 일도 안 한다.
+//! 먹기는 바로 낫지 않는다: 먹는 시간(맞으면 끊김) + 다음 먹기까지 대기(docs/decisions/0038).
 
 use crate::tuning as t;
 
@@ -15,6 +16,14 @@ pub enum Consumable {
 
 impl Consumable {
     pub const ALL: [Consumable; 2] = [Consumable::Berry, Consumable::Worm];
+
+    /// 먹는 데 걸리는 시간(docs/decisions/0038).
+    pub fn eat_time(self) -> f32 {
+        match self {
+            Consumable::Berry => t::BERRY_EAT_TIME,
+            Consumable::Worm => t::WORM_EAT_TIME,
+        }
+    }
 
     pub fn max(self) -> u8 {
         match self {
