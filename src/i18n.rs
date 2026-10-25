@@ -308,6 +308,8 @@ strings! {
     popo_name, popo_hi, popo_hi2, popo_pickup, popo_combo, popo_burrow, popo_emerge, popo_parry, popo_parry_skip, popo_special, popo_item, popo_item2, popo_menu, popo_save, popo_bye, tut_step, tut_parry, tut_special, tut_item,
     // 스테이지 고리: 튜토리얼 보스·쉼터·길 지도·가게 (docs/decisions/0030~0032)
     mob_chief, mob_chief_lore, mob_chief_atk, mob_chief_tip, toast_chief, toast_camp, toast_spring, toast_goal, tut_boss, popo_glade, bori_name, chief_intro_1, chief_intro_2, chief_beaten_1, chief_beaten_2, chief_beaten_3, chief_beaten_4, chief_beaten_5, camp_1, camp_2, camp_3, camp_again, bori_1, bori_2, bori_3, seat_1, node_burrow, node_burrow_desc, node_nest, node_nest_desc, node_cache, node_cache_desc, node_spring, node_spring_desc, node_boss, node_boss_desc, node_unknown, node_unknown_desc, route_title, route_hint, route_hint_back, shop_title, shop_seeds, shop_hi, shop_poor, shop_full, shop_thanks, shop_price, shop_heart, shop_heart_desc, shop_hint, ia_shop, ia_talk, ia_look, ia_route, map_camp,
+    // 가게: 사기 전에 묻기
+    shop_confirm, shop_yes, shop_no,
 }
 
 pub static KO: Strings = Strings {
@@ -572,6 +574,9 @@ pub static KO: Strings = Strings {
     ia_look: "{0} 살펴보기",
     ia_route: "{0} 길 지도",
     map_camp: "쉼터 {0}",
+    shop_confirm: "{0}, 씨앗 {1}개야. 살래?",
+    shop_yes: "사기",
+    shop_no: "그만두기",
 };
 
 pub static EN: Strings = Strings {
@@ -836,6 +841,9 @@ pub static EN: Strings = Strings {
     ia_look: "{0} Look",
     ia_route: "{0} Path map",
     map_camp: "Camp {0}",
+    shop_confirm: "{0} for {1} seeds. Buy it?",
+    shop_yes: "Buy",
+    shop_no: "Cancel",
 };
 
 pub static JA: Strings = Strings {
@@ -1100,6 +1108,9 @@ pub static JA: Strings = Strings {
     ia_look: "{0} 調べる",
     ia_route: "{0} 道の地図",
     map_camp: "休み場 {0}",
+    shop_confirm: "{0}、タネ{1}こだよ。買う？",
+    shop_yes: "買う",
+    shop_no: "やめる",
 };
 
 pub static ZH_HANS: Strings = Strings {
@@ -1365,6 +1376,9 @@ pub static ZH_HANS: Strings = Strings {
     ia_look: "{0} 查看",
     ia_route: "{0} 路线图",
     map_camp: "营地 {0}",
+    shop_confirm: "{0}，{1} 颗种子。要买吗？",
+    shop_yes: "买",
+    shop_no: "算了",
 };
 /// 브라질 포르투갈어(docs/decisions/0033). DeepL 초안 + 사람 손 검토(한국어·영어 대조). 원어민 검수 전.
 pub static PT_BR: Strings = Strings {
@@ -1629,6 +1643,9 @@ pub static PT_BR: Strings = Strings {
     ia_look: "{0} Olhar",
     ia_route: "{0} Mapa da trilha",
     map_camp: "Refúgio {0}",
+    shop_confirm: "{0} por {1} sementes. Vai levar?",
+    shop_yes: "Comprar",
+    shop_no: "Cancelar",
 };
 
 #[cfg(test)]

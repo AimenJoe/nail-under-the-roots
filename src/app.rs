@@ -287,6 +287,9 @@ enum Hit {
     /// 길 지도: 고를 수 있는 칸(choices 번호).
     RouteNode(usize),
     ShopItem(usize),
+    /// 사기 전에 묻는 창의 단추.
+    ShopYes,
+    ShopNo,
     /// 닫기 단추·패널 바깥(가게·길 지도).
     Close,
 }
@@ -335,6 +338,8 @@ pub struct App {
     /// 가게: 고른 줄, 방금 한 일(글, 남은 시간).
     shop_cursor: usize,
     shop_msg: Option<(Tr, f32)>,
+    /// 사기 전에 묻는 중: (물건 줄, "사기"에 커서가 있나).
+    shop_ask: Option<(usize, bool)>,
     /// 보리에게 말 건 횟수(말이 돌아간다).
     talk_n: u32,
 }
@@ -393,6 +398,7 @@ impl App {
             route_cancel: false,
             shop_cursor: 0,
             shop_msg: None,
+            shop_ask: None,
             talk_n: 0,
         }
     }

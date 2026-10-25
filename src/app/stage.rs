@@ -209,6 +209,7 @@ impl App {
         match i {
             Interact::Talk(Who::Popo) => {
                 self.shop_cursor = 0;
+                self.shop_ask = None;
                 self.shop_msg = None;
                 self.world.freeze();
                 self.scene = Scene::Shop;
@@ -423,6 +424,10 @@ impl App {
                 self.shop_msg = None;
             }
         }
+        if self.shop_ask.is_some() {
+            self.update_shop_ask(a, tap_hit);
+            return;
+        }
         if a.cancel || a.menu || tap_hit == Some(Hit::Close) {
             self.scene = Scene::Game;
             return;
@@ -436,14 +441,58 @@ impl App {
             self.shop_cursor = (self.shop_cursor + 1) % n;
         }
         self.shop_cursor = self.shop_cursor.min(n - 1);
-        let mut buy = a.confirm;
+        let mut pick = a.confirm;
         if let Some(Hit::ShopItem(i)) = tap_hit {
-            buy = self.shop_cursor == i;
+            pick = true;
             self.shop_cursor = i;
         }
-        if buy {
-            self.buy(wares[self.shop_cursor]);
+        if pick {
+            let ware = wares[self.shop_cursor];
+            match self.cant_buy(ware) {
+                // 살 수 없으면 묻지 않고 바로 포포가 말한다.
+                Some(why) => self.shop_msg = Some((why, 2.0)),
+                None => self.shop_ask = Some((self.shop_cursor, true)),
+            }
         }
+    }
+
+    /// 사기 전에 묻는 창: 좌우로 사기/그만두기, 확인으로 고른다. 뒤로·바깥 탭 = 그만두기(가게는 그대로).
+    fn update_shop_ask(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        let Some((i, yes)) = self.shop_ask else {
+            return;
+        };
+        if a.left || a.right {
+            self.shop_ask = Some((i, !yes));
+        }
+        let choice = match tap_hit {
+            Some(Hit::ShopYes) => Some(true),
+            Some(Hit::ShopNo) | Some(Hit::Close) => Some(false),
+            _ if a.cancel || a.menu => Some(false),
+            _ if a.confirm => self.shop_ask.map(|(_, y)| y),
+            _ => None,
+        };
+        if let Some(buy) = choice {
+            self.shop_ask = None;
+            if buy {
+                if let Some(&ware) = self.wares().get(i) {
+                    self.buy(ware);
+                }
+            }
+        }
+    }
+
+    /// 지금 이 물건을 살 수 없는 이유(포포의 말). 살 수 있으면 None.
+    fn cant_buy(&self, ware: Ware) -> Option<Tr> {
+        let w = &self.world;
+        if w.seeds < ware.price() {
+            return Some(|s| s.shop_poor);
+        }
+        let full = match ware {
+            Ware::Berry => !w.bag.has_room(Consumable::Berry),
+            Ware::Worm => !w.bag.has_room(Consumable::Worm),
+            Ware::Heart | Ware::Charm(_) => false,
+        };
+        full.then_some(|s| s.shop_full)
     }
 
     fn buy(&mut self, ware: Ware) {
@@ -568,6 +617,62 @@ impl App {
             FONT_PX,
             ui::TEXT_DIM,
         );
+        self.draw_shop_ask(ui, panel);
+    }
+
+    /// 사기 전에 묻는 창(가게 패널 가운데). 열려 있으면 탭은 이 창만 받는다.
+    fn draw_shop_ask(&mut self, ui: &Ui, panel: Rect) {
+        let Some((i, yes)) = self.shop_ask else {
+            return;
+        };
+        let Some(&ware) = self.wares().get(i) else {
+            return;
+        };
+        let s = i18n::s();
+        ui.rect(panel, ui::DIM_OVERLAY);
+        let b = Rect::new(panel.x + 26.0, panel.y + 44.0, panel.w - 52.0, 62.0);
+        ui.panel(b, None);
+        let q = fill(s.shop_confirm, &[&tr(ware.name()), &ware.price()]);
+        for (k, l) in ui::wrap(ui, &q, b.w - 12.0, FONT_PX)
+            .iter()
+            .take(2)
+            .enumerate()
+        {
+            ui.text_center(
+                l,
+                b.center().x,
+                b.y + 6.0 + k as f32 * 12.0,
+                FONT_PX,
+                ui::TEXT,
+            );
+        }
+        // 이 창이 열려 있는 동안 다른 칸(물건·✕)은 탭을 받지 않는다.
+        self.hits.clear();
+        let bw = (b.w - 18.0) / 2.0;
+        for (k, (label, hit, on)) in [
+            (s.shop_yes, Hit::ShopYes, yes),
+            (s.shop_no, Hit::ShopNo, !yes),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let r = Rect::new(
+                b.x + 6.0 + k as f32 * (bw + 6.0),
+                b.bottom() - 22.0,
+                bw,
+                16.0,
+            );
+            ui.rect(r, if on { ui::PANEL_LIGHT } else { ui::PANEL });
+            ui.rect_lines(r, if on { ui::ACCENT } else { ui::BORDER });
+            let label = ui.fit(label, r.w - 4.0, FONT_PX);
+            let c = if on { ui::TEXT } else { ui::TEXT_DIM };
+            ui.text_center(&label, r.center().x, r.y + 2.0, FONT_PX, c);
+            // 누르는 칸은 위아래로 조금 넉넉히.
+            self.hits
+                .push((Rect::new(r.x, r.y - 4.0, r.w, r.h + 8.0), hit));
+        }
+        self.hits
+            .push((Rect::new(-2000.0, -2000.0, 4000.0, 4000.0), Hit::Close));
     }
 
     /// 닫기 단추(패널 오른쪽 위 ✕)와 패널 바깥 탭 = 닫기. 터치에는 뒤로 버튼이 없어서(사람 피드백 2026-10-25).

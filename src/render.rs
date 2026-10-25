@@ -250,8 +250,7 @@ impl Renderer {
         let Some(tex) = self.art.as_ref().and_then(|a| a.portraits.as_ref()) else {
             return false;
         };
-        let k = (ui.scale / 2.0).floor().max(1.0);
-        let size = art::PORTRAIT * k;
+        let size = portrait_px(ui.scale);
         let p = ui.px(vec2(r.x, r.y));
         let (bw, bh) = (r.w * ui.scale, r.h * ui.scale);
         draw_texture_ex(
@@ -376,6 +375,35 @@ impl Renderer {
         if let Some(art) = &self.art {
             draw_bori_at(art, pos, facing.x < 0.0, moving, get_time() as f32);
         }
+    }
+}
+
+/// 초상화(원본 88px, 대화창 칸 44 논리 px)를 화면에 찍을 크기(화면 px).
+/// 배율이 짝수면 칸에 꼭 맞고(원본 1px = 화면 배율/2), 홀수(3, 5…)면 내림해 조금 작게(픽셀을 고르게, 0015).
+/// 배율 1(세로로 든 폰)은 반으로 줄여 칸에 맞춘다 — 예전엔 내림이 0이 되어 1배로 올려 칸의 두 배로 넘쳤다(사람 피드백 2026-10-25).
+fn portrait_px(scale: f32) -> f32 {
+    let k = (scale / 2.0).floor();
+    if k >= 1.0 {
+        art::PORTRAIT * k
+    } else {
+        art::PORTRAIT * 0.5 * scale.max(1.0).floor()
+    }
+}
+
+#[cfg(test)]
+mod portrait_tests {
+    use super::*;
+
+    #[test]
+    fn portrait_never_overflows_its_box() {
+        for s in 1..=8 {
+            let scale = s as f32;
+            let px = portrait_px(scale);
+            assert!(px <= 44.0 * scale, "배율 {s}: {px} > 칸 {}", 44.0 * scale);
+            assert!(px >= 44.0 * scale * 0.6, "배율 {s}: 너무 작다 {px}");
+        }
+        assert_eq!(portrait_px(1.0), 44.0);
+        assert_eq!(portrait_px(4.0), 176.0);
     }
 }
 
