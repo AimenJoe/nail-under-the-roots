@@ -187,6 +187,8 @@ pub const FIRE_SHADOW_REACH: f32 = 150.0;
 /// 불 곁 그림자 길이(높이 1px당): 바로 곁 MIN, 닿는 끝에서 MIN + GROW. 멀수록 길다.
 pub const FIRE_SHADOW_MIN: f32 = 0.5;
 pub const FIRE_SHADOW_GROW: f32 = 1.1;
+/// 불이 아래(앞)에 있어 그림자가 뒤(위)로 눕을 때 더 늘이는 비율(바로 위로 눕으면 1 + 이 값 배, 0104).
+pub const FIRE_SHADOW_BACK: f32 = 0.8;
 /// 옆으로 눕는 그림자의 두께(높이 1px당 뒤로). 없으면 발 줄 한 줄로 납작해진다.
 pub const FIRE_SHADOW_THICK: f32 = 0.3;
 /// 지도에 구운 장식의 그림자 길이 비율(0103): 3/4 시점에서 바닥에 깔린 것은 그림 높이만큼 서 있지 않다.

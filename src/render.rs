@@ -3299,6 +3299,8 @@ pub fn shadow_dir(foot: Vec2, fire: Option<Vec2>, bright: bool) -> Option<Vec2> 
     }
     let dir = if dist < 1.0 { vec2(0.0, 1.0) } else { d / dist };
     let len = t::FIRE_SHADOW_MIN + t::FIRE_SHADOW_GROW * (dist / reach).min(1.0);
+    // 불이 아래(앞)에 있으면 그림자가 뒤(위)로 눕는다: 몸에 가려지는 만큼 더 길게(0104).
+    let len = len * (1.0 + t::FIRE_SHADOW_BACK * (-dir.y).max(0.0));
     let radial = dir * len - vec2(0.0, t::FIRE_SHADOW_THICK * (1.0 - dir.y.abs()));
     if !bright {
         return Some(radial);
