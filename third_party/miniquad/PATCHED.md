@@ -1,0 +1,11 @@
+# miniquad 0.4.11 — nail-under-the-roots 패치본
+
+crates.io `miniquad 0.4.11` 원본(MIT OR Apache-2.0, 라이선스 파일 그대로)에서 두 군데를 고쳤다(docs/decisions/0075).
+
+- `src/native/android/keycodes.rs`: Android 게임패드 버튼 키코드(KEYCODE_BUTTON_A 96 … BUTTON_MODE 110)를
+  `KeyCode::F13`~`F25`로 넘긴다. 원본은 이 키코드들을 `Unknown`으로 버려서, Android에서 D패드(화살표 키로 들어온다)
+  말고는 패드 버튼이 하나도 들어오지 않았다.
+
+루트 `Cargo.toml`의 `[patch.crates-io]`가 이 폴더를 쓴다. cargo-quad-apk도 `java/MainActivity.java`를 이 폴더에서 가져간다.
+miniquad를 올릴 때는 새 원본을 받아 같은 패치를 다시 넣는다(`git diff`로 이 파일의 변경을 본다).
+- `src/lib.rs` 맨 위 `#![allow(warnings)]`: 경로 의존성은 cargo가 경고를 숨기지 않아(crates.io 의존성은 `--cap-lints`로 숨긴다) 원본의 dead_code 경고가 우리 빌드·clippy 출력에 섞였다.

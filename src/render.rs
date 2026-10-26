@@ -63,6 +63,8 @@ pub struct Renderer {
     terrain: Vec<(u64, Texture2D)>,
     /// 굽는 중인 지도(0068): 프레임마다 `BAKE_BUDGET`만큼 굽고, 그동안 월드 화면은 검정이다.
     baking: Option<(u64, crate::terrain::Baker)>,
+    /// 빛 더하기(0076): 바탕에 빛을 더한다. 못 만들면(셰이더 실패) 보통 섞기로 그린다.
+    light: Option<Material>,
 }
 
 /// 한 프레임에 지도를 굽는 시간(초). 굽는 동안 화면은 검정이라 프레임이 조금 길어져도 보이지 않는다.
@@ -87,6 +89,7 @@ impl Renderer {
             subpixel: Vec2::ZERO,
             terrain: Vec::new(),
             baking: None,
+            light: light_material(),
         }
     }
 
@@ -165,6 +168,7 @@ impl Renderer {
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
             draw_darkness(art, w, alpha, cam);
+            draw_save_lights(w, cam, self.light.as_ref());
             if draw_super_dim(w, cam) {
                 draw_nail(art, &w.player, w.fur, alpha, w.time);
                 draw_player_fx(&w.player, alpha);
@@ -1180,25 +1184,172 @@ fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D) {
                         OUTLINE,
                     );
                 }
-                Cell::Save => {
-                    let pulse = 0.55 + 0.35 * (w.time * 2.0).sin().abs();
-                    draw_circle(p.x, p.y, 9.0, Color::new(0.55, 1.0, 0.6, 0.12 * pulse));
-                    for k in 0..5 {
-                        let a = k as f32 / 5.0 * std::f32::consts::TAU + 0.3;
-                        let q = p + vec2(a.cos() * 7.0, a.sin() * 4.0);
-                        draw_rectangle(
-                            q.x - 1.0,
-                            q.y - 2.0,
-                            3.0,
-                            2.0,
-                            Color::new(0.6, 1.0, 0.65, pulse),
-                        );
-                        draw_rectangle(q.x, q.y, 1.0, 2.0, Color::new(0.9, 0.85, 0.7, 1.0));
-                    }
-                }
+                Cell::Save => draw_save_ring(p, w.time),
                 _ => {}
             }
         }
+    }
+}
+
+/// 빛 더하기 재질(0076). 섞기만 다르고 셰이더는 macroquad 기본과 같다.
+fn light_material() -> Option<Material> {
+    const VERTEX: &str = r#"#version 100
+    attribute vec3 position;
+    attribute vec2 texcoord;
+    attribute vec4 color0;
+    varying lowp vec2 uv;
+    varying lowp vec4 color;
+    uniform mat4 Model;
+    uniform mat4 Projection;
+    void main() {
+        gl_Position = Projection * Model * vec4(position, 1);
+        color = color0 / 255.0;
+        uv = texcoord;
+    }"#;
+    const FRAGMENT: &str = r#"#version 100
+    varying lowp vec4 color;
+    varying lowp vec2 uv;
+    uniform sampler2D Texture;
+    void main() {
+        gl_FragColor = color * texture2D(Texture, uv);
+    }"#;
+    use macroquad::miniquad::{BlendFactor, BlendState, BlendValue, Equation};
+    load_material(
+        ShaderSource::Glsl {
+            vertex: VERTEX,
+            fragment: FRAGMENT,
+        },
+        MaterialParams {
+            pipeline_params: PipelineParams {
+                color_blend: Some(BlendState::new(
+                    Equation::Add,
+                    BlendFactor::Value(BlendValue::SourceAlpha),
+                    BlendFactor::One,
+                )),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .ok()
+}
+
+/// 저장 지점: 빛나는 버섯 고리(버섯만, 빛은 `draw_save_lights`). 고리 자국은 짙게(실제 균환처럼).
+fn draw_save_ring(p: Vec2, time: f32) {
+    let pulse = 0.5 + 0.5 * (time * 2.5).sin();
+    let cap = Color::new(1.0, 0.97, 0.80, 1.0);
+    let cap_lit = Color::new(0.80, 1.0, 0.62, 1.0);
+    let stem = Color::new(0.95, 0.88, 0.70, 1.0);
+    draw_ellipse_lines(
+        p.x,
+        p.y,
+        11.0,
+        6.0,
+        0.0,
+        2.0,
+        Color::new(0.05, 0.12, 0.06, 0.30),
+    );
+    // 버섯 일곱: 뒤쪽(위)부터 그려 앞 버섯이 겹친다.
+    let mut caps: Vec<Vec2> = (0..7)
+        .map(|k| {
+            let t = k as f32 / 7.0 * std::f32::consts::TAU + 0.3;
+            (p + vec2(t.cos() * 11.0, t.sin() * 6.0)).round()
+        })
+        .collect();
+    caps.sort_by(|u, v| u.y.total_cmp(&v.y));
+    for q in caps {
+        // 둥근 갓(위 3칸, 아래 5칸) + 짧은 대.
+        draw_rectangle(q.x - 1.0, q.y - 5.0, 3.0, 1.0, OUTLINE);
+        draw_rectangle(q.x - 2.0, q.y - 4.0, 5.0, 1.0, OUTLINE);
+        draw_rectangle(q.x - 3.0, q.y - 3.0, 7.0, 3.0, OUTLINE);
+        draw_rectangle(q.x - 1.0, q.y - 1.0, 3.0, 3.0, OUTLINE);
+        draw_rectangle(q.x - 1.0, q.y - 4.0, 3.0, 1.0, cap);
+        draw_rectangle(q.x - 2.0, q.y - 3.0, 5.0, 1.0, cap);
+        let lit = Color::new(cap_lit.r, cap_lit.g, cap_lit.b, 0.6 + 0.4 * pulse);
+        draw_rectangle(q.x - 2.0, q.y - 2.0, 5.0, 1.0, lit);
+        draw_rectangle(q.x - 1.0, q.y - 4.0, 1.0, 1.0, WHITE);
+        draw_rectangle(q.x, q.y - 1.0, 1.0, 2.0, stem);
+    }
+}
+
+/// 저장 지점의 빛(0076). 사람 피드백 "저장 포인트가 너무 눈에 띄지 않는다": 초록 풀밭에 반투명 초록·금빛을
+/// 섞으면 탁해져 묻힌다 → 빛을 더해(밝기 대비) 숨쉬는 후광 + 위로 뜨는 포자(움직임). 아직 저장하지 않은
+/// 고리는 빛기둥이 높이 서서 부른다. 어두운 굴에서도 보이게 어둠 위에 그린다.
+fn draw_save_lights(w: &World, cam: Vec2, light: Option<&Material>) {
+    let Some(g) = &w.room.grid else { return };
+    let (x0, y0) = (
+        (cam.x / 16.0).floor() as i32 - 2,
+        (cam.y / 16.0).floor() as i32 - 2,
+    );
+    let rings: Vec<Vec2> = (y0..y0 + 16)
+        .flat_map(|cy| (x0..x0 + 25).map(move |cx| (cx, cy)))
+        .filter(|&(cx, cy)| g.get_i(cx, cy) == Cell::Save)
+        .map(|(cx, cy)| vec2(cx as f32 * 16.0 + 8.0, cy as f32 * 16.0 + 8.0))
+        .collect();
+    if rings.is_empty() {
+        return;
+    }
+    if let Some(m) = light {
+        gl_use_material(m);
+    }
+    // 더하기면 바탕이 밝아지고, 보통 섞기(재질 없음)면 덮인다 → 그때는 옅게.
+    let k = if light.is_some() { 1.0 } else { 0.6 };
+    let pulse = 0.5 + 0.5 * (w.time * 2.5).sin();
+    let a = |r: f32, g: f32, b: f32, al: f32| Color::new(r, g, b, al * k);
+    for p in rings {
+        let active = (w.adv.save_pos - p).length() < 1.0;
+        draw_ellipse(
+            p.x,
+            p.y,
+            16.0,
+            9.0,
+            0.0,
+            a(1.0, 0.85, 0.45, 0.10 + 0.08 * pulse),
+        );
+        draw_ellipse(
+            p.x,
+            p.y,
+            10.0,
+            5.5,
+            0.0,
+            a(1.0, 0.92, 0.60, 0.14 + 0.08 * pulse),
+        );
+        draw_ellipse(
+            p.x,
+            p.y,
+            5.0,
+            2.5,
+            0.0,
+            a(1.0, 1.0, 0.80, 0.22 + 0.10 * pulse),
+        );
+        let rise = if active { 3 } else { 8 };
+        for i in 0..rise {
+            let f = (rise - i) as f32 / rise as f32;
+            draw_rectangle(
+                p.x - 2.0,
+                p.y - 4.0 - i as f32 * 4.0,
+                4.0,
+                4.0,
+                a(1.0, 0.95, 0.70, 0.22 * f * (0.6 + 0.4 * pulse)),
+            );
+        }
+        // 위로 떠오르는 포자 다섯.
+        for j in 0..5 {
+            let ph = (w.time * 0.45 + j as f32 / 5.0).fract();
+            let x = p.x + (w.time * 1.7 + j as f32 * 2.1).sin() * 8.0;
+            let y = p.y - 2.0 - ph * 30.0;
+            let s = if ph < 0.5 { 2.0 } else { 1.0 };
+            draw_rectangle(
+                x.round(),
+                y.round(),
+                s,
+                s,
+                a(1.0, 0.95, 0.65, 1.0 - ph * 0.8),
+            );
+        }
+    }
+    if light.is_some() {
+        gl_use_default_material();
     }
 }
 

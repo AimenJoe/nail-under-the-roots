@@ -114,6 +114,28 @@ impl Pad {
     }
 }
 
+/// Android: 패치한 miniquad가 패드 버튼 키코드를 쓰지 않는 F13~F25로 넘긴다(third_party/miniquad/PATCHED.md, 0075).
+/// 테스트가 패치 표와 맞는지 보려고 테스트 빌드에서도 컴파일한다.
+#[cfg(any(target_os = "android", test))]
+impl Pad {
+    fn key(self) -> KeyCode {
+        match self {
+            Pad::South => KeyCode::F13,
+            Pad::East => KeyCode::F14,
+            Pad::West => KeyCode::F15,
+            Pad::North => KeyCode::F16,
+            Pad::L1 => KeyCode::F17,
+            Pad::R1 => KeyCode::F18,
+            Pad::L2 => KeyCode::F19,
+            Pad::R2 => KeyCode::F20,
+            Pad::L3 => KeyCode::F21,
+            Pad::R3 => KeyCode::F22,
+            Pad::Start => KeyCode::F23,
+            Pad::Select => KeyCode::F24,
+        }
+    }
+}
+
 /// 바꿀 수 있는 키(저장 번호 = 이 표의 자리). 이동(WASD·화살표)·Enter·Esc는 고정이라 없다.
 const KEYS: [(KeyCode, &str); 44] = [
     (KeyCode::J, "J"),
@@ -379,8 +401,6 @@ pub fn prompt(a: Act) -> &'static str {
 #[derive(Clone, Copy, Debug)]
 pub enum Captured {
     Key(KeyCode),
-    // Android 빌드에는 gamepads가 없어 패드를 잡지 않는다(D-pad는 키로 들어온다).
-    #[cfg_attr(target_os = "android", allow(dead_code))]
     Pad(Pad),
 }
 
@@ -451,9 +471,13 @@ impl Actions {
 }
 
 pub struct Input {
-    /// Android에서는 gamepads 크레이트가 빠진다. D-pad는 miniquad가 화살표 키로 넘겨 주므로 키보드 경로로 들어온다.
+    /// Android에서는 gamepads 크레이트가 빠진다. 패드 버튼은 패치한 miniquad가 F13~F25 키로, D패드는 화살표 키로 넘긴다
+    /// (스틱은 앱이 처리하지 않으면 Android가 D패드 키로 바꿔 준다, 0075).
     #[cfg(not(target_os = "android"))]
     pads: Gamepads,
+    /// Android: 패드 버튼을 한 번이라도 받았나(연결된 패드 수 대신).
+    #[cfg(target_os = "android")]
+    pad_seen: bool,
     /// 아직 틱이 소비하지 않은 눌림.
     pending: Actions,
     /// 가장 최근 프레임의 축 상태.
@@ -592,6 +616,8 @@ impl Input {
         Self {
             #[cfg(not(target_os = "android"))]
             pads: Gamepads::new(),
+            #[cfg(target_os = "android")]
+            pad_seen: false,
             pending: Actions::default(),
             held: Actions::default(),
             gamepad_count: 0,
@@ -796,12 +822,57 @@ impl Input {
                 }
             }
         }
+        #[cfg(target_os = "android")]
+        for p in PADS {
+            if is_key_pressed(p.key()) {
+                return Some(Captured::Pad(p));
+            }
+        }
         None
     }
 
+    /// Android: 패드 버튼은 F13~F25 키(Pad::key), D패드·스틱은 화살표 키로 들어온다. 화살표도 패드로 센다
+    /// (Android에 키보드를 붙이는 일은 드물고, 키보드로 세면 D패드를 누를 때마다 안내 글이 키보드 글자로 바뀐다).
     #[cfg(target_os = "android")]
     fn read_gamepads(&mut self) -> (Actions, usize) {
-        (Actions::default(), 0)
+        let mut a = Actions::default();
+        let mut m = Vec2::ZERO;
+        if is_key_down(KeyCode::Left) {
+            m.x -= 1.0;
+        }
+        if is_key_down(KeyCode::Right) {
+            m.x += 1.0;
+        }
+        if is_key_down(KeyCode::Up) {
+            m.y -= 1.0;
+        }
+        if is_key_down(KeyCode::Down) {
+            m.y += 1.0;
+        }
+        a.move_dir = m.normalize_or_zero();
+        let b = bindings();
+        let j = |p: Pad| is_key_pressed(p.key());
+        a.attack = j(b.pad(Act::Attack));
+        a.dodge = j(b.pad(Act::Dodge));
+        a.special = j(b.pad(Act::Special));
+        a.use_item = j(b.pad(Act::UseItem));
+        a.item_prev = j(b.pad(Act::ItemPrev));
+        a.item_next = j(b.pad(Act::ItemNext));
+        a.map = j(b.pad(Act::Map));
+        // 메뉴: A 확인, B(또는 기기 뒤로) 뒤로, Start 메뉴, LB·RB 탭(고정) — 데스크톱·웹 패드와 같다.
+        a.confirm = j(Pad::South);
+        a.cancel = j(Pad::East) || is_key_pressed(KeyCode::Back);
+        a.menu = j(Pad::Start);
+        a.tab_prev = j(Pad::L1);
+        a.tab_next = j(Pad::R1);
+        a.up = is_key_pressed(KeyCode::Up);
+        a.down = is_key_pressed(KeyCode::Down);
+        a.left = is_key_pressed(KeyCode::Left);
+        a.right = is_key_pressed(KeyCode::Right);
+        if PADS.iter().any(|p| is_key_down(p.key())) {
+            self.pad_seen = true;
+        }
+        (a, usize::from(self.pad_seen))
     }
 }
 
@@ -958,6 +1029,42 @@ fn apply_deadzone(v: Vec2) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Android 패드 버튼: 패치한 miniquad 표(KEYCODE_BUTTON_* → F13~F25)와 Pad::key가 같은 짝이고, 키가 겹치지 않는다.
+    /// 한쪽만 고치면 Android에서 버튼이 엉뚱하게 눌린다(0075).
+    #[test]
+    fn android_pad_keys_match_patched_miniquad() {
+        let table = include_str!("../third_party/miniquad/src/native/android/keycodes.rs");
+        let name = |p: Pad| match p {
+            Pad::South => "BUTTON_A",
+            Pad::East => "BUTTON_B",
+            Pad::West => "BUTTON_X",
+            Pad::North => "BUTTON_Y",
+            Pad::L1 => "BUTTON_L1",
+            Pad::R1 => "BUTTON_R1",
+            Pad::L2 => "BUTTON_L2",
+            Pad::R2 => "BUTTON_R2",
+            Pad::L3 => "BUTTON_THUMBL",
+            Pad::R3 => "BUTTON_THUMBR",
+            Pad::Start => "BUTTON_START",
+            Pad::Select => "BUTTON_SELECT",
+        };
+        let mut seen = Vec::new();
+        for p in PADS {
+            let k = p.key();
+            assert!(!seen.contains(&k), "{p:?} 키 겹침");
+            seen.push(k);
+            let line = table
+                .lines()
+                .find(|l| l.trim_end().ends_with(&format!("// KEYCODE_{}", name(p))))
+                .unwrap_or_else(|| panic!("패치 표에 KEYCODE_{} 없음", name(p)));
+            assert!(
+                line.contains(&format!("KeyCode::{k:?},")),
+                "{p:?}: 표는 `{}`, 게임은 {k:?}",
+                line.trim()
+            );
+        }
+    }
 
     /// 겹치는 키를 붙이면 서로 바뀐다. Start·이동 키는 붙지 않는다.
     #[test]
