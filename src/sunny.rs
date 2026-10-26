@@ -51,6 +51,18 @@ pub const BUSH_BERRY: R = (788, 54, 24, 21);
 pub const BUSH_FLOWER: R = (788, 86, 24, 21);
 #[allow(dead_code)]
 pub const BUSH_SMALL: R = (816, 65, 16, 15);
+/// 장터 가판(차양 + 판대 + 붉은 천). 쉼터·마을 가게(0077).
+pub const STALL: R = (604, 592, 24, 48);
+/// 판대 윗면: 가판 그림 위쪽에서 몇 px 아래인가(물건을 올려놓는 줄).
+pub const STALL_COUNTER: f32 = 23.0;
+/// 나무 긴 의자. 마을 꾸미기 "통나무 의자"(0077).
+pub const BENCH: R = (652, 611, 24, 13);
+/// 흰 들꽃 화분과 들꽃 한 포기. 마을 꾸미기 "들꽃 화분"(0077).
+pub const POT_WILDFLOWER: R = (853, 512, 8, 16);
+pub const WILDFLOWERS: R = (869, 513, 8, 12);
+/// HUD 아이콘: 하트(체력 한 칸), 새싹(씨앗).
+pub const HEART: R = (707, 756, 9, 8);
+pub const SPROUT: R = (660, 707, 10, 11);
 /// 돌로 두른 모닥불 자리.
 pub const FIRE_PIT: R = (596, 343, 23, 20);
 /// 불꽃 4칸(`Elements/VFX/Fire/spr_deco_fire_02_strip4.png`, 8×12 한 칸).

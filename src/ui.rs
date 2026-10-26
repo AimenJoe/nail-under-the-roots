@@ -41,6 +41,22 @@ impl Ui {
         draw_rectangle(p.x, p.y, r.w * self.scale, r.h * self.scale, c);
     }
 
+    /// 텍스처 한 칸을 논리 좌표 (x, y)에 원래 크기 × 배율로 찍는다.
+    pub fn sprite(&self, tex: &Texture2D, src: Rect, x: f32, y: f32, tint: Color) {
+        let p = self.px(vec2(x, y));
+        draw_texture_ex(
+            tex,
+            p.x,
+            p.y,
+            tint,
+            DrawTextureParams {
+                source: Some(src),
+                dest_size: Some(vec2(src.w * self.scale, src.h * self.scale)),
+                ..Default::default()
+            },
+        );
+    }
+
     pub fn rect_lines(&self, r: Rect, c: Color) {
         let p = self.px(vec2(r.x, r.y));
         draw_rectangle_lines(p.x, p.y, r.w * self.scale, r.h * self.scale, self.scale, c);

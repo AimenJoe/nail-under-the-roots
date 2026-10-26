@@ -419,15 +419,25 @@ impl Renderer {
 
     /// 인게임 HUD(실제 해상도): 반딧불 수, 웨이브·처치, 디버그 줄.
     pub fn draw_hud(&self, ui: &Ui, w: &World, gamepad_count: usize) {
-        draw_hud_bars(ui, w);
-        // 반딧불: 체력 핍 오른쪽. 숫자는 언어 폰트(숫자는 모든 폰트에 있다). 글자 윗부분이 화면 밖으로 잘리지 않게 y ≥ 1.
-        let x = 3.0 + w.player.stats.max_hp as f32 * 7.0 + 5.0;
+        let sheet = self
+            .art
+            .as_ref()
+            .and_then(|a| a.sunny.as_ref())
+            .map(|s| &s.sheet);
+        draw_hud_bars(ui, w, sheet);
+        // 반딧불: 체력 칸 오른쪽. 숫자는 언어 폰트(숫자는 모든 폰트에 있다). 글자 윗부분이 화면 밖으로 잘리지 않게 y ≥ 1.
+        let x = 3.0 + w.player.stats.max_hp as f32 * hp_step(sheet) + 5.0;
         let pulse = 0.6 + 0.4 * (w.time * 3.0).sin().abs();
+        // 반딧불 아이콘: 숨쉬는 빛 + 밝은 몸 + 머리 한 점(가운데 줄을 그으면 "="로 읽혔다).
+        ui.rect(
+            Rect::new(x - 1.0, 1.0, 5.0, 5.0),
+            Color::new(0.85, 1.0, 0.45, 0.25 * pulse),
+        );
         ui.rect(
             Rect::new(x, 2.0, 3.0, 3.0),
-            Color::new(0.85, 1.0, 0.45, pulse),
+            Color::new(0.85, 1.0, 0.45, 0.5 + 0.5 * pulse),
         );
-        ui.rect(Rect::new(x, 3.0, 3.0, 1.0), OUTLINE);
+        ui.rect(Rect::new(x + 1.0, 1.0, 1.0, 1.0), OUTLINE);
         ui.text(
             &w.glowbugs.to_string(),
             x + 5.0,
@@ -435,17 +445,29 @@ impl Renderer {
             crate::ui::FONT_PX,
             crate::ui::TEXT,
         );
-        // 씨앗(상점 화폐): 반딧불 오른쪽.
+        // 씨앗(상점 화폐): 반딧불 오른쪽. 팩이 있으면 새싹 아이콘(0077).
         let sx = x + 7.0 + ui.text_w(&w.glowbugs.to_string(), crate::ui::FONT_PX) + 6.0;
-        ui.rect(Rect::new(sx, 1.0, 3.0, 4.0), OUTLINE);
-        ui.rect(Rect::new(sx + 0.5, 1.5, 2.0, 3.0), world::SEED);
-        ui.rect(
-            Rect::new(sx + 1.0, 0.0, 2.0, 1.0),
-            Color::new(0.45, 0.78, 0.35, 1.0),
-        );
+        let tx = if let Some(sheet) = sheet {
+            ui.sprite(
+                sheet,
+                crate::sunny::rect(crate::sunny::SPROUT),
+                sx - 2.0,
+                0.0,
+                WHITE,
+            );
+            sx + 9.0
+        } else {
+            ui.rect(Rect::new(sx, 1.0, 3.0, 4.0), OUTLINE);
+            ui.rect(Rect::new(sx + 0.5, 1.5, 2.0, 3.0), world::SEED);
+            ui.rect(
+                Rect::new(sx + 1.0, 0.0, 2.0, 1.0),
+                Color::new(0.45, 0.78, 0.35, 1.0),
+            );
+            sx + 5.0
+        };
         ui.text(
             &w.seeds.to_string(),
-            sx + 5.0,
+            tx,
             1.0,
             crate::ui::FONT_PX,
             crate::ui::TEXT,
@@ -1532,6 +1554,30 @@ fn draw_stall(r: Rect) {
     draw_rectangle(x + 10.0, y - 3.0, 4.0, 3.0, world::SEED);
 }
 
+/// 가게(팩 장터 가판, 0077): 판대 위에 산딸기·씨앗 자루는 직접 올린다(무엇을 파는지 보이게).
+fn draw_stall_sunny(sunny: &art::Sunny, r: Rect) {
+    use crate::sunny as sn;
+    let foot = vec2((r.center().x).round(), r.bottom().round());
+    draw_ellipse(foot.x, foot.y - 1.0, 13.0, 3.0, 0.0, SHADOW_SOFT);
+    sn::draw_at_foot(&sunny.sheet, sn::STALL, foot, WHITE);
+    let top = foot.y - sn::STALL.3 as f32 + sn::STALL_COUNTER;
+    let x = foot.x - 7.0;
+    draw_circle(x + 3.0, top - 1.0, 2.0, world::BERRY);
+    draw_circle(x + 6.0, top - 1.0, 2.0, world::BERRY);
+    draw_rectangle(x + 10.0, top - 4.0, 4.0, 4.0, OUTLINE);
+    draw_rectangle(x + 10.5, top - 3.5, 3.0, 3.5, world::SEED);
+}
+
+/// 빈 자리(0046): 팩 그루터기 + 꽃잎. 꽃잎 규칙은 `draw_seat`와 같다.
+fn draw_seat_sunny(sunny: &art::Sunny, r: Rect, petals: u8) {
+    use crate::sunny as sn;
+    let foot = vec2((r.center().x).round(), r.bottom().round());
+    draw_ellipse(foot.x, foot.y - 1.0, 8.0, 2.0, 0.0, SHADOW_SOFT);
+    sn::draw_at_foot(&sunny.sheet, sn::STUMPS[1], foot, WHITE);
+    let (x, y) = (foot.x - 7.0, foot.y - 12.0);
+    seat_petals(x, y, petals);
+}
+
 /// 빈 자리: 통나무 의자 + 시든 꽃잎 하나(모모가 돌아올 곳).
 /// 모모가 숨은 흙 둔덕(0046): 따라오는 동안은 흙이 튀고, 멈춘 뒤엔 떨며 부풀어 오른다(튀어나올 예고).
 fn draw_dig_mound(pos: Vec2, ut: f32, windup: f32, time: f32) {
@@ -1703,6 +1749,11 @@ fn draw_seat(r: Rect, petals: u8) {
     draw_rectangle(x, y + 2.0, 14.0, 6.0, bark);
     draw_ellipse(x + 7.0, y + 2.0, 7.0, 2.5, 0.0, ring);
     draw_ellipse_lines(x + 7.0, y + 2.0, 4.0, 1.2, 0.0, 1.0, bark);
+    seat_petals(x, y, petals);
+}
+
+/// 의자 위 꽃잎 셋: 모모를 이긴 만큼 분홍, 처음엔 시든 것 하나만.
+fn seat_petals(x: f32, y: f32, petals: u8) {
     let wilted = Color::new(0.69, 0.50, 0.55, 1.0);
     let pink = Color::new(1.0, 0.66, 0.77, 1.0);
     for (i, dx) in [10.0, 3.0, 7.0].into_iter().enumerate() {
@@ -1978,6 +2029,20 @@ fn draw_decor_sunny(sunny: &art::Sunny, i: usize, at: Vec2, time: f32) {
                 let set = [sn::FLOWERS_WHITE, sn::FLOWERS_RED, sn::FLOWERS_BLUE][k];
                 sn::draw_at_foot(&sunny.sheet, set[3], foot + vec2(*dx, 4.0), WHITE);
             }
+        }
+        3 => {
+            draw_ellipse(foot.x, foot.y - 1.0, 12.0, 2.5, 0.0, SHADOW_SOFT);
+            sn::draw_at_foot(&sunny.sheet, sn::BENCH, foot, WHITE);
+        }
+        7 => {
+            draw_ellipse(foot.x - 2.0, foot.y - 1.0, 8.0, 2.0, 0.0, SHADOW_SOFT);
+            sn::draw_at_foot(
+                &sunny.sheet,
+                sn::POT_WILDFLOWER,
+                foot + vec2(-3.0, 0.0),
+                WHITE,
+            );
+            sn::draw_at_foot(&sunny.sheet, sn::WILDFLOWERS, foot + vec2(6.0, 1.0), WHITE);
         }
         _ => {
             let s = sn::MUSH_FRAME;
@@ -2457,8 +2522,14 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                         Some(sunny) => draw_campfire_sunny(sunny, r, w.time),
                         None => draw_campfire(r, w.time),
                     },
-                    PropKind::Stall => draw_stall(r),
-                    PropKind::Seat => draw_seat(r, w.momo_wins),
+                    PropKind::Stall => match &art.sunny {
+                        Some(sunny) => draw_stall_sunny(sunny, r),
+                        None => draw_stall(r),
+                    },
+                    PropKind::Seat => match &art.sunny {
+                        Some(sunny) => draw_seat_sunny(sunny, r, w.momo_wins),
+                        None => draw_seat(r, w.momo_wins),
+                    },
                 }
             }
             Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
@@ -2517,7 +2588,7 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                 }
             }
             Drawable::Decor(i, at) => match &art.sunny {
-                Some(sunny) if matches!(i, 0 | 2) => draw_decor_sunny(sunny, i, at, w.time),
+                Some(sunny) if matches!(i, 0 | 2 | 3 | 7) => draw_decor_sunny(sunny, i, at, w.time),
                 _ => draw_decor(i, at, w.time),
             },
             Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
@@ -3341,11 +3412,35 @@ fn draw_hitboxes(w: &World, alpha: f32) {
 }
 
 /// 체력 핍(왼쪽 위)·굴파기 쿨다운·SP 게이지(오른쪽 위). 화면 패스에서 게임 px 격자로(ui.rect).
-fn draw_hud_bars(ui: &Ui, w: &World) {
+/// 체력 한 칸의 간격: 팩 하트(9px) 또는 직접 그린 네모(6px).
+fn hp_step(sheet: Option<&Texture2D>) -> f32 {
+    if sheet.is_some() {
+        10.0
+    } else {
+        7.0
+    }
+}
+
+fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
     let dark = Color::new(0.2, 0.15, 0.2, 1.0);
+    let step = hp_step(sheet);
     for i in 0..w.player.stats.max_hp {
-        let c = if i < w.player.hp { world::MOLE } else { dark };
-        ui.rect(Rect::new(3.0 + i as f32 * 7.0, 1.0, 6.0, 6.0), c);
+        let x = 3.0 + i as f32 * step;
+        match sheet {
+            // 빈 칸은 같은 하트를 어둡게(0077).
+            Some(sheet) => {
+                let tint = if i < w.player.hp {
+                    WHITE
+                } else {
+                    Color::new(0.22, 0.17, 0.24, 1.0)
+                };
+                ui.sprite(sheet, crate::sunny::rect(crate::sunny::HEART), x, 0.0, tint);
+            }
+            None => {
+                let c = if i < w.player.hp { world::MOLE } else { dark };
+                ui.rect(Rect::new(x, 1.0, 6.0, 6.0), c);
+            }
+        }
     }
     let cd = (w.player.burrow_cd / w.player.burrow_cd_full()).min(1.0);
     let bw = 24.0;

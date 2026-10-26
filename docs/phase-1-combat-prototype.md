@@ -82,6 +82,7 @@
 | 모험(필드·던전) | `adventure.rs`, `map.rs`, `field.rs`, `dungeon.rs`, `room.rs`(격자), `render.rs`(draw_grid_art) | 연속 스크롤 필드, 자는 적, 저장 지점, 굴 입구 → 생성 던전(문 잠금·보물·휴식·보스·출구), 밀기 전환, 지도 탭, 저장 지점 부활. 단위 테스트(docs/decisions/0019) |
 | Android 패드 버튼 | `third_party/miniquad`(패치, `[patch.crates-io]`), `input.rs`(Pad::key·read_gamepads) | 패드 버튼 키코드 → F13~F25, 동작은 Bindings, 메뉴 A/B(뒤로)/Start/LB·RB, 다시 붙이기. 스틱은 Android가 바꿔 준 D패드 키(디지털). 패치 표 = Pad::key 테스트(0075) |
 | 저장 지점 빛 | `render.rs`(draw_save_ring·draw_save_lights·light_material) | 버섯 일곱 + 짙은 고리 자국, 더하기 섞기 금빛 후광·포자(어둠 위), 안 들른 고리는 빛기둥 높이(0076) |
+| 팩으로 갈아 끼운 소품 | `sunny.rs`(STALL·BENCH·POT_WILDFLOWER·HEART·SPROUT), `render.rs`(draw_stall_sunny·draw_seat_sunny·draw_decor_sunny·draw_hud_bars), `ui.rs`(sprite) | 가게 가판, 모모 빈 자리 그루터기, 꾸미기 의자·화분, HUD 하트·새싹. 팩이 없으면 예전 그림(0077) |
 | 패링 | `player.rs`(parry_dir), `world.rs`(parry_feedback) | 스윙 첫 0.12초 앞쪽: 돌진 경직, 투사체 반사, SP +4(docs/decisions/0020). 창이 열린 뒤 0.45초는 새 창 없음(연타 방지), 성공하면 바로(0038) |
 | 스테이지 고리 | `adventure.rs`, `camp.rs`, `route.rs`, `dungeon.rs`(Params), `app/stage.rs` | 필드 → 공터 보스 → 쉼터 → 길 지도(층 3 + 보스, 엇갈리지 않는 갈래, 다음 층만 보임) → 굴(굴·둥지·저장고·샘·보스) → 다음 쉼터. 쉼터: 체력 가득·저장 고리·포포 가게(씨앗)·보리·빈 자리, 공격 버튼 = 말 걸기. 쓰러지면 쉼터, 길은 새로. 단위 테스트(길 규칙 3, 고리 2)(docs/decisions/0030, 0031) |
 | 마을 | `village.rs`, `adventure.rs`(World::village, Place::Village), `render.rs`(큰 나무·꾸미기·할매), `app/stage.rs`(꾸미기 가게·할매·뿌리 길) | 튜토리얼 뒤 시작·엔딩 뒤 돌아오는 허브. 큰 나무 잎 = 깬 횟수, 포포 꾸미기 가게(마을 씨앗 6가지), 보리·할매(실뜨기)·빈 자리(0045) |
@@ -117,6 +118,7 @@
   - **APK가 설치되는지**(0074: v0.1.4까지는 Android 12+에서 "package appears to be invalid"로 거부됐다). 기기 모델·Android 버전을 함께 적는다
   - **Android 패드 버튼**(0075): A·B·X·Y·LB·RB·LT·RT·Start·Select가 듣는지, 메뉴에서 A 확인·B 뒤로·기기 뒤로 키, 설정에서 버튼 다시 붙이기, 안내 글이 패드 이름으로 나오는지. 스틱이 디지털(8방향)인 게 답답한지(답답하면 아날로그·오른쪽 스틱을 넣는다)
   - **저장 지점**(0076): 필드·쉼터에서 멀리서도 보이는지, 너무 번쩍이지 않는지
+  - **팩으로 바꾼 소품**(0077, 다음 버전): 가게 가판·모모 빈 자리·마을 의자·화분, HUD 하트·새싹이 어색하지 않은지
   - Sunnyside 그림(큰 나무·들판 나무·꽃·모닥불·버섯)이 나오는지, 장소를 바꿀 때 멈칫 없이 밝아지는지(검정이 0.2초쯤 길어진 게 거슬리지 않는지)
   - APK를 지우지 않고 덮어 설치했을 때 기록이 남는지, Android Chrome 글자 색, 타이틀 "v0.1.6 · <커밋>"
   - 모모 런: 포포 배웅과 쉼터 빈 자리 말(나일은 마을에서 기다린다)
