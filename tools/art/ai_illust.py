@@ -30,12 +30,15 @@ SIZE = {
     'halmae_deep': (704, 360), 'last_bloom': (640, 440), 'sprout': (640, 360), 'molehill': (640, 360),
     'doto_memory': (640, 360), 'momo_deep': (704, 360), 'kongi_door': (640, 360), 'title': (640, 360),
 }
+# 세로로 남을 때 자를 높이(0 위·1 아래). 없으면 가운데.
+CROP_Y = {}
 # 장면 → ✦ 자리(가운데 x, y, 반지름, 원본 px).
 STAR = {
     'great_tree': (912, 785, 21),
     # 16:9(1024×572) 그림은 늘 이 자리(수수 시트도 같다).
     'mother_burrow': (935, 483, 19),
     'bori_freed': (935, 483, 19),
+    'momo_bloom': (935, 483, 19),
 }
 
 
@@ -70,6 +73,21 @@ def _vivid_palette(points, n, bins=12, min_points=30):
     return out
 
 
+def _crop_to(img, aspect, y_at=0.5):
+    """게임 그림 비율로 자른다(나노바나나는 고를 수 있는 비율이 정해져 있다: 2:1 장면은 21:9로 받는다).
+    2% 안쪽 차이(16:9 원본 1024×572와 640×360)는 자르지 않는다. 가로로 남으면 가운데, 세로로 남으면 y_at(0 위·1 아래)에서."""
+    w, h = img.size
+    if abs(w / h - aspect) / aspect <= 0.02:
+        return img
+    if w / h > aspect:
+        nw = round(h * aspect)
+        x0 = (w - nw) // 2
+        return img.crop((x0, 0, x0 + nw, h))
+    nh = round(w / aspect)
+    y0 = round((h - nh) * y_at)
+    return img.crop((0, y0, w, y0 + nh))
+
+
 def scene(name, size=None):
     """원본이 있으면 size(게임 그림 크기, 짝수, 없으면 SIZE)의 그림, 없으면 None."""
     size = size or SIZE.get(name)
@@ -79,6 +97,7 @@ def scene(name, size=None):
     img = Image.open(path).convert('RGB')
     if name in STAR:
         ref_pack.erase_star_at(img, *STAR[name])
+    img = _crop_to(img, size[0] / size[1], CROP_Y.get(name, 0.5))
     w, h = img.size
     # 팔레트: 나머지 색은 점을 고르게 뽑아(전부 쓰면 느리다), 채도 높은 색은 원본 점을 전부 쓴다.
     # 4칸마다 뽑았더니 빨간 눈(눈 하나 3×2px)이 빠져 팔레트에 빨강이 없었다.
