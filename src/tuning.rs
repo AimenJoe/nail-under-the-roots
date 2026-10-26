@@ -177,6 +177,11 @@ pub const EXIT_MIN_DIST: f32 = 80.0;
 /// 잠긴 문(물든 뿌리 + 보라 실, 0094)이 자라 막는 시간 / 풀려 걷히는 시간.
 pub const DOOR_CLOSE_TIME: f32 = 0.35;
 pub const DOOR_OPEN_TIME: f32 = 0.5;
+/// 해 그림자(0102): 밝은 곳에서 서 있는 것의 h px 높이는 바닥 위 (X·h, Y·h)로 눕는다(오른쪽 아래 = 해가 왼쪽 위 뒤).
+pub const SUN_SHADOW_X: f32 = 0.45;
+pub const SUN_SHADOW_Y: f32 = 0.35;
+/// 해 그림자 진하기(겹쳐도 같다).
+pub const SUN_SHADOW_ALPHA: f32 = 0.28;
 /// 야광버섯의 빛(0095·0100): 어둠 지도에서 빼는 반지름(px)·세기(0..1). 은은하게 넓게: 여럿이 겹쳐야 바닥이 드러난다.
 pub const MUSH_LIGHT_R: f32 = 64.0;
 pub const MUSH_LIGHT: f32 = 0.28;

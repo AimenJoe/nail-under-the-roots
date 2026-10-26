@@ -123,6 +123,7 @@
 | 튜토리얼 아이템 단계(0093) | `tutorial.rs`, `world.rs`(start_eating, toast_eat_full) | 저장 지점에서 체력이 가득 차 막히던 것: 단계 동안 한 칸 비우고 산딸기를 둔다, 가득할 때 먹으면 알림 |
 | 잠긴 문(0094·0096~0099) | `render.rs`(draw_root_gate·빛 패스), `sunny.rs`(FENCE_H·FENCE_V), `room.rs`(door_anim·tick_doors), `world.rs`(열릴 때 실 풀림) | 팩 나무 울타리 두 겹(가운데 칸만: 남북 39,2 · 동서 40,3, 가로대가 벽에서 벽까지, 팩이 없으면 물든 뿌리) + 가로대를 감는 보라 실, 0.35초에 솟아 닫히고 0.5초에 가라앉으며 실이 풀린다, 어둠 속에서도 실이 빛남 |
 | 어둠 지도·야광버섯·그림자(0095·0100) | `render.rs`(dark_rt·cut_material·light_sources·draw_cast_shadows·draw_mushrooms), `art.rs`(light), `biome.rs` | 빛 자리마다 어둠을 빼는 렌더 타깃, 버섯 빛 64px·세기 0.28(은은하게 넓게), 심층 버섯 14%·뿌리 지대 4%, 빛 반대쪽으로 눕는 그림자 |
+| 해 그림자(0102, 시험) | `render.rs`(draw_sun_shadows·sun_shear·silhouette_material, draw_sorted의 sun), `sunny.rs`(stamp_sun_shadow), `terrain.rs`, `tuning.rs`(SUN_SHADOW_*) | 밝은 곳에서 서 있는 것의 모양을 발 줄 축으로 오른쪽 아래로 눕혀 렌더 타깃에 모아 한 번에(알파 0.28) 얹는다, 구운 풀포기·조약돌도 같은 그림자 |
 | 웨이브 | `world.rs`, `scenario.rs` | 지금은 개발 시나리오(아레나·웨이브 3부터)에서만. 적을 다 잡으면 1.2초 뒤 다음 웨이브(1C+1S → 2C+1S → 2C+2S → 3C+2S). 명세엔 없지만 5분 플레이 판정을 위해 넣음 |
 
 확인한 것: 데스크톱(Xvfb) 실행 캡처로 렌더 방향·공격 반원·굴파기·히트박스 표시, 헤드리스 Chromium으로 웹 빌드 로드·입력·콘솔(mismatch 없음). 확인 못 한 것: 실제 손맛(판정 1~4), 실기 게임패드, 소리의 실제 느낌(컨테이너에 오디오 장치 없음).

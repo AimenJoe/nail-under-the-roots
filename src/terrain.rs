@@ -654,6 +654,10 @@ impl Baker {
                 if let Some(r) = r {
                     let fx = cx * T + 8 + ox as i32 - r.2 as i32 / 2;
                     let fy = cy * T + 12 + oy as i32 - r.3 as i32;
+                    // 밝은 곳(들판·마을)의 서 있는 풀포기·조약돌은 해 그림자를 먼저(0102). 꽃은 바닥에 납작해 뺀다.
+                    if b.darkness().0 <= 0.0 && matches!(d, Decor::Tuft | Decor::Pebble) {
+                        crate::sunny::stamp_sun_shadow(img, sheet, r, fx, fy, is_solid);
+                    }
                     crate::sunny::stamp(img, sheet, r, fx, fy, ft, is_solid);
                     // 꽃은 무리로: 둘레에 한두 송이 더.
                     if matches!(

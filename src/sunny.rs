@@ -127,3 +127,50 @@ pub fn stamp(
         }
     }
 }
+
+/// 해 그림자(0102)를 CPU 그림(지도 굽기)에 찍는다: 팩 한 칸의 모양을 발 줄(왼쪽 위 (x, y) + 높이) 축으로 눕힌다.
+/// 실시간 그림자(`render::sun_shear`)와 같은 식. 같은 자리를 두 번 어둡게 하지 않는다. `skip`(벽 위)은 건너뛴다.
+pub fn stamp_sun_shadow(
+    dst: &mut Image,
+    sheet: &Image,
+    r: R,
+    x: i32,
+    y: i32,
+    skip: impl Fn(i32, i32) -> bool,
+) {
+    let k = vec2(crate::tuning::SUN_SHADOW_X, crate::tuning::SUN_SHADOW_Y);
+    let shade = crate::render::SUN_SHADE;
+    let (w, h) = (dst.width as i32, dst.height as i32);
+    let foot = y + r.3 as i32 - 1;
+    let mut spots: Vec<(i32, i32)> = Vec::new();
+    for sy in 0..r.3 as i32 {
+        for sx in 0..r.2 as i32 {
+            if sheet
+                .get_pixel(r.0 as u32 + sx as u32, r.1 as u32 + sy as u32)
+                .a
+                < 0.5
+            {
+                continue;
+            }
+            let up = (foot - (y + sy)) as f32;
+            let px = x + sx + (k.x * up).round() as i32;
+            let py = foot + (k.y * up).round() as i32;
+            if px < 0 || py < 0 || px >= w || py >= h || skip(px, py) {
+                continue;
+            }
+            spots.push((px, py));
+        }
+    }
+    spots.sort_unstable();
+    spots.dedup();
+    for (px, py) in spots {
+        let i = (py as usize * w as usize + px as usize) * 4;
+        let a = shade.a;
+        for (c, s) in dst.bytes[i..i + 3]
+            .iter_mut()
+            .zip([shade.r, shade.g, shade.b])
+        {
+            *c = (*c as f32 * (1.0 - a) + s * 255.0 * a) as u8;
+        }
+    }
+}

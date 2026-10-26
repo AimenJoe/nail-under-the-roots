@@ -70,6 +70,10 @@ pub struct Renderer {
     dark_rt: RenderTarget,
     /// 어둠 빼기 재질(0095). 못 만들면 예전 방식(플레이어 둘레만 뚫린 막).
     cut: Option<Material>,
+    /// 해 그림자(0102): 밝은 곳에서 서 있는 것들의 눕힌 모양을 모으는 렌더 타깃(월드와 같은 크기).
+    sun_rt: RenderTarget,
+    /// 모은 모양을 한 가지 진하기의 그림자로 얹는 재질. 못 만들면 해 그림자 없이 그린다.
+    silhouette: Option<Material>,
 }
 
 /// 한 프레임에 지도를 굽는 시간(초). 굽는 동안 화면은 검정이라 프레임이 조금 길어져도 보이지 않는다.
@@ -101,7 +105,47 @@ impl Renderer {
                 d
             },
             cut: cut_material(),
+            sun_rt: {
+                let d = render_target(VW + 1, VH + 1);
+                d.texture.set_filter(FilterMode::Nearest);
+                d
+            },
+            silhouette: silhouette_material(),
         }
+    }
+
+    /// 해 그림자(0102): 밝은 곳(어둠 0)에서만. 서 있는 것들을 발 줄 축으로 눕혀 `sun_rt`에 모으고,
+    /// 모양만 남겨 한 번에 얹는다. 그림자끼리 겹쳐도 더 진해지지 않는다(겹쳐 그린 반투명은 겹친 곳이 진해진다).
+    fn draw_sun_shadows(&self, art: &Art, w: &World, alpha: f32) {
+        let Some(m) = &self.silhouette else { return };
+        if w.biome.darkness().0 > 0.0 {
+            return;
+        }
+        let dc = Camera2D {
+            target: self.cam.target,
+            zoom: self.cam.zoom,
+            offset: self.cam.offset,
+            rotation: self.cam.rotation,
+            render_target: Some(self.sun_rt.clone()),
+            viewport: None,
+        };
+        set_camera(&dc);
+        clear_background(Color::new(0.0, 0.0, 0.0, 0.0));
+        draw_sorted(art, w, alpha, Some(vec2(t::SUN_SHADOW_X, t::SUN_SHADOW_Y)));
+        set_camera(&self.cam);
+        gl_use_material(m);
+        draw_texture_ex(
+            &self.sun_rt.texture,
+            self.view_origin.x,
+            self.view_origin.y,
+            Color::new(1.0, 1.0, 1.0, t::SUN_SHADOW_ALPHA),
+            DrawTextureParams {
+                dest_size: Some(vec2(RW, RH)),
+                flip_y: true,
+                ..Default::default()
+            },
+        );
+        gl_use_default_material();
     }
 
     /// 어둠 지도(0095): 어둠으로 채운 렌더 타깃에 빛 자리(플레이어·야광버섯·모닥불·반딧불·저장 지점·문·출구)마다
@@ -224,13 +268,14 @@ impl Renderer {
             } else {
                 draw_room_art(art, w);
             }
+            self.draw_sun_shadows(art, w, alpha);
             draw_drill_trail(Some(art), &w.player, alpha);
             draw_telegraphs(w, alpha);
             if self.cut.is_some() {
                 draw_mushrooms(art, w, cam);
             }
             draw_cast_shadows(w, alpha, cam);
-            draw_sorted(art, w, alpha);
+            draw_sorted(art, w, alpha, None);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
             draw_ambient(w, cam, false);
@@ -2926,16 +2971,24 @@ enum Drawable {
 }
 
 /// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
-fn draw_sorted(art: &Art, w: &World, alpha: f32) {
+/// `sun`이 있으면 해 그림자 패스(0102): 바닥 것(발밑 그림자·웅덩이·지뢰)은 빼고, 서 있는 것마다 발 줄을 축으로
+/// 바닥에 눕혀(`sun_shear`) 그대로 다시 그린다. 색은 버리고 모양만 쓴다(`Renderer::draw_sun_shadows`).
+fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<Vec2>) {
+    let ground = sun.is_none();
     let mut list: Vec<(f32, Drawable)> = Vec::new();
     for (i, p) in w.room.props.iter().enumerate() {
         list.push((p.rect.bottom(), Drawable::Pillar(i)));
     }
     for (i, p) in w.pickups.iter().enumerate() {
         list.push((p.pos.y + 4.0, Drawable::Pickup(i)));
-        draw_ellipse(p.pos.x, p.pos.y + 4.0, 5.0, 1.8, 0.0, SHADOW_SOFT);
+        if ground {
+            draw_ellipse(p.pos.x, p.pos.y + 4.0, 5.0, 1.8, 0.0, SHADOW_SOFT);
+        }
     }
     for (i, l) in w.loot.iter().enumerate() {
+        if !ground {
+            continue;
+        }
         let q = lerp(l.prev_pos, l.pos, alpha);
         list.push((q.y + 2.0, Drawable::Loot(i)));
         let r = if l.kind == loot::LootKind::Berry {
@@ -2950,7 +3003,9 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     if let Some(n) = &w.npc {
         let q = lerp(n.prev_pos, n.pos, alpha);
         list.push((q.y + 6.0, Drawable::Npc));
-        draw_ellipse(q.x, q.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+        if ground {
+            draw_ellipse(q.x, q.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+        }
     }
     for (i, n) in w.neighbors.iter().enumerate() {
         let big = n.who == world::Who::Bori;
@@ -2961,7 +3016,9 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
         }
         list.push((n.pos.y + 6.0, Drawable::Neighbor(i)));
         let rx = if big { 12.0 } else { 6.0 };
-        draw_ellipse(n.pos.x, n.pos.y + 6.0, rx, 2.5, 0.0, SHADOW_SOFT);
+        if ground {
+            draw_ellipse(n.pos.x, n.pos.y + 6.0, rx, 2.5, 0.0, SHADOW_SOFT);
+        }
     }
     if let Some(v) = &w.adv.village {
         for (c, at) in &w.adv.marks {
@@ -2969,12 +3026,12 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
                 'Y' => {
                     list.push((at.y + 8.0, Drawable::Tree(*at, v.growth)));
                     // 깨울 재주가 있으면 밑동이 빛난다(그림자처럼 먼저, 0061).
-                    if v.tree_ready {
+                    if v.tree_ready && ground {
                         draw_tree_glow(*at + vec2(0.0, 14.0), w.time);
                     }
                 }
                 // 물웅덩이는 바닥: 맨 먼저.
-                'W' => draw_puddle(*at, w.time),
+                'W' if ground => draw_puddle(*at, w.time),
                 'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
                 '1'..='9' => {
                     let i = (*c as u8 - b'1') as usize;
@@ -2988,9 +3045,16 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
     }
     for (i, e) in w.enemies.iter().enumerate() {
         let ep = lerp(e.prev_pos, e.pos, alpha);
-        list.push((ep.y + e.radius(), Drawable::Enemy(i)));
         if !e.hittable() {
-            continue; // 땅속: 그림자 없이 둔덕만.
+            // 땅속: 그림자 없이 둔덕만.
+            if ground {
+                list.push((ep.y + e.radius(), Drawable::Enemy(i)));
+            }
+            continue;
+        }
+        list.push((ep.y + e.radius(), Drawable::Enemy(i)));
+        if !ground {
+            continue;
         }
         draw_ellipse(
             ep.x,
@@ -3002,23 +3066,39 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
         );
     }
     // 묻힌 도토리는 바닥에(세워 그리는 것들보다 먼저).
-    for m in &w.mines {
+    for m in w.mines.iter().filter(|_| ground) {
         draw_mine(m, w.time);
     }
-    for (i, p) in w.projectiles.iter().enumerate() {
+    for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
         let q = lerp(p.prev_pos, p.pos, alpha);
         list.push((q.y + 3.0, Drawable::Projectile(i)));
         draw_ellipse(q.x, q.y + 6.0, 2.5, 1.2, 0.0, SHADOW_SOFT);
     }
-    if !matches!(
+    let standing = !matches!(
         w.player.state,
         player::State::Burrow { .. } | player::State::Dead
-    ) {
+    );
+    if standing && ground {
         draw_ellipse(pp.x, pp.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
         draw_player_halo(pp, w.time);
     }
+    if !ground {
+        // 해 그림자: 땅속 플레이어(둔덕)·빛인 것(모닥불)·줍는 것은 그림자를 드리우지 않는다.
+        list.retain(|(_, d)| match d {
+            Drawable::Player => standing,
+            Drawable::Pickup(_) => false,
+            Drawable::Pillar(i) => w.room.props[*i].kind != PropKind::Campfire,
+            _ => true,
+        });
+    }
     list.sort_by(|a, b| a.0.total_cmp(&b.0));
-    for (_, d) in list {
+    for (foot, d) in list {
+        // 해 그림자: 발 줄(foot)을 축으로 눕힌다. 끝에서 되돌린다.
+        if let Some(k) = sun {
+            unsafe { get_internal_gl() }
+                .quad_gl
+                .push_model_matrix(sun_shear(foot, k));
+        }
         match d {
             Drawable::Pillar(i) => {
                 let p = w.room.props[i];
@@ -3150,7 +3230,21 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32) {
             },
             Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
         }
+        if sun.is_some() {
+            unsafe { get_internal_gl() }.quad_gl.pop_model_matrix();
+        }
     }
+}
+
+/// 해 그림자 행렬(0102): 발 줄 y = `foot`는 그대로, 그 위로 h만큼 높은 점은 바닥 위 `k * h`만큼 떨어진 자리로.
+/// x' = x + k.x·(foot − y), y' = foot + k.y·(foot − y). k.y > 0이면 그림자가 앞(아래)으로 눕는다.
+fn sun_shear(foot: f32, k: Vec2) -> Mat4 {
+    Mat4::from_cols(
+        vec4(1.0, 0.0, 0.0, 0.0),
+        vec4(-k.x, -k.y, 0.0, 0.0),
+        vec4(0.0, 0.0, 1.0, 0.0),
+        vec4(k.x * foot, (1.0 + k.y) * foot, 0.0, 1.0),
+    )
 }
 
 /// 반딧불(빛나는 꽁무니 + 날개 깜빡임, 둥실) / 산딸기(빨간 열매 + 잎).
@@ -4296,6 +4390,57 @@ pub fn light_sources(w: &World, alpha: f32, cam: Vec2, player_radius: f32) -> Ve
         }
     }
     v
+}
+
+/// 해 그림자 색(0102). 실루엣 재질(셰이더 안 같은 값)과 지도 굽기가 같이 쓴다. 알파 = 진하기.
+pub const SUN_SHADE: Color = Color::new(0.10, 0.06, 0.14, t::SUN_SHADOW_ALPHA);
+
+/// 실루엣 재질(해 그림자, 0102): 그린 자리(알파가 있는 곳)를 모두 같은 그림자 색(`SUN_SHADE`)으로. 진하기는 정점 색 알파.
+fn silhouette_material() -> Option<Material> {
+    const VERTEX: &str = r#"#version 100
+    attribute vec3 position;
+    attribute vec2 texcoord;
+    attribute vec4 color0;
+    varying lowp vec2 uv;
+    varying lowp vec4 color;
+    uniform mat4 Model;
+    uniform mat4 Projection;
+    void main() {
+        gl_Position = Projection * Model * vec4(position, 1);
+        color = color0 / 255.0;
+        uv = texcoord;
+    }"#;
+    const FRAGMENT: &str = r#"#version 100
+    precision lowp float;
+    varying lowp vec4 color;
+    varying lowp vec2 uv;
+    uniform sampler2D Texture;
+    void main() {
+        float a = step(0.05, texture2D(Texture, uv).a);
+        gl_FragColor = vec4(0.10, 0.06, 0.14, a * color.a);
+    }"#;
+    load_material(
+        ShaderSource::Glsl {
+            vertex: VERTEX,
+            fragment: FRAGMENT,
+        },
+        MaterialParams {
+            pipeline_params: PipelineParams {
+                color_blend: Some(macroquad::miniquad::BlendState::new(
+                    macroquad::miniquad::Equation::Add,
+                    macroquad::miniquad::BlendFactor::Value(
+                        macroquad::miniquad::BlendValue::SourceAlpha,
+                    ),
+                    macroquad::miniquad::BlendFactor::OneMinusValue(
+                        macroquad::miniquad::BlendValue::SourceAlpha,
+                    ),
+                )),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .ok()
 }
 
 /// 어둠 빼기 재질(0095): 어둠 지도에서 그린 만큼 알파를 뺀다(결과 = 바탕 − 그림, 0 아래는 0).
