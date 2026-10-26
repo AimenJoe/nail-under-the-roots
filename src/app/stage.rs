@@ -974,6 +974,10 @@ impl App {
         let (Some(i), Some(anchor)) = (w.interactable(), w.interact_anchor()) else {
             return;
         };
+        // 알림(토스트)이 떠 있는 동안은 숨긴다: 방금 한 일의 대답이 알림이고, 둘이 위쪽에서 겹쳐 읽히지 않았다.
+        if w.toast.is_some() {
+            return;
+        }
         let s = i18n::s();
         let village = w.adv.place == crate::adventure::Place::Village;
         let verb = match i {

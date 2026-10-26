@@ -476,17 +476,39 @@ impl Renderer {
         if let Some((text, time)) = w.toast {
             let s = crate::i18n::tr(text);
             let a = (time / 0.4).min(1.0);
-            let tw = ui.text_w(s, crate::ui::FONT_PX) + 14.0;
-            let r = Rect::new(160.0 - tw / 2.0, 26.0, tw, crate::ui::FONT_PX + 6.0);
+            // 긴 알림(물웅덩이 등)이 한 줄로 화면 폭을 넘어 오른쪽 위 HUD(게이지·마을 씨앗)와 겹쳤다(사장 피드백
+            // 2026-10-26). 가운데 TOAST_W 안에서 줄을 바꾼다. 양옆 HUD 자리는 비운다.
+            const TOAST_W: f32 = 196.0;
+            let lines = crate::ui::wrap(ui, s, TOAST_W - 14.0, crate::ui::FONT_PX);
+            let tw = lines
+                .iter()
+                .map(|l| ui.text_w(l, crate::ui::FONT_PX))
+                .fold(0.0, f32::max)
+                + 14.0;
+            let line_h = crate::ui::FONT_PX + 2.0;
+            // 마을은 오른쪽 위에 마을 씨앗·맡긴 반딧불 두 줄(y 14~39)이 있어 그 아래로.
+            let top = if w.adv.place == crate::adventure::Place::Village {
+                44.0
+            } else {
+                26.0
+            };
+            let r = Rect::new(
+                (160.0 - tw / 2.0).round(),
+                top,
+                tw.round(),
+                lines.len() as f32 * line_h + 4.0,
+            );
             ui.rect(r, Color::new(0.07, 0.05, 0.09, 0.9 * a));
             ui.rect_lines(r, Color::new(0.90, 0.71, 0.47, a));
-            ui.text_center(
-                s,
-                160.0,
-                r.y + 3.0,
-                crate::ui::FONT_PX,
-                Color::new(0.92, 0.86, 0.76, a),
-            );
+            for (i, l) in lines.iter().enumerate() {
+                ui.text_center(
+                    l,
+                    160.0,
+                    r.y + 3.0 + i as f32 * line_h,
+                    crate::ui::FONT_PX,
+                    Color::new(0.92, 0.86, 0.76, a),
+                );
+            }
         }
         draw_boss_bar(ui, w);
         draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
