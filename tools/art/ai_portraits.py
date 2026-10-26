@@ -35,9 +35,11 @@ CHARACTERS = {
     'bori': (10, ('normal', 'happy'), None, 16),
     # 들쥐 대장 = 물든 보리(0032). 보리 보통 표정을 고쳐 그려 틀이 같다.
     'chief': (9, ('glare',), None, 16),
+    # 누룩 할매: 몸이 칸 아래로 이어지고 흰 몸이 배경 베이지와 가까워 아래 끝 번지기를 끈다(CHEST_AT_BOTTOM). 틀은 그대로.
+    'halmae': (15, ('normal', 'happy'), None, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
-CHEST_AT_BOTTOM = {'momo', 'momo_tainted'}
+CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
 FIT_CUT = 0.02
 # 틀이 1보다 클 때 귀 끝 위에 남길 여백 몫.
