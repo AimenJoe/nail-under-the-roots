@@ -4,7 +4,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 
 ## 먼저 읽을 것
 1. `docs/concept.md` — 무엇을 만드는가
-2. `docs/phase-1-combat-prototype.md` — 지금 단계의 범위와 판정 기준. 끝의 **"구현 상태"와 "사람이 할 일"**이 현재 위치다
+2. `docs/phase-1-combat-prototype.md` — 1단계 범위와 판정 기준. 끝의 **"구현 상태"와 "사람이 할 일"**이 현재 위치다. 다음 마일스톤(v0.2.0 조건표)은 `docs/decisions/0079`
 3. `docs/decisions/` — 왜 그렇게 정했나. 바꾸려면 새 번호로 기록
 
 세션 시작 프롬프트는 따로 없다. 이 파일과 위 세 문서가 그 역할을 한다. 세션이 끝나면 "구현 상태"·"사람이 할 일"을 갱신하고 커밋한다.
@@ -53,6 +53,6 @@ CI: `deploy-web.yml`이 위 세 줄을 돌리고 Netlify 시크릿이 있으면 
 - `mq_js_bundle.js`나 게임패드 JS 플러그인을 외부 URL로 핫링크하지 않는다. `web/`에 복사본.
 - 에셋 팩을 라이선스 확인 없이 커밋하지 않는다. `assets/LICENSES.md`에 기록. **이 레포는 공개다. 유료·제3자 팩 원본은 `assets/vendor/`(gitignore)에만 두고 커밋하지 않는다**(docs/decisions/0010). 팩 그림은 Claude가 보고 고르고 확인해도 되지만 AI 학습·생성 참조에는 쓰지 않는다(0064).
 - 직접 그린 그림은 PNG를 손으로 고치지 않는다. 점으로 다듬을 때는 `tools/pixel`(`.pxl` 텍스트 원본, `pxl.py check`의 계단·외톨이 검사, 브라우저 편집기 `editor.html`, 0070). 그 밖에는 `tools/art/*.py`를 고치고 다시 생성한다(Naïl `nail.py`, 적·이웃 `critters.py`, 보스 `chief.py`, 초상화 `portraits.py`, 타일 `tiles.py`, 컷씬 일러스트 `illust.py` — 임시 그림. 일러스트 바탕은 파스텔·수채 그림(`tools/art/sources/`, CC0·퍼블릭 도메인, 출처는 `assets/LICENSES.md`)을 `pastel_bg`로 도트화하고 그 위에 그린다(0073). 사람이 그린 그림으로 바꿀 때는 `docs/art/cutscene-illustrations.md`).
-- 1단계 범위 밖(에셋, 허브, 저장, 두 번째 캐릭터)을 판정 전에 만들지 않는다.
+- 마일스톤(docs/decisions/0079) 밖의 큰 기능을 사장 지시 없이 먼저 만들지 않는다. 마이너 버전은 마일스톤을 마쳤을 때만 올린다(패치는 자유).
 - `cargo-quad-apk` 커밋(`build-android.yml`의 `CARGO_QUAD_APK_REV`)과 `web/*.js` 복사본은 의도적으로만 올린다. 올리면 CI 콘솔/로그를 확인한다.
 - 언어: 문서·커밋 메시지 한국어, 코드 식별자 영어.
