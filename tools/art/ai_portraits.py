@@ -40,6 +40,8 @@ CHARACTERS = {
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
 CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae'}
+# 몸에 둘러싸인 배경 틈을 지울 캐릭터(_clear_holes): 할매 갓·대 사이.
+HOLES = {'halmae'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
 FIT_CUT = 0.02
 # 틀이 1보다 클 때 귀 끝 위에 남길 여백 몫.
@@ -212,6 +214,34 @@ def _tint_glow(img, mask, keep):
                 value = 0.42 if s < 0.12 else min(0.88, 0.62 + (v - 0.75))
                 r, g, b = colorsys.hsv_to_rgb(0.76, 0.42, value)
                 px[x, y] = (int(r * 255), int(g * 255), int(b * 255))
+
+
+def _clear_holes(img, mask, tol=20, min_area=200):
+    """캐릭터에 둘러싸여 가장자리와 이어지지 않은 배경 틈(배경색에 아주 가까운 덩어리)도 지운다.
+    할매 머리 위 갓·대 사이 틈이 베이지로 남았다(사장). 크림색 몸이 배경과 가까운 캐릭터(모모 가슴)는 지워지면 안 되니 HOLES에 든 캐릭터만."""
+    w, h = img.size
+    px = img.load()
+    corners = [px[0, 0], px[w - 1, 0], px[0, h // 2], px[w - 1, h // 2]]
+    bg = tuple(sum(c[i] for c in corners) // len(corners) for i in range(3))
+    near = lambda c: sum((c[i] - bg[i]) ** 2 for i in range(3)) <= tol * tol
+    seen = [[False] * w for _ in range(h)]
+    for y0 in range(h):
+        for x0 in range(w):
+            if seen[y0][x0] or not mask[y0][x0] or not near(px[x0, y0]):
+                continue
+            comp, stack = [], [(x0, y0)]
+            seen[y0][x0] = True
+            while stack:
+                x, y = stack.pop()
+                comp.append((x, y))
+                for (i, j) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    xx, yy = x + i, y + j
+                    if 0 <= xx < w and 0 <= yy < h and not seen[yy][xx] and mask[yy][xx] and near(px[xx, yy]):
+                        seen[yy][xx] = True
+                        stack.append((xx, yy))
+            if len(comp) >= min_area:
+                for (x, y) in comp:
+                    mask[y][x] = False
 
 
 def _shrink(img, mask):
@@ -408,6 +438,8 @@ def character(name):
             fix(img)
         images.append(img)
         mask = _character_mask(img, from_bottom=name not in CHEST_AT_BOTTOM)
+        if name in HOLES:
+            _clear_holes(img, mask)
         if name in HALO:
             _tint_glow(img, mask, HALO[name])
         masks.append(mask)
