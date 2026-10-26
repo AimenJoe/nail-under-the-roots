@@ -12,6 +12,7 @@ use crate::loot;
 use crate::map::Cell;
 use crate::player::{self, Player};
 use crate::room::PropKind;
+use crate::sunny;
 use crate::tuning as t;
 use crate::ui::Ui;
 use crate::world::{self, FxKind, World};
@@ -1341,7 +1342,7 @@ fn floor_decor(w: &World, cam: Vec2) -> Vec<(f32, f32, Decor)> {
 }
 
 /// 잠긴 문: 문을 막고 보라 실 두 가닥이 감는다(이야기의 "실", 0037).
-/// 팩이 있으면 팩의 나무 문(남북 문은 두 짝 문, 동서 문은 가로 널, 0096), 없으면 물든 뿌리 세 줄기(0094).
+/// 팩이 있으면 팩의 나무 울타리(남북 문은 가로 울타리, 동서 문은 세로 울타리, 0097), 없으면 물든 뿌리 세 줄기(0094).
 /// 잠그면 문이 바닥에서 솟고(뿌리는 문틀에서 자라고, `grow` 0→1) 실이 나중에 감긴다. 열면 거꾸로 걷히고 월드가 풀리는 실을 낸다.
 /// 무늬는 월드 좌표로 정해 두 칸짜리 문이 이어져 보인다.
 /// `glow`면 더하기 빛 패스용: 문은 빼고 실과 문틈 빛만(어두운 심층에서도 문이 보이게).
@@ -1382,8 +1383,8 @@ fn draw_root_gate(
             Color::new(th.r, th.g, th.b, 0.10 * grow * pulse),
         );
     }
-    // 문틈 뒤 보라 아지랑이(잠긴 동안 숨 쉰다).
-    if !glow {
+    // 문틈 뒤 보라 아지랑이(잠긴 동안 숨 쉰다). 가는 울타리 뒤에서는 네모로 보여 뿌리일 때만.
+    if !glow && sheet.is_none() {
         draw_rectangle(
             x0,
             y0,
@@ -1393,17 +1394,12 @@ fn draw_root_gate(
         );
     }
     if let Some(sheet) = sheet {
-        // 팩 나무 문: 앞쪽 절반 동안 바닥에서 솟는다(윗줄부터 보인다).
+        // 팩 울타리: 앞쪽 절반 동안 바닥에서 솟는다(윗줄부터 보인다).
         if !glow {
             let rise = (grow / 0.55).clamp(0.0, 1.0);
             let h = (rise * 16.0).round();
             if h > 0.0 {
-                let r = crate::sunny::rect(if vertical {
-                    crate::sunny::GATE_WOOD
-                } else {
-                    crate::sunny::GATE_PLANKS
-                });
-                draw_rectangle(x0, y0 + 13.0, 16.0, 3.0, Color::new(0.0, 0.0, 0.0, 0.25));
+                let r = sunny::rect(fence_tile(g, cx, cy, vertical));
                 draw_texture_ex(
                     sheet,
                     x0,
@@ -1437,14 +1433,31 @@ fn draw_root_gate(
             }
         }
     }
-    // 실: 문(뿌리)이 거의 다 선 뒤 감긴다.
+    // 실: 문(뿌리)이 거의 다 선 뒤 감긴다. 실은 문을 가로지르는 방향(across)으로 간다.
     let ta = ((grow - 0.55) / 0.45).clamp(0.0, 1.0);
     if ta > 0.0 {
-        for lane in [4.0_f32, 11.0] {
+        // 뿌리: 두 가닥이 따로 물결친다. 울타리: 한 가닥이 가로대를 사선으로 감는다(앞을 지나는 반만 보인다).
+        let strands: &[(f32, f32, f32)] = if sheet.is_some() {
+            let c = if vertical {
+                sunny::FENCE_RAIL_Y
+            } else {
+                sunny::FENCE_RAIL_X
+            };
+            &[(c, 3.5, 0.0)]
+        } else {
+            &[(4.0, 1.1, 4.0), (11.0, 1.1, 11.0)]
+        };
+        let fence = sheet.is_some();
+        let freq = if fence { 0.6 } else { 0.55 };
+        for &(lane, amp, phase) in strands {
             for k in 0..16 {
                 let wc = base_across + k as f32;
-                let wave = ((wc * 0.55 + time * 2.4 + lane).sin() * 1.1).round();
-                let a = lane + wave;
+                let ph = wc * freq + time * 2.4 + phase;
+                // 울타리를 감는 실은 뒤로 도는 반(cos < 0)이 가로대에 가려진다.
+                if fence && ph.cos() < 0.0 {
+                    continue;
+                }
+                let a = lane + (ph.sin() * amp).round();
                 let kf = k as f32;
                 if glow {
                     px(at(a, kf), Color::new(th.r, th.g, th.b, 0.55 * ta * pulse));
@@ -1461,8 +1474,29 @@ fn draw_root_gate(
     }
 }
 
+/// 잠긴 문 한 칸의 팩 울타리 칸(0097): 이웃 칸이 문인지 보고 끝 기둥·가운데·끝 기둥을 고른다.
+/// `vertical`(남북 문)이면 가로 울타리, 아니면(동서 문) 세로 울타리.
+fn fence_tile(g: &crate::map::Grid, cx: i32, cy: i32, vertical: bool) -> sunny::R {
+    let door = |x: i32, y: i32| g.get_i(x, y) == Cell::Door;
+    let (before, after) = if vertical {
+        (door(cx - 1, cy), door(cx + 1, cy))
+    } else {
+        (door(cx, cy - 1), door(cx, cy + 1))
+    };
+    let [start, mid, end] = if vertical {
+        sunny::FENCE_H
+    } else {
+        sunny::FENCE_V
+    };
+    match (before, after) {
+        (false, true) => start,
+        (true, false) => end,
+        _ => mid,
+    }
+}
+
 /// 격자 방(필드·던전) 그림: 구운 지도(terrain.rs, 0062)의 보이는 부분 + 매 프레임 바뀌는 칸.
-/// 특별한 칸: 문(열림 = 바닥, 잠김 = 나무 문(팩 없으면 물든 뿌리) + 보라 실, 0094·0096), 굴 입구, 출구, 저장 지점(빛나는 버섯 고리).
+/// 특별한 칸: 문(열림 = 바닥, 잠김 = 나무 울타리(팩 없으면 물든 뿌리) + 보라 실, 0094·0097), 굴 입구, 출구, 저장 지점(빛나는 버섯 고리).
 fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D, sheet: Option<&Texture2D>) {
     let Some(g) = &w.room.grid else { return };
     let view = Rect::new(cam.x.floor() - 1.0, cam.y.floor() - 1.0, RW + 3.0, RH + 3.0);
