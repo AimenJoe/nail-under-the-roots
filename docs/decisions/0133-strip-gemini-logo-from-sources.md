@@ -1,7 +1,7 @@
 # 0133. 나노바나나 원본에서 ✦ 로고를 지운다(흰색 얹기 되돌리기)
 
 - 날짜: 2026-10-26
-- 상태: 채택. 사장 지시("화면에 보일 때뿐 아니라 원본에서도 없애고 싶다"). 0108~0132의 "만들 때마다 ✦ 자리를 메우기"를 대신한다.
+- 상태: 채택. 후속(0138): 템플릿 잡음 탓에 별 둘레 네모 전체가 바뀌던 것을 고쳐 원본에서 다시 지웠고, 원본의 C2PA·EXIF 덩어리를 남긴다. 사장 지시("화면에 보일 때뿐 아니라 원본에서도 없애고 싶다"). 0108~0132의 "만들 때마다 ✦ 자리를 메우기"를 대신한다.
 
 ## 결정(`tools/art/strip_logo.py`, `tools/art/gemini_star_alpha.npz`)
 - 원본(`tools/art/sources/ai/` 초상화·시트·일러스트)에서 ✦를 **한 번** 지우고 PNG 글 칸 `nail-logo-stripped`를 남긴다. 게임 그림을 만드는 단계(`ai_portraits`·`ai_illust`·`ref_pack`)는 더 지우지 않는다. 옛 자리 표(`ai_portraits.STAR`·`_erase_star`, `ai_illust.STAR`, `ref_pack.STAR_AT`·`erase_star`)는 뺐다. 그림 안의 반짝이 지우기(`ai_illust.SPARKLES`)는 그대로.
