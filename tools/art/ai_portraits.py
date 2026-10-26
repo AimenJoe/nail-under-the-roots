@@ -9,6 +9,7 @@ PNG를 손으로 고치지 않고, 원본에 할 일을 모두 여기에 둔다(
   5. Naïl 털빛 1~3: 털 색만 portraits.FUR_VARIANTS 경사로 옮긴다(목도리·주둥이·앞발·발톱·눈은 그대로).
   6. 틀 맞추기(FIT): 캐릭터마다 그림 속 여백이 달라 칸에서 크기가 달라 보인다(포포는 높이 71%, Naïl은 94%).
      표정들을 합친 캐릭터 영역으로 정사각형을 잘라, 높이가 칸의 FIT 비율이 되고 가슴 아래는 칸 밖으로 조금 나가게 한다.
+     FIT가 1보다 크면 위가 칸 밖으로 나간다(모모의 긴 귀).
 """
 import colorsys
 import os
@@ -25,7 +26,11 @@ W = H = 88
 CHARACTERS = {
     'nail': (0, ('normal', 'happy', 'worried', 'determined'), None, 0),
     'popo': (5, ('normal', 'happy'), 0.92, 16),
+    # 모모는 귀가 길어 높이로 맞추면 얼굴이 작아진다. 1보다 크게 잡아 곧은 귀 끝은 칸 위로 내보낸다(접힌 귀 끝·꽃은 남는다, 1.15면 접힌 끝이 잘림).
+    'momo': (12, ('normal', 'happy', 'worried'), 1.08, 16),
 }
+# 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
+CHEST_AT_BOTTOM = {'momo'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
 FIT_CUT = 0.02
 # 한 캐릭터 표정들을 맞출 팔레트: 눈(보랏빛) EYE_COLORS + 채도 높은 색(캐릭터 표의 vivid) + 나머지 REST_COLORS.
@@ -82,22 +87,45 @@ def _eyes_to_lavender(img, boxes):
                     px[x, y] = tuple(int(lo[i] + (hi[i] - lo[i]) * t) for i in range(3))
 
 
-# 원본별로 더 고칠 것(원본 512px 좌표).
+def _plum_lines(img, keep):
+    """거의 검은 선을 Naïl·포포와 같은 자두빛 선으로(모모 원본만 선이 검정으로 나왔다). 눈 상자 keep 안(눈동자·속눈썹)은 그대로.
+    좌표는 원본 1024px 기준. 밝기 순서는 지켜서 선 가장자리의 섞인 점도 자두빛 쪽으로 옮긴다."""
+    lo, hi, top = (40, 24, 38), (64, 42, 52), 56
+    sx = img.width / 1024
+    boxes = [tuple(int(v * sx) for v in b) for b in keep]
+    px = img.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            c = px[x, y]
+            m = max(c)
+            if m < top and not any(x0 <= x < x1 and y0 <= y < y1 for (x0, y0, x1, y1) in boxes):
+                t = m / top
+                px[x, y] = tuple(int(lo[i] + (hi[i] - lo[i]) * t) for i in range(3))
+
+
+# 모모 눈 상자(원본 1024px): 왼눈·오른눈. 세 표정 모두 같은 자리다.
+MOMO_EYES = [(410, 470, 580, 640), (680, 480, 800, 640)]
+
+# 원본별로 더 고칠 것(Naïl은 원본 512px 좌표).
 FIXES = {
     'nail_determined': lambda img: _eyes_to_lavender(
         img, [((226, 250, 284, 288), 272), ((400, 244, 430, 266), 258)]),
 }
+for _face in ('normal', 'happy', 'worried'):
+    FIXES[f'momo_{_face}'] = lambda img: _plum_lines(img, MOMO_EYES)
 
 
-def _character_mask(img, tol=34):
-    """가장자리와 이어진 배경(밝은 베이지)을 빼고, 남은 것 가운데 가장 큰 덩어리(캐릭터)만 참."""
+def _character_mask(img, tol=34, from_bottom=True):
+    """가장자리와 이어진 배경(밝은 베이지)을 빼고, 남은 것 가운데 가장 큰 덩어리(캐릭터)만 참.
+    from_bottom: 아래 끝에서도 배경을 번질지. Naïl은 앞발 사이 아래에 갇힌 배경이 있어 켜야 하고,
+    모모는 크림색 가슴이 아래 끝에 닿고 배경 베이지와 가까워 켜면 가슴이 통째로 투명해진다(CHEST_AT_BOTTOM)."""
     w, h = img.size
     px = img.load()
     corners = [px[0, 0], px[w - 1, 0], px[0, h // 2], px[w - 1, h // 2]]
     bg = tuple(sum(c[i] for c in corners) // len(corners) for i in range(3))
     near_bg = lambda c: sum((c[i] - bg[i]) ** 2 for i in range(3)) <= tol * tol
     is_bg = [[False] * w for _ in range(h)]
-    stack = [(x, 0) for x in range(w)] + [(x, h - 1) for x in range(w)]
+    stack = [(x, 0) for x in range(w)] + ([(x, h - 1) for x in range(w)] if from_bottom else [])
     stack += [(0, y) for y in range(h)] + [(w - 1, y) for y in range(h)]
     while stack:
         x, y = stack.pop()
@@ -314,7 +342,7 @@ def character(name):
         if fix:
             fix(img)
         images.append(img)
-        masks.append(_character_mask(img))
+        masks.append(_character_mask(img, from_bottom=name not in CHEST_AT_BOTTOM))
     if fit:
         images, masks = _fit(images, masks, fit)
     return _shared_palette([_shrink(i, m) for i, m in zip(images, masks)], vivid)

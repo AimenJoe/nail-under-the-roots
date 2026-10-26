@@ -39,6 +39,8 @@ Edit the last attached image, the portrait of [이름]. Add only [고칠 것], c
 ```
 - **고친 것은 다음 고침에서 되살아날 수 있다**(시험: 귀를 지운 뒤 같은 대화에서 앞발을 더하자 귀가 다시 났다). 대화 안의 앞선 그림(귀 있는 그림)을 모델이 계속 보고, "나머지는 그대로"는 무엇을 고쳤는지 모른다. 그래서 (1) 고친 그림을 저장해 **새 대화**에 그 그림만(필요하면 시트와 함께) 첨부하고, (2) 프롬프트에 **지킬 것을 짚어** 적는다: `Ensure these features of the portrait remain completely unchanged: [고친 점들]`(공식 합성 템플릿의 "Ensure that the features … remain completely unchanged").
 - **다른 캐릭터 초상화를 크기 맞춤용으로 넣으면 생김새까지 따라간다**(시험: 귀 없는 Naïl 초상화를 함께 넣자 포포의 귀가 사라졌다). 그 캐릭터의 시트에서 귀·모자 같은 머리 모양을 다시 가져오게 고친다(첨부: 시트 → 고칠 초상화 순서).
+- **걱정 표정이 거절될 때**("저는 언어 모델일 뿐이라서…"): 부드러운 말로 바꾸고 맨 앞에 `Edit this image.`를 붙인다(`gently concerned look`, 또 거절되면 `thoughtful, slightly unsure look`). Naïl·모모 둘 다 이렇게 됐다.
+- 표정이 여럿이면 다음 표정도 **보통 표정 하나만** 첨부한다(기쁨 표정을 고치면 감은 눈이 남기 쉽다).
 - 첫 시험(Naïl 보통 표정): 시트에는 없던 둥근 귀가 생겼다(두더지는 귀가 털 속에 숨는다 → 캐릭터 글에 `no visible ears` 넣기). 가슴 위로 자르니 상징인 분홍 앞발이 빠졌다 → 초상화 프롬프트에 앞발을 넣는다.
 
 | 캐릭터 | 칸 | 표정(왼쪽이 보통) |
@@ -176,6 +178,7 @@ Scene (a game title screen background; the game draws the title text and menu on
 2. 팔레트를 줄이고(디더 없이), 1px 체크 무늬가 생기면 단으로 정리한다(사양 2).
 3. 안전 영역(아래 112px)·색 약속(갈색 뿌리·보라 실·눈 색)을 다시 본다.
 4. `assets/LICENSES.md`에 출처(모델·날짜·만든 사람)를 적고, 개발 → "이야기 일러스트"로 배율 2·3에서 본다.
+5. 초상화(`tools/art/ai_portraits.py`): 선이 검게 나오면 프롬프트로 다시 그리지 말고 자두빛으로 옮긴다(모모, 0110). 배경을 지운 미리보기는 **실제 바탕(어두운 대화창)**에서 본다. 밝은 바탕에서는 배경색과 비슷한 크림색 가슴이 지워진 것이 안 보였다(0110).
 
 ## 출처
 - [1차] Google, Gemini API "Nano Banana image generation"(모델 고르기, 참고 그림 한도, 비율·해상도, 프롬프트 템플릿, Best practices, Limitations, SynthID): https://ai.google.dev/gemini-api/docs/image-generation (2026-10-26 읽음)
