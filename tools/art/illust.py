@@ -26,6 +26,9 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ai_illust  # noqa: E402  (나노바나나 원본, 0125)
+
 OUTLINE = (43, 29, 42)
 LIGHT = np.array([-0.55, -0.65, 0.52])
 LIGHT = LIGHT / np.linalg.norm(LIGHT)
@@ -1670,8 +1673,11 @@ def main():
     for name, fn in SCENES.items():
         if only and name not in only:
             continue
-        set_style(*((V2_ENV, V4_ENV) if (V2_ENV or V4_ENV) else SCENE_STYLE.get(name, DEFAULT_STYLE)))
-        im = fn().image()
+        # 나노바나나 원본이 있으면 그 그림으로(ai_illust.py, 0125). 없으면 코드로 그린다.
+        im = ai_illust.scene(name) if name in ai_illust.SIZE else None
+        if im is None:
+            set_style(*((V2_ENV, V4_ENV) if (V2_ENV or V4_ENV) else SCENE_STYLE.get(name, DEFAULT_STYLE)))
+            im = fn().image()
         path = os.path.join(out, name + '.png')
         im.save(path, optimize=True)
         print(f'{path}: {im.size[0]}×{im.size[1]}, {os.path.getsize(path) // 1024}KB')
