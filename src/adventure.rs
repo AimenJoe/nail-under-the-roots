@@ -917,6 +917,7 @@ impl World {
         });
         if let Some(i) = near {
             self.room.open_chest(i);
+            sfx.play(sfx::Id::Chest);
             let at = self.room.props[i].rect.center();
             // 상자가 열리면 반짝임 셋(0081).
             for (k, d) in [vec2(-5.0, -8.0), vec2(4.0, -11.0), vec2(7.0, -5.0)]

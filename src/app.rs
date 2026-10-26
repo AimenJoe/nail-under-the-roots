@@ -661,7 +661,14 @@ impl App {
         let (track, ducked) = self.music_track();
         self.music.update(track, ducked, dt);
         match self.scene {
-            Scene::Game => self.update_game(dt),
+            Scene::Game => {
+                let heard = self.sfx.played();
+                self.update_game(dt);
+                // 게임에서 멈춤 창을 열면 메뉴 소리 하나(다른 창은 말 걸기·상자 소리가 이미 난다).
+                if self.scene == Scene::Pause && self.sfx.played() == heard {
+                    self.sfx.play(crate::sfx::Id::UiConfirm);
+                }
+            }
             Scene::Cutscene => {
                 let mut a = self.input.take();
                 // 건너뛰기 안내를 누르면 뒤로와 같다(터치).
@@ -699,10 +706,34 @@ impl App {
             }
             _ => {
                 let a = self.input.take();
+                let (before, heard) = (self.scene, self.sfx.played());
+                let tapped = a.tap.and_then(|p| self.hit_at(p));
                 self.update_menu(&a, dt);
+                self.menu_sound(&a, tapped, before, heard);
             }
         }
         self.draw();
+    }
+
+    /// 메뉴 소리(docs/decisions/0081): 메뉴 장면에서 이번 프레임에 다른 소리(살 때·안 될 때·크기 미리 듣기 …)가
+    /// 나지 않았으면 입력을 따라 하나 — 뒤로 > 고르기 > 커서. 화면마다 따로 달지 않는다(새 창도 저절로 난다).
+    fn menu_sound(&self, a: &Actions, tapped: Option<Hit>, before: Scene, heard: u32) {
+        use crate::sfx::Id;
+        if self.sfx.played() != heard || before == Scene::Intro {
+            return;
+        }
+        let back =
+            a.cancel || matches!(tapped, Some(Hit::Close)) || (a.menu && self.scene != before);
+        let id = if back && before != Scene::Title {
+            Id::UiBack
+        } else if a.confirm || tapped.is_some() {
+            Id::UiConfirm
+        } else if a.up || a.down || a.left || a.right {
+            Id::UiMove
+        } else {
+            return;
+        };
+        self.sfx.play(id);
     }
 
     // ---- 갱신 ---------------------------------------------------------------

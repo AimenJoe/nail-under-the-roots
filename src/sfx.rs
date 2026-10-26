@@ -1,5 +1,9 @@
-//! 임시 사운드. 에셋 없이 시작 시 합성한 WAV를 메모리에서 로드한다.
-//! 진짜 사운드가 들어오면 이 파일은 `load_sound(path)`로 바뀐다.
+//! 효과음. 시작할 때 합성한 WAV와 파일 소리(`assets/sfx`, docs/decisions/0081)를 메모리에 올린다.
+//!
+//! - 파일 소리: `assets/sfx/<이름>_<n>.wav`(CC0, `tools/audio/make_audio.py`가 만든다, 출처는 assets/LICENSES.md).
+//!   변형이 여럿이면 바로 전과 다른 것을 고른다(같은 타격음이 기계처럼 반복되지 않게). 파일을 못 읽으면 합성한 소리로.
+//! - 합성 소리: 드릴·반딧불 음계·패링처럼 이 게임만의 소리와, 파일이 없을 때의 대신.
+//! - 메뉴 소리(UiMove·UiConfirm·UiBack)는 앱이 메뉴 장면에서 한꺼번에 낸다(`App::menu_sound`).
 
 use std::cell::Cell;
 
@@ -32,6 +36,48 @@ pub enum Id {
     DrillWall,
     /// 패링(맑은 금속음).
     Parry,
+    /// 메뉴 커서가 움직였다.
+    UiMove,
+    /// 메뉴에서 골랐다.
+    UiConfirm,
+    /// 메뉴를 닫았다·뒤로.
+    UiBack,
+    /// 샀다(씨앗을 냈다).
+    Buy,
+    /// 안 된다(씨앗이 모자라다 등).
+    Deny,
+    /// 보물 상자가 열린다.
+    Chest,
+}
+
+/// 파일 소리 표: (이름, 변형 수, 크기). 크기는 MASTER_VOLUME·설정에 곱한다 — 귀로 맞춘다.
+/// 봉우리는 만들 때 모두 −1dBFS로 맞췄다. 자주 나는 메뉴 소리는 작게.
+const FILES: [(&str, usize, f32); 9] = [
+    ("ui_move", 1, 0.35),
+    ("ui_confirm", 1, 0.5),
+    ("ui_back", 1, 0.5),
+    ("buy", 1, 0.7),
+    ("deny", 1, 0.55),
+    ("enemy_hit", 3, 0.75),
+    ("enemy_die", 3, 0.85),
+    ("hurt", 2, 0.9),
+    ("chest", 1, 0.8),
+];
+
+/// 이 소리의 파일 표 자리.
+fn file_of(id: Id) -> Option<usize> {
+    Some(match id {
+        Id::UiMove => 0,
+        Id::UiConfirm => 1,
+        Id::UiBack => 2,
+        Id::Buy => 3,
+        Id::Deny => 4,
+        Id::EnemyHit => 5,
+        Id::EnemyDie => 6,
+        Id::Hurt => 7,
+        Id::Chest => 8,
+        _ => return None,
+    })
 }
 
 pub struct Sfx {
@@ -50,6 +96,14 @@ pub struct Sfx {
     drill: [Sound; 3],
     drill_wall: Sound,
     parry: Sound,
+    /// 파일 소리(`FILES` 차례). 못 읽은 것은 빈 목록.
+    files: Vec<Vec<Sound>>,
+    /// 파일 소리마다 바로 전에 낸 변형.
+    last_variant: std::cell::RefCell<Vec<usize>>,
+    /// 변형 고르기(게임의 rand와 따로: 소리가 게임 난수 차례를 바꾸지 않게).
+    rng: Cell<u32>,
+    /// 지금까지 낸(내려고 한) 소리 수. 앱이 메뉴 소리를 덧붙일지 본다(`App::menu_sound`).
+    played: Cell<u32>,
     /// 반딧불 음 높이 차례.
     glow_step: Cell<usize>,
     /// 설정의 소리 크기(0..1). MASTER_VOLUME에 곱한다.
@@ -63,7 +117,26 @@ const SAME_SOUND_GAP: f64 = 0.03;
 
 impl Sfx {
     pub async fn load() -> Self {
+        let mut files = Vec::new();
+        for (name, n, _) in FILES {
+            let mut v = Vec::new();
+            for i in 0..n {
+                let path = format!("sfx/{name}_{i}.wav");
+                match macroquad::file::load_file(&path).await {
+                    Ok(bytes) => match load_sound_from_bytes(&bytes).await {
+                        Ok(s) => v.push(s),
+                        Err(e) => eprintln!("효과음 {path}: 풀 수 없다({e})"),
+                    },
+                    Err(e) => eprintln!("효과음 {path}: 읽을 수 없다({e})"),
+                }
+            }
+            files.push(v);
+        }
         Self {
+            last_variant: std::cell::RefCell::new(vec![usize::MAX; files.len()]),
+            files,
+            rng: Cell::new(0x2545_F491),
+            played: Cell::new(0),
             claw: [
                 make(&[
                     Layer::noise(0.06, 0.5, 3.0),
@@ -179,12 +252,19 @@ impl Sfx {
         self.volume.set(v.clamp(0.0, 1.0));
     }
 
+    /// 지금까지 낸 소리 수(앱이 한 프레임 사이에 소리가 났는지 본다).
+    pub fn played(&self) -> u32 {
+        self.played.get()
+    }
+
     pub fn play(&self, id: Id) {
+        self.played.set(self.played.get().wrapping_add(1));
         if self.volume.get() <= 0.0 {
             return;
         }
-        let s = self.sound(id);
-        let key = s as *const Sound as usize;
+        let Some((s, gain, key)) = self.pick(id) else {
+            return;
+        };
         let now = macroquad::time::get_time();
         {
             let mut last = self.last.borrow_mut();
@@ -198,18 +278,47 @@ impl Sfx {
             s,
             PlaySoundParams {
                 looped: false,
-                volume: tuning::MASTER_VOLUME * self.volume.get(),
+                volume: tuning::MASTER_VOLUME * self.volume.get() * gain,
             },
         );
     }
 
     /// 길게 울리는 소리를 끊는다(드릴이 벽에 부딪혔을 때).
     pub fn stop(&self, id: Id) {
-        stop_sound(self.sound(id));
+        if let Some(s) = self.synth(id) {
+            stop_sound(s);
+        }
     }
 
-    fn sound(&self, id: Id) -> &Sound {
-        match id {
+    /// 낼 소리, 크기, 같은 소리 간격을 셀 열쇠. 파일 소리의 변형들은 열쇠 하나를 같이 쓴다.
+    fn pick(&self, id: Id) -> Option<(&Sound, f32, usize)> {
+        if let Some(f) = file_of(id) {
+            let set = &self.files[f];
+            if !set.is_empty() {
+                let mut last = self.last_variant.borrow_mut();
+                let mut i = 0;
+                if set.len() > 1 {
+                    let mut r = self.rng.get();
+                    r ^= r << 13;
+                    r ^= r >> 17;
+                    r ^= r << 5;
+                    self.rng.set(r);
+                    // 바로 전 것을 빼고 고른다.
+                    i = r as usize % (set.len() - 1);
+                    if i >= last[f] {
+                        i += 1;
+                    }
+                }
+                last[f] = i;
+                return Some((&set[i], FILES[f].2, f));
+            }
+        }
+        self.synth(id).map(|s| (s, 1.0, s as *const Sound as usize))
+    }
+
+    /// 합성한 소리. 메뉴·상자처럼 파일로만 있는 소리는 None(조용히).
+    fn synth(&self, id: Id) -> Option<&Sound> {
+        Some(match id {
             Id::Claw(i) => &self.claw[i.min(2)],
             Id::Burrow => &self.burrow,
             Id::Emerge => &self.emerge,
@@ -229,7 +338,9 @@ impl Sfx {
             Id::Drill(i) => &self.drill[i.min(2)],
             Id::DrillWall => &self.drill_wall,
             Id::Parry => &self.parry,
-        }
+            Id::Buy => &self.glowbug[0],
+            Id::UiMove | Id::UiConfirm | Id::UiBack | Id::Deny | Id::Chest => return None,
+        })
     }
 }
 

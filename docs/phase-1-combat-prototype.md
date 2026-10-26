@@ -86,7 +86,8 @@
 | 저장 슬롯 | `profile.rs`(SLOTS·slot·set_slot·load_slot·save_slot), `app/slots.rs`, `app.rs`(TitleItem), `web/index.html`(nail_save 칸 번호) | 슬롯 셋, 예전 기록 = 슬롯 1, 타이틀 시작하기·이어하기(기록이 있을 때만) → 슬롯 고르기, 요약·두 번 눌러 덮어쓰기·지우기(0078) |
 | 쉼터부터 이어하기 | `suspend.rs`(RunSave), `app/run.rs`(checkpoint_run·resume_run·clear_run), `adventure.rs`(resume_camp), `profile.rs`(칸 4~6) | 쉼터 도착·가게 닫기·쉼터에서 타이틀로 갈 때 적고, 이어하기 → 그 쉼터(같은 길 지도·재화·가방·장비·통계). 새 런·마을·엔딩·덮어쓰기에서 지움(0080) |
 | 특수효과(0081) | `world.rs`(FxKind Puff·Clod·Glint·Thread, puff·clods·spray·unravel, 발걸음), `render.rs`(draw_fx, draw_ambient, draw_world_lights) | 먼지·흙덩이·맞은 쪽 불똥·쓰러진 이웃의 보라 실·반짝임, 환경 입자, 더하기 빛(반딧불·모닥불·빛 버섯) |
-| 음악 바탕(0081) | `music.rs`, `app.rs`(music_track, 설정 음악 줄), `prefs.rs`(칸 18), `sfx.rs`(같은 소리 30ms) | 장소마다 곡·1초 교차·대사/창에서 낮춤. 곡 파일은 아직 없다(출처 도메인 대기) |
+| 음악 바탕(0081) | `music.rs`, `app.rs`(music_track, 설정 음악 줄), `prefs.rs`(칸 18), `sfx.rs`(같은 소리 30ms) | 장소마다 곡·1초 교차·대사/창에서 낮춤 |
+| 소리 파일(0081) | `tools/audio/make_audio.py`, `assets/sfx`·`assets/music`, `sfx.rs`(FILES·변형), `music.rs`(TRACKS·들을 때 읽기·KEEP), `app.rs`(menu_sound) | CC0 효과음(Kenney: 메뉴·사기·안 됨·맞음·쓰러짐·다침·상자)·음악 7곡(Aureolus_Omicron). 웹 헤드리스로 받기·재생·고리 확인, 네이티브 실제 소리는 미확인 |
 | 패링 | `player.rs`(parry_dir), `world.rs`(parry_feedback) | 스윙 첫 0.12초 앞쪽: 돌진 경직, 투사체 반사, SP +4(docs/decisions/0020). 창이 열린 뒤 0.45초는 새 창 없음(연타 방지), 성공하면 바로(0038) |
 | 스테이지 고리 | `adventure.rs`, `camp.rs`, `route.rs`, `dungeon.rs`(Params), `app/stage.rs` | 필드 → 공터 보스 → 쉼터 → 길 지도(층 3 + 보스, 엇갈리지 않는 갈래, 다음 층만 보임) → 굴(굴·둥지·저장고·샘·보스) → 다음 쉼터. 쉼터: 체력 가득·저장 고리·포포 가게(씨앗)·보리·빈 자리, 공격 버튼 = 말 걸기. 쓰러지면 쉼터, 길은 새로. 단위 테스트(길 규칙 3, 고리 2)(docs/decisions/0030, 0031) |
 | 마을 | `village.rs`, `adventure.rs`(World::village, Place::Village), `render.rs`(큰 나무·꾸미기·할매), `app/stage.rs`(꾸미기 가게·할매·뿌리 길) | 튜토리얼 뒤 시작·엔딩 뒤 돌아오는 허브. 큰 나무 잎 = 깬 횟수, 포포 꾸미기 가게(마을 씨앗 6가지), 보리·할매(실뜨기)·빈 자리(0045) |
@@ -117,8 +118,9 @@
 2026-10-25에 정리했다. 끝난 것(Netlify 시크릿, 플레이 판정, Sunnyside 받기·라이선스·비공개 에셋 레포, 화면 이동·스토리·다회차 결정, 저장 파일, 기술 해금·가게 화면)은 지웠다. 기록은 각 결정(docs/decisions)에 있다.
 
 ### v0.3.0 마일스톤(0081, 완성도) — 사람 몫
-- [ ] 세션 네트워크 허용 도메인에 `kenney.nl`·`opengameart.org` 추가(효과음·메뉴 소리·음악 출처, 2026-10-26에 막힘)
-- [ ] 곡·효과음이 들어오면 귀로 판정(크기 균형, 반복, 폰 스피커·이어폰)
+- [x] 세션 네트워크 허용 도메인에 `kenney.nl`·`opengameart.org` 추가
+- [ ] **v0.1.11 귀로 판정**(0081 진행 2): 곡이 장소에 맞는지(타이틀·마을·들판·쉼터·뿌리·심층·보스), 고리 이음매가 들리는지, 음악과 효과음 크기 균형, 메뉴 소리가 거슬리지 않는지, 맞음·쓰러짐·다침 변형이 반복으로 들리지 않는지, 폰 스피커·이어폰. 바꾸고 싶은 곡·소리는 "어디 → 무엇"으로 알려 주면 표만 고친다
+- [ ] Android에서 장소를 바꿀 때 곡을 읽느라 멈칫하는지(검은 화면이 길어지는지), 보스가 깨어날 때 멈칫하지 않는지
 - [ ] 새 특수효과(먼지·흙덩이·보라 실·꽃가루·모닥불 빛)가 지나치거나 모자라지 않은지
 
 ### v0.2.0 마일스톤(0079) — 사람 몫은 아래 "먼저"의 첫 둘

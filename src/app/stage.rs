@@ -765,6 +765,7 @@ impl App {
         let price = self.world.knots.price(ware.price());
         let w = &mut self.world;
         let msg: Tr = if w.seeds < price {
+            self.sfx.play(crate::sfx::Id::Deny);
             |s| s.shop_poor
         } else {
             let ok = match ware {
@@ -795,9 +796,10 @@ impl App {
             };
             if ok {
                 w.seeds -= price;
-                self.sfx.play(crate::sfx::Id::Glowbug);
+                self.sfx.play(crate::sfx::Id::Buy);
                 |s| s.shop_thanks
             } else {
+                self.sfx.play(crate::sfx::Id::Deny);
                 |s| s.shop_full
             }
         };
@@ -1037,6 +1039,7 @@ impl App {
                 // 이미 놓았다: 아무 일도 없다.
             } else if have < DECOR[i].price {
                 self.shop_msg = Some((|s| s.decor_poor, 3.0));
+                self.sfx.play(crate::sfx::Id::Deny);
             } else {
                 self.profile.set_count(KEY_SEEDS, have - DECOR[i].price);
                 self.profile.set(&key_decor(i));
@@ -1045,7 +1048,7 @@ impl App {
                     v.decor[i] = true;
                 }
                 self.shop_msg = Some((|s| s.decor_thanks, 2.5));
-                self.sfx.play(crate::sfx::Id::Heal);
+                self.sfx.play(crate::sfx::Id::Buy);
             }
         }
         if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
@@ -1204,6 +1207,7 @@ impl App {
                 self.shop_msg = Some((|s| s.tree_venom_on, 2.0));
             } else if have < t::VENOM_AWAKE_COST {
                 self.shop_msg = Some((|s| s.tree_poor, 3.0));
+                self.sfx.play(crate::sfx::Id::Deny);
             } else {
                 self.profile
                     .set_count(KEY_LIGHT, have - t::VENOM_AWAKE_COST);
@@ -1221,6 +1225,7 @@ impl App {
                 let have = self.profile.count(KEY_LIGHT);
                 if have < cost {
                     self.shop_msg = Some((|s| s.tree_poor, 3.0));
+                    self.sfx.play(crate::sfx::Id::Deny);
                 } else {
                     self.profile.set_count(KEY_LIGHT, have - cost);
                     self.profile.set(&key_awake(slot, side));

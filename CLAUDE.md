@@ -24,7 +24,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - 입력은 `Actions` 구조체로만. 게임 로직 어디에서도 `KeyCode`를 직접 보지 않는다. 게임 동작의 키·버튼은 `input::Bindings`(설정에서 바꿈, docs/decisions/0022), 화면에 버튼 이름을 쓸 때는 `input::prompt(Act)`, 메뉴 동사(확인·뒤로 …)는 `input::verb(Verb)` — 글에 키 이름을 박지 않는다. 둘 다 지금 쓰는 장치(키보드·패드·터치)를 따른다(docs/decisions/0036). Android 패드 버튼은 패치한 miniquad(`third_party/miniquad`, `[patch.crates-io]`)가 F13~F25 키로 넘긴다. 패치를 고치거나 miniquad를 올리면 `PATCHED.md`대로 다시 넣고 `cargo test`의 `android_pad_keys_match_patched_miniquad`를 본다(0075).
 - 내부 해상도 320×180, 정수 배율. 월드 좌표는 그릴 때 반올림. 카메라만은 반올림하지 않는다: 정수 부분으로 그리고 소수점은 화면에서 민다(렌더 타깃 1px 여분, docs/decisions/0034). HUD는 화면 패스에.
 - 로직은 고정 타임스텝(60Hz). 히트스톱은 로직 시계만 멈춘다.
-- 음악은 `src/music.rs`(곡 표 `TRACKS`, 웹 mp3·네이티브 ogg, 44.1kHz 원본), 효과음은 `src/sfx.rs`. 특수효과는 `world.rs` FxKind + `render.rs`(draw_fx·draw_ambient·draw_world_lights, 더하기 빛은 `light_material`, 0076·0081).
+- 음악은 `src/music.rs`(곡 표 `TRACKS`, 웹 mp3·네이티브 ogg, 들을 때 읽고 다 내려가면 놓는다), 효과음은 `src/sfx.rs`(파일 소리 표 `FILES` + 합성음, 메뉴 소리는 `App::menu_sound`가 한꺼번에). 소리 파일은 손으로 넣지 않고 `tools/audio/make_audio.py`의 표를 고쳐 다시 만든다(CC0만, 출처는 `assets/LICENSES.md`). 특수효과는 `world.rs` FxKind + `render.rs`(draw_fx·draw_ambient·draw_world_lights, 더하기 빛은 `light_material`, 0076·0081).
 - 손맛 수치는 `src/tuning.rs` 한 곳에. 적 종류별 수치·도감 글은 `src/species.rs` 표(docs/decisions/0021). 콤보(무기별)는 `src/moveset.rs`의 `Moveset` 표, 어떤 캐릭터가 어떤 무기 종류를 쓰는지는 `src/equipment.rs`(docs/decisions/0011). 플레이어 코드에 타별 숫자를 직접 쓰지 않는다(docs/decisions/0009).
 - UI는 커서 없이 동작해야 한다(좌우 이동 + 확인). 마우스는 보조.
 - 모듈 경계: `input`, `player`, `enemy`, `combat`, `room`, `render`, `world`(틱 순서). 각 모듈은 `Actions`와 월드 상태만 본다. 장면·메뉴는 `app`(+`ui`)에만 있고 `world`는 메뉴를 모른다.

@@ -107,7 +107,7 @@ async fn main() {
     done += 1;
     loading::step(done);
     let sfx = sfx::Sfx::load().await;
-    let music = music::Music::load().await;
+    let music = music::Music::new();
     done += 1;
     loading::step(done);
     let mut app = app::App::new(sfx, music, fonts, art);
