@@ -2320,12 +2320,14 @@ fn draw_dream_loop(at: Vec2, time: f32) {
     }
     let bob = ((time * 1.6).sin() * 1.5).round();
     let glow = 0.35 + 0.25 * (time * 2.2).sin().abs();
-    draw_circle(
-        x,
-        y - 12.0 + bob,
-        9.0,
-        Color::new(0.72, 0.62, 0.95, glow * 0.35),
-    );
+    if !shadow_pass() {
+        draw_circle(
+            x,
+            y - 12.0 + bob,
+            9.0,
+            Color::new(0.72, 0.62, 0.95, glow * 0.35),
+        );
+    }
     // 실뜨기 마름모 + 가로줄
     let c = Color::new(0.95, 0.93, 1.0, 1.0);
     let (cx, cy) = (x, y - 12.0 + bob);
@@ -2350,7 +2352,7 @@ fn draw_dream_loop(at: Vec2, time: f32) {
     draw_line(x - 7.0, y - 13.0, cx - 6.0, cy, 1.0, c);
     draw_line(x + 7.0, y - 13.0, cx + 6.0, cy, 1.0, c);
     // 떠오르는 빛 알갱이
-    for k in 0..2 {
+    for k in (0..2).filter(|_| !shadow_pass()) {
         let ph = (time * 0.7 + k as f32 * 0.5).fract();
         draw_rectangle(
             (cx - 3.0 + k as f32 * 6.0).round(),
@@ -2422,8 +2424,8 @@ fn draw_halmae_at(pos: Vec2, time: f32) {
     let shade = Color::new(0.66, 0.62, 0.78, 1.0);
     let cap = Color::new(0.78, 0.60, 0.38, 1.0);
     let cap_dark = Color::new(0.52, 0.38, 0.26, 1.0);
-    // 바닥에 퍼진 실
-    for k in 0..5 {
+    // 바닥에 퍼진 실(바닥에 깔려 그림자 패스에서는 뺀다)
+    for k in (0..5).filter(|_| !shadow_pass()) {
         let a = k as f32 * 1.2 + 0.3;
         let (dx, dy) = (a.cos() * 11.0, a.sin().abs() * 3.0 + 4.0);
         draw_line(
@@ -2514,8 +2516,11 @@ fn draw_great_tree_sunny(sunny: &art::Sunny, at: Vec2, growth: u8, time: f32) {
     let bark_hi = Color::new(0.58, 0.39, 0.28, 1.0);
     let bark_lo = Color::new(0.32, 0.20, 0.17, 1.0);
     let (x, base) = (at.x.round(), at.y + 8.0);
-    // 뿌리: 벼랑 위로 뻗는 굵은 뿌리 넷.
-    for (dx, dy) in [(-30.0, 4.0), (-14.0, 6.0), (14.0, 6.0), (30.0, 4.0)] {
+    // 뿌리: 벼랑 위로 뻗는 굵은 뿌리 넷(바닥에 깔려 그림자 패스에서는 뺀다).
+    for (dx, dy) in [(-30.0, 4.0), (-14.0, 6.0), (14.0, 6.0), (30.0, 4.0)]
+        .into_iter()
+        .filter(|_| !shadow_pass())
+    {
         draw_line(x + dx * 0.3, base - 4.0, x + dx, base + dy, 6.0, OUTLINE);
         draw_line(x + dx * 0.3, base - 4.0, x + dx, base + dy, 4.0, bark);
         draw_line(
@@ -2594,8 +2599,11 @@ fn draw_great_tree(at: Vec2, growth: u8, time: f32) {
     let bark = Color::new(0.40, 0.27, 0.21, 1.0);
     let bark_hi = Color::new(0.52, 0.37, 0.27, 1.0);
     let (x, base) = (at.x.round(), at.y + 8.0);
-    // 뿌리
-    for (dx, len) in [(-26.0, 18.0), (-12.0, 10.0), (12.0, 10.0), (26.0, 18.0)] {
+    // 뿌리(바닥에 깔려 그림자 패스에서는 뺀다)
+    for (dx, len) in [(-26.0, 18.0), (-12.0, 10.0), (12.0, 10.0), (26.0, 18.0)]
+        .into_iter()
+        .filter(|_| !shadow_pass())
+    {
         draw_line(
             x + dx * 0.4,
             base - 2.0,
@@ -2701,12 +2709,14 @@ fn draw_decor_sunny(sunny: &art::Sunny, i: usize, at: Vec2, time: f32) {
                     (foot.x + dx - s / 2.0).round(),
                     (foot.y - s + (k % 2) as f32 * 2.0).round(),
                 );
-                draw_circle(
-                    x + 8.0,
-                    y + 10.0,
-                    7.0,
-                    Color::new(0.5, 0.85, 1.0, 0.12 * pulse),
-                );
+                if !shadow_pass() {
+                    draw_circle(
+                        x + 8.0,
+                        y + 10.0,
+                        7.0,
+                        Color::new(0.5, 0.85, 1.0, 0.12 * pulse),
+                    );
+                }
                 draw_texture_ex(
                     &sunny.mush,
                     x,
@@ -3021,6 +3031,7 @@ enum Drawable {
 /// 바닥에 눕혀(`sun_shear`) 그대로 다시 그린다. 색은 버리고 모양만 쓴다(`Renderer::draw_sun_shadows`).
 fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
     let ground = sun.is_none();
+    SHADOW_PASS.with(|c| c.set(!ground));
     let mut list: Vec<(f32, Drawable)> = Vec::new();
     for (i, p) in w.room.props.iter().enumerate() {
         list.push((p.rect.bottom(), Drawable::Pillar(i)));
@@ -3291,7 +3302,7 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
                     Some(sunny) if growth > 0 => draw_great_tree_sunny(sunny, at, growth, w.time),
                     _ => draw_great_tree(at, growth, w.time),
                 }
-                if w.adv.village.is_some_and(|v| v.tree_ready) {
+                if w.adv.village.is_some_and(|v| v.tree_ready) && !shadow_pass() {
                     draw_tree_motes(at + vec2(0.0, 14.0), w.time);
                 }
             }
@@ -3305,6 +3316,17 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
             unsafe { get_internal_gl() }.quad_gl.pop_model_matrix();
         }
     }
+    SHADOW_PASS.with(|c| c.set(false));
+}
+
+thread_local! {
+    /// 그림자 패스 중인가(0106): 그리기 함수 안의 빛·표시(거품·별·고리·Z·체력 점·빛 알갱이)는 그림자를 드리우지 않는다.
+    static SHADOW_PASS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// 지금 그림자 모양만 모으는 중이면 참. 빛·표시·바닥에 깔린 것은 이때 그리지 않는다.
+fn shadow_pass() -> bool {
+    SHADOW_PASS.with(|c| c.get())
 }
 
 /// 그림자 패스의 빛(0103): 가장 가까운 모닥불 자리(불 밑동)와 밝은 곳인지.
@@ -3789,10 +3811,12 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
     }
     let base = sp.color;
     let mut tint = WHITE;
+    // 그림자 패스(0106)에서는 몸만: 거품·별·잔상·고리·Z·체력 점은 빛·표시라 그림자를 드리우지 않는다.
+    let marks = !shadow_pass();
     if e.poison > 0.0 && e.flash <= 0.0 {
         // 독: 초록빛이 돌고 거품이 오른다.
         tint = Color::new(0.7, 1.0, 0.6, 1.0);
-        for k in 0..2 {
+        for k in (0..2).filter(|_| marks) {
             let ph = (time * 1.6 + k as f32 * 0.5 + e.pos.x * 0.01).fract();
             let bx = pos.x + (k as f32 * 2.0 - 1.0) * (r * 0.5) + (ph * 9.0).sin();
             let by = pos.y - r - 4.0 - ph * 8.0;
@@ -3851,12 +3875,14 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             // 머리 위에 노란 점이 돈다.
             let a = st * 12.0;
             let s = pos + vec2(a.cos(), a.sin() * 0.5) * (r + 3.0) - vec2(0.0, r + 4.0);
-            draw_circle(s.x.round(), s.y.round(), 1.0, YELLOW);
+            if marks {
+                draw_circle(s.x.round(), s.y.round(), 1.0, YELLOW);
+            }
         }
         enemy::State::Charge { dir, .. } => {
             frame = 5;
             // 잔상
-            for i in 1..4 {
+            for i in (1..4).filter(|_| marks) {
                 let back = pos - dir * (i as f32 * 4.0);
                 let a = 0.4 - i as f32 * 0.1;
                 draw_circle(
@@ -3894,7 +3920,7 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
     if let (enemy::State::Howl { time: ht }, false) = (e.state, e.kind == crate::enemy::Kind::Doto)
     {
         // 울음: 퍼지는 고리 둘.
-        for k in 0..2 {
+        for k in (0..2).filter(|_| marks) {
             let ph = ((ht * 2.5) + k as f32 * 0.5).fract();
             draw_circle_lines(
                 pos.x,
@@ -3910,7 +3936,7 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         match e.state {
             enemy::State::Charge { .. } => frame = 4 + ((time * 14.0) as u32) % 2,
             enemy::State::Windup { .. } => frame = 4,
-            enemy::State::Guard { .. } => {
+            enemy::State::Guard { .. } if marks => {
                 frame = 4;
                 let ph = (time * 2.5).fract();
                 let a = std::f32::consts::PI * (1.1 + ph * 0.8);
@@ -3924,6 +3950,7 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
                     Color::new(0.75, 0.90, 1.0, 0.35 + 0.25 * (time * 6.0).sin().abs()),
                 );
             }
+            enemy::State::Guard { .. } => frame = 4,
             _ => {}
         }
     }
@@ -3933,9 +3960,11 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         let ph = (time * 0.8 + e.pos.x * 0.013).fract();
         let z = pos + vec2(4.0 + ph * 3.0, -r - 6.0 - ph * 6.0);
         let c = Color::new(0.9, 0.9, 1.0, 1.0 - ph);
-        draw_line(z.x, z.y, z.x + 3.0, z.y, 1.0, c);
-        draw_line(z.x + 3.0, z.y, z.x, z.y + 3.0, 1.0, c);
-        draw_line(z.x, z.y + 3.0, z.x + 3.0, z.y + 3.0, 1.0, c);
+        if marks {
+            draw_line(z.x, z.y, z.x + 3.0, z.y, 1.0, c);
+            draw_line(z.x + 3.0, z.y, z.x, z.y + 3.0, 1.0, c);
+            draw_line(z.x, z.y + 3.0, z.x + 3.0, z.y + 3.0, 1.0, c);
+        }
     }
     let flash = e.flash > 0.0;
     let chief = e.kind == crate::enemy::Kind::Chief;
@@ -3984,7 +4013,8 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
         }
     }
     // 체력 점(맞은 적만: 처음부터 숫자를 늘어놓지 않는다). 보스는 화면 아래 막대.
-    if !e.is_boss() && (e.hp < e.max_hp || sp.behavior == crate::species::Behavior::Dummy) {
+    if marks && !e.is_boss() && (e.hp < e.max_hp || sp.behavior == crate::species::Behavior::Dummy)
+    {
         let max = e.max_hp;
         for i in 0..max {
             let c = if i < e.hp { WHITE } else { DARKGRAY };
@@ -4554,7 +4584,8 @@ fn silhouette_material() -> Option<Material> {
     uniform sampler2D Texture;
     uniform vec4 Fire;
     void main() {
-        float a = step(0.05, texture2D(Texture, uv).a);
+        // 반투명(빛 원·잔상·옅은 고리)은 그림자를 드리우지 않는다: 반쯤 넘게 채운 점만 모양으로 친다(0106).
+        float a = step(0.5, texture2D(Texture, uv).a);
         float d = distance(world, Fire.xy);
         float fade = mix(1.0, 1.0 - smoothstep(0.55 * Fire.z, Fire.z, d), Fire.w);
         gl_FragColor = vec4(0.10, 0.06, 0.14, a * color.a * fade);
@@ -4634,9 +4665,13 @@ fn cut_material() -> Option<Material> {
 
 /// 빛 반대쪽으로 늘어나는 그림자(0095). 야광버섯·모닥불·저장 지점 곁의 캐릭터는 빛에서 먼 쪽으로 그림자가 길어지고,
 /// 어두운 곳에서는 플레이어의 빛이 적에게 그림자를 드리운다. 바닥 위(정렬 그리기 전)에 그려 어둠 지도가 함께 덮는다.
-/// `fire_silhouettes`: 모닥불 그림자는 모양 그림자(`draw_sun_shadows`, 0103)가 맡으므로 여기서 뺀다.
+/// `fire_silhouettes`: 모닥불 그림자는 모양 그림자(`draw_sun_shadows`, 0103)가 맡으므로 여기서 뺀다. 밝은 곳은 통째로 해 그림자에 맡긴다(0106).
 fn draw_cast_shadows(w: &World, alpha: f32, cam: Vec2, fire_silhouettes: bool) {
     let (dark, radius) = w.biome.darkness();
+    // 밝은 곳은 해 그림자(0102)가 맡는다: 낮에는 버섯·저장 지점·반딧불 같은 약한 빛이 그림자를 만들지 않는다(0106).
+    if fire_silhouettes && dark <= 0.0 {
+        return;
+    }
     let fires = if fire_silhouettes {
         campfires(w)
     } else {
