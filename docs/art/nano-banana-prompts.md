@@ -159,7 +159,7 @@ Scene (a memory from long, long ago, so the whole image is faded toward warm sep
 ### `momo_deep` — 약 2:1 (704×360, 왼쪽→오른쪽으로 흐른다. 비율을 골라야 하면 21:9)
 첨부: `sheet_momo.png`, `sheet_halmae.png`
 ```
-Scene (a wide image that the game slowly pans from left to right): The deepest place, reached as Momo. In the darkness, Halmae's threads hang everywhere, white with some violet, and caught in them are tufts of rabbit fur and withered flower petals, traces of Momo's lost family. Small Momo stands below and looks up at them. Her eyes are her own gentle lavender eyes. Longing and a quiet realization. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 21:9.
+Scene (a wide image that the game slowly pans from left to right): The deepest place, reached as Momo. In the darkness, Halmae's threads hang everywhere, white with some violet, and caught in them are tufts of rabbit fur and withered flower petals, traces of Momo's lost family. Small Momo stands on the right side and looks up at them. Her eyes are her own gentle lavender eyes. Longing and a quiet realization. Keep Momo's whole body above the bottom quarter of the image; the bottom quarter is plain dark ground, because a text box covers it. Keep important things away from the far left and right edges. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 21:9.
 ```
 
 ### `kongi_door` — 16:9 (640×360)

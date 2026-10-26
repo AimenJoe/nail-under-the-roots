@@ -5,6 +5,7 @@ PNG를 손으로 고치지 않고, 원본에 할 일을 모두 여기에 둔다(
   1. 오른쪽 아래 ✦(Gemini 앱 로고)는 원본에서 이미 지웠다(strip_logo.py, 0133).
   2. 팔레트로 줄인다(디더 없이): 채도 높은 색(보라 실·빛나는 눈)에 VIVID_COLORS칸쯤을 색상별 묶음으로 따로 떼고 나머지 REST_COLORS칸.
      한 덩어리로 줄이면 보라 실이 갈색에 묶여 칙칙한 자줏빛이 됐고, 점이 적은 빨간 눈은 묶음 없이는 사라졌다.
+     작은 캐릭터는 FOCUS에 자리를 적어 그 색에 FOCUS_COLORS칸을 따로 준다(momo_deep의 모모, 0135).
   3. 게임 칸(그림 크기의 절반, 일러스트는 게임 점의 2배 밀도)마다 그 자리에서 가장 흔한 색을 고른다(평균이면 덩어리 경계가 흐려진다).
      다만 칸의 VIVID_SHARE(15%) 넘게 채도 높은 색이면 그 색을 고른다: 작은 빨간 눈(한두 칸)이 흙색에 밀려 사라졌다.
   4. 2배로 키운다(다른 일러스트와 같은 2×2 점).
@@ -23,6 +24,7 @@ SRC = os.path.join(ROOT, 'sources', 'ai', 'illust')
 VIVID_COLORS = 16
 REST_COLORS = 48
 VIVID_SHARE = 0.15
+FOCUS_COLORS = 12
 # 장면 → 게임 그림 크기(src/illust.rs가 기대하는 크기, docs/art/nano-banana-prompts.md 4의 괄호).
 SIZE = {
     'great_tree': (640, 560), 'mother_burrow': (640, 360), 'bori_freed': (640, 360), 'momo_bloom': (640, 360),
@@ -33,6 +35,11 @@ SIZE = {
 # 작은 점 반짝이는 남긴다. 밝은 덩어리(채도 낮고 아주 밝은 점 25개 넘음)를 찾아 구름을 빼고 골랐다.
 SPARKLES = {
     'momo_bloom': [(326, 501, 11), (804, 456, 9), (710, 510, 11), (279, 456, 9)],
+}
+# 장면 → 팔레트 FOCUS_COLORS칸을 따로 떼어 줄 자리(원본 px, 자르기 전): 작은 캐릭터의 색. 나머지 색 팔레트에 섞으면 큰 면적 색(실·바위)이
+# 칸을 다 차지해, momo_deep의 작은 모모(그림의 1%)의 황갈색 털이 라벤더 회색·꽃잎 빨강이 됐다(점을 빠짐없이 넣어도 분홍 얼룩이 남았다).
+FOCUS = {
+    'momo_deep': [(745, 225, 835, 340)],
 }
 # 세로로 남을 때 자를 높이(0 위·1 아래). 없으면 가운데.
 CROP_Y = {}
@@ -91,6 +98,8 @@ def scene(name, size=None):
     img = Image.open(path).convert('RGB')
     for star in SPARKLES.get(name, ()):
         ref_pack.erase_star_at(img, *star)
+    # 자리 안의 어두운 바탕(밝기 합 150 아래)은 빼고 캐릭터 색만: 넣으면 칸 대부분이 바탕 검정에 갔다.
+    focus = [p for box in FOCUS.get(name, ()) for p in img.crop(box).getdata() if not _vivid(p) and sum(p) > 150]
     img = _crop_to(img, size[0] / size[1], CROP_Y.get(name, 0.5))
     w, h = img.size
     # 팔레트: 나머지 색은 점을 고르게 뽑아(전부 쓰면 느리다), 채도 높은 색은 원본 점을 전부 쓴다.
@@ -98,7 +107,7 @@ def scene(name, size=None):
     allpx = list(img.getdata())
     vivid = [p for p in allpx if _vivid(p)]
     rest = [p for p in allpx[::16] if not _vivid(p)]
-    entries = _vivid_palette(vivid, VIVID_COLORS) + _palette(rest, REST_COLORS)
+    entries = _vivid_palette(vivid, VIVID_COLORS) + _palette(rest, REST_COLORS) + _palette(focus, FOCUS_COLORS)
     pal = Image.new('P', (1, 1))
     flat = [v for c in entries for v in c]
     pal.putpalette(flat + flat[-3:] * (256 - len(entries)))
