@@ -87,7 +87,7 @@ World rules: The violet threads belong to Halmae, an ancient and lonely fungus g
 | 누룩 할매 | `ref_halmae.png` | `Halmae: an enormous, ancient fungus grandmother, a soft white cotton-like mycelium mound crowned with a cluster of tan mushroom caps, with a kind old face: closed eyes, rosy cheeks and a small smile. Her threads spread out in every direction, white with violet mixed in. Match the attached reference of Halmae.` |
 | 도토 | `ref_doto.png` | `Doto: a red squirrel with a huge fluffy tail and an acorn-cap hat, cheerful closed eyes. Match the attached reference of Doto.` |
 | 수수 | `ref_susu.png` | `Susu: a cute mole-cricket craftsman, a small digging insect drawn as a round, friendly animal: a big rounded, velvety brown thorax like a soft helmet, a small round head with two long thin antennae and big gentle eyes, a pair of large dark shovel-like front legs for digging, a short segmented abdomen, and brass goggles with round sky-blue lenses pushed up on his forehead. Match the attached reference of Susu.` |
-| 콩이 | `ref_kongi.png` | `Kongi: a small armadillo with a banded grey shell and long pink ears. Match the attached reference of Kongi.` |
+| 콩이 | `ref_kongi.png` | `Kongi: a small armadillo with a banded grey shell, a grey head plate, a long slender tapered snout and two short, pointed, leaf-shaped pinkish-grey ears (not long rabbit ears). Match the attached reference of Kongi.` |
 | 포포 | `ref_popo.png` | `Popo: a raccoon with grey fur, a black eye mask, a white muzzle and round ears, with a small trinket tucked behind one ear. Match the attached reference of Popo.` |
 
 ## 4. 장면

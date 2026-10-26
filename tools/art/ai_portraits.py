@@ -45,6 +45,8 @@ CHARACTERS = {
     'doto_tainted': (30, ('glare',), 0.96, 16),
     # 수수: 원본에 둘레 여백이 있어 틀을 맞춘다(높이 100%). 다리 사이에 갇힌 배경 틈을 지운다(HOLES).
     'susu': (33, ('normal', 'happy'), 1.0, 16),
+    # 콩이: 원본이 칸을 채워 틀은 그대로. 주둥이 위 머리 판의 밝은 테두리가 배경색과 가까워 틈 지우기(HOLES)는 켜지 않는다.
+    'kongi': (36, ('normal', 'happy'), None, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
 CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae', 'doto', 'doto_tainted'}
