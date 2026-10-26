@@ -3,17 +3,29 @@
 > 컷씬 일러스트 11장 + 타이틀 바탕을 Google 나노바나나(Gemini 이미지 모델)로 그릴 때 쓰는 프롬프트다. 장면 사양은 [`cutscene-illustrations.md`](cutscene-illustrations.md)를 따른다. AI 그림을 쓰기로 한 결정과 지킬 것은 `docs/decisions/0107`.
 
 ## 0. 쓰는 법
-1. **장면마다 새 대화**를 연다. 한 대화에서 여러 장면을 이어 그리면 앞 그림이 섞인다. 고치다 캐릭터가 흐트러지면 새 대화에서 다시 시작한다(2차 출처 팁).
-2. **첨부 순서**: 캐릭터 참고 그림(`ref_*.png`)을 먼저, 구도 참고(`layout_*.png`)를 **맨 마지막**에. 여러 장을 넣으면 마지막 그림의 가로세로 비를 따라간다는 2차 출처 팁이 있다. AI Studio처럼 비율을 고를 수 있으면 아래 표의 비율을 직접 고른다.
-3. 프롬프트 = **[공통 스타일] + [세계 규칙] + [장면]**. 세 덩어리를 그대로 이어 붙여 넣는다. 영어로 넣는다.
-4. 한 번에 다 맞추려 하지 말고, 나온 그림에 짧게 고쳐 달라고 한다. 예: "Make Naïl smaller and move him to the left third. Keep everything else the same."
-5. 나온 그림은 **크게(원본 그대로) 저장해서** 넘겨 준다. 크기·픽셀 격자·팔레트·안전 영역은 Claude가 맞춘다(아래 7).
+1. **모델**: Nano Banana 2.1(`gemini-nano-banana-2.1`)이 기본, 인물이 많은 장면은 Nano Banana Pro(`gemini-3-pro-image`). **Nano Banana 2 Lite는 쓰지 않는다**(참고 그림 여러 장·여러 번 고치기에 맞추지 않은 모델). 옛 Nano Banana(2.5 Flash Image)는 참고 그림 3장까지가 좋다. [1차]
+2. **참고 그림 한도**: 2.1은 캐릭터 4명까지 닮게, 물건 10개까지. Pro는 캐릭터 5명, 물건 6개, **그림체 참고 3장**. 한 장면에 넣는 캐릭터 그림은 이 안에서. [1차]
+3. **첨부 순서**: 캐릭터 그림(`ref_*.png`) 먼저, 구도 그림(`layout_*.png`)을 **맨 마지막**에. 비율이 다른 그림을 여러 장 넣으면 **마지막 그림의 비율**을 따르고, 원하는 비율이 안 나오면 그 크기의 그림을 같이 넣는 것이 권장 방법이다. `layout_*.png`는 게임 그림과 같은 비율로 만들어 두었다(16:9·640×560·704×360·640×440). AI Studio·API처럼 비율을 고를 수 있으면 아래 비율도 직접 고른다. [1차]
+4. **해상도는 가장 크게**(2K·4K). 도트처럼 그려도 진짜 픽셀 격자가 아니어서(한 칸이 6·7px로 들쭉날쭉) 나중에 격자를 맞추는데, 원본이 클수록 격자를 정확히 찾는다. [2차, 도구 회사 글]
+5. 프롬프트 = **[공통 스타일] + [세계 규칙] + [캐릭터] + [장면]**. 이어 붙여 영어로 넣는다(한국어도 지원 언어지만 이 문서의 글은 영어로 맞췄다). 낱말 나열보다 **장면을 문장으로 그리는 것**이 기본 원칙이다. [1차]
+6. **장면마다 새 대화.** 고치다 생김새가 흐트러지면 새 대화에서 자세한 설명과 함께 다시 시작한다. 한 번에 다 맞추려 하지 말고 짧게 고쳐 달라고 한다. 예: "Keep everything the same, but make Naïl smaller and move him to the left third." [1차]
+7. 나온 그림은 **원본 그대로** 넘겨 준다. 크기·격자·팔레트·안전 영역은 Claude가 맞춘다(아래 7).
+
+### 0-1. 먼저 캐릭터 시트(권장)
+장면을 그리기 전에 캐릭터마다 새 그림체로 **한 장씩** 먼저 그려 확정한다. 공식 문서는 같은 캐릭터를 여러 장 그릴 때 **앞서 만든 그림을 다음 프롬프트에 넣으라**고 한다. 확정한 시트를 장면의 캐릭터 그림으로 `ref_*.png` 대신(또는 함께) 넣는다. [1차]
+```
+Create a character reference sheet for a cozy pixel-art game: the character from the attached image, standing, shown from the front and from a three-quarter view side by side on a plain light background, full body, same proportions and colors as the reference. [캐릭터 글]. [공통 스타일]. Aspect ratio 16:9.
+```
+마음에 드는 그림체(예: 앞서 받은 초상화 판)가 있으면 Pro에서 **그림체 참고**로 첨부하고 이렇게 적는다: `Use the last attached image only as a style reference for line, palette and pixel density; take each character's design only from its own reference image.`
 
 참고 그림(직접 그린 것만, 팩 그림 없음. 0064): 세션 스크래치에 만들어 둔 `ref_*.png`(초상화를 4배로 키운 것)와 `layout_*.png`(지금 임시 일러스트 2배)를 받아서 쓴다. 다시 만들 때는 `assets/art/portraits.png`(칸 번호는 `src/cutscene.rs` `Portrait`)와 `assets/art/illust/*.png`에서 자른다.
 
 ## 1. 공통 스타일 (모든 장면 앞에)
+공식 원칙대로 목적(무엇에 쓰는 그림인지)을 먼저 말하고, "~하지 마"보다 원하는 모습을 적는다(semantic negative prompt). [1차]
 ```
-Style: a cozy, gently melancholic storybook cutscene illustration in high-quality 2D pixel art, like a cutscene from a 16-bit era console game. Chunky, clean pixel clusters on a regular pixel grid, flat color bands with 3 to 5 shades per material, crisp hard edges. Shading is done with solid bands of color rather than soft airbrush gradients, anti-aliasing or checkerboard dithering. Characters have dark plum outlines (#2B1D2A) about two pixels thick instead of black outlines. Soft light comes from the upper left. Warm, muted, earthy palette: browns, moss greens, dusky lavender and soft gold; saturated violet appears only in the threads. Cute, round animal characters with big gentle eyes; the mood is tender and a little lonely, never scary. Composition for a 16:9 game screen: faces and important elements sit in the upper two-thirds; the bottom third is calm ground or shadow because a dialogue box will cover it. The image shows only the scene, with no text, letters, logo, UI, frame or border.
+Purpose: a full-screen story cutscene illustration for "Naïl: Under the Roots", a cozy top-down pixel-art action game about a baby mole who travels down through the roots of a dying great tree to calm a lonely old neighbor. The mood is tender and a little lonely, never scary; there are no villains.
+Style: high-quality 2D pixel art like a cutscene from a 16-bit era console game. Chunky, clean pixel clusters, crisp hard pixel edges, and solid flat color bands with 3 to 5 shades per material. Characters are outlined in dark plum (#2B1D2A), about two pixels thick. Soft light comes from the upper left. A warm, muted, earthy limited palette of browns, moss greens, dusky lavender and soft gold, with saturated violet kept only for the threads. Cute, round animal characters with big gentle eyes.
+Layout: a landscape game screen. Faces and important things sit in the upper two-thirds; the bottom third is calm, simple ground or shadow, because a dialogue box covers it. The picture is a clean, wordless illustration that fills the frame edge to edge.
 ```
 
 ## 2. 세계 규칙 (모든 장면 앞에, 공통 스타일 다음)
@@ -37,97 +49,99 @@ World rules: The violet threads belong to Halmae, an ancient and lonely fungus g
 ## 4. 장면
 비율은 나노바나나에서 고를 비율, 괄호는 게임 그림 크기(Claude가 잘라 맞춘다).
 
-### `great_tree` — 1:1 (640×560, 위→아래로 내려가며 보인다)
+### `great_tree` — 8:7 세로로 긴 그림(640×560, 위→아래로 내려가며 보인다. 비율을 골라야 하면 1:1)
 첨부: `layout_great_tree.png`
 ```
-Scene (a tall image that the game slowly pans from top to bottom): In the upper half, a huge old tree with almost no leaves stands alone on a hill against a dusky evening sky with a low horizon; the whole tree is visible. In the lower half, the view cuts below the ground into dark soil: thick brown roots spread out, and thin glowing violet threads coil around them and seep away into the darkness. Deep in the dark, a few pairs of tiny red eyes glow. The upper half feels calm and quiet; the lower half carries a quiet unease. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene (a tall image that the game slowly pans from top to bottom), built in steps. First, in the upper half, a huge old tree with almost no leaves stands alone on a hill against a dusky evening sky with a low horizon; the whole tree is visible. Then, in the lower half, the view cuts below the ground into dark soil: thick brown roots spread out, and thin glowing violet threads coil around them and seep away into the darkness. Finally, deep in the dark, a few pairs of tiny red eyes glow. The upper half feels calm and quiet; the lower half carries a quiet unease. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `mother_burrow` — 16:9 (640×360)
 첨부: `ref_nail.png`, `ref_mom.png`, `layout_mother_burrow.png`
 ```
-Scene: Inside a snug underground burrow chamber with a nest of dry grass. A large mother mole, eyes closed and tender, gently nudges her tiny baby Naïl with her nose toward a tunnel that leads out of the chamber; warm daylight glows at the far end of the tunnel. Naïl is small and stands facing the light. The mood is warm and a little lonely: a parent letting a child go. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene: Inside a snug underground burrow chamber with a nest of dry grass. A large mother mole, eyes closed and tender, gently nudges her tiny baby Naïl with her nose toward a tunnel that leads out of the chamber; warm daylight glows at the far end of the tunnel. Naïl is small and stands facing the light. The mood is warm and a little lonely: a parent letting a child go. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `bori_freed` — 16:9 (640×360)
 첨부: `ref_bori.png`, `layout_bori_freed.png`
 ```
-Scene: An open clearing at dusk. The old field-mouse elder Bori sits with his eyes closed, catching his breath. Violet threads are loosening from his body and drifting upward, breaking into small sparkles as they go; none of them cover his face. His scar and big round ears are clearly visible. The feeling is relief. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene: An open clearing at dusk. The old field-mouse elder Bori sits with his eyes closed, catching his breath. Violet threads are loosening from his body and drifting upward, breaking into small sparkles as they go; none of them cover his face. His scar and big round ears are clearly visible. The feeling is relief. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `momo_bloom` — 16:9 (640×360)
 첨부: `ref_momo_freed.png`, `ref_momo_tainted.png`, `layout_momo_bloom.png`
 ```
-Scene: A close portrait of Momo the rabbit from the chest up, against a soft warm sky. The withered flower at the base of her ear is bursting into full pink bloom. The last violet threads are slipping off her and falling away below. Her eyes have just turned from glowing green back to her own glossy dark eyes, a little teary. She looks shy and relieved. Use the first attached image for her freed look and the second only to understand what she looked like while bound. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene: A close portrait of Momo the rabbit from the chest up, against a soft warm sky. The withered flower at the base of her ear is bursting into full pink bloom. The last violet threads are slipping off her and falling away below. Her eyes have just turned from glowing green back to her own glossy dark eyes, a little teary. She looks shy and relieved. Use the first attached image for her freed look and the second only to understand what she looked like while bound. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
-### `halmae_deep` — 21:9 (704×360, 오른쪽으로 조금 흐른다)
+### `halmae_deep` — 약 2:1 (704×360, 오른쪽으로 조금 흐른다. 비율을 골라야 하면 21:9)
 첨부: `ref_halmae.png`, `ref_nail.png`, `layout_halmae_deep.png`
 ```
-Scene (a wide image that the game slowly pans to the right): The deepest place under the roots. An enormous ancient fungus grandmother, Halmae, fills the middle and right: a vast soft mound of white mycelium crowned with clusters of mushroom caps, threads reaching out in every direction, white with violet mixed in, giving off a faint gentle glow. In the middle of the mound is a kind old face with closed eyes and a small smile. In the front left, tiny Naïl looks up at her. The feeling is awe and compassion, not fear. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene (a wide image that the game slowly pans to the right), built in steps. First, the deepest place under the roots, dark and soft. Then, an enormous ancient fungus grandmother, Halmae, fills the middle and right: a vast soft mound of white mycelium crowned with clusters of mushroom caps, threads reaching out in every direction, white with violet mixed in, giving off a faint gentle glow. In the middle of the mound is a kind old face with closed eyes and a small smile. Finally, in the front left, tiny Naïl looks up at her. The feeling is awe and compassion, not fear. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
-### `last_bloom` — 3:2 (640×440, 위→아래로 조금 내려간다)
+### `last_bloom` — 약 3:2 (640×440, 위→아래로 조금 내려간다) · 인물 넷이라 Pro 권장
 첨부: `ref_nail.png`, `ref_popo.png`, `ref_bori.png`, `ref_momo_freed.png`, `layout_last_bloom.png`
 ```
-Scene (an image the game pans slightly downward): Dawn. The great old tree blooms one last time, its crown a cloud of pale pink blossoms against a soft gold and lavender sky. At the foot of the tree, small in the frame, the neighbors gather and look up: the baby mole Naïl, the raccoon Popo, the old field mouse Bori and the rabbit Momo. Keep the gathered neighbors within the upper two-thirds of the image. A beautiful farewell. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene (an image the game pans slightly downward), built in steps. First, dawn: the great old tree blooms one last time, its crown a cloud of pale pink blossoms against a soft gold and lavender sky. Then, at the foot of the tree, small in the frame, the neighbors gather and look up: the baby mole Naïl, the raccoon Popo, the old field mouse Bori and the rabbit Momo. Keep the gathered neighbors within the upper two-thirds of the image. A beautiful farewell. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `sprout` — 16:9 (640×360)
 첨부: `layout_sprout.png`
 ```
-Scene: Underground, in dark soft soil. A seed has cracked open and a tiny sprout with two seed leaves is pushing upward. Soft white threads curl around it gently, like cupped hands protecting it. Faint light falls from above. A quiet new beginning. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene: Underground, in dark soft soil. A seed has cracked open and a tiny sprout with two seed leaves is pushing upward. Soft white threads curl around it gently, like cupped hands protecting it. Faint light falls from above. A quiet new beginning. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `molehill` — 16:9 (640×360)
 첨부: `ref_mom.png`, `layout_molehill.png`
 ```
-Scene: A morning meadow. The sprout has grown into a young tree. Beneath it, a mound village with little round doors and windows. In the foreground, a fresh new molehill of turned earth. Far away on the left, the mother mole peeks out of the ground with only her head showing, watching, small in the distance. Quiet joy. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene: A morning meadow. The sprout has grown into a young tree. Beneath it, a mound village with little round doors and windows. In the foreground, a fresh new molehill of turned earth. Far away on the left, the mother mole peeks out of the ground with only her head showing, watching, small in the distance. Quiet joy. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `doto_memory` — 16:9 (640×360)
 첨부: `ref_doto.png`, `layout_doto_memory.png`
 ```
-Scene (a memory from long, long ago, so the whole image is faded toward warm sepia and the edges darken like an old photograph): The deepest place under the roots. A young Doto, a red squirrel wearing an acorn-cap hat with his big tail raised, eyes closed and content, buries a softly glowing seed where a white thread touches the ground. From the darkness on the right, white threads flow in. The feeling is nostalgia, the warmth of something forgotten. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene (a memory from long, long ago, so the whole image is faded toward warm sepia and the edges darken like an old photograph): The deepest place under the roots. A young Doto, a red squirrel wearing an acorn-cap hat with his big tail raised, eyes closed and content, buries a softly glowing seed where a white thread touches the ground. From the darkness on the right, white threads flow in. The feeling is nostalgia, the warmth of something forgotten. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
-### `momo_deep` — 21:9 (704×360, 왼쪽→오른쪽으로 흐른다)
+### `momo_deep` — 약 2:1 (704×360, 왼쪽→오른쪽으로 흐른다. 비율을 골라야 하면 21:9)
 첨부: `ref_momo_freed.png`, `ref_halmae.png`, `layout_momo_deep.png`
 ```
-Scene (a wide image that the game slowly pans from left to right): The deepest place, reached as Momo. In the darkness, Halmae's threads hang everywhere, white with some violet, and caught in them are tufts of rabbit fur and withered flower petals, traces of Momo's lost family. Small Momo stands below and looks up at them. Her eyes are her own glossy dark eyes. Longing and a quiet realization. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene (a wide image that the game slowly pans from left to right): The deepest place, reached as Momo. In the darkness, Halmae's threads hang everywhere, white with some violet, and caught in them are tufts of rabbit fur and withered flower petals, traces of Momo's lost family. Small Momo stands below and looks up at them. Her eyes are her own glossy dark eyes. Longing and a quiet realization. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `kongi_door` — 16:9 (640×360)
 첨부: `ref_kongi.png`, `layout_kongi_door.png`
 ```
-Scene: The entrance to the deepest place: a huge stone door in the darkness. The gap in the middle has just begun to open, and pale golden light leaks out; the light beam lights a haze of dust and spills across the floor. The brown roots that bound the door now hang slack and loose, with violet threads sliding off them. In front of the door, Kongi the armadillo uncurls from a ball and lifts his head toward the gap; he is a silhouette against the light, with only the rim of his shell lit. Letting go, relief. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene: The entrance to the deepest place: a huge stone door in the darkness. The gap in the middle has just begun to open, and pale golden light leaks out; the light beam lights a haze of dust and spills across the floor. The brown roots that bound the door now hang slack and loose, with violet threads sliding off them. In front of the door, Kongi the armadillo uncurls from a ball and lifts his head toward the gap; he is a silhouette against the light, with only the rim of his shell lit. Letting go, relief. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `title` (타이틀 바탕) — 16:9 (640×360)
 첨부: `ref_nail.png`, `layout_title.png`
 ```
-Scene (a game title screen background; the game draws the title text and menu on top): A cross-section of the earth. The top third is a meadow at sunset with a distant lonely hill and two small village mounds; on the right, the trunk of a great tree rises out of frame. Below the ground line, dark layered soil: the great tree's brown roots spread down and to the left, and violet threads coil around the tips of the thickest roots. In the lower left, a tunnel leads down to a small burrow chamber where baby Naïl sleeps curled beside a jar of fireflies. Keep the top band of sky calm and simple for the title text, and keep the central area of the soil dark and even for the menu; put the interesting details (the tree, the burrow chamber) at the sides. Use the last attached image only as a rough guide for where things are placed; redraw everything with much more detail in the style above.
+Scene (a game title screen background; the game draws the title text and menu on top): A cross-section of the earth, built in steps. First, the top third is a meadow at sunset with a distant lonely hill and two small village mounds; on the right, the trunk of a great tree rises out of frame. Then, below the ground line, dark layered soil: the great tree's brown roots spread down and to the left, and violet threads coil around the tips of the thickest roots. Finally, in the lower left, a tunnel leads down to a small burrow chamber where baby Naïl sleeps curled beside a jar of fireflies. Keep the top band of sky calm and simple for the title text, and keep the central area of the soil dark and even for the menu; put the interesting details (the tree, the burrow chamber) at the sides. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ## 5. 자주 나오는 고침 말
+- 오른쪽 아래 ✦ 표시(Gemini 앱 로고)는 Claude가 자른다. 보이지 않는 SynthID 워터마크는 모든 생성 그림에 들어간다. [1차]
 - 선이 검다: `Change all outlines around the characters to dark plum (#2B1D2A), about two pixels thick.`
 - 너무 매끈하다(그라디언트): `Re-render as true pixel art: flat bands of color, 3 to 5 shades per material, crisp edges.`
 - 뿌리가 보라다: `The roots must be brown wood. Only the thin threads wrapped around them are violet.`
 - 눈 색이 틀리다: `Freed animals have their own dark eyes; only animals still bound have glowing red eyes (Momo's glow green).`
 - 얼굴이 아래에 있다: `Move the characters up so their faces are in the upper two-thirds; keep the bottom third simple.`
-- 글자가 들어갔다: `Remove all text and letters from the image.`
+- 글자가 들어갔다: `Keep everything the same, but make it a clean, wordless illustration: remove the lettering and fill those spots with the surrounding scenery.`
 
 ## 6. 하지 않는 것
 - 팩(Sunnyside 등) 그림·스크린숏을 첨부하지 않는다. 게임 화면 캡처에도 팩 그림이 섞여 있으니 넣지 않는다(0064).
 - 다른 작가의 그림·화풍 이름("○○ 스타일")을 넣지 않는다.
 
 ## 7. 넣고 나서(Claude)
-1. 장면의 비율로 자르고, 게임 크기(640×360 등)로 줄여 픽셀 격자를 다시 맞춘다. 나노바나나는 진짜 격자에 맞추지 않는다(한 "픽셀"이 6px·7px로 들쭉날쭉, 2차 출처).
+1. 장면의 비율로 자르고, 그림이 뜻한 격자를 찾아 게임 크기(640×360 등)로 한 칸 = 한 점이 되게 다시 찍는다. 나노바나나는 진짜 격자에 맞추지 않는다(한 "픽셀"이 6px·7px로 들쭉날쭉). 프롬프트로 격자를 맞추려 하지 말고 뒤에서 맞춘다.
 2. 팔레트를 줄이고(디더 없이), 1px 체크 무늬가 생기면 단으로 정리한다(사양 2).
 3. 안전 영역(아래 112px)·색 약속(갈색 뿌리·보라 실·눈 색)을 다시 본다.
 4. `assets/LICENSES.md`에 출처(모델·날짜·만든 사람)를 적고, 개발 → "이야기 일러스트"로 배율 2·3에서 본다.
 
-## 출처(2차, 이 환경에서 Google 공식 문서에는 접속하지 못했다)
-- 서술형 문장 > 낱말 나열, 작은 수정 반복, 새 대화로 다시 시작, 마지막 첨부 그림의 비율: https://deepakness.com/raw/nano-banana-prompt-best-practices, https://www.pixelbin.io/blog/nano-banana-prompt-guide, https://mindpal.space/blog/how-to-prompt-gemini-2-5-flash-image-generation-for-the-best-results-a1b2c3
-- 지원 비율(1:1~21:9): https://glama.ai/mcp/servers/@brunoqgalvao/gemini-image-mcp-server/blob/67301e5f4841e41af909b23290f8b00139fa732e/README.md
-- 도트 그림: 팔레트를 정하면 덩어리가 깔끔해지고, 격자는 나중에 맞춘다: https://www.spritecook.ai/blog/nanobanana-pixel-art-for-games
+## 출처
+- [1차] Google, Gemini API "Nano Banana image generation"(모델 고르기, 참고 그림 한도, 비율·해상도, 프롬프트 템플릿, Best practices, Limitations, SynthID): https://ai.google.dev/gemini-api/docs/image-generation (2026-10-26 읽음)
+- [1차] Google Developers Blog, "How to prompt Gemini 2.5 Flash Image Generation for the best results"(2025-08-28: 장면을 문장으로, 마지막 첨부 그림의 비율, 생김새가 흐트러지면 새 대화, semantic negative prompt): https://developers.googleblog.com/en/how-to-prompt-gemini-2-5-flash-image-generation-for-the-best-results/
+- [2차] SpriteCook, "Turning Nano Banana 2 AI Images into Actual Pixel Art"(2026-03-19: 격자 문제와 뒤에서 맞추기, 가장 큰 해상도, limited palette): https://www.spritecook.ai/blog/nanobanana-pixel-art-for-games — 도구 회사 글이라 자기 도구 홍보가 섞여 있다.
+- 첫 시험(2026-10-26, 사장): 참고 그림 없이 홈페이지만 주고 초상화를 그리게 했더니 이름·종족 글로 흔한 그림을 채웠다(누룩 할매 → 빨간 독버섯 할아버지, 땅강아지 → 사슴벌레, 모모 → 흰 토끼, 게임에 없는 이웃 넷). 참고 그림 + 생김새 글이 필요한 근거.
