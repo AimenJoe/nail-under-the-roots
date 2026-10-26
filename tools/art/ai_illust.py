@@ -2,8 +2,7 @@
 
 illust.py의 main()이 부른다. 원본이 있으면 그 장면을 이 그림으로 바꿔 끼우고, 없으면 코드로 그린 그림 그대로 둔다.
 PNG를 손으로 고치지 않고, 원본에 할 일을 모두 여기에 둔다(같은 원본 = 같은 결과):
-  1. 오른쪽 아래 ✦(Gemini 앱 로고)를 장면마다 적어 둔 자리에서 둘레 색으로 메운다(STAR).
-     어두운 그림에서 "배경보다 밝은 점"으로 찾으면 뿌리·실까지 별로 알고 지웠다.
+  1. 오른쪽 아래 ✦(Gemini 앱 로고)는 원본에서 이미 지웠다(strip_logo.py, 0133).
   2. 팔레트로 줄인다(디더 없이): 채도 높은 색(보라 실·빛나는 눈)에 VIVID_COLORS칸쯤을 색상별 묶음으로 따로 떼고 나머지 REST_COLORS칸.
      한 덩어리로 줄이면 보라 실이 갈색에 묶여 칙칙한 자줏빛이 됐고, 점이 적은 빨간 눈은 묶음 없이는 사라졌다.
   3. 게임 칸(그림 크기의 절반, 일러스트는 게임 점의 2배 밀도)마다 그 자리에서 가장 흔한 색을 고른다(평균이면 덩어리 경계가 흐려진다).
@@ -37,24 +36,6 @@ SPARKLES = {
 }
 # 세로로 남을 때 자를 높이(0 위·1 아래). 없으면 가운데.
 CROP_Y = {}
-# ✦ 반지름에 더하는 여유(px). 그림마다 별 크기가 조금씩 달라(last_bloom 둘째 판은 반지름 20, 위치도 3px 다름) 가장자리 테두리가 옅게 남았다.
-STAR_MARGIN = 2
-# 장면 → ✦ 자리(가운데 x, y, 반지름, 원본 px).
-STAR = {
-    'great_tree': (912, 785, 21),
-    # 16:9(1024×572) 그림은 늘 이 자리(수수 시트도 같다).
-    'mother_burrow': (935, 483, 19),
-    'bori_freed': (935, 483, 19),
-    'momo_bloom': (935, 483, 19),
-    'sprout': (935, 483, 19),
-    'molehill': (935, 483, 19),
-    # 21:9(1024×434)
-    'halmae_deep': (946, 356, 17),
-    # 3:2(1024×687)
-    'last_bloom': (927, 590, 21),
-}
-
-
 def _vivid(rgb):
     h, s, v = colorsys.rgb_to_hsv(*(c / 255 for c in rgb))
     return s > 0.42 and v > 0.35
@@ -108,9 +89,6 @@ def scene(name, size=None):
     if not os.path.exists(path):
         return None
     img = Image.open(path).convert('RGB')
-    if name in STAR:
-        x, y, r = STAR[name]
-        ref_pack.erase_star_at(img, x, y, r + STAR_MARGIN)
     for star in SPARKLES.get(name, ()):
         ref_pack.erase_star_at(img, *star)
     img = _crop_to(img, size[0] / size[1], CROP_Y.get(name, 0.5))

@@ -2,7 +2,7 @@
 
 portraits.py의 sheet()가 부른다. 원본이 있으면 그 칸을 이 그림으로 바꿔 끼우고, 없으면 직접 그린 그림 그대로 둔다.
 PNG를 손으로 고치지 않고, 원본에 할 일을 모두 여기에 둔다(같은 원본 = 같은 결과):
-  1. 오른쪽 아래 ✦(Gemini 앱 로고)를 둘레 색으로 메운다(네 꼭짓점 별 모양, 원본 512px에서 늘 같은 자리).
+  1. 오른쪽 아래 ✦(Gemini 앱 로고)는 원본에서 이미 지웠다(strip_logo.py, 0133).
   2. 고칠 것(검은 선 → 자두빛, 빨간 눈 밝히기 등)을 원본별 표대로.
   3. 배경(가장자리와 이어진 밝은 베이지)을 투명하게, 몸과 떨어진 반짝이·티끌은 지운다.
   4. 88×88로 줄이고(덩어리 평균), 같은 캐릭터 표정 넷을 한 팔레트로 맞춘다(디더 없이).
@@ -66,37 +66,8 @@ FIT_TOP = 0.01
 EYE_COLORS = 8
 REST_COLORS = 56
 # Gemini 앱 로고(✦): 원본 512px 기준 가운데·반지름(네 꼭짓점 별).
-STAR = (451.5, 452.5, 12.5)
-
-
 def _hsv(c):
     return colorsys.rgb_to_hsv(c[0] / 255, c[1] / 255, c[2] / 255)
-
-
-def _erase_star(img):
-    """✦ 자리를 둘레 색으로 메운다: 별 밖의 이웃 색 가운데 가장 흔한 것을 안쪽으로 번져 채운다."""
-    cx, cy, r = STAR
-    sx, sy = img.width / 512, img.height / 512
-    cx, cy, r = cx * sx, cy * sy, r * sx
-    px = img.load()
-    hole = set()
-    for y in range(int(cy - r) - 1, int(cy + r) + 2):
-        for x in range(int(cx - r) - 1, int(cx + r) + 2):
-            dx, dy = abs(x - cx) / r, abs(y - cy) / r
-            if dx ** (2 / 3) + dy ** (2 / 3) <= 1.15:
-                hole.add((x, y))
-    while hole:
-        filled = []
-        for (x, y) in hole:
-            near = [px[x + i, y + j] for i in (-1, 0, 1) for j in (-1, 0, 1)
-                    if (i or j) and (x + i, y + j) not in hole]
-            if len(near) >= 3:
-                filled.append(((x, y), max(set(near), key=near.count)))
-        if not filled:
-            break
-        for (p, c) in filled:
-            px[p] = c
-            hole.discard(p)
 
 
 def _plum_lines(img, keep):
@@ -459,8 +430,7 @@ def character(name):
         return None
     images, masks = [], []
     for f, p in zip(faces, paths):
-        img = Image.open(p).convert('RGB')
-        _erase_star(img)
+        img = Image.open(p).convert('RGB')   # ✦는 원본에서 이미 지웠다(strip_logo.py, 0133)
         if name in CUT_AT:
             img = img.crop((0, 0, img.width, CUT_AT[name]))
         fix = FIXES.get(f'{name}_{f}')

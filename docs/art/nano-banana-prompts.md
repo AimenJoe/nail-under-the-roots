@@ -62,7 +62,7 @@ Edit the last attached image, the portrait of [이름]. Add only [고칠 것], c
 | 엄마 | 17 | `gentle, eyes closed` |
 
 참고 그림(팩 그림 없음, 0064):
-- **캐릭터는 확정한 시트**(`sheet_<이름>.png`)와 시트가 없는 모습의 초상화(`ref_mom`·`ref_momo_tainted`·`ref_bori_tainted`·`ref_doto_tainted`·`ref_kongi_tainted`)를 쓴다(0124). `python3 tools/art/ref_pack.py <폴더>`가 `tools/art/sources/ai/sheets/`와 초상화 원본에서 만든다: 시트의 글자 띠를 잘라 내고(첨부에 글자가 있으면 장면에도 글자가 들어가기 쉽다) ✦ 로고를 지운다. `overview.png`는 확인용 한 장.
+- **캐릭터는 확정한 시트**(`sheet_<이름>.png`)와 시트가 없는 모습의 초상화(`ref_mom`·`ref_momo_tainted`·`ref_bori_tainted`·`ref_doto_tainted`·`ref_kongi_tainted`)를 쓴다(0124). `python3 tools/art/ref_pack.py <폴더>`가 `tools/art/sources/ai/sheets/`와 초상화 원본에서 만든다: 시트의 글자 띠를 잘라 낸다(첨부에 글자가 있으면 장면에도 글자가 들어가기 쉽다). ✦ 로고는 원본에서 이미 지웠다(0133). `overview.png`는 확인용 한 장.
 - **돌아오는 장면에 물든 모습 그림을 넣지 않는다**: `bori_freed`에 물든 보리를 둘째로 넣었더니 돌아온 보리의 털이 푸른 잿빛이 되고, 흉터가 빨간 X, 몸이 날씬해졌다(물든 모습의 색·생김새가 번졌다). 묶였던 모습은 글로만 쓰고, 틀리면 시트 → 고칠 그림 순서로 첨부해 "Redraw only <이름> to match the first attached image"로 고친다(0127). 물든 모습 초상화는 물든 모습이 주인공인 장면에만 쓴다.
 - **패닝하는 그림은 마지막 화면의 대화창 자리를 원본 높이 비율로 적는다**: `last_bloom`(640×440, 아래로 80 패닝)은 마지막 화면에서 대화창이 원본 높이 75% 아래를 덮는다. "위쪽 3분의 2"만 쓰면 이웃들이 61~93%에 서서 가려졌다(0130).
 - **반짝이는 "small round dots of light"로 적는다**: "sparkles"만 쓰면 ✦ 로고와 똑같은 네 꼭짓점 별이 그려져 로고처럼 보였다(`momo_bloom`, 0128).
@@ -175,7 +175,7 @@ Scene (a game title screen background; the game draws the title text and menu on
 ```
 
 ## 5. 자주 나오는 고침 말
-- 오른쪽 아래 ✦ 표시(Gemini 앱 로고)는 Claude가 자른다. 보이지 않는 SynthID 워터마크는 모든 생성 그림에 들어간다. [1차]
+- 오른쪽 아래 ✦ 표시(Gemini 앱 로고)는 원본을 `tools/art/sources/ai/`에 넣고 `python3 tools/art/strip_logo.py`로 원본에서 한 번 지운다(0133). 나노바나나로 고친 그림에는 앞 그림의 ✦를 모델이 다시 그린 흐린 보랏빛 별이 겹쳐 있어, 스크립트가 되돌린 뒤 그 자리를 메운다. 보이지 않는 SynthID 워터마크는 모든 생성 그림에 들어간다. [1차]
 - 선이 검다: `Change all outlines around the characters to dark plum (#2B1D2A), about two pixels thick.`
 - 너무 매끈하다(그라디언트): `Re-render as true pixel art: flat bands of color, 3 to 5 shades per material, crisp edges.`
 - 뿌리가 보라다: `The roots must be brown wood. Only the thin threads wrapped around them are violet.`
