@@ -33,11 +33,11 @@ CHARACTERS = {
     'momo_tainted': (7, ('normal', 'pained'), 1.22, 16),
     # 보리: 원본이 칸을 거의 채워(Naïl처럼) 틀은 그대로. 선도 짙은 자두빛이라 따로 고치지 않는다.
     'bori': (10, ('normal', 'happy'), None, 16),
+    # 들쥐 대장 = 물든 보리(0032). 보리 보통 표정을 고쳐 그려 틀이 같다.
+    'chief': (9, ('glare',), None, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
 CHEST_AT_BOTTOM = {'momo', 'momo_tainted'}
-# 몸 둘레에 빛 번짐이 붙은 캐릭터(빛나는 실): 흰빛을 보랏빛으로 물들인다(_tint_glow).
-HALO = {'momo_tainted'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
 FIT_CUT = 0.02
 # 틀이 1보다 클 때 귀 끝 위에 남길 여백 몫.
@@ -116,12 +116,37 @@ def _plum_lines(img, keep):
 MOMO_EYES = [(410, 470, 580, 640), (680, 480, 800, 640)]
 # 물든 모모 괴로운 표정의 눈물(원본 1024px). 흰빛 물들이기에서 뺀다.
 MOMO_TEAR = (395, 590, 465, 675)
+# 들쥐 대장(물든 보리)에서 흰빛 물들이기를 뺄 자리(원본 1024px): 수염 왼쪽·오른쪽, 눈 둘.
+CHIEF_KEEP = [(395, 520, 570, 710), (750, 510, 910, 700), (430, 410, 570, 510), (660, 420, 760, 500)]
+# 몸 둘레에 빛 번짐이 붙은 캐릭터(빛나는 실): 흰빛을 보랏빛으로 물들인다(_tint_glow).
+HALO = {
+    'momo_tainted': MOMO_EYES + [MOMO_TEAR],
+    'chief': CHIEF_KEEP,
+}
+# 보랏빛 눈 팔레트(EYE_COLORS)를 떼지 않는 캐릭터: 들쥐 대장은 눈이 빨강이고 털이 보라 기운 잿빛이라,
+# 떼면 털이 그 칸을 다 차지해 보라 실이 털 색과 묶였다(흰 줄로 보였다). 실은 채도 칸으로 간다.
+NO_EYE_SPLIT = {'chief'}
+
+def _glow_red_eyes(img, boxes):
+    """눈 상자 안의 빨강을 숯불처럼 밝고 진하게(들쥐 대장). 원본 눈은 검붉은 바탕에 빨간 점이라 88px에서 빛나는 눈으로 읽히지 않았다.
+    실에 묶인 동물 = 작게 빛나는 빨간 눈이 이야기 약속이다(nano-banana-prompts.md 세계 규칙). 빨강(색상 0.95~0.05, 채도 > 0.4)만 옮기고 흰 반사·검은 선은 그대로."""
+    sx = img.width / 1024
+    px = img.load()
+    for (x0, y0, x1, y1) in boxes:
+        for y in range(int(y0 * sx), int(y1 * sx)):
+            for x in range(int(x0 * sx), int(x1 * sx)):
+                h, s, v = _hsv(px[x, y])
+                if (h < 0.05 or h > 0.95) and s > 0.4 and v > 0.18:
+                    r, g, b = colorsys.hsv_to_rgb(0.99, 0.82, min(1.0, 0.62 + v * 0.6))
+                    px[x, y] = (int(r * 255), int(g * 255), int(b * 255))
+
 
 # 원본별로 더 고칠 것(Naïl은 원본 512px 좌표).
 FIXES = {
     'nail_determined': lambda img: _eyes_to_lavender(
         img, [((226, 250, 284, 288), 272), ((400, 244, 430, 266), 258)]),
 }
+FIXES['chief_glare'] = lambda img: _glow_red_eyes(img, CHIEF_KEEP[2:])
 for _face in ('normal', 'happy', 'worried', 'tainted_normal', 'tainted_pained'):
     FIXES[f'momo_{_face}'] = lambda img: _plum_lines(img, MOMO_EYES)
 
@@ -212,7 +237,7 @@ def _shrink(img, mask):
     return out
 
 
-def _shared_palette(cells, vivid_colors):
+def _shared_palette(cells, vivid_colors, eye_split=True):
     """표정들을 한 팔레트로(디더 없이). 투명은 그대로."""
     strip = Image.new('RGB', (W * len(cells), H), (0, 0, 0))
     for i, c in enumerate(cells):
@@ -241,6 +266,8 @@ def _shared_palette(cells, vivid_colors):
         h, s, v = _hsv(p)
         return s > 0.45 and v > 0.45
 
+    if not eye_split:
+        is_eye = lambda p: False
     eye = [p for p in opaque if is_eye(p)]
     split = vivid_colors > 0
     vivid = [p for p in opaque if split and not is_eye(p) and is_vivid(p)]
@@ -380,11 +407,11 @@ def character(name):
         images.append(img)
         mask = _character_mask(img, from_bottom=name not in CHEST_AT_BOTTOM)
         if name in HALO:
-            _tint_glow(img, mask, MOMO_EYES + [MOMO_TEAR])
+            _tint_glow(img, mask, HALO[name])
         masks.append(mask)
     if fit:
         images, masks = _fit(images, masks, fit)
-    return _shared_palette([_shrink(i, m) for i, m in zip(images, masks)], vivid)
+    return _shared_palette([_shrink(i, m) for i, m in zip(images, masks)], vivid, name not in NO_EYE_SPLIT)
 
 
 def cells(fur_variants):
