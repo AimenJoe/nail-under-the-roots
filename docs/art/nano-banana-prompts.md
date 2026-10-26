@@ -96,7 +96,7 @@ World rules: The violet threads belong to Halmae, an ancient and lonely fungus g
 | 누룩 할매 | `ref_halmae.png` | `Halmae: an enormous, ancient fungus grandmother, a soft white cotton-like mycelium mound crowned with a cluster of tan mushroom caps, with a kind old face: closed eyes, rosy cheeks and a small smile. Her threads spread out in every direction, white with violet mixed in. Match the attached reference of Halmae.` |
 | 도토 | `ref_doto.png` | `Doto: a red squirrel with a huge fluffy tail and an acorn-cap hat, cheerful closed eyes. Match the attached reference of Doto.` |
 | 수수 | `ref_susu.png` | `Susu: a cute mole-cricket craftsman, a small digging insect drawn as a round, friendly animal: a big rounded, velvety brown thorax like a soft helmet, a small round head with two long thin antennae and big gentle eyes, a pair of large dark shovel-like front legs for digging, a short segmented abdomen, and brass goggles with round sky-blue lenses pushed up on his forehead. Match the attached reference of Susu.` |
-| 콩이 | `ref_kongi.png` | `Kongi: a small armadillo with a banded grey shell, a grey head plate, a long slender tapered snout and two short, pointed, leaf-shaped pinkish-grey ears (not long rabbit ears). Match the attached reference of Kongi.` |
+| 콩이 | `sheet_kongi.png` | `Kongi: a small, chubby, cute armadillo with a soft pink face, belly and limbs, a domed banded grey shell on his back and a grey head plate, a long rounded pink snout, two tall pink ears, small gentle dark eyes and rosy cheeks. Match the attached character sheet of Kongi.` (확정한 시트가 귀가 길고 분홍이라 시트에 맞췄다. 예전 글 "짧고 뾰족한 귀"는 시트 전 것) |
 | 포포 | `ref_popo.png` | `Popo: a raccoon with grey fur, a black eye mask, a white muzzle and round ears, with a small trinket tucked behind one ear. Match the attached reference of Popo.` |
 
 ## 4. 장면
@@ -163,9 +163,9 @@ Scene (a wide image that the game slowly pans from left to right): The deepest p
 ```
 
 ### `kongi_door` — 16:9 (640×360)
-첨부: `sheet_kongi.png`
+첨부: `sheet_kongi.png`. 공통 스타일·세계 규칙·콩이 글을 앞에 붙인다(첫 판은 스타일 없이 그려 도트가 아닌 그림이 나왔다).
 ```
-Scene: The entrance to the deepest place: a huge stone door in the darkness. The gap in the middle has just begun to open, and pale golden light leaks out; the light beam lights a haze of dust and spills across the floor. The brown roots that bound the door now hang slack and loose, with violet threads sliding off them. In front of the door, Kongi the armadillo uncurls from a ball and lifts his head toward the gap; he is a silhouette against the light, with only the rim of his shell lit. Letting go, relief. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
+Scene: The entrance to the deepest place: a huge stone door in the darkness. The gap in the middle has just begun to open, and pale golden light leaks out; the light lights a haze of dust and spills across the floor. The brown roots that bound the door now hang slack and loose, with a few violet threads sliding off them. In front of the door, a little to the left of the light, Kongi has just uncurled from a ball and lifts his head toward the gap, eyes softly closed. The warm light from the gap rims his shell and ears, and his pink face and belly are still clearly visible in the soft glow; he is not a dark silhouette. Kongi is clearly visible, about a third of the image height, and his feet stand above the bottom quarter of the image; the bottom quarter is plain dark floor, because a text box covers it. Letting go, relief. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
 ```
 
 ### `title` (타이틀 바탕) — 16:9 (640×360)
