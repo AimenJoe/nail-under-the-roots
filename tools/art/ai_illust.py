@@ -37,6 +37,8 @@ SPARKLES = {
 }
 # 세로로 남을 때 자를 높이(0 위·1 아래). 없으면 가운데.
 CROP_Y = {}
+# ✦ 반지름에 더하는 여유(px). 그림마다 별 크기가 조금씩 달라(last_bloom 둘째 판은 반지름 20, 위치도 3px 다름) 가장자리 테두리가 옅게 남았다.
+STAR_MARGIN = 2
 # 장면 → ✦ 자리(가운데 x, y, 반지름, 원본 px).
 STAR = {
     'great_tree': (912, 785, 21),
@@ -48,7 +50,7 @@ STAR = {
     # 21:9(1024×434)
     'halmae_deep': (946, 356, 17),
     # 3:2(1024×687)
-    'last_bloom': (926, 592, 18),
+    'last_bloom': (927, 590, 21),
 }
 
 
@@ -106,7 +108,8 @@ def scene(name, size=None):
         return None
     img = Image.open(path).convert('RGB')
     if name in STAR:
-        ref_pack.erase_star_at(img, *STAR[name])
+        x, y, r = STAR[name]
+        ref_pack.erase_star_at(img, x, y, r + STAR_MARGIN)
     for star in SPARKLES.get(name, ()):
         ref_pack.erase_star_at(img, *star)
     img = _crop_to(img, size[0] / size[1], CROP_Y.get(name, 0.5))
