@@ -176,6 +176,11 @@ impl Player {
         t::PLAYER_RADIUS
     }
 
+    /// 땅 위를 걷고 있다(발걸음 먼지, 0081): 굴 속·공중·드릴 돌진이 아니다.
+    pub fn on_foot(&self) -> bool {
+        matches!(self.state, State::Free | State::Attack { .. })
+    }
+
     pub fn is_alive(&self) -> bool {
         self.state != State::Dead
     }

@@ -24,8 +24,35 @@ pub struct Debug {
 
 #[derive(Debug, Clone, Copy)]
 pub enum FxKind {
-    Ring { r0: f32, r1: f32, color: Color },
-    Spark { color: Color },
+    Ring {
+        r0: f32,
+        r1: f32,
+        color: Color,
+    },
+    Spark {
+        color: Color,
+    },
+    /// 먼지·연기(0081): 채운 동그라미가 커지며 옅어진다.
+    Puff {
+        r0: f32,
+        r1: f32,
+        color: Color,
+    },
+    /// 흙덩이(0081): 높이 `z`로 튀어 올랐다가 떨어져 한 번 통 튄다. 바닥엔 그림자.
+    Clod {
+        color: Color,
+        z: f32,
+        vz: f32,
+    },
+    /// 반짝임(0081): 십자 빛이 커졌다 줄어든다(주운 것·상자).
+    Glint {
+        color: Color,
+    },
+    /// 풀려 흩어지는 보라 실(0081): 쓰러진 이웃에서 실이 빠져나가 위로 떠오르며 사라진다(0037 이야기).
+    Thread {
+        angle: f32,
+        len: f32,
+    },
 }
 
 pub struct Fx {
@@ -184,6 +211,8 @@ pub struct World {
     /// 이번 틱의 공격 히트박스(디버그 표시용).
     pub last_strike: Option<Strike>,
     respawn_timer: f32,
+    /// 발걸음 먼지(0081): 걸은 거리를 모아 한 걸음마다.
+    step_dist: f32,
     enemy_events: Vec<enemy::Event>,
 }
 
@@ -246,6 +275,7 @@ impl World {
             time: 0.0,
             last_strike: None,
             respawn_timer: t::WAVE_RESPAWN_DELAY,
+            step_dist: 0.0,
             enemy_events: Vec::new(),
         };
         w.next_wave();
@@ -299,6 +329,15 @@ impl World {
                     self.burrows += 1;
                     sfx.play(sfx::Id::Burrow);
                     self.fx.push(ring(self.player.pos, 4.0, 12.0, 0.2, DIRT));
+                    clods(&mut self.fx, self.player.pos, 5, DIRT, 40.0);
+                    puff(
+                        &mut self.fx,
+                        self.player.pos,
+                        2,
+                        self.biome.dust(),
+                        5.0,
+                        0.4,
+                    );
                 }
                 player::Event::Emerge => {
                     sfx.play(sfx::Id::Emerge);
@@ -311,6 +350,15 @@ impl World {
                     ));
                     self.feel.add_trauma(0.15);
                     burst(&mut self.fx, self.player.pos, 10, DIRT, 70.0);
+                    clods(&mut self.fx, self.player.pos, 8, DIRT, 70.0);
+                    puff(
+                        &mut self.fx,
+                        self.player.pos,
+                        4,
+                        self.biome.dust(),
+                        8.0,
+                        0.45,
+                    );
                 }
                 player::Event::DrillRev => {
                     // 부아아…: 소리 하나가 시동부터 돌진 끝까지 간다.
@@ -338,6 +386,8 @@ impl World {
                         .push(ring(p, 2.0, t::DRILL_WALL_RADIUS * 0.6, 0.25, DIRT));
                     burst(&mut self.fx, p, 30, DIRT, 170.0);
                     burst(&mut self.fx, p, 10, RAGE, 120.0);
+                    clods(&mut self.fx, p, 10, DIRT, 110.0);
+                    puff(&mut self.fx, p, 5, self.biome.dust(), 10.0, 0.5);
                     self.feel.flash = t::DRILL_WALL_FLASH;
                 }
                 player::Event::Ate(c) => ate = Some(*c),
@@ -346,6 +396,14 @@ impl World {
                     self.burrows += 1;
                     sfx.play(sfx::Id::Charge);
                     burst(&mut self.fx, self.player.pos, 6, DIRT, 50.0);
+                    puff(
+                        &mut self.fx,
+                        self.player.pos + vec2(0.0, 4.0),
+                        2,
+                        self.biome.dust(),
+                        4.0,
+                        0.35,
+                    );
                 }
                 player::Event::Land(big) => {
                     let p = self.player.pos;
@@ -360,6 +418,14 @@ impl World {
                     } else {
                         self.fx.push(ring(p, 2.0, 9.0, 0.15, DIRT));
                     }
+                    puff(
+                        &mut self.fx,
+                        p + vec2(0.0, 4.0),
+                        if *big { 5 } else { 2 },
+                        self.biome.dust(),
+                        5.0,
+                        0.4,
+                    );
                 }
                 player::Event::Hurt | player::Event::Die | player::Event::Parry => {}
             }
@@ -480,10 +546,17 @@ impl World {
         }
         for (pos, kind) in picked_at {
             match kind {
-                LootKind::Glowbug => self.fx.push(ring(pos, 1.0, 5.0, 0.15, GLOW)),
-                LootKind::Seed => self.fx.push(ring(pos, 1.0, 6.0, 0.18, SEED)),
+                LootKind::Glowbug => {
+                    self.fx.push(ring(pos, 1.0, 5.0, 0.15, GLOW));
+                    self.fx.push(glint(pos + vec2(0.0, -3.0), GLOW, 0.3));
+                }
+                LootKind::Seed => {
+                    self.fx.push(ring(pos, 1.0, 6.0, 0.18, SEED));
+                    self.fx.push(glint(pos + vec2(0.0, -3.0), WHITE, 0.25));
+                }
                 LootKind::Berry | LootKind::Worm => {
                     self.fx.push(ring(pos, 2.0, 10.0, 0.2, WHITE));
+                    self.fx.push(glint(pos + vec2(0.0, -4.0), WHITE, 0.3));
                 }
                 LootKind::RootHeart => {
                     self.fx.push(ring(pos, 4.0, 22.0, 0.4, POISON));
@@ -540,6 +613,7 @@ impl World {
             self.fx
                 .push(ring(e.pos, e.radius(), e.radius() * 3.0, 0.25, POISON));
             burst(&mut self.fx, e.pos, 10, color, 90.0);
+            unravel(&mut self.fx, e.pos, e.radius());
         }
         let mut summon = false;
         let mut bury = 0;
@@ -674,6 +748,7 @@ impl World {
                         self.kills += 1;
                         deaths.push((e.pos, e.kind));
                         burst(&mut self.fx, e.pos, 12, enemy_color(e.kind), 110.0);
+                        unravel(&mut self.fx, e.pos, e.radius());
                     }
                     break;
                 }
@@ -730,6 +805,8 @@ impl World {
                 self.feel.add_trauma(s.shake);
                 let hit_point = e.pos - dir * e.radius() * 0.5;
                 self.fx.push(ring(hit_point, 2.0, 9.0, 0.12, WHITE));
+                // 맞은 쪽으로 튀는 불똥(0081): 어디로 밀었는지 보인다.
+                spray(&mut self.fx, hit_point, dir, 4, WHITE, 140.0);
                 if e.alive {
                     sfx.play(sfx::Id::EnemyHit);
                 } else {
@@ -744,6 +821,7 @@ impl World {
                     self.fx
                         .push(ring(e.pos, e.radius(), e.radius() * 3.0, 0.25, color));
                     burst(&mut self.fx, e.pos, 12, color, 110.0);
+                    unravel(&mut self.fx, e.pos, e.radius());
                 }
             }
             if let Some(from) = shell_from {
@@ -912,9 +990,40 @@ impl World {
         for f in &mut self.fx {
             f.time += dt;
             f.pos += f.vel * dt;
-            f.vel *= 0.9;
+            match &mut f.kind {
+                // 흙덩이는 공기 저항이 작고 중력으로 떨어진다. 바닥에 닿으면 한 번 작게 튀고 미끄러진다.
+                FxKind::Clod { z, vz, .. } => {
+                    f.vel *= 0.97;
+                    *vz -= CLOD_GRAVITY * dt;
+                    *z += *vz * dt;
+                    if *z < 0.0 {
+                        *z = 0.0;
+                        *vz = -*vz * 0.35;
+                        f.vel *= 0.5;
+                    }
+                }
+                // 실은 천천히 떠오른다.
+                FxKind::Thread { angle, .. } => {
+                    f.vel *= 0.95;
+                    *angle += dt * 1.5;
+                }
+                _ => f.vel *= 0.9,
+            }
         }
         self.fx.retain(|f| f.time < f.dur);
+        // 발걸음 먼지(0081): 걷는 동안 12px마다 발 뒤에 작은 먼지. 효과가 넘치면 건너뛴다.
+        let moved = (self.player.pos - self.player.prev_pos).length();
+        if self.player.is_alive() && self.player.on_foot() && moved > 0.2 {
+            self.step_dist += moved;
+            if self.step_dist > STEP_DUST_EVERY && self.fx.len() < FX_SOFT_CAP {
+                self.step_dist = 0.0;
+                let back = -(self.player.pos - self.player.prev_pos).normalize_or_zero();
+                let at = self.player.pos + vec2(0.0, 5.0) + back * 3.0;
+                puff(&mut self.fx, at, 1, self.biome.dust(), 3.0, 0.35);
+            }
+        } else {
+            self.step_dist = STEP_DUST_EVERY * 0.6;
+        }
 
         // 7. 모험(입구·출구·저장, 던전 방, 카메라)
         self.adventure_post(sfx);
@@ -1136,6 +1245,102 @@ fn ring(pos: Vec2, r0: f32, r1: f32, dur: f32, color: Color) -> Fx {
         time: 0.0,
         dur,
         kind: FxKind::Ring { r0, r1, color },
+    }
+}
+
+/// 효과가 이만큼 넘으면 먼지 같은 꾸밈 효과는 건너뛴다(타격 효과는 그대로).
+const FX_SOFT_CAP: usize = 300;
+const STEP_DUST_EVERY: f32 = 12.0;
+const CLOD_GRAVITY: f32 = 360.0;
+/// 쓰러진 이웃에서 풀려 나오는 실의 보라(물든 털의 실 색).
+pub const THREAD: Color = Color::new(0.68, 0.45, 0.92, 1.0);
+
+/// 먼지·연기 `n`개: `spread` 반경 안 아무 데서, 천천히 퍼진다.
+fn puff(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, size: f32, dur: f32) {
+    for _ in 0..n {
+        let ang = rand::gen_range(0.0, std::f32::consts::TAU);
+        let off = vec2(ang.cos(), ang.sin()) * rand::gen_range(0.0, size);
+        fx.push(Fx {
+            pos: pos + off,
+            vel: off * 2.0 + vec2(0.0, -6.0),
+            time: 0.0,
+            dur: dur * rand::gen_range(0.8, 1.2),
+            kind: FxKind::Puff {
+                r0: size * 0.5,
+                r1: size * 1.3,
+                color,
+            },
+        });
+    }
+}
+
+/// 흙덩이 `n`개: 사방으로 튀어 올랐다 떨어진다.
+fn clods(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
+    for _ in 0..n {
+        let ang = rand::gen_range(0.0, std::f32::consts::TAU);
+        let sp = rand::gen_range(0.4, 1.0) * speed;
+        fx.push(Fx {
+            pos,
+            vel: vec2(ang.cos(), ang.sin() * 0.6) * sp,
+            time: 0.0,
+            dur: rand::gen_range(0.45, 0.7),
+            kind: FxKind::Clod {
+                color,
+                z: 2.0,
+                vz: rand::gen_range(70.0, 130.0),
+            },
+        });
+    }
+}
+
+/// 맞은 쪽(`dir`)으로 퍼지는 불똥.
+fn spray(fx: &mut Vec<Fx>, pos: Vec2, dir: Vec2, n: usize, color: Color, speed: f32) {
+    let base = dir.y.atan2(dir.x);
+    for _ in 0..n {
+        let ang = base + rand::gen_range(-0.7, 0.7);
+        let sp = rand::gen_range(0.5, 1.0) * speed;
+        fx.push(Fx {
+            pos,
+            vel: vec2(ang.cos(), ang.sin()) * sp,
+            time: 0.0,
+            dur: rand::gen_range(0.1, 0.22),
+            kind: FxKind::Spark { color },
+        });
+    }
+}
+
+fn glint(pos: Vec2, color: Color, dur: f32) -> Fx {
+    Fx {
+        pos,
+        vel: Vec2::ZERO,
+        time: 0.0,
+        dur,
+        kind: FxKind::Glint { color },
+    }
+}
+
+/// 쓰러진 이웃: 연기 조금 + 보라 실이 풀려 위로 흩어진다(0081). 이웃이 실에서 풀려나는 그림.
+fn unravel(fx: &mut Vec<Fx>, pos: Vec2, radius: f32) {
+    puff(
+        fx,
+        pos,
+        4,
+        Color::new(0.45, 0.38, 0.50, 1.0),
+        radius * 0.6,
+        0.45,
+    );
+    for k in 0..5 {
+        let ang = rand::gen_range(0.0, std::f32::consts::TAU);
+        fx.push(Fx {
+            pos: pos + vec2(ang.cos(), ang.sin()) * radius * 0.5,
+            vel: vec2(ang.cos() * 18.0, -rand::gen_range(14.0, 30.0)),
+            time: 0.0,
+            dur: 0.7 + k as f32 * 0.06,
+            kind: FxKind::Thread {
+                angle: ang,
+                len: rand::gen_range(4.0, 7.0),
+            },
+        });
     }
 }
 

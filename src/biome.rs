@@ -49,6 +49,15 @@ impl Biome {
         }
     }
 
+    /// 발밑 먼지 색(0081): 들판은 마른 흙빛, 굴은 어두운 흙, 심층은 차가운 잿빛.
+    pub fn dust(self) -> Color {
+        match self {
+            Biome::Meadow => Color::new(0.80, 0.72, 0.55, 1.0),
+            Biome::Roots => Color::new(0.58, 0.46, 0.38, 1.0),
+            Biome::Deep => Color::new(0.50, 0.50, 0.62, 1.0),
+        }
+    }
+
     pub fn floor_tint(self) -> Color {
         match self {
             Biome::Meadow => WHITE,

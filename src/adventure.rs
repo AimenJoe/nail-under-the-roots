@@ -918,6 +918,21 @@ impl World {
         if let Some(i) = near {
             self.room.open_chest(i);
             let at = self.room.props[i].rect.center();
+            // 상자가 열리면 반짝임 셋(0081).
+            for (k, d) in [vec2(-5.0, -8.0), vec2(4.0, -11.0), vec2(7.0, -5.0)]
+                .into_iter()
+                .enumerate()
+            {
+                self.fx.push(crate::world::Fx {
+                    pos: at + d,
+                    vel: vec2(0.0, -8.0),
+                    time: -0.08 * k as f32,
+                    dur: 0.45,
+                    kind: crate::world::FxKind::Glint {
+                        color: Color::new(1.0, 0.92, 0.55, 1.0),
+                    },
+                });
+            }
             for _ in 0..rand::gen_range(t::CHEST_SEEDS.0, t::CHEST_SEEDS.1 + 1) {
                 self.push_loot(Loot::spawn(LootKind::Seed, at));
             }

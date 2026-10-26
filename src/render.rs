@@ -4,7 +4,7 @@
 use macroquad::prelude::*;
 
 use crate::art::{self, Art};
-use crate::biome::{self, Decor};
+use crate::biome::{self, Biome, Decor};
 use crate::combat::{Shape, StrikeKind};
 use crate::enemy::{self, Enemy};
 use crate::input::TouchOverlay;
@@ -167,8 +167,10 @@ impl Renderer {
             draw_sorted(art, w, alpha);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
+            draw_ambient(w, cam, false);
             draw_darkness(art, w, alpha, cam);
             draw_save_lights(w, cam, self.light.as_ref());
+            draw_world_lights(w, cam, alpha, self.light.as_ref());
             if draw_super_dim(w, cam) {
                 draw_nail(art, &w.player, w.fur, alpha, w.time);
                 draw_player_fx(&w.player, alpha);
@@ -1392,6 +1394,154 @@ fn draw_save_lights(w: &World, cam: Vec2, light: Option<&Material>) {
             );
         }
     }
+    if light.is_some() {
+        gl_use_default_material();
+    }
+}
+
+/// 0..1 해시(환경 입자 자리, 0081). 같은 번호면 같은 값이라 상태 없이 그린다.
+fn hash01(i: u32, k: u32) -> f32 {
+    let mut x = i.wrapping_mul(0x9E37_79B9) ^ k.wrapping_mul(0x85EB_CA6B);
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x2C1B_3C6D);
+    x ^= x >> 12;
+    (x & 0xFFFF) as f32 / 65535.0
+}
+
+/// 환경 입자(0081): 들판·마을은 떠다니는 꽃가루, 뿌리 지대는 천천히 내리는 포자, 심층은 빛 알갱이(더하기 빛 패스).
+/// 상태가 없다. 번호마다 월드에 붙은 자리(카메라 둘레 타일에서 되풀이)와 흐름이 정해져 있다.
+/// 분위기 입자는 작고 대비가 낮게(타격 효과보다 눈에 덜 띄게).
+fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
+    let deep = w.biome == Biome::Deep;
+    if glow != deep || w.room.grid.is_none() {
+        return;
+    }
+    let (tw, th) = (RW + 48.0, RH + 48.0);
+    let n = if deep { 18 } else { 22 };
+    for i in 0..n {
+        let (hx, hy, hs) = (hash01(i, 1), hash01(i, 2), hash01(i, 3));
+        let t = w.time;
+        let (drift, color, size) = match w.biome {
+            // 꽃가루: 바람 따라 옆으로, 위아래로 살랑.
+            Biome::Meadow => (
+                vec2(6.0 + hs * 6.0, (t * (0.8 + hs) + hs * 6.0).sin() * 3.0),
+                Color::new(1.0, 0.97, 0.85, 0.55),
+                1.0,
+            ),
+            // 포자: 천천히 내리며 좌우로 흔들.
+            Biome::Roots => (
+                vec2((t * (0.6 + hs) + hs * 9.0).sin() * 4.0, 5.0 + hs * 4.0),
+                Color::new(0.90, 0.85, 0.72, 0.45),
+                1.0,
+            ),
+            // 빛 알갱이: 아주 천천히 떠오른다.
+            Biome::Deep => (
+                vec2((t * 0.5 + hs * 7.0).sin() * 5.0, -3.0 - hs * 3.0),
+                Color::new(
+                    0.55,
+                    0.80,
+                    1.0,
+                    0.35 + 0.25 * (t * 2.0 + hs * 9.0).sin().abs(),
+                ),
+                if hs > 0.7 { 2.0 } else { 1.0 },
+            ),
+        };
+        // 꽃가루는 옆으로 흘러가고, 포자·빛 알갱이는 위아래로 흐른다(나머지 축은 살랑임).
+        let flow = if w.biome == Biome::Meadow {
+            vec2(drift.x * t, drift.y)
+        } else {
+            vec2(drift.x, drift.y * t)
+        };
+        let x = cam.x - 24.0 + (hx * tw + flow.x - cam.x).rem_euclid(tw);
+        let y = cam.y - 24.0 + (hy * th + flow.y - cam.y).rem_euclid(th);
+        if deep {
+            draw_circle(
+                x.round(),
+                y.round(),
+                3.0,
+                Color::new(color.r, color.g, color.b, color.a * 0.3),
+            );
+        }
+        draw_rectangle(x.round(), y.round(), size, size, color);
+    }
+}
+
+/// 더하기 빛(0081): 반딧불(떨어진 것)·모닥불(바닥 빛 + 불티)·빛 버섯·심층 빛 알갱이. 어둠 위에 그린다.
+fn draw_world_lights(w: &World, cam: Vec2, alpha: f32, light: Option<&Material>) {
+    if w.room.grid.is_none() {
+        return;
+    }
+    if let Some(m) = light {
+        gl_use_material(m);
+    }
+    let k = if light.is_some() { 1.0 } else { 0.5 };
+    let t = w.time;
+    for l in &w.loot {
+        if l.kind != loot::LootKind::Glowbug {
+            continue;
+        }
+        let q = lerp(l.prev_pos, l.pos, alpha);
+        let pulse = 0.55 + 0.45 * ((t * 6.0 + l.phase * 10.0) * 0.8).sin().abs();
+        let g = world::GLOW;
+        draw_circle(
+            q.x.round(),
+            (q.y - l.z - 3.0).round(),
+            6.0,
+            Color::new(g.r, g.g, g.b, 0.16 * pulse * k),
+        );
+    }
+    for p in &w.room.props {
+        if p.kind != PropKind::Campfire {
+            continue;
+        }
+        let c = vec2(p.rect.center().x, p.rect.bottom() - 6.0);
+        let flick = 0.5 + 0.25 * (t * 9.0).sin() + 0.25 * (t * 13.7).sin();
+        // 바닥 빛: 겹을 여럿 두어 가장자리가 스티커처럼 끊기지 않게(바깥일수록 옅게).
+        for (i, (rx, ry, a)) in [
+            (40.0, 22.0, 0.03),
+            (30.0, 16.0, 0.04),
+            (20.0, 11.0, 0.05),
+            (11.0, 6.0, 0.06),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let warm = 0.55 + i as f32 * 0.06;
+            draw_ellipse(
+                c.x,
+                c.y + 2.0,
+                rx + flick,
+                ry + flick * 0.5,
+                0.0,
+                Color::new(1.0, warm, 0.25 + i as f32 * 0.04, (a + 0.02 * flick) * k),
+            );
+        }
+        // 불티: 넷이 위로 떠오르다 사라진다.
+        for i in 0..4u32 {
+            let ph = (t * 0.9 + hash01(i, 7)).fract();
+            let x = c.x + (t * 3.0 + i as f32 * 1.7).sin() * 3.0 + (hash01(i, 8) - 0.5) * 6.0;
+            let y = c.y - 6.0 - ph * 22.0;
+            draw_rectangle(
+                x.round(),
+                y.round(),
+                1.0,
+                1.0,
+                Color::new(1.0, 0.75, 0.35, (1.0 - ph) * k),
+            );
+        }
+    }
+    for (x, y, d) in floor_decor(w, cam) {
+        if d == Decor::Mushroom {
+            let pulse = 0.6 + 0.4 * ((t * 2.0 + x * 0.1).sin());
+            draw_circle(
+                x + 8.0,
+                y + 10.0,
+                8.0,
+                Color::new(0.35, 0.65, 1.0, 0.10 * pulse * k),
+            );
+        }
+    }
+    draw_ambient(w, cam, true);
     if light.is_some() {
         gl_use_default_material();
     }
@@ -3400,6 +3550,59 @@ fn draw_fx(w: &World) {
                     s,
                     Color::new(color.r, color.g, color.b, 1.0 - p),
                 );
+            }
+            // 먼지·연기: 정수 반지름, 천천히 옅어진다(분위기 효과는 대비를 낮게, 0081).
+            FxKind::Puff { r0, r1, color } => {
+                let r = (r0 + (r1 - r0) * p).round().max(1.0);
+                let a = 0.55 * (1.0 - p) * (1.0 - p);
+                draw_circle(pos.x, pos.y, r, Color::new(color.r, color.g, color.b, a));
+            }
+            // 흙덩이: 바닥 그림자 + 높이만큼 떠 있는 2px 덩이(아래 한 점 어둡게).
+            FxKind::Clod { color, z, .. } => {
+                let a = if p > 0.8 { (1.0 - p) * 5.0 } else { 1.0 };
+                draw_rectangle(
+                    pos.x,
+                    pos.y + 1.0,
+                    2.0,
+                    1.0,
+                    Color::new(0.0, 0.0, 0.0, 0.25 * a),
+                );
+                let y = (pos.y - z).round();
+                draw_rectangle(pos.x, y, 2.0, 2.0, Color::new(color.r, color.g, color.b, a));
+                draw_rectangle(
+                    pos.x,
+                    y + 1.0,
+                    2.0,
+                    1.0,
+                    Color::new(color.r * 0.6, color.g * 0.6, color.b * 0.6, a),
+                );
+            }
+            // 반짝임: 십자가 커졌다 줄어든다(팔 길이 0→2→0, 가운데는 흰 점).
+            FxKind::Glint { color } => {
+                if f.time < 0.0 {
+                    continue;
+                }
+                let arm = ((1.0 - (p * 2.0 - 1.0).abs()) * 2.5).round();
+                let c = Color::new(color.r, color.g, color.b, 1.0 - p * 0.5);
+                if arm > 0.0 {
+                    draw_rectangle(pos.x - arm, pos.y, arm * 2.0 + 1.0, 1.0, c);
+                    draw_rectangle(pos.x, pos.y - arm, 1.0, arm * 2.0 + 1.0, c);
+                }
+                draw_rectangle(pos.x, pos.y, 1.0, 1.0, WHITE);
+            }
+            // 풀려 흩어지는 실: 짧은 물결 선(점 몇 개), 끝으로 갈수록 옅다.
+            FxKind::Thread { angle, len } => {
+                let c = crate::world::THREAD;
+                let d = vec2(angle.cos(), angle.sin());
+                let n = vec2(-d.y, d.x);
+                let n_px = len.round() as i32;
+                for i in 0..n_px {
+                    let t = i as f32;
+                    let wave = (t * 0.9 + f.time * 9.0).sin() * 1.2;
+                    let q = (pos + d * t + n * wave).round();
+                    let a = (1.0 - p) * (1.0 - t / len * 0.6);
+                    draw_rectangle(q.x, q.y, 1.0, 1.0, Color::new(c.r, c.g, c.b, a));
+                }
             }
         }
     }
