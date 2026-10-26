@@ -26,6 +26,8 @@ pub struct Art {
     pub illust: Vec<Option<Texture2D>>,
     /// 타이틀 바탕 640×360(2배 밀도, `tools/art/illust.py` title, 0083). 없으면 예전 선 바탕.
     pub title: Option<Texture2D>,
+    /// 타이틀 위를 흐르는 안개 640×360 RGBA(가로로 이어짐, 0083).
+    pub title_fog: Option<Texture2D>,
 }
 
 /// chief.png 한 칸.
@@ -173,8 +175,13 @@ impl Art {
         if let Some(t) = &title {
             t.set_filter(FilterMode::Nearest);
         }
+        let title_fog = load_texture("art/illust/title_fog.png").await.ok();
+        if let Some(t) = &title_fog {
+            t.set_filter(FilterMode::Nearest);
+        }
         Some(Self {
             title,
+            title_fog,
             nail,
             nail_furs,
             tiles,

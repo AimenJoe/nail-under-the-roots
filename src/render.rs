@@ -330,12 +330,15 @@ impl Renderer {
         }
     }
 
-    /// 타이틀 바탕(docs/decisions/0083): 땅의 단면 그림 + 반딧불 몇 마리(굴 방 둘레·뿌리 사이) + 떨어지는 마른 잎,
-    /// 메뉴 뒤 옅은 어둠(글이 읽히게). 그림이 없으면 아무것도 하지 않는다(월드 패스의 선 바탕이 남는다).
-    /// `t`는 초(움직임만, 상태 없음).
+    /// 타이틀 바탕(docs/decisions/0083): 어둠 속 땅의 단면, 천천히 흐르는 안개 두 겹, 반딧불(굴 방·뿌리 사이),
+    /// 물든 뿌리 끝에서 떠오르는 보라 알갱이, 메뉴 뒤 옅은 어둠. 그림이 없으면 아무것도 하지 않는다
+    /// (월드 패스의 선 바탕이 남는다). `t`는 초(움직임만, 상태 없음).
     pub fn draw_title_art(&self, ui: &Ui, t: f32) {
         use crate::illust::{VIEW_H, VIEW_W};
-        let Some(tex) = self.art.as_ref().and_then(|a| a.title.as_ref()) else {
+        let Some(art) = self.art.as_ref() else {
+            return;
+        };
+        let Some(tex) = art.title.as_ref() else {
             return;
         };
         let o = ui.px(vec2(0.0, 0.0));
@@ -350,6 +353,30 @@ impl Renderer {
                 ..Default::default()
             },
         );
+        // 안개: 가로로 이어진 그림을 옆으로 굴린다(두 조각으로 그려 화면 밖으로 넘치지 않게). 게임 1px(원본 2px)씩.
+        if let Some(fog) = art.title_fog.as_ref() {
+            for (speed, alpha, flip) in [(5.0, 0.8, false), (9.0, 0.45, true)] {
+                let off = ((t * speed / 2.0).floor() * 2.0).rem_euclid(VIEW_W);
+                let c = Color::new(1.0, 1.0, 1.0, alpha);
+                for (sx, sw, dx) in [(off, VIEW_W - off, 0.0), (0.0, off, VIEW_W - off)] {
+                    if sw <= 0.0 {
+                        continue;
+                    }
+                    draw_texture_ex(
+                        fog,
+                        o.x + dx * k,
+                        o.y,
+                        c,
+                        DrawTextureParams {
+                            dest_size: Some(vec2(sw * k, VIEW_H * k)),
+                            source: Some(Rect::new(sx, 0.0, sw, VIEW_H)),
+                            flip_y: flip,
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+        }
         // 원본 px(640×360) 좌표로 작은 네모 하나.
         let dot = |x: f32, y: f32, size: f32, c: Color| {
             draw_rectangle(
@@ -360,47 +387,46 @@ impl Renderer {
                 c,
             );
         };
-        // 반딧불: 자리마다 느린 8자 + 깜빡임. 둘은 굴 방 안, 나머지는 뿌리 사이.
+        // 반딧불: 자리마다 느린 8자 + 깜빡임. 둘은 굴 방 안, 하나는 굴길, 나머지는 뿌리 사이 어둠.
         const FLIES: [(f32, f32, f32); 7] = [
-            (128.0, 250.0, 0.0),
-            (70.0, 236.0, 1.7),
-            (300.0, 214.0, 3.1),
-            (420.0, 172.0, 4.4),
-            (470.0, 276.0, 2.2),
-            (610.0, 240.0, 5.3),
-            (250.0, 300.0, 0.9),
+            (126.0, 256.0, 0.0),
+            (176.0, 266.0, 1.7),
+            (88.0, 176.0, 3.1),
+            (330.0, 196.0, 4.4),
+            (430.0, 250.0, 2.2),
+            (600.0, 220.0, 5.3),
+            (270.0, 292.0, 0.9),
         ];
         for (i, &(x, y, ph)) in FLIES.iter().enumerate() {
             let s = 0.35 + 0.07 * i as f32;
             let px = x + (t * s + ph).sin() * 10.0;
             let py = y + (t * s * 2.0 + ph).sin() * 5.0;
-            let a = 0.55 + 0.45 * (t * 2.3 + ph * 1.7).sin().max(0.0);
+            let a = 0.35 + 0.65 * (t * 2.3 + ph * 1.7).sin().max(0.0);
             dot(
                 px - 2.0,
                 py - 2.0,
                 6.0,
-                Color::new(1.0, 0.92, 0.55, 0.18 * a),
+                Color::new(1.0, 0.92, 0.55, 0.16 * a),
             );
             dot(px, py, 2.0, Color::new(1.0, 0.97, 0.75, a));
         }
-        // 마른 잎 하나가 가지 끝에서 흔들리며 떨어진다(9초마다).
-        let cycle = 9.0;
-        let lt = t % cycle;
-        if lt < 6.0 {
-            let lx = 440.0 + (lt * 2.1).sin() * 14.0 - lt * 6.0;
-            let ly = 10.0 + lt * 18.0;
-            if ly < 112.0 {
-                dot(lx, ly, 4.0, Color::new(0.69, 0.52, 0.29, 1.0));
-                dot(lx + 1.0, ly + 1.0, 2.0, Color::new(0.77, 0.61, 0.36, 1.0));
-            }
+        // 물든 뿌리 끝(오른쪽 아래)에서 보라 알갱이가 천천히 떠올라 사라진다.
+        for i in 0..9 {
+            let f = i as f32;
+            let period = 7.0 + (f * 1.37) % 3.0;
+            let p = ((t + f * 2.9) / period).fract();
+            let x = 470.0 + (f * 53.0) % 160.0 + (p * 6.0 + f).sin() * 6.0;
+            let y = 352.0 - p * 120.0;
+            let a = (p * 4.0).min(1.0) * (1.0 - p) * 0.8;
+            dot(x, y, 2.0, Color::new(0.78, 0.6, 1.0, a));
         }
-        // 메뉴 뒤(게임 좌표 90~256 × 53~151, 오늘의 굴 날짜까지) 옅은 어둠. 가장자리는 한 겹 더 옅게.
+        // 메뉴 뒤(게임 좌표 90~256 × 53~151, 오늘의 굴 날짜까지) 옅은 어둠. 바탕이 어두워 아주 옅게.
         let menu = Rect::new(90.0, 53.0, 166.0, 98.0);
         ui.rect(
             Rect::new(menu.x - 2.0, menu.y - 2.0, menu.w + 4.0, menu.h + 4.0),
-            Color::new(0.05, 0.03, 0.05, 0.18),
+            Color::new(0.03, 0.02, 0.04, 0.12),
         );
-        ui.rect(menu, Color::new(0.05, 0.03, 0.05, 0.32));
+        ui.rect(menu, Color::new(0.03, 0.02, 0.04, 0.2));
     }
 
     /// 컷씬 일러스트를 게임 화면 전체에(docs/decisions/0039). 원본 1px = 화면 배율/2 px(초상화와 같은 2배 밀도).

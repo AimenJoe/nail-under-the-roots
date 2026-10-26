@@ -1242,127 +1242,268 @@ def doto_memory():
     return cv
 
 
+def vnoise(h, w, cell, seed, wrap_x=True):
+    """값 잡음(부드러운 0..1). wrap_x면 가로로 이어진다(굴려도 이음매가 없다)."""
+    r = np.random.default_rng(seed)
+    gw = max(1, w // cell)
+    gh = h // cell + 2
+    g = r.random((gh, gw + (0 if wrap_x else 1)))
+    y = np.arange(h) / cell
+    x = np.arange(w) / cell
+    y0 = np.floor(y).astype(int)
+    x0 = np.floor(x).astype(int)
+    fy = y - y0
+    fx = x - x0
+    fy = fy * fy * (3 - 2 * fy)
+    fx = fx * fx * (3 - 2 * fx)
+    xi0 = x0 % gw if wrap_x else x0
+    xi1 = (x0 + 1) % gw if wrap_x else x0 + 1
+    a = g[y0][:, xi0]
+    b = g[y0][:, xi1]
+    c = g[y0 + 1][:, xi0]
+    d = g[y0 + 1][:, xi1]
+    top = a + (b - a) * fx
+    bot = c + (d - c) * fx
+    return top + (bot - top) * fy[:, None]
+
+
+def fbm(h, w, seed, cells=(120, 60, 30, 14), wrap_x=True):
+    out = np.zeros((h, w), np.float32)
+    amp, tot = 1.0, 0.0
+    for k, c in enumerate(cells):
+        out += vnoise(h, w, c, seed + k * 101, wrap_x) * amp
+        tot += amp
+        amp *= 0.5
+    return out / tot
+
+
+def warped_blob(cv, pts, radii, seed, rough=6.0):
+    """곡선을 따라 원을 이어 붙이고, 가장자리를 잡음으로 흔든 마스크(도형처럼 매끈하지 않은 굴).
+    pts·radii: 곡선 점과 그 자리 반지름."""
+    d = np.full((cv.h, cv.w), 1e9, np.float32)
+    for (x, y), r in zip(pts, radii):
+        d = np.minimum(d, np.hypot(cv.xx - x, cv.yy - y) - r)
+    n = fbm(cv.h, cv.w, seed, cells=(40, 18, 8)) - 0.5
+    return d + n * rough * 2.4 < 0
+
+
 def title():
-    """타이틀 바탕(0083): 땅의 단면 — 제목 그대로 "뿌리 아래". 위 1/3은 해 질 녘 들판(Friedrich「외로운 나무」 하늘·산,
-    퍼블릭 도메인), 아래는 흙. 오른쪽 큰 나무의 뿌리가 흙 속으로 번지고, 왼쪽 아래 굴 방에서 Naïl이 잔다.
-    맨 아래 구석에 보라 실이 조금(이야기의 실마리).
-    글자 자리(게임 좌표 ×2): 제목 y 32~100, 메뉴 x 192~448 · y 112~300, 안내 y 306, 저작권 줄 y 332 아래.
-    그래서 땅 줄은 제목 바로 아래(118), 메뉴 뒤 흙은 고르고 어둡게, 볼거리(나무·굴 방)는 메뉴 양옆에 둔다."""
+    """타이틀 바탕 v2(0083): 땅의 단면을 "어둠 속 실루엣"으로. 사장 피드백(v1): "너무 깨끗하다, ppt 같다,
+    굴 안은 비네트, 입구가 도형 같다" → 빛이 있는 곳만 보이고 나머지는 어둠·안개에 묻힌다.
+    - 빛 셋: 굴 방의 반딧불 병(따뜻한 빛, 굴 안에서만 번진다), 해 진 하늘(나무·풀은 그 앞 실루엣), 아래 깊은 곳의
+      보라 빛(물든 뿌리 끝, 뿌리는 그 앞 검은 실루엣). 모든 것은 albedo × 빛 + 안개 산란으로 계산한다.
+    - 굴길·굴 방 가장자리는 잡음으로 흔든 마스크, 입구는 흙이 쏟아진 둔덕 + 늘어진 풀.
+    - 끝으로 게임 픽셀(320×180)로 줄여 색을 줄이고 2배로 되돌린다(2×2 = 게임 1px, 뭉개진 도트 질감).
+    글 자리(게임 좌표 ×2): 제목 y 32~100, 메뉴 x 192~500 · y 112~300 → 그 뒤는 가장 어둡다."""
     rng = random.Random(83)
-    cv = Canvas(640, 360)
-    ground = 118
-    # 하늘·먼 산: 그림 오른쪽(나무가 없는 쪽)을 뒤집어 이어 붙인다. 그대로면 이음매가 가운데(제목 바로 뒤)라
-    # 대칭 무늬가 글자를 가렸다. 뒤집어 붙인 그림은 왼쪽 끝 = 오른쪽 끝이라 옆으로 굴려도 이어진다 →
-    # 이음매를 큰 나무 줄기 뒤(x 540)로 굴린다. ('tile'로 붙이면 가운데에 세로 이음매가 보였다.)
-    pastel_bg(cv, 'friedrich_lone_tree.jpg', colors=16, margin=0.0, box=(0, 0, 640, ground + 2),
-              crop=(0.6, 0.30, 0.99, 0.70), mirror=True)
-    cv.px[:ground + 2] = np.roll(cv.px[:ground + 2], 220, axis=1)
-    sky = cv.px.copy()
-    # 흙: 땅 바로 밑은 따뜻하게, 아래로 갈수록 어둡게
-    bands(cv, ground, 360, (104, 72, 54), (26, 18, 24), 10)
-    pebbles(cv, rng, (0, ground + 12, 640, 352), 90, [(104, 80, 66), (88, 70, 64), (120, 96, 74)])
-    # 흙 층 경계(가는 어두운 물결 두 줄)
-    for y0, col in ((168, (78, 54, 44)), (238, (52, 36, 36))):
-        pts = [(x, y0 + 5 * math.sin(x / 47) + 3 * math.sin(x / 13)) for x in range(-8, 650, 8)]
-        cv.paint(stroke(cv, pts, 2), col)
-    # 땅 줄·풀
-    cv.paint((cv.yy >= ground - 4) & (cv.yy < ground + 4), (72, 92, 62))
-    grass_tufts(cv, rng, ground, 0, 640, hue_shift([(52, 70, 50), (74, 96, 60), (98, 122, 72), (140, 156, 90)]))
-    base = cv.px.copy()
-    # 마을 둔덕 둘(왼쪽 들판, 작은 둥근 문)
-    for (x, r) in ((150, 20), (232, 14)):
-        hill = ellipse(cv, x, ground, r * 1.6, r) & (cv.yy <= ground)
-        outline(cv, hill, (60, 40, 32), 1)
-        shade(cv, hill, [(98, 66, 48), (132, 92, 64), (164, 120, 84), (190, 150, 108)], x, ground, r * 1.6, r)
-        door = ellipse(cv, x + 2, ground - 2, r * 0.45, r * 0.55) & (cv.yy <= ground)
-        cv.paint(door, (70, 46, 34))
-        cv.paint(ellipse(cv, x + r * 0.9, ground - r * 0.5, 2.5, 2.5), (255, 220, 140))
-    # 큰 나무(오른쪽): 줄기 아래쪽만, 위는 화면 밖으로
-    tx = 540
-    trunk = poly(cv, [(486, ground + 8), (512, ground - 18), (520, 40), (522, -10), (562, -10), (564, 40),
-                      (572, ground - 18), (598, ground + 8)])
-    # 왼쪽으로 뻗은 가지 하나(제목 쪽으로 기울지 않게 높이)
-    trunk |= stroke(cv, bezier((522, 30), (490, 14), (462, 6), (430, -6)), 12, 5)
-    trunk |= stroke(cv, bezier((470, 10), (458, 0), (452, -4), (446, -12)), 5, 2)
-    # 뿌리: 굵은 것은 오른쪽·아래로, 가는 것은 메뉴 뒤로(어둡게)
-    roots = []
-    for k, (ex, ey, w) in enumerate(((628, 300, 18), (590, 352, 16), (470, 330, 13), (400, 250, 9),
-                                     (330, 180, 7), (300, 300, 7), (250, 236, 5), (640, 210, 12))):
-        sx = 500 + k * 12
-        pts = bezier((sx, ground), (sx + (ex - sx) * 0.25, ground + 40), (ex + rng.uniform(-30, 30), ey - 60), (ex, ey))
-        roots.append((pts, w))
-    under_menu = (cv.xx > 180) & (cv.xx < 460)
-    for pts, w in roots:
-        m = stroke(cv, pts, w, 2)
-        outline(cv, m, (34, 22, 24), 1)
-        dim = w <= 9
-        cv.paint(m, BARK[1] if dim else BARK[2])
-        if not dim:
-            cv.paint(stroke(cv, [(x - 2, y) for x, y in pts], max(2, w * 0.25), 1) & m, BARK[3])
-        cv.paint(m & under_menu, BARK[1])
-        # 잔뿌리
-        for i in range(8, len(pts) - 4, 9):
+    W, H = 640, 360
+    cv = Canvas(W, H)
+    yy, xx = cv.yy, cv.xx
+    ground = 104
+    fog = fbm(H, W, 7)
+    grain = fbm(H, W, 9, cells=(4, 2))
+    # ---- albedo(바탕 색) ----
+    alb = np.zeros((H, W, 3), np.float32)
+    t = np.clip(yy / ground, 0, 1)[..., None]
+    sky_top, sky_low = np.array([22, 20, 44.0]), np.array([120, 70, 86.0])
+    alb[:] = sky_top + (sky_low - sky_top) * t ** 1.6
+    # 먼 언덕 실루엣 두 겹
+    for k, (base_y, amp, col) in enumerate(((84, 16, (48, 36, 64)), (94, 9, (30, 24, 40)))):
+        ridge = base_y - amp * (fbm(1, W, 30 + k, cells=(160, 70, 30))[0] - 0.4) * 2
+        alb[yy > ridge[None, :].repeat(H, 0)] = col
+    soil = np.array([92, 66, 52.0]) * (0.7 + 0.6 * fbm(H, W, 11, cells=(50, 22, 9)))[..., None]
+    strata = np.sin((yy + 18 * fbm(H, W, 12, cells=(120, 40))) / 9.0) * 0.06
+    soil = soil * (1 + strata[..., None])
+    below = yy >= ground
+    alb[below] = soil[below]
+    # 풀: 땅 줄 위로 들쭉날쭉한 검은 풀
+    grass_h = 4 + 9 * fbm(1, W, 13, cells=(24, 8, 3))[0]
+    grass = (yy >= ground - grass_h[None, :]) & (yy < ground + 3)
+    alb[grass] = (16, 18, 20)
+    # ---- 큰 나무(오른쪽, 하늘 앞 실루엣) ----
+    tree = np.zeros((H, W), bool)
+    edge = (fbm(H, 1, 14, cells=(30, 10), wrap_x=False)[:, 0] - 0.5) * 10
+    half = 30 + np.clip((ground - yy[:, 0]) * -0.0, 0, 0)
+    for y in range(0, ground + 6):
+        w0 = 24 + max(0, (y - (ground - 30))) * 1.6
+        c = 548 + edge[y] * 0.6
+        tree[y, int(c - w0 - edge[y]):int(c + w0 + edge[y] * 0.5)] = True
+    trng = random.Random(15)
+
+    def branch(x, y, ang, length, width, depth):
+        nonlocal tree
+        ex, ey = x + math.cos(ang) * length, y + math.sin(ang) * length
+        mid = (x + math.cos(ang + trng.uniform(-.4, .4)) * length * .5, y + math.sin(ang + trng.uniform(-.4, .4)) * length * .5)
+        pts = bezier((x, y), mid, mid, (ex, ey), 20)
+        tree |= stroke(cv, pts, width, max(1.2, width * 0.55))
+        if depth == 0:
+            return
+        for k in range(2 if trng.random() < 0.7 else 3):
+            t_ = trng.uniform(0.55, 0.95)
+            sx, sy = pts[int(t_ * (len(pts) - 1))]
+            branch(sx, sy, ang + trng.uniform(0.3, 0.75) * (1 if k % 2 == 0 else -1), length * trng.uniform(0.55, 0.75),
+                   width * 0.6, depth - 1)
+
+    for (sx, sy, ang, ln, wd) in ((540, 40, -2.3, 110, 16), (556, 30, -1.2, 90, 14), (536, 70, -2.9, 90, 11),
+                                  (562, 60, -0.5, 70, 10)):
+        branch(sx, sy, ang, ln, wd, 4)
+    alb[tree] = (14, 12, 16)
+    # ---- 뿌리(검은 실루엣, 잡음으로 흔들림) ----
+    roots = np.zeros((H, W), bool)
+    tips = []
+    for k, (ex, ey, w) in enumerate(((636, 290, 20), (590, 372, 18), (470, 360, 14), (380, 300, 9),
+                                     (300, 214, 7), (240, 330, 6), (200, 190, 5), (640, 190, 13), (520, 250, 8))):
+        sx = 520 + k * 7
+        pts = bezier((sx, ground + 2), (sx + (ex - sx) * 0.2, ground + 50), (ex + rng.uniform(-40, 40), ey - 70), (ex, ey), 60)
+        pts = [(x + math.sin(i * 0.35 + k) * 2.5, y) for i, (x, y) in enumerate(pts)]
+        roots |= stroke(cv, pts, w, 1.5)
+        for i in range(10, len(pts) - 5, 7):
             x, y = pts[i]
-            a = rng.uniform(0.4, 2.7)
-            fine = stroke(cv, [(x, y), (x + math.cos(a) * 18, y + math.sin(a) * 14)], 2, 1)
-            cv.paint(fine, BARK[1])
-    outline(cv, trunk, (30, 20, 24), 2)
-    shade(cv, trunk, BARK, tx, 60, 44, 90)
-    for _ in range(14):
-        x = rng.uniform(516, 566)
-        y = rng.uniform(-10, ground - 10)
-        ln = rng.uniform(8, 18)
-        crack = stroke(cv, [(x, y), (x + rng.uniform(-2, 2), y + ln)], 2) & trunk
-        cv.paint(crack, BARK[0])
-    rim = tuple(min(255, v * 1.05) for v in sky[:60].reshape(-1, 3).mean(0))
-    rim_light(cv, trunk, rim, 2, 0.5)
-    # 마른 잎 몇 장
-    for (x, y) in ((444, 2), (458, 10), (436, 12)):
-        m = ellipse(cv, x, y, 5, 3, rot=rng.uniform(0, 3))
-        cv.paint(dilate(m) & ~m, (70, 46, 34))
-        cv.paint(m, rng.choice([(176, 132, 74), (196, 156, 92)]))
-    # 왼쪽 아래 Naïl의 굴 방 + 땅으로 난 굴길
-    room = ellipse(cv, 104, 262, 76, 42)
-    tunnel = stroke(cv, bezier((52, ground), (40, 160), (60, 210), (78, 236)), 26, 22)
-    cav = room | tunnel
-    lit = Canvas(640, 360)
-    bands(lit, ground, 320, (150, 112, 84), (96, 70, 58), 7)
-    cv.px[cav] = lit.px[cav]
-    outline(cv, cav, (36, 24, 26), 2)
-    # 굴 방의 따뜻한 빛(반딧불 병). 빛은 방 안에만(밖으로 새면 둥근 띠가 흙 위에 떠 보였다).
-    before = cv.px.copy()
-    glow(cv, 150, 270, 90, (255, 214, 140), 0.4, 5)
-    cv.px[~cav] = before[~cav]
-    nest = ellipse(cv, 100, 292, 62, 12) & cav
-    cv.paint(nest, (132, 104, 64))
-    for _ in range(40):
-        x = rng.uniform(44, 160)
-        y = rng.uniform(284, 300)
-        a = rng.uniform(-0.6, 0.6)
-        cv.paint(stroke(cv, [(x, y), (x + math.cos(a) * 14, y + math.sin(a) * 4)], 2) & cav,
-                 rng.choice([(196, 166, 96), (166, 132, 76), (214, 186, 118)]))
-    mole(cv, 96, 274, 24, facing=1, eyes='closed')
-    # 작은 반딧불 병(빛의 까닭)
-    jar = ellipse(cv, 152, 282, 7, 9)
-    outline(cv, jar, (60, 50, 50), 1)
-    cv.paint(jar, (200, 214, 170))
-    cv.paint(ellipse(cv, 152, 283, 3, 3), (255, 250, 190))
-    cv.paint(ellipse(cv, 152, 272, 5, 2), (110, 80, 60))
-    # 굵은 뿌리 끝이 보라로 물든다(이야기의 실마리, 옅게). 따로 그은 실은 번개·낙서처럼 보였다 → 뿌리 끝
-    # 1/4에만 보라 빛을 얹고 둘레를 은은하게.
-    for pts, w in roots:
-        if w < 12:
+            a = rng.uniform(0.3, 2.8)
+            roots |= stroke(cv, bezier((x, y), (x + math.cos(a) * 10, y + math.sin(a) * 10 + 4),
+                                       (x + math.cos(a) * 18, y + math.sin(a) * 16), (x + math.cos(a) * 24, y + math.sin(a) * 22), 10), 2, 1)
+        if w >= 13:
+            tips.append(pts[-1])
+    alb[roots] = (18, 13, 15)
+    # ---- 굴길·굴 방(흔들린 가장자리) ----
+    path = bezier((74, ground - 2), (60, 150), (84, 210), (112, 240), 30)
+    radii = [11 + 3 * math.sin(i * 0.7) for i in range(len(path))]
+    tunnel = warped_blob(cv, path, radii, 21, rough=4)
+    room_pts = [(60 + i * 10, 266 + 10 * math.sin(i * 0.5)) for i in range(15)]
+    room_r = [30 + 16 * math.sin(math.pi * i / 14) for i in range(15)]
+    room = warped_blob(cv, room_pts, room_r, 22, rough=7)
+    # 굴 입구의 위 가장자리: 땅 줄에서 잡음으로 들쭉날쭉(곧은 선으로 자르면 네모 뚜껑처럼 보였다).
+    lip = ground - 1 + 5 * fbm(1, W, 27, cells=(10, 4, 2))[0]
+    cav = (tunnel | room) & (yy >= lip[None, :])
+    inner = np.array([112, 86, 70.0]) * (0.7 + 0.6 * fbm(H, W, 23, cells=(16, 6)))[..., None]
+    alb[cav] = inner[cav]
+    # 굴 벽 안쪽 가장자리: 부스러진 흙 알갱이(가장자리를 더 거칠게)
+    rim = dilate(cav, 3) & ~cav & below
+    crumbs = rim & (fbm(H, W, 24, cells=(3, 2)) > 0.55)
+    alb[crumbs] = (84, 60, 46)
+    # 입구: 쏟아진 흙 둔덕 + 구멍 위로 늘어진 풀
+    spill = warped_blob(cv, [(96, ground - 2), (112, ground + 1)], [12, 9], 25, rough=4) & (yy <= ground + 2) & ~cav
+    alb[spill] = (40, 30, 28)
+    droops = np.zeros((H, W), bool)
+    for k in range(11):
+        x0 = 58 + k * 2.6
+        drop = 6 + (k * 7) % 11
+        droop = bezier((x0, ground - 6), (x0 + 2, ground - 10), (x0 + 4, ground - 1), (x0 + 3 + k % 3, ground + drop), 14)
+        droops |= stroke(cv, droop, 1.6, 1)
+    # 둥지·Naïl·병
+    nest = warped_blob(cv, [(84, 292), (130, 292)], [16, 14], 26, rough=4) & cav & (yy >= 286)
+    alb[nest] = (128, 100, 60)
+    mcv = Canvas(W, H)
+    mcv.px[:] = alb
+    mole(mcv, 104, 278, 22, facing=1, eyes='closed')
+    naill = np.abs(mcv.px - alb).sum(-1) > 0          # Naïl이 그려진 칸
+    # 굴 방 천장에서 늘어진 잔뿌리(병 빛 앞 실루엣)
+    for k, x0 in enumerate((88, 118, 140, 166)):
+        top = np.nonzero(cav[:, x0])[0]
+        if len(top) == 0:
             continue
-        tip = stroke(cv, pts[-int(len(pts) * 0.28):], w * 0.55, 2)
-        cv.paint(dilate(tip, 5) & ~tip, VIOLET[1], 0.16)
-        cv.paint(tip, VIOLET[1], 0.55)
-        cv.paint(stroke(cv, [(x - 1, y) for x, y in pts[-int(len(pts) * 0.2):]], 1) & tip, VIOLET[3], 0.7)
-    # 바닥 어둡게(저작권·버전 줄이 읽히게)
-    for i, y in enumerate(range(318, 360, 6)):
-        m = (cv.yy >= y) & (cv.yy < y + 6)
-        cv.px[m] = cv.px[m] * (1 - 0.06 * (i + 1))
-    ambient_tint(cv, base, 0.10, light_from=(0, ground))
+        y0 = top.min()
+        ln = 14 + 9 * (k % 3)
+        hang = bezier((x0, y0 - 2), (x0 + 3, y0 + ln * 0.4), (x0 - 2, y0 + ln * 0.7), (x0 + 1 + k % 2, y0 + ln), 14)
+        mcv.paint(stroke(cv, hang, 2.2, 1) & cav, (40, 28, 26))
+    alb = mcv.px
+    # Naïl은 병 빛 앞의 실루엣: 몸은 어둡게 누르고, 병 쪽(오른쪽 위) 가장자리만 따뜻하게 남긴다.
+    shifted = np.zeros_like(naill)
+    shifted[3:, :-4] = naill[:-3, 4:]                  # 병 쪽으로 밀어 본 몸
+    rim_px = naill & ~shifted
+    alb[naill & ~rim_px] *= 0.32
+    alb[rim_px] = alb[rim_px] * 0.6 + np.array([255, 200, 140.0]) * 0.4
+    # ---- 빛 ----
+    def falloff(cx, cy, r, sharp=2.0):
+        d = np.hypot(xx - cx, yy - cy) / r
+        return np.clip(1 - d, 0, 1) ** sharp
+    warm = np.array([1.0, 0.72, 0.42])
+    violet = np.array([0.55, 0.32, 0.85])
+    dusk = np.array([0.75, 0.62, 0.78])
+    L = np.zeros((H, W, 3), np.float32) + 0.10
+    # 하늘·땅 위는 해 진 빛(위로 갈수록 어둡다)
+    above = yy < ground
+    L[above] += (dusk * 0.55)[None, :] * (0.55 + 0.45 * np.clip(yy[above] / ground, 0, 1))[:, None] * 0 + dusk * 0.0
+    L[above] = 1.0
+    # 반딧불 병: 굴 안(입구 쪽은 약하게) + 벽 너머로 아주 조금
+    # 병에서 멀어질수록 빨리 어두워진다 = 굴 방 안의 비네트(벽 가장자리는 어둠에 묻힌다).
+    jarL = falloff(150, 284, 130, 2.6)
+    inside = cav.astype(np.float32)
+    soft_in = np.clip(np.where(cav, 1.0, 0.0) + dilate(cav, 6) * 0.3, 0, 1)
+    L += warm[None, None, :] * (jarL * (0.15 + 1.7 * soft_in))[..., None]
+    # 굴길로 떨어지는 해 진 빛(입구에서 짧게, 금방 사라진다)
+    # 입구 바로 밑은 입술 그림자(어둡다), 10~40px 아래에서 가장 밝고, 그 아래로 사라진다. 빛은 하늘 쪽(오른쪽 위)
+    # 벽이 더 받는다 → 굴길 오른쪽 벽만 옅게 밝은 띠.
+    d = yy - ground
+    shaft = np.clip(d / 10, 0, 1) * np.clip(1 - (d - 12) / 40, 0, 1) ** 1.6 * inside
+    shaft *= 0.55 + 0.45 * np.clip((xx - 66) / 18, 0, 1)
+    L += dusk[None, None, :] * (shaft * 0.8)[..., None]
+    # 깊은 곳 보라 빛: 물든 뿌리 끝 아래
+    vio = np.zeros((H, W), np.float32)
+    for (x, y) in tips:
+        vio += falloff(x, min(y, 356), 170, 1.6)
+    vio += falloff(430, 410, 300, 1.8) * 0.8
+    vio *= 1 - 0.85 * soft_in                          # 보라 빛은 굴 방 안까지 들어오지 않는다(따뜻한 빛만)
+    L += violet[None, None, :] * (vio * 1.3)[..., None]
+    img = alb * L
+    # 물든 뿌리 끝: 보라 자체 빛(실루엣 끝이 빛난다)
+    tipm = np.zeros((H, W), bool)
+    for (x, y) in tips:
+        tipm |= ellipse(cv, x, y, 16, 26)
+    tip_root = tipm & roots
+    img[tip_root] = img[tip_root] * 0.4 + np.array([120, 70, 170.0]) * 0.6
+    # 늘어진 풀: 굴길 안 빛 앞 검은 실루엣(빛 뒤에 그린다)
+    img[droops] = (10, 10, 14)
+    # 반딧불 병: 빛 계산 뒤에 그린다(빛에 묻히지 않게). 유리 테두리 + 뚜껑 + 빛 알맹이 둘.
+    jar = ellipse(cv, 150, 286, 7, 9)
+    img[dilate(jar) & ~jar] = (60, 46, 40)
+    img[jar] = img[jar] * 0.5 + np.array([200, 210, 150.0]) * 0.5
+    img[ellipse(cv, 150, 276, 5, 2)] = (70, 50, 40)
+    img[ellipse(cv, 148, 288, 2.5, 2.5)] = (255, 250, 210)
+    img[ellipse(cv, 153, 283, 1.5, 1.5)] = (255, 236, 170)
+    # ---- 안개 산란: 빛이 있는 곳에서 안개가 밝아진다 ----
+    fogd = np.clip((fog - 0.35) * 1.8, 0, 1) * np.clip((yy - ground + 30) / 120, 0, 1)
+    scatter = (warm[None, None, :] * jarL[..., None] * 40 + violet[None, None, :] * vio[..., None] * 70)
+    img += scatter * fogd[..., None]
+    # 하늘 아래쪽 옅은 안개(풀·나무 밑동이 흐려진다)
+    haze = np.clip(1 - np.abs(yy - ground) / 26, 0, 1) * (0.25 + 0.5 * fog)
+    img = img * (1 - haze[..., None] * 0.5) + np.array([70, 52, 70.0]) * haze[..., None] * 0.5
+    # ---- 비네트: 바깥과 메뉴 뒤 흙은 어둠으로 ----
+    nx, ny = (xx - W * 0.5) / (W * 0.5), (yy - H * 0.48) / (H * 0.5)
+    vig = np.clip(1 - 0.55 * (nx ** 2 + ny ** 2) ** 1.2, 0.08, 1)
+    img *= vig[..., None]
+    img *= (0.92 + 0.16 * grain)[..., None]
+    cv.px = np.clip(img, 0, 255)
+    # ---- 게임 픽셀로 줄여 색을 줄이고 2배로 ----
+    small = cv.image().resize((W // 2, H // 2), Image.BOX)
+    small = small.quantize(64, method=Image.MEDIANCUT, dither=Image.NONE).convert('RGB')
+    big = small.resize((W, H), Image.NEAREST)
+    cv.px = np.asarray(big, dtype=np.float32).copy()
     return cv
+
+
+class _Rgba:
+    def __init__(self, img):
+        self.img = img
+
+    def image(self):
+        return self.img
+
+
+def title_fog():
+    """타이틀 위를 천천히 흐르는 안개(0083), 640×360 RGBA. 가로로 이어진다(게임이 옆으로 굴린다).
+    땅 줄 둘레와 아래쪽에 짙고, 메뉴 한가운데는 옅다. 알파는 게임 픽셀(2×2) 단위로 계단을 둔다."""
+    H, W = 360, 640
+    yy = np.mgrid[0:H, 0:W][0].astype(np.float32)
+    n = fbm(H, W, 41, cells=(160, 80, 40, 20))
+    band = np.exp(-((yy - 112) / 40) ** 2) * 0.8 + np.clip((yy - 230) / 130, 0, 1) * 0.9
+    a = np.clip((n - 0.5) * 2.6, 0, 1) * band
+    a = (np.round(a * 6) / 6)                       # 알파 계단(부드러운 그라디언트 대신 도트 질감)
+    a = a.reshape(H // 2, 2, W // 2, 2).mean((1, 3)).repeat(2, 0).repeat(2, 1)
+    rgba = np.zeros((H, W, 4), np.uint8)
+    rgba[..., 0], rgba[..., 1], rgba[..., 2] = 150, 126, 170
+    rgba[..., 3] = np.clip(a * 80, 0, 255).astype(np.uint8)
+    return _Rgba(Image.fromarray(rgba, 'RGBA'))
 
 
 SCENES = {
@@ -1377,6 +1518,7 @@ SCENES = {
     'molehill': molehill,
     'doto_memory': doto_memory,
     'title': title,
+    'title_fog': title_fog,
 }
 
 
