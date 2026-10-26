@@ -43,7 +43,7 @@
 - 웹 빌드가 Netlify에 배포되어 링크로 열린다(CI는 이미 준비됨, Netlify 시크릿만 등록).
 - 손맛 수치가 `tuning.rs`에 정리되고, 결정 사항이 `docs/decisions/`에 기록.
 
-## 구현 상태 (2026-10-24)
+## 구현 상태 (2026-10-24, 표는 2026-10-26 v0.1.15 + 브랜치까지)
 코드는 전부 들어갔다. **판정: 통과**(2026-10-25 사장 "판정 및 손맛은 좋은 편이야, 지금 이대로도"). 수치는 지금 값을 기준으로 둔다. 본인 외 한 명 더는 아직이다.
 
 | 항목 | 위치 | 비고 |
@@ -60,7 +60,7 @@
 | 웹 GL 컨텍스트 | `web/index.html` | 안티에일리어싱·투명 배경 끔, 고성능 GPU 요청. 아이폰급(dpr 3) 캔버스 2532×1170에서 매 프레임 4배 샘플을 없앰. 헤드리스 같은 3초 동안 그린 프레임 62 → 144(docs/decisions/0026) |
 | 도감·상태 | `app.rs`(draw_bestiary, draw_status) | 도감: 만난 이웃, 능력은 말로. 상태: 플레이어 능력치 숫자(체력·공격력·공속·굴파기 대기·분노 충전·무기·장신구·반딧불·씨앗) |
 | 조작 설정 | `input.rs`(Bindings, prompt, capture), `prefs.rs`, `app.rs`(draw_controls), `web/index.html`(nail_prefs) | 오른쪽 넷 = 공격·굴파기·필살기·아이템, 어깨 = 아이템 넘기기, Select = 지도. 다시 붙이기(겹치면 맞바꿈), 웹 저장(docs/decisions/0022) |
-| 피격·사망·재시작 | `player.rs`, `world.rs` | 체력 3, 피격 무적 0.8s. R / Start로 즉시 재시작 |
+| 피격·사망·재시작 | `player.rs`, `world.rs`, `tuning.rs`(PLAYER_HP) | 체력 5(처음 3, 0016), 피격 무적 0.8s. 재시작은 메뉴 → 다시 시작(터치는 R 버튼) |
 | 전투감 | `combat.rs`(Feel), `world.rs`, `render.rs` | 히트스톱(로직 시계만), trauma² 흔들림(정수 px), 흰색 플래시, 넉백(감쇠), 합성음 |
 | 게임패드 | `input.rs`, `web/macroquad-gamepads-0.1.js` | 메뉴는 D패드·왼쪽 스틱 둘 다(스틱은 큰 축 하나, 0.5에서 잡고 0.3에서 풀림, 누르고 있으면 반복). 데스크톱(gilrs)·웹(플러그인). 웹은 비표준 매핑 패드도 받도록 플러그인 패치. Android 13 폰 브라우저 + 실기 패드로 인식 확인(2026-10-25). 데스크톱 실기는 미확인 |
 | 터치(보조) | `input.rs` TouchState·`layout_for`, `render.rs` 오버레이, `web/index.html` | 왼쪽 반 떠다니는 스틱 + 버튼. 공격이 가장 크고(지름 ≈ 짧은 변의 27%, 가로 폰 약 105pt), 굴파기·필살기·아이템은 엄지 호를 따라(2026-10-25, 겹침·화면 안 테스트). 모바일 브라우저용. 터치 좌표는 DPI로 나눠야 함(macroquad touches()는 물리 픽셀). Android 13 폰 브라우저 실기 확인(2026-10-25) |
@@ -71,9 +71,9 @@
 | 튜토리얼 | `tutorial.rs`, `cutscene.rs`(popo_talk), `world.rs`(npc) | 라쿤 포포의 9단계: 이동·발톱·3연타·굴파기·솟구치기·패링(30초면 넘김)·필살기·아이템·메뉴 안내. 단계마다 대화 + "[n/9]" 힌트(지금 버튼 이름), 연습 중 체력 그대로(docs/decisions/0023). 헤드리스 Chromium으로 오프닝 → 포포 → 1~3단계 확인 |
 | 개발 시나리오 | `scenario.rs` | 타이틀 "개발"(dev feature). 빈 방, 돌격형 1/3, 원거리형 1, 1+1, 웨이브 3부터, 오프닝 컷씬. 판정 2(적 3마리)는 "돌격형 3마리"로 바로 들어간다 |
 | 컷씬 | `cutscene.rs` | JRPG식 대화창·배우 이동·페이드·건너뛰기. 오프닝: 물든 모모(이름표 "???", 초상화 차가움·괴로움, 스프라이트)가 길을 막는다(docs/decisions/0008, 0029) |
-| 게임 틀 | `app.rs`, `ui.rs` | 인트로 → 타이틀(시작·설정) → 게임 ⇄ 일시정지(메뉴·상태·가방·저널·지도). 커서 없는 탐색 + 탭/클릭 보조. 한글 픽셀 폰트. 가방·지도는 틀만, 저널은 튜토리얼 퀘스트 4개(docs/decisions/0007) |
+| 게임 틀 | `app.rs`, `ui.rs` | 인트로 → 타이틀(시작·설정) → 게임 ⇄ 일시정지(메뉴·상태·가방·저널·지도). 커서 없는 탐색 + 탭/클릭 보조. 한글 픽셀 폰트. 탭 여섯(메뉴·상태·가방·저널·도감·지도). 처음엔 가방·지도가 틀만, 저널이 튜토리얼 퀘스트 4개였다(0007) — 지금 내용은 아래 저널·장비·지도 줄 |
 | 글자 성능 | `ui.rs`(glyph_plan, warm), `render.rs`(present) | 픽셀 폰트를 원래 12 물리 px(정수배)로 굽고 정수배로 키움 + 언어를 정할 때 그 언어 글자를 한 번에 미리 굽기. 대화 중 텍스처 올리기 160MB → 0(헤드리스 측정). 화면은 수정 전과 픽셀 단위로 같음. Safari 버벅임 대응(실기 확인은 사람) |
-| 다국어 | `i18n.rs`, `ui.rs`, `tools/fonts/`, `web/index.html` | 한국어·영어·일본어·간체·브라질 포르투갈어(0033) 표, 언어별 폰트(일·중은 Ark Pixel 서브셋), 기기 선호 목록으로 시작, 설정에서 전환, 가짜 언어 Pseudo. CJK 줄바꿈(금칙)·넘침 대비(fit·탭 여백). 폰트 글자·자리표시자 테스트(docs/decisions/0013, 0014). 번역은 초안 |
+| 다국어 | `i18n.rs`, `ui.rs`, `tools/fonts/`, `web/index.html` | 처음 다섯(한국어·영어·일본어·간체·브라질 포르투갈어, 0033) → 지금 아홉(+프랑스어·스페인어 0084, 독일어·러시아어 0085) 표, 언어별 폰트(일·중은 Ark Pixel 서브셋), 기기 선호 목록으로 시작, 설정에서 전환, 가짜 언어 Pseudo. CJK 줄바꿈(금칙)·넘침 대비(fit·탭 여백). 폰트 글자·자리표시자 테스트(docs/decisions/0013, 0014). 번역은 직접 쓴 초안(원어민 검수 전) |
 | 초상화 | `tools/art/portraits.py`, `art.rs`, `render.rs`(draw_portrait), `cutscene.rs`(Face) | 88×88, 게임 픽셀의 2배 밀도. Naïl 보통·기쁨·걱정·결의, 이웃은 그림자(docs/decisions/0015) |
 | 반딧불·산딸기 | `loot.rs`, `world.rs`(drop_loot), `render.rs`(draw_loot, HUD) | 화폐(자석·HUD·상태 탭), 회복(불운 보정), 최대 체력 5, 줍는 소리(음 올라감). 개발 시나리오 "떨어지는 것 확인"(docs/decisions/0016) |
 | 능력치·장신구 | `equipment.rs`(Stats, CHARMS), `app.rs`(가방 끼기/빼기, 상태 탭) | 장신구 5종 2칸, 생명의 씨앗, 공격 속도 = 스윙 시계 배율(docs/decisions/0017) |
@@ -106,15 +106,17 @@
 | 임시 그림 다듬기 | `tools/art/portraits.py`(칸 12~17), `tools/art/illust.py`(bands, momo_bloom), `cutscene.rs`(Portrait::MOMO·HALMAE·MOM) | 돌아온 모모·누룩 할매·엄마 초상화, 일러스트 띠 경계 2×2 섞기, 모모 일러스트 몸·눈(0049) |
 | 작은 정리(0051) | `app.rs`(상태 탭·도감 쪽), `story.rs`(TalkBori·TalkMomo), `portraits.py`(털빛 초상화, 12칸 줄), `illust.py`(큰 나무 가지) | 상태 탭에 재주, 대화창 Naïl 털빛, 도감 이야기·공격·요령 쪽(확인으로 넘김), 진행을 따르는 보리·모모 말, 큰 나무 가지 |
 | 초상화 v4(0070·0071) | `tools/pixel`(점 도구·편집기), `tools/art/portraits.py`(fur_clumps·silhouette_tufts, 기본 v4) | 털 인물(Naïl·엄마·보리·모모·도토·포포)에 털 뭉치 경계·크기 섞인 실루엣 삐침·작은 하이라이트·빛 쪽 외곽선 한 단, Naïl 원통 목도리·평평한 발톱·정수리 한 가닥. 대화창에서 헤드리스 확인 |
-| 일러스트 바탕(0072·0073) | `tools/art/illust.py`(set_style·SCENE_STYLE·pastel_bg·ambient_tint), `tools/art/sources/`, `tools/pixel/pxl.py`(pixelate --cel) | 일러스트 열 장 모두 v4: 여섯 장(흙더미·큰 나무·마지막 꽃·엄마 굴·보리·모모)은 파스텔·수채·유화(CC0·퍼블릭 도메인) 바탕을 도트화, 땅속·꿈 네 장은 v4 규칙만 |
+| 일러스트 바탕(0072·0073) | `tools/art/illust.py`(set_style·SCENE_STYLE·pastel_bg·ambient_tint), `tools/art/sources/`, `tools/pixel/pxl.py`(pixelate --cel) | 그때 열 장 모두 v4(콩이의 문은 0085 실루엣 방식): 여섯 장(흙더미·큰 나무·마지막 꽃·엄마 굴·보리·모모)은 파스텔·수채·유화(CC0·퍼블릭 도메인) 바탕을 도트화, 땅속·꿈 네 장은 v4 규칙만 |
 | 저널 | `journal.rs`, `app.rs`(Tally·draw_journal), `app/stage.rs`(sync_journal·claim_journal·물웅덩이), `village.rs`(자리 7~9·W), `equipment.rs`(장신구 8), `tools/art/nail.py`(털빛 3) | 런을 넘어 남는 목표 31개(이야기·싸움·탐험·이웃·마을), 앞 목표 뒤에 보임, 받기로 반딧불·씨앗·저널 전용 꾸미기 3·털빛 3·새 장신구 3(0048). 장신구는 받으면 가방에·런마다 들고 시작, 받은 뒤 보상이 어디 있는지 표시(0050) |
 | 오늘의 굴 | `daily.rs`, `adventure.rs`(camp_start_seeded), `app.rs`(TitleItem) | 날짜(UTC) 시드, 첫 쉼터에서, 가장 먼 쉼터·완주 기록, 타이틀 줄에 날짜·기록, 한 달 넘은 기록 지움(0044) |
 | 실뜨기 | `knots.rs`, `enemy.rs`(max_hp·windup·apply_knots), `world.rs`(knots), `app.rs`(begin_run·KnotPick) | 첫 클리어로 1단계, 가장 높은 단계로 닿으면 다음 단계. 시작할 때 고르기. 매듭: 적 체력 ×1.25 · 예고 ×0.8 · 산딸기 ×0.6 · 가게 ×1.5 · 먹기 대기 ×1.6(0043) |
 | 런의 끝 | `tuning.rs`(FINAL_STAGE), `route.rs`(is_final), `adventure.rs`(AdvEvent::Deepest), `app/stage.rs`(reach_deepest) | 필드 + 길 3개, 셋째 길 보스 칸 = 가장 깊은 곳 → 반쪽/참 엔딩(조건 깃발) → 타이틀, 클리어 수 기록, 반쪽 엔딩 뒤 포포 한마디(0042) |
 | 기록·다회차 | `profile.rs`, `story.rs`, `app.rs`(start·on_death·album·설정), `web/index.html`(nail_save), `player.rs`(resist) | 깃발 + 수 기록(웹 localStorage·데스크톱 파일·Android 앱 폴더), 튜토리얼 뒤 새 런은 바로 필드·보리 뒤엔 대장 없음, 런 사이 한마디(가장 구체적인 줄·한 번), 도감 유지, 앨범(타이틀), 포포의 응원(20%+2%/쓰러짐, 최대 80%), 기록 지우기(0041) |
-| 컷씬 일러스트 | `illust.rs`, `cutscene.rs`(Step::Illust·Narrate, cut_to, 이야기 장면), `render.rs`(draw_illust), `tools/art/illust.py` | 640×360 2배 밀도 한 장 그림 + 느린 패닝 + 입자, 내레이션 띠. 8장(오프닝 2·보리·모모·할매·마지막 꽃·새싹·둔덕) 임시 그림, 대사 다섯 언어. 오프닝·보리는 게임에, 나머지는 개발 "이야기 일러스트"(0037, 0039) |
+| 컷씬 일러스트 | `illust.rs`, `cutscene.rs`(Step::Illust·Narrate, cut_to, 이야기 장면), `render.rs`(draw_illust), `tools/art/illust.py` | 640×360 2배 밀도 한 장 그림 + 느린 패닝 + 입자, 내레이션 띠. 처음 8장(0039) → 지금 11장(+도토 기억 0053·모모 깊은 곳 0056·콩이의 문 0085), 모두 이야기 컷씬에서 나오고 앨범에 모인다. 개발 "이야기 일러스트"는 바로 보기용. 임시 그림, 내레이션 아홉 언어(0037, 0039) |
 | 튜토리얼 보스 | `enemy.rs`(Chief), `species.rs`(CHIEF), `field.rs`(공터), `tools/art/chief.py`, `render.rs`(보스 막대) | 들쥐 대장 보리: 돌진 ↔ 뛰어 찍기, 반 아래면 생쥐 떼, 공격 중 슈퍼아머, 벽에 박으면 2.2초 틈. 32×32 그림, 초상화 3, 처치 컷씬 → 쉼터의 이웃. 헤드리스로 공터 잠금·막대·처치 컷씬·쉼터·가게·길 지도 확인(docs/decisions/0032) |
-| 웨이브 | `world.rs` | 적을 다 잡으면 1.2초 뒤 다음 웨이브(1C+1S → 2C+1S → 2C+2S → 3C+2S). 명세엔 없지만 5분 플레이 판정을 위해 넣음 |
+| iOS 빌드 1단계(0086) | `.github/workflows/build-ios.yml`, `ios/Info.plist`, `ios/icons/`, `profile.rs`(iOS 저장 자리) | macOS 러너에서 `aarch64-apple-ios` 빌드 → 손으로 짠 `.app` → 서명 안 한 `.ipa` 아티팩트. 실기 실행은 미확인(서명: Sideloadly·AltStore·TestFlight는 나중에). 패드는 iOS에서 아직 안 됨(gilrs) |
+| 앱 아이콘(0087) | `tools/icons/make_icons.py`, `android/res/mipmap-*`, `Cargo.toml`(res·icon), `build-android.yml`(application-icon 검사) | Naïl 초상화 얼굴에서 iOS·Android 아이콘. Android는 옛 mipmap + 적응형(8+). CI가 APK에 아이콘이 없으면 실패 |
+| 웨이브 | `world.rs`, `scenario.rs` | 지금은 개발 시나리오(아레나·웨이브 3부터)에서만. 적을 다 잡으면 1.2초 뒤 다음 웨이브(1C+1S → 2C+1S → 2C+2S → 3C+2S). 명세엔 없지만 5분 플레이 판정을 위해 넣음 |
 
 확인한 것: 데스크톱(Xvfb) 실행 캡처로 렌더 방향·공격 반원·굴파기·히트박스 표시, 헤드리스 Chromium으로 웹 빌드 로드·입력·콘솔(mismatch 없음). 확인 못 한 것: 실제 손맛(판정 1~4), 실기 게임패드, 소리의 실제 느낌(컨테이너에 오디오 장치 없음).
 
@@ -128,6 +130,7 @@
 - [ ] **v0.1.14 타이틀 바탕 v2**(0083): 신비하고 덜 또렷한 느낌이 맞는지, 안개가 너무 짙거나 옅지 않은지, 굴 방 비네트·입구가 자연스러운지
 - [ ] **v0.1.14 프랑스어·스페인어**(0084): 원어민이 있으면 말투·용어 검수(특히 쥐 이름, 프랑스어 ! ? 앞 띄어쓰기, 스페인어 Mando/Control)
 - [ ] **v0.1.15**(0083·0085): 타이틀 v2.1 어둡기, 콩이 컷씬 그림(셋째 길 보스를 이기면), 앨범 스크롤, 독일어·러시아어(원어민 검수가 있으면 좋다). 다른 일러스트 열 장도 이 방식으로 다시 그릴지
+- [ ] **브랜치(v0.1.16 후보)**: Android 홈 화면 아이콘이 둥근·네모 런처에서 잘리지 않는지(0087). iOS는 원하면 `nail-ios-unsigned` 아티팩트를 Sideloadly(Windows·Mac)로 내 Apple ID 서명해 설치 → 화면·터치·소리·저장(0086)
 - [ ] Android에서 장소를 바꿀 때 곡을 읽느라 멈칫하는지(검은 화면이 길어지는지), 보스가 깨어날 때 멈칫하지 않는지
 - [ ] 새 특수효과(먼지·흙덩이·보라 실·꽃가루·모닥불 빛)가 지나치거나 모자라지 않은지
 
@@ -170,4 +173,5 @@
 - [ ] 굴토끼 가족(할매 실 속) 갈래를 이야기에 넣을지, 모모 전용 재주·장신구(0056)
 - [ ] 컷씬 일러스트를 사람이 그릴지(본인/외주). 정하면 `docs/art/cutscene-illustrations.md`를 넘긴다(0039)
 - [ ] 다음 캐릭터(0040 순서 7)
+- [ ] iOS 배포 길(0086): Apple Developer Program($99/년) + CI 서명 → TestFlight로 갈지, iOS 패드 다리(GCController)를 언제 넣을지
 - [ ] Android 개발자 인증(2026-09 일부 나라, 2027 전 세계): 사이드로드 APK도 인증된 개발자 서명이 필요해진다(ADB 설치는 예외). 무료 "제한 배포" 계정(기기 20대)으로 할지, 정식 등록할지, 릴리스 서명 키를 언제 만들지
