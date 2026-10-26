@@ -58,7 +58,7 @@ Edit the last attached image, the portrait of [이름]. Add only [고칠 것], c
 | 도토 | 31~32 | `calm` · `happy, eyes closed in a smile` |
 | 수수 | 33~34 | `calm` · `happy` |
 | 콩이 | 36~37 | `calm` · `happy, eyes closed in a smile` |
-| 도토·콩이·들쥐 대장(물듦) | 30·35·9 | `glaring, small glowing red eyes` |
+| 도토·콩이·들쥐 대장(물듦) | 30·35·9 | `glaring, small glowing eyes` — 도토는 amber, 콩이는 pale sky blue, 대장은 red(0052·0054) |
 | 엄마 | 17 | `gentle, eyes closed` |
 
 참고 그림(직접 그린 것만, 팩 그림 없음. 0064): 세션 스크래치에 만들어 둔 `ref_*.png`(초상화를 4배로 키운 것)와 `layout_*.png`(지금 임시 일러스트 2배)를 받아서 쓴다. 다시 만들 때는 `assets/art/portraits.png`(칸 번호는 `src/cutscene.rs` `Portrait`)와 `assets/art/illust/*.png`에서 자른다.
@@ -73,7 +73,7 @@ Layout: a landscape game screen. Faces and important things sit in the upper two
 
 ## 2. 세계 규칙 (모든 장면 앞에, 공통 스타일 다음)
 ```
-World rules: The violet threads belong to Halmae, an ancient and lonely fungus grandmother who is afraid of being left alone. They are thin, softly glowing violet strands that wrap around tree roots. Tree roots are always brown wood, never purple; the violet threads only coil around them. Animals bound by the threads have small glowing red eyes, except Momo the rabbit, whose bound eyes glow green. When an animal is freed, its eyes return to their own gentle dark color and the threads loosen, fall away, and fade to white or sparkle.
+World rules: The violet threads belong to Halmae, an ancient and lonely fungus grandmother who is afraid of being left alone. They are thin, softly glowing violet strands that wrap around tree roots. Tree roots are always brown wood, never purple; the violet threads only coil around them. Animals bound by the threads have small glowing eyes: red for the field mice, green for Momo the rabbit, amber for Doto the squirrel, and pale sky blue for Kongi the armadillo. When an animal is freed, its eyes return to their own gentle dark color and the threads loosen, fall away, and fade to white or sparkle.
 ```
 
 ## 3. 캐릭터 (장면에 나오는 사람만 이어 붙인다)
@@ -169,7 +169,7 @@ Scene (a game title screen background; the game draws the title text and menu on
 - 선이 검다: `Change all outlines around the characters to dark plum (#2B1D2A), about two pixels thick.`
 - 너무 매끈하다(그라디언트): `Re-render as true pixel art: flat bands of color, 3 to 5 shades per material, crisp edges.`
 - 뿌리가 보라다: `The roots must be brown wood. Only the thin threads wrapped around them are violet.`
-- 눈 색이 틀리다: `Freed animals have their own dark eyes; only animals still bound have glowing red eyes (Momo's glow green).`
+- 눈 색이 틀리다: `Freed animals have their own dark eyes; only animals still bound have glowing eyes (field mice red, Momo green, Doto amber, Kongi pale sky blue).`
 - 얼굴이 아래에 있다: `Move the characters up so their faces are in the upper two-thirds; keep the bottom third simple.`
 - 글자가 들어갔다: `Keep everything the same, but make it a clean, wordless illustration: remove the lettering and fill those spots with the surrounding scenery.`
 

@@ -39,6 +39,8 @@ CHARACTERS = {
     'halmae': (15, ('normal', 'happy'), None, 16),
     # 엄마 두더지: Naïl 초상화를 함께 넣어 같은 그림체로 그리고, 털을 한 단 짙고 매끈하게 고쳐 Naïl과 갈랐다. 틀은 그대로.
     'mom': (17, ('gentle',), None, 16),
+    # 도토: 몸이 원본 942줄에서 끝나(CUT_AT) 잘라 쓰고, 틀을 높이 96%로 맞춘다.
+    'doto': (31, ('normal', 'happy'), 0.96, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
 CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae', 'doto'}
