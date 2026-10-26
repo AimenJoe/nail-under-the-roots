@@ -8,6 +8,7 @@ use macroquad::prelude::*;
 
 mod dream;
 mod pick;
+mod slots;
 mod stage;
 
 use crate::art::Art;
@@ -28,7 +29,12 @@ const INTRO_LINE_TIME: f32 = 2.6;
 /// 타이틀 메뉴 줄. 오늘의 굴은 튜토리얼을 마친 뒤에만 보인다.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum TitleItem {
-    Start,
+    /// 지금 슬롯으로 이어하기(기록이 있을 때, 0078).
+    Continue,
+    /// 지금 슬롯이 비었을 때: 여기서 새로 시작.
+    New,
+    /// 저장 슬롯 창(어느 슬롯이든 기록이 있을 때).
+    Slots,
     Daily,
     Album,
     Settings,
@@ -154,6 +160,8 @@ enum Scene {
     DreamPick,
     /// 누구와 내려갈까(마을의 뿌리 길, 모모가 돌아온 뒤, docs/decisions/0056).
     CharPick,
+    /// 저장 슬롯(타이틀, docs/decisions/0078).
+    Slots,
 }
 
 /// 컷씬이 끝난 뒤 갈 곳.
@@ -322,6 +330,8 @@ fn draw_charm_icon(ui: &Ui, r: Rect, color: Color) {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Hit {
     TitleItem(usize),
+    SlotPlay(usize),
+    SlotErase(usize),
     PauseTab(usize),
     PauseItem(usize),
     SettingRow(usize),
@@ -365,6 +375,11 @@ pub struct App {
     scene: Scene,
     intro_t: f32,
     title_cursor: usize,
+    /// 저장 슬롯(0078): 지금 슬롯 밖의 기록(요약·비었나), 창의 커서·단추(0 이어하기, 1 지우기)·지우기 대기.
+    slot_cache: Vec<crate::profile::Profile>,
+    slots_cursor: usize,
+    slots_col: usize,
+    slots_armed: Option<usize>,
     pause_tab: usize,
     pause_cursor: usize,
     settings_cursor: usize,
@@ -470,6 +485,12 @@ impl App {
             scene: Scene::Intro,
             intro_t: 0.0,
             title_cursor: 0,
+            slot_cache: (0..crate::profile::SLOTS)
+                .map(crate::profile::load_slot)
+                .collect(),
+            slots_cursor: 0,
+            slots_col: 0,
+            slots_armed: None,
             pause_tab: 0,
             pause_cursor: 0,
             settings_cursor: 0,
@@ -985,7 +1006,8 @@ impl App {
                     None
                 };
                 match chosen.and_then(|i| items.get(i).copied()) {
-                    Some(TitleItem::Start) => self.begin_run(),
+                    Some(TitleItem::Continue) | Some(TitleItem::New) => self.begin_run(),
+                    Some(TitleItem::Slots) => self.open_slots(),
                     Some(TitleItem::Daily) => {
                         self.knot_level = 0;
                         self.start(Scenario::Daily);
@@ -1108,6 +1130,7 @@ impl App {
             Scene::Route => self.update_route(a, tap_hit),
             Scene::Shop => self.update_shop(a, tap_hit, dt),
             Scene::Album => self.update_album(a, tap_hit, dt),
+            Scene::Slots => self.update_slots(a, tap_hit),
             Scene::KnotPick => self.update_knot_pick(a, tap_hit),
             Scene::Decor => self.update_decor(a, tap_hit, dt),
             Scene::Tree => self.update_tree(a, tap_hit, dt),
@@ -1450,6 +1473,7 @@ impl App {
             Scene::Intro => self.draw_intro(&ui),
             Scene::Title => self.draw_title(&ui),
             Scene::Album => self.draw_album(&ui),
+            Scene::Slots => self.draw_slots(&ui),
             Scene::KnotPick => {
                 ui.dim();
                 self.draw_knot_pick(&ui);
@@ -1605,7 +1629,14 @@ impl App {
     }
 
     fn title_items(&self) -> Vec<TitleItem> {
-        let mut v = vec![TitleItem::Start];
+        // 기록이 있으면 이어하기와 슬롯 창을 나눈다(사장 피드백 2026-10-26, 0078). 처음이면 새로 하기 하나.
+        let mut v = if !self.profile.is_empty() {
+            vec![TitleItem::Continue, TitleItem::Slots]
+        } else if (0..crate::profile::SLOTS).any(|i| self.slot_filled(i)) {
+            vec![TitleItem::New, TitleItem::Slots]
+        } else {
+            vec![TitleItem::New]
+        };
         if self.profile.flag(crate::profile::key::TUTORIAL) {
             v.push(TitleItem::Daily);
         }
@@ -1619,7 +1650,9 @@ impl App {
     fn title_label(&self, it: TitleItem) -> String {
         let s = i18n::s();
         match it {
-            TitleItem::Start => s.title_start.to_string(),
+            TitleItem::Continue => s.title_continue.to_string(),
+            TitleItem::New => s.title_new.to_string(),
+            TitleItem::Slots => s.title_slots.to_string(),
             TitleItem::Daily => {
                 let day = crate::daily::today();
                 if self.profile.count(&crate::daily::key_clear(day)) > 0 {
@@ -1875,8 +1908,9 @@ impl App {
     fn draw_title(&mut self, ui: &Ui) {
         // 뒤의 뿌리 선이 가는 글자 획과 겹치면 끊겨(깨져) 보인다(사람 피드백). 타이틀 글에는 어두운 테두리.
         let ui = &ui.with_outline();
-        ui.text_center("Naïl", 160.0, 26.0, FONT_PX * 2.0, ui::ACCENT);
-        ui.text_center("Under the Roots", 160.0, 50.0, FONT_PX, ui::TEXT);
+        // 줄이 여섯(이어하기·저장 슬롯·오늘의 굴·앨범·설정·개발)까지 들어가게 제목을 조금 올렸다(0078).
+        ui.text_center("Naïl", 160.0, 16.0, FONT_PX * 2.0, ui::ACCENT);
+        ui.text_center("Under the Roots", 160.0, 40.0, FONT_PX, ui::TEXT);
         let s = i18n::s();
         let labels: Vec<String> = self
             .title_items()
@@ -1884,7 +1918,7 @@ impl App {
             .map(|it| self.title_label(it))
             .collect();
         let labels: Vec<&str> = labels.iter().map(|l| l.as_str()).collect();
-        let rects = ui.menu_list(&labels, self.title_cursor, 96.0, 68.0, 128.0);
+        let rects = ui.menu_list(&labels, self.title_cursor, 96.0, 56.0, 128.0);
         // 오늘의 굴 줄 오른쪽에 오늘 날짜(UTC): 날마다 다른 굴이라는 표시.
         if let Some(i) = self
             .title_items()
@@ -1901,9 +1935,7 @@ impl App {
                 ui::TEXT_DIM,
             );
         }
-        if let Some((note, _)) = self.title_note {
-            ui.text_center(tr(note), 160.0, 138.0, FONT_PX, ui::ACCENT);
-        }
+        let note = self.title_note.map(|(n, _)| n);
         for (i, r) in rects.into_iter().enumerate() {
             self.hits.push((r, Hit::TitleItem(i)));
         }
@@ -1912,7 +1944,11 @@ impl App {
             s.title_controls_touch,
             &[Verb::Pick, Verb::Confirm, Verb::Back],
         );
-        ui.text_center(&hint, 160.0, 150.0, FONT_PX, ui::TEXT_DIM);
+        // 알림(오늘의 굴 완주)이 있으면 조작 안내 자리에.
+        match note {
+            Some(n) => ui.text_center(tr(n), 160.0, 153.0, FONT_PX, ui::ACCENT),
+            None => ui.text_center(&hint, 160.0, 153.0, FONT_PX, ui::TEXT_DIM),
+        }
         ui.text(s.copyright, 4.0, 166.0, FONT_PX, ui::TEXT_DIM);
         let room = 312.0 - ui.text_w(s.copyright, FONT_PX) - 12.0;
         let version = ui.fit(&fill(s.version, &[&build_label()]), room, FONT_PX);

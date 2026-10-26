@@ -29,7 +29,7 @@ async function open(browser, prof) {
 async function dev(browser, idx) {
   const s = await open(browser, base);
   await s.key('Enter', 600);
-  for (let i = 0; i < 4; i++) await s.key('ArrowDown', 150);
+  for (let i = 0; i < 5; i++) await s.key('ArrowDown', 150); // 이어하기·저장 슬롯·오늘의 굴·앨범·설정 다음이 개발(0078)
   await s.key('Enter', 600);
   for (let i = 0; i < idx; i++) await s.key('ArrowDown', 80);
   await s.key('Enter', 1500);
