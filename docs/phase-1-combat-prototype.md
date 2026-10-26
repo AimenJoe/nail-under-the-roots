@@ -121,7 +121,7 @@
 | 화면 × 아홉 언어 점검(0089) | `ui.rs`(check, F3), 헤드리스 순회 | 넘침·겹침·잘림 검사기, 가게·꾸미기·실뜨기·조작·도감·저널·가방·상태·큰 나무·튜토리얼 힌트·말풍선 고침, 스페인어·러시아어 몇 줄 줄임 |
 | 인트로·웹 로딩(0092) | `app.rs`(draw_intro), `loading.rs`(prefetch·bytes·texture·image·step), `art.rs`·`sfx.rs`(files), `main.rs` | 인트로 바탕 = 어둠 아래 타이틀 그림(줄마다 걷힘). 시작 파일 44개를 한꺼번에 받고 파일마다 막대: 지연 70ms·9Mbps 흉내에서 7.7초 → 4.4초 |
 | 튜토리얼 아이템 단계(0093) | `tutorial.rs`, `world.rs`(start_eating, toast_eat_full) | 저장 지점에서 체력이 가득 차 막히던 것: 단계 동안 한 칸 비우고 산딸기를 둔다, 가득할 때 먹으면 알림 |
-| 잠긴 문(0094·0096·0097) | `render.rs`(draw_root_gate·fence_tile·빛 패스), `sunny.rs`(FENCE_H·FENCE_V), `room.rs`(door_anim·tick_doors), `world.rs`(열릴 때 실 풀림) | 팩 나무 울타리(남북 가로 울타리, 동서 세로 울타리, 팩이 없으면 물든 뿌리) + 가로대를 감는 보라 실, 0.35초에 솟아 닫히고 0.5초에 가라앉으며 실이 풀린다, 어둠 속에서도 실이 빛남 |
+| 잠긴 문(0094·0096~0098) | `render.rs`(draw_root_gate·fence_tile·빛 패스), `sunny.rs`(FENCE_H·FENCE_V), `room.rs`(door_anim·tick_doors), `world.rs`(열릴 때 실 풀림) | 팩 나무 울타리 두 겹(남북 가로 울타리 가운데 칸, 동서 세로 울타리, 팩이 없으면 물든 뿌리) + 가로대를 감는 보라 실, 0.35초에 솟아 닫히고 0.5초에 가라앉으며 실이 풀린다, 어둠 속에서도 실이 빛남 |
 | 어둠 지도·야광버섯·그림자(0095) | `render.rs`(dark_rt·cut_material·light_sources·draw_cast_shadows·draw_mushrooms), `art.rs`(light), `biome.rs` | 빛 자리마다 어둠을 빼는 렌더 타깃, 버섯 빛 34px, 심층 버섯 14%·뿌리 지대 4%, 빛 반대쪽으로 눕는 그림자 |
 | 웨이브 | `world.rs`, `scenario.rs` | 지금은 개발 시나리오(아레나·웨이브 3부터)에서만. 적을 다 잡으면 1.2초 뒤 다음 웨이브(1C+1S → 2C+1S → 2C+2S → 3C+2S). 명세엔 없지만 5분 플레이 판정을 위해 넣음 |
 

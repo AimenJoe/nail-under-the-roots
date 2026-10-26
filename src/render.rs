@@ -1399,17 +1399,21 @@ fn draw_root_gate(
             let rise = (grow / 0.55).clamp(0.0, 1.0);
             let h = (rise * 16.0).round();
             if h > 0.0 {
+                // 울타리 두 겹을 엇갈려 쌓는다(뒤 겹부터). 가로는 위아래로, 세로는 좌우로 민다.
                 let r = sunny::rect(fence_tile(g, cx, cy, vertical));
-                draw_texture_ex(
-                    sheet,
-                    x0,
-                    y0 + 16.0 - h,
-                    WHITE,
-                    DrawTextureParams {
-                        source: Some(Rect::new(r.x, r.y, r.w, h)),
-                        ..Default::default()
-                    },
-                );
+                for d in sunny::FENCE_STACK {
+                    let (dx, dy) = if vertical { (0.0, d) } else { (d, 0.0) };
+                    draw_texture_ex(
+                        sheet,
+                        x0 + dx,
+                        y0 + 16.0 - h + dy,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(r.x, r.y, r.w, h)),
+                            ..Default::default()
+                        },
+                    );
+                }
             }
         }
     } else {
@@ -1443,7 +1447,7 @@ fn draw_root_gate(
             } else {
                 sunny::FENCE_RAIL_X
             };
-            &[(c, 3.5, 0.0)]
+            &[(c, sunny::FENCE_WRAP, 0.0)]
         } else {
             &[(4.0, 1.1, 4.0), (11.0, 1.1, 11.0)]
         };
@@ -1474,21 +1478,16 @@ fn draw_root_gate(
     }
 }
 
-/// 잠긴 문 한 칸의 팩 울타리 칸(0097): 이웃 칸이 문인지 보고 끝 기둥·가운데·끝 기둥을 고른다.
-/// `vertical`(남북 문)이면 가로 울타리, 아니면(동서 문) 세로 울타리.
+/// 잠긴 문 한 칸의 팩 울타리 칸(0097·0098). `vertical`(남북 문)이면 가로 울타리 가운데 칸,
+/// 아니면(동서 문) 세로 울타리: 위아래 칸이 문인지 보고 위 끝·가운데·아래 끝을 고른다.
 fn fence_tile(g: &crate::map::Grid, cx: i32, cy: i32, vertical: bool) -> sunny::R {
-    let door = |x: i32, y: i32| g.get_i(x, y) == Cell::Door;
-    let (before, after) = if vertical {
-        (door(cx - 1, cy), door(cx + 1, cy))
-    } else {
-        (door(cx, cy - 1), door(cx, cy + 1))
-    };
-    let [start, mid, end] = if vertical {
-        sunny::FENCE_H
-    } else {
-        sunny::FENCE_V
-    };
-    match (before, after) {
+    // 가로 울타리는 늘 가운데 칸: 가로대가 양쪽 벽까지 이어진다.
+    if vertical {
+        return sunny::FENCE_H;
+    }
+    let door = |y: i32| g.get_i(cx, y) == Cell::Door;
+    let [start, mid, end] = sunny::FENCE_V;
+    match (door(cy - 1), door(cy + 1)) {
         (false, true) => start,
         (true, false) => end,
         _ => mid,
