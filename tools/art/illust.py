@@ -69,6 +69,7 @@ def set_style(v2, v4):
     V2 = v2 or v4
     if V2:
         from portraits import hue_shift
+        globals()['hue_shift'] = hue_shift            # 장면 안에서도 쓴다(풀 포기 색)
         globals().update({k: hue_shift(v) for k, v in _BASE.items()})
     else:
         globals().update(_BASE)
@@ -492,14 +493,22 @@ def great_tree():
     rng = random.Random(11)
     cv = Canvas(640, 560)
     ground = 300
-    bands(cv, 0, ground, (46, 38, 74), (206, 150, 126), 10)
-    if V2:
+    if V4:
+        # 0073: 하늘·먼 산·들판은 Caspar David Friedrich「외로운 나무」(1822, 퍼블릭 도메인). 그림 속 나무는 가운데를 비켜
+        # 먼 곳의 다른 나무로 남긴다(큰 나무 줄기가 x 322).
+        # 그림 속 나무가 큰 나무와 겹치지 않게, 나무 오른쪽(산·들판)만 잘라 좌우로 이어 붙인다.
+        pastel_bg(cv, 'friedrich_lone_tree.jpg', colors=18, margin=0.0, box=(0, 0, 640, ground + 2),
+                  crop=(0.6, 0.06, 0.99, 0.74), mirror=True)
+    else:
+        bands(cv, 0, ground, (46, 38, 74), (206, 150, 126), 10)
+    if V2 and not V4:
         # 대기 원근: 먼 산줄기 한 겹 더(하늘색 쪽으로 밝게)
         far = poly(cv, [(0, 236)] + [(x, 232 - 22 * math.sin(x / 110 + 1.3) - 9 * math.sin(x / 37)) for x in range(0, 641, 16)] + [(640, ground), (0, ground)])
         cv.paint(far, (146, 110, 128))
     # 먼 언덕
-    hill = poly(cv, [(0, 262)] + [(x, 258 - 14 * math.sin(x / 70) - 8 * math.sin(x / 23)) for x in range(0, 641, 16)] + [(640, ground), (0, ground)])
-    cv.paint(hill, (92, 78, 96))
+    if not V4:
+        hill = poly(cv, [(0, 262)] + [(x, 258 - 14 * math.sin(x / 70) - 8 * math.sin(x / 23)) for x in range(0, 641, 16)] + [(640, ground), (0, ground)])
+        cv.paint(hill, (92, 78, 96))
     # 땅속 흙 띠
     bands(cv, ground, 560, (92, 64, 50), (30, 20, 26), 9)
     if V2:
@@ -546,6 +555,7 @@ def great_tree():
     for x, y in ((92, 520), (548, 506), (420, 540)):
         for dx in (0, 9):
             cv.paint(ellipse(cv, x + dx, y, 2.2, 1.6), (230, 60, 90))
+    base = cv.px.copy()
     # 나무 줄기: 밑동이 벌어진 줄기 + 갈라지며 가늘어지는 가지(0049). 예전엔 굵기가 같은 곡선 여섯 개라 사슴뿔처럼 보였다.
     trunk = poly(cv, [(262, ground + 6), (286, ground - 20), (298, 170), (304, 96), (336, 96), (342, 170),
                       (354, ground - 20), (380, ground + 6)])
@@ -592,8 +602,12 @@ def great_tree():
             cv.paint(crack, BARK[0])
             cv.paint(stroke(cv, [(x + 2, y + 1), (x + 2, y + ln - 1)], 1) & trunk & ~crack, BARK[3])
         # 가는 가지까지 2px이면 주황 테두리처럼 보인다: 줄기만 2px, 가지는 1px을 옅게.
-        rim_light(cv, trunk, SUNSET_RIM, 2, within=trunk & ~branch_only)
-        rim_light(cv, trunk, SUNSET_RIM, 1, 0.45, within=branch_only)
+        rim = SUNSET_RIM
+        if V4:   # 바탕 그림의 하늘 빛(노을이 아니다)
+            sky = base[:120].reshape(-1, 3).mean(0)
+            rim = tuple(min(255, v * 1.05) for v in sky)
+        rim_light(cv, trunk, rim, 2, 0.5 if V4 else 1.0, within=trunk & ~branch_only)
+        rim_light(cv, trunk, rim, 1, 0.35 if V4 else 0.45, within=branch_only)
     else:
         for k in range(5):
             x = 300 + k * 9
@@ -604,6 +618,8 @@ def great_tree():
             m = ellipse(cv, x + rng.uniform(-3, 3), y + rng.uniform(1, 5), 5, 3, rot=rng.uniform(0, 3))
             cv.paint(dilate(m) & ~m, (70, 46, 34))
             cv.paint(m, rng.choice([(176, 132, 74), (150, 104, 60), (196, 156, 92)]))
+    if V4:
+        ambient_tint(cv, base, 0.14, light_from=(0, ground))
     return cv
 
 
@@ -934,20 +950,31 @@ def sprout():
 SOURCES = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sources')
 
 
-def pastel_bg(cv, name, colors=18, edge=30, margin=0.04):
+def pastel_bg(cv, name, colors=18, edge=30, margin=0.04, box=None, crop=None, mirror=False):
     """바탕을 파스텔·수채 그림에서(0073): tools/pixel의 --cel과 같은 길(단순화 → 면 나누기 → 다수결 축소 → 큰 면 1px 선).
     원본은 tools/art/sources/(CC0·퍼블릭 도메인, 출처는 assets/LICENSES.md). 인물과 같은 칸 크기로 만든다(믹셀 피하기)."""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pixel'))
     from pxl import cel_pixelate, prepare
-    src = prepare(Image.open(os.path.join(SOURCES, name)).convert('RGB'), cv.w, cv.h, margin, 1.1, 1.1)
-    img, _ = cel_pixelate(src, cv.w, cv.h, colors, edge)
-    cv.px[:] = np.asarray(img, dtype=np.float32)
+    x0, y0, x1, y1 = box or (0, 0, cv.w, cv.h)      # 캔버스에서 채울 칸
+    src = Image.open(os.path.join(SOURCES, name)).convert('RGB')
+    if crop:                                          # 원본에서 쓸 부분(비율)
+        w, h = src.size
+        src = src.crop((int(crop[0] * w), int(crop[1] * h), int(crop[2] * w), int(crop[3] * h)))
+    if mirror:                                        # 좌우로 이어 붙여 넓힌다(이음매는 가운데 — 큰 것이 가리는 자리)
+        wide = Image.new('RGB', (src.width * 2, src.height))
+        wide.paste(src.transpose(Image.FLIP_LEFT_RIGHT), (0, 0))
+        wide.paste(src, (src.width, 0))
+        src = wide
+    src = prepare(src, x1 - x0, y1 - y0, margin, 1.1, 1.1)
+    img, _ = cel_pixelate(src, x1 - x0, y1 - y0, colors, edge)
+    cv.px[y0:y1, x0:x1] = np.asarray(img, dtype=np.float32)
 
 
-def ambient_tint(cv, base, amount=0.15):
-    """바탕 위에 얹은 것(바탕과 달라진 칸)에 바탕의 평균 빛을 조금 섞는다: 그림 속 공기에 함께 들어가 스티커처럼 뜨지 않게."""
+def ambient_tint(cv, base, amount=0.15, light_from=None):
+    """바탕 위에 얹은 것(바탕과 달라진 칸)에 바탕의 평균 빛을 조금 섞는다: 그림 속 공기에 함께 들어가 스티커처럼 뜨지 않게.
+    light_from(y0, y1)이면 그 줄들의 평균을 빛으로(예: 하늘만)."""
     changed = np.abs(cv.px - base).sum(-1) > 0
-    amb = base.reshape(-1, 3).mean(0)
+    amb = (base if light_from is None else base[light_from[0]:light_from[1]]).reshape(-1, 3).mean(0)
     cv.px[changed] = cv.px[changed] * (1 - amount) + amb * amount
 
 
@@ -1157,7 +1184,7 @@ SCENES = {
 
 
 # 장면마다 그림 방식(v2, v4). 하나씩 바꾼다(0073): 파스텔 바탕으로 바꾼 장면은 v4.
-SCENE_STYLE = {'molehill': (True, True)}
+SCENE_STYLE = {'molehill': (True, True), 'great_tree': (True, True)}
 
 
 def main():
