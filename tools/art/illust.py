@@ -15,6 +15,7 @@
     띠 경계만 2×2 칸 바둑판으로 섞는다(0049): 2×2 = 게임 1px이라 어느 배율에서도 고르게 찍힌다.
   - 몸은 마스크 하나에 구(球) 음영 띠를 입힌다(왼쪽 위 빛). 캐릭터마다 바깥에 어두운 외곽선 1~2px.
   - 실·뿌리는 베지어 곡선을 굵기를 줄여 가며 긋는다.
+비교 시험: NAIL_ART_V2=1(색조 이동·조약돌·풀 포기·노을 가장자리 빛), NAIL_ART_V4=1(v2 + 털 뭉치·삐침·Naïl 목도리, 0072).
 """
 import math
 import os
@@ -49,12 +50,22 @@ DLIGHT = [(206, 180, 156), (232, 212, 190), (248, 238, 222)]
 ACORN = [(62, 40, 26), (98, 66, 40), (138, 98, 60), (176, 134, 84)]
 
 # v2(비교 시험, 기본 꺼짐): NAIL_ART_V2=1. 초상화 v2와 같은 색조 이동 + 덩어리(조약돌·풀·나무껍질)·노을 가장자리 빛.
+# Naïl의 뜨개 목도리(portraits.py RAMP['scarf']와 같은 색)
+SCARF = [(104, 34, 44), (150, 52, 54), (196, 82, 66), (228, 122, 86), (246, 166, 120)]
+
 V2 = os.environ.get('NAIL_ART_V2') == '1'
+# v4(비교 시험, 기본 꺼짐): NAIL_ART_V4=1. 초상화 v4(0071)의 털 뭉치·삐침·작은 하이라이트·빛 쪽 외곽선을 일러스트에도(0072).
+V4 = os.environ.get('NAIL_ART_V4') == '1'
+V2 = V2 or V4
 if V2:
     from portraits import hue_shift
-    FUR, MOM_FUR, PINK, RFUR, RMUZ, RABBIT, BARK, VIOLET, GREEN, BLOSSOM, CAP, DFUR, ACORN = (
-        hue_shift(r) for r in (FUR, MOM_FUR, PINK, RFUR, RMUZ, RABBIT, BARK, VIOLET, GREEN, BLOSSOM, CAP, DFUR, ACORN))
+    FUR, MOM_FUR, PINK, RFUR, RMUZ, RABBIT, BARK, VIOLET, GREEN, BLOSSOM, CAP, DFUR, ACORN, SCARF = (
+        hue_shift(r) for r in (FUR, MOM_FUR, PINK, RFUR, RMUZ, RABBIT, BARK, VIOLET, GREEN, BLOSSOM, CAP, DFUR, ACORN, SCARF))
     SUNSET_RIM = (226, 160, 118)
+FUR_RAMPS = (FUR, MOM_FUR, RFUR, RABBIT, DFUR)
+_lu = math.hypot(LIGHT[0], LIGHT[1])
+_U = (LIGHT[0] / _lu, LIGHT[1] / _lu)      # 화면에서 빛 쪽
+_V = (-_U[1], _U[0])
 
 
 # ---- 캔버스와 마스크 -----------------------------------------------------------
@@ -145,12 +156,106 @@ def shade(cv, mask, ramp, cx=None, cy=None, rx=None, ry=None, bias=0.0):
     k = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2] + bias
     k = np.clip((k + 0.35) / 1.25, 0, 0.999)
     idx = (k * len(ramp)).astype(int)
+    if V4 and any(ramp is r for r in FUR_RAMPS):
+        n = len(ramp)
+        idx[(idx == n - 1) & (k < 0.9)] = n - 2       # 가장 밝은 단은 빛 바로 밑 작은 덩어리만
+        idx = fur_clumps(cv, mask, idx, max(rx, ry))
     for i, c in enumerate(ramp):
         cv.paint(mask & (idx == i), c)
 
 
 def outline(cv, mask, rgb=OUTLINE, r=2):
     cv.paint(dilate(mask, r) & ~mask, rgb)
+
+
+# ---- v4: 털이 대머리·피부로 읽히지 않게(초상화 0071과 같은 규칙, 마스크판) ------------------------------
+def fur_clumps(cv, mask, idx, size):
+    """단 경계를 털 뭉치로: 빛 방향으로 비대칭 톱니만큼 밀린 자리의 단을 가져온다. 경계만 휜다.
+    일러스트는 인물 크기가 제각각이라 톱니 주기를 크기에 맞춘다."""
+    period = float(np.clip(size * 0.09, 4.6, 11.0))
+    amp = period * 0.75
+    a = cv.xx * _V[0] + cv.yy * _V[1]
+    b = cv.xx * _U[0] + cv.yy * _U[1]
+    k = amp * (((a / period + b * 0.12 * 4.6 / period) % 1.0) - 0.5)
+    qx = np.clip(np.rint(cv.xx + _U[0] * k), 0, cv.w - 1).astype(int)
+    qy = np.clip(np.rint(cv.yy + _U[1] * k), 0, cv.h - 1).astype(int)
+    ok = mask & mask[qy, qx]
+    return np.where(ok, idx[qy, qx], idx)
+
+
+# 삐침: 크기에 비례하는 삼각형(일러스트는 인물이 초상화보다 몇 배 커서, 1px 도장은 바깥선에 묻혀 가는 송곳털이 된다).
+# 길이·간격은 일부러 섞는다(같은 크기가 고르게 서면 톱니·가시).
+TUFT_LEN = (1.0, 0.6, 1.4, 0.7, 1.1, 0.8, 1.5, 0.6, 1.2)
+TUFT_GAP = (1.0, 1.4, 1.1, 1.6, 0.9, 1.3, 1.8, 1.1)
+
+
+def tufted(cv, mask, size, facing=1):
+    """털 덩어리 마스크에 삐침을 더해 돌려준다. 윗선은 끝이 뒤쪽 위, 뒤쪽 옆선은 끝이 뒤쪽 아래(털이 코에서 뒤로 자란다).
+    facing 0이면(정면) 윗선은 바깥쪽으로 갈라지고 양옆 모두. 좁은 줄(귀·꼬리 끝)은 건너뛴다."""
+    if not V4:
+        return mask
+    out = mask.copy()
+    ys, xs = np.nonzero(mask)
+    if len(xs) == 0:
+        return out
+    L0, G0 = max(2.5, size * 0.075), max(5.0, size * 0.16)
+    min_run = size * 0.35
+    midx = (xs.min() + xs.max()) / 2
+
+    def run(y, x):
+        row = mask[y]
+        l = x
+        while l > 0 and row[l - 1]:
+            l -= 1
+        r = x
+        while r < cv.w - 1 and row[r + 1]:
+            r += 1
+        return r - l + 1
+    tris = []
+    i, x = 0, float(xs.min()) + G0 * 0.5
+    while x <= xs.max():                              # 윗선
+        xi = int(x)
+        col = np.nonzero(mask[:, xi])[0]
+        if len(col) and col.min() + 1 < cv.h and run(col.min() + 1, xi) >= min_run:
+            top = col.min()
+            L = L0 * TUFT_LEN[i % len(TUFT_LEN)]
+            back = (-1 if facing > 0 else 1) if facing else (-1 if xi < midx else 1)
+            tris.append([(xi - L * 0.75, top + 2), (xi + L * 0.75, top + 2), (xi + back * L * 0.9, top - L * 0.7)])
+            i += 1
+        x += G0 * TUFT_GAP[i % len(TUFT_GAP)]
+    for side in (((-1 if facing > 0 else 1),) if facing else (-1, 1)):   # 뒤쪽 옆선(정면이면 양옆)
+        i, y = 0, float(ys.min()) + G0
+        while y < ys.max() - G0:
+            yi = int(y)
+            row = np.nonzero(mask[yi])[0]
+            if len(row):
+                x = row.min() if side < 0 else row.max()
+                if run(yi, x) >= min_run:
+                    L = L0 * TUFT_LEN[(i + 4) % len(TUFT_LEN)]
+                    tris.append([(x - side * 2, yi - L * 0.75), (x - side * 2, yi + L * 0.75), (x + side * L * 0.7, yi + L * 0.9)])
+                    i += 1
+            y += G0 * TUFT_GAP[(i + 3) % len(TUFT_GAP)]
+    if tris:
+        im = Image.new('L', (cv.w, cv.h), 0)
+        d = ImageDraw.Draw(im)
+        for t in tris:
+            d.polygon([(round(px), round(py)) for px, py in t], fill=255)
+        out |= np.array(im) > 0
+    return out
+
+
+def lit_outline(cv, sil, fur, ramp, r=2):
+    """v4: 바깥선을 두르고, 털 덩어리의 빛 쪽(왼쪽 위) 바깥선만 털 둘째 단으로(빛 쪽 실루엣이 가장 어두우면 빛과 어긋난다)."""
+    outline(cv, sil, r=r)
+    if not V4:
+        return
+    ring = dilate(sil, r) & ~sil
+    lit = np.zeros_like(fur)
+    for i in range(1, r + 1):
+        sh = np.zeros_like(fur)
+        sh[:-i, :-i] = fur[i:, i:]          # 오른쪽 아래 i칸이 털이면 빛 쪽 바깥
+        lit |= sh
+    cv.paint(ring & lit, ramp[1])
 
 
 def bands(cv, y0, y1, top, bottom, n, x0=0, x1=None, blend=True):
@@ -222,6 +327,13 @@ def mole(cv, cx, cy, s, facing=1, eyes='open', ramp=FUR, paws=True):
     body = ellipse(cv, cx, cy, s, s * 0.8)
     head = ellipse(cv, cx + f * s * 0.55, cy - s * 0.05, s * 0.6, s * 0.55)
     allm = body | head
+    nail_ = V4 and ramp is FUR            # Naïl(엄마는 목도리를 떠 준 쪽이라 없다)
+    if nail_:
+        # 정수리 한 가닥: 얼굴 쪽으로 기운 잎 모양
+        hx, hy = cx + f * s * 0.42, cy - s * 0.05 - s * 0.55
+        allm |= poly(cv, [(hx - f * s * 0.08, hy + s * 0.06), (hx + f * s * 0.06, hy + s * 0.04),
+                          (hx + f * s * 0.12, hy - s * 0.16), (hx + f * s * 0.02, hy - s * 0.08)])
+    allm = tufted(cv, allm, s, f)
     snout = ellipse(cv, cx + f * s * 1.08, cy + s * 0.05, s * 0.28, s * 0.18)
     nose = ellipse(cv, cx + f * s * 1.3, cy + s * 0.02, s * 0.11, s * 0.1)
     pawm = np.zeros_like(body)
@@ -236,9 +348,30 @@ def mole(cv, cx, cy, s, facing=1, eyes='open', ramp=FUR, paws=True):
     clawm = np.zeros_like(body)
     for c in claws:
         clawm |= c
-    sil = allm | snout | nose | pawm | clawm
-    outline(cv, sil, r=2 if s > 30 else 1)
+    scarf = tails = np.zeros_like(body)
+    if nail_:
+        # 엄마가 떠 준 목도리: 머리와 몸 사이 목을 감은 띠(앞으로 살짝 휜다) + 앞 아래 매듭 + 뒤로 늘어진 꼬리
+        # 옆에서 보면 목이 없어서, 머리 둘레(몸과 맞닿은 쪽)를 감은 깃처럼 그린다. 매듭은 머리 뒤 아래, 꼬리는 아래로.
+        hx, hy, hrx, hry = cx + f * s * 0.55, cy - s * 0.05, s * 0.6, s * 0.55
+        w = s * 0.2
+        collar = ellipse(cv, hx, hy, hrx + w, hry + w) & ~ellipse(cv, hx, hy, hrx, hry) & body
+        scarf = collar & (cv.yy > hy - hry * 0.7)
+        th = math.radians(112)                       # 매듭: 머리 뒤 아래(앞발에 가리지 않게)
+        kx, ky = hx + f * math.cos(th) * (hrx + w * 0.5), hy + math.sin(th) * (hry + w * 0.5)
+        knot = ellipse(cv, kx, ky, s * 0.1, s * 0.085)
+        tails = knot | stroke(cv, bezier((kx, ky), (kx - f * s * 0.04, ky + s * 0.14),
+                                         (kx - f * s * 0.12, ky + s * 0.22), (kx - f * s * 0.2, ky + s * 0.34)),
+                              max(2, s * 0.12), max(2, s * 0.07))
+        x0 = kx
+    sil = allm | snout | nose | pawm | clawm | tails
+    lit_outline(cv, sil, allm, ramp, r=2 if s > 30 else 1)
     shade(cv, allm, ramp, cx + f * s * 0.2, cy, s * 1.2, s * 0.9)
+    if nail_:
+        # 원통처럼: 빛 쪽이 밝다. 뜨개 골은 4칸마다 한 줄(2칸 줄무늬는 소음).
+        shade(cv, scarf, SCARF[:4], hx, hy, hrx + w, hry + w)
+        ang = np.arctan2(cv.yy - hy, (cv.xx - hx) * f)
+        cv.paint(scarf & ((np.floor(ang * (hrx + w) / 4.0) % 2) == 0) & ((np.floor(ang * (hrx + w) / 2.0) % 2) == 0), SCARF[0], 0.4)
+        shade(cv, tails, SCARF[:4], kx, ky + s * 0.1, s * 0.25, s * 0.3)
     shade(cv, snout | nose, PINK)
     cv.paint(nose, PINK[0])
     cv.paint(ellipse(cv, cx + f * s * 1.27, cy - s * 0.02, s * 0.04, s * 0.035), PINK[3])
@@ -516,10 +649,11 @@ def bori_freed():
     tail = stroke(cv, bezier((cx - 70, cy + 50), (cx - 150, cy + 60), (cx - 170, cy - 10), (cx - 140, cy - 40)), 8, 3)
     snout = ellipse(cv, cx + 52, cy - 44, 24, 18)
     paws = ellipse(cv, cx + 30, cy + 30, 20, 14) | ellipse(cv, cx - 10, cy + 36, 20, 14)
-    sil = body | head | ears | tail | snout | paws
-    outline(cv, sil, r=2)
+    furm = tufted(cv, body | head, 90, 1)
+    sil = furm | ears | tail | snout | paws
+    lit_outline(cv, sil, furm, RFUR, r=2)
     shade(cv, tail, PINK[:3])
-    shade(cv, body | head, RFUR, cx, cy - 20, 100, 110)
+    shade(cv, furm, RFUR, cx, cy - 20, 100, 110)
     shade(cv, ears, RFUR)
     cv.paint(ellipse(cv, cx - 30, cy - 102, 18, 18) | ellipse(cv, cx + 60, cy - 102, 18, 18), PINK[1])
     shade(cv, snout, RMUZ)
@@ -562,8 +696,11 @@ def momo_bloom():
     cheeks = ellipse(cv, cx - 50, cy + 30, 46, 34) | ellipse(cv, cx + 50, cy + 30, 46, 34)
     # 몸: 머리 밑으로 이어지는 어깨(목 없이 한 덩어리 — 공 두 개를 쌓은 눈사람처럼 보이지 않게, 0049)
     chest = ellipse(cv, cx, cy + 116, 128, 74) | poly(cv, [(cx - 92, cy + 30), (cx + 92, cy + 30), (cx + 120, cy + 100), (cx - 120, cy + 100)])
-    sil = ear_l | ear_r | head | cheeks | chest
-    outline(cv, sil, r=2)
+    furm = tufted(cv, head | cheeks | chest, 100, 0)
+    extra = furm & ~(head | cheeks | chest)
+    chest = chest | extra
+    sil = ear_l | ear_r | furm
+    lit_outline(cv, sil, furm, RABBIT, r=2)
     shade(cv, chest, RABBIT, cx, cy + 110, 130, 80)
     shade(cv, ear_l, RABBIT)
     shade(cv, ear_r, RABBIT)
@@ -673,8 +810,10 @@ def rabbit(cv, cx, cy, s, facing=1, eyes='open'):
     ear_a = ellipse(cv, cx + f * s * 0.28, cy - s * 1.55, s * 0.2, s * 0.68, rot=-0.22 * f)
     ear_b = ellipse(cv, cx + f * s * 0.72, cy - s * 1.5, s * 0.2, s * 0.68, rot=0.28 * f)
     tail = ellipse(cv, cx - f * s * 0.95, cy + s * 0.1, s * 0.26, s * 0.24)
+    furm = tufted(cv, body | head, s, f)
+    body, head = furm, furm
     sil = body | head | ear_a | ear_b | tail
-    outline(cv, sil, r=1)
+    lit_outline(cv, sil, furm, RABBIT, r=1)
     shade(cv, body | head | ear_a | ear_b, RABBIT, cx + f * s * 0.2, cy - s * 0.3, s * 1.3, s * 1.2)
     cv.paint(ellipse(cv, cx + f * s * 0.28, cy - s * 1.5, s * 0.08, s * 0.48, rot=-0.22 * f)
              | ellipse(cv, cx + f * s * 0.72, cy - s * 1.45, s * 0.08, s * 0.48, rot=0.28 * f), PINK[1])
@@ -852,7 +991,8 @@ def doto_memory():
     for i in range(0, len(tpts), 4):                 # 털 끝이 삐죽(바깥쪽으로 작은 털 뭉치)
         x, y = tpts[i]
         tail |= ellipse(cv, x + rng.uniform(-22, 22), y + rng.uniform(-22, 22), 9, 7)
-    outline(cv, tail, OUTLINE, 2)
+    tail = tufted(cv, tail, 60, 1)
+    lit_outline(cv, tail, tail, DFUR, 2)
     shade(cv, tail, DFUR, 200, 140, 80, 110, bias=-0.08)
     for i in range(6, len(tpts) - 4, 5):
         x, y = tpts[i]
@@ -863,8 +1003,9 @@ def doto_memory():
     neck = ellipse(cv, 312, 170, 28, 24)
     head = ellipse(cv, 330, 146, 30, 26)
     ear = ellipse(cv, 340, 104, 8, 18, rot=0.2)
-    fig = body | neck | head | ear
-    outline(cv, fig, OUTLINE, 2)
+    furm = tufted(cv, body | neck | head, 50, 1)
+    fig = furm | ear
+    lit_outline(cv, fig, furm, DFUR, 2)
     shade(cv, fig & ~ear, DFUR, 300, 170, 70, 64, bias=0.05)
     shade(cv, ear, DFUR)
     cv.paint(ellipse(cv, 341, 108, 3, 10, rot=0.2), (180, 110, 110))
