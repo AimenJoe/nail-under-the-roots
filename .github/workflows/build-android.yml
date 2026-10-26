@@ -107,6 +107,11 @@ jobs:
           "$BT/apksigner" verify --verbose --print-certs "$APK"
           keytool -list -keystore ~/.android/debug.keystore -storepass android 2>/dev/null | grep -i "fingerprint" || true
           "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdkVersion|native-code|launchable-activity|application-label|uses-feature|uses-gl-es" || true
+          # targetSdk 31+: intent-filter가 있는 액티비티에 android:exported가 없으면 기기가 설치를 거부한다
+          # ("package appears to be invalid"). 서명·badging 검사로는 안 잡혀서 v0.1.0~v0.1.4가 그대로 나갔다(0074).
+          if ! "$BT/aapt2" dump xmltree "$APK" --file AndroidManifest.xml | grep -q "android:exported"; then
+            echo "::error::AndroidManifest의 MainActivity에 android:exported가 없다(Android 12+에서 설치 실패)"; exit 1
+          fi
           unzip -l "$APK"
           sha256sum "$APK"
 
