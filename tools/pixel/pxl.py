@@ -258,6 +258,9 @@ def cmd_pixelate(a):
     from PIL import ImageEnhance, ImageFilter
     tw, th = (int(v) for v in a.size.lower().split("x"))
     src = Image.open(a.src).convert("RGB")
+    if a.margin > 0:      # 그림 테두리(액자·종이 가장자리) 걷어 내기
+        mw, mh = int(src.width * a.margin), int(src.height * a.margin)
+        src = src.crop((mw, mh, src.width - mw, src.height - mh))
     # 목표 비율로 가운데 자르기(cover)
     sw, sh = src.size
     k = max(tw / sw, th / sh)
@@ -353,6 +356,7 @@ def main(argv=None):
     s = sub.add_parser("pixelate"); s.add_argument("src"); s.add_argument("pxl"); s.add_argument("--size", default="320x180")
     s.add_argument("--colors", type=int, default=24); s.add_argument("--palette"); s.add_argument("--preview")
     s.add_argument("--contrast", type=float, default=1.1); s.add_argument("--saturation", type=float, default=1.1)
+    s.add_argument("--margin", type=float, default=0.0, help="가장자리를 이 비율만큼 먼저 잘라 낸다(예: 0.03)")
     a = ap.parse_args(argv)
     return {"import": cmd_import, "render": cmd_render, "show": cmd_show, "check": cmd_check,
             "sheet": cmd_sheet, "put": cmd_put, "rekey": cmd_rekey,
