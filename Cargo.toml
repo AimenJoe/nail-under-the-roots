@@ -39,6 +39,9 @@ build_targets = ["aarch64-linux-android"]
 fullscreen = true
 # APK에 넣을 에셋 폴더(폰트 등). 코드는 set_pc_assets_folder("assets")로 플랫폼별 경로를 맞춘다.
 assets = "assets"
+# 앱 아이콘(docs/decisions/0087): tools/icons/make_icons.py가 만든 mipmap(옛 아이콘 + Android 8+ 적응형).
+res = "android/res"
+icon = "@mipmap/ic_launcher"
 # 앱 스토어 업데이트 판정용 정수. 배포할 때마다 올린다.
 version_code = 16
 

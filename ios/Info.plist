@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- iOS 앱 정보(docs/decisions/0086). build-ios.yml이 __VERSION__·__BUILD__를 Cargo.toml 값으로 바꿔 .app에 넣는다. -->
+<!-- iOS 앱 정보(docs/decisions/0086). 아이콘은 tools/icons/make_icons.py. build-ios.yml이 __VERSION__·__BUILD__를 Cargo.toml 값으로 바꿔 .app에 넣는다. -->
 <plist version="1.0">
 <dict>
 	<key>CFBundleExecutable</key>

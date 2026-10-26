@@ -29,7 +29,7 @@
   - 버전·빌드 번호는 Cargo.toml의 `version`·`version_code`를 쓴다.
   - 가로 화면만 쓰고, 상태 표시줄을 숨긴다. `UILaunchScreen`(스토리보드 없이 전체 화면, iOS 14+).
   - 아이콘은 에셋 카탈로그 없이 `CFBundleIconFiles`로 지정한다.
-- 아이콘: `tools/ios/make_icons.py`가 Naïl 초상화를 정수배로 키워 어두운 흙빛 + 아래쪽 따뜻한 빛 위에 올린다(120·152·167·180·1024).
+- 아이콘: `tools/icons/make_icons.py`(Android와 같은 스크립트, 0087)가 Naïl 초상화를 정수배로 키워 어두운 흙빛 + 아래쪽 따뜻한 빛 위에 올린다(120·152·167·180·1024).
 - 시험 방법(사장): Actions의 build-ios 실행 → 아티팩트 `nail-ios-unsigned`를 받는다 → 압축을 풀어 .ipa를 Sideloadly(또는 AltStore)로 내 Apple ID 서명·설치한다 → iPhone 설정 → 일반 → VPN 및 기기 관리에서 개발자 앱을 신뢰한다. 무료 계정은 7일마다 다시 해야 한다.
 
 ## 다음(배포를 생각할 때)
