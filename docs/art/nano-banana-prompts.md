@@ -26,12 +26,17 @@ Create a character reference sheet for a cozy pixel-art game: the character from
 
 1) 보통 표정(시트 첨부):
 ```
-Using the attached character sheet of [이름], create one dialogue portrait for the same game: a single head-and-shoulders portrait of [이름], centered, facing slightly to the right, on a plain flat light background (#E8E0D0). [표정]. Keep the character's design, clothing, colors and pixel style exactly the same as the sheet. A clean, wordless image with only this one character. Aspect ratio 1:1.
+Using the attached character sheet of [이름], create one dialogue portrait for the same game: a single head-and-shoulders portrait of [이름], centered, facing slightly to the right, with [그 캐릭터의 상징: Naïl은 his big pink front paws with cream claws raised in front of his scarf] visible at the bottom, on a plain flat light background (#E8E0D0). [표정]. Keep the character's design, clothing, colors and pixel style exactly the same as the sheet. A clean, wordless image with only this one character. Aspect ratio 1:1.
 ```
-2) 표정 바꾸기(같은 대화, 보통 표정 그림 기준):
+2) 표정 바꾸기(같은 대화, 보통 표정 그림 기준). "provided image"라고만 쓰면 같은 대화의 마지막 그림을 고친다. 헷갈리지 않게 보통 표정 그림을 **첨부하고** "the attached portrait"로 가리킨다:
 ```
-Using the provided image, change only [이름]'s facial expression to [표정]. Keep everything else exactly the same: the same size, position, framing, clothing, colors, background and pixel style.
+Using the attached portrait of [이름], change only the facial expression to [표정]. Keep everything else exactly the same: the same size, position, framing, clothing, colors, background and pixel style.
 ```
+3) 다른 그림에서 모양을 빌려 고칠 때는 첨부 순서로 가리킨다. 비율은 마지막 첨부 그림을 따르니 **고칠 그림을 마지막에** 둔다:
+```
+Edit the last attached image, the portrait of [이름]. Add only [고칠 것], copying its shape from the first attached image, the character sheet. Keep everything else in the portrait exactly the same. The output is the edited portrait only.
+```
+- 첫 시험(Naïl 보통 표정): 시트에는 없던 둥근 귀가 생겼다(두더지는 귀가 털 속에 숨는다 → 캐릭터 글에 `no visible ears` 넣기). 가슴 위로 자르니 상징인 분홍 앞발이 빠졌다 → 초상화 프롬프트에 앞발을 넣는다.
 
 | 캐릭터 | 칸 | 표정(왼쪽이 보통) |
 |---|---|---|
@@ -65,7 +70,7 @@ World rules: The violet threads belong to Halmae, an ancient and lonely fungus g
 ## 3. 캐릭터 (장면에 나오는 사람만 이어 붙인다)
 | 이름 | 첨부 | 붙여 넣을 글 |
 |---|---|---|
-| Naïl | `ref_nail.png` | `Naïl: a tiny baby mole with a round, fluffy brown body, a big pink snout, large pink front paws with cream claws, small shiny dark eyes with a white highlight, and a knitted red-orange scarf tied at the front. Match the attached reference of Naïl.` |
+| Naïl | `ref_nail.png` | `Naïl: a tiny baby mole with no visible ears (a mole's ears are hidden in its fur), a round, fluffy brown body, a big pink snout, large pink front paws with cream claws, small shiny dark eyes with a white highlight, and a knitted red-orange scarf tied at the front. Match the attached reference of Naïl.` |
 | 엄마 | `ref_mom.png` | `Naïl's mother: the same kind of mole but larger, with slightly darker brown fur, no scarf, and gentle closed eyes. Match the attached reference of the mother mole.` |
 | 보리 | `ref_bori.png` | `Bori: an old field-mouse elder with reddish-brown fur, big round ears with pink insides, a small scar on his forehead, a pink snout and a long pink tail; sturdy, tired and kind. Match the attached reference of Bori.` |
 | 모모(돌아옴) | `ref_momo_freed.png` | `Momo: a young European wild rabbit (a burrow rabbit with medium-length ears; one ear tip folds over), warm grey-brown fur, a cream chest and muzzle, big glossy dark eyes with small lashes, and a pink flower at the base of one ear. Match the attached reference of Momo.` |
