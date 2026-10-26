@@ -114,6 +114,13 @@ async fn main() {
     let mut first = true;
     loop {
         app.frame();
+        #[cfg(feature = "dev")]
+        {
+            if is_key_pressed(KeyCode::F3) {
+                ui::check::toggle();
+            }
+            ui::check::end_frame(tuning::VIEW_W, tuning::VIEW_H);
+        }
         next_frame().await;
         if first {
             // 첫 프레임이 화면에 나간 뒤 로딩 화면을 걷는다(그 전에 걷으면 검은 화면이 한 번 보인다).

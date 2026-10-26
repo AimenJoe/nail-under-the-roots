@@ -58,6 +58,8 @@ impl Ui {
     }
 
     pub fn rect_lines(&self, r: Rect, c: Color) {
+        #[cfg(feature = "dev")]
+        check::frame(r);
         let p = self.px(vec2(r.x, r.y));
         draw_rectangle_lines(p.x, p.y, r.w * self.scale, r.h * self.scale, self.scale, c);
     }
@@ -80,6 +82,10 @@ impl Ui {
 
     /// 왼쪽 위 기준으로 글자를 찍는다. `size`는 논리 px(12 또는 24).
     pub fn text(&self, s: &str, x: f32, y: f32, size: f32, c: Color) {
+        #[cfg(feature = "dev")]
+        if check::on() && c.a > 0.05 {
+            check::text(s, Rect::new(x, y, self.text_w(s, size), size));
+        }
         let p = self.px(vec2(x, y + size * 0.8));
         if self.outline {
             // 상하좌우 1게임 px에 어두운 글자를 먼저: 가는 획(Galmuri Condensed)이 뒤의 선과 겹쳐 끊겨 보이지 않게.
@@ -131,6 +137,8 @@ impl Ui {
         if self.text_w(s, size) <= max_w {
             return s.to_string();
         }
+        #[cfg(feature = "dev")]
+        check::cut(s, max_w);
         let mut cut: Vec<char> = s.chars().collect();
         while !cut.is_empty() {
             cut.pop();
@@ -452,5 +460,118 @@ mod tests {
             wrap_with("こうげき（ATK）", 6.0, w),
             vec!["こうげき", "（ATK）"]
         );
+    }
+}
+
+/// 개발 빌드의 글자 넘침 검사(F3로 켬/끔). 그린 글자 칸을 프레임마다 모아, 화면 밖·테두리 밖·겹침·`fit`으로 잘림을
+/// 콘솔에 한 번씩 찍는다(웹은 브라우저 콘솔). 헤드리스로 화면 × 언어를 돌며 콘솔을 모으면 넘침을 사람 눈 전에 거른다.
+#[cfg(feature = "dev")]
+pub mod check {
+    use macroquad::logging::warn;
+    use macroquad::prelude::Rect;
+    use std::cell::RefCell;
+    use std::collections::HashSet;
+
+    #[derive(Default)]
+    struct State {
+        on: bool,
+        texts: Vec<(String, Rect)>,
+        frames: Vec<Rect>,
+        seen: HashSet<String>,
+    }
+
+    thread_local! {
+        static S: RefCell<State> = RefCell::new(State::default());
+    }
+
+    pub fn on() -> bool {
+        S.with(|s| s.borrow().on)
+    }
+
+    pub fn toggle() {
+        S.with(|s| {
+            let mut s = s.borrow_mut();
+            s.on = !s.on;
+            s.seen.clear();
+            warn!("[ui-check] {}", if s.on { "on" } else { "off" });
+        });
+    }
+
+    pub(super) fn text(t: &str, r: Rect) {
+        if t.trim().is_empty() {
+            return;
+        }
+        S.with(|s| s.borrow_mut().texts.push((t.to_string(), r)));
+    }
+
+    pub(super) fn frame(r: Rect) {
+        if on() {
+            S.with(|s| s.borrow_mut().frames.push(r));
+        }
+    }
+
+    pub(super) fn cut(t: &str, max_w: f32) {
+        if on() {
+            report(format!("cut ({max_w:.0}px) {t}"));
+        }
+    }
+
+    fn report(msg: String) {
+        S.with(|s| {
+            let mut s = s.borrow_mut();
+            if s.seen.insert(msg.clone()) {
+                warn!("[ui-check] {}", msg);
+            }
+        });
+    }
+
+    /// 두 칸이 1px 넘게 겹치는가(맞닿은 줄은 겹침이 아니다).
+    fn overlap(a: Rect, b: Rect) -> bool {
+        let w = a.right().min(b.right()) - a.x.max(b.x);
+        let h = a.bottom().min(b.bottom()) - a.y.max(b.y);
+        w > 1.5 && h > 1.5
+    }
+
+    /// 프레임 끝에 부른다: 모은 칸을 살피고 비운다.
+    pub fn end_frame(screen_w: f32, screen_h: f32) {
+        if !on() {
+            return;
+        }
+        let (texts, frames) = S.with(|s| {
+            let mut s = s.borrow_mut();
+            (std::mem::take(&mut s.texts), std::mem::take(&mut s.frames))
+        });
+        for (i, (t, r)) in texts.iter().enumerate() {
+            if r.x < -0.5 || r.y < -0.5 || r.right() > screen_w + 0.5 || r.bottom() > screen_h + 0.5
+            {
+                report(format!(
+                    "off-screen x{:.0} y{:.0} w{:.0} {t}",
+                    r.x, r.y, r.w
+                ));
+            }
+            // 글의 왼쪽 위를 품은 가장 작은 테두리 밖으로 나가면 넘침.
+            let inside = frames
+                .iter()
+                .filter(|f| f.contains(r.point() + macroquad::prelude::vec2(0.5, 0.5)))
+                .min_by(|a, b| (a.w * a.h).total_cmp(&(b.w * b.h)));
+            if let Some(f) = inside {
+                if r.right() > f.right() + 0.5 || r.bottom() > f.bottom() + 1.5 {
+                    report(format!(
+                        "past-frame ({:.0},{:.0} {:.0}x{:.0}) by {:.0}→ {:.0}↓ {t}",
+                        f.x,
+                        f.y,
+                        f.w,
+                        f.h,
+                        (r.right() - f.right()).max(0.0),
+                        (r.bottom() - f.bottom()).max(0.0)
+                    ));
+                }
+            }
+            for (u, q) in texts.iter().skip(i + 1) {
+                if u != t && overlap(*r, *q) {
+                    report(format!("overlap {t} <> {u}"));
+                }
+            }
+        }
     }
 }

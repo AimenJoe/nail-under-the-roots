@@ -808,7 +808,8 @@ impl App {
 
     pub(super) fn draw_shop(&mut self, ui: &Ui) {
         let s = i18n::s();
-        let panel = Rect::new(44.0, 14.0, 232.0, 150.0);
+        // 물건 넷 + 설명 두 줄이 창 아래로 넘쳐 HUD와 겹쳤다: 창을 위로 늘리고 줄 간격 15(0089).
+        let panel = Rect::new(44.0, 6.0, 232.0, 160.0);
         ui.panel(panel, Some(s.shop_title));
         self.close_button(ui, panel);
         // 가진 씨앗(오른쪽 위, 닫기 단추 왼쪽)
@@ -839,7 +840,7 @@ impl App {
         // 물건 줄: 이름 … 값
         let wares = self.wares();
         let list_y = face.bottom() + 6.0;
-        let row_h = FONT_PX + 4.0;
+        let row_h = FONT_PX + 3.0;
         for (i, ware) in wares.iter().enumerate() {
             let r = Rect::new(
                 panel.x + 6.0,
@@ -881,7 +882,7 @@ impl App {
         ui.text_right(
             &hint,
             panel.right() - 2.0,
-            panel.bottom() + 2.0,
+            panel.bottom() + 1.0,
             FONT_PX,
             ui::TEXT_DIM,
         );
@@ -1060,7 +1061,8 @@ impl App {
     pub(super) fn draw_decor(&mut self, ui: &Ui) {
         use crate::village::{key_decor, DECOR, KEY_SEEDS};
         let s = i18n::s();
-        let panel = Rect::new(44.0, 14.0, 232.0, 150.0);
+        // 꾸미기 여섯 줄이 창 아래로 넘쳐 조작 안내와 겹쳤다: 창을 위로 늘림(0089).
+        let panel = Rect::new(44.0, 6.0, 232.0, 160.0);
         ui.panel(panel, Some(s.decor_title));
         self.close_button(ui, panel);
         let have = self.profile.count(KEY_SEEDS);
@@ -1122,7 +1124,7 @@ impl App {
         }
         let hint = super::vfill(s.decor_hint, &[Verb::Confirm, Verb::Back]);
         let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
-        ui.text_center(&hint, 160.0, panel.bottom() + 4.0, FONT_PX, ui::TEXT_DIM);
+        ui.text_center(&hint, 160.0, panel.bottom() + 1.0, FONT_PX, ui::TEXT_DIM);
     }
 
     /// 들고 있는 반딧불을 마을(큰 나무)로 보낸다: 쉼터에 닿을 때·런이 끝날 때(0047). 첫 시작만. 보낸 수.

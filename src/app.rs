@@ -1918,7 +1918,8 @@ impl App {
         }
         let hint = vfill(s.knot_hint, &[Verb::Confirm, Verb::Change, Verb::Back]);
         let hint = ui.fit(&hint, 300.0, FONT_PX);
-        ui.text_center(&hint, 160.0, panel.bottom() + 4.0, FONT_PX, ui::TEXT_DIM);
+        // 창 아래 +4면 글자 아래 2px가 화면 밖(180)으로 잘렸다(0089).
+        ui.text_center(&hint, 160.0, panel.bottom() + 1.0, FONT_PX, ui::TEXT_DIM);
         self.close_button(ui, panel);
     }
 

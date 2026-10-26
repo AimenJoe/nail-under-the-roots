@@ -341,16 +341,24 @@ impl World {
                 }
                 player::Event::Emerge => {
                     sfx.play(sfx::Id::Emerge);
+                    // 땅이 터진다(0090): 맞는 반지름의 밝은 고리 + 밀쳐내는 반지름까지 퍼지는 흙 고리.
                     self.fx.push(ring(
                         self.player.pos,
                         6.0,
                         self.player.talents.emerge_radius() + 4.0,
                         0.22,
+                        WHITE,
+                    ));
+                    self.fx.push(ring(
+                        self.player.pos,
+                        10.0,
+                        t::EMERGE_PUSH_RADIUS,
+                        0.32,
                         DIRT,
                     ));
-                    self.feel.add_trauma(0.15);
-                    burst(&mut self.fx, self.player.pos, 10, DIRT, 70.0);
-                    clods(&mut self.fx, self.player.pos, 8, DIRT, 70.0);
+                    self.feel.add_trauma(t::EMERGE_BURST_SHAKE);
+                    burst(&mut self.fx, self.player.pos, 14, DIRT, 110.0);
+                    clods(&mut self.fx, self.player.pos, 14, DIRT, 110.0);
                     puff(
                         &mut self.fx,
                         self.player.pos,
@@ -760,6 +768,8 @@ impl World {
             let origin = self.player.pos;
             let mut shell_from = None;
             let mut broke_at = None;
+            // 마무리 타·솟구치기가 맞힌 첫 자리(0090): 한 번만 쿵 소리와 충격 고리.
+            let mut impact_at = None;
             for e in &mut self.enemies {
                 if e.last_hit_by == s.id
                     || !e.hittable()
@@ -804,6 +814,11 @@ impl World {
                 self.feel.add_hitstop(s.hitstop);
                 self.feel.add_trauma(s.shake);
                 let hit_point = e.pos - dir * e.radius() * 0.5;
+                if (s.finisher || s.kind == crate::combat::StrikeKind::Emerge)
+                    && impact_at.is_none()
+                {
+                    impact_at = Some((hit_point, dir));
+                }
                 self.fx.push(ring(hit_point, 2.0, 9.0, 0.12, WHITE));
                 // 맞은 쪽으로 튀는 불똥(0081): 어디로 밀었는지 보인다.
                 spray(&mut self.fx, hit_point, dir, 4, WHITE, 140.0);
@@ -823,6 +838,16 @@ impl World {
                     burst(&mut self.fx, e.pos, 12, color, 110.0);
                     unravel(&mut self.fx, e.pos, e.radius());
                 }
+            }
+            if let Some((p, dir)) = impact_at {
+                sfx.play(sfx::Id::Impact);
+                self.fx.push(ring(p, 3.0, 22.0, 0.2, WHITE));
+                spray(&mut self.fx, p, dir, 8, WHITE, 200.0);
+                clods(&mut self.fx, p, 6, DIRT, 90.0);
+                puff(&mut self.fx, p, 3, self.biome.dust(), 6.0, 0.4);
+            }
+            if s.kind == crate::combat::StrikeKind::Emerge {
+                emerge_push(&mut self.enemies, origin, self.player.facing, s.id);
             }
             if let Some(from) = shell_from {
                 self.player
@@ -1238,6 +1263,30 @@ pub fn enemy_color(kind: Kind) -> Color {
     kind.species().color
 }
 
+/// 밀쳐내기(0090): 솟구치기에 안 맞은 둘레의 잡몹을 피해 없이 바깥으로 민다. 가까울수록 세게. 보스는 버틴다.
+/// 같은 공격 번호(`id`)로 맞은 적은 이미 맞았으니 건너뛴다.
+fn emerge_push(enemies: &mut [crate::enemy::Enemy], origin: Vec2, facing: Vec2, id: u32) {
+    for e in enemies {
+        if e.last_hit_by == id || e.is_boss() || !e.hittable() {
+            continue;
+        }
+        let d = e.pos - origin;
+        let reach = t::EMERGE_PUSH_RADIUS + e.radius();
+        let dist = d.length();
+        if dist >= reach {
+            continue;
+        }
+        let k = 1.0 - (1.0 - t::EMERGE_PUSH_EDGE) * (dist / reach);
+        e.last_hit_by = id;
+        e.hurt(
+            0,
+            d.normalize_or(facing),
+            t::EMERGE_PUSH_KNOCKBACK * k,
+            t::EMERGE_PUSH_STUN,
+        );
+    }
+}
+
 fn ring(pos: Vec2, r0: f32, r1: f32, dur: f32, color: Color) -> Fx {
     Fx {
         pos,
@@ -1355,5 +1404,40 @@ fn burst(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
             dur: rand::gen_range(0.15, 0.35),
             kind: FxKind::Spark { color },
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::enemy::{Enemy, Kind};
+
+    /// 밀쳐내기(0090): 둘레의 잡몹은 피해 없이 바깥으로 밀리고 멈춘다. 가까울수록 세다. 이미 맞은 적·보스·멀리 있는 적은 그대로.
+    #[test]
+    fn emerge_pushes_nearby_mobs_outward_without_damage() {
+        let o = vec2(100.0, 100.0);
+        let mut es = vec![
+            Enemy::new(Kind::FieldMouse, o + vec2(30.0, 0.0)),
+            Enemy::new(Kind::FieldMouse, o + vec2(0.0, -44.0)),
+            Enemy::new(Kind::FieldMouse, o + vec2(90.0, 0.0)),
+            Enemy::new(Kind::Chief, o + vec2(-30.0, 0.0)),
+            Enemy::new(Kind::FieldMouse, o + vec2(10.0, 0.0)),
+        ];
+        es[4].last_hit_by = 7; // 솟구치기에 이미 맞은 적
+        let hp: Vec<i32> = es.iter().map(|e| e.hp).collect();
+        emerge_push(&mut es, o, vec2(1.0, 0.0), 7);
+        assert!(
+            es[0].vel.x > 0.0 && es[0].vel.y.abs() < 1e-3,
+            "오른쪽 적은 오른쪽으로"
+        );
+        assert!(es[1].vel.y < 0.0, "위쪽 적은 위로");
+        assert!(es[0].vel.length() > es[1].vel.length(), "가까울수록 세게");
+        assert_eq!(es[2].vel, Vec2::ZERO, "반지름 밖은 그대로");
+        assert_eq!(es[3].vel, Vec2::ZERO, "보스는 버틴다");
+        assert_eq!(es[4].vel, Vec2::ZERO, "이미 맞은 적은 또 밀지 않는다");
+        for (e, h) in es.iter().zip(hp) {
+            assert_eq!(e.hp, h, "밀쳐내기는 피해가 없다");
+        }
+        assert!(matches!(es[0].state, crate::enemy::State::Stunned { .. }));
     }
 }

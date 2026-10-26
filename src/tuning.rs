@@ -54,10 +54,12 @@ pub const CLAW_RANGE: f32 = 14.0;
 /// 스윙 시작 시 전방으로 살짝 전진.
 pub const CLAW_LUNGE: f32 = 45.0;
 pub const CLAW_DAMAGE: [i32; 3] = [1, 1, 2];
-pub const CLAW_KNOCKBACK: [f32; 3] = [90.0, 90.0, 230.0];
-pub const CLAW_STUN: [f32; 3] = [0.15, 0.15, 0.40];
-pub const CLAW_HITSTOP: [f32; 3] = [0.05, 0.05, 0.10];
-pub const CLAW_SHAKE: [f32; 3] = [0.15, 0.15, 0.40];
+/// 3타(마무리)는 "그저 그렇다"(첫 바깥 판정, 0090): 넉백 230 → 330(마찰 9로 약 25px → 37px 밀림), 멈춤·흔들림·경직도 올림.
+/// 마무리 타의 충격 이펙트·소리는 world(`finisher_impact`).
+pub const CLAW_KNOCKBACK: [f32; 3] = [90.0, 90.0, 330.0];
+pub const CLAW_STUN: [f32; 3] = [0.15, 0.15, 0.50];
+pub const CLAW_HITSTOP: [f32; 3] = [0.05, 0.05, 0.13];
+pub const CLAW_SHAKE: [f32; 3] = [0.15, 0.15, 0.55];
 
 // ---- 굴파기 ------------------------------------------------------------
 /// 땅속 최대 시간. 지나면 자동으로 솟구친다.
@@ -81,17 +83,26 @@ pub const CHAIN_STUN: f32 = 0.5;
 pub const CHAIN_HITSTOP: f32 = 0.06;
 pub const CHAIN_SHAKE: f32 = 0.35;
 pub const CHAIN_RECOVER: f32 = 0.25;
-/// 솟구침 범위 공격 반지름.
-pub const EMERGE_RADIUS: f32 = 16.0;
+/// 솟구침 범위 공격 반지름. 16이면 적 바로 밑에서만 맞아 "숨는 용도"로만 썼다(첫 바깥 판정, 0090) → 22.
+pub const EMERGE_RADIUS: f32 = 22.0;
 /// 솟구침 동작 시간(이동 불가).
 pub const EMERGE_TIME: f32 = 0.12;
-/// 솟구친 직후 공격 불가 시간(리스크).
-pub const EMERGE_NO_ATTACK: f32 = 0.10;
-pub const EMERGE_DAMAGE: i32 = 1;
-pub const EMERGE_KNOCKBACK: f32 = 190.0;
-pub const EMERGE_STUN: f32 = 0.45;
-pub const EMERGE_HITSTOP: f32 = 0.08;
-pub const EMERGE_SHAKE: f32 = 0.35;
+/// 솟구친 직후 공격 불가 시간(리스크). 솟구친 뒤 바로 발톱으로 잇게 0.10 → 0.06(0090).
+pub const EMERGE_NO_ATTACK: f32 = 0.06;
+/// 기습 보상: 평타 한 대(1)보다 세게(0090).
+pub const EMERGE_DAMAGE: i32 = 2;
+pub const EMERGE_KNOCKBACK: f32 = 340.0;
+pub const EMERGE_STUN: f32 = 0.6;
+pub const EMERGE_HITSTOP: f32 = 0.11;
+pub const EMERGE_SHAKE: f32 = 0.5;
+/// 밀쳐내기(0090): 맞는 반지름 밖, 이 반지름 안의 잡몹은 피해 없이 바깥으로 밀려나고 잠깐 멈춘다(보스는 안 밀린다).
+/// 가까울수록 세게(바깥 끝은 `EMERGE_PUSH_EDGE`배).
+pub const EMERGE_PUSH_RADIUS: f32 = 44.0;
+pub const EMERGE_PUSH_KNOCKBACK: f32 = 260.0;
+pub const EMERGE_PUSH_EDGE: f32 = 0.55;
+pub const EMERGE_PUSH_STUN: f32 = 0.25;
+/// 솟구칠 때(맞든 안 맞든) 흔들림. 땅이 터지는 느낌(예전 0.15).
+pub const EMERGE_BURST_SHAKE: f32 = 0.25;
 
 /// 이웃 NPC(포포)가 걷는 속도.
 pub const NPC_SPEED: f32 = 70.0;
@@ -300,10 +311,10 @@ pub const CHIEF_STUN_MUL: f32 = 0.35;
 // ---- 큰 나무의 재주(src/talents.rs, docs/decisions/0047) -------------------------------
 /// 굴파기 A 깊은 굴: 땅속 시간·솟구침 반지름·대기 배율. B 얕은 굴.
 pub const TAL_DEEP_TIME: f32 = 0.6;
-pub const TAL_DEEP_RADIUS: f32 = 22.0;
+pub const TAL_DEEP_RADIUS: f32 = 30.0;
 pub const TAL_DEEP_CD: f32 = 1.4;
 pub const TAL_SHALLOW_TIME: f32 = 0.2;
-pub const TAL_SHALLOW_RADIUS: f32 = 12.0;
+pub const TAL_SHALLOW_RADIUS: f32 = 16.0;
 pub const TAL_SHALLOW_CD: f32 = 0.55;
 /// 패링 A 되받아치기: 튕겨낸 돌격에 주는 피해(게이지는 0). B 빛 모으기: 패링 한 번에 차는 게이지.
 pub const TAL_PARRY_COUNTER: i32 = 2;

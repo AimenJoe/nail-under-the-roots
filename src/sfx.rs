@@ -48,6 +48,8 @@ pub enum Id {
     Deny,
     /// 보물 상자가 열린다.
     Chest,
+    /// 마무리 타·솟구치기가 맞았다: 낮고 무거운 쿵(0090).
+    Impact,
 }
 
 /// 파일 소리 표: (이름, 변형 수, 크기). 크기는 MASTER_VOLUME·설정에 곱한다 — 귀로 맞춘다.
@@ -91,6 +93,7 @@ pub struct Sfx {
     shoot: Sound,
     charge: Sound,
     wall_hit: Sound,
+    impact: Sound,
     glowbug: [Sound; 4],
     heal: Sound,
     drill: [Sound; 3],
@@ -187,6 +190,12 @@ impl Sfx {
             wall_hit: make(&[
                 Layer::noise(0.1, 0.6, 2.0),
                 Layer::tone(0.12, 90.0, 50.0, Wave::Sine, 0.6, 1.5),
+            ])
+            .await,
+            impact: make(&[
+                Layer::tone(0.3, 130.0, 38.0, Wave::Sine, 1.0, 1.1),
+                Layer::noise(0.12, 0.7, 2.5),
+                Layer::tone(0.16, 260.0, 80.0, Wave::Square, 0.25, 1.6),
             ])
             .await,
             glowbug: [
@@ -329,6 +338,7 @@ impl Sfx {
             Id::Shoot => &self.shoot,
             Id::Charge => &self.charge,
             Id::WallHit => &self.wall_hit,
+            Id::Impact => &self.impact,
             Id::Glowbug => {
                 let i = self.glow_step.get();
                 self.glow_step.set((i + 1) % self.glowbug.len());
