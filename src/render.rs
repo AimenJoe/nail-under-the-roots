@@ -1899,12 +1899,15 @@ fn draw_world_lights(
     for (x, y, d) in floor_decor(w, cam) {
         if d == Decor::Mushroom {
             let pulse = 0.6 + 0.4 * ((t * 2.0 + x * 0.1).sin());
-            draw_circle(
-                x + 8.0,
-                y + 10.0,
-                8.0,
-                Color::new(0.35, 0.65, 1.0, 0.10 * pulse * k),
-            );
+            // 동심원 세 겹으로 가장자리를 풀어 은은하게(0100).
+            for r in [16.0, 11.0, 6.0] {
+                draw_circle(
+                    x + 8.0,
+                    y + 10.0,
+                    r,
+                    Color::new(0.35, 0.65, 1.0, 0.035 * pulse * k),
+                );
+            }
         }
     }
     // 잠긴 문의 실과 빛(0094): 어둠 마스크 위에 더해 그려 어두운 심층에서도 막힌 문이 보인다.
@@ -3516,12 +3519,14 @@ fn draw_mushrooms(art: &Art, w: &World, cam: Vec2) {
             if let Some(sunny) = &art.sunny {
                 let s = crate::sunny::MUSH_FRAME;
                 let f = ((w.time * 4.0 + x * 0.13) as u32 % 4) as f32;
-                draw_circle(
-                    x + 8.0,
-                    y + 10.0,
-                    7.0,
-                    Color::new(0.5, 0.85, 1.0, 0.10 * pulse),
-                );
+                for r in [13.0, 9.0, 5.0] {
+                    draw_circle(
+                        x + 8.0,
+                        y + 10.0,
+                        r,
+                        Color::new(0.5, 0.85, 1.0, 0.035 * pulse),
+                    );
+                }
                 draw_texture_ex(
                     &sunny.mush,
                     x,
