@@ -854,7 +854,15 @@ fn draw_player_fx(p: &Player, alpha: f32) {
                         Color::new(1.0, 1.0, 1.0, 0.25 * (1.0 - k)),
                     );
                 }
-                draw_claw_marks(origin, dir, hit.range, k, finisher, p.moveset.mark);
+                // 자국이 지나가는 쪽 = 친 발(0082): 짝수 타는 위에서 아래로, 홀수 타는 아래에서 위로, 마지막 타는 둘 다(X).
+                let mark = p.moveset.mark;
+                if finisher {
+                    draw_claw_marks(origin, dir, hit.range, k, true, mark, 1.0);
+                    draw_claw_marks(origin, dir, hit.range, k, true, mark, -1.0);
+                } else {
+                    let sweep = if idx % 2 == 0 { 1.0 } else { -1.0 };
+                    draw_claw_marks(origin, dir, hit.range, k, false, mark, sweep);
+                }
             } else if at < a0 {
                 draw_sector_lines(
                     origin,
@@ -992,7 +1000,8 @@ fn draw_super_dim(w: &World, cam: Vec2) -> bool {
 }
 
 /// 발톱 자국: 전방 호를 따라 세 줄. 휘두르는 동안 펼쳐지고 끝에서 옅어진다.
-fn draw_claw_marks(origin: Vec2, dir: Vec2, r: f32, k: f32, strong: bool, mark: Color) {
+/// `sweep` 1 = 호의 한쪽 끝에서, −1 = 반대쪽 끝에서 펼친다(번갈아 치는 발).
+fn draw_claw_marks(origin: Vec2, dir: Vec2, r: f32, k: f32, strong: bool, mark: Color, sweep: f32) {
     let base = dir.y.atan2(dir.x);
     let span = std::f32::consts::FRAC_PI_2 * 0.95;
     let reveal = (k * 1.6).min(1.0);
@@ -1011,8 +1020,8 @@ fn draw_claw_marks(origin: Vec2, dir: Vec2, r: f32, k: f32, strong: bool, mark: 
     let steps = 10;
     for line in 0..3 {
         let rr = r - line as f32 * 3.0;
-        let a_start = base - span;
-        let a_end = base - span + 2.0 * span * reveal;
+        let a_start = base - span * sweep;
+        let a_end = a_start + 2.0 * span * reveal * sweep;
         let mut prev = origin + vec2(a_start.cos(), a_start.sin()) * rr;
         for i in 1..=steps {
             let a = a_start + (a_end - a_start) * i as f32 / steps as f32;
@@ -3042,9 +3051,22 @@ fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
         player::State::Burrow { time: bt } => (((bt * 12.0) as u32) % 2, 2),
         player::State::Emerge { .. } | player::State::Drill { .. } => (2, 1),
         player::State::Recover { .. } => (3, 1),
-        player::State::Attack { idx, .. } => {
-            let last = p.moveset.last();
-            (if idx == last { 2 } else { idx.min(1) as u32 }, 1)
+        // 한 타 = 들기 → 치기 → (마지막 타) 거두기. 1·2타는 가까운 발·먼 발을 번갈아, 마지막 타는 두 발(0082).
+        player::State::Attack { idx, time: at, .. } => {
+            let (a0, a1) = p.moveset.hits[idx].active;
+            let pose = if idx == p.moveset.last() {
+                2
+            } else {
+                (idx % 2) as u32
+            };
+            let col = if at < a0 {
+                5 + pose
+            } else if pose == 2 && at > a1 + 0.04 {
+                8
+            } else {
+                pose
+            };
+            (col, 1)
         }
         _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => (3, 1),
         _ if moving => (2 + ((time * 10.0) as u32) % 4, 0),

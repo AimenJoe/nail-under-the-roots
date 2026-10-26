@@ -3,7 +3,8 @@
 실행: python3 tools/art/nail.py [출력 경로]  (기본 assets/art/nail.png, 털빛 1~3은 같은 폴더의 nail_fur<n>.png)
 칸 16×16, 오른쪽을 본다(왼쪽은 게임에서 좌우 반전). 발바닥 y=14, 그림자는 게임이 그린다.
   줄 0: idle 2, walk 4
-  줄 1: attack 3(1타·2타·마지막 타), hurt, dead
+  줄 1: 치기 3(앞발·뒷발·두 발), hurt, dead, 들기 3(앞발·뒷발·두 발), 마지막 타 거두기
+        (한 타 = 들기 → 치기 → 거두기, docs/decisions/0082. 1·2타는 가까운 발·먼 발을 번갈아, 마지막 타는 두 발)
   줄 2: 흙더미 2(굴파기), 그림자
   줄 3~5: 줄 0~2의 흰 실루엣(피격 플래시용)
 그리는 법: 채움 색만 문자로 적고 외곽선('o')은 자동으로 두른다. 그래서 부위를 옮겨도 외곽선이 깨지지 않는다.
@@ -183,20 +184,66 @@ def walk(a, i):
     return f
 
 
-def attack(a, i):
-    # 발톱은 늘 발 높이(12줄 이하)에서. 코 바로 밑에 크림색을 두면 다시 이빨로 읽힌다.
-    # 머리는 옮기지 않는다(코가 칸 끝에 닿아 있다). 앞으로 나가는 맛은 게임의 전진(lunge)이 낸다.
+def bob(a, dy):
+    """윗몸(3~11줄)만 dy줄 옮긴다(0082). 발 줄(12~13)은 땅에 그대로 → 상체가 들썩인다.
+    dy=-1: 들기(몸이 한 줄 늘어난다, 11줄을 한 번 더). dy=+1: 내리찍기(몸이 한 줄 눌린다, 옛 12줄이 덮인다)."""
     f = list(a)
-    if i == 0:  # 앞발 쭉
+    if dy < 0:
+        for y in range(2, 11):
+            f[y] = a[y + 1]
+    elif dy > 0:
+        for y in range(12, 3, -1):
+            f[y] = a[y - 1]
+        f[3] = BLANK
+    return f
+
+
+def eyes_shut(f, dy=0):
+    # 눈 질끈(가로선). 몸을 옮긴 만큼 눈 줄도 옮긴다.
+    put(f, 9, 7 + dy, 'bb')
+    put(f, 9, 8 + dy, 'ee')
+
+
+def attack(a, i):
+    """치기(0082): 0 = 가까운 앞발(밝게, 가운데 높이로 쭉), 1 = 먼 앞발(그늘 색, 낮게 긁기), 2 = 두 발 + 내리찍기.
+    발톱은 늘 발 높이(12줄 이하)에서. 코 바로 밑(14~15열, 코 다음 줄)에 크림색을 두면 다시 이빨로 읽힌다.
+    머리를 앞으로 옮기지 않는다(코가 칸 끝에 닿아 있다). 앞으로 나가는 맛은 게임의 전진(lunge)이 낸다."""
+    f = list(a)
+    if i == 0:  # 가까운 발 쭉, 먼 발은 땅에
         put(f, 11, 12, 'bpccc')
-    elif i == 1:  # 낮게 긁기
+    elif i == 1:  # 먼 발 낮게 긁기(그늘 색), 가까운 발은 뒤로 당겨 땅에
         put(f, 11, 12, 'bb...')
+        put(f, 9, 13, 'dpdd')
+        put(f, 12, 13, 'qCCC')
+    else:  # 마지막 타: 윗몸을 한 줄 내리찍고 두 발 다(가까운 발은 땅을 따라 멀리, 먼 발은 몸 가장자리)
+        f = bob(f, 1)
+        eyes_shut(f, 1)
+        put(f, 11, 12, 'qCC')
         put(f, 11, 13, 'bpccc')
-    else:  # 마지막 타: 눈 질끈(가로선), 두 발 다
-        put(f, 9, 7, 'bb')
-        put(f, 9, 8, 'ee')
-        put(f, 10, 12, 'bbpccc')
-        put(f, 11, 13, 'bpccc')
+    return f
+
+
+def windup(a, i):
+    """들기(0082): 윗몸을 한 줄 들어 올리고 칠 발을 땅에서 뗀다. 짧다(1·2타 약 1프레임, 마지막 타 3프레임).
+    들었다가 내려오는 한 줄이 "들썩"이다. 뗀 발은 발 높이(12줄)에 둔다 — 몸 가운데(눈 밑)에 분홍·크림을 두면
+    입으로 읽힌다(2026-10-26 확대 확인)."""
+    f = bob(a, -1)
+    if i == 0:  # 가까운 발을 들어 뒤로 젖힌다
+        put(f, 11, 13, 'd...')
+        put(f, 10, 12, 'pcc')
+    elif i == 1:  # 먼 발(그늘 색)을 든다. 가까운 발은 땅에
+        put(f, 9, 12, 'qCC')
+    else:  # 두 발 다 든다
+        put(f, 11, 13, 'd...')
+        put(f, 8, 12, 'qCpcc')
+    return f
+
+
+def settle(a):
+    """마지막 타 거두기: 몸은 제자리, 두 발은 아직 앞에(후딜레이 동안 자세를 지킨다)."""
+    f = list(a)
+    put(f, 11, 12, 'bqC')
+    put(f, 11, 13, 'bpcc')
     return f
 
 
@@ -235,10 +282,11 @@ def sheet(fur=0):
     a = grid(BASE)
     rows = [
         [a, idle_b(a), walk(a, 0), walk(a, 1), walk(a, 2), walk(a, 3)],
-        [attack(a, 0), attack(a, 1), attack(a, 2), hurt(a), dead(a)],
+        [attack(a, 0), attack(a, 1), attack(a, 2), hurt(a), dead(a),
+         windup(a, 0), windup(a, 1), windup(a, 2), settle(a)],
         [grid(MOUND_A), grid(MOUND_B), grid(SHADOW)],
     ]
-    img = Image.new('RGBA', (16 * 6, 16 * 6), (0, 0, 0, 0))
+    img = Image.new('RGBA', (16 * max(len(r) for r in rows), 16 * 6), (0, 0, 0, 0))
     for ry, row in enumerate(rows):
         for rx, f in enumerate(row):
             f = outline(f)
