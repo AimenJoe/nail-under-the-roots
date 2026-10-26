@@ -119,13 +119,21 @@ pub struct Sfx {
 const SAME_SOUND_GAP: f64 = 0.03;
 
 impl Sfx {
+    /// 시작할 때 읽는 소리 파일(assets 기준, `load`와 같은 이름). main이 한꺼번에 받는다(0092).
+    pub fn files() -> Vec<String> {
+        FILES
+            .iter()
+            .flat_map(|(name, n, _)| (0..*n).map(move |i| format!("sfx/{name}_{i}.wav")))
+            .collect()
+    }
+
     pub async fn load() -> Self {
         let mut files = Vec::new();
         for (name, n, _) in FILES {
             let mut v = Vec::new();
             for i in 0..n {
                 let path = format!("sfx/{name}_{i}.wav");
-                match macroquad::file::load_file(&path).await {
+                match crate::loading::bytes(&path).await {
                     Ok(bytes) => match load_sound_from_bytes(&bytes).await {
                         Ok(s) => v.push(s),
                         Err(e) => eprintln!("효과음 {path}: 풀 수 없다({e})"),

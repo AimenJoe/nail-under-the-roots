@@ -46,32 +46,31 @@ pub struct Sunny {
 
 /// 팩 폴더(assets 기준).
 const SUNNY: &str = "vendor/sunnyside/Sunnyside_World_ASSET_PACK_V2.1/Sunnyside_World_Assets";
+/// 팩에서 읽는 파일(`SUNNY` 기준): 나무·타일셋·불꽃·버섯.
+const SUNNY_FILES: [&str; 4] = [
+    "Elements/Plants/spr_deco_tree_01_strip4.png",
+    "Tileset/spr_tileset_sunnysideworld_16px.png",
+    "Elements/VFX/Fire/spr_deco_fire_02_strip4.png",
+    "Elements/Plants/spr_deco_mushroom_blue_01_strip4.png",
+];
 /// 둥근 나무 한 칸 크기와 잎(윗부분) 높이.
 pub const SUNNY_TREE: (f32, f32) = (32.0, 34.0);
 pub const SUNNY_CROWN_H: f32 = 22.0;
 
 async fn load_sunny() -> Option<Sunny> {
-    let tree = load_texture(&format!(
-        "{SUNNY}/Elements/Plants/spr_deco_tree_01_strip4.png"
-    ))
-    .await
-    .ok()?;
-    let sheet_img = load_image(&format!(
-        "{SUNNY}/Tileset/spr_tileset_sunnysideworld_16px.png"
-    ))
-    .await
-    .ok()?;
+    let tree = crate::loading::texture(&format!("{SUNNY}/{}", SUNNY_FILES[0]))
+        .await
+        .ok()?;
+    let sheet_img = crate::loading::image(&format!("{SUNNY}/{}", SUNNY_FILES[1]))
+        .await
+        .ok()?;
     let sheet = Texture2D::from_image(&sheet_img);
-    let fire = load_texture(&format!(
-        "{SUNNY}/Elements/VFX/Fire/spr_deco_fire_02_strip4.png"
-    ))
-    .await
-    .ok()?;
-    let mush = load_texture(&format!(
-        "{SUNNY}/Elements/Plants/spr_deco_mushroom_blue_01_strip4.png"
-    ))
-    .await
-    .ok()?;
+    let fire = crate::loading::texture(&format!("{SUNNY}/{}", SUNNY_FILES[2]))
+        .await
+        .ok()?;
+    let mush = crate::loading::texture(&format!("{SUNNY}/{}", SUNNY_FILES[3]))
+        .await
+        .ok()?;
     for t in [&tree, &sheet, &fire, &mush] {
         t.set_filter(FilterMode::Nearest);
     }
@@ -134,35 +133,61 @@ impl Art {
             .unwrap_or(&self.nail)
     }
 
+    /// 시작할 때 읽는 그림 파일(assets 기준). main이 `loading::prefetch`로 한꺼번에 받는다(0092).
+    /// `load`의 경로와 같아야 한다(다르면 그 파일만 따로 받는다 — 느릴 뿐 틀리지 않는다).
+    pub fn files() -> Vec<String> {
+        let mut v: Vec<String> = ["art/nail.png", "art/tiles.png"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        v.extend((1..crate::journal::FURS).map(|n| format!("art/nail_fur{n}.png")));
+        v.extend(
+            ["art/portraits.png", "art/critters.png", "art/chief.png"]
+                .iter()
+                .map(|s| s.to_string()),
+        );
+        v.extend(
+            crate::illust::Illust::ALL
+                .iter()
+                .map(|il| format!("art/illust/{}.png", il.spec().file)),
+        );
+        v.push("art/illust/title.png".into());
+        v.push("art/illust/title_fog.png".into());
+        v.extend(SUNNY_FILES.iter().map(|f| format!("{SUNNY}/{f}")));
+        v
+    }
+
     pub async fn load() -> Option<Self> {
-        let nail = load_texture("art/nail.png").await.ok()?;
-        let tiles_img = load_image("art/tiles.png").await.ok()?;
+        let nail = crate::loading::texture("art/nail.png").await.ok()?;
+        let tiles_img = crate::loading::image("art/tiles.png").await.ok()?;
         let tiles = Texture2D::from_image(&tiles_img);
         nail.set_filter(FilterMode::Nearest);
         let mut nail_furs = Vec::new();
         for n in 1..crate::journal::FURS {
-            let t = load_texture(&format!("art/nail_fur{n}.png")).await.ok();
+            let t = crate::loading::texture(&format!("art/nail_fur{n}.png"))
+                .await
+                .ok();
             if let Some(t) = &t {
                 t.set_filter(FilterMode::Nearest);
             }
             nail_furs.push(t);
         }
         tiles.set_filter(FilterMode::Nearest);
-        let portraits = load_texture("art/portraits.png").await.ok();
+        let portraits = crate::loading::texture("art/portraits.png").await.ok();
         if let Some(p) = &portraits {
             p.set_filter(FilterMode::Nearest);
         }
-        let critters = load_texture("art/critters.png").await.ok();
+        let critters = crate::loading::texture("art/critters.png").await.ok();
         if let Some(c) = &critters {
             c.set_filter(FilterMode::Nearest);
         }
-        let chief = load_texture("art/chief.png").await.ok();
+        let chief = crate::loading::texture("art/chief.png").await.ok();
         if let Some(c) = &chief {
             c.set_filter(FilterMode::Nearest);
         }
         let mut illust = Vec::new();
         for il in crate::illust::Illust::ALL {
-            let t = load_texture(&format!("art/illust/{}.png", il.spec().file))
+            let t = crate::loading::texture(&format!("art/illust/{}.png", il.spec().file))
                 .await
                 .ok();
             if let Some(t) = &t {
@@ -171,11 +196,13 @@ impl Art {
             illust.push(t);
         }
         // 타이틀 바탕(0083). 컷씬 그림이 아니라 앨범 목록(`Illust::ALL`)에 넣지 않는다.
-        let title = load_texture("art/illust/title.png").await.ok();
+        let title = crate::loading::texture("art/illust/title.png").await.ok();
         if let Some(t) = &title {
             t.set_filter(FilterMode::Nearest);
         }
-        let title_fog = load_texture("art/illust/title_fog.png").await.ok();
+        let title_fog = crate::loading::texture("art/illust/title_fog.png")
+            .await
+            .ok();
         if let Some(t) = &title_fog {
             t.set_filter(FilterMode::Nearest);
         }

@@ -1733,6 +1733,18 @@ impl App {
     }
 
     fn draw_intro(&self, ui: &Ui) {
+        // 바탕은 타이틀 그림(0083)을 짙은 어둠 밑에 두고, 줄이 넘어갈수록 조금씩 걷어 타이틀로 이어진다.
+        // 예전엔 처음 타이틀의 격자 + 뿌리 선(render::draw_title_background)이 그대로 남아 어울리지 않았다(사장 2026-10-26, 0092).
+        let total = INTRO_LINE_TIME * INTRO_LINES.len() as f32;
+        let lift = (self.intro_t / total).clamp(0.0, 1.0);
+        self.renderer.draw_title_art(ui, get_time() as f32);
+        draw_rectangle(
+            0.0,
+            0.0,
+            screen_width(),
+            screen_height(),
+            Color::new(0.02, 0.01, 0.03, 0.9 - 0.45 * lift),
+        );
         let idx = (self.intro_t / INTRO_LINE_TIME) as usize;
         if let Some(line) = INTRO_LINES.get(idx).map(|f| tr(*f)) {
             let p = (self.intro_t - idx as f32 * INTRO_LINE_TIME) / INTRO_LINE_TIME;
@@ -2817,7 +2829,8 @@ impl App {
             .floor()
             .clamp(13.0, FONT_PX + 4.0);
         let fits = ((avail / row_h).floor() as usize).max(1);
-        // 넘기면 목록 오른쪽 9px에 ▲▼(이름·설명과 겹쳤다). 목록 폭은 가장 긴 아는 이름에 맞춰 74~115
+        // 넘기면 목록 오른쪽 9px에 ▲▼(이름·설명과 겹쳤다). 목록 폭은 가장 긴 아는 이름에 맞춰 74~100
+        // (더 넓히면 오른쪽 능력 말이 잘렸다. 아주 긴 이름은 목록에서만 "…", 오른쪽 제목엔 다 나온다)
         // (포르투갈어·프랑스어·러시아어 이름이 "Esquilo-listra…"처럼 잘렸다, 0089).
         let arrows = if fits < BESTIARY.len() { 9.0 } else { 0.0 };
         let list_w = BESTIARY
@@ -2825,7 +2838,7 @@ impl App {
             .filter(|k| seen.contains(k))
             .map(|k| ui.text_w(tr(k.species().name), FONT_PX) + 8.0 + arrows)
             .fold(74.0, f32::max)
-            .min(115.0);
+            .min(100.0);
         let first = self
             .bestiary_cursor
             .saturating_sub(fits - 1)
@@ -2941,7 +2954,8 @@ impl App {
         );
         let top = y0 + 13.0;
         let rows = (((c.bottom() + 2.0 - top) / 12.0).floor() as usize).max(1);
-        let lines = ui::wrap(ui, tr(text), w, FONT_PX);
+        // 줄바꿈 폭은 6px 덜: 일본어·간체 금칙이 앞 줄로 당긴 글자가 칸을 넘었다(0089).
+        let lines = ui::wrap(ui, tr(text), w - 6.0, FONT_PX);
         for (i, l) in lines.iter().take(rows).enumerate() {
             let l = if i + 1 == rows && lines.len() > rows {
                 ui.fit(&format!("{l}…"), w, FONT_PX)

@@ -63,7 +63,11 @@ fn window_conf() -> Conf {
 }
 
 async fn load_font(path: &str) -> Option<Font> {
-    match load_ttf_font(path).await {
+    let font = match loading::bytes(path).await {
+        Ok(b) => load_ttf_font_from_bytes(&b),
+        Err(e) => Err(e),
+    };
+    match font {
         Ok(mut f) => {
             f.set_filter(FilterMode::Nearest);
             Some(f)
@@ -81,35 +85,38 @@ async fn main() {
     set_pc_assets_folder("assets");
     // 기기 언어로 시작한다. 설정에서 바꿀 수 있다(아직 저장하지 않음, docs/decisions/0013).
     i18n::set_lang(i18n::detect());
-    // 언어별 폰트를 전부 읽는다. 없으면 기본 폰트(한글·한자 없음)로라도 뜨게 한다.
-    // 준비 단계마다 웹 로딩 화면의 막대를 채운다(loading::STEPS = 기본 폰트 1 + 일본어·간체 2 + 그림 1 + 소리 1).
-    let mut done = 0;
+    // 시작할 때 읽는 파일(폰트·그림·소리)을 한꺼번에 받고(웹 로딩 막대가 파일마다 찬다), 받아 둔 바이트로 만든다(0092).
+    // 폰트가 없으면 기본 폰트(한글·한자 없음)로라도 뜨게 한다.
+    let mut font_files: Vec<&'static str> = vec![i18n::BASE_FONT];
+    for l in i18n::Lang::ALL {
+        let f = l.font_file();
+        if !font_files.contains(&f) {
+            font_files.push(f);
+        }
+    }
+    let mut files: Vec<String> = font_files.iter().map(|f| f.to_string()).collect();
+    files.extend(art::Art::files());
+    files.extend(sfx::Sfx::files());
+    // 받은 뒤 남은 단계: 그림 만들기, 소리 풀기.
+    loading::prefetch(&files, 2).await;
+    let total = files.len() as u32 + 2;
     let mut fonts = render::Fonts {
         base: load_font(i18n::BASE_FONT).await,
         by_file: Vec::new(),
     };
-    done += 1;
-    loading::step(done);
-    for l in i18n::Lang::ALL {
-        let file = l.font_file();
-        if file != i18n::BASE_FONT && !fonts.by_file.iter().any(|(f, _)| *f == file) {
-            if let Some(f) = load_font(file).await {
-                fonts.by_file.push((file, f));
-            }
-            done += 1;
-            loading::step(done);
+    for file in font_files.iter().skip(1) {
+        if let Some(f) = load_font(file).await {
+            fonts.by_file.push((file, f));
         }
     }
     let art = art::Art::load().await;
     if art.is_none() {
         eprintln!("그림 에셋(assets/art) 로드 실패: 도형으로 그린다");
     }
-    done += 1;
-    loading::step(done);
+    loading::step(total - 1, total);
     let sfx = sfx::Sfx::load().await;
+    loading::step(total, total);
     let music = music::Music::new();
-    done += 1;
-    loading::step(done);
     let mut app = app::App::new(sfx, music, fonts, art);
     let mut first = true;
     loop {
