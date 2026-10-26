@@ -80,6 +80,8 @@ Layout: a landscape game screen. Faces and important things sit in the upper two
 World rules: The violet threads belong to Halmae, an ancient and lonely fungus grandmother who is afraid of being left alone. They are thin, softly glowing violet strands that wrap around tree roots. Tree roots are always brown wood, never purple; the violet threads only coil around them. Animals bound by the threads have small glowing eyes: red for the field mice, green for Momo the rabbit, amber for Doto the squirrel, and pale sky blue for Kongi the armadillo. When an animal is freed, its eyes return to their own gentle dark color and the threads loosen, fall away, and fade to white or sparkle.
 ```
 
+**실이 없는 장면**에서는 세계 규칙 바로 뒤에 이 문장을 붙인다: `There are no violet threads anywhere in this scene; all roots are clean, bare brown wood.` 세계 규칙의 "실은 뿌리를 감는다" 때문에 `mother_burrow` 첫 그림에서 집 굴 방의 뿌리마다 실이 거미줄처럼 감겼다(0126). 해당: `mother_burrow`, `molehill`, `sprout`, `last_bloom`(`cutscene-illustrations.md`에서 실이 나오지 않는 장면).
+
 ## 3. 캐릭터 (장면에 나오는 사람만 이어 붙인다)
 | 이름 | 첨부 | 붙여 넣을 글 |
 |---|---|---|
