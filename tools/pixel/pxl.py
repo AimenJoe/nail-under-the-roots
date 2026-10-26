@@ -23,6 +23,7 @@
     python3 tools/pixel/pxl.py pixelate 사진.jpg 새.pxl --size 320x180 [--colors 24 | --palette 그림.png] [--preview 미리보기.png]
         그림·사진을 도트로: 자르기 → 크기에 맞춘 중앙값 흐림(재질 무늬를 덩어리로) → 칸 평균으로 줄이기 → 색 줄이기(디더 없음)
         → 외톨이 정리. --palette면 그 그림의 색만 쓴다(게임 그림과 색을 맞출 때). 그 뒤는 손으로(show·put·editor.html).
+        --cel: 4배에서 Kuwahara 단순화 → 면 나누기 → 다수결로 줄이기 → 큰 면 경계에만 1px 외곽선(--edge 밝기 차).
 """
 import argparse
 import sys
@@ -254,6 +255,92 @@ def cmd_rekey(a):
     p.save(a.pxl)
 
 
+def kuwahara(img, r):
+    """Kuwahara 필터(numpy): 네 사분면 중 밝기 분산이 가장 작은 쪽의 평균. 경계는 살리고 면 안은 평평해진다(붓 그림 흉내)."""
+    import numpy as np
+    h, w, _ = img.shape
+    pad = np.pad(img, ((r, r), (r, r), (0, 0)), mode="edge")
+    lum = pad @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    S = np.zeros((h + 2 * r + 1, w + 2 * r + 1, 3), np.float64); S[1:, 1:] = pad.cumsum(0).cumsum(1)
+    L = np.zeros((h + 2 * r + 1, w + 2 * r + 1), np.float64); L[1:, 1:] = lum.cumsum(0).cumsum(1)
+    L2 = np.zeros_like(L); L2[1:, 1:] = (lum * lum).cumsum(0).cumsum(1)
+    n = (r + 1) ** 2
+    best_var = np.full((h, w), np.inf); out = np.zeros((h, w, 3), np.float32)
+
+    def box(T, y0, x0):        # 출력 (y,x)에 대해 pad 좌표 [y+y0, y+y0+r] × [x+x0, x+x0+r] 합
+        ys, xs = np.arange(h)[:, None] + y0, np.arange(w)[None, :] + x0
+        return T[ys + r + 1, xs + r + 1] - T[ys, xs + r + 1] - T[ys + r + 1, xs] + T[ys, xs]
+    for y0, x0 in ((0, 0), (0, r), (r, 0), (r, r)):
+        m = box(L, y0, x0) / n
+        var = box(L2, y0, x0) / n - m * m
+        mean = box(S, y0, x0) / n
+        pick = var < best_var
+        best_var = np.where(pick, var, best_var)
+        out[pick] = mean[pick]
+    return out
+
+
+def cel_pixelate(src, tw, th, k, edge):
+    """단순화 → 면 나누기 → 다수결로 줄이기 → 목표 해상도에서 1px 외곽선. (RGB 이미지, 외곽선 마스크)를 돌려준다."""
+    import numpy as np
+    f = 4
+    big = np.asarray(src.resize((tw * f, th * f), Image.LANCZOS), dtype=np.float32)
+    flat = kuwahara(kuwahara(big, 3), 2)
+    q = Image.fromarray(np.clip(flat, 0, 255).astype(np.uint8)).quantize(colors=k, method=Image.Quantize.MEDIANCUT,
+                                                                           dither=Image.Dither.NONE)
+    lab = np.asarray(q)
+    pal = np.array(q.getpalette()[: 3 * 256], dtype=np.float32).reshape(-1, 3)
+    # 칸마다 가장 많은 면(평균이 아니라 다수결: 경계가 섞인 색을 만들지 않는다)
+    blocks = lab.reshape(th, f, tw, f).transpose(0, 2, 1, 3).reshape(th, tw, f * f)
+    counts = np.stack([(blocks == i).sum(-1) for i in range(k)], -1)
+    small = counts.argmax(-1)
+    # 작은 섬 합치기: 3×3 다수결 두 번(제 면이 셋 미만이면 둘레에 많은 면으로)
+    for _ in range(2):
+        pad = np.pad(small, 1, mode="edge")
+        win = np.stack([pad[dy:dy + th, dx:dx + tw] for dy in range(3) for dx in range(3)], -1)
+        cnt = np.stack([(win == i).sum(-1) for i in range(k)], -1)
+        own = np.take_along_axis(cnt, small[..., None], -1)[..., 0]
+        small = np.where(own >= 3, small, cnt.argmax(-1))
+    # 덩어리 크기(4방향 이어진 같은 면): 큰 덩어리끼리의 경계에만 선을 긋는다(잔무늬 경계는 선 부스러기가 된다)
+    comp = -np.ones((th, tw), np.int32)
+    size = []
+    for y in range(th):
+        for x in range(tw):
+            if comp[y, x] >= 0:
+                continue
+            cid, lv, stack, n = len(size), small[y, x], [(y, x)], 0
+            comp[y, x] = cid
+            while stack:
+                cy, cx = stack.pop()
+                n += 1
+                for ny, nx in ((cy + 1, cx), (cy - 1, cx), (cy, cx + 1), (cy, cx - 1)):
+                    if 0 <= ny < th and 0 <= nx < tw and comp[ny, nx] < 0 and small[ny, nx] == lv:
+                        comp[ny, nx] = cid
+                        stack.append((ny, nx))
+            size.append(n)
+    big_part = np.array(size)[comp] >= max(12, tw * th // 1500)
+    rgb = pal[small]
+    lum = rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    # 외곽선: 오른쪽·아래 이웃과 면이 다르고 밝기 차가 edge 이상이면, 더 어두운 쪽 칸에 1px.
+    line = np.zeros((th, tw), bool)
+    for dy, dx in ((0, 1), (1, 0)):
+        a_l, b_l = small[: th - dy, : tw - dx], small[dy:, dx:]
+        a_y, b_y = lum[: th - dy, : tw - dx], lum[dy:, dx:]
+        diff = (a_l != b_l) & (np.abs(a_y - b_y) >= edge) & big_part[: th - dy, : tw - dx] & big_part[dy:, dx:]
+        dark_a = diff & (a_y <= b_y)
+        dark_b = diff & (a_y > b_y)
+        line[: th - dy, : tw - dx] |= dark_a
+        line[dy:, dx:] |= dark_b
+    # 홀로 떨어진 선 점 지우기(둘레 여덟 칸에 선이 없으면)
+    lp = np.pad(line, 1)
+    nb = sum(lp[1 + dy:1 + dy + th, 1 + dx:1 + dx + tw] for dy in (-1, 0, 1) for dx in (-1, 0, 1) if dy or dx)
+    line &= nb > 0
+    # 선 색: 그 면 색을 어둡게 + 보라 쪽으로(검은 선 대신 선택 외곽선)
+    shade = rgb * 0.5 + np.array([18, 8, 26], dtype=np.float32)
+    rgb = np.where(line[..., None], shade, rgb)
+    return Image.fromarray(np.clip(rgb + 0.5, 0, 255).astype(np.uint8)), line
+
+
 def cmd_pixelate(a):
     from PIL import ImageEnhance, ImageFilter
     tw, th = (int(v) for v in a.size.lower().split("x"))
@@ -276,7 +363,9 @@ def cmd_pixelate(a):
     if cell >= 3:
         src = src.filter(ImageFilter.MedianFilter(min(9, cell | 1)))
     small = src.resize((tw, th), Image.BOX)
-    if a.palette:
+    if a.cel:
+        q, _ = cel_pixelate(src, tw, th, a.colors, a.edge)
+    elif a.palette:
         pal_im = Image.open(a.palette).convert("RGB")
         cols = sorted({c for c in (pal_im.getpixel((x, y)) for y in range(pal_im.height) for x in range(pal_im.width))})
         if len(cols) > 256:
@@ -317,7 +406,7 @@ def cmd_pixelate(a):
                 qp[x, y] = final[mp[x, y]]
     px = q.load()
     # 외톨이 정리: 둘레 여덟 칸에 같은 색이 없으면 둘레에 가장 많은 색으로(두 번)
-    for _ in range(2):
+    for _ in range(0 if a.cel else 2):          # --cel은 면 나누기가 이미 덩어리라, 정리하면 1px 선 끝이 먹힌다
         changes = []
         for y in range(1, th - 1):
             for x in range(1, tw - 1):
@@ -357,6 +446,8 @@ def main(argv=None):
     s.add_argument("--colors", type=int, default=24); s.add_argument("--palette"); s.add_argument("--preview")
     s.add_argument("--contrast", type=float, default=1.1); s.add_argument("--saturation", type=float, default=1.1)
     s.add_argument("--margin", type=float, default=0.0, help="가장자리를 이 비율만큼 먼저 잘라 낸다(예: 0.03)")
+    s.add_argument("--cel", action="store_true", help="단순화(Kuwahara) → 면 나누기 → 다수결 축소 → 1px 외곽선")
+    s.add_argument("--edge", type=float, default=30, help="--cel: 외곽선을 그을 면 사이 밝기 차(0~255)")
     a = ap.parse_args(argv)
     return {"import": cmd_import, "render": cmd_render, "show": cmd_show, "check": cmd_check,
             "sheet": cmd_sheet, "put": cmd_put, "rekey": cmd_rekey,
