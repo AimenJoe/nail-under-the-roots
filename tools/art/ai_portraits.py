@@ -41,12 +41,14 @@ CHARACTERS = {
     'mom': (17, ('gentle',), None, 16),
     # 도토: 몸이 원본 942줄에서 끝나(CUT_AT) 잘라 쓰고, 틀을 높이 96%로 맞춘다.
     'doto': (31, ('normal', 'happy'), 0.96, 16),
+    # 물든 도토: 도토 보통 표정을 고쳐 그려 틀·잘린 줄이 같다. 눈은 호박색 빛(0052).
+    'doto_tainted': (30, ('glare',), 0.96, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
-CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae', 'doto'}
+CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae', 'doto', 'doto_tainted'}
 # 몸이 원본 아래 끝보다 위에서 잘린 캐릭터: 그 줄(원본 1024px)까지만 쓴다. 도토는 942줄에서 몸이 끝나고 아래가 배경 띠라,
 # 크림색 배(배경과 거리 30, 허용 34 안)가 그 띠를 타고 지워져 칸에 구멍이 났다. 잘라서 몸이 아래 끝에 닿게 하고 CHEST_AT_BOTTOM.
-CUT_AT = {'doto': 942}
+CUT_AT = {'doto': 942, 'doto_tainted': 942}
 # 몸에 둘러싸인 배경 틈을 지울 캐릭터(_clear_holes): 할매 갓·대 사이.
 HOLES = {'halmae'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
@@ -119,20 +121,23 @@ HALO = {
     'chief': CHIEF_KEEP,
 }
 # 보랏빛 눈 팔레트(EYE_COLORS)를 떼지 않는 캐릭터: 들쥐 대장은 눈이 빨강이고 털이 보라 기운 잿빛이라,
-# 떼면 털이 그 칸을 다 차지해 보라 실이 털 색과 묶였다(흰 줄로 보였다). 실은 채도 칸으로 간다.
-NO_EYE_SPLIT = {'chief'}
+# 떼면 털이 그 칸을 다 차지해 보라 실이 털 색과 묶였다(흰 줄로 보였다). 실은 채도 칸으로 간다. 물든 도토도 털이 보라 기운이라 같다.
+NO_EYE_SPLIT = {'chief', 'doto_tainted'}
 
-def _glow_red_eyes(img, boxes):
-    """눈 상자 안의 빨강을 숯불처럼 밝고 진하게(들쥐 대장). 원본 눈은 검붉은 바탕에 빨간 점이라 88px에서 빛나는 눈으로 읽히지 않았다.
-    실에 묶인 동물 = 작게 빛나는 빨간 눈이 이야기 약속이다(nano-banana-prompts.md 세계 규칙). 빨강(색상 0.95~0.05, 채도 > 0.4)만 옮기고 흰 반사·검은 선은 그대로."""
+def _glow_eyes(img, boxes, hues, out_hue):
+    """눈 상자 안의 빛 색(색상이 hues 안, 채도 > 0.4)을 밝고 진하게. 흰 반사·검은 선은 그대로.
+    물든 눈은 88px로 줄이면 흐려져 빛나는 눈으로 읽히지 않았다(들쥐 대장은 검붉게, 물든 도토는 흐린 주황 갈색).
+    실에 묶인 동물 = 작게 빛나는 눈이 이야기 약속이다(nano-banana-prompts.md 세계 규칙). hues = (낮은 끝, 높은 끝), 0을 넘어가면 낮은 끝 > 높은 끝."""
+    lo, hi = hues
     sx = img.width / 1024
     px = img.load()
     for (x0, y0, x1, y1) in boxes:
         for y in range(int(y0 * sx), int(y1 * sx)):
             for x in range(int(x0 * sx), int(x1 * sx)):
                 h, s, v = _hsv(px[x, y])
-                if (h < 0.05 or h > 0.95) and s > 0.4 and v > 0.18:
-                    r, g, b = colorsys.hsv_to_rgb(0.99, 0.82, min(1.0, 0.62 + v * 0.6))
+                inside = (lo <= h <= hi) if lo <= hi else (h >= lo or h <= hi)
+                if inside and s > 0.4 and v > 0.18:
+                    r, g, b = colorsys.hsv_to_rgb(out_hue, 0.82, min(1.0, 0.62 + v * 0.6))
                     px[x, y] = (int(r * 255), int(g * 255), int(b * 255))
 
 
@@ -143,7 +148,10 @@ def _glow_red_eyes(img, boxes):
 # 원본별로 더 고칠 것(Naïl은 원본 512px 좌표).
 # 예전 결의 표정은 눈이 호박색으로 나와 연보라로 고쳤다. 다시 그린 결의 표정(눈 색을 프롬프트에 적음)은 처음부터 연보라라 뺐다(0117).
 FIXES = {}
-FIXES['chief_glare'] = lambda img: _glow_red_eyes(img, CHIEF_KEEP[2:])
+FIXES['chief_glare'] = lambda img: _glow_eyes(img, CHIEF_KEEP[2:], (0.95, 0.05), 0.99)
+# 물든 도토 눈 상자(원본 1024px): 왼눈·오른눈. 호박색(색상 0.05~0.14)을 꿀빛으로.
+DOTO_TAINTED_EYES = [(545, 480, 690, 610), (770, 480, 870, 610)]
+FIXES['doto_tainted_glare'] = lambda img: _glow_eyes(img, DOTO_TAINTED_EYES, (0.05, 0.14), 0.09)
 for _face in ('normal', 'happy', 'worried', 'tainted_normal', 'tainted_pained'):
     FIXES[f'momo_{_face}'] = lambda img: _plum_lines(img, MOMO_EYES)
 
