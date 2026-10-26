@@ -10,6 +10,8 @@ on:
     paths:
       - 'src/**'
       - 'assets/**'
+      - 'android/**'        # 앱 아이콘(0087)
+      - 'third_party/**'    # 패치한 miniquad(0075)
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.cargo/**'
