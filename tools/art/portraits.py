@@ -24,7 +24,7 @@
   3. 털 결: 머리 윗선을 들쭉날쭉하게(털 뭉치), 등 쪽에 짧은 어두운 결.
   4. 선택 외곽선(sel-out): 바깥선은 이웃 재질의 가장 어두운 색, 빛 받는 쪽은 한 단 밝게. 검은 선을 피한다.
   5. 눈: 큰 흰 반사 + 작은 반사 + 아래쪽 푸른 반사광. 볼 홍조는 디더.
-비교 시험: NAIL_ART_V2=1(색조 이동·셀 음영, 캐릭터 해석), NAIL_ART_V4=1(v2 + 털 뭉치·삐침·작은 하이라이트, docs/decisions/0071).
+기본은 v4(v2 + 털 뭉치·삐침·작은 하이라이트, docs/decisions/0071). 옛 그림: NAIL_ART_V4=0 NAIL_ART_V2=1(v2), NAIL_ART_V4=0(v1).
 """
 import colorsys
 import math
@@ -118,8 +118,9 @@ BAYER2 = [[0.0, 0.5], [0.75, 0.25]]
 #   색조 이동(그늘은 차갑게 보라·파랑 쪽, 빛은 따뜻하게 노랑 쪽), 디더 없는 단(셀 음영) + 외톨이 픽셀 정리(덩어리),
 #   홍조는 디더 대신 작은 덩어리, 털 결은 무작위 줄을 줄여 덩어리 쪽 몇 가닥만.
 V2 = os.environ.get('NAIL_ART_V2') == '1'
-# v4(비교 시험, 기본 꺼짐): NAIL_ART_V4=1. v2 위에 점 다듬기에서 배운 것을 단계로 얹는다(docs/decisions/0071).
-V4 = os.environ.get('NAIL_ART_V4') == '1'
+# v4(기본, docs/decisions/0071): v2 위에 점 다듬기에서 배운 것을 단계로 얹는다. 옛 그림과 비교할 때만
+# NAIL_ART_V4=0(그러면 NAIL_ART_V2=1이 v2, 둘 다 없으면 v1).
+V4 = os.environ.get('NAIL_ART_V4', '1') != '0'
 V2 = V2 or V4
 
 
@@ -291,9 +292,20 @@ def fur_clumps(cv, period=4.6, amp=3.4, slant=0.12):
                     cv.mat[y][x] = q
 
 
-def silhouette_tufts(cv, spacing=(6, 9, 7, 8), min_run=12):
-    """털 덩어리 윗선·왼쪽 선에 끝이 털 흐름(코에서 뒤로 = 왼쪽 아래)을 보는 작은 삐침. 간격은 일부러 고르지 않게.
-    귀처럼 좁은 곳(가로 덩어리가 min_run보다 짧은 줄)은 건너뛴다."""
+# 삐침 도장(가장자리 칸 기준 상대 좌표). 크기를 섞어야 털로 읽힌다(같은 크기가 고르게 서면 톱니·가시가 된다).
+TUFT_TOP = ([(0, -1), (-1, -1), (-2, -2)],                                          # 작은 것: 끝이 왼쪽 위
+            [(0, -1), (-1, -1), (-2, -1), (-1, -2), (-2, -2), (-3, -3)],            # 큰 것
+            [(0, -1), (-1, -1), (-2, -1), (-3, -1), (-2, -2), (-3, -2), (-4, -3), (-5, -4)])   # 긴 것
+TUFT_LEFT = ([(-1, 0), (-1, 1), (-2, 1), (-2, 2)],                                  # 작은 것: 끝이 왼쪽 아래
+             [(-1, 0), (-1, 1), (-2, 1), (-1, 2), (-2, 2), (-3, 2), (-3, 3)],
+             [(-1, 0), (-1, 1), (-2, 1), (-1, 2), (-2, 2), (-3, 2), (-3, 3), (-4, 3), (-4, 4)])
+TUFT_SIZES = (1, 0, 2, 0, 1, 1, 0, 2, 0, 1)
+TUFT_GAPS = (4, 6, 5, 7, 4, 6, 8, 5)
+
+
+def silhouette_tufts(cv, min_run=12):
+    """털 덩어리 윗선·왼쪽 선에 끝이 털 흐름(코에서 뒤로 = 왼쪽 아래)을 보는 삐침. 간격·크기는 일부러 고르지 않게.
+    귀처럼 좁은 곳(가로 덩어리가 min_run보다 짧은 줄)은 건너뛴다. 삐침 색은 붙은 자리의 단(빛 쪽 끝이 어두우면 점으로 보인다)."""
     def fur(x, y):
         m = cv.mat[y][x] if 0 <= x < W and 0 <= y < H else None
         return m if m and m[0] in FURRY and cv.col[y][x] is None else None
@@ -310,7 +322,7 @@ def silhouette_tufts(cv, spacing=(6, 9, 7, 8), min_run=12):
             m += 1
         return n + m
     adds = []
-    i, nxt = 0, 4
+    i, nxt = 0, 3
     for x in range(2, W - 2):                     # 윗선: 끝이 왼쪽 위
         top = next((y for y in range(1, H - 30) if fur(x, y)), None)
         if top is None or not all(empty(x, yy) for yy in range(0, top)):
@@ -318,8 +330,8 @@ def silhouette_tufts(cv, spacing=(6, 9, 7, 8), min_run=12):
         if x < nxt or run(x, top + 1) < min_run:
             continue
         m = cv.mat[top][x]
-        adds += [(x, top - 1, m), (x - 1, top - 1, m), (x - 2, top - 2, m)]
-        nxt = x + spacing[i % len(spacing)]
+        adds += [(x + dx, top + dy, m) for dx, dy in TUFT_TOP[TUFT_SIZES[i % len(TUFT_SIZES)]]]
+        nxt = x + TUFT_GAPS[i % len(TUFT_GAPS)]
         i += 1
     i, nxt = 0, 0
     for y in range(4, H - 12):                    # 왼쪽 선: 끝이 왼쪽 아래
@@ -327,8 +339,8 @@ def silhouette_tufts(cv, spacing=(6, 9, 7, 8), min_run=12):
         if left is None or not fur(left, y) or y < nxt or run(left, y) < min_run:
             continue
         m = cv.mat[y][left]
-        adds += [(left - 1, y, m), (left - 1, y + 1, m), (left - 2, y + 1, m), (left - 2, y + 2, m)]
-        nxt = y + spacing[(i + 1) % len(spacing)]
+        adds += [(left + dx, y + dy, m) for dx, dy in TUFT_LEFT[TUFT_SIZES[(i + 3) % len(TUFT_SIZES)]]]
+        nxt = y + TUFT_GAPS[(i + 2) % len(TUFT_GAPS)]
         i += 1
     for x, y, m in adds:
         if empty(x, y):
