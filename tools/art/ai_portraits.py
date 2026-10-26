@@ -41,7 +41,10 @@ CHARACTERS = {
     'mom': (17, ('gentle',), None, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
-CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae'}
+CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae', 'doto'}
+# 몸이 원본 아래 끝보다 위에서 잘린 캐릭터: 그 줄(원본 1024px)까지만 쓴다. 도토는 942줄에서 몸이 끝나고 아래가 배경 띠라,
+# 크림색 배(배경과 거리 30, 허용 34 안)가 그 띠를 타고 지워져 칸에 구멍이 났다. 잘라서 몸이 아래 끝에 닿게 하고 CHEST_AT_BOTTOM.
+CUT_AT = {'doto': 942}
 # 몸에 둘러싸인 배경 틈을 지울 캐릭터(_clear_holes): 할매 갓·대 사이.
 HOLES = {'halmae'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
@@ -429,6 +432,8 @@ def character(name):
     for f, p in zip(faces, paths):
         img = Image.open(p).convert('RGB')
         _erase_star(img)
+        if name in CUT_AT:
+            img = img.crop((0, 0, img.width, CUT_AT[name]))
         fix = FIXES.get(f'{name}_{f}')
         if fix:
             fix(img)
