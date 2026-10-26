@@ -15,7 +15,7 @@
 > **용어**: 이 문서에서 "캐릭터 시트(character sheet)"는 늘 이 0-1 단계의 결과, 곧 그 캐릭터의 앞모습·3/4 모습 그림이다. "초상화(portrait)"는 0-2의 가슴 위 그림이다.
 장면을 그리기 전에 캐릭터마다 새 그림체로 **한 장씩** 먼저 그려 확정한다. 공식 문서는 같은 캐릭터를 여러 장 그릴 때 **앞서 만든 그림을 다음 프롬프트에 넣으라**고 한다. 확정한 시트를 장면의 캐릭터 그림으로 `ref_*.png` 대신(또는 함께) 넣는다. [1차]
 ```
-Create a character reference sheet for a cozy pixel-art game: the character from the attached image, standing, shown from the front and from a three-quarter view side by side on a plain light background, full body, same proportions and colors as the reference. [캐릭터 글]. [공통 스타일]. Aspect ratio 16:9.
+Create a character reference sheet for a cozy pixel-art game: the character from the attached image, standing, shown from the front and from a three-quarter view side by side on a plain light background, full body, same proportions and colors as the reference. [캐릭터 글]. [공통 스타일]. A clean, wordless image with no title, labels or color swatches. Aspect ratio 16:9.
 ```
 마음에 드는 그림체(예: 앞서 받은 초상화 판)가 있으면 Pro에서 **그림체 참고**로 첨부하고 이렇게 적는다: `Use the last attached image only as a style reference for line, palette and pixel density; take each character's design only from its own reference image.`
 
@@ -42,6 +42,7 @@ Edit the last attached image, the portrait of [이름]. Add only [고칠 것], c
 - **걱정 표정이 거절될 때**("저는 언어 모델일 뿐이라서…"): 부드러운 말로 바꾸고 맨 앞에 `Edit this image.`를 붙인다(`gently concerned look`, 또 거절되면 `thoughtful, slightly unsure look`). Naïl·모모 둘 다 이렇게 됐다.
 - **물든 모습은 돌아온 모습 그림을 고쳐 그린다**(틀이 1px까지 같다). 실은 "선만큼 굵게, 볼·이마·귀 둘레로", 눈은 "반딧불 같은 선명한 초록"으로 적는다. 가는 실은 88px에서 사라지고, "glowing green"만 쓰면 흰빛 민트가 나왔다(0112).
 - 표정이 여럿이면 다음 표정도 **보통 표정 하나만** 첨부한다(기쁨 표정을 고치면 감은 눈이 남기 쉽다).
+- **시트에서 몸집이 빠지기 쉽다**(보리가 날씬한 쥐가 됐다): 통통함·머리 크기를 캐릭터 글에 적고, 틀리면 참고 그림 → 시트 순서로 첨부해 고친다. 시트 프롬프트에 글자 없음을 넣지 않으면 제목·색 견본이 들어간다(0113).
 - 첫 시험(Naïl 보통 표정): 시트에는 없던 둥근 귀가 생겼다(두더지는 귀가 털 속에 숨는다 → 캐릭터 글에 `no visible ears` 넣기). 가슴 위로 자르니 상징인 분홍 앞발이 빠졌다 → 초상화 프롬프트에 앞발을 넣는다.
 
 | 캐릭터 | 칸 | 표정(왼쪽이 보통) |
@@ -78,7 +79,7 @@ World rules: The violet threads belong to Halmae, an ancient and lonely fungus g
 |---|---|---|
 | Naïl | `ref_nail.png` | `Naïl: a tiny baby mole with no visible ears (a mole's ears are hidden in its fur), a round, fluffy brown body, a big pink snout, large pink front paws with cream claws, small shiny dark eyes with a white highlight, and a knitted red-orange scarf tied at the front. Match the attached reference of Naïl.` |
 | 엄마 | `ref_mom.png` | `Naïl's mother: the same kind of mole but larger, with slightly darker brown fur, no scarf, and gentle closed eyes. Match the attached reference of the mother mole.` |
-| 보리 | `ref_bori.png` | `Bori: an old field-mouse elder with reddish-brown fur, big round ears with pink insides, a small scar on his forehead, a pink snout and a long pink tail; sturdy, tired and kind. Match the attached reference of Bori.` |
+| 보리 | `ref_bori.png` | `Bori: a plump, round old field-mouse elder with a big wide head and reddish-brown fur, big round ears with pink insides, a small scar on his forehead, a pink snout and a long pink tail; sturdy, tired and kind. Match the attached reference of Bori.` |
 | 모모(돌아옴) | `ref_momo_freed.png` | `Momo: a young European wild rabbit (a burrow rabbit with medium-length ears; one ear tip folds over), warm grey-brown fur, a cream chest and muzzle, big glossy dark eyes with small lashes, and a pink flower at the base of one ear. Match the attached reference of Momo.` |
 | 모모(물듦) | `ref_momo_tainted.png` | `Momo while bound: the same rabbit with dusky plum-grey fur and glowing green eyes, violet threads coiled around her body. Match the attached reference.` |
 | 누룩 할매 | `ref_halmae.png` | `Halmae: an enormous, ancient fungus grandmother, a soft white cotton-like mycelium mound crowned with a cluster of tan mushroom caps, with a kind old face: closed eyes, rosy cheeks and a small smile. Her threads spread out in every direction, white with violet mixed in. Match the attached reference of Halmae.` |

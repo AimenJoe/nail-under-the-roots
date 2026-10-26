@@ -31,6 +31,8 @@ CHARACTERS = {
     'momo': (12, ('normal', 'happy', 'worried'), 1.22, 16),
     # 물든 모모: 돌아온 모모 보통 표정을 고쳐 그려 틀이 1px까지 같다 → 같은 틀. 보라 실은 눈 팔레트(보랏빛) 칸을, 초록 눈은 채도 칸을 쓴다.
     'momo_tainted': (7, ('normal', 'pained'), 1.22, 16),
+    # 보리: 원본이 칸을 거의 채워(Naïl처럼) 틀은 그대로. 선도 짙은 자두빛이라 따로 고치지 않는다.
+    'bori': (10, ('normal', 'happy'), None, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
 CHEST_AT_BOTTOM = {'momo', 'momo_tainted'}
