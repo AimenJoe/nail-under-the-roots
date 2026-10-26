@@ -2057,6 +2057,26 @@ pub fn draw_bori_at(art: &Art, pos: Vec2, face_left: bool, moving: bool, time: f
 }
 
 /// 쉼터 모닥불: 돌 둘레 + 장작 + 흔들리는 불꽃 + 바닥 빛.
+/// 모닥불의 돌만(불꽃·빛 없이): 그림자 패스용(0105). 그림 자리는 `draw_campfire_sunny`·`draw_campfire`와 같다.
+fn draw_campfire_stones(sunny: Option<&art::Sunny>, r: Rect) {
+    if let Some(sunny) = sunny {
+        let c = vec2(r.center().x, r.bottom() - 4.0);
+        crate::sunny::draw_at_foot(
+            &sunny.sheet,
+            crate::sunny::FIRE_PIT,
+            c + vec2(0.0, 6.0),
+            WHITE,
+        );
+        return;
+    }
+    let c = vec2(r.center().x, r.bottom() - 5.0);
+    for k in 0..7 {
+        let a = k as f32 / 7.0 * std::f32::consts::TAU;
+        let p = c + vec2(a.cos() * 7.0, a.sin() * 3.0);
+        draw_rectangle((p.x - 1.5).round(), (p.y - 1.0).round(), 3.0, 2.0, OUTLINE);
+    }
+}
+
 fn draw_campfire(r: Rect, time: f32) {
     let c = vec2(r.center().x, r.bottom() - 5.0);
     let flick = (time * 9.0).sin() * 0.5 + (time * 13.7).sin() * 0.5;
@@ -3109,17 +3129,38 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
         draw_player_halo(pp, w.time);
     }
     if !ground {
-        // 해 그림자: 땅속 플레이어(둔덕)·빛인 것(모닥불)·줍는 것은 그림자를 드리우지 않는다.
+        // 해 그림자: 땅속 플레이어(둔덕)·줍는 것은 그림자를 드리우지 않는다. 모닥불은 돌만(아래).
         list.retain(|(_, d)| match d {
             Drawable::Player => standing,
             Drawable::Pickup(_) => false,
-            Drawable::Pillar(i) => w.room.props[*i].kind != PropKind::Campfire,
             _ => true,
         });
     }
     list.sort_by(|a, b| a.0.total_cmp(&b.0));
     for (foot, d) in list {
         // 해·모닥불 그림자: 발 줄(foot)을 축으로 눕힌다. 끝에서 되돌린다. 빛이 닿지 않으면 그리지 않는다.
+        if let (Some(_), Drawable::Pillar(i)) = (sun, &d) {
+            let p = w.room.props[*i];
+            if p.kind == PropKind::Campfire {
+                // 모닥불 돌(0105): 불꽃은 빛이라 빼고, 돌만 키워 그려 돌마다 바깥쪽 그림자가 되게 한다.
+                // 가로는 불 한가운데를 축으로 양옆으로, 세로는 돌무더기 뒤 끝을 축으로: 3/4 시점에서 뒤(위)로 눕는
+                // 그림자는 짧게 줄어 보이므로 뒤쪽 돌은 거의 늘지 않고 앞쪽 돌일수록 앞으로 길어진다.
+                let cx = p.rect.center().x;
+                let back = p.rect.bottom() + 2.0 - crate::sunny::FIRE_PIT.3 as f32 + 2.0;
+                let k = 1.0 + t::FIRE_PIT_SPREAD;
+                let m = Mat4::from_cols(
+                    vec4(k, 0.0, 0.0, 0.0),
+                    vec4(0.0, k, 0.0, 0.0),
+                    vec4(0.0, 0.0, 1.0, 0.0),
+                    vec4(cx * (1.0 - k), back * (1.0 - k), 0.0, 1.0),
+                );
+                let gl = unsafe { get_internal_gl() };
+                gl.quad_gl.push_model_matrix(m);
+                draw_campfire_stones(art.sunny.as_ref(), p.rect);
+                gl.quad_gl.pop_model_matrix();
+                continue;
+            }
+        }
         if let Some(l) = sun {
             let at = vec2(drawable_x(w, alpha, &d), foot);
             let Some(k) = shadow_dir(at, l.fire, l.bright) else {

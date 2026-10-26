@@ -189,6 +189,8 @@ pub const FIRE_SHADOW_MIN: f32 = 0.5;
 pub const FIRE_SHADOW_GROW: f32 = 1.1;
 /// 불이 아래(앞)에 있어 그림자가 뒤(위)로 눕을 때 더 늘이는 비율(바로 위로 눕으면 1 + 이 값 배, 0104).
 pub const FIRE_SHADOW_BACK: f32 = 0.8;
+/// 모닥불 돌무더기의 그림자: 돌 그림을 이만큼 키운 모양(0105, 가로는 불 한가운데·세로는 뒤 끝이 축). 돌마다 바깥쪽으로 진다.
+pub const FIRE_PIT_SPREAD: f32 = 0.28;
 /// 옆으로 눕는 그림자의 두께(높이 1px당 뒤로). 없으면 발 줄 한 줄로 납작해진다.
 pub const FIRE_SHADOW_THICK: f32 = 0.3;
 /// 지도에 구운 장식의 그림자 길이 비율(0103): 3/4 시점에서 바닥에 깔린 것은 그림 높이만큼 서 있지 않다.
