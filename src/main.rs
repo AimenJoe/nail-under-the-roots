@@ -29,6 +29,7 @@ mod loading;
 mod loot;
 mod map;
 mod moveset;
+mod music;
 mod player;
 mod prefs;
 mod profile;
@@ -106,9 +107,10 @@ async fn main() {
     done += 1;
     loading::step(done);
     let sfx = sfx::Sfx::load().await;
+    let music = music::Music::load().await;
     done += 1;
     loading::step(done);
-    let mut app = app::App::new(sfx, fonts, art);
+    let mut app = app::App::new(sfx, music, fonts, art);
     let mut first = true;
     loop {
         app.frame();

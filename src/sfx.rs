@@ -54,7 +54,12 @@ pub struct Sfx {
     glow_step: Cell<usize>,
     /// 설정의 소리 크기(0..1). MASTER_VOLUME에 곱한다.
     volume: Cell<f32>,
+    /// 소리마다 마지막으로 낸 때(0081): 같은 소리를 아주 짧은 사이에 겹쳐 내지 않는다(한 틱에 여럿 맞을 때).
+    last: std::cell::RefCell<Vec<(usize, f64)>>,
 }
+
+/// 같은 소리를 다시 내기까지 최소 간격(초).
+const SAME_SOUND_GAP: f64 = 0.03;
 
 impl Sfx {
     pub async fn load() -> Self {
@@ -166,6 +171,7 @@ impl Sfx {
             .await,
             glow_step: Cell::new(0),
             volume: Cell::new(1.0),
+            last: std::cell::RefCell::new(Vec::new()),
         }
     }
 
@@ -178,6 +184,16 @@ impl Sfx {
             return;
         }
         let s = self.sound(id);
+        let key = s as *const Sound as usize;
+        let now = macroquad::time::get_time();
+        {
+            let mut last = self.last.borrow_mut();
+            match last.iter_mut().find(|(k, _)| *k == key) {
+                Some((_, t)) if now - *t < SAME_SOUND_GAP => return,
+                Some((_, t)) => *t = now,
+                None => last.push((key, now)),
+            }
+        }
         play_sound(
             s,
             PlaySoundParams {

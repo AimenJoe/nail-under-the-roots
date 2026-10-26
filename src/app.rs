@@ -70,8 +70,9 @@ const PAUSE_MENU: [Tr; 4] = [
     |s| s.pm_settings,
     |s| s.pm_title,
 ];
-const SETTING_ROWS: [Tr; 8] = [
+const SETTING_ROWS: [Tr; 9] = [
     |s| s.set_sound,
+    |s| s.set_music,
     |s| s.set_shake,
     |s| s.set_debug,
     |s| s.set_language,
@@ -81,10 +82,10 @@ const SETTING_ROWS: [Tr; 8] = [
     |s| s.set_back,
 ];
 /// 설정의 "포포의 응원"·"조작 설정"·"기록 지우기"·"돌아가기" 줄.
-const SETTING_ASSIST: usize = 4;
-const SETTING_CONTROLS: usize = 5;
-const SETTING_ERASE: usize = 6;
-const SETTING_BACK: usize = 7;
+const SETTING_ASSIST: usize = 5;
+const SETTING_CONTROLS: usize = 6;
+const SETTING_ERASE: usize = 7;
+const SETTING_BACK: usize = 8;
 /// 값이 아니라 누르는 줄(좌우로 바뀌지 않는다).
 fn setting_is_button(i: usize) -> bool {
     matches!(i, SETTING_CONTROLS | SETTING_ERASE | SETTING_BACK)
@@ -180,6 +181,8 @@ enum Back {
 /// 설정. 값은 0..=10 단계. 웹에서는 브라우저에 저장한다(prefs.rs). 디버그 정보는 저장하지 않는다.
 pub struct Settings {
     pub volume: u8,
+    /// 음악 크기(0..=10, 효과음과 따로, 0081).
+    pub music: u8,
     pub shake: u8,
     pub debug_overlay: bool,
     /// 사람이 고른 언어(None = 기기 언어).
@@ -415,6 +418,7 @@ pub struct App {
     journal_check: f32,
     inventory: Inventory,
     sfx: Sfx,
+    music: crate::music::Music,
     input: Input,
     renderer: Renderer,
     acc: f32,
@@ -467,10 +471,16 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(sfx: Sfx, fonts: render::Fonts, art: Option<Art>) -> Self {
+    pub fn new(
+        sfx: Sfx,
+        mut music: crate::music::Music,
+        fonts: render::Fonts,
+        art: Option<Art>,
+    ) -> Self {
         let saved = crate::prefs::load();
         let settings = Settings {
             volume: saved.map(|p| p.volume).unwrap_or(7),
+            music: saved.map(|p| p.music).unwrap_or(7),
             shake: saved.map(|p| p.shake).unwrap_or(10),
             debug_overlay: false,
             lang: saved.and_then(|p| p.lang),
@@ -482,6 +492,7 @@ impl App {
             i18n::set_lang(l);
         }
         sfx.set_volume(settings.volume_f());
+        music.set_volume(settings.music as f32 / 10.0);
         let mut world = World::new();
         world.debug.overlay = settings.debug_overlay;
         Self {
@@ -522,6 +533,7 @@ impl App {
             inventory: Inventory::new(&[]),
             gift: None,
             sfx,
+            music,
             input: Input::new(),
             renderer: Renderer::new(fonts, art),
             acc: 0.0,
@@ -552,6 +564,40 @@ impl App {
             knot_level: 0,
             title_note: None,
         }
+    }
+
+    /// 지금 들려야 할 곡과 낮출지(0081). 타이틀 쪽 화면은 타이틀 곡, 게임은 장소·환경, 보스와 싸우는 동안은 보스 곡.
+    /// 대사(컷씬)·일시정지·가게 같은 창이 떠 있으면 음악을 낮춘다.
+    fn music_track(&self) -> (Option<crate::music::Track>, bool) {
+        use crate::adventure::Place;
+        use crate::music::Track;
+        let title = matches!(
+            self.scene,
+            Scene::Intro | Scene::Title | Scene::Slots | Scene::Album | Scene::Dev
+        ) || matches!(
+            self.scene,
+            Scene::Settings { back: Back::Title } | Scene::Controls { back: Back::Title }
+        );
+        if title {
+            return (Some(Track::Title), false);
+        }
+        let w = &self.world;
+        let boss = self.dream.is_some() || w.enemies.iter().any(|e| e.is_boss() && !e.asleep);
+        let track = if boss {
+            Track::Boss
+        } else {
+            match w.adv.place {
+                Place::Village => Track::Village,
+                Place::Camp => Track::Camp,
+                Place::Field => Track::Field,
+                Place::Dungeon | Place::Arena => match w.biome {
+                    crate::biome::Biome::Meadow => Track::Field,
+                    crate::biome::Biome::Roots => Track::Roots,
+                    crate::biome::Biome::Deep => Track::Deep,
+                },
+            }
+        };
+        (Some(track), self.scene != Scene::Game)
     }
 
     /// 기록을 저장한다. 이번 런에서 만난 이웃도 함께 남긴다.
@@ -612,6 +658,8 @@ impl App {
         } else {
             (self.letterbox - step).max(target)
         };
+        let (track, ducked) = self.music_track();
+        self.music.update(track, ducked, dt);
         match self.scene {
             Scene::Game => self.update_game(dt),
             Scene::Cutscene => {
@@ -1158,12 +1206,16 @@ impl App {
                 self.sfx.set_volume(self.settings.volume_f());
                 self.sfx.play(crate::sfx::Id::EnemyHit);
             }
-            1 => self.settings.shake = (self.settings.shake as i8 + d).clamp(0, 10) as u8,
-            2 => {
+            1 => {
+                self.settings.music = (self.settings.music as i8 + d).clamp(0, 10) as u8;
+                self.music.set_volume(self.settings.music as f32 / 10.0);
+            }
+            2 => self.settings.shake = (self.settings.shake as i8 + d).clamp(0, 10) as u8,
+            3 => {
                 self.settings.debug_overlay = !self.settings.debug_overlay;
                 self.world.debug.overlay = self.settings.debug_overlay;
             }
-            3 => {
+            4 => {
                 let l = i18n::lang().cycle(d);
                 i18n::set_lang(l);
                 self.settings.lang = Some(l);
@@ -1183,6 +1235,7 @@ impl App {
     fn save_prefs(&self) {
         crate::prefs::save(&crate::prefs::Prefs {
             volume: self.settings.volume,
+            music: self.settings.music,
             shake: self.settings.shake,
             lang: self.settings.lang,
             bindings: crate::input::bindings(),
@@ -2118,12 +2171,14 @@ impl App {
     }
 
     fn draw_settings(&mut self, ui: &Ui) {
-        let panel = Rect::new(56.0, 6.0, 208.0, 156.0);
+        // 줄이 아홉(음악 크기를 따로 둔 뒤, 0081): 창을 위로 붙이고 줄 간격을 1px 줄여 아래 안내 두 줄 자리를 남긴다.
+        let panel = Rect::new(56.0, 0.0, 208.0, 155.0);
         let s = i18n::s();
         ui.panel(panel, Some(s.settings));
         let assist = self.assist_resist();
         let values = [
             format!("{}%", self.settings.volume * 10),
+            format!("{}%", self.settings.music * 10),
             format!("{}%", self.settings.shake * 10),
             if self.settings.debug_overlay {
                 s.on
@@ -2142,12 +2197,12 @@ impl App {
             String::new(),
             String::new(),
         ];
-        let row_h = FONT_PX + 4.0;
+        let row_h = FONT_PX + 3.0;
         for (i, label) in trs(&SETTING_ROWS).into_iter().enumerate() {
-            let y = panel.y + 22.0 + i as f32 * row_h;
+            let y = panel.y + 18.0 + i as f32 * row_h;
             let selected = self.settings_cursor == i;
             if setting_is_button(i) {
-                let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, FONT_PX + 4.0);
+                let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, FONT_PX + 3.0);
                 if selected {
                     ui.rect(r, ui::PANEL_LIGHT);
                     ui.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ui::ACCENT);
@@ -2190,7 +2245,7 @@ impl App {
             ui.text_center(
                 l,
                 160.0,
-                panel.bottom() + 4.0 + i as f32 * 13.0,
+                panel.bottom() + 1.0 + i as f32 * 12.0,
                 FONT_PX,
                 ui::TEXT_DIM,
             );
