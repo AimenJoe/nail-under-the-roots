@@ -35,7 +35,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - UI 텍스트는 `assets/fonts/Galmuri11-Condensed.ttf`(서브셋: ASCII·Latin-1·œŒŸ·키릴·KS X 1001 한글 2,350자 등, 목록은 `assets/LICENSES.md`)로 실제 해상도에 찍는다. 일본어·간체는 Ark Pixel 서브셋(`tools/fonts/build_cjk.py`). 그 밖의 한자·확장 한글은 안 나온다. 새 글자가 필요하면 서브셋을 다시 만든다(`cargo test`가 표의 글자가 폰트에 있는지 본다).
 - 플레이어가 보는 글은 `src/i18n.rs`의 언어별 표에만 쓴다(한국어·영어·일본어·중국어 간체·브라질 포르투갈어·프랑스어·스페인어·독일어·러시아어, 0084·0085). 코드에 글 리터럴을 두지 않는다. 숫자는 `{0}` + `fill()`, 데이터 표는 `Tr`. 개발 전용 화면만 예외(docs/decisions/0013).
 - 번역은 직접 쓴다. DeepL 같은 기계 번역은 사장이 따로 말할 때만 쓴다(초안 품질이 낮다: 굴 → oyster, 보리 → barley, 털빛 → feather 같은 게임 용어 오독이 많았다). 기존 표의 용어를 먼저 찾아 맞춘다.
-- 글을 넣거나 바꾸면 아홉 언어를 다 쓰고, 일본어·간체 표를 고쳤으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font 체크아웃>`으로 폰트를 다시 만든다. 새 화면은 가짜 언어 Pseudo(설정 → 언어 끝)와 일본어로 넘침을 본다. 고정 칸은 `ui.fit`, 긴 글은 `ui::wrap`(docs/decisions/0014).
+- 글을 넣거나 바꾸면 아홉 언어를 다 쓰고, 일본어·간체 표를 고쳤으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font 체크아웃>`으로 폰트를 다시 만든다. 새 화면은 가짜 언어 Pseudo(설정 → 언어 끝)와 일본어·러시아어·포르투갈어로 넘침을 본다. 개발 빌드에서 F3를 누르면 글자 넘침 검사(`ui::check`: 화면 밖·테두리 밖·겹침·`fit`으로 잘림을 콘솔에, 0089)가 켜진다. 고정 칸은 `ui.fit`, 긴 글은 `ui::wrap`(docs/decisions/0014).
 
 ## 커밋 전
 ```sh

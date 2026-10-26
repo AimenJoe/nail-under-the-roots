@@ -1645,9 +1645,6 @@ impl App {
                 }
                 // 획득 창이 떠 있으면 말풍선은 숨긴다(창 위에 겹쳤다).
                 self.draw_dream_hud(&ui);
-                if self.gift.is_none() {
-                    self.draw_interact_bubble(&ui);
-                }
                 // 마을: 마을 씨앗·맡긴 반딧불(오른쪽 위 막대 아래).
                 // 깨울 수 있는 재주가 있으면 반딧불 줄이 빛나고, 나무 밑동도 빛난다(0061).
                 if self.world.adv.place == crate::adventure::Place::Village {
@@ -1678,6 +1675,10 @@ impl App {
                     );
                     ui.rect(Rect::new(x, 32.0, 1.0, 1.0), g);
                 }
+                // 말풍선은 마을 숫자(오른쪽 위) 뒤에: 할매·실 고리 곁에서 숫자가 말풍선 위로 찍혔다(0089).
+                if self.gift.is_none() {
+                    self.draw_interact_bubble(&ui);
+                }
                 if !self.world.player.is_alive() {
                     self.draw_dead(&ui);
                 }
@@ -1693,8 +1694,8 @@ impl App {
                 self.draw_route(&ui);
             }
             Scene::Shop => {
-                self.renderer
-                    .draw_hud(&ui, &self.world, self.input.gamepad_count);
+                // HUD는 그리지 않는다: 창이 화면 위아래 끝까지 와서(0089) 반딧불·씨앗 숫자와 퀵 슬롯이 창 가장자리에 반쯤 비쳤다.
+                // 씨앗은 창 제목 줄에 있다.
                 ui.dim();
                 self.draw_shop(&ui);
             }
@@ -2347,7 +2348,7 @@ impl App {
     fn draw_controls(&mut self, ui: &Ui) {
         use crate::input::{self, ACTS};
         let s = i18n::s();
-        let panel = Rect::new(28.0, 2.0, 264.0, 156.0);
+        let panel = Rect::new(28.0, 2.0, 264.0, 154.0);
         ui.panel(panel, Some(s.set_controls));
         let b = input::bindings();
         let row_h = FONT_PX + 0.5;
@@ -2432,12 +2433,13 @@ impl App {
             }
         }
         // 안내: 바꾸는 법은 패널 안 아래, 고정된 키는 패널 밖(두 줄까지).
-        let hint = ui.fit(s.ctl_hint, panel.w - 12.0, FONT_PX);
+        let hint = ui.fit(s.ctl_hint, panel.w - 4.0, FONT_PX);
         ui.text_center(&hint, 160.0, panel.bottom() - 12.0, FONT_PX, ui::TEXT_DIM);
-        let mut y = panel.bottom() + 1.0;
+        // 두 줄이면 둘째 줄 아래가 화면(180) 밖으로 잘렸다: 창 바로 밑에서 10px 간격(0089).
+        let mut y = panel.bottom();
         for l in ui::wrap(ui, s.ctl_fixed, 312.0, FONT_PX).iter().take(2) {
             ui.text_center(l, 160.0, y, FONT_PX, ui::TEXT_DIM);
-            y += 10.5;
+            y += 11.0;
         }
     }
 
@@ -2536,7 +2538,18 @@ impl App {
             .fold(0.0, f32::max)
             + 16.0;
         let h = lines.len() as f32 * 13.0 + 8.0;
-        let r = Rect::new(160.0 - w / 2.0, 178.0 - h - 7.0, w, h);
+        // 넓으면 왼쪽 아래 퀵 슬롯 판(칸 둘 + "I 먹기")을 덮었다(일본어, 0089): 그때는 그 판 위로 올린다.
+        let quick = fill(
+            i18n::s().quick_hint,
+            &[&crate::input::prompt(crate::input::Act::UseItem)],
+        );
+        let quick_right = 57.0 + ui.text_w(&quick, FONT_PX) + 6.0;
+        let bottom = if 160.0 - w / 2.0 < quick_right {
+            148.0
+        } else {
+            171.0
+        };
+        let r = Rect::new(160.0 - w / 2.0, bottom - h, w, h);
         ui.rect(r, ui::PANEL);
         ui.rect_lines(r, ui::BORDER);
         for (i, l) in lines.iter().enumerate() {
@@ -2672,11 +2685,16 @@ impl App {
         };
         let row_h = FONT_PX + 1.0;
         let col_w = c.w / 2.0 - 4.0;
+        // 이름 칸은 값이 남긴 만큼까지 넓힌다(55%로 고정하면 일본어 "いかりのたまり"가 잘렸다, 0089).
         let key_w_of = |rows: &[(&str, String)]| {
+            let val = rows
+                .iter()
+                .map(|(_, v)| ui.text_w(v, FONT_PX))
+                .fold(0.0, f32::max);
             rows.iter()
                 .map(|(k, _)| ui.text_w(k, FONT_PX))
                 .fold(0.0, f32::max)
-                .min(col_w * 0.55)
+                .min((col_w - val - 10.0).max(col_w * 0.55))
                 + 6.0
         };
         for (col, rows) in [(0usize, &left[..]), (1, &right[..])] {
@@ -2792,7 +2810,6 @@ impl App {
         use crate::species::{self, BESTIARY};
         let s = i18n::s();
         let seen = &self.world.seen;
-        let list_w = 74.0;
         // 목록이 아래 "만난 이웃 n/m" 줄에 닿지 않게. 줄 간격은 13 아래로 줄이지 않는다(9종에서 일본어가 겹쳤다, 0054).
         // 다 안 들어가면 고른 줄을 따라 넘긴다(▲▼).
         let avail = c.h - FONT_PX - 6.0;
@@ -2800,18 +2817,27 @@ impl App {
             .floor()
             .clamp(13.0, FONT_PX + 4.0);
         let fits = ((avail / row_h).floor() as usize).max(1);
+        // 넘기면 목록 오른쪽 9px에 ▲▼(이름·설명과 겹쳤다). 목록 폭은 가장 긴 아는 이름에 맞춰 74~115
+        // (포르투갈어·프랑스어·러시아어 이름이 "Esquilo-listra…"처럼 잘렸다, 0089).
+        let arrows = if fits < BESTIARY.len() { 9.0 } else { 0.0 };
+        let list_w = BESTIARY
+            .iter()
+            .filter(|k| seen.contains(k))
+            .map(|k| ui.text_w(tr(k.species().name), FONT_PX) + 8.0 + arrows)
+            .fold(74.0, f32::max)
+            .min(115.0);
         let first = self
             .bestiary_cursor
             .saturating_sub(fits - 1)
             .min(BESTIARY.len().saturating_sub(fits));
         if first > 0 {
-            ui.text("▲", c.x + list_w - 8.0, c.y - 9.0, FONT_PX, ui::TEXT_DIM);
+            ui.text("▲", c.x + list_w - 9.0, c.y + 1.0, FONT_PX, ui::TEXT_DIM);
         }
         if first + fits < BESTIARY.len() {
             ui.text(
                 "▼",
-                c.x + list_w - 8.0,
-                c.y + fits as f32 * row_h - 3.0,
+                c.x + list_w - 9.0,
+                c.y + (fits - 1) as f32 * row_h + 1.0,
                 FONT_PX,
                 ui::TEXT_DIM,
             );
@@ -2830,7 +2856,7 @@ impl App {
                 ui.rect_lines(r, ui::ACCENT);
             }
             ui.text(
-                &ui.fit(name, list_w - 6.0, FONT_PX),
+                &ui.fit(name, list_w - 6.0 - arrows, FONT_PX),
                 r.x + 3.0,
                 r.y + 1.0,
                 FONT_PX,
@@ -2982,24 +3008,19 @@ impl App {
                 }
                 let ms = wp.moveset;
                 let last = &ms.hits[ms.last()];
-                // 언어마다 길이가 달라 칸 폭에 맞춘다(프랑스어·스페인어에서 넘쳤다, 0084).
-                ui.text(
-                    &ui.fit(
-                        &fill(s.bag_combo, &[&ms.hits.len(), &last.damage]),
-                        desc_w,
-                        FONT_PX,
-                    ),
-                    desc_x,
-                    y + 4.0,
-                    FONT_PX,
-                    ui::TEXT_DIM,
-                );
+                // 언어마다 길이가 달라 칸 폭에서 두 줄까지(한 줄로 자르면 영어·포르투갈어에서 "마지막 타 피해"가 잘렸다, 0084·0089).
+                let combo = fill(s.bag_combo, &[&ms.hits.len(), &last.damage]);
+                let lines = ui::wrap(ui, &combo, desc_w, FONT_PX);
+                for (k, l) in lines.iter().take(2).enumerate() {
+                    ui.text(l, desc_x, y + 4.0 + k as f32 * 13.0, FONT_PX, ui::TEXT_DIM);
+                }
                 let hint = if self.inventory.equipped == Some(*w) {
                     s.equipped.to_string()
                 } else {
                     vfill(s.equip_hint, &[Verb::Confirm])
                 };
-                ui.text(&hint, desc_x, y + 18.0, FONT_PX, ui::ACCENT);
+                let extra = 13.0 * (lines.len().clamp(1, 2) - 1) as f32;
+                ui.text(&hint, desc_x, y + 18.0 + extra, FONT_PX, ui::ACCENT);
             }
             Some(Item::Charm(c)) => {
                 let ch = &CHARMS[*c];
@@ -3132,7 +3153,7 @@ impl App {
             ui.text_right("▲", c.x + list_w, c.y - 10.0, FONT_PX, ui::TEXT_DIM);
         }
         if self.journal_scroll + rows < goals.len() {
-            ui.text_right("▼", c.x + list_w, c.bottom() - 2.0, FONT_PX, ui::TEXT_DIM);
+            ui.text_right("▼", c.x + list_w, c.bottom() - 4.0, FONT_PX, ui::TEXT_DIM);
         }
         let g = goals[self.journal_cursor];
         let dx = c.x + list_w + 8.0;
@@ -3145,11 +3166,8 @@ impl App {
             FONT_PX,
             ui::ACCENT,
         );
-        let mut y = c.y + 29.0;
-        for l in ui::wrap(ui, tr(g.desc), dw, FONT_PX).iter().take(3) {
-            ui.text(l, dx, y, FONT_PX, ui::TEXT);
-            y += 13.0;
-        }
+        // 줄바꿈 폭은 2px 덜: 일본어 금칙(줄머리에 못 오는 글자)이 앞 줄로 당겨져 칸을 넘쳤다(0089).
+        let ww = dw - 6.0;
         let what = match g.reward {
             Reward::Light(n) => fill(s.r_light, &[&n]),
             Reward::Seeds(n) => fill(s.village_seeds, &[&n]),
@@ -3158,9 +3176,7 @@ impl App {
             Reward::Charm(i) => fill(s.r_charm, &[&tr(crate::equipment::CHARMS[i].name)]),
         };
         let what = fill(s.j_reward, &[&what]);
-        let by = c.bottom() - 39.0;
-        ui.text(&ui.fit(&what, dw, FONT_PX), dx, by, FONT_PX, ui::TEXT);
-        // 상태: 받은 뒤엔 보상이 어디 있는지(가방·마을·큰 나무…, 0050). 두 줄까지.
+        // 상태: 받은 뒤엔 보상이 어디 있는지(가방·마을·큰 나무…, 0050).
         let state = if g.claimed(&self.profile) {
             tr(crate::journal::reward_place(g.reward)).to_string()
         } else if g.ready(&self.profile) {
@@ -3173,8 +3189,35 @@ impl App {
         } else {
             ui::TEXT_DIM
         };
-        for (k, l) in ui::wrap(ui, &state, dw, FONT_PX).iter().take(2).enumerate() {
-            ui.text(l, dx, by + 13.0 + k as f32 * 13.0, FONT_PX, sc);
+        // 아래에서부터 쌓는다: 상태(두 줄까지) 위에 보상(두 줄까지), 남은 자리에 설명(세 줄까지).
+        // 보상을 한 줄로 자르면 "보상: 장신구 · 들쥐 방…"처럼 무엇인지가 잘렸다(0089).
+        let mut state_l = ui::wrap(ui, &state, ww, FONT_PX);
+        if state_l.len() > 2 {
+            state_l.truncate(2);
+            state_l[1] = ui.fit(&format!("{}…", state_l[1]), dw, FONT_PX);
+        }
+        let what_l: Vec<String> = ui::wrap(ui, &what, ww, FONT_PX)
+            .into_iter()
+            .take(2)
+            .collect();
+        let by = c.bottom() - 13.0 * (state_l.len() + what_l.len()) as f32;
+        for (k, l) in what_l.iter().enumerate() {
+            ui.text(l, dx, by + k as f32 * 13.0, FONT_PX, ui::TEXT);
+        }
+        let sy = by + 13.0 * what_l.len() as f32;
+        for (k, l) in state_l.iter().enumerate() {
+            ui.text(l, dx, sy + k as f32 * 13.0, FONT_PX, sc);
+        }
+        let top = c.y + 29.0;
+        let room = (((by - 2.0 - top) / 13.0).floor().max(1.0) as usize).min(3);
+        let desc = ui::wrap(ui, tr(g.desc), ww, FONT_PX);
+        for (k, l) in desc.iter().take(room).enumerate() {
+            let l = if k + 1 == room && desc.len() > room {
+                ui.fit(&format!("{l}…"), dw, FONT_PX)
+            } else {
+                l.clone()
+            };
+            ui.text(&l, dx, top + k as f32 * 13.0, FONT_PX, ui::TEXT);
         }
     }
 

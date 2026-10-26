@@ -39,6 +39,8 @@ pub struct Bag {
     pub worms: u8,
     /// 퀵 슬롯에 올라와 있는 것.
     pub selected: Consumable,
+    /// 저절로 바뀐 슬롯을 깜빡여 보이는 남은 시간(초, 0091). 저장하지 않는다.
+    pub flash: f32,
 }
 
 impl Default for Bag {
@@ -47,6 +49,7 @@ impl Default for Bag {
             berries: 0,
             worms: 0,
             selected: Consumable::Berry,
+            flash: 0.0,
         }
     }
 }
@@ -77,19 +80,28 @@ impl Bag {
             return false;
         }
         *self.count_mut(c) += 1;
-        if self.count(self.selected) == 0 {
+        if self.count(self.selected) == 0 && self.selected != c {
             self.selected = c;
+            self.flash = t::QUICK_FLASH;
         }
         true
     }
 
-    /// 하나 꺼낸다. 없으면 false.
+    /// 하나 꺼낸다. 없으면 false. 슬롯에 올린 것이 다 떨어지면 가진 다른 것으로 저절로 바꾸고 깜빡인다(0091).
+    /// 먹어서든, 쓰러져 지렁이가 저절로 쓰였든 같다.
     pub fn take(&mut self, c: Consumable) -> bool {
         let n = self.count_mut(c);
         if *n == 0 {
             return false;
         }
         *n -= 1;
+        if self.count(self.selected) == 0 {
+            let before = self.selected;
+            self.cycle(true);
+            if self.selected != before {
+                self.flash = t::QUICK_FLASH;
+            }
+        }
         true
     }
 
@@ -133,5 +145,29 @@ mod tests {
         assert!(!b.take(Consumable::Worm));
         b.cycle(true);
         assert_eq!(b.selected, Consumable::Berry);
+    }
+
+    /// 슬롯의 것이 다 떨어지면 가진 다른 것으로 저절로 바뀌고 깜빡인다(0091). 다 없으면 그대로.
+    #[test]
+    fn empty_slot_switches_to_what_is_left() {
+        let mut b = Bag::default();
+        b.add(Consumable::Berry);
+        b.add(Consumable::Worm);
+        assert_eq!(b.selected, Consumable::Berry);
+        b.flash = 0.0;
+        assert!(b.take(Consumable::Berry));
+        assert_eq!(b.selected, Consumable::Worm, "산딸기가 떨어지면 지렁이로");
+        assert!(b.flash > 0.0, "바뀐 것을 보인다");
+        // 쓰러져 지렁이가 저절로 쓰여도 같다: 산딸기를 다시 주웠으면 산딸기로.
+        b.add(Consumable::Berry);
+        b.flash = 0.0;
+        assert!(b.take(Consumable::Worm));
+        assert_eq!(b.selected, Consumable::Berry);
+        assert!(b.flash > 0.0);
+        // 마지막 하나를 쓰면 바꿀 것이 없다.
+        b.flash = 0.0;
+        assert!(b.take(Consumable::Berry));
+        assert_eq!(b.selected, Consumable::Berry);
+        assert_eq!(b.flash, 0.0);
     }
 }

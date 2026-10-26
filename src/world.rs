@@ -473,6 +473,7 @@ impl World {
         }
 
         // 1a. 퀵 아이템
+        self.bag.flash = (self.bag.flash - t::TICK_DT).max(0.0);
         if a.item_prev || a.item_next {
             self.bag.cycle(a.item_next);
         }
@@ -1113,9 +1114,6 @@ impl World {
         let pos = p.pos;
         self.fx.push(ring(pos, 3.0, 14.0, 0.3, BERRY));
         burst(&mut self.fx, pos, 8, BERRY, 60.0);
-        if self.bag.count(c) == 0 {
-            self.bag.cycle(true);
-        }
     }
 
     /// 쥬시 지렁이로 일어난다: 체력 일부, 잠깐 무적, 주변을 밀어낸다.

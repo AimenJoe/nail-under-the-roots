@@ -525,7 +525,16 @@ impl Renderer {
             .as_ref()
             .and_then(|a| a.sunny.as_ref())
             .map(|s| &s.sheet);
+        // 왼쪽 위 바탕판(0091): 체력·반딧불·씨앗이 밝은 바닥 위에서 묻혔다.
+        {
+            let gx = 3.0 + w.player.stats.max_hp as f32 * hp_step(sheet) + 5.0;
+            let sx = gx + 7.0 + ui.text_w(&w.glowbugs.to_string(), crate::ui::FONT_PX) + 6.0;
+            let tx = if sheet.is_some() { sx + 9.0 } else { sx + 5.0 };
+            let end = tx + ui.text_w(&w.seeds.to_string(), crate::ui::FONT_PX);
+            hud_plate(ui, Rect::new(0.0, -1.0, end + 3.0, 13.0));
+        }
         draw_hud_bars(ui, w, sheet);
+        let out = ui.with_outline();
         // 반딧불: 체력 칸 오른쪽. 숫자는 언어 폰트(숫자는 모든 폰트에 있다). 글자 윗부분이 화면 밖으로 잘리지 않게 y ≥ 1.
         let x = 3.0 + w.player.stats.max_hp as f32 * hp_step(sheet) + 5.0;
         let pulse = 0.6 + 0.4 * (w.time * 3.0).sin().abs();
@@ -539,7 +548,7 @@ impl Renderer {
             Color::new(0.85, 1.0, 0.45, 0.5 + 0.5 * pulse),
         );
         ui.rect(Rect::new(x + 1.0, 1.0, 1.0, 1.0), OUTLINE);
-        ui.text(
+        out.text(
             &w.glowbugs.to_string(),
             x + 5.0,
             1.0,
@@ -566,7 +575,7 @@ impl Renderer {
             );
             sx + 5.0
         };
-        ui.text(
+        out.text(
             &w.seeds.to_string(),
             tx,
             1.0,
@@ -707,25 +716,64 @@ fn draw_boss_bar(ui: &Ui, w: &World) {
 }
 
 /// 퀵 슬롯(왼쪽 아래): 산딸기·지렁이 두 칸, 고른 칸은 테두리 강조, 개수, 먹기 키 안내.
+/// HUD 바탕판(0091): 풀밭·흙 위에서도 HUD가 묻히지 않게 반투명 어두운 판 + 어두운 테두리.
+fn hud_plate(ui: &Ui, r: Rect) {
+    ui.rect(r, Color::new(0.06, 0.04, 0.08, 0.62));
+    ui.rect_lines(r, Color::new(0.02, 0.01, 0.03, 0.75));
+}
+
+/// 퀵 슬롯(0091): 칸 22px·아이콘 2배, 고른 칸은 두꺼운 금빛 테두리, 안 고른 칸은 흐리게.
+/// 저절로 바뀐 칸(`Bag::flash`)은 하얗게 깜빡인다. 수는 테두리 글자로 칸 오른쪽 아래.
 fn draw_quick_slots(ui: &Ui, w: &World) {
     use crate::items::Consumable;
-    let (x0, y0, size) = (4.0, 156.0, 18.0);
+    let (x0, y0, size, gap) = (5.0, 153.0, 22.0, 3.0);
+    let hint = crate::i18n::fill(
+        crate::i18n::s().quick_hint,
+        &[&crate::input::prompt(crate::input::Act::UseItem)],
+    );
+    let hx = x0 + 2.0 * (size + gap) + 2.0;
+    let hw = ui.text_w(&hint, crate::ui::FONT_PX);
+    hud_plate(
+        ui,
+        Rect::new(x0 - 3.0, y0 - 3.0, hx + hw + 4.0 - (x0 - 3.0), size + 6.0),
+    );
+    let out = ui.with_outline();
+    let flash_on = w.bag.flash > 0.0 && ((w.bag.flash * 8.0) as i32) % 2 == 0;
     for (i, c) in Consumable::ALL.iter().enumerate() {
-        let r = Rect::new(x0 + i as f32 * (size + 3.0), y0, size, size);
+        let r = Rect::new(x0 + i as f32 * (size + gap), y0, size, size);
         let n = w.bag.count(*c);
         let selected = w.bag.selected == *c;
-        ui.rect(r, Color::new(0.07, 0.05, 0.09, 0.8));
-        ui.rect_lines(
+        ui.rect(
             r,
             if selected {
-                crate::ui::ACCENT
+                Color::new(0.20, 0.14, 0.17, 0.95)
             } else {
-                crate::ui::BORDER
+                Color::new(0.07, 0.05, 0.09, 0.85)
             },
         );
-        let dim = if n == 0 { 0.35 } else { 1.0 };
-        let center = ui.px(vec2(r.x + size / 2.0, r.y + size / 2.0 - 1.0));
-        let k = ui.scale;
+        let border = if selected && flash_on {
+            WHITE
+        } else if selected {
+            crate::ui::ACCENT
+        } else {
+            Color::new(0.55, 0.40, 0.28, 0.6)
+        };
+        ui.rect_lines(r, border);
+        if selected {
+            ui.rect_lines(
+                Rect::new(r.x + 1.0, r.y + 1.0, r.w - 2.0, r.h - 2.0),
+                border,
+            );
+        }
+        let dim = if n == 0 {
+            0.3
+        } else if selected {
+            1.0
+        } else {
+            0.65
+        };
+        let center = ui.px(vec2(r.x + size / 2.0 - 2.0, r.y + size / 2.0 - 1.0));
+        let k = ui.scale * 2.0;
         match c {
             Consumable::Berry => {
                 let s = k;
@@ -753,7 +801,7 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
             }
             Consumable::Worm => {
                 if n > 0 {
-                    draw_worm(center, w.time * 6.0, k);
+                    draw_worm(center, w.time * 6.0, k * 0.75);
                 } else {
                     draw_rectangle(
                         center.x - 4.0 * k,
@@ -774,31 +822,20 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
                 Color::new(0.0, 0.0, 0.0, 0.55),
             );
         }
-        ui.text(
-            &n.to_string(),
-            r.right() - 6.0,
-            r.bottom() - 11.0,
+        let ns = n.to_string();
+        out.text(
+            &ns,
+            r.right() - ui.text_w(&ns, crate::ui::FONT_PX) - 2.0,
+            r.bottom() - 13.0,
             crate::ui::FONT_PX,
             if n == 0 {
-                crate::ui::TEXT_DIM
+                Color::new(0.85, 0.45, 0.45, 1.0)
             } else {
                 crate::ui::TEXT
             },
         );
     }
-    // 풀밭 위에서도 읽히게 어두운 바탕.
-    let hint = crate::i18n::fill(
-        crate::i18n::s().quick_hint,
-        &[&crate::input::prompt(crate::input::Act::UseItem)],
-    );
-    let hint = hint.as_str();
-    let hx = x0 + 2.0 * (size + 3.0) + 2.0;
-    let hw = ui.text_w(hint, crate::ui::FONT_PX) + 6.0;
-    ui.rect(
-        Rect::new(hx - 3.0, y0 + 3.0, hw, crate::ui::FONT_PX + 2.0),
-        Color::new(0.07, 0.05, 0.09, 0.6),
-    );
-    ui.text(hint, hx, y0 + 4.0, crate::ui::FONT_PX, crate::ui::TEXT);
+    out.text(&hint, hx, y0 + 5.0, crate::ui::FONT_PX, crate::ui::TEXT);
 }
 
 /// 컷씬 배우(월드 패스 안에서, begin_world 뒤 present 전에).
@@ -3788,25 +3825,44 @@ fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
             }
         }
     }
+    // 오른쪽 위(0091): 굴파기 대기(위, 가늘게)와 SP 게이지(아래, 굵게). 24px·3~4px로는 눈에 안 띄었다 →
+    // 34px, 바탕판, 칸마다 어두운 테두리, 가득 찬 SP는 금빛 테두리가 숨 쉰다.
     let cd = (w.player.burrow_cd / w.player.burrow_cd_full()).min(1.0);
-    let bw = 24.0;
-    let x = t::VIEW_W - 3.0 - bw;
-    ui.rect(Rect::new(x, 2.0, bw, 4.0), dark);
+    let bw = 34.0;
+    let x = t::VIEW_W - 4.0 - bw;
+    hud_plate(ui, Rect::new(x - 3.0, -1.0, bw + 6.0, 16.0));
+    let frame = Color::new(0.02, 0.01, 0.03, 1.0);
+    ui.rect(Rect::new(x - 1.0, 1.0, bw + 2.0, 5.0), frame);
+    ui.rect(Rect::new(x, 2.0, bw, 3.0), dark);
+    let ready = cd <= 0.0;
     ui.rect(
-        Rect::new(x, 2.0, (bw * (1.0 - cd).max(0.0)).round(), 4.0),
-        world::DIRT,
+        Rect::new(x, 2.0, (bw * (1.0 - cd).max(0.0)).round(), 3.0),
+        if ready {
+            Color::new(0.78, 0.60, 0.40, 1.0)
+        } else {
+            world::DIRT
+        },
     );
     // SP 게이지(그 아래). 가득이면 깜빡인다 — 필살기를 쓸 수 있다. 색은 캐릭터의 게이지 종류(두더지 = 분노).
     let sp = w.player.sp / t::SP_MAX;
     let full = w.player.sp_full();
-    ui.rect(Rect::new(x, 8.0, bw, 3.0), dark);
+    ui.rect(Rect::new(x - 1.0, 7.0, bw + 2.0, 7.0), frame);
+    ui.rect(Rect::new(x, 8.0, bw, 5.0), dark);
     let gc = w.character.gauge().color();
     let gold = if full && ((w.time * 6.0) as i32) % 2 == 0 {
         Color::new(1.0, 1.0, 0.85, 1.0)
     } else {
         gc
     };
-    ui.rect(Rect::new(x, 8.0, (bw * sp).round(), 3.0), gold);
+    ui.rect(Rect::new(x, 8.0, (bw * sp).round(), 5.0), gold);
+    if full {
+        let a = 0.5 + 0.5 * (w.time * 5.0).sin();
+        let c = crate::ui::ACCENT;
+        ui.rect_lines(
+            Rect::new(x - 2.0, 6.0, bw + 4.0, 9.0),
+            Color::new(c.r, c.g, c.b, a),
+        );
+    }
 }
 
 fn draw_hud_screen(w: &World, scale: f32, ox: f32, oy: f32, gamepad_count: usize) {

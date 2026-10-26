@@ -242,7 +242,8 @@ impl Ui {
         }
         let c = if selected { TEXT } else { TEXT_DIM };
         let right = x + w - 4.0;
-        let vw = self.text_w(value, FONT_PX).max(40.0);
+        // 값 양옆 2px: 값이 40px보다 길면 ◀▶가 글자에 붙었다(간체 "◀简体中文▶", 0089).
+        let vw = self.text_w(value, FONT_PX).max(40.0) + 4.0;
         let arrow_w = 12.0;
         let r_arrow = Rect::new(right - arrow_w, y, arrow_w, row.h);
         let l_arrow = Rect::new(right - arrow_w * 2.0 - vw, y, arrow_w, row.h);

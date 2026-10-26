@@ -998,12 +998,30 @@ impl App {
         let text = fill(verb, &[&input::prompt(Act::Attack)]);
         let p = (anchor - w.adv.cam).round();
         let tw = ui.text_w(&text, FONT_PX) + 8.0;
-        let r = Rect::new(
+        let mut r = Rect::new(
             (p.x - tw / 2.0).clamp(2.0, 318.0 - tw),
             (p.y - FONT_PX - 8.0).max(2.0),
             tw,
             FONT_PX + 4.0,
         );
+        // 마을 오른쪽 위의 숫자 두 줄(y 14~39)과 겹치면 말풍선을 그 왼쪽으로 민다(할매·실 고리 곁, 0089).
+        if village && r.y < 40.0 {
+            let seeds = fill(
+                s.village_seeds,
+                &[&self.profile.count(crate::village::KEY_SEEDS)],
+            );
+            let light = fill(
+                s.tree_light,
+                &[&self.profile.count(crate::talents::KEY_LIGHT)],
+            );
+            let hud_x = 316.0
+                - ui.text_w(&seeds, FONT_PX)
+                    .max(ui.text_w(&light, FONT_PX) + 6.0)
+                - 4.0;
+            if r.right() > hud_x {
+                r.x = (hud_x - tw).max(2.0);
+            }
+        }
         ui.rect(r, ui::PANEL);
         ui.rect_lines(r, ui::BORDER);
         ui.text_center(&text, r.center().x, r.y + 2.0, FONT_PX, ui::TEXT);
@@ -1303,9 +1321,10 @@ impl App {
                     ui.text_w(&cost, FONT_PX) + 4.0
                 };
                 ui.text(mark, cell.x + 3.0, cell.y + 3.0, FONT_PX, mc);
-                let name = ui.fit(tr(tal.name), cell.w - 16.0 - cw, FONT_PX);
+                let nx = mark_end(ui, cell.x);
+                let name = ui.fit(tr(tal.name), cell.right() - nx - 3.0 - cw, FONT_PX);
                 let tc = if awake { ui::TEXT } else { ui::TEXT_DIM };
-                ui.text(&name, cell.x + 13.0, cell.y + 3.0, FONT_PX, tc);
+                ui.text(&name, nx, cell.y + 3.0, FONT_PX, tc);
                 if !cost.is_empty() {
                     let cc = if have >= tal.cost {
                         ui::ACCENT
@@ -1346,8 +1365,9 @@ impl App {
                 ui.text_right(&cost, cell.right() - 3.0, cell.y + 3.0, FONT_PX, cc);
             }
             let tc = if venom { ui::TEXT } else { ui::TEXT_DIM };
-            let name = ui.fit(s.w_venom, cell.w - 40.0, FONT_PX);
-            ui.text(&name, cell.x + 13.0, cell.y + 3.0, FONT_PX, tc);
+            let nx = mark_end(ui, cell.x);
+            let name = ui.fit(s.w_venom, cell.right() - nx - 30.0, FONT_PX);
+            ui.text(&name, nx, cell.y + 3.0, FONT_PX, tc);
         }
         // 고른 칸의 설명 + 상태(또는 방금 한 일).
         let (r, c) = self.tree_cursor;
@@ -1448,4 +1468,9 @@ impl App {
         self.journal_ready = crate::journal::ready_count(&self.profile);
         self.sfx.play(crate::sfx::Id::Heal);
     }
+}
+
+/// 칸 왼쪽의 ●/○ 뒤 이름이 시작할 x. 일본어·간체 폰트의 ●는 전각(12px)이라 고정 +13이면 이름에 붙었다(0089).
+fn mark_end(ui: &Ui, x: f32) -> f32 {
+    (x + 3.0 + ui.text_w("●", FONT_PX) + 2.0).max(x + 13.0)
 }

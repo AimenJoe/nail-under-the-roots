@@ -20,6 +20,8 @@ pub const PLAYER_RADIUS: f32 = 6.0;
 pub const PLAYER_SPEED: f32 = 90.0;
 /// 최대 체력. 3이면 오래 못 버틴다(사장 피드백 2026-10-25) → 5 + 산딸기 회복(docs/decisions/0016).
 pub const PLAYER_HP: i32 = 5;
+/// 퀵 슬롯이 저절로 바뀌었을 때 깜빡이는 시간(0091).
+pub const QUICK_FLASH: f32 = 1.2;
 /// 피격 후 무적 시간.
 pub const PLAYER_HURT_INVULN: f32 = 0.8;
 pub const PLAYER_HURT_KNOCKBACK: f32 = 170.0;
