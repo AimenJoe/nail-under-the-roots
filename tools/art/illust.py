@@ -886,9 +886,14 @@ def momo_deep():
 def last_bloom():
     rng = random.Random(66)
     cv = Canvas(640, 440)
-    bands(cv, 0, 340, (250, 212, 170), (176, 196, 222), 9)
-    bands(cv, 340, 440, (120, 150, 86), (78, 108, 62), 5)
-    glow(cv, 520, 60, 140, (255, 250, 220), 0.5, 5)
+    if V4:
+        # 0073: 바탕은 Robert Frederick Blum「봄 풍경」(파스텔, 사포 위, Met CC0). 황토 종이를 봄빛으로 옮겨 쓴다.
+        pastel_bg(cv, 'blum_spring_landscape.jpg', colors=18, edge=26, margin=0.05, tone=spring_tone)
+        base = cv.px.copy()
+    else:
+        bands(cv, 0, 340, (250, 212, 170), (176, 196, 222), 9)
+        bands(cv, 340, 440, (120, 150, 86), (78, 108, 62), 5)
+        glow(cv, 520, 60, 140, (255, 250, 220), 0.5, 5)
     trunk = poly(cv, [(286, 350), (300, 200), (306, 140), (334, 140), (340, 200), (356, 350)])
     for (sx, sy, ex, ey, w) in ((310, 190, 160, 110, 14), (330, 180, 480, 100, 14), (318, 150, 240, 50, 10),
                                 (324, 146, 410, 40, 10)):
@@ -896,17 +901,24 @@ def last_bloom():
     outline(cv, trunk, (40, 28, 30), 2)
     shade(cv, trunk, BARK, 322, 240, 60, 140)
     # 꽃 구름
+    # 꽃 공 하나하나(한 덩어리로 묶어 털처럼 칠하면 네모난 구멍·줄무늬가 생겼다 — 꽃은 공이 낫다, 0073)
     for (x, y, r, n) in ((320, 90, 150, 160), (160, 120, 80, 70), (480, 110, 90, 80), (250, 50, 70, 50), (400, 40, 80, 60)):
         blossom_cluster(cv, rng, x, y, r, n)
     # 밑동의 이웃들(실루엣): 두더지·라쿤·들쥐·굴토끼
     dark = (70, 72, 70)
+    if V4:   # 밝은 파스텔 위: 바탕을 어둡게 누른 색(역광 실루엣이 바탕과 한 가족), 발밑 그림자
+        dark = tuple(int(v * 0.42) for v in base[300:380].reshape(-1, 3).mean(0))
+        for (x, rx) in ((230, 22), (296, 22), (370, 16), (410, 16)):
+            ground_shadow(cv, x, 348, rx, 4)
     silhouette_critter(cv, 'raccoon', 230, 336, 16, dark, 1)
     silhouette_critter(cv, 'mouse', 410, 340, 12, dark, -1)
     silhouette_critter(cv, 'rabbit', 370, 338, 12, dark, -1)
     mole(cv, 296, 340, 16, facing=1)
-    for _ in range(40):
+    for _ in range(22 if V4 else 40):
         x, y = rng.uniform(0, 640), rng.uniform(340, 440)
         flower(cv, x, y, rng.uniform(2, 4), BLOSSOM, (250, 220, 140))
+    if V4:
+        ambient_tint(cv, base, 0.12)
     return cv
 
 
@@ -950,7 +962,27 @@ def sprout():
 SOURCES = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sources')
 
 
-def pastel_bg(cv, name, colors=18, edge=30, margin=0.04, box=None, crop=None, mirror=False):
+def spring_tone(src, split=0.5):
+    """색 종이(황토) 파스텔을 봄빛으로: 종이색 칸(밝은 황토)만 위는 옅은 하늘, 아래는 옅은 풀빛으로 색조를 옮긴다.
+    어두운 줄기·그늘은 채도만 낮춰 갈색으로 두고, 위쪽 흰 붓질(꽃)에는 분홍빛을 아주 조금. split = 하늘→풀이 바뀌는 높이(비율)."""
+    hsv = np.asarray(src.convert('HSV')).astype(np.float32)
+    H, S, V = hsv[..., 0] / 255 * 360, hsv[..., 1] / 255, hsv[..., 2] / 255
+    yy = np.mgrid[0:hsv.shape[0], 0:hsv.shape[1]][0] / hsv.shape[0]
+    paper = (H > 20) & (H < 60) & (S > 0.22) & (V > 0.5)
+    t = np.clip((yy - split) / 0.16, 0, 1)
+    nH = np.where(paper, 205 * (1 - t) + 92 * t, H)
+    nS = np.where(paper, S * 0.4, S)
+    nV = np.where(paper, np.clip(V * 1.06, 0, 1), V)
+    dark = (V <= 0.5) & (H > 15) & (H < 60)
+    nS = np.where(dark, S * 0.75, nS)
+    white = (S < 0.22) & (V > 0.72) & (yy < split + 0.05)
+    nH = np.where(white, 345, nH)
+    nS = np.where(white, np.maximum(nS, 0.07), nS)
+    out = np.stack([nH / 360 * 255, nS * 255, nV * 255], -1).astype(np.uint8)
+    return Image.fromarray(out, 'HSV').convert('RGB')
+
+
+def pastel_bg(cv, name, colors=18, edge=30, margin=0.04, box=None, crop=None, mirror=False, tone=None):
     """바탕을 파스텔·수채 그림에서(0073): tools/pixel의 --cel과 같은 길(단순화 → 면 나누기 → 다수결 축소 → 큰 면 1px 선).
     원본은 tools/art/sources/(CC0·퍼블릭 도메인, 출처는 assets/LICENSES.md). 인물과 같은 칸 크기로 만든다(믹셀 피하기)."""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pixel'))
@@ -960,6 +992,8 @@ def pastel_bg(cv, name, colors=18, edge=30, margin=0.04, box=None, crop=None, mi
     if crop:                                          # 원본에서 쓸 부분(비율)
         w, h = src.size
         src = src.crop((int(crop[0] * w), int(crop[1] * h), int(crop[2] * w), int(crop[3] * h)))
+    if tone is not None:                              # 색 보정(예: spring_tone)
+        src = tone(src)
     if mirror:                                        # 좌우로 이어 붙여 넓힌다(이음매는 가운데 — 큰 것이 가리는 자리)
         wide = Image.new('RGB', (src.width * 2, src.height))
         wide.paste(src.transpose(Image.FLIP_LEFT_RIGHT), (0, 0))
@@ -1184,7 +1218,7 @@ SCENES = {
 
 
 # 장면마다 그림 방식(v2, v4). 하나씩 바꾼다(0073): 파스텔 바탕으로 바꾼 장면은 v4.
-SCENE_STYLE = {'molehill': (True, True), 'great_tree': (True, True)}
+SCENE_STYLE = {'molehill': (True, True), 'great_tree': (True, True), 'last_bloom': (True, True)}
 
 
 def main():
