@@ -74,7 +74,7 @@
 | 게임 틀 | `app.rs`, `ui.rs` | 인트로 → 타이틀(시작·설정) → 게임 ⇄ 일시정지(메뉴·상태·가방·저널·지도). 커서 없는 탐색 + 탭/클릭 보조. 한글 픽셀 폰트. 탭 여섯(메뉴·상태·가방·저널·도감·지도). 처음엔 가방·지도가 틀만, 저널이 튜토리얼 퀘스트 4개였다(0007) — 지금 내용은 아래 저널·장비·지도 줄 |
 | 글자 성능 | `ui.rs`(glyph_plan, warm), `render.rs`(present) | 픽셀 폰트를 원래 12 물리 px(정수배)로 굽고 정수배로 키움 + 언어를 정할 때 그 언어 글자를 한 번에 미리 굽기. 대화 중 텍스처 올리기 160MB → 0(헤드리스 측정). 화면은 수정 전과 픽셀 단위로 같음. Safari 버벅임 대응(실기 확인은 사람) |
 | 다국어 | `i18n.rs`, `ui.rs`, `tools/fonts/`, `web/index.html` | 처음 다섯(한국어·영어·일본어·간체·브라질 포르투갈어, 0033) → 지금 아홉(+프랑스어·스페인어 0084, 독일어·러시아어 0085) 표, 언어별 폰트(일·중은 Ark Pixel 서브셋), 기기 선호 목록으로 시작, 설정에서 전환, 가짜 언어 Pseudo. CJK 줄바꿈(금칙)·넘침 대비(fit·탭 여백). 폰트 글자·자리표시자 테스트(docs/decisions/0013, 0014). 번역은 직접 쓴 초안(원어민 검수 전) |
-| 초상화 | `tools/art/portraits.py`, `art.rs`, `render.rs`(draw_portrait), `cutscene.rs`(Face) | 88×88, 게임 픽셀의 2배 밀도. Naïl 보통·기쁨·걱정·결의, 이웃은 그림자(docs/decisions/0015) |
+| 초상화 | `tools/art/portraits.py`, `art.rs`, `render.rs`(draw_portrait), `cutscene.rs`(Face) | 88×88, 게임 픽셀의 2배 밀도. Naïl 보통·기쁨·걱정·결의, 이웃은 그림자(docs/decisions/0015). 홀수 배율에서도 칸을 꽉 채운다(0111) |
 | 반딧불·산딸기 | `loot.rs`, `world.rs`(drop_loot), `render.rs`(draw_loot, HUD) | 화폐(자석·HUD·상태 탭), 회복(불운 보정), 최대 체력 5, 줍는 소리(음 올라감). 개발 시나리오 "떨어지는 것 확인"(docs/decisions/0016) |
 | 능력치·장신구 | `equipment.rs`(Stats, CHARMS), `app.rs`(가방 끼기/빼기, 상태 탭) | 장신구 5종 2칸, 생명의 씨앗, 공격 속도 = 스윙 시계 배율(docs/decisions/0017) |
 | 퀵 아이템 | `items.rs`, `player.rs`(State::Eat), `world.rs`(start_eating, finish_eating, revive), `render.rs`(퀵 슬롯·draw_eating) | 산딸기 1칸 회복, 쥬시 지렁이 가득 회복 + 목숨(최대 3), I·Y 먹기, Q·L1 넘기기. 먹는 시간 0.35초(맞으면 끊김, 굴파기로 끊기) + 먹기 대기 1.5초, 슬롯 덮개·터치 테두리(0038) |

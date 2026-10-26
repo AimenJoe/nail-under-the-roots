@@ -806,16 +806,12 @@ impl Renderer {
     }
 }
 
-/// 초상화(원본 88px, 대화창 칸 44 논리 px)를 화면에 찍을 크기(화면 px).
-/// 배율이 짝수면 칸에 꼭 맞고(원본 1px = 화면 배율/2), 홀수(3, 5…)면 내림해 조금 작게(픽셀을 고르게, 0015).
+/// 초상화(원본 88px, 대화창 칸 44 논리 px)를 화면에 찍을 크기(화면 px): 늘 칸에 꼭 맞게.
+/// 배율이 짝수면 원본 1px = 화면 배율/2 px로 고르고, 홀수(3, 5…)면 2·3px(배율 5) 또는 1·2px(배율 3)이 번갈아 찍힌다.
+/// 예전엔 홀수 배율에서 내림해 점을 고르게 두었는데(0015), 1920×1080 브라우저(배율 5)에서 칸의 80%만 차 둘레가 비어 보였다(사장, 0111).
 /// 배율 1(세로로 든 폰)은 반으로 줄여 칸에 맞춘다 — 예전엔 내림이 0이 되어 1배로 올려 칸의 두 배로 넘쳤다(사람 피드백 2026-10-25).
 fn portrait_px(scale: f32) -> f32 {
-    let k = (scale / 2.0).floor();
-    if k >= 1.0 {
-        art::PORTRAIT * k
-    } else {
-        art::PORTRAIT * 0.5 * scale.max(1.0).floor()
-    }
+    art::PORTRAIT * 0.5 * scale.max(1.0).floor()
 }
 
 #[cfg(test)]
@@ -823,12 +819,11 @@ mod portrait_tests {
     use super::*;
 
     #[test]
-    fn portrait_never_overflows_its_box() {
+    fn portrait_fills_its_box() {
         for s in 1..=8 {
             let scale = s as f32;
             let px = portrait_px(scale);
-            assert!(px <= 44.0 * scale, "배율 {s}: {px} > 칸 {}", 44.0 * scale);
-            assert!(px >= 44.0 * scale * 0.6, "배율 {s}: 너무 작다 {px}");
+            assert_eq!(px, 44.0 * scale, "배율 {s}: 칸을 꽉 채우지 않는다");
         }
         assert_eq!(portrait_px(1.0), 44.0);
         assert_eq!(portrait_px(4.0), 176.0);
