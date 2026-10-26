@@ -12,6 +12,7 @@
 7. 나온 그림은 **원본 그대로** 넘겨 준다. 크기·격자·팔레트·안전 영역은 Claude가 맞춘다(아래 7).
 
 ### 0-1. 먼저 캐릭터 시트(권장)
+> **용어**: 이 문서에서 "캐릭터 시트(character sheet)"는 늘 이 0-1 단계의 결과, 곧 그 캐릭터의 앞모습·3/4 모습 그림이다. "초상화(portrait)"는 0-2의 가슴 위 그림이다.
 장면을 그리기 전에 캐릭터마다 새 그림체로 **한 장씩** 먼저 그려 확정한다. 공식 문서는 같은 캐릭터를 여러 장 그릴 때 **앞서 만든 그림을 다음 프롬프트에 넣으라**고 한다. 확정한 시트를 장면의 캐릭터 그림으로 `ref_*.png` 대신(또는 함께) 넣는다. [1차]
 ```
 Create a character reference sheet for a cozy pixel-art game: the character from the attached image, standing, shown from the front and from a three-quarter view side by side on a plain light background, full body, same proportions and colors as the reference. [캐릭터 글]. [공통 스타일]. Aspect ratio 16:9.
@@ -37,6 +38,7 @@ Using the attached portrait of [이름], change only the facial expression to [�
 Edit the last attached image, the portrait of [이름]. Add only [고칠 것], copying its shape from the first attached image, the character sheet. Keep everything else in the portrait exactly the same. The output is the edited portrait only.
 ```
 - **고친 것은 다음 고침에서 되살아날 수 있다**(시험: 귀를 지운 뒤 같은 대화에서 앞발을 더하자 귀가 다시 났다). 대화 안의 앞선 그림(귀 있는 그림)을 모델이 계속 보고, "나머지는 그대로"는 무엇을 고쳤는지 모른다. 그래서 (1) 고친 그림을 저장해 **새 대화**에 그 그림만(필요하면 시트와 함께) 첨부하고, (2) 프롬프트에 **지킬 것을 짚어** 적는다: `Ensure these features of the portrait remain completely unchanged: [고친 점들]`(공식 합성 템플릿의 "Ensure that the features … remain completely unchanged").
+- **다른 캐릭터 초상화를 크기 맞춤용으로 넣으면 생김새까지 따라간다**(시험: 귀 없는 Naïl 초상화를 함께 넣자 포포의 귀가 사라졌다). 그 캐릭터의 시트에서 귀·모자 같은 머리 모양을 다시 가져오게 고친다(첨부: 시트 → 고칠 초상화 순서).
 - 첫 시험(Naïl 보통 표정): 시트에는 없던 둥근 귀가 생겼다(두더지는 귀가 털 속에 숨는다 → 캐릭터 글에 `no visible ears` 넣기). 가슴 위로 자르니 상징인 분홍 앞발이 빠졌다 → 초상화 프롬프트에 앞발을 넣는다.
 
 | 캐릭터 | 칸 | 표정(왼쪽이 보통) |
