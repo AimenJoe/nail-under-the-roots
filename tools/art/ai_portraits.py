@@ -3,7 +3,7 @@
 portraits.py의 sheet()가 부른다. 원본이 있으면 그 칸을 이 그림으로 바꿔 끼우고, 없으면 직접 그린 그림 그대로 둔다.
 PNG를 손으로 고치지 않고, 원본에 할 일을 모두 여기에 둔다(같은 원본 = 같은 결과):
   1. 오른쪽 아래 ✦(Gemini 앱 로고)를 둘레 색으로 메운다(네 꼭짓점 별 모양, 원본 512px에서 늘 같은 자리).
-  2. 고칠 것(눈 속 따뜻한 빛 → 연보라 등)을 원본별 표대로.
+  2. 고칠 것(검은 선 → 자두빛, 빨간 눈 밝히기 등)을 원본별 표대로.
   3. 배경(가장자리와 이어진 밝은 베이지)을 투명하게, 몸과 떨어진 반짝이·티끌은 지운다.
   4. 88×88로 줄이고(덩어리 평균), 같은 캐릭터 표정 넷을 한 팔레트로 맞춘다(디더 없이).
   5. Naïl 털빛 1~3: 털 색만 portraits.FUR_VARIANTS 경사로 옮긴다(목도리·주둥이·앞발·발톱·눈은 그대로).
@@ -86,22 +86,6 @@ def _erase_star(img):
             hole.discard(p)
 
 
-def _eyes_to_lavender(img, boxes):
-    """눈 속 주황·노랑 빛을 보통 표정 눈의 연보라로(결의 표정만 눈동자가 호박색으로 나왔다).
-    털(채도 0.39~0.52·밝기 0.47~0.63)과 가르려고 채도가 높거나(주황) 아주 밝은(노랑) 점만, 흰 반사는 위쪽만 남긴다."""
-    lo, hi = (88, 70, 112), (176, 162, 212)
-    px = img.load()
-    for (x0, y0, x1, y1), white_from in boxes:
-        for y in range(y0, y1):
-            for x in range(x0, x1):
-                h, s, v = _hsv(px[x, y])
-                warm = h < 0.2 and s > 0.12 and (s > 0.55 or v > 0.7)
-                low_white = s <= 0.12 and v > 0.85 and y >= white_from
-                if warm or low_white:
-                    t = min(1.0, max(0.0, (v - 0.4) / 0.6))
-                    px[x, y] = tuple(int(lo[i] + (hi[i] - lo[i]) * t) for i in range(3))
-
-
 def _plum_lines(img, keep):
     """거의 검은 선을 Naïl·포포와 같은 자두빛 선으로(모모 원본만 선이 검정으로 나왔다). 눈 상자 keep 안(눈동자·속눈썹)은 그대로.
     좌표는 원본 1024px 기준. 밝기 순서는 지켜서 선 가장자리의 섞인 점도 자두빛 쪽으로 옮긴다."""
@@ -147,11 +131,13 @@ def _glow_red_eyes(img, boxes):
                     px[x, y] = (int(r * 255), int(g * 255), int(b * 255))
 
 
+# 얼린 팔레트(frozen_palette): 확인을 받은 캐릭터의 팔레트를 파일로 두고, 나중에 다시 그린 표정은 그 팔레트에 맞춰 찍기만 한다.
+# 팔레트를 표정들로 새로 만들면 표정 하나를 다시 그려도 다른 표정의 색까지 바뀌었다(Naïl 결의를 다시 그리자 기쁨의 볼이
+# 진한 빨강이 되고, 털빛 변형의 주둥이 중간 단이 털로 칠해졌다, 0117). Naïl만 얼렸다.
+
 # 원본별로 더 고칠 것(Naïl은 원본 512px 좌표).
-FIXES = {
-    'nail_determined': lambda img: _eyes_to_lavender(
-        img, [((226, 250, 284, 288), 272), ((400, 244, 430, 266), 258)]),
-}
+# 예전 결의 표정은 눈이 호박색으로 나와 연보라로 고쳤다. 다시 그린 결의 표정(눈 색을 프롬프트에 적음)은 처음부터 연보라라 뺐다(0117).
+FIXES = {}
 FIXES['chief_glare'] = lambda img: _glow_red_eyes(img, CHIEF_KEEP[2:])
 for _face in ('normal', 'happy', 'worried', 'tainted_normal', 'tainted_pained'):
     FIXES[f'momo_{_face}'] = lambda img: _plum_lines(img, MOMO_EYES)
@@ -271,7 +257,7 @@ def _shrink(img, mask):
     return out
 
 
-def _shared_palette(cells, vivid_colors, eye_split=True):
+def _shared_palette(cells, vivid_colors, eye_split=True, frozen=None):
     """표정들을 한 팔레트로(디더 없이). 투명은 그대로."""
     strip = Image.new('RGB', (W * len(cells), H), (0, 0, 0))
     for i, c in enumerate(cells):
@@ -303,10 +289,18 @@ def _shared_palette(cells, vivid_colors, eye_split=True):
     if not eye_split:
         is_eye = lambda p: False
     eye = [p for p in opaque if is_eye(p)]
+    if frozen:
+        entries = frozen
+        return _apply_palette(cells, entries)
     split = vivid_colors > 0
     vivid = [p for p in opaque if split and not is_eye(p) and is_vivid(p)]
     rest = [p for p in opaque if not is_eye(p) and not (split and is_vivid(p))]
     entries = colors(eye, EYE_COLORS) + colors(vivid, vivid_colors) + colors(rest, REST_COLORS)
+    return _apply_palette(cells, entries)
+
+
+def _apply_palette(cells, entries):
+    """칸들을 팔레트 entries에 맞춰 찍는다(디더 없이, 가장 가까운 색). 투명은 그대로."""
     pal = Image.new('P', (1, 1))
     flat_pal = [v for c in entries for v in c]
     pal.putpalette(flat_pal + flat_pal[-3:] * (256 - len(entries)))
@@ -447,7 +441,17 @@ def character(name):
         masks.append(mask)
     if fit:
         images, masks = _fit(images, masks, fit)
-    return _shared_palette([_shrink(i, m) for i, m in zip(images, masks)], vivid, name not in NO_EYE_SPLIT)
+    return _shared_palette([_shrink(i, m) for i, m in zip(images, masks)], vivid, name not in NO_EYE_SPLIT,
+                           frozen_palette(name))
+
+
+def frozen_palette(name):
+    """얼린 팔레트 `sources/ai/<이름>_palette.png`(한 줄, 한 점 = 한 색)의 색들. 없으면 None(표정들로 새로 만든다)."""
+    p = os.path.join(SRC, f'{name}_palette.png')
+    if not os.path.exists(p):
+        return None
+    img = Image.open(p).convert('RGB')
+    return [img.getpixel((x, 0)) for x in range(img.width)]
 
 
 def cells(fur_variants):

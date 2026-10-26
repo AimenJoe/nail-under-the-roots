@@ -49,7 +49,7 @@ Edit the last attached image, the portrait of [이름]. Add only [고칠 것], c
 
 | 캐릭터 | 칸 | 표정(왼쪽이 보통) |
 |---|---|---|
-| Naïl | 0~3 | `calm and neutral` · `happy, eyes closed in a smile` · `worried, brows raised and a small, uneasy mouth` · `determined, brows lowered and a firm mouth` |
+| Naïl | 0~3 | `calm and neutral` · `happy, eyes closed in a smile` · `worried, brows raised and a small, uneasy mouth` · `gentle, brave determination: brows only slightly lowered, eyes bright and steady, a small firm but soft mouth, never fierce` |
 | 모모(돌아옴) | 12~14 | `calm, a little shy` · `happy, eyes closed in a smile` · `worried, ears drooping` |
 | 모모(물듦) | 7~8 | `cold and distant, glowing green eyes` · `pained, glowing green eyes squeezed half shut` |
 | 포포 | 5~6 | `calm and friendly` · `happy, eyes closed in a big smile` |
