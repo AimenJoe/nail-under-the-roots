@@ -18,6 +18,35 @@ Create a character reference sheet for a cozy pixel-art game: the character from
 ```
 마음에 드는 그림체(예: 앞서 받은 초상화 판)가 있으면 Pro에서 **그림체 참고**로 첨부하고 이렇게 적는다: `Use the last attached image only as a style reference for line, palette and pixel density; take each character's design only from its own reference image.`
 
+### 0-2. 대화 초상화(표정)
+- **한 장에 표정 하나.** 한 장에 넷을 줄 세우게 했더니 셋이 겹치고 한 몸에 얼굴이 둘 붙었다(2026-10-26 시험). 원인: 정사각형 넷에는 4:1이 필요한데 16:9를 적었다. 그리고 모델은 한 장 안의 개수를 잘 지키지 못한다(공식 Limitations: 요청한 개수를 늘 지키지는 않는다).
+- **보통 표정을 먼저 1:1로**, 그다음 같은 대화에서 **표정만 바꾸기**(공식 inpainting 템플릿 "change only … keep everything else exactly the same"). 크기·자리·몸이 그대로라 대사가 바뀔 때 얼굴이 튀지 않는다.
+- 표정을 바꿀 때는 **늘 보통 표정 그림을 기준으로** 고친다. 고친 그림을 다시 고치면 흐트러진다. 흐트러지면 새 대화에 보통 표정 그림을 첨부하고 다시.
+- 게임 초상화는 모두 오른쪽을 보는 가슴 위 모습, 88×88(`assets/art/portraits.png`). 배경은 한 가지 색으로 받아 Claude가 지운다.
+
+1) 보통 표정(시트 첨부):
+```
+Using the attached character sheet of [이름], create one dialogue portrait for the same game: a single head-and-shoulders portrait of [이름], centered, facing slightly to the right, on a plain flat light background (#E8E0D0). [표정]. Keep the character's design, clothing, colors and pixel style exactly the same as the sheet. A clean, wordless image with only this one character. Aspect ratio 1:1.
+```
+2) 표정 바꾸기(같은 대화, 보통 표정 그림 기준):
+```
+Using the provided image, change only [이름]'s facial expression to [표정]. Keep everything else exactly the same: the same size, position, framing, clothing, colors, background and pixel style.
+```
+
+| 캐릭터 | 칸 | 표정(왼쪽이 보통) |
+|---|---|---|
+| Naïl | 0~3 | `calm and neutral` · `happy, eyes closed in a smile` · `worried, brows raised and a small, uneasy mouth` · `determined, brows lowered and a firm mouth` |
+| 모모(돌아옴) | 12~14 | `calm, a little shy` · `happy, eyes closed in a smile` · `worried, ears drooping` |
+| 모모(물듦) | 7~8 | `cold and distant, glowing green eyes` · `pained, glowing green eyes squeezed half shut` |
+| 포포 | 5~6 | `calm and friendly` · `happy, eyes closed in a big smile` |
+| 보리 | 10~11 | `calm, tired but kind` · `happy, eyes closed in a smile` |
+| 누룩 할매 | 15~16 | `peaceful, eyes closed` · `happy, eyes closed in a warm smile` |
+| 도토 | 31~32 | `calm` · `happy, eyes closed in a smile` |
+| 수수 | 33~34 | `calm` · `happy` |
+| 콩이 | 36~37 | `calm` · `happy, eyes closed in a smile` |
+| 도토·콩이·들쥐 대장(물듦) | 30·35·9 | `glaring, small glowing red eyes` |
+| 엄마 | 17 | `gentle, eyes closed` |
+
 참고 그림(직접 그린 것만, 팩 그림 없음. 0064): 세션 스크래치에 만들어 둔 `ref_*.png`(초상화를 4배로 키운 것)와 `layout_*.png`(지금 임시 일러스트 2배)를 받아서 쓴다. 다시 만들 때는 `assets/art/portraits.png`(칸 번호는 `src/cutscene.rs` `Portrait`)와 `assets/art/illust/*.png`에서 자른다.
 
 ## 1. 공통 스타일 (모든 장면 앞에)
