@@ -20,6 +20,9 @@
     python3 tools/pixel/pxl.py sheet 출력.png 열 a.pxl b.pxl ...       칸을 이어 시트로
     python3 tools/pixel/pxl.py put 그림.pxl x y 글자열                 (x, y)부터 오른쪽으로 덮어쓴다('_'는 건너뜀)
     python3 tools/pixel/pxl.py rekey 그림.pxl d=O:외곽선 u=4:털4 ...      글자를 한꺼번에 바꾸고 이름을 붙인다(가져온 뒤 읽기 쉽게)
+    python3 tools/pixel/pxl.py pixelate 사진.jpg 새.pxl --size 320x180 [--colors 24 | --palette 그림.png] [--preview 미리보기.png]
+        그림·사진을 도트로: 자르기 → 크기에 맞춘 중앙값 흐림(재질 무늬를 덩어리로) → 칸 평균으로 줄이기 → 색 줄이기(디더 없음)
+        → 외톨이 정리. --palette면 그 그림의 색만 쓴다(게임 그림과 색을 맞출 때). 그 뒤는 손으로(show·put·editor.html).
 """
 import argparse
 import sys
@@ -251,6 +254,90 @@ def cmd_rekey(a):
     p.save(a.pxl)
 
 
+def cmd_pixelate(a):
+    from PIL import ImageEnhance, ImageFilter
+    tw, th = (int(v) for v in a.size.lower().split("x"))
+    src = Image.open(a.src).convert("RGB")
+    # 목표 비율로 가운데 자르기(cover)
+    sw, sh = src.size
+    k = max(tw / sw, th / sh)
+    cw, ch = int(round(tw / k)), int(round(th / k))
+    x0, y0 = (sw - cw) // 2, (sh - ch) // 2
+    src = src.crop((x0, y0, x0 + cw, y0 + ch))
+    if a.contrast != 1.0:
+        src = ImageEnhance.Contrast(src).enhance(a.contrast)
+    if a.saturation != 1.0:
+        src = ImageEnhance.Color(src).enhance(a.saturation)
+    # 한 칸이 원본 몇 px인지에 맞춘 중앙값 흐림: 잎·풀·털 같은 잔무늬가 덩어리로 뭉친다(바로 줄이면 칸마다 색이 튄다).
+    cell = max(1, cw // tw)
+    if cell >= 3:
+        src = src.filter(ImageFilter.MedianFilter(min(9, cell | 1)))
+    small = src.resize((tw, th), Image.BOX)
+    if a.palette:
+        pal_im = Image.open(a.palette).convert("RGB")
+        cols = sorted({c for c in (pal_im.getpixel((x, y)) for y in range(pal_im.height) for x in range(pal_im.width))})
+        if len(cols) > 256:
+            cols = sorted({c for c in pal_im.quantize(256, method=Image.Quantize.MEDIANCUT).convert("RGB").getdata()})
+        pim = Image.new("P", (1, 1))
+        flat = [v for c in cols for v in c][:768]
+        pim.putpalette(flat + [0] * (768 - len(flat)))
+        q = small.quantize(palette=pim, dither=Image.Dither.NONE).convert("RGB")
+    else:
+        # 색을 넉넉히(4배) 뽑은 뒤 가까운 색끼리 합친다. 바로 N색으로 자르면 넓은 면(하늘·풀)이 색을 다 가져가서
+        # 좁지만 뚜렷한 색(나무 기둥 갈색, 눈)이 사라진다.
+        many = small.quantize(colors=min(256, a.colors * 4), method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+        counts = {i: n for n, i in many.getcolors(256)}
+        pal = many.getpalette()[: 3 * 256]
+        groups = {i: ([pal[3 * i], pal[3 * i + 1], pal[3 * i + 2]], counts[i]) for i in counts}
+
+        def dist(c1, c2):          # redmean: 사람 눈에 가까운 RGB 거리
+            r = (c1[0] + c2[0]) / 2
+            dr, dg, db = c1[0] - c2[0], c1[1] - c2[1], c1[2] - c2[2]
+            return (2 + r / 256) * dr * dr + 4 * dg * dg + (2 + (255 - r) / 256) * db * db
+        owner = {i: i for i in groups}
+        while len(groups) > a.colors:
+            ks = list(groups)
+            best = min(((dist(groups[i][0], groups[j][0]), i, j) for n, i in enumerate(ks) for j in ks[n + 1:]))
+            _, i, j = best
+            (ci, ni), (cj, nj) = groups[i], groups[j]
+            groups[i] = ([(ci[k] * ni + cj[k] * nj) / (ni + nj) for k in range(3)], ni + nj)
+            del groups[j]
+            for k, v in owner.items():
+                if v == j:
+                    owner[k] = i
+        final = {i: tuple(int(round(v)) for v in groups[owner[i]][0]) for i in owner}
+        q = Image.new("RGB", small.size)
+        mp = many.load()
+        qp = q.load()
+        for y in range(th):
+            for x in range(tw):
+                qp[x, y] = final[mp[x, y]]
+    px = q.load()
+    # 외톨이 정리: 둘레 여덟 칸에 같은 색이 없으면 둘레에 가장 많은 색으로(두 번)
+    for _ in range(2):
+        changes = []
+        for y in range(1, th - 1):
+            for x in range(1, tw - 1):
+                c = px[x, y]
+                nb = [px[x + dx, y + dy] for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy]
+                if c not in nb:
+                    changes.append((x, y, max(set(nb), key=nb.count)))
+        for x, y, c in changes:
+            px[x, y] = c
+    uniq = sorted({px[x, y] for y in range(th) for x in range(tw)}, key=sum)
+    if len(uniq) > len(KEYS):
+        sys.exit(f"색이 {len(uniq)}개라 글자가 모자란다. --colors를 줄일 것")
+    keymap = {c: KEYS[i] for i, c in enumerate(uniq)}
+    palette = {".": ((0, 0, 0, 0), "투명")}
+    palette.update({keymap[c]: (c + (255,), "") for c in uniq})
+    rows = ["".join(keymap[px[x, y]] for x in range(tw)) for y in range(th)]
+    Pxl(tw, th, palette, rows, [f"# {Path(a.src).name}에서 도트로({tw}×{th}, 색 {len(uniq)})"]).save(a.pxl)
+    if a.preview:
+        z = max(1, 960 // tw)
+        q.resize((tw * z, th * z), Image.NEAREST).save(a.preview)
+    print(f"{a.pxl}: {tw}×{th}, 색 {len(uniq)}")
+
+
 def main(argv=None):
     import signal
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # | head 로 잘라 읽을 때 조용히
@@ -263,9 +350,13 @@ def main(argv=None):
     s = sub.add_parser("sheet"); s.add_argument("png"); s.add_argument("cols", type=int); s.add_argument("files", nargs="+")
     s = sub.add_parser("put"); s.add_argument("pxl"); s.add_argument("x", type=int); s.add_argument("y", type=int); s.add_argument("text")
     s = sub.add_parser("rekey"); s.add_argument("pxl"); s.add_argument("specs", nargs="+")
+    s = sub.add_parser("pixelate"); s.add_argument("src"); s.add_argument("pxl"); s.add_argument("--size", default="320x180")
+    s.add_argument("--colors", type=int, default=24); s.add_argument("--palette"); s.add_argument("--preview")
+    s.add_argument("--contrast", type=float, default=1.1); s.add_argument("--saturation", type=float, default=1.1)
     a = ap.parse_args(argv)
     return {"import": cmd_import, "render": cmd_render, "show": cmd_show, "check": cmd_check,
-            "sheet": cmd_sheet, "put": cmd_put, "rekey": cmd_rekey}[a.cmd](a) or 0
+            "sheet": cmd_sheet, "put": cmd_put, "rekey": cmd_rekey,
+            "pixelate": cmd_pixelate}[a.cmd](a) or 0
 
 
 if __name__ == "__main__":
