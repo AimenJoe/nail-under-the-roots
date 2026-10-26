@@ -34,6 +34,8 @@ CHARACTERS = {
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
 CHEST_AT_BOTTOM = {'momo', 'momo_tainted'}
+# 몸 둘레에 빛 번짐이 붙은 캐릭터(빛나는 실): 흰빛을 보랏빛으로 물들인다(_tint_glow).
+HALO = {'momo_tainted'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
 FIT_CUT = 0.02
 # 틀이 1보다 클 때 귀 끝 위에 남길 여백 몫.
@@ -110,6 +112,8 @@ def _plum_lines(img, keep):
 
 # 모모 눈 상자(원본 1024px): 왼눈·오른눈. 세 표정 모두 같은 자리다.
 MOMO_EYES = [(410, 470, 580, 640), (680, 480, 800, 640)]
+# 물든 모모 괴로운 표정의 눈물(원본 1024px). 흰빛 물들이기에서 뺀다.
+MOMO_TEAR = (395, 590, 465, 675)
 
 # 원본별로 더 고칠 것(Naïl은 원본 512px 좌표).
 FIXES = {
@@ -159,6 +163,26 @@ def _character_mask(img, tol=34, from_bottom=True):
             if count > best_n:
                 best, best_n = n, count
     return [[label[y][x] == best for x in range(w)] for y in range(h)]
+
+
+def _tint_glow(img, mask, keep):
+    """빛나는 실 둘레·가운데의 흰빛을 보랏빛으로. 원본의 흰빛은 실 빛과 밝은 배경 베이지가 섞인 것이라 어두운 대화창에서 하얗게 튀었다(사장).
+    - 거의 배경색인 번짐(채도 < 0.12)은 어두운 보라(밝기 0.42): 어두운 바탕 위의 은은한 빛으로 읽힌다.
+    - 그보다 짙은 흰빛(채도 < 0.3, 밝기 > 0.75)은 연보라(밝기 0.62~0.88, 밝을수록 밝게).
+    번짐을 지우면(바깥에서 벗기기) 남은 실 고리가 칸 한 점(원본 약 12px)보다 가늘어져 88px로 줄일 때 귀 밖 고리가 사라졌다. 그래서 지우지 않고 물들인다.
+    keep 상자(눈·눈물, 원본 1024px)는 그대로."""
+    sx = img.width / 1024
+    boxes = [tuple(int(v * sx) for v in b) for b in keep]
+    px = img.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            if not mask[y][x] or any(x0 <= x < x1 and y0 <= y < y1 for (x0, y0, x1, y1) in boxes):
+                continue
+            hh, s, v = _hsv(px[x, y])
+            if s < 0.3 and v > 0.75:
+                value = 0.42 if s < 0.12 else min(0.88, 0.62 + (v - 0.75))
+                r, g, b = colorsys.hsv_to_rgb(0.76, 0.42, value)
+                px[x, y] = (int(r * 255), int(g * 255), int(b * 255))
 
 
 def _shrink(img, mask):
@@ -352,7 +376,10 @@ def character(name):
         if fix:
             fix(img)
         images.append(img)
-        masks.append(_character_mask(img, from_bottom=name not in CHEST_AT_BOTTOM))
+        mask = _character_mask(img, from_bottom=name not in CHEST_AT_BOTTOM)
+        if name in HALO:
+            _tint_glow(img, mask, MOMO_EYES + [MOMO_TEAR])
+        masks.append(mask)
     if fit:
         images, masks = _fit(images, masks, fit)
     return _shared_palette([_shrink(i, m) for i, m in zip(images, masks)], vivid)
