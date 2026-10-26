@@ -367,6 +367,11 @@ impl Player {
         self.item_buf > 0.0 && self.item_cd <= 0.0 && self.state == State::Free
     }
 
+    /// 먹기 버튼을 눌렀지만 먹지 않았다(체력이 가득 등): 버퍼를 비워 알림이 프레임마다 다시 뜨지 않게.
+    pub fn drop_item_press(&mut self) {
+        self.item_buf = 0.0;
+    }
+
     /// 먹기 시작. 대기는 지금부터 센다(끊겨도 그대로).
     pub fn start_eat(&mut self, item: Consumable) {
         self.item_buf = 0.0;

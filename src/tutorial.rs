@@ -217,6 +217,19 @@ impl Tutorial {
                 }
             }
             Stage::Item => {
+                // 연습 동안은 맞지 않으니, 저장 지점(시작 자리 곁)·뿌리 심장으로 체력이 가득 차면 먹을 수 없어
+                // 이 단계에서 영영 막혔다(사장 2026-10-26, 0093). 먹기 전까지 한 칸 비워 두고 산딸기를 둔다.
+                if w.items_used == self.base {
+                    if w.player.hp >= w.player.stats.max_hp {
+                        w.player.hp = w.player.stats.max_hp - 1;
+                    }
+                    if w.bag.count(Consumable::Berry) == 0 {
+                        w.bag.add(Consumable::Berry);
+                    }
+                    if w.bag.count(w.bag.selected) == 0 {
+                        w.bag.selected = Consumable::Berry;
+                    }
+                }
                 if w.items_used > self.base {
                     self.say(&[
                         (|s| s.popo_item2, Face::Normal, None),
@@ -360,6 +373,15 @@ mod tests {
         tu.update(&mut w, 0.1);
         assert_eq!(tu.stage, Stage::Item);
         assert!(w.bag.count(Consumable::Berry) > 0);
+        // 저장 지점에서 체력이 가득 차고 산딸기를 잃어도 다시 먹을 수 있게 된다(0093).
+        w.player.hp = w.player.stats.max_hp;
+        w.bag.take(Consumable::Berry);
+        tu.update(&mut w, 0.1);
+        assert!(
+            w.player.hp < w.player.stats.max_hp,
+            "먹을 수 있게 한 칸 비운다"
+        );
+        assert!(w.bag.count(Consumable::Berry) > 0, "산딸기를 다시 둔다");
         w.items_used += 1;
         tu.update(&mut w, 0.1);
         tu.update(&mut w, 3.5);

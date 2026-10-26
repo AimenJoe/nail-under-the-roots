@@ -1093,7 +1093,13 @@ impl World {
     fn start_eating(&mut self) {
         let p = &mut self.player;
         let c = self.bag.selected;
-        if p.hp >= p.stats.max_hp || self.bag.count(c) == 0 {
+        if self.bag.count(c) == 0 {
+            return;
+        }
+        if p.hp >= p.stats.max_hp {
+            // 아무 일도 안 일어나면 고장 난 줄 안다(튜토리얼에서 막혔다, 0093): 왜 안 먹는지 알린다.
+            p.drop_item_press();
+            self.toast = Some((|s| s.toast_eat_full, 1.6));
             return;
         }
         p.start_eat(c);
