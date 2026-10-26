@@ -1400,7 +1400,11 @@ fn draw_root_gate(
             let h = (rise * 16.0).round();
             if h > 0.0 {
                 // 울타리 두 겹을 엇갈려 쌓는다(뒤 겹부터). 가로는 위아래로, 세로는 좌우로 민다.
-                let r = sunny::rect(fence_tile(g, cx, cy, vertical));
+                let r = sunny::rect(if vertical {
+                    sunny::FENCE_H
+                } else {
+                    sunny::FENCE_V
+                });
                 for d in sunny::FENCE_STACK {
                     let (dx, dy) = if vertical { (0.0, d) } else { (d, 0.0) };
                     draw_texture_ex(
@@ -1475,22 +1479,6 @@ fn draw_root_gate(
                 }
             }
         }
-    }
-}
-
-/// 잠긴 문 한 칸의 팩 울타리 칸(0097·0098). `vertical`(남북 문)이면 가로 울타리 가운데 칸,
-/// 아니면(동서 문) 세로 울타리: 위아래 칸이 문인지 보고 위 끝·가운데·아래 끝을 고른다.
-fn fence_tile(g: &crate::map::Grid, cx: i32, cy: i32, vertical: bool) -> sunny::R {
-    // 가로 울타리는 늘 가운데 칸: 가로대가 양쪽 벽까지 이어진다.
-    if vertical {
-        return sunny::FENCE_H;
-    }
-    let door = |y: i32| g.get_i(cx, y) == Cell::Door;
-    let [start, mid, end] = sunny::FENCE_V;
-    match (door(cy - 1), door(cy + 1)) {
-        (false, true) => start,
-        (true, false) => end,
-        _ => mid,
     }
 }
 
