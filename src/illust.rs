@@ -33,6 +33,8 @@ pub enum Illust {
     DotoMemory,
     /// 모모로 가장 깊은 곳: 실에 걸린 굴토끼 털과 시든 꽃잎(0056).
     MomoDeep,
+    /// 콩이가 정신을 차렸다: 깊은 곳의 문, 틈으로 새는 빛 앞에서 말린 몸을 편다(0085, 어둠 속 실루엣 방식).
+    KongiDoor,
 }
 
 /// 그림 위에 떠다니는 것.
@@ -60,7 +62,7 @@ pub struct Spec {
 }
 
 impl Illust {
-    pub const ALL: [Illust; 10] = [
+    pub const ALL: [Illust; 11] = [
         Illust::GreatTree,
         Illust::MotherBurrow,
         Illust::BoriFreed,
@@ -71,6 +73,7 @@ impl Illust {
         Illust::Molehill,
         Illust::DotoMemory,
         Illust::MomoDeep,
+        Illust::KongiDoor,
     ];
 
     pub fn index(self) -> usize {
@@ -108,6 +111,7 @@ impl Illust {
             Illust::Molehill => ("molehill", still, 1.0, Fx::Petals),
             Illust::DotoMemory => ("doto_memory", still, 1.0, Fx::Dust),
             Illust::MomoDeep => ("momo_deep", (Vec2::ZERO, vec2(64.0, 0.0)), 12.0, Fx::Spores),
+            Illust::KongiDoor => ("kongi_door", still, 1.0, Fx::Dust),
         };
         Spec {
             file,

@@ -53,7 +53,7 @@ fn build_label() -> String {
 
 /// 상태 탭 글 한 줄 높이 = 위아래로 한 번 내리는 양.
 const STATUS_LINE: f32 = 12.0;
-const ALBUM_COLS: usize = 5;
+const ALBUM_COLS: usize = 6;
 const PAUSE_TABS: [Tr; 6] = [
     |s| s.tab_menu,
     |s| s.tab_status,
@@ -1970,8 +1970,8 @@ impl App {
         }
         let panel = Rect::new(16.0, 8.0, 288.0, 150.0);
         ui.panel(panel, Some(s.title_album));
-        // 5×2칸(그림 9장, 0053). 칸은 16:9.
-        let (cw, ch, gap) = (52.0, 30.0, 5.0);
+        // 6×2칸(그림 11장, 0085: 콩이의 문을 더해 5칸 두 줄을 넘었다). 칸은 16:9.
+        let (cw, ch, gap) = (44.0, 25.0, 4.0);
         let x0 = panel.x + (panel.w - ALBUM_COLS as f32 * cw - (ALBUM_COLS - 1) as f32 * gap) / 2.0;
         let y0 = panel.y + 38.0;
         let mut seen = 0;

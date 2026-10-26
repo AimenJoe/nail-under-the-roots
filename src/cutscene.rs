@@ -606,7 +606,7 @@ pub fn kongi_returns(w: &World, at: Vec2) -> Cutscene {
     let side = if at.x >= w.player.pos.x { 22.0 } else { -22.0 };
     let near = w.player.pos + vec2(side, 0.0);
     let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
-    let steps = vec![
+    let mut steps = vec![
         Step::Wait(0.6),
         say(1, Face::Normal, |s| s.kongi_b1),
         Step::Move {
@@ -623,8 +623,16 @@ pub fn kongi_returns(w: &World, at: Vec2) -> Cutscene {
             dir: vec2(side, 0.0),
         },
         say(0, Face::Worried, |s| s.kongi_b2),
+    ];
+    // 깊은 곳의 문(0085): 콩이가 지키던 문, 틈으로 빛이 샌다. 그림 위에서 내레이션 + 콩이의 말, 그리고 돌아온다.
+    steps.extend(cut_to(Some(Illust::KongiDoor)));
+    steps.extend([
+        Step::Narrate(|s| s.kongi_door),
         say(1, Face::Normal, |s| s.kongi_b3),
         say(1, Face::Normal, |s| s.kongi_b4),
+    ]);
+    steps.extend(cut_to(None));
+    steps.extend([
         Step::Give(crate::app::STONE_CLAW),
         say(0, Face::Happy, |s| s.kongi_b5),
         say(1, Face::Happy, |s| s.kongi_b6),
@@ -634,7 +642,7 @@ pub fn kongi_returns(w: &World, at: Vec2) -> Cutscene {
             speed: 90.0,
         },
         Step::Hide { actor: 1 },
-    ];
+    ]);
     Cutscene::new(actors, steps)
 }
 

@@ -1495,6 +1495,127 @@ def title():
     return cv
 
 
+
+def kongi_door():
+    """콩이가 정신을 차렸다(0085): 깊은 곳의 문. 타이틀 v2(0083)와 같은 방식 — 빛이 보이는 것을 정한다.
+    - 빛 둘: 돌문 가운데 틈으로 새어 나오는 옅은 금빛(위에서 아래로 번지는 빛줄기, 먼지 안개가 밝아진다),
+      문을 얽은 물든 뿌리의 바래 가는 보라 빛.
+    - 문을 얽었던 뿌리는 늘어져 처졌다(풀렸다). 콩이(아르마딜로)는 문 앞에서 말린 몸을 펴며 고개를 든다 — 틈 빛 앞 실루엣,
+      등딱지 띠 가장자리만 빛을 받는다.
+    - 대화창이 아래 1/3(y 248~)을 덮는다 → 틈·콩이 머리는 그 위에."""
+    rng = random.Random(85)
+    W, H = 640, 360
+    cv = Canvas(W, H)
+    yy, xx = cv.yy, cv.xx
+    floor = 236
+    fog = fbm(H, W, 51)
+    grain = fbm(H, W, 52, cells=(4, 2))
+    # ---- albedo ----
+    rock = np.array([70, 60, 62.0]) * (0.6 + 0.7 * fbm(H, W, 53, cells=(60, 24, 10, 4)))[..., None]
+    alb = rock.copy()
+    # 바닥: 흙(조금 따뜻하게), 앞으로 갈수록 거칠게
+    floor_y = floor + 22 * (fbm(1, W, 54, cells=(80, 20, 6))[0] - 0.5)[None, :]
+    fl = yy >= floor_y   # 바닥 경계는 들쭉날쭉(곧은 줄은 도형처럼 보였다)
+    alb[fl] = (np.array([84, 64, 52.0]) * (0.6 + 0.8 * fbm(H, W, 55, cells=(14, 6, 3)))[..., None])[fl]
+    # 돌문: 아치 모양의 큰 돌 두 짝(가운데 틈), 가장자리는 잡음으로 깨진 돌
+    cx = 330
+    arch = warped_blob(cv, [(cx, 150 - k * 4) for k in range(10)], [118 - k * 3 for k in range(10)], 56, rough=7)
+    arch &= yy < floor + 4
+    door = warped_blob(cv, [(cx, 160 - k * 5) for k in range(10)], [98 - k * 3 for k in range(10)], 57, rough=4)
+    door &= yy < floor + 2
+    # 틈: 거의 곧게(지그재그면 번개로 읽혔다), 아래로 갈수록 조금 벌어진다 — 문이 막 열리기 시작했다.
+    crack_x = cx + 1.2 * np.sin(yy / 17.0) + (fbm(H, 1, 58, cells=(24, 8), wrap_x=False)[:, 0:1] - 0.5) * 5
+    cw = 1.2 + 3.0 * np.clip((yy - 60) / 180, 0, 1) + 1.6 * (fbm(H, 1, 64, cells=(6, 3), wrap_x=False)[:, 0:1] - 0.5)
+    crack = (np.abs(xx - crack_x) < np.clip(cw, 0.6, None)) & door   # 폭이 들쭉날쭉(깨진 돌 틈)
+    stone = np.array([92, 86, 90.0]) * (0.55 + 0.7 * fbm(H, W, 59, cells=(18, 8, 4)))[..., None]
+    alb[arch & ~door] = (stone * 0.75)[arch & ~door]
+    alb[door] = stone[door]
+    # 돌 짜임: 가로 이음매 몇 줄(잡음으로 흔들림)
+    for y0 in (96, 136, 176, 212):
+        seam = np.abs(yy - (y0 + 4 * np.sin(xx / 23.0) + 6 * fbm(H, W, 60 + y0, cells=(30, 8)))) < 1.0
+        alb[seam & door] *= 0.55
+    alb[crack] = (8, 6, 8)
+    # 문을 얽었던 물든 뿌리: 늘어져 처진 줄(풀렸다), 끝은 바닥에 닿아 늘어진다
+    roots = np.zeros((H, W), bool)
+    tips = []
+    for k, (x0, y0, x1, y1, sag) in enumerate(((180, 60, 470, 70, 70), (210, 30, 520, 110, 90), (150, 120, 300, 236, 30),
+                                               (520, 40, 380, 236, 40), (250, 20, 200, 236, 20), (460, 20, 600, 200, 50),
+                                               (120, 40, 260, 160, 60))):
+        mid = ((x0 + x1) / 2, (y0 + y1) / 2 + sag)
+        pts = bezier((x0, y0), (x0 + (mid[0] - x0) * 0.6, mid[1]), (x1 - (x1 - mid[0]) * 0.6, mid[1]), (x1, y1), 60)
+        pts = [(x + math.sin(i * 0.4 + k) * 2.0, y) for i, (x, y) in enumerate(pts)]
+        roots |= stroke(cv, pts, 6 - k * 0.4, 2)
+        tips += pts[::12]
+    # 끊어진 잔뿌리가 아래로 늘어진다
+    for _ in range(16):
+        x = rng.uniform(170, 500)
+        y = rng.uniform(40, 120)
+        ln = rng.uniform(20, 60)
+        hang = bezier((x, y), (x + rng.uniform(-6, 6), y + ln * 0.4), (x + rng.uniform(-10, 10), y + ln * 0.8), (x + rng.uniform(-12, 12), y + ln), 14)
+        roots |= stroke(cv, hang, 2.2, 1)
+    alb[roots] = (26, 16, 26)
+    # 콩이(아르마딜로): 말린 몸을 펴며 고개를 든다. 문 앞 왼쪽, 머리는 대화창 위. 틈 빛 앞 실루엣.
+    # 등딱지는 곧은 줄무늬(통처럼 보였다) 대신 위 가장자리를 물결로 깎아 띠 마디를 실루엣으로 보인다.
+    kx, ky = 270, 214
+    ang = np.arctan2(yy - ky, xx - kx)
+    rad = np.hypot((xx - kx) / 50, (yy - ky) / 34)
+    scallop = 1 + 0.06 * np.abs(np.sin(ang * 9)) * (yy < ky)
+    shell = (rad < scallop) & (yy <= ky + 16)
+    head = ellipse(cv, kx + 50, ky - 12, 14, 11, rot=-0.4)
+    snout = stroke(cv, bezier((kx + 58, ky - 14), (kx + 66, ky - 18), (kx + 72, ky - 22), (kx + 76, ky - 25), 10), 7, 3)
+    ear = poly(cv, [(kx + 42, ky - 20), (kx + 44, ky - 44), (kx + 50, ky - 22)]) | poly(cv, [(kx + 49, ky - 21), (kx + 55, ky - 42), (kx + 56, ky - 19)])
+    tail = stroke(cv, bezier((kx - 46, ky + 8), (kx - 62, ky + 10), (kx - 72, ky + 16), (kx - 80, ky + 20), 14), 8, 2)
+    feet = ellipse(cv, kx - 22, ky + 17, 8, 5) | ellipse(cv, kx + 26, ky + 17, 8, 5) | ellipse(cv, kx + 46, ky + 2, 5, 7)
+    body = shell | head | snout | ear | tail | feet
+    alb[body] = (40, 34, 38)
+    bands = np.zeros((H, W), bool)
+    # ---- 빛 ----
+    def falloff(px, py, r, sharp=2.0):
+        d = np.hypot(xx - px, yy - py) / r
+        return np.clip(1 - d, 0, 1) ** sharp
+    gold = np.array([1.0, 0.88, 0.66])
+    violet = np.array([0.55, 0.32, 0.85])
+    L = np.zeros((H, W, 3), np.float32) + 0.06
+    # 틈에서 새는 빛: 틈 줄기를 따라 가로로 빨리 줄고, 아래로 갈수록 넓게 번진다(빛줄기)
+    dx = np.abs(xx - crack_x)
+    spread = 6 + np.clip(yy - 60, 0, None) * 0.55
+    beam = np.exp(-(dx / spread) ** 2) * np.clip((yy - 50) / 40, 0, 1)
+    glow_c = np.exp(-(dx / 26) ** 2) * np.exp(-((yy - 150) / 120) ** 2)
+    shaft = beam * (0.6 + 0.4 * fbm(H, W, 61, cells=(30, 12))) * np.clip((floor_y + 10 - yy) / 30, 0, 1)
+    pool = np.exp(-((xx - cx) / 120) ** 2 - ((yy - floor - 14) / 40) ** 2) * (0.6 + 0.6 * fbm(H, W, 62, cells=(16, 6)))
+    L += gold[None, None, :] * (shaft * 1.5 + glow_c * 0.9 + pool * 1.1)[..., None]
+    # 바래 가는 보라(뿌리 둘레만)
+    vio = np.zeros((H, W), np.float32)
+    for (x, y) in tips[::3]:
+        vio += falloff(x, y, 60, 2.0) * 0.35
+    L += violet[None, None, :] * np.clip(vio, 0, 1.2)[..., None]
+    img = alb * L
+    # 틈 자체는 가장 밝다
+    img[crack] = (255, 236, 190)
+    img[dilate(crack, 1) & ~crack & door] = img[dilate(crack, 1) & ~crack & door] * 0.3 + np.array([250, 210, 150.0]) * 0.7
+    # 콩이 가장자리 빛: 틈 쪽(오른쪽) 가장자리 2px
+    shifted = np.zeros_like(body)
+    shifted[:, :-3] = body[:, 3:]
+    rimm = body & ~shifted
+    img[rimm] = img[rimm] * 0.3 + np.array([240, 200, 150.0]) * 0.55
+    # 물든 뿌리 몇 마디가 아직 은은히 보라
+    img[roots & (vio > 0.25)] = img[roots & (vio > 0.25)] * 0.5 + np.array([110, 64, 150.0]) * 0.35
+    # ---- 먼지 안개: 빛줄기 안에서만 밝아진다 ----
+    fogd = np.clip((fog - 0.3) * 1.6, 0, 1)
+    img += gold[None, None, :] * (shaft * fogd * 70)[..., None]
+    # ---- 비네트·결·어둡게 ----
+    nx, ny = (xx - W * 0.5) / (W * 0.5), (yy - H * 0.42) / (H * 0.5)
+    vig = np.clip(1 - 0.75 * (nx ** 2 + ny ** 2) ** 1.1, 0.05, 1)
+    img *= vig[..., None] * 0.85
+    img *= (0.9 + 0.2 * grain)[..., None]
+    dn = np.random.default_rng(63).random((H // 2, W // 2)).repeat(2, 0).repeat(2, 1)
+    img *= (0.93 + 0.14 * dn)[..., None]
+    cv.px = np.clip(img, 0, 255)
+    small = cv.image().resize((W // 2, H // 2), Image.BOX)
+    small = small.quantize(96, method=Image.MEDIANCUT, dither=Image.NONE).convert('RGB')
+    cv.px = np.asarray(small.resize((W, H), Image.NEAREST), dtype=np.float32).copy()
+    return cv
+
 class _Rgba:
     def __init__(self, img):
         self.img = img
@@ -1530,6 +1651,7 @@ SCENES = {
     'sprout': sprout,
     'molehill': molehill,
     'doto_memory': doto_memory,
+    'kongi_door': kongi_door,
     'title': title,
     'title_fog': title_fog,
 }
