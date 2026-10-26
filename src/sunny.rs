@@ -65,6 +65,9 @@ pub const HEART: R = (707, 756, 9, 8);
 pub const SPROUT: R = (660, 707, 10, 11);
 /// 돌로 두른 모닥불 자리.
 pub const FIRE_PIT: R = (596, 343, 23, 20);
+/// 잠긴 문(0096): 두 짝 나무 문(남북 문), 가로 널 울타리 문(동서 문, 벽을 옆에서 본 모양).
+pub const GATE_WOOD: R = (608, 80, 16, 16);
+pub const GATE_PLANKS: R = (640, 80, 16, 16);
 /// 불꽃 4칸(`Elements/VFX/Fire/spr_deco_fire_02_strip4.png`, 8×12 한 칸).
 pub const FIRE_FRAME: (f32, f32) = (8.0, 12.0);
 /// 파란 버섯 4칸(`Elements/Plants/spr_deco_mushroom_blue_01_strip4.png`, 16×16 한 칸).
