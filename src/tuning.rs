@@ -173,6 +173,9 @@ pub const EXIT_MIN_DIST: f32 = 80.0;
 /// 잠긴 문(물든 뿌리 + 보라 실, 0094)이 자라 막는 시간 / 풀려 걷히는 시간.
 pub const DOOR_CLOSE_TIME: f32 = 0.35;
 pub const DOOR_OPEN_TIME: f32 = 0.5;
+/// 야광버섯의 빛(0095): 어둠 지도에서 빼는 반지름(px)·세기(0..1).
+pub const MUSH_LIGHT_R: f32 = 34.0;
+pub const MUSH_LIGHT: f32 = 0.6;
 /// 뿌리 심장으로 늘릴 수 있는 최대 체력 상한(기본 PLAYER_HP 위로).
 pub const ROOT_HEART_MAX: i32 = 5;
 

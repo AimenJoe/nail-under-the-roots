@@ -65,6 +65,10 @@ pub struct Renderer {
     baking: Option<(u64, crate::terrain::Baker)>,
     /// 빛 더하기(0076): 바탕에 빛을 더한다. 못 만들면(셰이더 실패) 보통 섞기로 그린다.
     light: Option<Material>,
+    /// 어둠 지도(0095): 월드와 같은 크기. 어둠으로 채우고 빛 자리마다 어둠을 뺀 뒤 월드 위에 덮는다.
+    dark_rt: RenderTarget,
+    /// 어둠 빼기 재질(0095). 못 만들면 예전 방식(플레이어 둘레만 뚫린 막).
+    cut: Option<Material>,
 }
 
 /// 한 프레임에 지도를 굽는 시간(초). 굽는 동안 화면은 검정이라 프레임이 조금 길어져도 보이지 않는다.
@@ -90,7 +94,63 @@ impl Renderer {
             terrain: Vec::new(),
             baking: None,
             light: light_material(),
+            dark_rt: {
+                let d = render_target(VW + 1, VH + 1);
+                d.texture.set_filter(FilterMode::Nearest);
+                d
+            },
+            cut: cut_material(),
         }
+    }
+
+    /// 어둠 지도(0095): 어둠으로 채운 렌더 타깃에 빛 자리(플레이어·야광버섯·모닥불·반딧불·저장 지점·문·출구)마다
+    /// 어둠을 빼고, 월드 위에 덮는다. 예전엔 플레이어 둘레 하나만 뚫려 버섯 곁 바닥도 깜깜했다.
+    fn draw_light_map(&self, art: &Art, w: &World, alpha: f32, cam: Vec2) {
+        let (dark, radius) = w.biome.darkness();
+        if dark <= 0.0 {
+            return;
+        }
+        let dc = Camera2D {
+            target: self.cam.target,
+            zoom: self.cam.zoom,
+            offset: self.cam.offset,
+            rotation: self.cam.rotation,
+            render_target: Some(self.dark_rt.clone()),
+            viewport: None,
+        };
+        set_camera(&dc);
+        clear_background(Color::new(0.0, 0.0, 0.0, dark));
+        if let Some(m) = &self.cut {
+            gl_use_material(m);
+        }
+        let blob = |p: Vec2, r: f32, k: f32| {
+            draw_texture_ex(
+                &art.light,
+                p.x - r,
+                p.y - r,
+                Color::new(0.0, 0.0, 0.0, k.clamp(0.0, 1.0)),
+                DrawTextureParams {
+                    dest_size: Some(vec2(r * 2.0, r * 2.0)),
+                    ..Default::default()
+                },
+            );
+        };
+        for l in light_sources(w, alpha, cam, radius) {
+            blob(l.pos, l.radius, l.strength);
+        }
+        gl_use_default_material();
+        set_camera(&self.cam);
+        draw_texture_ex(
+            &self.dark_rt.texture,
+            self.view_origin.x,
+            self.view_origin.y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(vec2(RW, RH)),
+                flip_y: true,
+                ..Default::default()
+            },
+        );
     }
 
     /// 지도를 굽는 중이다: 앱은 월드 틱을 멈춘다(화면이 검정인 동안 장소 바꾸기가 끝나 버리지 않게, 0068).
@@ -164,11 +224,22 @@ impl Renderer {
             }
             draw_drill_trail(Some(art), &w.player, alpha);
             draw_telegraphs(w, alpha);
+            if self.cut.is_some() {
+                draw_mushrooms(art, w, cam);
+            }
+            draw_cast_shadows(w, alpha, cam);
             draw_sorted(art, w, alpha);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
             draw_ambient(w, cam, false);
-            draw_darkness(art, w, alpha, cam);
+            if self.cut.is_some() {
+                self.draw_light_map(art, w, alpha, cam);
+                for l in &w.loot {
+                    draw_loot(l, alpha, w.time, true);
+                }
+            } else {
+                draw_darkness(art, w, alpha, cam);
+            }
             draw_save_lights(w, cam, self.light.as_ref());
             draw_world_lights(w, cam, alpha, self.light.as_ref());
             if draw_super_dim(w, cam) {
@@ -1262,7 +1333,6 @@ fn floor_decor(w: &World, cam: Vec2) -> Vec<(f32, f32, Decor)> {
     out
 }
 
-/// 격자 방(필드·던전) 그림: 구운 지도(terrain.rs, 0062)의 보이는 부분 + 매 프레임 바뀌는 칸.
 /// 잠긴 문(0094): 물든 뿌리 두 줄기가 문을 막고 보라 실 두 가닥이 감는다(이야기의 "실", 0037).
 /// 잠그면 뿌리가 문틀에서 자라 나오고(`grow` 0→1) 실이 나중에 감긴다. 열면 거꾸로 걷히고 월드가 풀리는 실을 낸다.
 /// 무늬는 월드 좌표로 정해 두 칸짜리 문이 이어져 보인다. 남북 문은 세로 뿌리, 동서 문은 가로 뿌리.
@@ -1349,6 +1419,7 @@ fn draw_root_gate(g: &crate::map::Grid, cx: i32, cy: i32, grow: f32, time: f32, 
     }
 }
 
+/// 격자 방(필드·던전) 그림: 구운 지도(terrain.rs, 0062)의 보이는 부분 + 매 프레임 바뀌는 칸.
 /// 특별한 칸: 문(열림 = 바닥, 잠김 = 물든 뿌리 + 보라 실, 0094), 굴 입구, 출구, 저장 지점(빛나는 버섯 고리).
 fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D) {
     let Some(g) = &w.room.grid else { return };
@@ -3355,9 +3426,20 @@ fn draw_darkness(art: &Art, w: &World, alpha: f32, cam: Vec2) {
     draw_rectangle(l, y0 + s, r - l, (b - (y0 + s)).max(0.0), black);
     draw_rectangle(l, y0, (x0 - l).max(0.0), s, black);
     draw_rectangle(x0 + s, y0, (r - (x0 + s)).max(0.0), s, black);
+    draw_dark_extras(art, w, alpha, cam);
+}
+
+/// 어둠 위에 한 번 더 그리는 것: 반딧불과 빛나는 버섯(어둠에 묻히지 않게).
+fn draw_dark_extras(art: &Art, w: &World, alpha: f32, cam: Vec2) {
     for l in &w.loot {
         draw_loot(l, alpha, w.time, true);
     }
+    draw_mushrooms(art, w, cam);
+}
+
+/// 빛나는 버섯. 어둠 지도(0095)가 있으면 바닥 높이(캐릭터 밑)에 그리고 버섯 빛이 둘레를 밝힌다.
+/// 없으면 예전처럼 어둠 위에 한 번 더 그린다(그때는 캐릭터 위에 겹칠 수 있다).
+fn draw_mushrooms(art: &Art, w: &World, cam: Vec2) {
     for (x, y, d) in floor_decor(w, cam) {
         if d == Decor::Mushroom {
             let pulse = 0.65 + 0.25 * ((w.time * 2.0 + x * 0.1).sin());
@@ -4062,4 +4144,181 @@ fn draw_sector_lines(origin: Vec2, dir: Vec2, r: f32, color: Color) {
         prev = p;
     }
     draw_line(origin.x, origin.y, prev.x, prev.y, 1.0, color);
+}
+
+/// 빛 하나(0095): 자리·반지름·세기(0..1, 어둠을 얼마나 빼나).
+pub struct LightSrc {
+    pub pos: Vec2,
+    pub radius: f32,
+    pub strength: f32,
+}
+
+/// 지금 화면 둘레의 빛. 어둠 지도와 그림자(빛 반대쪽으로 늘어남)가 같이 쓴다.
+pub fn light_sources(w: &World, alpha: f32, cam: Vec2, player_radius: f32) -> Vec<LightSrc> {
+    let t = w.time;
+    let mut v = Vec::new();
+    // 플레이어(예전 어둠 막의 구멍과 같은 크기, 가운데는 거의 다 걷힌다).
+    v.push(LightSrc {
+        pos: lerp(w.player.prev_pos, w.player.pos, alpha),
+        radius: player_radius,
+        strength: 1.0,
+    });
+    for (x, y, d) in floor_decor(w, cam) {
+        if d == Decor::Mushroom {
+            let pulse = 0.85 + 0.15 * ((t * 2.0 + x * 0.1).sin());
+            v.push(LightSrc {
+                pos: vec2(x + 8.0, y + 10.0),
+                radius: t::MUSH_LIGHT_R,
+                strength: t::MUSH_LIGHT * pulse,
+            });
+        }
+    }
+    for p in &w.room.props {
+        if p.kind == PropKind::Campfire {
+            let flick = 0.9 + 0.1 * (t * 9.0).sin();
+            v.push(LightSrc {
+                pos: vec2(p.rect.center().x, p.rect.bottom() - 6.0),
+                radius: 80.0,
+                strength: 0.95 * flick,
+            });
+        }
+    }
+    for l in &w.loot {
+        if l.kind == loot::LootKind::Glowbug {
+            v.push(LightSrc {
+                pos: lerp(l.prev_pos, l.pos, alpha),
+                radius: 18.0,
+                strength: 0.55,
+            });
+        }
+    }
+    if let Some(g) = &w.room.grid {
+        let (x0, y0) = (
+            (cam.x / 16.0).floor() as i32 - 2,
+            (cam.y / 16.0).floor() as i32 - 2,
+        );
+        for cy in y0..y0 + 16 {
+            for cx in x0..x0 + 25 {
+                let c = vec2(cx as f32 * 16.0 + 8.0, cy as f32 * 16.0 + 8.0);
+                match g.get_i(cx, cy) {
+                    Cell::Save => v.push(LightSrc {
+                        pos: c,
+                        radius: 44.0,
+                        strength: 0.7,
+                    }),
+                    Cell::Exit => v.push(LightSrc {
+                        pos: c,
+                        radius: 34.0,
+                        strength: 0.65,
+                    }),
+                    Cell::Door if w.room.door_anim > 0.0 => v.push(LightSrc {
+                        pos: c,
+                        radius: 22.0,
+                        strength: 0.4 * w.room.door_anim,
+                    }),
+                    _ => {}
+                }
+            }
+        }
+    }
+    v
+}
+
+/// 어둠 빼기 재질(0095): 어둠 지도에서 그린 만큼 알파를 뺀다(결과 = 바탕 − 그림, 0 아래는 0).
+fn cut_material() -> Option<Material> {
+    const VERTEX: &str = r#"#version 100
+    attribute vec3 position;
+    attribute vec2 texcoord;
+    attribute vec4 color0;
+    varying lowp vec2 uv;
+    varying lowp vec4 color;
+    uniform mat4 Model;
+    uniform mat4 Projection;
+    void main() {
+        gl_Position = Projection * Model * vec4(position, 1);
+        color = color0 / 255.0;
+        uv = texcoord;
+    }"#;
+    const FRAGMENT: &str = r#"#version 100
+    varying lowp vec4 color;
+    varying lowp vec2 uv;
+    uniform sampler2D Texture;
+    void main() {
+        gl_FragColor = color * texture2D(Texture, uv);
+    }"#;
+    use macroquad::miniquad::{BlendFactor, BlendState, Equation};
+    load_material(
+        ShaderSource::Glsl {
+            vertex: VERTEX,
+            fragment: FRAGMENT,
+        },
+        MaterialParams {
+            pipeline_params: PipelineParams {
+                color_blend: Some(BlendState::new(
+                    Equation::ReverseSubtract,
+                    BlendFactor::One,
+                    BlendFactor::One,
+                )),
+                alpha_blend: Some(BlendState::new(
+                    Equation::ReverseSubtract,
+                    BlendFactor::One,
+                    BlendFactor::One,
+                )),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .ok()
+}
+
+/// 빛 반대쪽으로 늘어나는 그림자(0095). 야광버섯·모닥불·저장 지점 곁의 캐릭터는 빛에서 먼 쪽으로 그림자가 길어지고,
+/// 어두운 곳에서는 플레이어의 빛이 적에게 그림자를 드리운다. 바닥 위(정렬 그리기 전)에 그려 어둠 지도가 함께 덮는다.
+fn draw_cast_shadows(w: &World, alpha: f32, cam: Vec2) {
+    let (dark, radius) = w.biome.darkness();
+    let lights = light_sources(w, alpha, cam, radius);
+    // 밝은 들판에서는 플레이어 빛이 없다(어둠이 없으니 비추는 빛이 아니다).
+    let skip_player = if dark > 0.0 { 0 } else { 1 };
+    let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
+    let mut casters: Vec<(Vec2, f32, bool)> = vec![(pp + vec2(0.0, 6.0), 6.0, true)];
+    for e in &w.enemies {
+        if e.alive {
+            let q = lerp(e.prev_pos, e.pos, alpha);
+            casters.push((q + vec2(0.0, e.radius() * 0.8), e.radius(), false));
+        }
+    }
+    if let Some(n) = &w.npc {
+        let q = lerp(n.prev_pos, n.pos, alpha);
+        casters.push((q + vec2(0.0, 6.0), 6.0, false));
+    }
+    for (foot, size, is_player) in casters {
+        for (i, l) in lights.iter().enumerate() {
+            if i < skip_player || (is_player && i == 0) {
+                continue;
+            }
+            let d = foot - l.pos;
+            let dist = d.length();
+            let reach = l.radius * 1.15;
+            if dist < 3.0 || dist > reach {
+                continue;
+            }
+            let k = (1.0 - dist / reach) * l.strength;
+            if k < 0.05 {
+                continue;
+            }
+            let dir = d / dist;
+            let len = size * 0.8 + 16.0 * k;
+            // 3/4 시점: 바닥에 눕힌 그림자는 세로가 줄어든다.
+            let c = foot + vec2(dir.x, dir.y * 0.5) * (len * 0.5);
+            let ang = (dir.y * 0.5).atan2(dir.x).to_degrees();
+            draw_ellipse(
+                c.x.round(),
+                c.y.round(),
+                len * 0.5 + 2.0,
+                (size * 0.35).max(2.0),
+                ang,
+                Color::new(0.03, 0.01, 0.05, (0.55 * k).min(0.45)),
+            );
+        }
+    }
 }

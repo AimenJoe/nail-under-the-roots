@@ -108,16 +108,19 @@ impl Biome {
                 (0.42, &[Decor::Tuft]),
                 (0.45, &[Decor::Pebble]),
             ],
+            // 뿌리 지대에도 야광버섯을 드문드문(0095): 어둠 속 길잡이.
             Biome::Roots => &[
-                (0.06, &[Decor::FlowerWhite, Decor::FlowerPink]),
+                (0.04, &[Decor::Mushroom]),
+                (0.08, &[Decor::FlowerWhite, Decor::FlowerPink]),
                 (0.16, &[Decor::Tuft]),
                 (0.30, &[Decor::RootVine]),
                 (0.36, &[Decor::Pebble]),
                 (0.40, &[Decor::Moss]),
             ],
+            // 심층은 야광버섯을 더 많이(0095, 9% → 14%): 어둠이 짙어 바닥이 안 보였다.
             Biome::Deep => &[
-                (0.14, &[Decor::Moss]),
-                (0.23, &[Decor::Mushroom]),
+                (0.12, &[Decor::Moss]),
+                (0.26, &[Decor::Mushroom]),
                 (0.38, &[Decor::RootVine]),
                 (0.43, &[Decor::Pebble]),
             ],

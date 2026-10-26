@@ -16,6 +16,8 @@ pub struct Art {
     pub sunny: Option<Sunny>,
     /// 어둠 마스크(가운데 투명, 바깥 검정). 코드로 만든다.
     pub dark: Texture2D,
+    /// 빛 구멍(0095): 가운데 불투명 → 가장자리 투명. 어둠 지도에서 이만큼 어둠을 뺀다.
+    pub light: Texture2D,
     /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이. 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
@@ -215,6 +217,7 @@ impl Art {
             tiles_img,
             sunny: load_sunny().await,
             dark: dark_mask(),
+            light: light_blob(),
             critters,
             portraits,
             chief,
@@ -233,6 +236,25 @@ fn dark_mask() -> Texture2D {
             let dy = (y as f32 + 0.5) / n as f32 * 2.0 - 1.0;
             let d = (dx * dx + dy * dy).sqrt();
             let t = ((d - 0.35) / 0.65).clamp(0.0, 1.0);
+            let a = t * t * (3.0 - 2.0 * t);
+            img.set_pixel(x as u32, y as u32, Color::new(0.0, 0.0, 0.0, a));
+        }
+    }
+    let tex = Texture2D::from_image(&img);
+    tex.set_filter(FilterMode::Linear);
+    tex
+}
+
+/// 64×64 빛 구멍(0095). 가운데부터 부드럽게 옅어진다(가장자리 0). 어둠 지도에 뺄셈으로 찍는다.
+fn light_blob() -> Texture2D {
+    let n = 64u16;
+    let mut img = Image::gen_image_color(n, n, Color::new(0.0, 0.0, 0.0, 0.0));
+    for y in 0..n {
+        for x in 0..n {
+            let dx = (x as f32 + 0.5) / n as f32 * 2.0 - 1.0;
+            let dy = (y as f32 + 0.5) / n as f32 * 2.0 - 1.0;
+            let d = (dx * dx + dy * dy).sqrt().min(1.0);
+            let t = 1.0 - d;
             let a = t * t * (3.0 - 2.0 * t);
             img.set_pixel(x as u32, y as u32, Color::new(0.0, 0.0, 0.0, a));
         }
