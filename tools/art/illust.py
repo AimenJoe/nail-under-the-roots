@@ -1284,7 +1284,8 @@ def warped_blob(cv, pts, radii, seed, rough=6.0):
     for (x, y), r in zip(pts, radii):
         d = np.minimum(d, np.hypot(cv.xx - x, cv.yy - y) - r)
     n = fbm(cv.h, cv.w, seed, cells=(40, 18, 8)) - 0.5
-    return d + n * rough * 2.4 < 0
+    fine = fbm(cv.h, cv.w, seed + 7, cells=(5, 3, 2)) - 0.5       # 고운 부스러짐(매끈한 콩 모양이 동화 그림처럼 보였다)
+    return d + n * rough * 2.4 + fine * rough * 1.3 < 0
 
 
 def title():
@@ -1369,13 +1370,14 @@ def title():
     path = bezier((74, ground - 2), (60, 150), (84, 210), (112, 240), 30)
     radii = [11 + 3 * math.sin(i * 0.7) for i in range(len(path))]
     tunnel = warped_blob(cv, path, radii, 21, rough=4)
-    room_pts = [(60 + i * 10, 266 + 10 * math.sin(i * 0.5)) for i in range(15)]
-    room_r = [30 + 16 * math.sin(math.pi * i / 14) for i in range(15)]
-    room = warped_blob(cv, room_pts, room_r, 22, rough=7)
+    rr = random.Random(29)
+    room_pts = [(58 + i * 10 + rr.uniform(-3, 3), 266 + 10 * math.sin(i * 0.5) + rr.uniform(-5, 5)) for i in range(15)]
+    room_r = [26 + 18 * math.sin(math.pi * i / 14) + rr.uniform(-5, 6) for i in range(15)]
+    room = warped_blob(cv, room_pts, room_r, 22, rough=9)
     # 굴 입구의 위 가장자리: 땅 줄에서 잡음으로 들쭉날쭉(곧은 선으로 자르면 네모 뚜껑처럼 보였다).
     lip = ground - 1 + 5 * fbm(1, W, 27, cells=(10, 4, 2))[0]
     cav = (tunnel | room) & (yy >= lip[None, :])
-    inner = np.array([112, 86, 70.0]) * (0.7 + 0.6 * fbm(H, W, 23, cells=(16, 6)))[..., None]
+    inner = np.array([112, 86, 70.0]) * (0.55 + 0.8 * fbm(H, W, 23, cells=(16, 6, 3)))[..., None]
     alb[cav] = inner[cav]
     # 굴 벽 안쪽 가장자리: 부스러진 흙 알갱이(가장자리를 더 거칠게)
     rim = dilate(cav, 3) & ~cav & below
@@ -1391,8 +1393,16 @@ def title():
         droop = bezier((x0, ground - 6), (x0 + 2, ground - 10), (x0 + 4, ground - 1), (x0 + 3 + k % 3, ground + drop), 14)
         droops |= stroke(cv, droop, 1.6, 1)
     # 둥지·Naïl·병
-    nest = warped_blob(cv, [(84, 292), (130, 292)], [16, 14], 26, rough=4) & cav & (yy >= 286)
-    alb[nest] = (128, 100, 60)
+    # 둥지: 한 덩어리로 칠하면 오려 붙인 도형이 됐다 → 지푸라기 가닥을 겹겹이(밝기·길이·기울기가 제각각).
+    nrng = random.Random(31)
+    straw = [(96, 74, 46), (128, 100, 60), (150, 120, 72), (84, 64, 44), (170, 140, 86)]
+    for _ in range(140):
+        x = nrng.uniform(66, 150)
+        y = nrng.uniform(284, 300) + abs(x - 106) * 0.06
+        a = nrng.uniform(-0.5, 0.5) + (0.3 if x > 106 else -0.3) * nrng.random()
+        ln = nrng.uniform(6, 16)
+        m = stroke(cv, [(x, y), (x + math.cos(a) * ln, y + math.sin(a) * ln * 0.5)], 1.6, 1) & cav
+        alb[m] = nrng.choice(straw)
     mcv = Canvas(W, H)
     mcv.px[:] = alb
     mole(mcv, 104, 278, 22, facing=1, eyes='closed')
@@ -1427,10 +1437,10 @@ def title():
     L[above] = 1.0
     # 반딧불 병: 굴 안(입구 쪽은 약하게) + 벽 너머로 아주 조금
     # 병에서 멀어질수록 빨리 어두워진다 = 굴 방 안의 비네트(벽 가장자리는 어둠에 묻힌다).
-    jarL = falloff(150, 284, 130, 2.6)
+    jarL = falloff(150, 284, 130, 2.6) * (0.8 + 0.4 * fbm(H, W, 33, cells=(20, 8, 3)))
     inside = cav.astype(np.float32)
     soft_in = np.clip(np.where(cav, 1.0, 0.0) + dilate(cav, 6) * 0.3, 0, 1)
-    L += warm[None, None, :] * (jarL * (0.15 + 1.7 * soft_in))[..., None]
+    L += warm[None, None, :] * (jarL * (0.15 + 2.3 * soft_in))[..., None]
     # 굴길로 떨어지는 해 진 빛(입구에서 짧게, 금방 사라진다)
     # 입구 바로 밑은 입술 그림자(어둡다), 10~40px 아래에서 가장 밝고, 그 아래로 사라진다. 빛은 하늘 쪽(오른쪽 위)
     # 벽이 더 받는다 → 굴길 오른쪽 벽만 옅게 밝은 띠.
@@ -1454,13 +1464,6 @@ def title():
     img[tip_root] = img[tip_root] * 0.4 + np.array([120, 70, 170.0]) * 0.6
     # 늘어진 풀: 굴길 안 빛 앞 검은 실루엣(빛 뒤에 그린다)
     img[droops] = (10, 10, 14)
-    # 반딧불 병: 빛 계산 뒤에 그린다(빛에 묻히지 않게). 유리 테두리 + 뚜껑 + 빛 알맹이 둘.
-    jar = ellipse(cv, 150, 286, 7, 9)
-    img[dilate(jar) & ~jar] = (60, 46, 40)
-    img[jar] = img[jar] * 0.5 + np.array([200, 210, 150.0]) * 0.5
-    img[ellipse(cv, 150, 276, 5, 2)] = (70, 50, 40)
-    img[ellipse(cv, 148, 288, 2.5, 2.5)] = (255, 250, 210)
-    img[ellipse(cv, 153, 283, 1.5, 1.5)] = (255, 236, 170)
     # ---- 안개 산란: 빛이 있는 곳에서 안개가 밝아진다 ----
     fogd = np.clip((fog - 0.35) * 1.8, 0, 1) * np.clip((yy - ground + 30) / 120, 0, 1)
     scatter = (warm[None, None, :] * jarL[..., None] * 40 + violet[None, None, :] * vio[..., None] * 70)
@@ -1470,13 +1473,23 @@ def title():
     img = img * (1 - haze[..., None] * 0.5) + np.array([70, 52, 70.0]) * haze[..., None] * 0.5
     # ---- 비네트: 바깥과 메뉴 뒤 흙은 어둠으로 ----
     nx, ny = (xx - W * 0.5) / (W * 0.5), (yy - H * 0.48) / (H * 0.5)
-    vig = np.clip(1 - 0.55 * (nx ** 2 + ny ** 2) ** 1.2, 0.08, 1)
-    img *= vig[..., None]
-    img *= (0.92 + 0.16 * grain)[..., None]
+    vig = np.clip(1 - 0.7 * (nx ** 2 + ny ** 2) ** 1.1, 0.05, 1)
+    img *= vig[..., None] * 0.78                       # 사장: "좀 더 어둡게"(v2 → ×0.78)
+    img *= (0.9 + 0.2 * grain)[..., None]
+    # 반딧불 병: 유리 테두리를 그리면 동그라미 도형("0")으로 읽혔다 → 테두리 없이 빛 알맹이 + 둘레 번짐만.
+    # 어둡게 누른 뒤에 그려야 가장 밝은 점으로 남는다.
+    for r, c, a in ((9, (255, 200, 120), 0.35), (5, (255, 226, 160), 0.6)):
+        m = ellipse(cv, 150, 285, r, r * 1.1)
+        img[m] = img[m] * (1 - a) + np.array(c, np.float32) * a
+    img[ellipse(cv, 149, 286, 2.5, 2.5)] = (255, 250, 214)
+    img[ellipse(cv, 153, 282, 1.4, 1.4)] = (255, 238, 176)
+    # 색을 줄이기 전 게임 1px(2×2) 단위 잡음: 매끈한 빛 띠가 계단 경계(도형의 테두리)로 굳지 않게.
+    dn = np.random.default_rng(37).random((H // 2, W // 2)).repeat(2, 0).repeat(2, 1)
+    img *= (0.93 + 0.14 * dn)[..., None]
     cv.px = np.clip(img, 0, 255)
     # ---- 게임 픽셀로 줄여 색을 줄이고 2배로 ----
     small = cv.image().resize((W // 2, H // 2), Image.BOX)
-    small = small.quantize(64, method=Image.MEDIANCUT, dither=Image.NONE).convert('RGB')
+    small = small.quantize(96, method=Image.MEDIANCUT, dither=Image.NONE).convert('RGB')
     big = small.resize((W, H), Image.NEAREST)
     cv.px = np.asarray(big, dtype=np.float32).copy()
     return cv
