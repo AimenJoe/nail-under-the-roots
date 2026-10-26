@@ -63,6 +63,7 @@ Edit the last attached image, the portrait of [이름]. Add only [고칠 것], c
 
 참고 그림(팩 그림 없음, 0064):
 - **캐릭터는 확정한 시트**(`sheet_<이름>.png`)와 시트가 없는 모습의 초상화(`ref_mom`·`ref_momo_tainted`·`ref_bori_tainted`·`ref_doto_tainted`·`ref_kongi_tainted`)를 쓴다(0124). `python3 tools/art/ref_pack.py <폴더>`가 `tools/art/sources/ai/sheets/`와 초상화 원본에서 만든다: 시트의 글자 띠를 잘라 내고(첨부에 글자가 있으면 장면에도 글자가 들어가기 쉽다) ✦ 로고를 지운다. `overview.png`는 확인용 한 장.
+- **돌아오는 장면에 물든 모습 그림을 넣지 않는다**: `bori_freed`에 물든 보리를 둘째로 넣었더니 돌아온 보리의 털이 푸른 잿빛이 되고, 흉터가 빨간 X, 몸이 날씬해졌다(물든 모습의 색·생김새가 번졌다). 묶였던 모습은 글로만 쓰고, 틀리면 시트 → 고칠 그림 순서로 첨부해 "Redraw only <이름> to match the first attached image"로 고친다(0127). 물든 모습 초상화는 물든 모습이 주인공인 장면에만 쓴다.
 - 그림체를 더 맞추고 싶으면 Pro에서 초상화 하나를 그림체 참고로 더 넣는다(0-1 끝의 문장).
 - 구도는 `layout_*.png`(지금 임시 일러스트 2배)를 **마지막에** 넣는다. 다시 만들 때는 `assets/art/illust/*.png`에서 자른다.
 - 예전 `ref_*.png`(직접 그린 초상화를 4배로 키운 것)는 시트를 그릴 때만 썼다.
@@ -112,15 +113,15 @@ Scene: Inside a snug underground burrow chamber with a nest of dry grass. A larg
 ```
 
 ### `bori_freed` — 16:9 (640×360)
-첨부: `sheet_bori.png`, `ref_bori_tainted.png`, `layout_bori_freed.png` (둘째는 묶였던 모습을 알려 주는 용도)
+첨부: `sheet_bori.png`, `layout_bori_freed.png`
 ```
-Scene: An open clearing at dusk. The old field-mouse elder Bori sits with his eyes closed, catching his breath. Violet threads are loosening from his body and drifting upward, breaking into small sparkles as they go; none of them cover his face. His scar and big round ears are clearly visible. The feeling is relief. Use the first attached image for his freed look and the second only to understand what he looked like while bound. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
+Scene: An open clearing at dusk. The old field-mouse elder Bori sits with his eyes closed, catching his breath. Violet threads are loosening from his body and drifting upward, breaking into small sparkles as they go; none of them cover his face. His scar and big round ears are clearly visible. The feeling is relief. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `momo_bloom` — 16:9 (640×360)
-첨부: `sheet_momo.png`, `ref_momo_tainted.png`, `layout_momo_bloom.png`
+첨부: `sheet_momo.png`, `layout_momo_bloom.png`
 ```
-Scene: A close portrait of Momo the rabbit from the chest up, against a soft warm sky. The withered flower at the base of her ear is bursting into full pink bloom. The last violet threads are slipping off her and falling away below. Her eyes have just turned from glowing green back to her own glossy dark eyes, a little teary. She looks shy and relieved. Use the first attached image for her freed look and the second only to understand what she looked like while bound. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
+Scene: A close portrait of Momo the rabbit from the chest up, against a soft warm sky. The withered flower at the base of her ear is bursting into full pink bloom. The last violet threads are slipping off her and falling away below. Her eyes have just turned from glowing green back to her own glossy dark eyes, a little teary. She looks shy and relieved. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `halmae_deep` — 약 2:1 (704×360, 오른쪽으로 조금 흐른다. 비율을 골라야 하면 21:9)
@@ -160,9 +161,9 @@ Scene (a wide image that the game slowly pans from left to right): The deepest p
 ```
 
 ### `kongi_door` — 16:9 (640×360)
-첨부: `sheet_kongi.png`, `ref_kongi_tainted.png`, `layout_kongi_door.png` (둘째는 묶였던 모습을 알려 주는 용도)
+첨부: `sheet_kongi.png`, `layout_kongi_door.png`
 ```
-Scene: The entrance to the deepest place: a huge stone door in the darkness. The gap in the middle has just begun to open, and pale golden light leaks out; the light beam lights a haze of dust and spills across the floor. The brown roots that bound the door now hang slack and loose, with violet threads sliding off them. In front of the door, Kongi the armadillo uncurls from a ball and lifts his head toward the gap; he is a silhouette against the light, with only the rim of his shell lit. Letting go, relief. Use the first attached image for his look and the second only to understand what he looked like while bound. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
+Scene: The entrance to the deepest place: a huge stone door in the darkness. The gap in the middle has just begun to open, and pale golden light leaks out; the light beam lights a haze of dust and spills across the floor. The brown roots that bound the door now hang slack and loose, with violet threads sliding off them. In front of the door, Kongi the armadillo uncurls from a ball and lifts his head toward the gap; he is a silhouette against the light, with only the rim of his shell lit. Letting go, relief. Use the last attached image only as a rough guide for where things are placed and for the frame shape; redraw everything with much more detail in the style above, keeping the same aspect ratio as that image.
 ```
 
 ### `title` (타이틀 바탕) — 16:9 (640×360)
