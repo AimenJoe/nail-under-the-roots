@@ -29,9 +29,11 @@ CHARACTERS = {
     # 모모는 귀가 길어 높이로 맞추면 얼굴이 작아진다. 1보다 크게 잡아 귀 끝을 칸 맨 위에 두고 가슴을 칸 아래로 내보낸다
     # (처음엔 귀 끝을 잘랐는데 거슬렸다, 사장). 1.22에서 얼굴이 Naïl·포포와 비슷하다.
     'momo': (12, ('normal', 'happy', 'worried'), 1.22, 16),
+    # 물든 모모: 돌아온 모모 보통 표정을 고쳐 그려 틀이 1px까지 같다 → 같은 틀. 보라 실은 눈 팔레트(보랏빛) 칸을, 초록 눈은 채도 칸을 쓴다.
+    'momo_tainted': (7, ('normal', 'pained'), 1.22, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
-CHEST_AT_BOTTOM = {'momo'}
+CHEST_AT_BOTTOM = {'momo', 'momo_tainted'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
 FIT_CUT = 0.02
 # 틀이 1보다 클 때 귀 끝 위에 남길 여백 몫.
@@ -114,7 +116,7 @@ FIXES = {
     'nail_determined': lambda img: _eyes_to_lavender(
         img, [((226, 250, 284, 288), 272), ((400, 244, 430, 266), 258)]),
 }
-for _face in ('normal', 'happy', 'worried'):
+for _face in ('normal', 'happy', 'worried', 'tainted_normal', 'tainted_pained'):
     FIXES[f'momo_{_face}'] = lambda img: _plum_lines(img, MOMO_EYES)
 
 
