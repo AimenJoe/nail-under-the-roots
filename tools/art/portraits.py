@@ -2,7 +2,7 @@
 
 실행: python3 tools/art/portraits.py [출력 경로]  (기본 assets/art/portraits.png)
 칸 88×88(한 줄 12칸, 칸 번호는 왼쪽 위부터), 게임 픽셀의 2배 밀도(대화창의 44×44 칸에 찍는다 → 화면 배율 4면 원본 1px = 화면 2px).
-  칸 0~3: Naïl 보통·기쁨·걱정·결의
+  칸 0~3: Naïl 보통·기쁨·걱정·결의 — 나노바나나 원본(tools/art/sources/ai/nail_*.png)을 ai_portraits.py가 칸으로(0108)
   칸 4  : 변해 버린 이웃(아직 정체를 모름: 그림자 + 빛나는 눈 + 뿌리)
   칸 5~6: 라쿤 포포(튜토리얼 안내) 보통·기쁨
   칸 7~8: 모모(굴토끼, 히로인) 물든 모습 — 차가움·괴로움(docs/decisions/0029)
@@ -11,7 +11,7 @@
   칸 12~14: 돌아온 모모 보통·기쁨·걱정 — 따뜻한 회갈색, 검은 눈, 핀 꽃, 뿌리 없음(docs/decisions/0049)
   칸 15~16: 누룩 할매 보통·기쁨 — 흰 실 덩어리 몸, 머리에 버섯 갓 셋, 감은 눈
   칸 17  : 엄마 두더지 — Naïl보다 크고 털이 짙다, 다정하게 감은 눈
-  칸 18~29: Naïl 털빛 1~3(잿빛·밤빛·모래빛) × 표정 4(저널 보상, docs/decisions/0048) — 털 경사만 바꾼다
+  칸 18~29: Naïl 털빛 1~3(잿빛·밤빛·모래빛) × 표정 4(저널 보상, docs/decisions/0048) — 털 경사만 바꾼다(나노바나나 칸도 같은 경사로)
   칸 30  : 도토(물든 청설모, 둘째 길 보스) — 도토리 갓 모자, 호박색 빛 눈, 꼬리를 감은 뿌리(docs/decisions/0052)
   칸 31~32: 돌아온 도토 보통·기쁨 — 붉은 밤색 털, 검은 눈, 모자는 그대로
   칸 33~34: 땅강아지 수수 보통·기쁨 — 벨벳 투구 같은 가슴, 이마에 올린 보안경, 큰 삽발(docs/decisions/0053)
@@ -1632,6 +1632,12 @@ def sheet():
     out = Image.new('RGBA', (W * cols, H * rows), (0, 0, 0, 0))
     for i, cv in enumerate(frames):
         out.paste(to_image(cv), ((i % cols) * W, (i // cols) * H))
+    # 나노바나나 원본이 있는 캐릭터는 그 칸을 바꿔 끼운다(ai_portraits.py, docs/decisions/0108).
+    import ai_portraits
+    for i, img in ai_portraits.cells(FUR_VARIANTS).items():
+        box = ((i % cols) * W, (i // cols) * H)
+        out.paste(Image.new('RGBA', (W, H), (0, 0, 0, 0)), box)
+        out.paste(img, box)
     return out
 
 
