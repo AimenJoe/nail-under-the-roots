@@ -15,6 +15,7 @@
 """
 import math
 import os
+import random
 
 from PIL import Image, ImageDraw
 
@@ -69,17 +70,31 @@ def art():
     for (x, y) in [(16, 20), (48, 20), (19, 14), (45, 14), (32, 3)]:
         d.rectangle((x - 1, y - 1, x, y), fill=S)
     R = (12, 7, 14)
-    roots = [
-        [(32, 38), (32, 44), (31, 50), (32, 55), (31, 59)],
-        [(30, 38), (25, 42), (19, 45), (13, 49), (9, 53)],
-        [(34, 38), (39, 42), (45, 45), (51, 49), (55, 53)],
-        [(31, 40), (27, 47), (23, 52), (20, 57)],
-        [(33, 40), (37, 47), (41, 52), (44, 57)],
-    ]
-    widths = [3, 2, 2, 1]
-    for pts in roots:
-        for j in range(len(pts) - 1):
-            d.line([pts[j], pts[j + 1]], fill=R, width=widths[min(j, 3)])
+    # 뿌리: 굵은 뿌리 다섯이 조금씩 휘며 가늘어지고, 도중에 실뿌리가 갈라진다(정해진 씨앗 = 늘 같은 그림).
+    # 처음엔 곧은 선 다섯이라 너무 단순했다(사장: "진짜 뿌리처럼 실뿌리들도").
+    rng = random.Random(23)
+
+    def grow(x, y, ang, length, width, depth, pull=0.035):
+        steps = int(length / 0.7)
+        for i in range(steps):
+            t = i / steps
+            w = width * (1 - t) + 0.6 * t
+            ang += rng.uniform(-0.18, 0.18) + (math.pi / 2 - ang) * pull   # 흔들리며 아래로 끌린다(바깥 뿌리는 약하게)
+            x += math.cos(ang) * 0.7
+            y += math.sin(ang) * 0.7
+            if not (1 <= x < G - 1 and GROUND + 1 < y < G - 1):
+                return
+            # 붓: 굵기 1·2·3점(둥근 점을 겹쳐 찍으면 밑동이 덩어리로 뭉쳤다)
+            n = 3 if w >= 2.4 else 2 if w >= 1.4 else 1
+            cx, cy = int(x), int(y)
+            d.rectangle((cx - (n - 1) // 2, cy - (n - 1) // 2, cx + n // 2, cy + n // 2), fill=R)
+            if depth and i > 3 and rng.random() < 0.14:
+                side = rng.choice((-1, 1)) * rng.uniform(0.55, 1.1)
+                grow(x, y, ang + side, length * (1 - t) * rng.uniform(0.35, 0.6), max(0.6, w * 0.5), depth - 1, pull)
+
+    for deg, length, width, pull in ((162, 30, 2.4, 0.012), (132, 28, 2.6, 0.025), (100, 25, 3.0, 0.035),
+                                     (80, 25, 3.0, 0.035), (48, 28, 2.6, 0.025), (18, 30, 2.4, 0.012)):
+        grow(32 + math.cos(math.radians(deg)) * 2, GROUND + 1.5, math.radians(deg), length, width, 3, pull)
     # 보라 실: 뿌리 다발을 묶는 고리 둘. 앞쪽 반(아래 호)은 뿌리 위로 지나가고, 뒤쪽 반(위 호)은 뿌리에 가려진다.
     core, dim = (176, 124, 228), (104, 70, 148)
     for (cx, cy, rx, ry, tilt, ph) in ((32, 44, 9.5, 2.6, -0.10, 0.4), (32, 51, 15.5, 3.2, 0.08, 2.1)):
