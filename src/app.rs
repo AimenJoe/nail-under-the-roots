@@ -53,7 +53,9 @@ fn build_label() -> String {
 
 /// 상태 탭 글 한 줄 높이 = 위아래로 한 번 내리는 양.
 const STATUS_LINE: f32 = 12.0;
-const ALBUM_COLS: usize = 6;
+const ALBUM_COLS: usize = 5;
+/// 앨범에 한 번에 보이는 줄. 그림이 더 많으면 굴린다(0085).
+const ALBUM_ROWS: usize = 2;
 const PAUSE_TABS: [Tr; 6] = [
     |s| s.tab_menu,
     |s| s.tab_status,
@@ -361,6 +363,8 @@ enum Hit {
     Skip,
     /// 앨범 칸.
     AlbumItem(usize),
+    /// 앨범 ▲▼(누르면 한 줄 올리거나 내린다).
+    AlbumRow(bool),
     /// 실뜨기: 단계 내리기·올리기·시작.
     KnotLeft,
     KnotRight,
@@ -468,6 +472,8 @@ pub struct App {
     /// 앨범: 고른 칸, 크게 보는 중이면 흐른 시간.
     album_cursor: usize,
     album_view: Option<f32>,
+    /// 앨범에서 보이는 첫 줄(그림이 두 줄을 넘으면 굴린다, 0085).
+    album_top: usize,
 }
 
 impl App {
@@ -554,6 +560,7 @@ impl App {
             erase_armed: false,
             album_cursor: 0,
             album_view: None,
+            album_top: 0,
             after_cutscene: AfterCut::Game,
             decor_cursor: 0,
             tree_cursor: (0, 0),
@@ -1104,6 +1111,7 @@ impl App {
                     }
                     Some(TitleItem::Album) => {
                         self.album_cursor = 0;
+                        self.album_top = 0;
                         self.album_view = None;
                         self.scene = Scene::Album;
                     }
@@ -1937,8 +1945,22 @@ impl App {
         if a.right {
             self.album_cursor = (c + 1) % n;
         }
-        if a.up || a.down {
-            self.album_cursor = (c + ALBUM_COLS) % n;
+        // 위아래 = 한 줄. 끝에서 넘어가면 반대쪽 끝 줄의 같은 칸(없으면 그 줄 마지막 칸).
+        let rows = n.div_ceil(ALBUM_COLS);
+        let step_row = |c: usize, down: bool| {
+            let (row, col) = (c / ALBUM_COLS, c % ALBUM_COLS);
+            let row = if down {
+                (row + 1) % rows
+            } else {
+                (row + rows - 1) % rows
+            };
+            (row * ALBUM_COLS + col).min(n - 1)
+        };
+        if a.up || matches!(tap_hit, Some(Hit::AlbumRow(false))) {
+            self.album_cursor = step_row(c, false);
+        }
+        if a.down || matches!(tap_hit, Some(Hit::AlbumRow(true))) {
+            self.album_cursor = step_row(c, true);
         }
         let chosen = if a.confirm {
             Some(self.album_cursor)
@@ -1970,20 +1992,34 @@ impl App {
         }
         let panel = Rect::new(16.0, 8.0, 288.0, 150.0);
         ui.panel(panel, Some(s.title_album));
-        // 6×2칸(그림 11장, 0085: 콩이의 문을 더해 5칸 두 줄을 넘었다). 칸은 16:9.
-        let (cw, ch, gap) = (44.0, 25.0, 4.0);
+        // 5칸 × 보이는 두 줄(0085). 그림이 늘면 고른 칸이 보이게 줄을 굴린다. 칸은 16:9.
+        let (cw, ch, gap) = (52.0, 30.0, 5.0);
         let x0 = panel.x + (panel.w - ALBUM_COLS as f32 * cw - (ALBUM_COLS - 1) as f32 * gap) / 2.0;
         let y0 = panel.y + 38.0;
-        let mut seen = 0;
+        let rows = Illust::ALL.len().div_ceil(ALBUM_COLS);
+        let row = self.album_cursor / ALBUM_COLS;
+        if row < self.album_top {
+            self.album_top = row;
+        } else if row >= self.album_top + ALBUM_ROWS {
+            self.album_top = row + 1 - ALBUM_ROWS;
+        }
+        self.album_top = self.album_top.min(rows.saturating_sub(ALBUM_ROWS));
+        let seen = Illust::ALL
+            .iter()
+            .filter(|il| self.album_seen(**il))
+            .count();
         for (i, il) in Illust::ALL.iter().enumerate() {
+            let r_row = i / ALBUM_COLS;
+            if r_row < self.album_top || r_row >= self.album_top + ALBUM_ROWS {
+                continue;
+            }
             let r = Rect::new(
                 x0 + (i % ALBUM_COLS) as f32 * (cw + gap),
-                y0 + (i / ALBUM_COLS) as f32 * (ch + gap + 10.0),
+                y0 + (r_row - self.album_top) as f32 * (ch + gap + 10.0),
                 cw,
                 ch,
             );
             if self.album_seen(*il) {
-                seen += 1;
                 self.renderer.draw_illust_thumb(ui, *il, r);
             } else {
                 ui.rect(r, ui::PANEL_LIGHT);
@@ -1998,6 +2034,20 @@ impl App {
                 );
             }
             self.hits.push((r, Hit::AlbumItem(i)));
+        }
+        // 위·아래에 더 있으면 ▲▼(누르면 한 줄 굴린다). 칸이 패널 폭을 거의 다 써서 가운데 위·아래에 둔다.
+        if self.album_top > 0 {
+            ui.text_center("▲", 160.0, y0 - 12.0, FONT_PX, ui::ACCENT);
+            self.hits.push((
+                Rect::new(146.0, y0 - 14.0, 28.0, 13.0),
+                Hit::AlbumRow(false),
+            ));
+        }
+        if self.album_top + ALBUM_ROWS < rows {
+            let yb = y0 + ALBUM_ROWS as f32 * (ch + gap + 10.0) - 8.0;
+            ui.text_center("▼", 160.0, yb, FONT_PX, ui::ACCENT);
+            self.hits
+                .push((Rect::new(146.0, yb - 2.0, 28.0, 13.0), Hit::AlbumRow(true)));
         }
         let count = fill(s.album_count, &[&seen, &Illust::ALL.len()]);
         ui.text(&count, panel.x + 8.0, panel.y + 21.0, FONT_PX, ui::TEXT_DIM);
