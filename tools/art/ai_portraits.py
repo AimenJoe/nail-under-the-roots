@@ -9,7 +9,7 @@ PNG를 손으로 고치지 않고, 원본에 할 일을 모두 여기에 둔다(
   5. Naïl 털빛 1~3: 털 색만 portraits.FUR_VARIANTS 경사로 옮긴다(목도리·주둥이·앞발·발톱·눈은 그대로).
   6. 틀 맞추기(FIT): 캐릭터마다 그림 속 여백이 달라 칸에서 크기가 달라 보인다(포포는 높이 71%, Naïl은 94%).
      표정들을 합친 캐릭터 영역으로 정사각형을 잘라, 높이가 칸의 FIT 비율이 되고 가슴 아래는 칸 밖으로 조금 나가게 한다.
-     FIT가 1보다 크면 위가 칸 밖으로 나간다(모모의 긴 귀).
+     FIT가 1보다 크면 위(귀 끝)를 칸 맨 위에 맞추고 가슴 아래를 칸 밖으로 더 내보낸다(모모의 긴 귀).
 """
 import colorsys
 import os
@@ -26,13 +26,16 @@ W = H = 88
 CHARACTERS = {
     'nail': (0, ('normal', 'happy', 'worried', 'determined'), None, 0),
     'popo': (5, ('normal', 'happy'), 0.92, 16),
-    # 모모는 귀가 길어 높이로 맞추면 얼굴이 작아진다. 1보다 크게 잡아 곧은 귀 끝은 칸 위로 내보낸다(접힌 귀 끝·꽃은 남는다, 1.15면 접힌 끝이 잘림).
-    'momo': (12, ('normal', 'happy', 'worried'), 1.08, 16),
+    # 모모는 귀가 길어 높이로 맞추면 얼굴이 작아진다. 1보다 크게 잡아 귀 끝을 칸 맨 위에 두고 가슴을 칸 아래로 내보낸다
+    # (처음엔 귀 끝을 잘랐는데 거슬렸다, 사장). 1.22에서 얼굴이 Naïl·포포와 비슷하다.
+    'momo': (12, ('normal', 'happy', 'worried'), 1.22, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
 CHEST_AT_BOTTOM = {'momo'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
 FIT_CUT = 0.02
+# 틀이 1보다 클 때 귀 끝 위에 남길 여백 몫.
+FIT_TOP = 0.01
 # 한 캐릭터 표정들을 맞출 팔레트: 눈(보랏빛) EYE_COLORS + 채도 높은 색(캐릭터 표의 vivid) + 나머지 REST_COLORS.
 # 32·48색 한 덩어리면 Naïl 눈의 보랏빛과 목도리 주황이 털 갈색에 묻혔다(눈은 점이 적어 팔레트를 나눌 때 사라진다).
 EYE_COLORS = 8
@@ -315,8 +318,13 @@ def _fit(images, masks, frac):
     xs = [x for m in masks for x in range(w) if any(m[y][x] for y in range(0, h, 4))]
     top, bottom, left, right = min(ys), max(ys) + 1, min(xs), max(xs) + 1
     side = int((bottom - top) / frac)
-    y1 = bottom - int(side * FIT_CUT)
-    y0 = y1 - side
+    if frac > 1:
+        # 키보다 칸이 작으면 위(귀 끝)를 칸 맨 위에 맞추고 남는 것은 가슴 아래로 내보낸다(귀가 잘리면 거슬린다, 사장).
+        y0 = top - int(side * FIT_TOP)
+        y1 = y0 + side
+    else:
+        y1 = bottom - int(side * FIT_CUT)
+        y0 = y1 - side
     x0 = (left + right) // 2 - side // 2
     out_i, out_m = [], []
     for img, m in zip(images, masks):
