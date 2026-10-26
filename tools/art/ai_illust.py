@@ -6,6 +6,7 @@ PNG를 손으로 고치지 않고, 원본에 할 일을 모두 여기에 둔다(
   2. 팔레트로 줄인다(디더 없이): 채도 높은 색(보라 실·빛나는 눈)에 VIVID_COLORS칸쯤을 색상별 묶음으로 따로 떼고 나머지 REST_COLORS칸.
      한 덩어리로 줄이면 보라 실이 갈색에 묶여 칙칙한 자줏빛이 됐고, 점이 적은 빨간 눈은 묶음 없이는 사라졌다.
      작은 캐릭터는 FOCUS에 자리를 적어 그 색에 FOCUS_COLORS칸을 따로 준다(momo_deep의 모모, 0135).
+     FOCUS 자리의 칸은 어두운 선이 DARK_SHARE 넘으면 그 색(윤곽·털 결을 지킨다, title의 Naïl, 0137).
   3. 게임 칸(그림 크기의 절반, 일러스트는 게임 점의 2배 밀도)마다 그 자리에서 가장 흔한 색을 고른다(평균이면 덩어리 경계가 흐려진다).
      다만 칸의 VIVID_SHARE(15%) 넘게 채도 높은 색이면 그 색을 고른다: 작은 빨간 눈(한두 칸)이 흙색에 밀려 사라졌다.
   4. 2배로 키운다(다른 일러스트와 같은 2×2 점).
@@ -25,6 +26,8 @@ VIVID_COLORS = 16
 REST_COLORS = 48
 VIVID_SHARE = 0.15
 FOCUS_COLORS = 12
+DARK_SHARE = 0.25
+DARK_RATIO = 0.7
 # 장면 → 게임 그림 크기(src/illust.rs가 기대하는 크기, docs/art/nano-banana-prompts.md 4의 괄호).
 SIZE = {
     'great_tree': (640, 560), 'mother_burrow': (640, 360), 'bori_freed': (640, 360), 'momo_bloom': (640, 360),
@@ -41,6 +44,7 @@ SPARKLES = {
 FOCUS = {
     'momo_deep': [(745, 225, 835, 340)],
     'kongi_door': [(265, 255, 450, 500)],   # 분홍 몸이 베이지 회색이 됐다
+    'title': [(80, 380, 250, 520), (255, 425, 345, 515)],   # 잠든 Naïl(갈색 털이 회색·분홍 덩어리가 됐다)·반딧불 병
 }
 # 세로로 남을 때 자를 높이(0 위·1 아래). 없으면 가운데.
 CROP_Y = {}
@@ -75,19 +79,18 @@ def _vivid_palette(points, n, bins=12, min_points=30):
     return out
 
 
-def _crop_to(img, aspect, y_at=0.5):
-    """게임 그림 비율로 자른다(나노바나나는 고를 수 있는 비율이 정해져 있다: 2:1 장면은 21:9로 받는다).
+def _crop_box(w, h, aspect, y_at=0.5):
+    """게임 그림 비율로 자를 자리(나노바나나는 고를 수 있는 비율이 정해져 있다: 2:1 장면은 21:9로 받는다).
     2% 안쪽 차이(16:9 원본 1024×572와 640×360)는 자르지 않는다. 가로로 남으면 가운데, 세로로 남으면 y_at(0 위·1 아래)에서."""
-    w, h = img.size
     if abs(w / h - aspect) / aspect <= 0.02:
-        return img
+        return (0, 0, w, h)
     if w / h > aspect:
         nw = round(h * aspect)
         x0 = (w - nw) // 2
-        return img.crop((x0, 0, x0 + nw, h))
+        return (x0, 0, x0 + nw, h)
     nh = round(w / aspect)
     y0 = round((h - nh) * y_at)
-    return img.crop((0, y0, w, y0 + nh))
+    return (0, y0, w, y0 + nh)
 
 
 def scene(name, size=None):
@@ -100,8 +103,10 @@ def scene(name, size=None):
     for star in SPARKLES.get(name, ()):
         ref_pack.erase_star_at(img, *star)
     # 자리 안의 어두운 바탕(밝기 합 150 아래)은 빼고 캐릭터 색만: 넣으면 칸 대부분이 바탕 검정에 갔다.
-    focus = [p for box in FOCUS.get(name, ()) for p in img.crop(box).getdata() if not _vivid(p) and sum(p) > 150]
-    img = _crop_to(img, size[0] / size[1], CROP_Y.get(name, 0.5))
+    # 채도 높은 점도 넣는다: 따뜻한 굴 방 안에서는 털·목도리가 다 채도 높은 색이라 빼면 Naïl이 회색·분홍이 됐다(title).
+    focus = [p for box in FOCUS.get(name, ()) for p in img.crop(box).getdata() if sum(p) > 150]
+    crop = _crop_box(*img.size, size[0] / size[1], CROP_Y.get(name, 0.5))
+    img = img.crop(crop)
     w, h = img.size
     # 팔레트: 나머지 색은 점을 고르게 뽑아(전부 쓰면 느리다), 채도 높은 색은 원본 점을 전부 쓴다.
     # 4칸마다 뽑았더니 빨간 눈(눈 하나 3×2px)이 빠져 팔레트에 빨강이 없었다.
@@ -115,13 +120,27 @@ def scene(name, size=None):
     idx = np.asarray(img.quantize(palette=pal, dither=Image.Dither.NONE))
     is_vivid = np.array([_vivid(c) for c in entries] + [False] * (256 - len(entries)))
     k = len(entries)
+    lum = np.array([0.3 * r + 0.59 * g + 0.11 * b for r, g, b in entries])
     gw, gh = size[0] // 2, size[1] // 2
+    in_focus = np.zeros((gh, gw), bool)
+    for x0, y0, x1, y1 in FOCUS.get(name, ()):
+        cx0, cy0 = (x0 - crop[0]) * gw // w, (y0 - crop[1]) * gh // h
+        cx1, cy1 = -(-(x1 - crop[0]) * gw // w), -(-(y1 - crop[1]) * gh // h)
+        in_focus[max(cy0, 0):max(cy1, 0), max(cx0, 0):max(cx1, 0)] = True
     out = np.zeros((gh, gw), np.int32)
     for j in range(gh):
         y0, y1 = j * h // gh, (j + 1) * h // gh
         for i in range(gw):
             x0, x1 = i * w // gw, (i + 1) * w // gw
             counts = np.bincount(idx[y0:y1, x0:x1].ravel(), minlength=k)[:k]
+            if in_focus[j, i]:
+                # 캐릭터 자리: 칸의 DARK_SHARE 넘게 어두운 선(칸 가운데 밝기의 DARK_RATIO 아래)이면 그 색.
+                # 3px쯤인 윤곽·털 결이 칸(원본 3px)에서 가장 흔한 색에 밀려, 굴 방과 같은 황갈색 Naïl이 바탕에 녹았다(title).
+                order = np.repeat(lum[:k], counts)
+                dark = counts * (lum[:k] < DARK_RATIO * np.median(order))
+                if dark.sum() > DARK_SHARE * counts.sum():
+                    out[j, i] = dark.argmax()
+                    continue
             vc = counts * is_vivid[:k]
             if vc.sum() > VIVID_SHARE * counts.sum():
                 out[j, i] = vc.argmax()
