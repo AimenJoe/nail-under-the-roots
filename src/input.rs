@@ -413,6 +413,8 @@ pub struct Actions {
     pub aim: Vec2,
     pub attack: bool,
     pub dodge: bool,
+    /// 굴파기 버튼을 누르고 있다(눌림 에지가 아니라 지금 상태). 누르고 있는 동안 땅속에 더 머문다(0101).
+    pub dodge_held: bool,
     /// 필살기(SP가 차면). L / B(○)·L2 / 터치 SP.
     pub special: bool,
     /// 퀵 아이템 먹기. F / Y(△) / 터치 ITEM.
@@ -509,6 +511,8 @@ struct TouchState {
     /// (`TouchPhase::Started`에 기대면 안 된다: 실제 손가락은 touchstart 직후 touchmove가 같은 프레임에 들어와
     /// macroquad의 터치 맵에서 Started가 Moved로 덮인다.)
     known: Vec<u64>,
+    /// 굴파기 버튼 위에서 시작해 아직 떼지 않은 손가락(누르고 있기, 0101).
+    dig: Option<u64>,
 }
 
 #[derive(Clone, Copy)]
@@ -673,6 +677,7 @@ impl Input {
             now.move_dir = touch.move_dir;
         }
         now.aim = pad.aim;
+        now.dodge_held = kb.dodge_held || pad.dodge_held || touch.dodge_held;
 
         // 메뉴 탐색 에지(반복 포함)는 이동 방향에서 만든다. 키·D패드의 눌림 에지(아래 read_*)와
         // 같은 프레임에 겹치면 |=라 한 칸이다. 스틱에는 눌림 에지가 없으므로 첫 칸도 여기서 낸다.
@@ -691,6 +696,7 @@ impl Input {
         let mut a = self.pending;
         a.move_dir = self.held.move_dir;
         a.aim = self.held.aim;
+        a.dodge_held = self.held.dodge_held;
         self.pending = Actions::default();
         a
     }
@@ -755,7 +761,12 @@ impl Input {
                             a.attack = true;
                             a.confirm = true;
                         }
-                        "DIG" => a.dodge = true,
+                        "DIG" => {
+                            a.dodge = true;
+                            if !ended {
+                                self.touch.dig = Some(t.id);
+                            }
+                        }
                         "R" => a.restart = true,
                         "SP" => a.special = true,
                         "ITEM" => a.use_item = true,
@@ -777,6 +788,9 @@ impl Input {
             }
             if ended {
                 self.touch.known.retain(|id| *id != t.id);
+                if self.touch.dig == Some(t.id) {
+                    self.touch.dig = None;
+                }
                 if self.touch.stick.map(|s| s.id) == Some(t.id) {
                     self.touch.stick = None;
                 }
@@ -791,6 +805,12 @@ impl Input {
                 self.touch.stick = None;
             }
         }
+        if let Some(id) = self.touch.dig {
+            if !touches.iter().any(|t| t.id == id) {
+                self.touch.dig = None;
+            }
+        }
+        a.dodge_held = self.touch.dig.is_some();
         if let Some(s) = self.touch.stick {
             let v = (s.pos - s.origin) / layout.stick_radius;
             let len = v.length();
@@ -854,6 +874,7 @@ impl Input {
         let j = |p: Pad| is_key_pressed(p.key());
         a.attack = j(b.pad(Act::Attack));
         a.dodge = j(b.pad(Act::Dodge));
+        a.dodge_held = is_key_down(b.pad(Act::Dodge).key());
         a.special = j(b.pad(Act::Special));
         a.use_item = j(b.pad(Act::UseItem));
         a.item_prev = j(b.pad(Act::ItemPrev));
@@ -914,6 +935,7 @@ fn read_keyboard() -> Actions {
         aim: Vec2::ZERO,
         attack: k(Act::Attack),
         dodge: k(Act::Dodge),
+        dodge_held: is_key_down(b.key(Act::Dodge)),
         special: k(Act::Special),
         use_item: k(Act::UseItem),
         item_prev: k(Act::ItemPrev),
@@ -997,6 +1019,7 @@ fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
         let j = |x: Act| pad.is_just_pressed(b.pad(x).button());
         a.attack |= j(Act::Attack);
         a.dodge |= j(Act::Dodge);
+        a.dodge_held |= pad.is_currently_pressed(b.pad(Act::Dodge).button());
         a.special |= j(Act::Special);
         a.use_item |= j(Act::UseItem);
         a.item_prev |= j(Act::ItemPrev);

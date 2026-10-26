@@ -67,6 +67,10 @@ pub const CLAW_SHAKE: [f32; 3] = [0.15, 0.15, 0.55];
 /// 땅속 최대 시간. 지나면 자동으로 솟구친다.
 pub const BURROW_MAX_TIME: f32 = 0.35;
 pub const BURROW_SPEED_FACTOR: f32 = 1.3;
+/// 굴파기 버튼을 누르고 있으면 땅속 시간에 이만큼(초)까지 더 머문다. 떼면 바로 솟구친다(0101).
+pub const BURROW_HOLD_EXTRA: f32 = 0.45;
+/// 더 머문 1초마다 굴파기 대기가 이만큼(초) 늘어난다: 오래 숨을수록 다음 굴이 늦다.
+pub const BURROW_HOLD_CD: f32 = 1.0;
 /// 쿨다운(솟구친 순간부터).
 pub const BURROW_COOLDOWN: f32 = 0.6;
 /// 모모의 회피 깡충(0056): 체공 시간·거리·높이(그림). 공중에서는 안 맞고 적·탄·묻힌 도토리를 넘는다. 대기는 굴파기 대기와 같은 값을 쓴다.

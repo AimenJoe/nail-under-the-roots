@@ -470,8 +470,15 @@ impl Player {
                 self.pos += move_dir * t::PLAYER_SPEED * t::BURROW_SPEED_FACTOR * dt;
                 self.state = State::Burrow { time };
                 let early = (self.dodge_buf > 0.0 && time > 0.05) || self.attack_buf > 0.0;
-                if time >= self.talents.burrow_time() || early {
-                    strike = Some(self.start_emerge());
+                // 톡 누르면 정한 시간, 누르고 있으면 BURROW_HOLD_EXTRA까지 더 머문다(떼면 솟구침, 0101).
+                let base = self.talents.burrow_time();
+                let limit = if a.dodge_held {
+                    base + t::BURROW_HOLD_EXTRA
+                } else {
+                    base
+                };
+                if time >= limit || early {
+                    strike = Some(self.start_emerge((time - base).max(0.0)));
                 }
             }
             State::Hop { time, dir } => {
@@ -698,10 +705,11 @@ impl Player {
         self.events.push(Event::Burrow);
     }
 
-    fn start_emerge(&mut self) -> Strike {
+    /// `held`: 정한 시간보다 더 머문 초. 그만큼 대기가 늘어 땅속에 숨어 지내지는 못한다(0101).
+    fn start_emerge(&mut self, held: f32) -> Strike {
         self.dodge_buf = 0.0;
         self.attack_buf = 0.0;
-        self.burrow_cd = self.burrow_cd_full();
+        self.burrow_cd = self.burrow_cd_full() + held * t::BURROW_HOLD_CD;
         self.no_attack = t::EMERGE_NO_ATTACK;
         self.swing_id += 1;
         self.state = State::Emerge { time: 0.0 };
@@ -1087,5 +1095,56 @@ mod tests {
             n
         };
         assert!(swing_ticks(1.5) < swing_ticks(1.0));
+    }
+
+    /// 굴파기(0101): 톡 누르면 정한 시간, 누르고 있으면 더 머물고 떼면 바로 솟구친다. 더 머문 만큼 대기가 는다.
+    #[test]
+    fn burrow_holds_while_pressed_and_pops_on_release() {
+        let room = Room::new();
+        let secs = |p: &mut Player, hold_ticks: usize| -> f32 {
+            let dig = Actions {
+                dodge: true,
+                dodge_held: true,
+                ..Default::default()
+            };
+            tick(p, &room, &dig);
+            let mut n = 1;
+            while matches!(p.state, State::Burrow { .. }) {
+                let a = Actions {
+                    move_dir: vec2(1.0, 0.0),
+                    dodge_held: n < hold_ticks,
+                    ..Default::default()
+                };
+                tick(p, &room, &a);
+                n += 1;
+            }
+            n as f32 * t::TICK_DT
+        };
+        let tap = {
+            let mut p = Player::new(room.center());
+            let s = secs(&mut p, 1);
+            assert!(
+                (p.burrow_cd - p.burrow_cd_full()).abs() < 1e-4,
+                "톡: 대기 그대로"
+            );
+            s
+        };
+        assert!(
+            (tap - t::BURROW_MAX_TIME).abs() < 0.04,
+            "톡 = 정한 시간 {tap}"
+        );
+        let mut p = Player::new(room.center());
+        let full = secs(&mut p, usize::MAX);
+        assert!(
+            (full - t::BURROW_MAX_TIME - t::BURROW_HOLD_EXTRA).abs() < 0.04,
+            "끝까지 누르면 더 머문다 {full}"
+        );
+        assert!(
+            p.burrow_cd > p.burrow_cd_full() + 0.3,
+            "더 머문 만큼 대기가 는다"
+        );
+        let mut p = Player::new(room.center());
+        let half = secs(&mut p, 36); // 0.6초에 뗀다
+        assert!((half - 0.6).abs() < 0.04, "떼면 바로 솟구친다 {half}");
     }
 }
