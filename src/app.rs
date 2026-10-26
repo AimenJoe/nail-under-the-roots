@@ -29,12 +29,10 @@ const INTRO_LINE_TIME: f32 = 2.6;
 /// 타이틀 메뉴 줄. 오늘의 굴은 튜토리얼을 마친 뒤에만 보인다.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum TitleItem {
-    /// 지금 슬롯으로 이어하기(기록이 있을 때, 0078).
-    Continue,
-    /// 지금 슬롯이 비었을 때: 여기서 새로 시작.
+    /// 시작하기: 슬롯을 골라 처음부터(0078).
     New,
-    /// 저장 슬롯 창(어느 슬롯이든 기록이 있을 때).
-    Slots,
+    /// 이어하기: 기록이 있는 슬롯을 골라 이어서(기록이 하나라도 있을 때만).
+    Continue,
     Daily,
     Album,
     Settings,
@@ -380,6 +378,8 @@ pub struct App {
     slots_cursor: usize,
     slots_col: usize,
     slots_armed: Option<usize>,
+    /// 슬롯 창이 이어하기로 열렸나(false = 시작하기).
+    slots_load: bool,
     pause_tab: usize,
     pause_cursor: usize,
     settings_cursor: usize,
@@ -491,6 +491,7 @@ impl App {
             slots_cursor: 0,
             slots_col: 0,
             slots_armed: None,
+            slots_load: false,
             pause_tab: 0,
             pause_cursor: 0,
             settings_cursor: 0,
@@ -1006,8 +1007,8 @@ impl App {
                     None
                 };
                 match chosen.and_then(|i| items.get(i).copied()) {
-                    Some(TitleItem::Continue) | Some(TitleItem::New) => self.begin_run(),
-                    Some(TitleItem::Slots) => self.open_slots(),
+                    Some(TitleItem::New) => self.open_slots(false),
+                    Some(TitleItem::Continue) => self.open_slots(true),
                     Some(TitleItem::Daily) => {
                         self.knot_level = 0;
                         self.start(Scenario::Daily);
@@ -1629,14 +1630,11 @@ impl App {
     }
 
     fn title_items(&self) -> Vec<TitleItem> {
-        // 기록이 있으면 이어하기와 슬롯 창을 나눈다(사장 피드백 2026-10-26, 0078). 처음이면 새로 하기 하나.
-        let mut v = if !self.profile.is_empty() {
-            vec![TitleItem::Continue, TitleItem::Slots]
-        } else if (0..crate::profile::SLOTS).any(|i| self.slot_filled(i)) {
-            vec![TitleItem::New, TitleItem::Slots]
-        } else {
-            vec![TitleItem::New]
-        };
+        // 시작하기 / 이어하기(기록이 있는 슬롯이 하나라도 있을 때). 둘 다 슬롯 고르기로 간다(사장 피드백 2026-10-26, 0078).
+        let mut v = vec![TitleItem::New];
+        if (0..crate::profile::SLOTS).any(|i| self.slot_filled(i)) {
+            v.push(TitleItem::Continue);
+        }
         if self.profile.flag(crate::profile::key::TUTORIAL) {
             v.push(TitleItem::Daily);
         }
@@ -1650,9 +1648,8 @@ impl App {
     fn title_label(&self, it: TitleItem) -> String {
         let s = i18n::s();
         match it {
-            TitleItem::Continue => s.title_continue.to_string(),
             TitleItem::New => s.title_new.to_string(),
-            TitleItem::Slots => s.title_slots.to_string(),
+            TitleItem::Continue => s.title_continue.to_string(),
             TitleItem::Daily => {
                 let day = crate::daily::today();
                 if self.profile.count(&crate::daily::key_clear(day)) > 0 {
@@ -1908,7 +1905,7 @@ impl App {
     fn draw_title(&mut self, ui: &Ui) {
         // 뒤의 뿌리 선이 가는 글자 획과 겹치면 끊겨(깨져) 보인다(사람 피드백). 타이틀 글에는 어두운 테두리.
         let ui = &ui.with_outline();
-        // 줄이 여섯(이어하기·저장 슬롯·오늘의 굴·앨범·설정·개발)까지 들어가게 제목을 조금 올렸다(0078).
+        // 줄이 여섯(시작하기·이어하기·오늘의 굴·앨범·설정·개발)까지 들어가게 제목을 조금 올렸다(0078).
         ui.text_center("Naïl", 160.0, 16.0, FONT_PX * 2.0, ui::ACCENT);
         ui.text_center("Under the Roots", 160.0, 40.0, FONT_PX, ui::TEXT);
         let s = i18n::s();

@@ -1,5 +1,6 @@
-//! 저장 슬롯(docs/decisions/0078): 기록(프로필)을 셋까지 따로 둔다. 타이틀의 "이어하기"는 마지막 슬롯,
-//! "저장 슬롯" 창에서 슬롯을 골라 이어하거나, 빈 슬롯에서 새로 시작하거나, 지운다(두 번 눌러야 지워진다).
+//! 저장 슬롯(docs/decisions/0078): 기록(프로필)을 셋까지 따로 둔다.
+//! 타이틀 "시작하기" → 슬롯 고르기(빈 슬롯은 시작, 기록이 있으면 두 번 눌러 덮어쓰기),
+//! "이어하기"(기록이 있을 때만) → 기록이 있는 슬롯 고르기(이어하기 · 두 번 눌러 지우기).
 
 use macroquad::prelude::*;
 
@@ -23,20 +24,42 @@ impl App {
         self.slot_cache = (0..SLOTS).map(profile::load_slot).collect();
     }
 
-    pub(super) fn open_slots(&mut self) {
+    /// `load`: 이어하기로 열었나(false = 시작하기).
+    pub(super) fn open_slots(&mut self, load: bool) {
         // 지금 기록을 먼저 써 둬야 창의 요약이 맞는다.
         crate::profile::save(&self.profile);
         self.refresh_slots();
-        self.slots_cursor = profile::slot();
+        let cur = profile::slot();
+        self.slots_load = load;
+        // 이어하기는 지금(없으면 첫) 기록 있는 슬롯, 시작하기는 첫 빈 슬롯(없으면 지금 슬롯)에서 시작한다.
+        self.slots_cursor = if load {
+            if self.slot_filled(cur) {
+                cur
+            } else {
+                (0..SLOTS).find(|&i| self.slot_filled(i)).unwrap_or(cur)
+            }
+        } else {
+            (0..SLOTS).find(|&i| !self.slot_filled(i)).unwrap_or(cur)
+        };
         self.slots_col = 0;
         self.slots_armed = None;
         self.scene = Scene::Slots;
     }
 
-    /// 슬롯 `i`로 바꾸고 그 기록으로 시작한다(비었으면 오프닝부터).
-    pub(super) fn play_slot(&mut self, i: usize) {
+    /// 슬롯 `i`의 기록으로 이어한다(튜토리얼을 마쳤으면 마을).
+    fn continue_slot(&mut self, i: usize) {
         profile::set_slot(i);
         self.profile = profile::load_slot(i);
+        self.apply_assist();
+        self.begin_run();
+    }
+
+    /// 슬롯 `i`를 비우고 처음부터(오프닝).
+    fn new_in_slot(&mut self, i: usize) {
+        profile::set_slot(i);
+        self.profile = Profile::default();
+        profile::save(&self.profile);
+        self.refresh_slots();
         self.apply_assist();
         self.begin_run();
     }
@@ -46,61 +69,110 @@ impl App {
         if i == profile::slot() {
             self.profile = empty.clone();
             self.apply_assist();
-            profile::save(&empty);
-        } else {
-            profile::save_slot(i, &empty);
         }
+        profile::save_slot(i, &empty);
         self.refresh_slots();
         self.sfx.play(crate::sfx::Id::Hurt);
     }
 
-    pub(super) fn update_slots(&mut self, a: &Actions, tap_hit: Option<Hit>) {
-        let filled = self.slot_filled(self.slots_cursor);
-        if a.up || a.down {
-            self.slots_cursor = if a.up {
-                (self.slots_cursor + SLOTS - 1) % SLOTS
+    /// 한 줄의 단추: (글, 탭 칸, 단추 번호). 이어하기 창의 빈 슬롯은 단추가 없다.
+    fn slot_buttons(&self, i: usize) -> Vec<(&'static str, Hit, usize)> {
+        let s = i18n::s();
+        let armed = self.slots_armed == Some(i);
+        let filled = self.slot_filled(i);
+        match (self.slots_load, filled) {
+            (true, true) => vec![
+                (s.title_continue, Hit::SlotPlay(i), 0),
+                (
+                    if armed {
+                        s.slot_erase_again
+                    } else {
+                        s.slot_erase
+                    },
+                    Hit::SlotErase(i),
+                    1,
+                ),
+            ],
+            (true, false) => Vec::new(),
+            (false, false) => vec![(s.title_start, Hit::SlotPlay(i), 0)],
+            (false, true) => vec![(
+                if armed {
+                    s.slot_erase_again
+                } else {
+                    s.slot_overwrite
+                },
+                Hit::SlotPlay(i),
+                0,
+            )],
+        }
+    }
+
+    /// 위아래로 다음 슬롯. 이어하기 창은 기록 있는 슬롯만 지난다.
+    fn step_slot(&self, down: bool) -> usize {
+        let mut i = self.slots_cursor;
+        for _ in 0..SLOTS {
+            i = if down {
+                (i + 1) % SLOTS
             } else {
-                (self.slots_cursor + 1) % SLOTS
+                (i + SLOTS - 1) % SLOTS
             };
+            if !self.slots_load || self.slot_filled(i) {
+                return i;
+            }
+        }
+        self.slots_cursor
+    }
+
+    pub(super) fn update_slots(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        if a.up || a.down {
+            self.slots_cursor = self.step_slot(a.down);
             self.slots_col = 0;
             self.slots_armed = None;
         }
-        if (a.left || a.right) && filled {
+        let n = self.slot_buttons(self.slots_cursor).len();
+        if (a.left || a.right) && n > 1 {
             self.slots_col = 1 - self.slots_col;
             self.slots_armed = None;
         }
         let mut go = a.confirm;
-        match tap_hit {
-            Some(Hit::SlotPlay(i)) => {
-                if self.slots_cursor != i || self.slots_col != 0 {
-                    self.slots_armed = None;
-                }
-                self.slots_cursor = i;
-                self.slots_col = 0;
-                go = true;
+        let tapped = match tap_hit {
+            Some(Hit::SlotPlay(i)) => Some((i, 0)),
+            Some(Hit::SlotErase(i)) => Some((i, 1)),
+            _ => None,
+        };
+        if let Some((i, col)) = tapped {
+            if self.slots_cursor != i || self.slots_col != col {
+                self.slots_armed = None;
             }
-            Some(Hit::SlotErase(i)) => {
-                if self.slots_cursor != i || self.slots_col != 1 {
-                    self.slots_armed = None;
-                }
-                self.slots_cursor = i;
-                self.slots_col = 1;
-                go = true;
-            }
-            _ => {}
+            self.slots_cursor = i;
+            self.slots_col = col;
+            go = true;
         }
         if go {
             let i = self.slots_cursor;
-            if self.slots_col == 1 && self.slot_filled(i) {
-                if self.slots_armed == Some(i) {
+            let filled = self.slot_filled(i);
+            match (self.slots_load, filled, self.slots_col) {
+                (true, true, 0) => self.continue_slot(i),
+                (false, false, _) => self.new_in_slot(i),
+                // 지우기·덮어쓰기는 두 번 눌러야 한다.
+                (true, true, _) | (false, true, _) if self.slots_armed != Some(i) => {
+                    self.slots_armed = Some(i);
+                }
+                (true, true, _) => {
                     self.slots_armed = None;
                     self.slots_col = 0;
                     self.erase_slot(i);
-                } else {
-                    self.slots_armed = Some(i);
+                    // 이어할 슬롯이 없어지면 타이틀로(이어하기 줄도 사라진다).
+                    match (0..SLOTS).find(|&k| self.slot_filled(k)) {
+                        Some(k) => self.slots_cursor = k,
+                        None => self.scene = Scene::Title,
+                    }
                 }
-            } else {
-                self.play_slot(i);
+                (false, true, _) => {
+                    self.slots_armed = None;
+                    self.new_in_slot(i);
+                }
+                _ => {}
             }
             return;
         }
@@ -112,7 +184,12 @@ impl App {
     pub(super) fn draw_slots(&mut self, ui: &Ui) {
         let s = i18n::s();
         let panel = Rect::new(28.0, 14.0, 264.0, 144.0);
-        ui.panel(panel, Some(s.title_slots));
+        let title = if self.slots_load {
+            s.title_continue
+        } else {
+            s.title_new
+        };
+        ui.panel(panel, Some(title));
         let current = profile::slot();
         for i in 0..SLOTS {
             let r = Rect::new(
@@ -122,12 +199,20 @@ impl App {
                 34.0,
             );
             let on = self.slots_cursor == i;
+            let filled = self.slot_filled(i);
+            // 이어하기 창의 빈 슬롯은 고를 수 없다: 흐리게.
+            let usable = filled || !self.slots_load;
             ui.rect(r, if on { ui::PANEL_LIGHT } else { ui::PANEL });
             ui.rect_lines(r, if on { ui::ACCENT } else { ui::BORDER });
             let name = fill(s.slot_name, &[&(i + 1)]);
-            let name_c = if i == current { ui::ACCENT } else { ui::TEXT };
+            let name_c = if !usable {
+                ui::TEXT_DIM
+            } else if i == current && filled {
+                ui::ACCENT
+            } else {
+                ui::TEXT
+            };
             ui.text(&name, r.x + 6.0, r.y + 3.0, FONT_PX, name_c);
-            let filled = self.slot_filled(i);
             let summary = if filled {
                 let p = if i == current {
                     &self.profile
@@ -139,37 +224,15 @@ impl App {
                 s.slot_empty.to_string()
             };
             // 단추는 첫 줄 오른쪽, 요약은 둘째 줄 전체 폭(요약이 잘리지 않게).
-            let bw = 74.0;
             let line = ui.fit(&summary, r.w - 12.0, FONT_PX);
             ui.text(&line, r.x + 6.0, r.y + 19.0, FONT_PX, ui::TEXT_DIM);
-            // 오른쪽 단추: 이어하기(빈 슬롯은 시작) · 지우기.
-            let mut buttons = vec![(
-                if filled {
-                    s.title_continue
-                } else {
-                    s.title_start
-                },
-                Hit::SlotPlay(i),
-                0,
-            )];
-            if filled {
-                let erase = if self.slots_armed == Some(i) {
-                    s.slot_erase_again
-                } else {
-                    s.slot_erase
-                };
-                buttons.push((erase, Hit::SlotErase(i), 1));
-            }
+            let bw = 74.0;
+            let buttons = self.slot_buttons(i);
             let n = buttons.len() as f32;
             for (k, (label, hit, col)) in buttons.into_iter().enumerate() {
-                let b = Rect::new(
-                    r.right() - 4.0 - (n - k as f32) * (bw + 4.0) + 4.0,
-                    r.y + 2.0,
-                    bw,
-                    15.0,
-                );
+                let b = Rect::new(r.right() - (n - k as f32) * (bw + 4.0), r.y + 2.0, bw, 15.0);
                 let sel = on && self.slots_col == col;
-                let warn = col == 1 && self.slots_armed == Some(i);
+                let warn = self.slots_armed == Some(i) && (col == 1 || filled && !self.slots_load);
                 ui.rect(b, if sel { ui::PANEL_LIGHT } else { ui::PANEL });
                 let edge = if warn {
                     Color::new(0.95, 0.45, 0.40, 1.0)
@@ -187,11 +250,20 @@ impl App {
             }
         }
         self.close_button(ui, panel);
-        let hint = super::device_hint(
-            s.slots_hint,
-            s.title_controls_touch,
-            &[Verb::Pick, Verb::Change, Verb::Confirm, Verb::Back],
-        );
+        // 시작하기 창은 슬롯마다 단추가 하나라 좌우 안내가 없다.
+        let hint = if self.slots_load {
+            super::device_hint(
+                s.slots_hint,
+                s.title_controls_touch,
+                &[Verb::Pick, Verb::Change, Verb::Confirm, Verb::Back],
+            )
+        } else {
+            super::device_hint(
+                s.title_controls,
+                s.title_controls_touch,
+                &[Verb::Pick, Verb::Confirm, Verb::Back],
+            )
+        };
         let hint = ui.fit(&hint, 312.0, FONT_PX);
         ui.text_center(&hint, 160.0, 162.0, FONT_PX, ui::TEXT_DIM);
     }
