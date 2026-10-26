@@ -30,6 +30,11 @@ SIZE = {
     'halmae_deep': (704, 360), 'last_bloom': (640, 440), 'sprout': (640, 360), 'molehill': (640, 360),
     'doto_memory': (640, 360), 'momo_deep': (704, 360), 'kongi_door': (640, 360), 'title': (640, 360),
 }
+# 그림 안의 큰 네 꼭짓점 반짝이(가운데 x, y, 반지름, 원본 px): ✦ 로고와 똑같은 모양이라 로고처럼 보여 지운다(사장).
+# 작은 점 반짝이는 남긴다. 밝은 덩어리(채도 낮고 아주 밝은 점 25개 넘음)를 찾아 구름을 빼고 골랐다.
+SPARKLES = {
+    'momo_bloom': [(326, 501, 11), (804, 456, 9), (710, 510, 11), (279, 456, 9)],
+}
 # 세로로 남을 때 자를 높이(0 위·1 아래). 없으면 가운데.
 CROP_Y = {}
 # 장면 → ✦ 자리(가운데 x, y, 반지름, 원본 px).
@@ -97,6 +102,8 @@ def scene(name, size=None):
     img = Image.open(path).convert('RGB')
     if name in STAR:
         ref_pack.erase_star_at(img, *STAR[name])
+    for star in SPARKLES.get(name, ()):
+        ref_pack.erase_star_at(img, *star)
     img = _crop_to(img, size[0] / size[1], CROP_Y.get(name, 0.5))
     w, h = img.size
     # 팔레트: 나머지 색은 점을 고르게 뽑아(전부 쓰면 느리다), 채도 높은 색은 원본 점을 전부 쓴다.
