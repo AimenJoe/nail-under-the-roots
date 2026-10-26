@@ -211,6 +211,7 @@ impl App {
                     if self.bank_glowbugs() > 0 {
                         self.world.toast = Some((|s| s.toast_camp_bank, 3.0));
                     }
+                    self.checkpoint_run();
                     self.play(cutscene::camp_arrive(&self.world, n));
                 }
                 AdvEvent::RouteOpen => self.open_route(false),
@@ -295,6 +296,8 @@ impl App {
             self.scene = Scene::Title;
             return;
         }
+        // 런이 끝났다: 쉼터 이어하기를 지운다(0080).
+        self.clear_run();
         let ch = self.world.character;
         let momo = ch == crate::equipment::Character::Momo;
         let true_end = self.profile.flag(key::MOMO_BACK) && self.profile.flag(key::DOTO_MEMORY);
@@ -691,6 +694,8 @@ impl App {
         }
         if a.cancel || a.menu || tap_hit == Some(Hit::Close) {
             self.scene = Scene::Game;
+            // 산 것까지 쉼터 이어하기에 남긴다(0080).
+            self.checkpoint_run();
             return;
         }
         let wares = self.wares();

@@ -40,6 +40,7 @@ mod sfx;
 mod species;
 mod story;
 mod sunny;
+mod suspend;
 mod talents;
 mod terrain;
 mod tuning;

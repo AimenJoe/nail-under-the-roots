@@ -83,7 +83,8 @@
 | Android 패드 버튼 | `third_party/miniquad`(패치, `[patch.crates-io]`), `input.rs`(Pad::key·read_gamepads) | 패드 버튼 키코드 → F13~F25, 동작은 Bindings, 메뉴 A/B(뒤로)/Start/LB·RB, 다시 붙이기. 스틱은 Android가 바꿔 준 D패드 키(디지털). 패치 표 = Pad::key 테스트(0075) |
 | 저장 지점 빛 | `render.rs`(draw_save_ring·draw_save_lights·light_material) | 버섯 일곱 + 짙은 고리 자국, 더하기 섞기 금빛 후광·포자(어둠 위), 안 들른 고리는 빛기둥 높이(0076) |
 | 팩으로 갈아 끼운 소품 | `sunny.rs`(STALL·BENCH·POT_WILDFLOWER·HEART·SPROUT), `render.rs`(draw_stall_sunny·draw_seat_sunny·draw_decor_sunny·draw_hud_bars), `ui.rs`(sprite) | 가게 가판, 모모 빈 자리 그루터기, 꾸미기 의자·화분, HUD 하트·새싹. 팩이 없으면 예전 그림(0077) |
-| 저장 슬롯 | `profile.rs`(SLOTS·slot·set_slot·load_slot·save_slot), `app/slots.rs`, `app.rs`(TitleItem), `web/index.html`(nail_save 칸 번호) | 슬롯 셋, 예전 기록 = 슬롯 1, 타이틀 시작하기·이어하기(기록이 있을 때만) → 슬롯 고르기, 요약·두 번 눌러 덮어쓰기·지우기. 런 중단 저장은 아직(0078) |
+| 저장 슬롯 | `profile.rs`(SLOTS·slot·set_slot·load_slot·save_slot), `app/slots.rs`, `app.rs`(TitleItem), `web/index.html`(nail_save 칸 번호) | 슬롯 셋, 예전 기록 = 슬롯 1, 타이틀 시작하기·이어하기(기록이 있을 때만) → 슬롯 고르기, 요약·두 번 눌러 덮어쓰기·지우기(0078) |
+| 쉼터부터 이어하기 | `suspend.rs`(RunSave), `app/run.rs`(checkpoint_run·resume_run·clear_run), `adventure.rs`(resume_camp), `profile.rs`(칸 4~6) | 쉼터 도착·가게 닫기·쉼터에서 타이틀로 갈 때 적고, 이어하기 → 그 쉼터(같은 길 지도·재화·가방·장비·통계). 새 런·마을·엔딩·덮어쓰기에서 지움(0080) |
 | 패링 | `player.rs`(parry_dir), `world.rs`(parry_feedback) | 스윙 첫 0.12초 앞쪽: 돌진 경직, 투사체 반사, SP +4(docs/decisions/0020). 창이 열린 뒤 0.45초는 새 창 없음(연타 방지), 성공하면 바로(0038) |
 | 스테이지 고리 | `adventure.rs`, `camp.rs`, `route.rs`, `dungeon.rs`(Params), `app/stage.rs` | 필드 → 공터 보스 → 쉼터 → 길 지도(층 3 + 보스, 엇갈리지 않는 갈래, 다음 층만 보임) → 굴(굴·둥지·저장고·샘·보스) → 다음 쉼터. 쉼터: 체력 가득·저장 고리·포포 가게(씨앗)·보리·빈 자리, 공격 버튼 = 말 걸기. 쓰러지면 쉼터, 길은 새로. 단위 테스트(길 규칙 3, 고리 2)(docs/decisions/0030, 0031) |
 | 마을 | `village.rs`, `adventure.rs`(World::village, Place::Village), `render.rs`(큰 나무·꾸미기·할매), `app/stage.rs`(꾸미기 가게·할매·뿌리 길) | 튜토리얼 뒤 시작·엔딩 뒤 돌아오는 허브. 큰 나무 잎 = 깬 횟수, 포포 꾸미기 가게(마을 씨앗 6가지), 보리·할매(실뜨기)·빈 자리(0045) |
@@ -117,19 +118,20 @@
 - [ ] 1. 본인 외 한 사람의 판정(아래 첫 줄)
 - [ ] 2. Android 실기 확인(아래 v0.1.x 확인의 설치·패드·저장)
 - [ ] 3. 1·2에서 나온 것 고치기(Claude)
-- [ ] 4. 쉼터부터 이어하기(Claude, 0080)
+- [x] 4. 쉼터부터 이어하기(Claude, 0080, v0.1.9)
 - [x] 5. 문서를 실제와 맞추기(0079, concept.md, CLAUDE.md)
 
 ### 먼저
 - [ ] **본인 외 한 사람에게 건네기**(v0.1.0부터 남은 1단계 완료 조건): 안내 페이지 https://claude.ai/artifact/6NSJVxv4dSvx7e46EwjZ9j (원본 `docs/playtest/playtest.html`, 공유는 페이지의 Share 메뉴에서)를 건넨다. 설명 없이 바로 시작 → 10~15분 → 판정 기준 4개 + 기기·좋았던 것·답답했던 것을 "답 복사"로 받는다. 받은 답은 다음 세션에 붙여 넣는다
-- [ ] **v0.1.8 확인**(0058~0078을 한 번에): 웹·APK에서
+- [ ] **v0.1.9 확인**(0058~0080을 한 번에): 웹·APK에서
   - **APK가 설치되는지**(0074: v0.1.4까지는 Android 12+에서 "package appears to be invalid"로 거부됐다). 기기 모델·Android 버전을 함께 적는다
   - **Android 패드 버튼**(0075): A·B·X·Y·LB·RB·LT·RT·Start·Select가 듣는지, 메뉴에서 A 확인·B 뒤로·기기 뒤로 키, 설정에서 버튼 다시 붙이기, 안내 글이 패드 이름으로 나오는지. 스틱이 디지털(8방향)인 게 답답한지(답답하면 아날로그·오른쪽 스틱을 넣는다)
   - **저장 지점**(0076): 필드·쉼터에서 멀리서도 보이는지, 너무 번쩍이지 않는지
   - **팩으로 바꾼 소품**(0077): 가게 가판·모모 빈 자리·마을 의자·화분, HUD 하트·새싹이 어색하지 않은지
+  - **쉼터부터 이어하기**(0080): 쉼터에서 앱을 껐다 켜고 이어하기 → 같은 쉼터·같은 씨앗·가방인지, 굴 안에서 끄면 마지막 쉼터부터인지
   - **저장 슬롯**(0078): 덮어 설치한 뒤 예전 기록이 슬롯 1로 이어지는지, 타이틀 시작하기·이어하기 → 슬롯 고르기, 덮어쓰기·지우기(두 번)
   - Sunnyside 그림(큰 나무·들판 나무·꽃·모닥불·버섯)이 나오는지, 장소를 바꿀 때 멈칫 없이 밝아지는지(검정이 0.2초쯤 길어진 게 거슬리지 않는지)
-  - APK를 지우지 않고 덮어 설치했을 때 기록이 남는지, Android Chrome 글자 색, 타이틀 "v0.1.8 · <커밋>"
+  - APK를 지우지 않고 덮어 설치했을 때 기록이 남는지, Android Chrome 글자 색, 타이틀 "v0.1.9 · <커밋>"
   - 모모 런: 포포 배웅과 쉼터 빈 자리 말(나일은 마을에서 기다린다)
   - 새 그림(0071~0073): 대화 초상화의 털·목도리, 컷씬 일러스트 열 장(특히 패닝하는 큰 나무·마지막 꽃이 끝까지 자연스러운지, 대화창에 얼굴이 가리지 않는지)
 - [ ] GitHub에서 Secret `SECRETS_TOKEN`과 그 fine-grained 토큰을 지운다(0067, 이미 했으면 체크)
@@ -151,5 +153,4 @@
 - [ ] 굴토끼 가족(할매 실 속) 갈래를 이야기에 넣을지, 모모 전용 재주·장신구(0056)
 - [ ] 컷씬 일러스트를 사람이 그릴지(본인/외주). 정하면 `docs/art/cutscene-illustrations.md`를 넘긴다(0039)
 - [ ] 다음 캐릭터(0040 순서 7)
-- [ ] 런 중단 저장(0078 "안 한 것"): 쉼터에서 껐다 켜면 그 쉼터부터 이어갈지(한 번 쓰는 저장)
 - [ ] Android 개발자 인증(2026-09 일부 나라, 2027 전 세계): 사이드로드 APK도 인증된 개발자 서명이 필요해진다(ADB 설치는 예외). 무료 "제한 배포" 계정(기기 20대)으로 할지, 정식 등록할지, 릴리스 서명 키를 언제 만들지

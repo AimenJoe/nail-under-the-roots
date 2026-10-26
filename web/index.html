@@ -122,7 +122,8 @@
       version: 2,
       register_plugin: function (importObject) {
         // 칸 0 = 마지막으로 쓴 슬롯 번호, 1~3 = 저장 슬롯(src/profile.rs, 0078). 슬롯 1은 예전 한 칸 저장 열쇠 그대로.
-        var key = function (cell) { return cell === 0 ? "nail.slot" : cell === 1 ? "nail.profile" : "nail.profile." + cell; };
+        // 칸 4~6 = 슬롯마다 진행 중인 런(쉼터부터 이어하기, 0080).
+        var key = function (cell) { return cell === 0 ? "nail.slot" : cell === 1 ? "nail.profile" : cell <= 3 ? "nail.profile." + cell : "nail.run." + (cell - 3); };
         var get = function (cell) { try { return window.localStorage.getItem(key(cell)) || ""; } catch (e) { return ""; } };
         importObject.env.nail_save_len = function (cell) { return new TextEncoder().encode(get(cell)).length; };
         importObject.env.nail_save_read = function (cell, ptr, len) {

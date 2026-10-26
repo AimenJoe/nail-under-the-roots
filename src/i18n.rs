@@ -272,7 +272,7 @@ strings! {
     intro_1, intro_2, intro_3, skip_hint,
     title_start, title_settings, title_dev, title_controls, version, copyright,
     // 저장 슬롯(docs/decisions/0078)
-    title_continue, title_new, slot_overwrite, slot_name, slot_empty, slot_summary, slot_summary_start, slot_erase, slot_erase_again, slots_hint,
+    title_continue, title_new, slot_overwrite, slot_name, slot_empty, slot_summary, slot_summary_start, slot_resting, slot_erase, slot_erase_again, slots_hint,
     // 설정
     settings, set_sound, set_shake, set_debug, set_language, set_back, on, off, settings_hint,
     // 일시정지
@@ -371,6 +371,7 @@ pub static KO: Strings = Strings {
     slot_empty: "비어 있음",
     slot_summary: "쉼터 {0}까지 · 끝까지 {1}번 · 모험 {2}번",
     slot_summary_start: "첫 쉼터 전 · 모험 {0}번",
+    slot_resting: "쉼터 {0}에서 쉬는 중 · 모험 {1}번",
     slot_erase: "지우기",
     slot_erase_again: "한 번 더",
     slots_hint: "{0} 슬롯 · {1} 고르기 · {2} 확인 · {3} 뒤로",
@@ -993,6 +994,7 @@ pub static EN: Strings = Strings {
     slot_empty: "Empty",
     slot_summary: "Camp {0} · Reached the end {1} · Runs {2}",
     slot_summary_start: "Before the first camp · Runs {0}",
+    slot_resting: "Resting at camp {0} · Runs {1}",
     slot_erase: "Erase",
     slot_erase_again: "Again",
     slots_hint: "{0} slot · {1} choose · {2} confirm · {3} back",
@@ -1615,6 +1617,7 @@ pub static JA: Strings = Strings {
     slot_empty: "からっぽ",
     slot_summary: "休み場 {0}・最後まで {1}回・冒険 {2}回",
     slot_summary_start: "最初の休み場の前・冒険 {0}回",
+    slot_resting: "休み場 {0}で休憩中・冒険 {1}回",
     slot_erase: "消す",
     slot_erase_again: "もう一度",
     slots_hint: "{0}スロット・{1}えらぶ・{2}決定・{3}もどる",
@@ -2237,6 +2240,7 @@ pub static ZH_HANS: Strings = Strings {
     slot_empty: "空",
     slot_summary: "营地 {0}·到达最深处 {1}次·冒险 {2}次",
     slot_summary_start: "第一个营地之前·冒险 {0}次",
+    slot_resting: "正在营地 {0}休息·冒险 {1}次",
     slot_erase: "删除",
     slot_erase_again: "再按一次",
     slots_hint: "{0}存档·{1}选择·{2}确认·{3}返回",
@@ -2862,6 +2866,7 @@ pub static PT_BR: Strings = Strings {
     slot_empty: "Vazio",
     slot_summary: "Refúgio {0} · Chegou ao fim {1} · Jornadas {2}",
     slot_summary_start: "Antes do primeiro refúgio · Jornadas {0}",
+    slot_resting: "Descansando no refúgio {0} · Jornadas {1}",
     slot_erase: "Apagar",
     slot_erase_again: "De novo",
     slots_hint: "{0} slot · {1} escolher · {2} confirmar · {3} voltar",

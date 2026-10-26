@@ -6,7 +6,7 @@
 //! - 저장소: 웹은 localStorage(web/index.html의 nail_save 플러그인, wasm 메모리로 바이트를 주고받는다),
 //!   데스크톱은 사용자 데이터 폴더의 파일, Android는 앱 전용 폴더의 파일.
 //! - 저장 슬롯 셋(0078). 칸 번호 0 = 마지막으로 쓴 슬롯 번호, 1~3 = 슬롯. 슬롯 1은 예전 한 칸 저장과 같은 자리라
-//!   옛 기록이 그대로 슬롯 1이 된다.
+//!   옛 기록이 그대로 슬롯 1이 된다. 칸 4~6 = 슬롯마다 진행 중인 런(쉼터부터 이어하기, `suspend.rs`, 0080).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -103,6 +103,16 @@ impl Profile {
 
     pub fn count(&self, k: &str) -> u32 {
         self.counts.get(k).copied().unwrap_or(0)
+    }
+
+    /// 수 칸이 있나(0이어도 있으면 true).
+    pub fn has_count(&self, k: &str) -> bool {
+        self.counts.contains_key(k)
+    }
+
+    /// 모든 수 칸(키 순서).
+    pub fn counts(&self) -> impl Iterator<Item = (&str, u32)> {
+        self.counts.iter().map(|(k, v)| (k.as_str(), *v))
     }
 
     pub fn add(&mut self, k: &str, n: u32) {
@@ -209,7 +219,8 @@ mod store {
         match cell {
             0 => "slot.txt".to_string(),
             1 => "profile.txt".to_string(),
-            n => format!("profile-{n}.txt"),
+            n if n <= super::SLOTS as u32 => format!("profile-{n}.txt"),
+            n => format!("run-{}.txt", n - super::SLOTS as u32),
         }
     }
 
@@ -305,6 +316,23 @@ pub fn save_slot(i: usize, p: &Profile) {
     store::write(i.min(SLOTS - 1) as u32 + 1, &p.encode());
 }
 
+/// 슬롯 `i`의 진행 중인 런 칸(0080).
+fn run_cell(i: usize) -> u32 {
+    (SLOTS + i.min(SLOTS - 1)) as u32 + 1
+}
+
+/// 슬롯 `i`에 진행 중인 런이 있으면 그 글(깃발 + 수).
+pub fn load_run(i: usize) -> Option<Profile> {
+    store::read(run_cell(i))
+        .and_then(|s| Profile::decode(&s))
+        .filter(|p| !p.is_empty())
+}
+
+/// 진행 중인 런을 쓰거나(Some) 지운다(None = 빈 글).
+pub fn save_run(i: usize, p: Option<&Profile>) {
+    store::write(run_cell(i), &p.map(|p| p.encode()).unwrap_or_default());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,6 +343,8 @@ mod tests {
         assert_eq!(store::file_name(1), "profile.txt");
         assert_eq!(store::file_name(2), "profile-2.txt");
         assert_eq!(store::file_name(0), "slot.txt");
+        assert_eq!(store::file_name(4), "run-1.txt");
+        assert_eq!(store::file_name(6), "run-3.txt");
         assert!(Profile::default().is_empty());
         let mut p = Profile::default();
         p.add(key::RUNS, 1);

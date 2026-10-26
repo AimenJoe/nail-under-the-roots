@@ -8,6 +8,7 @@ use macroquad::prelude::*;
 
 mod dream;
 mod pick;
+mod run;
 mod slots;
 mod stage;
 
@@ -380,6 +381,8 @@ pub struct App {
     slots_armed: Option<usize>,
     /// 슬롯 창이 이어하기로 열렸나(false = 시작하기).
     slots_load: bool,
+    /// 쉼터부터 이어하는 중(0080): `start`가 새 런 셈·이야기 한마디·이어하기 지우기를 건너뛴다.
+    resuming: bool,
     pause_tab: usize,
     pause_cursor: usize,
     settings_cursor: usize,
@@ -492,6 +495,7 @@ impl App {
             slots_col: 0,
             slots_armed: None,
             slots_load: false,
+            resuming: false,
             pause_tab: 0,
             pause_cursor: 0,
             settings_cursor: 0,
@@ -820,9 +824,13 @@ impl App {
         let start = ch.starting_weapon();
         // 튜토리얼을 마친 기록이 있으면 오프닝·튜토리얼을 건너뛰고 발톱을 든 채 시작한다(0041).
         let veteran = s == Scenario::Normal && self.profile.flag(crate::profile::key::TUTORIAL);
-        if s == Scenario::Normal {
+        if s == Scenario::Normal && !self.resuming {
             self.profile.add(crate::profile::key::RUNS, 1);
             crate::profile::save(&self.profile);
+        }
+        // 새 런을 시작하거나 마을로 돌아오면 쉼터 이어하기는 끝났다(0080).
+        if matches!(s, Scenario::Normal | Scenario::Village) && !self.resuming {
+            self.clear_run();
         }
         if s == Scenario::Daily {
             // 한 달 넘은 오늘의 굴 기록은 지운다(기록이 끝없이 늘지 않게).
@@ -930,7 +938,9 @@ impl App {
                 self.world.skip_glade_boss();
             }
             self.scene = Scene::Game;
-            self.say_story(crate::story::When::RunStart);
+            if !self.resuming {
+                self.say_story(crate::story::When::RunStart);
+            }
             return;
         }
         if matches!(s, Scenario::Normal | Scenario::Tutorial) {
@@ -1303,6 +1313,8 @@ impl App {
                     }
                     Some(3) => {
                         self.bank_glowbugs();
+                        // 쉼터에서 나가면 그 쉼터부터 이어한다(굴 안이면 마지막 쉼터, 0080).
+                        self.checkpoint_run();
                         self.title_cursor = 0;
                         self.scene = Scene::Title;
                     }

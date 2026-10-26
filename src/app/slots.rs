@@ -48,14 +48,20 @@ impl App {
 
     /// 슬롯 `i`의 기록으로 이어한다(튜토리얼을 마쳤으면 마을).
     fn continue_slot(&mut self, i: usize) {
+        let run = self.slot_run(i);
         profile::set_slot(i);
         self.profile = profile::load_slot(i);
         self.apply_assist();
-        self.begin_run();
+        // 쉼터에서 쉬던 런이 있으면 그 쉼터로(0080), 없으면 마을(튜토리얼 전이면 오프닝).
+        match run {
+            Some(r) => self.resume_run(r),
+            None => self.begin_run(),
+        }
     }
 
     /// 슬롯 `i`를 비우고 처음부터(오프닝).
     fn new_in_slot(&mut self, i: usize) {
+        profile::save_run(i, None);
         profile::set_slot(i);
         self.profile = Profile::default();
         profile::save(&self.profile);
@@ -71,6 +77,7 @@ impl App {
             self.apply_assist();
         }
         profile::save_slot(i, &empty);
+        profile::save_run(i, None);
         self.refresh_slots();
         self.sfx.play(crate::sfx::Id::Hurt);
     }
@@ -219,7 +226,14 @@ impl App {
                 } else {
                     &self.slot_cache[i]
                 };
-                slot_summary(p)
+                match self.slot_run(i) {
+                    // 쉼터에서 쉬던 런이 있으면 그것을 먼저 보여 준다(이어하기가 거기로 간다, 0080).
+                    Some(r) => fill(
+                        s.slot_resting,
+                        &[&r.stage, &p.count(crate::profile::key::RUNS)],
+                    ),
+                    None => slot_summary(p),
+                }
             } else {
                 s.slot_empty.to_string()
             };

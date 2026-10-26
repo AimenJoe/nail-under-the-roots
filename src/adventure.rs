@@ -62,6 +62,9 @@ pub enum BossFight {
     Done,
 }
 
+/// 쉼터에 들어설 때 시드에 더하는 수(쉼터마다 다른 길 지도). 이어하기가 되돌릴 때도 쓴다.
+const CAMP_SEED_STEP: u64 = 0x0051_A7E5;
+
 /// 앱에 알릴 일(컷씬·화면). 앱이 비운다.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AdvEvent {
@@ -263,6 +266,21 @@ impl World {
         w.adv.seed = seed;
         w.enter_camp();
         w
+    }
+
+    /// 쉼터부터 이어하기(0080): 적어 둔 쉼터 번호·시드·깊이로 그 쉼터를 다시 세운다(길 지도도 같다).
+    /// `seed`는 쉼터에 들어선 뒤의 값(`adv_seed`). 쉼터 도착 알림은 앱이 버린다(도착 장면을 다시 틀지 않게).
+    pub fn resume_camp(&mut self, stage: u32, seed: u64, depth: u32) {
+        self.adv.boss = BossFight::Done;
+        self.adv.stage = stage.saturating_sub(1);
+        self.adv.seed = seed.wrapping_sub(CAMP_SEED_STEP);
+        self.adv.depth = depth;
+        self.enter_camp();
+    }
+
+    /// 지금 모험 시드(쉼터부터 이어하기가 적어 둔다).
+    pub fn adv_seed(&self) -> u64 {
+        self.adv.seed
     }
 
     /// 쉼터에서 시작하는 모험 월드(개발 시나리오).
@@ -715,7 +733,7 @@ impl World {
         self.adv.home = Place::Camp;
         self.adv.place = Place::Camp;
         self.adv.heart_sold = false;
-        self.adv.seed = self.adv.seed.wrapping_add(0x0051_A7E5);
+        self.adv.seed = self.adv.seed.wrapping_add(CAMP_SEED_STEP);
         self.adv.route = Some(Route::generate(self.adv.seed, stage));
         self.adv.last_cell = None;
         self.adv.events.push(AdvEvent::CampArrive(stage));
