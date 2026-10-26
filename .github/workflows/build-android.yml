@@ -112,6 +112,12 @@ jobs:
           if ! "$BT/aapt2" dump xmltree "$APK" --file AndroidManifest.xml | grep -q "android:exported"; then
             echo "::error::AndroidManifest의 MainActivity에 android:exported가 없다(Android 12+에서 설치 실패)"; exit 1
           fi
+          # 앱 아이콘(0087): 매니페스트에 android:icon이 있고 APK에 mipmap이 들어갔는지.
+          if ! "$BT/aapt2" dump badging "$APK" | grep -q "application-icon"; then
+            echo "::error::APK에 앱 아이콘이 없다(Cargo.toml의 res·icon, android/res)"; exit 1
+          fi
+          "$BT/aapt2" dump badging "$APK" | grep "application-icon" || true
+          unzip -l "$APK" | grep -c "res/mipmap" || true
           unzip -l "$APK"
           sha256sum "$APK"
 
