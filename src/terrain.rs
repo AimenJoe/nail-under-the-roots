@@ -303,7 +303,7 @@ pub fn bake(
     tiles: Option<&Image>,
     sunny: Option<&Image>,
 ) -> Image {
-    let mut k = Baker::new(g, b, paths);
+    let mut k = Baker::new(g, b, paths, &[]);
     k.step(tiles, sunny, &mut || false);
     k.finish()
 }
@@ -324,6 +324,8 @@ pub struct Baker {
     g: Grid,
     b: Biome,
     paths: Vec<(Vec2, Vec2)>,
+    /// 모닥불 자리(0103): 곁의 장식 그림자는 불에서 바깥쪽으로.
+    fires: Vec<Vec2>,
     w: i32,
     h: i32,
     pal: Palette,
@@ -350,7 +352,7 @@ fn tint_px(c: Rgb, t: Color) -> [u8; 4] {
 }
 
 impl Baker {
-    pub fn new(g: &Grid, b: Biome, paths: &[(Vec2, Vec2)]) -> Self {
+    pub fn new(g: &Grid, b: Biome, paths: &[(Vec2, Vec2)], fires: &[Vec2]) -> Self {
         let (w, h) = (g.w as i32 * T, g.h as i32 * T);
         let (wu, hu) = (w as usize, h as usize);
         let pal = palette(b);
@@ -368,6 +370,7 @@ impl Baker {
             g: g.clone(),
             b,
             paths: paths.to_vec(),
+            fires: fires.to_vec(),
             w,
             h,
             pal,
@@ -617,9 +620,30 @@ impl Baker {
             h,
             solid,
             img,
+            fires,
             ..
         } = self;
         let (w, h, b) = (*w, *h, *b);
+        let bright = b.darkness().0 <= 0.0;
+        // 장식 그림자(0102·0103): 발 자리에서 방향을 정하고, 바닥에 붙은 것일수록(꽃 < 조약돌 < 풀포기) 짧게.
+        let shadow_for = |foot: Vec2, lift: f32| -> Option<crate::sunny::StampShadow> {
+            let fire = fires
+                .iter()
+                .copied()
+                .min_by(|a, c| (*a - foot).length().total_cmp(&(*c - foot).length()));
+            let k = crate::render::shadow_dir(foot, fire, bright)?;
+            Some(crate::sunny::StampShadow {
+                k: k * lift,
+                alpha: if bright {
+                    crate::tuning::SUN_SHADOW_ALPHA
+                } else {
+                    crate::tuning::FIRE_SHADOW_ALPHA
+                },
+                fade: fire
+                    .filter(|_| !bright)
+                    .map(|f| (f, crate::tuning::FIRE_SHADOW_REACH)),
+            })
+        };
         let idx = |x: i32, y: i32| y as usize * w as usize + x as usize;
         let is_solid = |x: i32, y: i32| {
             if x < 0 || y < 0 || x >= w || y >= h {
@@ -654,9 +678,15 @@ impl Baker {
                 if let Some(r) = r {
                     let fx = cx * T + 8 + ox as i32 - r.2 as i32 / 2;
                     let fy = cy * T + 12 + oy as i32 - r.3 as i32;
-                    // 밝은 곳(들판·마을)의 서 있는 풀포기·조약돌은 해 그림자를 먼저(0102). 꽃은 바닥에 납작해 뺀다.
-                    if b.darkness().0 <= 0.0 && matches!(d, Decor::Tuft | Decor::Pebble) {
-                        crate::sunny::stamp_sun_shadow(img, sheet, r, fx, fy, is_solid);
+                    // 해·모닥불 그림자를 먼저(0102·0103). 바닥에 깔린 것은 높이 비율만큼 짧다.
+                    let lift = match d {
+                        Decor::Tuft => crate::tuning::DECOR_LIFT_TUFT,
+                        Decor::Pebble => crate::tuning::DECOR_LIFT_PEBBLE,
+                        _ => crate::tuning::DECOR_LIFT_FLOWER,
+                    };
+                    let foot = vec2((fx + r.2 as i32 / 2) as f32, (fy + r.3 as i32) as f32);
+                    if let Some(sh) = shadow_for(foot, lift) {
+                        crate::sunny::stamp_sun_shadow(img, sheet, r, (fx, fy), &sh, is_solid);
                     }
                     crate::sunny::stamp(img, sheet, r, fx, fy, ft, is_solid);
                     // 꽃은 무리로: 둘레에 한두 송이 더.
@@ -673,6 +703,19 @@ impl Baker {
                             let q = hash(cx, cy, 52 + k as u32) as i32;
                             let rr = set[(q as usize >> 4) % 2];
                             let (dx, dy) = ((q % 11) - 5, ((q >> 8) % 7) - 3);
+                            let (qx, qy) = (fx + dx + 3, fy + dy + 2);
+                            let foot =
+                                vec2((qx + rr.2 as i32 / 2) as f32, (qy + rr.3 as i32) as f32);
+                            if let Some(sh) = shadow_for(foot, crate::tuning::DECOR_LIFT_FLOWER) {
+                                crate::sunny::stamp_sun_shadow(
+                                    img,
+                                    sheet,
+                                    rr,
+                                    (qx, qy),
+                                    &sh,
+                                    is_solid,
+                                );
+                            }
                             crate::sunny::stamp(
                                 img,
                                 sheet,
@@ -881,7 +924,7 @@ mod tests {
         let tiles = Image::gen_image_color(512, 512, Color::new(0.5, 0.6, 0.4, 1.0));
         let paths = [(vec2(40.0, 60.0), vec2(250.0, 150.0))];
         let whole = bake(&g, Biome::Meadow, &paths, Some(&tiles), None);
-        let mut k = Baker::new(&g, Biome::Meadow, &paths);
+        let mut k = Baker::new(&g, Biome::Meadow, &paths, &[]);
         let mut steps = 0;
         while !k.step(Some(&tiles), None, &mut || true) {
             steps += 1;

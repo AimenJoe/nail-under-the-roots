@@ -114,11 +114,18 @@ impl Renderer {
         }
     }
 
-    /// 해 그림자(0102): 밝은 곳(어둠 0)에서만. 서 있는 것들을 발 줄 축으로 눕혀 `sun_rt`에 모으고,
-    /// 모양만 남겨 한 번에 얹는다. 그림자끼리 겹쳐도 더 진해지지 않는다(겹쳐 그린 반투명은 겹친 곳이 진해진다).
+    /// 해·모닥불 그림자(0102·0103). 서 있는 것들을 발 줄 축으로 눕혀 `sun_rt`에 모으고, 모양만 남겨 한 번에 얹는다.
+    /// 그림자끼리 겹쳐도 더 진해지지 않는다(겹쳐 그린 반투명은 겹친 곳이 진해진다).
+    /// 밝은 곳: 해(오른쪽 아래), 모닥불 곁은 모닥불 바깥쪽. 어두운 곳: 모닥불 빛이 닿는 데만, 멀수록 옅게.
     fn draw_sun_shadows(&self, art: &Art, w: &World, alpha: f32) {
         let Some(m) = &self.silhouette else { return };
-        if w.biome.darkness().0 > 0.0 {
+        let bright = w.biome.darkness().0 <= 0.0;
+        let center = self.cam.target;
+        let fire = campfires(w)
+            .into_iter()
+            .filter(|f| (*f - center).length() < RW + t::FIRE_SHADOW_REACH)
+            .min_by(|a, b| (*a - center).length().total_cmp(&(*b - center).length()));
+        if !bright && fire.is_none() {
             return;
         }
         let dc = Camera2D {
@@ -131,14 +138,30 @@ impl Renderer {
         };
         set_camera(&dc);
         clear_background(Color::new(0.0, 0.0, 0.0, 0.0));
-        draw_sorted(art, w, alpha, Some(vec2(t::SUN_SHADOW_X, t::SUN_SHADOW_Y)));
+        draw_sorted(art, w, alpha, Some(ShadowLight { fire, bright }));
         set_camera(&self.cam);
+        // 어두운 곳은 모닥불에서 멀수록 옅게(셰이더가 그림자 자리마다 모닥불까지 거리를 잰다).
+        let f = fire.unwrap_or_default();
+        m.set_uniform(
+            "Fire",
+            vec4(
+                f.x,
+                f.y,
+                t::FIRE_SHADOW_REACH,
+                if bright { 0.0 } else { 1.0 },
+            ),
+        );
         gl_use_material(m);
+        let a = if bright {
+            t::SUN_SHADOW_ALPHA
+        } else {
+            t::FIRE_SHADOW_ALPHA
+        };
         draw_texture_ex(
             &self.sun_rt.texture,
             self.view_origin.x,
             self.view_origin.y,
-            Color::new(1.0, 1.0, 1.0, t::SUN_SHADOW_ALPHA),
+            Color::new(1.0, 1.0, 1.0, a),
             DrawTextureParams {
                 dest_size: Some(vec2(RW, RH)),
                 flip_y: true,
@@ -245,7 +268,10 @@ impl Renderer {
                     self.baking = None;
                 } else {
                     if self.baking.as_ref().map(|(k, _)| *k) != Some(key) {
-                        self.baking = Some((key, crate::terrain::Baker::new(g, w.biome, &paths)));
+                        self.baking = Some((
+                            key,
+                            crate::terrain::Baker::new(g, w.biome, &paths, &campfires(w)),
+                        ));
                     }
                     let (_, baker) = self.baking.as_mut().unwrap();
                     let t0 = get_time();
@@ -274,7 +300,7 @@ impl Renderer {
             if self.cut.is_some() {
                 draw_mushrooms(art, w, cam);
             }
-            draw_cast_shadows(w, alpha, cam);
+            draw_cast_shadows(w, alpha, cam, self.silhouette.is_some());
             draw_sorted(art, w, alpha, None);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
@@ -2973,7 +2999,7 @@ enum Drawable {
 /// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
 /// `sun`이 있으면 해 그림자 패스(0102): 바닥 것(발밑 그림자·웅덩이·지뢰)은 빼고, 서 있는 것마다 발 줄을 축으로
 /// 바닥에 눕혀(`sun_shear`) 그대로 다시 그린다. 색은 버리고 모양만 쓴다(`Renderer::draw_sun_shadows`).
-fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<Vec2>) {
+fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
     let ground = sun.is_none();
     let mut list: Vec<(f32, Drawable)> = Vec::new();
     for (i, p) in w.room.props.iter().enumerate() {
@@ -3093,8 +3119,12 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<Vec2>) {
     }
     list.sort_by(|a, b| a.0.total_cmp(&b.0));
     for (foot, d) in list {
-        // 해 그림자: 발 줄(foot)을 축으로 눕힌다. 끝에서 되돌린다.
-        if let Some(k) = sun {
+        // 해·모닥불 그림자: 발 줄(foot)을 축으로 눕힌다. 끝에서 되돌린다. 빛이 닿지 않으면 그리지 않는다.
+        if let Some(l) = sun {
+            let at = vec2(drawable_x(w, alpha, &d), foot);
+            let Some(k) = shadow_dir(at, l.fire, l.bright) else {
+                continue;
+            };
             unsafe { get_internal_gl() }
                 .quad_gl
                 .push_model_matrix(sun_shear(foot, k));
@@ -3233,6 +3263,66 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<Vec2>) {
         if sun.is_some() {
             unsafe { get_internal_gl() }.quad_gl.pop_model_matrix();
         }
+    }
+}
+
+/// 그림자 패스의 빛(0103): 가장 가까운 모닥불 자리(불 밑동)와 밝은 곳인지.
+#[derive(Clone, Copy)]
+struct ShadowLight {
+    fire: Option<Vec2>,
+    bright: bool,
+}
+
+/// 장소의 모닥불 자리(불 밑동, 빛 자리와 같다).
+pub fn campfires(w: &World) -> Vec<Vec2> {
+    w.room
+        .props
+        .iter()
+        .filter(|p| p.kind == PropKind::Campfire)
+        .map(|p| vec2(p.rect.center().x, p.rect.bottom() - 6.0))
+        .collect()
+}
+
+/// 발이 `foot`인 것의 그림자 방향·길이(높이 1px당 바닥 위 px, 0102·0103). 빛이 닿지 않으면 None.
+/// 모닥불 곁은 불에서 바깥쪽으로, 멀수록 길게. 옆으로 눕는 그림자는 납작한 줄이 되지 않게 뒤로 조금 두께를 준다.
+/// 밝은 곳은 모닥불에서 멀어질수록 해 방향으로 부드럽게 돌아간다. 실시간 그림자와 지도 굽기가 같이 쓴다.
+pub fn shadow_dir(foot: Vec2, fire: Option<Vec2>, bright: bool) -> Option<Vec2> {
+    let sun = vec2(t::SUN_SHADOW_X, t::SUN_SHADOW_Y);
+    let Some(f) = fire else {
+        return bright.then_some(sun);
+    };
+    let reach = t::FIRE_SHADOW_REACH;
+    let d = foot - f;
+    let dist = d.length();
+    if !bright && dist > reach {
+        return None;
+    }
+    let dir = if dist < 1.0 { vec2(0.0, 1.0) } else { d / dist };
+    let len = t::FIRE_SHADOW_MIN + t::FIRE_SHADOW_GROW * (dist / reach).min(1.0);
+    let radial = dir * len - vec2(0.0, t::FIRE_SHADOW_THICK * (1.0 - dir.y.abs()));
+    if !bright {
+        return Some(radial);
+    }
+    let u = ((dist - 0.6 * reach) / (0.4 * reach)).clamp(0.0, 1.0);
+    let u = u * u * (3.0 - 2.0 * u);
+    Some(radial.lerp(sun, u))
+}
+
+/// 정렬 그리기 한 개의 발 x(그림자 패스가 모닥불까지 거리를 잴 때).
+fn drawable_x(w: &World, alpha: f32, d: &Drawable) -> f32 {
+    match *d {
+        Drawable::Pillar(i) => w.room.props[i].rect.center().x,
+        Drawable::Pickup(i) => w.pickups[i].pos.x,
+        Drawable::Loot(i) => lerp(w.loot[i].prev_pos, w.loot[i].pos, alpha).x,
+        Drawable::Player => lerp(w.player.prev_pos, w.player.pos, alpha).x,
+        Drawable::Enemy(i) => lerp(w.enemies[i].prev_pos, w.enemies[i].pos, alpha).x,
+        Drawable::Projectile(i) => lerp(w.projectiles[i].prev_pos, w.projectiles[i].pos, alpha).x,
+        Drawable::Npc => w
+            .npc
+            .as_ref()
+            .map_or(0.0, |n| lerp(n.prev_pos, n.pos, alpha).x),
+        Drawable::Neighbor(i) => w.neighbors[i].pos.x,
+        Drawable::Tree(at, _) | Drawable::Decor(_, at) | Drawable::DreamLoop(at) => at.x,
     }
 }
 
@@ -4405,19 +4495,26 @@ fn silhouette_material() -> Option<Material> {
     varying lowp vec4 color;
     uniform mat4 Model;
     uniform mat4 Projection;
+    varying highp vec2 world;
     void main() {
         gl_Position = Projection * Model * vec4(position, 1);
         color = color0 / 255.0;
         uv = texcoord;
+        world = position.xy;
     }"#;
+    // Fire = (불 x, 불 y, 닿는 거리, 어두운 곳이면 1): 어두운 곳은 불에서 멀수록 옅게(0103).
     const FRAGMENT: &str = r#"#version 100
-    precision lowp float;
+    precision mediump float;
     varying lowp vec4 color;
     varying lowp vec2 uv;
+    varying highp vec2 world;
     uniform sampler2D Texture;
+    uniform vec4 Fire;
     void main() {
         float a = step(0.05, texture2D(Texture, uv).a);
-        gl_FragColor = vec4(0.10, 0.06, 0.14, a * color.a);
+        float d = distance(world, Fire.xy);
+        float fade = mix(1.0, 1.0 - smoothstep(0.55 * Fire.z, Fire.z, d), Fire.w);
+        gl_FragColor = vec4(0.10, 0.06, 0.14, a * color.a * fade);
     }"#;
     load_material(
         ShaderSource::Glsl {
@@ -4437,6 +4534,7 @@ fn silhouette_material() -> Option<Material> {
                 )),
                 ..Default::default()
             },
+            uniforms: vec![UniformDesc::new("Fire", UniformType::Float4)],
             ..Default::default()
         },
     )
@@ -4493,9 +4591,24 @@ fn cut_material() -> Option<Material> {
 
 /// 빛 반대쪽으로 늘어나는 그림자(0095). 야광버섯·모닥불·저장 지점 곁의 캐릭터는 빛에서 먼 쪽으로 그림자가 길어지고,
 /// 어두운 곳에서는 플레이어의 빛이 적에게 그림자를 드리운다. 바닥 위(정렬 그리기 전)에 그려 어둠 지도가 함께 덮는다.
-fn draw_cast_shadows(w: &World, alpha: f32, cam: Vec2) {
+/// `fire_silhouettes`: 모닥불 그림자는 모양 그림자(`draw_sun_shadows`, 0103)가 맡으므로 여기서 뺀다.
+fn draw_cast_shadows(w: &World, alpha: f32, cam: Vec2, fire_silhouettes: bool) {
     let (dark, radius) = w.biome.darkness();
-    let lights = light_sources(w, alpha, cam, radius);
+    let fires = if fire_silhouettes {
+        campfires(w)
+    } else {
+        Vec::new()
+    };
+    let mut lights = light_sources(w, alpha, cam, radius);
+    // 플레이어 빛(0번)은 자리를 지킨다: 아래 skip_player가 0번을 본다.
+    let mut i = 1;
+    while i < lights.len() {
+        if fires.iter().any(|f| (lights[i].pos - *f).length() < 0.5) {
+            lights.remove(i);
+        } else {
+            i += 1;
+        }
+    }
     // 밝은 들판에서는 플레이어 빛이 없다(어둠이 없으니 비추는 빛이 아니다).
     let skip_player = if dark > 0.0 { 0 } else { 1 };
     let pp = lerp(w.player.prev_pos, w.player.pos, alpha);

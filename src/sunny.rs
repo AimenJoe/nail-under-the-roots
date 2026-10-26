@@ -128,17 +128,25 @@ pub fn stamp(
     }
 }
 
-/// 해 그림자(0102)를 CPU 그림(지도 굽기)에 찍는다: 팩 한 칸의 모양을 발 줄(왼쪽 위 (x, y) + 높이) 축으로 눕힌다.
+/// 구운 장식 하나의 그림자(0102·0103): 방향·길이(`render::shadow_dir` × 높이 비율)와,
+/// 어두운 곳이면 옅어지는 기준(불 자리, 닿는 거리). 진하기는 `alpha`.
+pub struct StampShadow {
+    pub k: Vec2,
+    pub alpha: f32,
+    pub fade: Option<(Vec2, f32)>,
+}
+
+/// 해·모닥불 그림자를 CPU 그림(지도 굽기)에 찍는다: 팩 한 칸의 모양을 발 줄(왼쪽 위 (x, y) + 높이) 축으로 눕힌다.
 /// 실시간 그림자(`render::sun_shear`)와 같은 식. 같은 자리를 두 번 어둡게 하지 않는다. `skip`(벽 위)은 건너뛴다.
 pub fn stamp_sun_shadow(
     dst: &mut Image,
     sheet: &Image,
     r: R,
-    x: i32,
-    y: i32,
+    (x, y): (i32, i32),
+    sh: &StampShadow,
     skip: impl Fn(i32, i32) -> bool,
 ) {
-    let k = vec2(crate::tuning::SUN_SHADOW_X, crate::tuning::SUN_SHADOW_Y);
+    let k = sh.k;
     let shade = crate::render::SUN_SHADE;
     let (w, h) = (dst.width as i32, dst.height as i32);
     let foot = y + r.3 as i32 - 1;
@@ -164,8 +172,16 @@ pub fn stamp_sun_shadow(
     spots.sort_unstable();
     spots.dedup();
     for (px, py) in spots {
+        let fade = sh.fade.map_or(1.0, |(f, reach)| {
+            let d = vec2(px as f32, py as f32).distance(f);
+            let u = ((d - 0.55 * reach) / (0.45 * reach)).clamp(0.0, 1.0);
+            1.0 - u * u * (3.0 - 2.0 * u)
+        });
+        let a = sh.alpha * fade;
+        if a <= 0.0 {
+            continue;
+        }
         let i = (py as usize * w as usize + px as usize) * 4;
-        let a = shade.a;
         for (c, s) in dst.bytes[i..i + 3]
             .iter_mut()
             .zip([shade.r, shade.g, shade.b])

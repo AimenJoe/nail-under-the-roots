@@ -182,6 +182,19 @@ pub const SUN_SHADOW_X: f32 = 0.45;
 pub const SUN_SHADOW_Y: f32 = 0.35;
 /// 해 그림자 진하기(겹쳐도 같다).
 pub const SUN_SHADOW_ALPHA: f32 = 0.28;
+/// 모닥불 그림자(0103): 불 밑동에서 이 거리(px)까지 그림자가 진다(어두운 곳은 바깥으로 옅게, 밝은 곳은 해 방향으로 돌아간다).
+pub const FIRE_SHADOW_REACH: f32 = 150.0;
+/// 불 곁 그림자 길이(높이 1px당): 바로 곁 MIN, 닿는 끝에서 MIN + GROW. 멀수록 길다.
+pub const FIRE_SHADOW_MIN: f32 = 0.5;
+pub const FIRE_SHADOW_GROW: f32 = 1.1;
+/// 옆으로 눕는 그림자의 두께(높이 1px당 뒤로). 없으면 발 줄 한 줄로 납작해진다.
+pub const FIRE_SHADOW_THICK: f32 = 0.3;
+/// 지도에 구운 장식의 그림자 길이 비율(0103): 3/4 시점에서 바닥에 깔린 것은 그림 높이만큼 서 있지 않다.
+pub const DECOR_LIFT_FLOWER: f32 = 0.3;
+pub const DECOR_LIFT_PEBBLE: f32 = 0.45;
+pub const DECOR_LIFT_TUFT: f32 = 0.6;
+/// 어두운 곳(쉼터) 모닥불 그림자 진하기. 어둠 지도가 위에 덮이므로 해보다 진하게.
+pub const FIRE_SHADOW_ALPHA: f32 = 0.42;
 /// 야광버섯의 빛(0095·0100): 어둠 지도에서 빼는 반지름(px)·세기(0..1). 은은하게 넓게: 여럿이 겹쳐야 바닥이 드러난다.
 pub const MUSH_LIGHT_R: f32 = 64.0;
 pub const MUSH_LIGHT: f32 = 0.28;
