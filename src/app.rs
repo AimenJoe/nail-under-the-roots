@@ -1565,6 +1565,15 @@ impl App {
         let ui = self.renderer.present();
         self.hits.clear();
         self.last_ui = (ui.scale, ui.ox, ui.oy);
+        // 타이틀과 타이틀에서 여는 창은 같은 바탕 그림(0083).
+        let title_bg = matches!(self.scene, Scene::Title | Scene::Slots | Scene::Dev)
+            || matches!(
+                self.scene,
+                Scene::Settings { back: Back::Title } | Scene::Controls { back: Back::Title }
+            );
+        if title_bg {
+            self.renderer.draw_title_art(&ui, get_time() as f32);
+        }
 
         match self.scene {
             Scene::Intro => self.draw_intro(&ui),

@@ -330,6 +330,79 @@ impl Renderer {
         }
     }
 
+    /// 타이틀 바탕(docs/decisions/0083): 땅의 단면 그림 + 반딧불 몇 마리(굴 방 둘레·뿌리 사이) + 떨어지는 마른 잎,
+    /// 메뉴 뒤 옅은 어둠(글이 읽히게). 그림이 없으면 아무것도 하지 않는다(월드 패스의 선 바탕이 남는다).
+    /// `t`는 초(움직임만, 상태 없음).
+    pub fn draw_title_art(&self, ui: &Ui, t: f32) {
+        use crate::illust::{VIEW_H, VIEW_W};
+        let Some(tex) = self.art.as_ref().and_then(|a| a.title.as_ref()) else {
+            return;
+        };
+        let o = ui.px(vec2(0.0, 0.0));
+        let k = ui.scale / 2.0;
+        draw_texture_ex(
+            tex,
+            o.x,
+            o.y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(vec2(VIEW_W * k, VIEW_H * k)),
+                ..Default::default()
+            },
+        );
+        // 원본 px(640×360) 좌표로 작은 네모 하나.
+        let dot = |x: f32, y: f32, size: f32, c: Color| {
+            draw_rectangle(
+                (o.x + x * k).round(),
+                (o.y + y * k).round(),
+                (size * k).max(1.0).round(),
+                (size * k).max(1.0).round(),
+                c,
+            );
+        };
+        // 반딧불: 자리마다 느린 8자 + 깜빡임. 둘은 굴 방 안, 나머지는 뿌리 사이.
+        const FLIES: [(f32, f32, f32); 7] = [
+            (128.0, 250.0, 0.0),
+            (70.0, 236.0, 1.7),
+            (300.0, 214.0, 3.1),
+            (420.0, 172.0, 4.4),
+            (470.0, 276.0, 2.2),
+            (610.0, 240.0, 5.3),
+            (250.0, 300.0, 0.9),
+        ];
+        for (i, &(x, y, ph)) in FLIES.iter().enumerate() {
+            let s = 0.35 + 0.07 * i as f32;
+            let px = x + (t * s + ph).sin() * 10.0;
+            let py = y + (t * s * 2.0 + ph).sin() * 5.0;
+            let a = 0.55 + 0.45 * (t * 2.3 + ph * 1.7).sin().max(0.0);
+            dot(
+                px - 2.0,
+                py - 2.0,
+                6.0,
+                Color::new(1.0, 0.92, 0.55, 0.18 * a),
+            );
+            dot(px, py, 2.0, Color::new(1.0, 0.97, 0.75, a));
+        }
+        // 마른 잎 하나가 가지 끝에서 흔들리며 떨어진다(9초마다).
+        let cycle = 9.0;
+        let lt = t % cycle;
+        if lt < 6.0 {
+            let lx = 440.0 + (lt * 2.1).sin() * 14.0 - lt * 6.0;
+            let ly = 10.0 + lt * 18.0;
+            if ly < 112.0 {
+                dot(lx, ly, 4.0, Color::new(0.69, 0.52, 0.29, 1.0));
+                dot(lx + 1.0, ly + 1.0, 2.0, Color::new(0.77, 0.61, 0.36, 1.0));
+            }
+        }
+        // 메뉴 뒤(게임 좌표 90~256 × 53~151, 오늘의 굴 날짜까지) 옅은 어둠. 가장자리는 한 겹 더 옅게.
+        let menu = Rect::new(90.0, 53.0, 166.0, 98.0);
+        ui.rect(
+            Rect::new(menu.x - 2.0, menu.y - 2.0, menu.w + 4.0, menu.h + 4.0),
+            Color::new(0.05, 0.03, 0.05, 0.18),
+        );
+        ui.rect(menu, Color::new(0.05, 0.03, 0.05, 0.32));
+    }
+
     /// 컷씬 일러스트를 게임 화면 전체에(docs/decisions/0039). 원본 1px = 화면 배율/2 px(초상화와 같은 2배 밀도).
     /// 홀수 배율에서는 원본 픽셀이 1.5배처럼 고르지 않게 늘어난다 — 그래서 임시 그림은 1px 디더를 쓰지 않는다.
     /// `t`는 그림이 뜬 뒤 흐른 시간(패닝·입자).

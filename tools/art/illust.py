@@ -8,6 +8,7 @@
   halmae_deep  704×360  오른쪽으로 64px 패닝
   last_bloom   640×440  위(꽃) → 아래(밑동)로 패닝
   나머지       640×360(doto_memory 포함 — 도토가 기억해 내는 장면, 0053)
+  title        640×360 타이틀 바탕(0083, 컷씬 그림이 아니다: 앨범에 없다, assets/art/title.png로 옮긴다)
 대화창·내레이션 띠가 보이는 창의 y 248 아래를 덮는다 → 얼굴·중요한 것은 그 위에.
 
 그리는 법(픽셀 그림 흉내):
@@ -1241,6 +1242,129 @@ def doto_memory():
     return cv
 
 
+def title():
+    """타이틀 바탕(0083): 땅의 단면 — 제목 그대로 "뿌리 아래". 위 1/3은 해 질 녘 들판(Friedrich「외로운 나무」 하늘·산,
+    퍼블릭 도메인), 아래는 흙. 오른쪽 큰 나무의 뿌리가 흙 속으로 번지고, 왼쪽 아래 굴 방에서 Naïl이 잔다.
+    맨 아래 구석에 보라 실이 조금(이야기의 실마리).
+    글자 자리(게임 좌표 ×2): 제목 y 32~100, 메뉴 x 192~448 · y 112~300, 안내 y 306, 저작권 줄 y 332 아래.
+    그래서 땅 줄은 제목 바로 아래(118), 메뉴 뒤 흙은 고르고 어둡게, 볼거리(나무·굴 방)는 메뉴 양옆에 둔다."""
+    rng = random.Random(83)
+    cv = Canvas(640, 360)
+    ground = 118
+    # 하늘·먼 산: 그림 오른쪽(나무가 없는 쪽)을 뒤집어 이어 붙인다. 그대로면 이음매가 가운데(제목 바로 뒤)라
+    # 대칭 무늬가 글자를 가렸다. 뒤집어 붙인 그림은 왼쪽 끝 = 오른쪽 끝이라 옆으로 굴려도 이어진다 →
+    # 이음매를 큰 나무 줄기 뒤(x 540)로 굴린다. ('tile'로 붙이면 가운데에 세로 이음매가 보였다.)
+    pastel_bg(cv, 'friedrich_lone_tree.jpg', colors=16, margin=0.0, box=(0, 0, 640, ground + 2),
+              crop=(0.6, 0.30, 0.99, 0.70), mirror=True)
+    cv.px[:ground + 2] = np.roll(cv.px[:ground + 2], 220, axis=1)
+    sky = cv.px.copy()
+    # 흙: 땅 바로 밑은 따뜻하게, 아래로 갈수록 어둡게
+    bands(cv, ground, 360, (104, 72, 54), (26, 18, 24), 10)
+    pebbles(cv, rng, (0, ground + 12, 640, 352), 90, [(104, 80, 66), (88, 70, 64), (120, 96, 74)])
+    # 흙 층 경계(가는 어두운 물결 두 줄)
+    for y0, col in ((168, (78, 54, 44)), (238, (52, 36, 36))):
+        pts = [(x, y0 + 5 * math.sin(x / 47) + 3 * math.sin(x / 13)) for x in range(-8, 650, 8)]
+        cv.paint(stroke(cv, pts, 2), col)
+    # 땅 줄·풀
+    cv.paint((cv.yy >= ground - 4) & (cv.yy < ground + 4), (72, 92, 62))
+    grass_tufts(cv, rng, ground, 0, 640, hue_shift([(52, 70, 50), (74, 96, 60), (98, 122, 72), (140, 156, 90)]))
+    base = cv.px.copy()
+    # 마을 둔덕 둘(왼쪽 들판, 작은 둥근 문)
+    for (x, r) in ((150, 20), (232, 14)):
+        hill = ellipse(cv, x, ground, r * 1.6, r) & (cv.yy <= ground)
+        outline(cv, hill, (60, 40, 32), 1)
+        shade(cv, hill, [(98, 66, 48), (132, 92, 64), (164, 120, 84), (190, 150, 108)], x, ground, r * 1.6, r)
+        door = ellipse(cv, x + 2, ground - 2, r * 0.45, r * 0.55) & (cv.yy <= ground)
+        cv.paint(door, (70, 46, 34))
+        cv.paint(ellipse(cv, x + r * 0.9, ground - r * 0.5, 2.5, 2.5), (255, 220, 140))
+    # 큰 나무(오른쪽): 줄기 아래쪽만, 위는 화면 밖으로
+    tx = 540
+    trunk = poly(cv, [(486, ground + 8), (512, ground - 18), (520, 40), (522, -10), (562, -10), (564, 40),
+                      (572, ground - 18), (598, ground + 8)])
+    # 왼쪽으로 뻗은 가지 하나(제목 쪽으로 기울지 않게 높이)
+    trunk |= stroke(cv, bezier((522, 30), (490, 14), (462, 6), (430, -6)), 12, 5)
+    trunk |= stroke(cv, bezier((470, 10), (458, 0), (452, -4), (446, -12)), 5, 2)
+    # 뿌리: 굵은 것은 오른쪽·아래로, 가는 것은 메뉴 뒤로(어둡게)
+    roots = []
+    for k, (ex, ey, w) in enumerate(((628, 300, 18), (590, 352, 16), (470, 330, 13), (400, 250, 9),
+                                     (330, 180, 7), (300, 300, 7), (250, 236, 5), (640, 210, 12))):
+        sx = 500 + k * 12
+        pts = bezier((sx, ground), (sx + (ex - sx) * 0.25, ground + 40), (ex + rng.uniform(-30, 30), ey - 60), (ex, ey))
+        roots.append((pts, w))
+    under_menu = (cv.xx > 180) & (cv.xx < 460)
+    for pts, w in roots:
+        m = stroke(cv, pts, w, 2)
+        outline(cv, m, (34, 22, 24), 1)
+        dim = w <= 9
+        cv.paint(m, BARK[1] if dim else BARK[2])
+        if not dim:
+            cv.paint(stroke(cv, [(x - 2, y) for x, y in pts], max(2, w * 0.25), 1) & m, BARK[3])
+        cv.paint(m & under_menu, BARK[1])
+        # 잔뿌리
+        for i in range(8, len(pts) - 4, 9):
+            x, y = pts[i]
+            a = rng.uniform(0.4, 2.7)
+            fine = stroke(cv, [(x, y), (x + math.cos(a) * 18, y + math.sin(a) * 14)], 2, 1)
+            cv.paint(fine, BARK[1])
+    outline(cv, trunk, (30, 20, 24), 2)
+    shade(cv, trunk, BARK, tx, 60, 44, 90)
+    for _ in range(14):
+        x = rng.uniform(516, 566)
+        y = rng.uniform(-10, ground - 10)
+        ln = rng.uniform(8, 18)
+        crack = stroke(cv, [(x, y), (x + rng.uniform(-2, 2), y + ln)], 2) & trunk
+        cv.paint(crack, BARK[0])
+    rim = tuple(min(255, v * 1.05) for v in sky[:60].reshape(-1, 3).mean(0))
+    rim_light(cv, trunk, rim, 2, 0.5)
+    # 마른 잎 몇 장
+    for (x, y) in ((444, 2), (458, 10), (436, 12)):
+        m = ellipse(cv, x, y, 5, 3, rot=rng.uniform(0, 3))
+        cv.paint(dilate(m) & ~m, (70, 46, 34))
+        cv.paint(m, rng.choice([(176, 132, 74), (196, 156, 92)]))
+    # 왼쪽 아래 Naïl의 굴 방 + 땅으로 난 굴길
+    room = ellipse(cv, 104, 262, 76, 42)
+    tunnel = stroke(cv, bezier((52, ground), (40, 160), (60, 210), (78, 236)), 26, 22)
+    cav = room | tunnel
+    lit = Canvas(640, 360)
+    bands(lit, ground, 320, (150, 112, 84), (96, 70, 58), 7)
+    cv.px[cav] = lit.px[cav]
+    outline(cv, cav, (36, 24, 26), 2)
+    # 굴 방의 따뜻한 빛(반딧불 병). 빛은 방 안에만(밖으로 새면 둥근 띠가 흙 위에 떠 보였다).
+    before = cv.px.copy()
+    glow(cv, 150, 270, 90, (255, 214, 140), 0.4, 5)
+    cv.px[~cav] = before[~cav]
+    nest = ellipse(cv, 100, 292, 62, 12) & cav
+    cv.paint(nest, (132, 104, 64))
+    for _ in range(40):
+        x = rng.uniform(44, 160)
+        y = rng.uniform(284, 300)
+        a = rng.uniform(-0.6, 0.6)
+        cv.paint(stroke(cv, [(x, y), (x + math.cos(a) * 14, y + math.sin(a) * 4)], 2) & cav,
+                 rng.choice([(196, 166, 96), (166, 132, 76), (214, 186, 118)]))
+    mole(cv, 96, 274, 24, facing=1, eyes='closed')
+    # 작은 반딧불 병(빛의 까닭)
+    jar = ellipse(cv, 152, 282, 7, 9)
+    outline(cv, jar, (60, 50, 50), 1)
+    cv.paint(jar, (200, 214, 170))
+    cv.paint(ellipse(cv, 152, 283, 3, 3), (255, 250, 190))
+    cv.paint(ellipse(cv, 152, 272, 5, 2), (110, 80, 60))
+    # 굵은 뿌리 끝이 보라로 물든다(이야기의 실마리, 옅게). 따로 그은 실은 번개·낙서처럼 보였다 → 뿌리 끝
+    # 1/4에만 보라 빛을 얹고 둘레를 은은하게.
+    for pts, w in roots:
+        if w < 12:
+            continue
+        tip = stroke(cv, pts[-int(len(pts) * 0.28):], w * 0.55, 2)
+        cv.paint(dilate(tip, 5) & ~tip, VIOLET[1], 0.16)
+        cv.paint(tip, VIOLET[1], 0.55)
+        cv.paint(stroke(cv, [(x - 1, y) for x, y in pts[-int(len(pts) * 0.2):]], 1) & tip, VIOLET[3], 0.7)
+    # 바닥 어둡게(저작권·버전 줄이 읽히게)
+    for i, y in enumerate(range(318, 360, 6)):
+        m = (cv.yy >= y) & (cv.yy < y + 6)
+        cv.px[m] = cv.px[m] * (1 - 0.06 * (i + 1))
+    ambient_tint(cv, base, 0.10, light_from=(0, ground))
+    return cv
+
+
 SCENES = {
     'great_tree': great_tree,
     'mother_burrow': mother_burrow,
@@ -1252,6 +1376,7 @@ SCENES = {
     'sprout': sprout,
     'molehill': molehill,
     'doto_memory': doto_memory,
+    'title': title,
 }
 
 

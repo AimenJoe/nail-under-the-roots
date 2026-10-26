@@ -24,6 +24,8 @@ pub struct Art {
     pub chief: Option<Texture2D>,
     /// 컷씬 일러스트(illust::Illust::ALL 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
     pub illust: Vec<Option<Texture2D>>,
+    /// 타이틀 바탕 640×360(2배 밀도, `tools/art/illust.py` title, 0083). 없으면 예전 선 바탕.
+    pub title: Option<Texture2D>,
 }
 
 /// chief.png 한 칸.
@@ -166,7 +168,13 @@ impl Art {
             }
             illust.push(t);
         }
+        // 타이틀 바탕(0083). 컷씬 그림이 아니라 앨범 목록(`Illust::ALL`)에 넣지 않는다.
+        let title = load_texture("art/illust/title.png").await.ok();
+        if let Some(t) = &title {
+            t.set_filter(FilterMode::Nearest);
+        }
         Some(Self {
+            title,
             nail,
             nail_furs,
             tiles,
