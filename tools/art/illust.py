@@ -56,7 +56,7 @@ SCARF = [(104, 34, 44), (150, 52, 54), (196, 82, 66), (228, 122, 86), (246, 166,
 _BASE = dict(FUR=FUR, MOM_FUR=MOM_FUR, PINK=PINK, RFUR=RFUR, RMUZ=RMUZ, RABBIT=RABBIT, BARK=BARK, VIOLET=VIOLET,
              GREEN=GREEN, BLOSSOM=BLOSSOM, CAP=CAP, DFUR=DFUR, ACORN=ACORN, SCARF=SCARF)
 SUNSET_RIM = (226, 160, 118)
-# 그림 방식. 환경 변수가 있으면 모든 장면에(비교용), 없으면 장면마다 SCENE_STYLE(0072·0073).
+# 그림 방식. 환경 변수가 있으면 모든 장면에(비교용), 없으면 장면마다 SCENE_STYLE/DEFAULT_STYLE(0072·0073).
 #   NAIL_ART_V2=1: 색조 이동·조약돌·풀 포기·노을 가장자리 빛 / NAIL_ART_V4=1: v2 + 초상화 v4의 털 규칙(0071)
 V2_ENV = os.environ.get('NAIL_ART_V2') == '1'
 V4_ENV = os.environ.get('NAIL_ART_V4') == '1'
@@ -626,20 +626,34 @@ def great_tree():
 def mother_burrow():
     rng = random.Random(22)
     cv = Canvas(640, 360)
-    bands(cv, 0, 360, (60, 42, 38), (28, 20, 24), 6)
-    speckle(cv, rng, (0, 0, 640, 360), 160, [(48, 34, 32), (82, 60, 50), (40, 28, 30)])
     # 굴 방(밝은 흙)과 오른쪽 위로 난 굴길
     room = ellipse(cv, 260, 190, 230, 120)
     tunnel = stroke(cv, bezier((380, 170), (470, 150), (520, 90), (600, 0)), 90, 70)
     cav = room | tunnel
-    # 굴 안은 밝은 흙(아래로 어두워짐), 밖은 그대로 어두운 흙.
-    lit = Canvas(640, 360)
-    bands(lit, 60, 360, (150, 112, 84), (90, 66, 56), 7)
-    cv.px[cav] = lit.px[cav]
+    if V4:
+        # 0073: 흙벽 질감은 Hubert Robert「동굴 입구」(1784, Met CC0)의 오른쪽 바위벽 물감. 색은 예전의 따뜻한 굴 색을 두고,
+        # 그림은 밝기 질감으로만 얹는다(그림 색을 그대로 쓰면 녹갈색 돌 던전이 됐다).
+        tex = Canvas(640, 360)
+        pastel_bg(tex, 'robert_mouth_of_cave.jpg', colors=12, edge=255, margin=0.0, crop=(0.52, 0.16, 0.95, 0.6), mirror=True)
+        L = tex.px @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+        mod = np.clip(1 + 0.42 * (L / L.mean() - 1), 0.78, 1.24)[..., None]
+        bands(cv, 0, 360, (60, 42, 38), (28, 20, 24), 6)
+        lit = Canvas(640, 360)
+        bands(lit, 0, 360, (150, 112, 84), (90, 66, 56), 7)
+        cv.px[:] = cv.px * mod
+        cv.px[cav] = (lit.px * mod)[cav]
+    else:
+        bands(cv, 0, 360, (60, 42, 38), (28, 20, 24), 6)
+        speckle(cv, rng, (0, 0, 640, 360), 160, [(48, 34, 32), (82, 60, 50), (40, 28, 30)])
+        # 굴 안은 밝은 흙(아래로 어두워짐), 밖은 그대로 어두운 흙.
+        lit = Canvas(640, 360)
+        bands(lit, 60, 360, (150, 112, 84), (90, 66, 56), 7)
+        cv.px[cav] = lit.px[cav]
     outline(cv, cav, (36, 24, 26), 3)
     # 굴길 끝의 빛: 굴길 안만 위로 갈수록 밝게(넓은 계단 셋).
     for i, (r, al) in enumerate(((260, 0.10), (180, 0.14), (110, 0.2))):
         cv.paint(ellipse(cv, 640, -20, r, r) & tunnel, (255, 238, 196), al)
+    base = cv.px.copy()
     # 바닥 둥지(마른 풀)
     nest = ellipse(cv, 170, 268, 130, 34) & cav
     cv.paint(nest, (132, 104, 64))
@@ -656,22 +670,34 @@ def mother_burrow():
     # 엄마 코끝과 Naïl 엉덩이 사이 작은 흙먼지
     for k in range(4):
         cv.paint(ellipse(cv, 330 + k * 4, 214 - k * 5, 3, 2), (180, 150, 120))
+    if V4:
+        ambient_tint(cv, base, 0.12, light_from=(60, 300))
     return cv
 
 
 def bori_freed():
     rng = random.Random(33)
     cv = Canvas(640, 360)
-    bands(cv, 0, 200, (112, 96, 128), (220, 176, 140), 8)
-    bands(cv, 200, 360, (106, 128, 74), (60, 84, 52), 6)
-    for _ in range(60):
-        x, y = rng.uniform(0, 640), rng.uniform(210, 360)
-        flower(cv, x, y, rng.uniform(2, 4), [(150, 120, 150), (230, 200, 230), (250, 240, 250), (255, 255, 255)], (250, 220, 120))
-    # 공터 둘레 덤불(지평선 위, 어두운 초록)
-    for (x, r) in ((30, 80), (130, 60), (510, 64), (610, 84)):
-        bush = ellipse(cv, x, 206, r, r * 0.55) & (cv.yy <= 210)
-        cv.paint(bush, (64, 84, 62))
-        cv.paint(ellipse(cv, x - r * 0.3, 190, r * 0.4, r * 0.2) & bush, (84, 106, 74))
+    if V4:
+        # 0073: 바탕은「해질녘 들판(Meadow at Sunset)」(ca. 1845, National Gallery of Art 2013.196.3, CC0 — rawpixel 경유).
+        # 분홍·하늘빛 하늘, 어두운 나무 줄, 금빛 들판. 꽃은 그림 결을 덮지 않게 조금만.
+        pastel_bg(cv, 'meadow_at_sunset_1845.jpg', colors=18, edge=28, margin=0.03)
+        for _ in range(22):
+            x, y = rng.uniform(0, 640), rng.uniform(250, 360)
+            flower(cv, x, y, rng.uniform(2, 3.4), [(150, 120, 150), (230, 200, 230), (250, 240, 250), (255, 255, 255)], (250, 220, 120))
+        base = cv.px.copy()
+        ground_shadow(cv, 330, 258, 92, 12)
+    else:
+        bands(cv, 0, 200, (112, 96, 128), (220, 176, 140), 8)
+        bands(cv, 200, 360, (106, 128, 74), (60, 84, 52), 6)
+        for _ in range(60):
+            x, y = rng.uniform(0, 640), rng.uniform(210, 360)
+            flower(cv, x, y, rng.uniform(2, 4), [(150, 120, 150), (230, 200, 230), (250, 240, 250), (255, 255, 255)], (250, 220, 120))
+        # 공터 둘레 덤불(지평선 위, 어두운 초록)
+        for (x, r) in ((30, 80), (130, 60), (510, 64), (610, 84)):
+            bush = ellipse(cv, x, 206, r, r * 0.55) & (cv.yy <= 210)
+            cv.paint(bush, (64, 84, 62))
+            cv.paint(ellipse(cv, x - r * 0.3, 190, r * 0.4, r * 0.2) & bush, (84, 106, 74))
     # 보리(들쥐 대장): 앉아서 눈을 감고 숨을 고른다
     cx, cy = 320, 190
     body = ellipse(cv, cx, cy + 10, 78, 62)
@@ -708,17 +734,27 @@ def bori_freed():
         cv.paint(m, VIOLET[2])
         for (x, y) in pts[28::4]:
             cv.paint(ellipse(cv, x, y, 1.6, 1.6), (230, 210, 255))
+    if V4:
+        ambient_tint(cv, base, 0.12)
     return cv
 
 
 def momo_bloom():
     rng = random.Random(44)
     cv = Canvas(640, 360)
-    bands(cv, 0, 360, (90, 70, 110), (210, 160, 180), 9)
-    # 뒤 빛망울
-    for _ in range(26):
-        x, y, r = rng.uniform(0, 640), rng.uniform(0, 300), rng.uniform(8, 26)
-        cv.paint(ellipse(cv, x, y, r, r), (255, 230, 240), 0.12)
+    if V4:
+        # 0073: 바탕은「풍경 배경(Landscape background, 1846–1848)」(수채, CC0 — rawpixel 경유). 노랑·하늘빛 옅은 하늘.
+        pastel_bg(cv, 'landscape_background_1846.jpg', colors=16, edge=40, margin=0.03)
+        for _ in range(10):
+            x, y, r = rng.uniform(0, 640), rng.uniform(0, 300), rng.uniform(8, 22)
+            cv.paint(ellipse(cv, x, y, r, r), (255, 240, 230), 0.1)
+        base = cv.px.copy()
+    else:
+        bands(cv, 0, 360, (90, 70, 110), (210, 160, 180), 9)
+        # 뒤 빛망울
+        for _ in range(26):
+            x, y, r = rng.uniform(0, 640), rng.uniform(0, 300), rng.uniform(8, 26)
+            cv.paint(ellipse(cv, x, y, r, r), (255, 230, 240), 0.12)
     cx, cy = 320, 176
     # 귀(길게, 위로)
     ear_l = ellipse(cv, cx - 44, cy - 128, 24, 84, rot=-0.18)
@@ -775,6 +811,8 @@ def momo_bloom():
     for _ in range(5):
         p0 = (cx + rng.uniform(-90, 90), cy + rng.uniform(60, 110))
         wavy_thread(cv, p0, (p0[0] + rng.uniform(-60, 60), 360), rng, 3, 2, VIOLET)
+    if V4:
+        ambient_tint(cv, base, 0.1)
     return cv
 
 
@@ -994,9 +1032,9 @@ def pastel_bg(cv, name, colors=18, edge=30, margin=0.04, box=None, crop=None, mi
         src = src.crop((int(crop[0] * w), int(crop[1] * h), int(crop[2] * w), int(crop[3] * h)))
     if tone is not None:                              # 색 보정(예: spring_tone)
         src = tone(src)
-    if mirror:                                        # 좌우로 이어 붙여 넓힌다(이음매는 가운데 — 큰 것이 가리는 자리)
+    if mirror:   # 좌우로 이어 붙여 넓힌다. True = 뒤집어 대칭(이음매가 안 보인다), 'tile' = 그대로 나란히(대칭 무늬가 안 생긴다)
         wide = Image.new('RGB', (src.width * 2, src.height))
-        wide.paste(src.transpose(Image.FLIP_LEFT_RIGHT), (0, 0))
+        wide.paste(src if mirror == 'tile' else src.transpose(Image.FLIP_LEFT_RIGHT), (0, 0))
         wide.paste(src, (src.width, 0))
         src = wide
     src = prepare(src, x1 - x0, y1 - y0, margin, 1.1, 1.1)
@@ -1217,8 +1255,10 @@ SCENES = {
 }
 
 
-# 장면마다 그림 방식(v2, v4). 하나씩 바꾼다(0073): 파스텔 바탕으로 바꾼 장면은 v4.
-SCENE_STYLE = {'molehill': (True, True), 'great_tree': (True, True), 'last_bloom': (True, True)}
+# 장면마다 그림 방식(v2, v4). 모든 장면이 v4(0073: 여섯 장은 파스텔·수채 바탕, 땅속·꿈 네 장은 v4 규칙만).
+# 옛 그림과 비교할 때는 환경 변수로 모든 장면에(NAIL_ART_V2=1 → v2, 둘 다 0이면 v1이 아니라 기본 — v1은 SCENE_STYLE을 고친다).
+SCENE_STYLE = {}
+DEFAULT_STYLE = (True, True)
 
 
 def main():
@@ -1228,7 +1268,7 @@ def main():
     for name, fn in SCENES.items():
         if only and name not in only:
             continue
-        set_style(*((V2_ENV, V4_ENV) if (V2_ENV or V4_ENV) else SCENE_STYLE.get(name, (False, False))))
+        set_style(*((V2_ENV, V4_ENV) if (V2_ENV or V4_ENV) else SCENE_STYLE.get(name, DEFAULT_STYLE)))
         im = fn().image()
         path = os.path.join(out, name + '.png')
         im.save(path, optimize=True)
