@@ -341,12 +341,11 @@ def cel_pixelate(src, tw, th, k, edge):
     return Image.fromarray(np.clip(rgb + 0.5, 0, 255).astype(np.uint8)), line
 
 
-def cmd_pixelate(a):
+def prepare(src, tw, th, margin=0.0, contrast=1.1, saturation=1.1):
+    """도트화 앞 단계: 테두리 걷기 → 목표 비율로 가운데 자르기 → 대비·채도 → 한 칸 크기에 맞춘 중앙값 흐림."""
     from PIL import ImageEnhance, ImageFilter
-    tw, th = (int(v) for v in a.size.lower().split("x"))
-    src = Image.open(a.src).convert("RGB")
-    if a.margin > 0:      # 그림 테두리(액자·종이 가장자리) 걷어 내기
-        mw, mh = int(src.width * a.margin), int(src.height * a.margin)
+    if margin > 0:      # 그림 테두리(액자·종이 가장자리) 걷어 내기
+        mw, mh = int(src.width * margin), int(src.height * margin)
         src = src.crop((mw, mh, src.width - mw, src.height - mh))
     # 목표 비율로 가운데 자르기(cover)
     sw, sh = src.size
@@ -354,14 +353,20 @@ def cmd_pixelate(a):
     cw, ch = int(round(tw / k)), int(round(th / k))
     x0, y0 = (sw - cw) // 2, (sh - ch) // 2
     src = src.crop((x0, y0, x0 + cw, y0 + ch))
-    if a.contrast != 1.0:
-        src = ImageEnhance.Contrast(src).enhance(a.contrast)
-    if a.saturation != 1.0:
-        src = ImageEnhance.Color(src).enhance(a.saturation)
+    if contrast != 1.0:
+        src = ImageEnhance.Contrast(src).enhance(contrast)
+    if saturation != 1.0:
+        src = ImageEnhance.Color(src).enhance(saturation)
     # 한 칸이 원본 몇 px인지에 맞춘 중앙값 흐림: 잎·풀·털 같은 잔무늬가 덩어리로 뭉친다(바로 줄이면 칸마다 색이 튄다).
     cell = max(1, cw // tw)
     if cell >= 3:
         src = src.filter(ImageFilter.MedianFilter(min(9, cell | 1)))
+    return src
+
+
+def cmd_pixelate(a):
+    tw, th = (int(v) for v in a.size.lower().split("x"))
+    src = prepare(Image.open(a.src).convert("RGB"), tw, th, a.margin, a.contrast, a.saturation)
     small = src.resize((tw, th), Image.BOX)
     if a.cel:
         q, _ = cel_pixelate(src, tw, th, a.colors, a.edge)

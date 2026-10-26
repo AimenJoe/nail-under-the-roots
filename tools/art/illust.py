@@ -53,16 +53,29 @@ ACORN = [(62, 40, 26), (98, 66, 40), (138, 98, 60), (176, 134, 84)]
 # Naïl의 뜨개 목도리(portraits.py RAMP['scarf']와 같은 색)
 SCARF = [(104, 34, 44), (150, 52, 54), (196, 82, 66), (228, 122, 86), (246, 166, 120)]
 
-V2 = os.environ.get('NAIL_ART_V2') == '1'
-# v4(비교 시험, 기본 꺼짐): NAIL_ART_V4=1. 초상화 v4(0071)의 털 뭉치·삐침·작은 하이라이트·빛 쪽 외곽선을 일러스트에도(0072).
-V4 = os.environ.get('NAIL_ART_V4') == '1'
-V2 = V2 or V4
-if V2:
-    from portraits import hue_shift
-    FUR, MOM_FUR, PINK, RFUR, RMUZ, RABBIT, BARK, VIOLET, GREEN, BLOSSOM, CAP, DFUR, ACORN, SCARF = (
-        hue_shift(r) for r in (FUR, MOM_FUR, PINK, RFUR, RMUZ, RABBIT, BARK, VIOLET, GREEN, BLOSSOM, CAP, DFUR, ACORN, SCARF))
-    SUNSET_RIM = (226, 160, 118)
-FUR_RAMPS = (FUR, MOM_FUR, RFUR, RABBIT, DFUR)
+_BASE = dict(FUR=FUR, MOM_FUR=MOM_FUR, PINK=PINK, RFUR=RFUR, RMUZ=RMUZ, RABBIT=RABBIT, BARK=BARK, VIOLET=VIOLET,
+             GREEN=GREEN, BLOSSOM=BLOSSOM, CAP=CAP, DFUR=DFUR, ACORN=ACORN, SCARF=SCARF)
+SUNSET_RIM = (226, 160, 118)
+# 그림 방식. 환경 변수가 있으면 모든 장면에(비교용), 없으면 장면마다 SCENE_STYLE(0072·0073).
+#   NAIL_ART_V2=1: 색조 이동·조약돌·풀 포기·노을 가장자리 빛 / NAIL_ART_V4=1: v2 + 초상화 v4의 털 규칙(0071)
+V2_ENV = os.environ.get('NAIL_ART_V2') == '1'
+V4_ENV = os.environ.get('NAIL_ART_V4') == '1'
+
+
+def set_style(v2, v4):
+    """경사 표와 V2·V4를 한 장면 동안 바꾼다(장면 함수는 전역을 그릴 때 읽는다)."""
+    global V2, V4, FUR_RAMPS
+    V4 = v4
+    V2 = v2 or v4
+    if V2:
+        from portraits import hue_shift
+        globals().update({k: hue_shift(v) for k, v in _BASE.items()})
+    else:
+        globals().update(_BASE)
+    FUR_RAMPS = (FUR, MOM_FUR, RFUR, RABBIT, DFUR)
+
+
+set_style(V2_ENV, V4_ENV)
 _lu = math.hypot(LIGHT[0], LIGHT[1])
 _U = (LIGHT[0] / _lu, LIGHT[1] / _lu)      # 화면에서 빛 쪽
 _V = (-_U[1], _U[0])
@@ -142,7 +155,7 @@ def dilate(m, r=1):
     return out
 
 
-def shade(cv, mask, ramp, cx=None, cy=None, rx=None, ry=None, bias=0.0):
+def shade(cv, mask, ramp, cx=None, cy=None, rx=None, ry=None, bias=0.0, clumps=False):
     """마스크에 구 음영 띠. 중심·반지름을 안 주면 마스크 상자로."""
     ys, xs = np.nonzero(mask)
     if len(xs) == 0:
@@ -156,7 +169,7 @@ def shade(cv, mask, ramp, cx=None, cy=None, rx=None, ry=None, bias=0.0):
     k = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2] + bias
     k = np.clip((k + 0.35) / 1.25, 0, 0.999)
     idx = (k * len(ramp)).astype(int)
-    if V4 and any(ramp is r for r in FUR_RAMPS):
+    if V4 and (clumps or any(ramp is r for r in FUR_RAMPS)):
         n = len(ramp)
         idx[(idx == n - 1) & (k < 0.9)] = n - 2       # 가장 밝은 단은 빛 바로 밑 작은 덩어리만
         idx = fur_clumps(cv, mask, idx, max(rx, ry))
@@ -321,8 +334,9 @@ def wavy_thread(cv, p0, p3, rng, amp, width, ramp, wraps=0, base=None):
 
 # ---- 인물 -------------------------------------------------------------------
 
-def mole(cv, cx, cy, s, facing=1, eyes='open', ramp=FUR, paws=True):
-    """두더지: 둥근 몸 + 분홍 주둥이 + 큰 앞발·크림 발톱. s = 몸 가로 반지름."""
+def mole(cv, cx, cy, s, facing=1, eyes='open', ramp=None, paws=True):
+    """두더지: 둥근 몸 + 분홍 주둥이 + 큰 앞발·크림 발톱. s = 몸 가로 반지름. ramp 없으면 Naïl 털(FUR)."""
+    ramp = FUR if ramp is None else ramp
     f = facing
     body = ellipse(cv, cx, cy, s, s * 0.8)
     head = ellipse(cv, cx + f * s * 0.55, cy - s * 0.05, s * 0.6, s * 0.55)
@@ -413,7 +427,8 @@ def silhouette_critter(cv, kind, cx, cy, s, rgb, facing=1):
     return m
 
 
-def flower(cv, cx, cy, r, ramp=BLOSSOM, center=(250, 210, 120)):
+def flower(cv, cx, cy, r, ramp=None, center=(250, 210, 120)):
+    ramp = BLOSSOM if ramp is None else ramp
     m = np.zeros((cv.h, cv.w), dtype=bool)
     for k in range(5):
         a = -math.pi / 2 + k * 2 * math.pi / 5
@@ -916,7 +931,87 @@ def sprout():
     return cv
 
 
+SOURCES = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sources')
+
+
+def pastel_bg(cv, name, colors=18, edge=30, margin=0.04):
+    """바탕을 파스텔·수채 그림에서(0073): tools/pixel의 --cel과 같은 길(단순화 → 면 나누기 → 다수결 축소 → 큰 면 1px 선).
+    원본은 tools/art/sources/(CC0·퍼블릭 도메인, 출처는 assets/LICENSES.md). 인물과 같은 칸 크기로 만든다(믹셀 피하기)."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pixel'))
+    from pxl import cel_pixelate, prepare
+    src = prepare(Image.open(os.path.join(SOURCES, name)).convert('RGB'), cv.w, cv.h, margin, 1.1, 1.1)
+    img, _ = cel_pixelate(src, cv.w, cv.h, colors, edge)
+    cv.px[:] = np.asarray(img, dtype=np.float32)
+
+
+def ambient_tint(cv, base, amount=0.15):
+    """바탕 위에 얹은 것(바탕과 달라진 칸)에 바탕의 평균 빛을 조금 섞는다: 그림 속 공기에 함께 들어가 스티커처럼 뜨지 않게."""
+    changed = np.abs(cv.px - base).sum(-1) > 0
+    amb = base.reshape(-1, 3).mean(0)
+    cv.px[changed] = cv.px[changed] * (1 - amount) + amb * amount
+
+
+def ground_shadow(cv, cx, cy, rx, ry, k=0.62):
+    """인물 발밑 그림자: 바탕을 어둡게 눌러 땅에 붙인다."""
+    m = ellipse(cv, cx, cy, rx, ry)
+    cv.px[m] = cv.px[m] * k
+
+
 def molehill():
+    if V4:
+        return molehill_pastel()
+    return molehill_v1()
+
+
+def molehill_pastel():
+    """흙더미(0073): 바탕은 Erzsébet Korb「도나우 풍경」(파스텔, ca. 1920–22, CC0). 길 끝 언덕에 마을 둥근 문,
+    길 끝에 새싹이 자란 어린 나무, 앞쪽 들판에 새 두더지 둔덕, 왼쪽 길섶에서 고개 내민 엄마 두더지."""
+    rng = random.Random(88)
+    cv = Canvas(640, 360)
+    pastel_bg(cv, 'korb_danube.jpg')
+    base = cv.px.copy()
+    # 마을: 길 끝 언덕(지평선 아래 들판 띠)에 둥근 문·창
+    for (x, y) in ((206, 238), (258, 230), (384, 230), (444, 240)):
+        ground_shadow(cv, x, y + 8, 18, 3)
+        door = ellipse(cv, x, y, 12, 14) & (cv.yy <= y + 7)
+        outline(cv, door, (60, 50, 40), 1)
+        cv.paint(door, (110, 74, 52))
+        cv.paint(ellipse(cv, x, y - 2, 6, 7) & door, (84, 54, 40))
+        cv.paint(ellipse(cv, x + 22, y - 4, 4, 4), (255, 220, 140))
+    # 어린 나무: 길이 모이는 곳
+    tx, ty = 316, 246
+    ground_shadow(cv, tx, ty + 2, 22, 4)
+    trunk = stroke(cv, bezier((tx, ty), (tx - 4, ty - 40), (tx + 6, ty - 80), (tx, ty - 120)), 8, 4)
+    outline(cv, trunk, (50, 36, 30), 1)
+    shade(cv, trunk, BARK, tx, ty - 60, 10, 60)
+    crown = [(tx - 20, ty - 120, 26), (tx + 22, ty - 128, 28), (tx, ty - 148, 26), (tx - 34, ty - 96, 18), (tx + 36, ty - 100, 18)]
+    cm = np.zeros((cv.h, cv.w), bool)
+    for (x, y, r) in crown:
+        cm |= ellipse(cv, x, y, r, r * 0.8)
+    cm = tufted(cv, cm, 40, 0)                # 잎도 털처럼: 가장자리 삐침 + 단 경계 톱니(매끈한 공은 풍선으로 읽힌다)
+    outline(cv, cm, (40, 70, 44), 1)
+    shade(cv, cm, GREEN, tx, ty - 126, 52, 40, clumps=True)
+    for _ in range(6):
+        flower(cv, rng.uniform(tx - 40, tx + 40), rng.uniform(ty - 160, ty - 100), 4, BLOSSOM, (250, 220, 140))
+    # 앞쪽 새 두더지 둔덕(오른쪽 들판)
+    ground_shadow(cv, 476, 306, 76, 8)
+    hillm = ellipse(cv, 470, 300, 70, 34) & (cv.yy <= 304)
+    outline(cv, hillm, (60, 40, 32), 2)
+    shade(cv, hillm, [(98, 66, 48), (132, 92, 64), (164, 120, 84), (190, 150, 108)], 470, 300, 70, 40)
+    speckle(cv, rng, (420, 272, 520, 300), 14, [(84, 56, 42), (150, 110, 80)], size=(2, 3))
+    # 왼쪽 길섶, 땅에서 고개를 내민 엄마 두더지 — 둔덕을 바라본다
+    hole = ellipse(cv, 176, 246, 28, 8)
+    cv.paint(hole, (70, 46, 34))
+    mole(cv, 176, 234, 14, facing=1, eyes='open', ramp=MOM_FUR, paws=False)
+    cv.paint(ellipse(cv, 176, 248, 32, 7) & (cv.yy >= 246), (96, 66, 48))
+    for _ in range(18):
+        x, y = rng.uniform(0, 640), rng.uniform(262, 360)
+        flower(cv, x, y, rng.uniform(2, 3.5), [(200, 180, 90), (240, 220, 120), (255, 240, 170), (255, 250, 220)], (240, 160, 80))
+    ambient_tint(cv, base)
+    return cv
+
+
+def molehill_v1():
     rng = random.Random(88)
     cv = Canvas(640, 360)
     bands(cv, 0, 200, (150, 196, 230), (236, 232, 206), 8)
@@ -1061,6 +1156,10 @@ SCENES = {
 }
 
 
+# 장면마다 그림 방식(v2, v4). 하나씩 바꾼다(0073): 파스텔 바탕으로 바꾼 장면은 v4.
+SCENE_STYLE = {'molehill': (True, True)}
+
+
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else 'assets/art/illust'
     only = sys.argv[2:]
@@ -1068,6 +1167,7 @@ def main():
     for name, fn in SCENES.items():
         if only and name not in only:
             continue
+        set_style(*((V2_ENV, V4_ENV) if (V2_ENV or V4_ENV) else SCENE_STYLE.get(name, (False, False))))
         im = fn().image()
         path = os.path.join(out, name + '.png')
         im.save(path, optimize=True)

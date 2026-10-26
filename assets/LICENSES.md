@@ -11,7 +11,8 @@
 | `art/portraits.png` | 직접 그림. 원본 `tools/art/portraits.py` | © 2026 Beardworks | 대화창 초상화 88×88, 한 줄 12칸(Naïl 털빛 3 × 표정 4 포함, Naïl 표정 4 + 이웃 그림자 + 라쿤 포포 2 + 물든 모모 2 + 들쥐 대장·보리 3 + 돌아온 모모 3 + 누룩 할매 2 + 엄마 두더지 1 + 도토 3 + 수수 2 + 콩이 3) |
 | `art/critters.png` | 직접 그림. 원본 `tools/art/critters.py` | © 2026 Beardworks | 적(물든 들쥐·생쥐·시궁쥐·다람쥐·청설모)·허수아비·라쿤 포포·물든 모모·돌아온 모모·도토·돌아온 도토·수수·콩이·돌아온 콩이 16×16 + 흰 실루엣. v2 손으로 찍은 자세 |
 | `art/chief.png` | 직접 그림. 원본 `tools/art/chief.py` | © 2026 Beardworks | 튜토리얼 보스 들쥐 대장(물든 모습 8칸)·돌아온 보리(5칸) 32×32 + 흰 실루엣 |
-| `art/illust/*.png` | 직접 그림(임시). 원본 `tools/art/illust.py` | © 2026 Beardworks | 컷씬 일러스트 9장 640×360(2배 밀도, 일부는 패닝용으로 더 큼). 사람이 그린 그림으로 바꾸면 이 행을 작가·계약으로 고친다(docs/art/cutscene-illustrations.md) |
+| `art/illust/*.png` | 직접 그림(임시). 원본 `tools/art/illust.py` | © 2026 Beardworks(molehill 바탕은 아래 Korb 파스텔, CC0) | 컷씬 일러스트 9장 640×360(2배 밀도, 일부는 패닝용으로 더 큼). 사람이 그린 그림으로 바꾸면 이 행을 작가·계약으로 고친다(docs/art/cutscene-illustrations.md) |
+| `tools/art/sources/korb_danube.jpg` → `art/illust/molehill.png` 바탕 | Erzsébet Korb, *Untitled (Landscape with the Danube)*, 파스텔, ca. 1920–22, The Met 2026.21.19 [소장품 페이지](https://www.metmuseum.org/art/collection/search/927415) (`images.metmuseum.org` web-large, 2026-10-26) | CC0(Met Open Access, API `isPublicDomain: true`) | 흙더미 일러스트 바탕(0073). `illust.py`가 도트화(단순화 → 면 나누기 → 1px 외곽선)하고 그 위에 마을·어린 나무·둔덕·엄마 두더지를 그린다. 출처 표시 의무는 없지만 남긴다 |
 | `art/tiles.png` | 직접 그림. 원본 `tools/art/tiles.py` | © 2026 Beardworks | Sunnyside가 들어오기 전 대체 타일(풀·꽃·흙·벼랑·그루터기·바위·버섯·뿌리·얼룩) |
 | `site/img/s_*.png` | 게임 스크린숏(`tools/site/shots.js`) | 게임 화면 | 공식 페이지용(0069). Sunnyside 그림이 **게임 화면 안에** 들어 있다. 팩 원본 파일이 아니고 칸을 꺼낼 수 없는 합성 화면이라, 게임 소개 용도로 둔다. `site/img/p_*`·`i_*`는 직접 그린 그림을 자르거나 복사한 것(`tools/site/make_images.py`) |
 | `site/fonts/galmuri11-sub.woff2` | Galmuri11 Condensed를 페이지 글자만 남겨 줄임 | SIL OFL 1.1(예약 이름 없음, `site/fonts/OFL.md`) | 공식 페이지 제목용 |
