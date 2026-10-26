@@ -47,6 +47,8 @@ CHARACTERS = {
     'susu': (33, ('normal', 'happy'), 1.0, 16),
     # 콩이: 원본이 칸을 채워 틀은 그대로. 주둥이 위 머리 판의 밝은 테두리가 배경색과 가까워 틈 지우기(HOLES)는 켜지 않는다.
     'kongi': (36, ('normal', 'happy'), None, 16),
+    # 물든 콩이: 콩이 보통 표정을 고쳐 그려 틀이 같다. 눈은 옅은 하늘빛 빛(0054).
+    'kongi_tainted': (35, ('glare',), None, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
 CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae', 'doto', 'doto_tainted'}
@@ -125,13 +127,14 @@ HALO = {
     'chief': CHIEF_KEEP,
 }
 # 보랏빛 눈 팔레트(EYE_COLORS)를 떼지 않는 캐릭터: 들쥐 대장은 눈이 빨강이고 털이 보라 기운 잿빛이라,
-# 떼면 털이 그 칸을 다 차지해 보라 실이 털 색과 묶였다(흰 줄로 보였다). 실은 채도 칸으로 간다. 물든 도토도 털이 보라 기운이라 같다.
-NO_EYE_SPLIT = {'chief', 'doto_tainted'}
+# 떼면 털이 그 칸을 다 차지해 보라 실이 털 색과 묶였다(흰 줄로 보였다). 실은 채도 칸으로 간다. 물든 도토·콩이도 털이 보라 기운이라 같다.
+NO_EYE_SPLIT = {'chief', 'doto_tainted', 'kongi_tainted'}
 
-def _glow_eyes(img, boxes, hues, out_hue):
+def _glow_eyes(img, boxes, hues, out_hue, min_sat=0.4, out_sat=0.82):
     """눈 상자 안의 빛 색(색상이 hues 안, 채도 > 0.4)을 밝고 진하게. 흰 반사·검은 선은 그대로.
     물든 눈은 88px로 줄이면 흐려져 빛나는 눈으로 읽히지 않았다(들쥐 대장은 검붉게, 물든 도토는 흐린 주황 갈색).
-    실에 묶인 동물 = 작게 빛나는 눈이 이야기 약속이다(nano-banana-prompts.md 세계 규칙). hues = (낮은 끝, 높은 끝), 0을 넘어가면 낮은 끝 > 높은 끝."""
+    실에 묶인 동물 = 작게 빛나는 눈이 이야기 약속이다(nano-banana-prompts.md 세계 규칙). hues = (낮은 끝, 높은 끝), 0을 넘어가면 낮은 끝 > 높은 끝.
+    min_sat·out_sat: 옮길 점의 채도 문턱과 옮긴 채도. 물든 콩이의 홍채는 채도 0.21의 흰빛 하늘색이라 문턱을 낮추고, 옅은 하늘빛이 남게 0.45로."""
     lo, hi = hues
     sx = img.width / 1024
     px = img.load()
@@ -140,8 +143,8 @@ def _glow_eyes(img, boxes, hues, out_hue):
             for x in range(int(x0 * sx), int(x1 * sx)):
                 h, s, v = _hsv(px[x, y])
                 inside = (lo <= h <= hi) if lo <= hi else (h >= lo or h <= hi)
-                if inside and s > 0.4 and v > 0.18:
-                    r, g, b = colorsys.hsv_to_rgb(out_hue, 0.82, min(1.0, 0.62 + v * 0.6))
+                if inside and s > min_sat and v > 0.18:
+                    r, g, b = colorsys.hsv_to_rgb(out_hue, out_sat, min(1.0, 0.62 + v * 0.6))
                     px[x, y] = (int(r * 255), int(g * 255), int(b * 255))
 
 
@@ -156,8 +159,22 @@ FIXES['chief_glare'] = lambda img: _glow_eyes(img, CHIEF_KEEP[2:], (0.95, 0.05),
 # 물든 도토 눈 상자(원본 1024px): 왼눈·오른눈. 호박색(색상 0.05~0.14)을 꿀빛으로.
 DOTO_TAINTED_EYES = [(545, 480, 690, 610), (770, 480, 870, 610)]
 FIXES['doto_tainted_glare'] = lambda img: _glow_eyes(img, DOTO_TAINTED_EYES, (0.05, 0.14), 0.09)
+# 물든 콩이 눈 상자(원본 1024px). 흰빛 하늘색(색상 0.45~0.62, 채도 0.12 넘음)을 옅지만 분명한 하늘빛으로(0054).
+KONGI_TAINTED_EYES = [(490, 460, 630, 570)]
+FIXES['kongi_tainted_glare'] = lambda img: _glow_eyes(img, KONGI_TAINTED_EYES, (0.45, 0.62), 0.54, 0.12, 0.45)
 for _face in ('normal', 'happy', 'worried', 'tainted_normal', 'tainted_pained'):
     FIXES[f'momo_{_face}'] = lambda img: _plum_lines(img, MOMO_EYES)
+
+
+def _bg_color(img):
+    """배경색: 위 두 모서리와 좌우 가운데 네 점의 평균. 네 점 가운데 나머지와 먼(거리 40 넘는) 점은 뺀다.
+    물든 콩이는 왼쪽 가운데가 짙은 등딱지 위라 평균이 배경에서 벗어나, 배경이 하나도 지워지지 않았다(0122)."""
+    w, h = img.size
+    px = img.load()
+    pts = [px[0, 0], px[w - 1, 0], px[0, h // 2], px[w - 1, h // 2]]
+    dist = lambda a, b: sum((a[i] - b[i]) ** 2 for i in range(3)) ** 0.5
+    keep = [p for p in pts if sorted(dist(p, q) for q in pts)[2] <= 40] or pts
+    return tuple(sum(c[i] for c in keep) // len(keep) for i in range(3))
 
 
 def _character_mask(img, tol=34, from_bottom=True):
@@ -166,8 +183,7 @@ def _character_mask(img, tol=34, from_bottom=True):
     모모는 크림색 가슴이 아래 끝에 닿고 배경 베이지와 가까워 켜면 가슴이 통째로 투명해진다(CHEST_AT_BOTTOM)."""
     w, h = img.size
     px = img.load()
-    corners = [px[0, 0], px[w - 1, 0], px[0, h // 2], px[w - 1, h // 2]]
-    bg = tuple(sum(c[i] for c in corners) // len(corners) for i in range(3))
+    bg = _bg_color(img)
     near_bg = lambda c: sum((c[i] - bg[i]) ** 2 for i in range(3)) <= tol * tol
     is_bg = [[False] * w for _ in range(h)]
     stack = [(x, 0) for x in range(w)] + ([(x, h - 1) for x in range(w)] if from_bottom else [])
@@ -226,8 +242,7 @@ def _clear_holes(img, mask, tol=20, min_area=200):
     할매 머리 위 갓·대 사이 틈이 베이지로 남았다(사장). 크림색 몸이 배경과 가까운 캐릭터(모모 가슴)는 지워지면 안 되니 HOLES에 든 캐릭터만."""
     w, h = img.size
     px = img.load()
-    corners = [px[0, 0], px[w - 1, 0], px[0, h // 2], px[w - 1, h // 2]]
-    bg = tuple(sum(c[i] for c in corners) // len(corners) for i in range(3))
+    bg = _bg_color(img)
     near = lambda c: sum((c[i] - bg[i]) ** 2 for i in range(3)) <= tol * tol
     seen = [[False] * w for _ in range(h)]
     for y0 in range(h):
