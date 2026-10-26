@@ -7,6 +7,8 @@ PNG를 손으로 고치지 않고, 원본에 할 일을 모두 여기에 둔다(
   3. 배경(가장자리와 이어진 밝은 베이지)을 투명하게, 몸과 떨어진 반짝이·티끌은 지운다.
   4. 88×88로 줄이고(덩어리 평균), 같은 캐릭터 표정 넷을 한 팔레트로 맞춘다(디더 없이).
   5. Naïl 털빛 1~3: 털 색만 portraits.FUR_VARIANTS 경사로 옮긴다(목도리·주둥이·앞발·발톱·눈은 그대로).
+  6. 틀 맞추기(FIT): 캐릭터마다 그림 속 여백이 달라 칸에서 크기가 달라 보인다(포포는 높이 71%, Naïl은 94%).
+     표정들을 합친 캐릭터 영역으로 정사각형을 잘라, 높이가 칸의 FIT 비율이 되고 가슴 아래는 칸 밖으로 조금 나가게 한다.
 """
 import colorsys
 import os
@@ -16,12 +18,20 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, 'sources', 'ai')
 W = H = 88
-# 표정 순서 = 칸 순서(portraits.py 칸 0~3).
-FACES = ('normal', 'happy', 'worried', 'determined')
-# 한 캐릭터 표정들을 맞출 팔레트 색 수. 32·48색이면 눈의 보랏빛과 목도리 주황이 털 갈색에 묻혔다.
-# 눈(보랏빛)은 점이 적어 팔레트를 나눌 때 사라지므로 EYE_COLORS칸을 따로 떼어 둔다.
-PALETTE = 64
+# 캐릭터: 원본 이름 → (첫 칸, 표정 순서 = 칸 순서, 틀 맞추기). 틀이 None이면 원본 그대로(Naïl이 기준).
+# 칸 번호는 portraits.py 맨 위 표, 표정 이름은 원본 파일 이름 `<이름>_<표정>.png`.
+# vivid: 채도 높은 작은 색에 따로 뗄 팔레트 칸 수. 포포의 노란 연필이 회색 털에 밀려 황토색이 돼서 켰다.
+# Naïl은 0: 켜면 나머지 색의 나뉨이 달라져 주둥이 중간 단이 털 색과 묶이고, 털빛 변형의 주둥이가 물들었다.
+CHARACTERS = {
+    'nail': (0, ('normal', 'happy', 'worried', 'determined'), None, 0),
+    'popo': (5, ('normal', 'happy'), 0.92, 16),
+}
+# 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
+FIT_CUT = 0.02
+# 한 캐릭터 표정들을 맞출 팔레트: 눈(보랏빛) EYE_COLORS + 채도 높은 색(캐릭터 표의 vivid) + 나머지 REST_COLORS.
+# 32·48색 한 덩어리면 Naïl 눈의 보랏빛과 목도리 주황이 털 갈색에 묻혔다(눈은 점이 적어 팔레트를 나눌 때 사라진다).
 EYE_COLORS = 8
+REST_COLORS = 56
 # Gemini 앱 로고(✦): 원본 512px 기준 가운데·반지름(네 꼭짓점 별).
 STAR = (451.5, 452.5, 12.5)
 
@@ -143,7 +153,7 @@ def _shrink(img, mask):
     return out
 
 
-def _shared_palette(cells):
+def _shared_palette(cells, vivid_colors):
     """표정들을 한 팔레트로(디더 없이). 투명은 그대로."""
     strip = Image.new('RGB', (W * len(cells), H), (0, 0, 0))
     for i, c in enumerate(cells):
@@ -168,9 +178,15 @@ def _shared_palette(cells):
         raw = q.getpalette()
         return [tuple(raw[i * 3:i * 3 + 3]) for i in used]
 
+    def is_vivid(p):
+        h, s, v = _hsv(p)
+        return s > 0.45 and v > 0.45
+
     eye = [p for p in opaque if is_eye(p)]
-    rest = [p for p in opaque if not is_eye(p)]
-    entries = colors(eye, EYE_COLORS) + colors(rest, PALETTE - EYE_COLORS)
+    split = vivid_colors > 0
+    vivid = [p for p in opaque if split and not is_eye(p) and is_vivid(p)]
+    rest = [p for p in opaque if not is_eye(p) and not (split and is_vivid(p))]
+    entries = colors(eye, EYE_COLORS) + colors(vivid, vivid_colors) + colors(rest, REST_COLORS)
     pal = Image.new('P', (1, 1))
     flat_pal = [v for c in entries for v in c]
     pal.putpalette(flat_pal + flat_pal[-3:] * (256 - len(entries)))
@@ -264,30 +280,57 @@ def fur_variant(cell, ramp):
     return out
 
 
+def _fit(images, masks, frac):
+    """표정들을 합친 캐릭터 영역으로 같은 정사각형을 잘라(표정끼리 틀이 같게) 높이가 frac이 되게 한다."""
+    w, h = images[0].size
+    ys = [y for m in masks for y in range(h) if any(m[y])]
+    xs = [x for m in masks for x in range(w) if any(m[y][x] for y in range(0, h, 4))]
+    top, bottom, left, right = min(ys), max(ys) + 1, min(xs), max(xs) + 1
+    side = int((bottom - top) / frac)
+    y1 = bottom - int(side * FIT_CUT)
+    y0 = y1 - side
+    x0 = (left + right) // 2 - side // 2
+    out_i, out_m = [], []
+    for img, m in zip(images, masks):
+        ci = Image.new('RGB', (side, side), img.getpixel((0, 0)))
+        ci.paste(img.crop((max(0, x0), max(0, y0), min(w, x0 + side), min(h, y1))), (max(0, -x0), max(0, -y0)))
+        cm = [[0 <= x0 + x < w and 0 <= y0 + y < h and m[y0 + y][x0 + x] for x in range(side)] for y in range(side)]
+        out_i.append(ci)
+        out_m.append(cm)
+    return out_i, out_m
+
+
 def character(name):
-    """name_<표정>.png 넷을 칸 그림 넷으로. 하나라도 없으면 None(직접 그린 그림을 쓴다)."""
-    paths = [os.path.join(SRC, f'{name}_{f}.png') for f in FACES]
+    """<이름>_<표정>.png를 칸 그림으로(표정 순서대로). 하나라도 없으면 None(직접 그린 그림을 쓴다)."""
+    _, faces, fit, vivid = CHARACTERS[name]
+    paths = [os.path.join(SRC, f'{name}_{f}.png') for f in faces]
     if not all(os.path.exists(p) for p in paths):
         return None
-    cells = []
-    for f, p in zip(FACES, paths):
+    images, masks = [], []
+    for f, p in zip(faces, paths):
         img = Image.open(p).convert('RGB')
         _erase_star(img)
         fix = FIXES.get(f'{name}_{f}')
         if fix:
             fix(img)
-        cells.append(_shrink(img, _character_mask(img)))
-    return _shared_palette(cells)
+        images.append(img)
+        masks.append(_character_mask(img))
+    if fit:
+        images, masks = _fit(images, masks, fit)
+    return _shared_palette([_shrink(i, m) for i, m in zip(images, masks)], vivid)
 
 
 def cells(fur_variants):
-    """{칸 번호: 88×88 RGBA}. Naïl: 칸 0~3, 털빛 k는 칸 18 + (k-1)*4부터."""
+    """{칸 번호: 88×88 RGBA}. 원본이 다 있는 캐릭터만. Naïl 털빛 k는 칸 18 + (k-1)*4부터."""
     out = {}
-    nail = character('nail')
-    if nail:
-        for i, c in enumerate(nail):
-            out[i] = c
-        for k, ramp in fur_variants.items():
-            for i, c in enumerate(nail):
-                out[18 + (k - 1) * 4 + i] = fur_variant(c, ramp)
+    for name, (first, _, _, _) in CHARACTERS.items():
+        made = character(name)
+        if not made:
+            continue
+        for i, c in enumerate(made):
+            out[first + i] = c
+        if name == 'nail':
+            for k, ramp in fur_variants.items():
+                for i, c in enumerate(made):
+                    out[18 + (k - 1) * 4 + i] = fur_variant(c, ramp)
     return out
