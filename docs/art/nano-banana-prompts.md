@@ -36,6 +36,7 @@ Using the attached portrait of [이름], change only the facial expression to [�
 ```
 Edit the last attached image, the portrait of [이름]. Add only [고칠 것], copying its shape from the first attached image, the character sheet. Keep everything else in the portrait exactly the same. The output is the edited portrait only.
 ```
+- **고친 것은 다음 고침에서 되살아날 수 있다**(시험: 귀를 지운 뒤 같은 대화에서 앞발을 더하자 귀가 다시 났다). 대화 안의 앞선 그림(귀 있는 그림)을 모델이 계속 보고, "나머지는 그대로"는 무엇을 고쳤는지 모른다. 그래서 (1) 고친 그림을 저장해 **새 대화**에 그 그림만(필요하면 시트와 함께) 첨부하고, (2) 프롬프트에 **지킬 것을 짚어** 적는다: `Ensure these features of the portrait remain completely unchanged: [고친 점들]`(공식 합성 템플릿의 "Ensure that the features … remain completely unchanged").
 - 첫 시험(Naïl 보통 표정): 시트에는 없던 둥근 귀가 생겼다(두더지는 귀가 털 속에 숨는다 → 캐릭터 글에 `no visible ears` 넣기). 가슴 위로 자르니 상징인 분홍 앞발이 빠졌다 → 초상화 프롬프트에 앞발을 넣는다.
 
 | 캐릭터 | 칸 | 표정(왼쪽이 보통) |
