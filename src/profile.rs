@@ -233,7 +233,8 @@ mod store {
             PathBuf::from("/data/data/io.github.aimenjoe.nail/files")
         } else if cfg!(target_os = "windows") {
             PathBuf::from(std::env::var_os("APPDATA")?).join("nail")
-        } else if cfg!(target_os = "macos") {
+        } else if cfg!(any(target_os = "macos", target_os = "ios")) {
+            // iOS: HOME은 앱 샌드박스. 쓸 수 있는 곳은 Documents·Library·tmp 아래뿐이라 Library/Application Support에(0086).
             PathBuf::from(std::env::var_os("HOME")?).join("Library/Application Support/nail")
         } else {
             match std::env::var_os("XDG_DATA_HOME") {
