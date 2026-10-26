@@ -1263,7 +1263,93 @@ fn floor_decor(w: &World, cam: Vec2) -> Vec<(f32, f32, Decor)> {
 }
 
 /// 격자 방(필드·던전) 그림: 구운 지도(terrain.rs, 0062)의 보이는 부분 + 매 프레임 바뀌는 칸.
-/// 특별한 칸: 문(열림 = 바닥, 잠김 = 뿌리 창살), 굴 입구, 출구, 저장 지점(빛나는 버섯 고리).
+/// 잠긴 문(0094): 물든 뿌리 두 줄기가 문을 막고 보라 실 두 가닥이 감는다(이야기의 "실", 0037).
+/// 잠그면 뿌리가 문틀에서 자라 나오고(`grow` 0→1) 실이 나중에 감긴다. 열면 거꾸로 걷히고 월드가 풀리는 실을 낸다.
+/// 무늬는 월드 좌표로 정해 두 칸짜리 문이 이어져 보인다. 남북 문은 세로 뿌리, 동서 문은 가로 뿌리.
+/// `glow`면 더하기 빛 패스용: 뿌리는 빼고 실과 문틈 빛만(어두운 심층에서도 문이 보이게).
+fn draw_root_gate(g: &crate::map::Grid, cx: i32, cy: i32, grow: f32, time: f32, glow: bool) {
+    let blocked = |c: Cell| matches!(c, Cell::Wall | Cell::Door);
+    // 좌우가 막혀 있으면 위아래로 지나는 문(남북) → 세로 뿌리.
+    let vertical = blocked(g.get_i(cx - 1, cy)) && blocked(g.get_i(cx + 1, cy));
+    let (x0, y0) = (cx as f32 * 16.0, cy as f32 * 16.0);
+    let root_dark = Color::new(0.30, 0.20, 0.16, 1.0);
+    let root = Color::new(0.45, 0.31, 0.22, 1.0);
+    let root_hi = Color::new(0.62, 0.46, 0.32, 1.0);
+    let th = world::THREAD;
+    let pulse = 0.82 + 0.18 * (time * 3.0).sin();
+    // (along, across) → 월드 px. along = 뿌리가 뻗는 방향, across = 가로지르는 방향.
+    let at = |along: f32, across: f32| -> Vec2 {
+        if vertical {
+            vec2(x0 + across, y0 + along)
+        } else {
+            vec2(x0 + along, y0 + across)
+        }
+    };
+    let px = |q: Vec2, c: Color| draw_rectangle(q.x.round(), q.y.round(), 1.0, 1.0, c);
+    let (base_along, base_across) = if vertical { (y0, x0) } else { (x0, y0) };
+    if glow {
+        let c = at(8.0, 8.0);
+        draw_circle(
+            c.x,
+            c.y,
+            11.0,
+            Color::new(th.r, th.g, th.b, 0.10 * grow * pulse),
+        );
+    }
+    // 문틈 뒤 보라 아지랑이(잠긴 동안 숨 쉰다).
+    if !glow {
+        draw_rectangle(
+            x0,
+            y0,
+            16.0,
+            16.0,
+            Color::new(th.r * 0.5, th.g * 0.3, th.b * 0.6, 0.22 * grow * pulse),
+        );
+    }
+    let reach = (grow * 16.0).ceil() as i32;
+    // 뿌리 세 줄기, 몸 3px(밝은 쪽·몸·그늘) + 외곽선. 빛 패스에서는 밝은 쪽에 흐린 빛만 더한다.
+    for lane in [2.0_f32, 7.0, 12.0] {
+        for r in 0..reach.min(16) {
+            let wa = base_along + r as f32;
+            let wob = ((wa * 0.45 + (base_across + lane) * 0.3).sin() * 1.2).round();
+            let c = lane + wob;
+            let rf = r as f32;
+            if glow {
+                px(at(rf, c), Color::new(0.55, 0.35, 0.25, 0.18 * grow));
+                continue;
+            }
+            px(at(rf, c - 1.0), OUTLINE);
+            px(at(rf, c), if (wa as i32) % 3 == 0 { root_hi } else { root });
+            px(at(rf, c + 1.0), root);
+            px(at(rf, c + 2.0), root_dark);
+            px(at(rf, c + 3.0), OUTLINE);
+        }
+    }
+    // 실: 뿌리가 거의 다 자란 뒤 감긴다.
+    let ta = ((grow - 0.55) / 0.45).clamp(0.0, 1.0);
+    if ta > 0.0 {
+        for lane in [4.0_f32, 11.0] {
+            for k in 0..16 {
+                let wc = base_across + k as f32;
+                let wave = ((wc * 0.55 + time * 2.4 + lane).sin() * 1.1).round();
+                let a = lane + wave;
+                let kf = k as f32;
+                if glow {
+                    px(at(a, kf), Color::new(th.r, th.g, th.b, 0.55 * ta * pulse));
+                    px(
+                        at(a + 1.0, kf),
+                        Color::new(th.r, th.g, th.b, 0.25 * ta * pulse),
+                    );
+                } else {
+                    px(at(a + 1.0, kf), Color::new(0.34, 0.20, 0.46, ta));
+                    px(at(a, kf), Color::new(th.r * pulse, th.g * pulse, th.b, ta));
+                }
+            }
+        }
+    }
+}
+
+/// 특별한 칸: 문(열림 = 바닥, 잠김 = 물든 뿌리 + 보라 실, 0094), 굴 입구, 출구, 저장 지점(빛나는 버섯 고리).
 fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D) {
     let Some(g) = &w.room.grid else { return };
     let view = Rect::new(cam.x.floor() - 1.0, cam.y.floor() - 1.0, RW + 3.0, RH + 3.0);
@@ -1291,13 +1377,8 @@ fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D) {
             let c = g.get_i(cx, cy);
             let p = vec2(cx as f32 * 16.0 + 8.0, cy as f32 * 16.0 + 8.0);
             match c {
-                Cell::Door if w.room.doors_locked() => {
-                    let wood = Color::new(0.42, 0.28, 0.20, 1.0);
-                    for k in 0..3 {
-                        let x = p.x - 6.0 + k as f32 * 5.0;
-                        draw_rectangle(x - 1.0, p.y - 8.0, 4.0, 16.0, OUTLINE);
-                        draw_rectangle(x, p.y - 8.0, 2.0, 16.0, wood);
-                    }
+                Cell::Door if w.room.door_anim > 0.0 => {
+                    draw_root_gate(g, cx, cy, w.room.door_anim, w.time, false);
                 }
                 Cell::Entrance => {
                     draw_ellipse(p.x, p.y + 2.0, 12.0, 7.0, 0.0, world::DIRT);
@@ -1684,6 +1765,22 @@ fn draw_world_lights(w: &World, cam: Vec2, alpha: f32, light: Option<&Material>)
                 8.0,
                 Color::new(0.35, 0.65, 1.0, 0.10 * pulse * k),
             );
+        }
+    }
+    // 잠긴 문의 실과 빛(0094): 어둠 마스크 위에 더해 그려 어두운 심층에서도 막힌 문이 보인다.
+    if w.room.door_anim > 0.0 {
+        if let Some(g) = &w.room.grid {
+            let (x0, y0) = (
+                (cam.x / 16.0).floor() as i32 - 1,
+                (cam.y / 16.0).floor() as i32 - 1,
+            );
+            for cy in y0..y0 + 14 {
+                for cx in x0..x0 + 23 {
+                    if g.get_i(cx, cy) == Cell::Door {
+                        draw_root_gate(g, cx, cy, w.room.door_anim, t, true);
+                    }
+                }
+            }
         }
     }
     draw_ambient(w, cam, true);

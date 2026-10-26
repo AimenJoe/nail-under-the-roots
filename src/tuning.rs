@@ -170,6 +170,9 @@ pub const CHEST_SEEDS: (u32, u32) = (3, 5);
 pub const BOSS_SEEDS: u32 = 6;
 /// 끝방 출구는 마지막으로 쓰러진 자리·플레이어에서 이만큼(px) 넘게 떨어진 칸에 생긴다(0060). 보상을 줍기 전에 빠지지 않게.
 pub const EXIT_MIN_DIST: f32 = 80.0;
+/// 잠긴 문(물든 뿌리 + 보라 실, 0094)이 자라 막는 시간 / 풀려 걷히는 시간.
+pub const DOOR_CLOSE_TIME: f32 = 0.35;
+pub const DOOR_OPEN_TIME: f32 = 0.5;
 /// 뿌리 심장으로 늘릴 수 있는 최대 체력 상한(기본 PLAYER_HP 위로).
 pub const ROOT_HEART_MAX: i32 = 5;
 

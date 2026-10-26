@@ -309,6 +309,15 @@ impl World {
         for e in &mut self.enemies {
             e.apply_knots(knots);
         }
+        // 문(0094): 열리는 순간 문마다 보라 실이 풀려 흩어지고 흙먼지가 인다.
+        if self.room.tick_doors(dt) {
+            for p in self.room.door_cells() {
+                if (p - self.player.pos).length() < 360.0 {
+                    unravel(&mut self.fx, p, 10.0);
+                    puff(&mut self.fx, p, 2, self.biome.dust(), 7.0, 0.5);
+                }
+            }
+        }
         self.feel.tick(dt);
         if self.feel.hitstop > 0.0 {
             // 히트스톱: 로직 시계만 멈춘다. 입력은 버퍼에 쌓인다.

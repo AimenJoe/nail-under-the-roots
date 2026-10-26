@@ -50,6 +50,10 @@ pub struct Room {
     pub spawn_points: Vec<Vec2>,
     pub grid: Option<Grid>,
     doors_locked: bool,
+    /// 잠긴 문 그림이 얼마나 자랐나(0 = 열림 .. 1 = 다 막힘, 0094). 잠그면 자라고 열면 걷힌다.
+    pub door_anim: f32,
+    /// 지난 틱에 잠겨 있었나(열리는 순간을 알기 위해).
+    door_was_locked: bool,
 }
 
 impl Room {
@@ -88,6 +92,8 @@ impl Room {
             ],
             grid: None,
             doors_locked: false,
+            door_anim: 0.0,
+            door_was_locked: false,
         }
     }
 
@@ -101,6 +107,8 @@ impl Room {
             spawn_points,
             grid: Some(grid),
             doors_locked: false,
+            door_anim: 0.0,
+            door_was_locked: false,
         };
         r.rebuild_solids();
         r
@@ -137,6 +145,34 @@ impl Room {
     }
 
     /// 던전 방의 문을 잠그거나 연다(격자 방만).
+    /// 문 그림 시계를 한 틱 돌린다. 방금 열렸으면 true(월드가 풀리는 실·흙먼지를 낸다).
+    pub fn tick_doors(&mut self, dt: f32) -> bool {
+        self.door_anim = if self.doors_locked {
+            (self.door_anim + dt / tuning::DOOR_CLOSE_TIME).min(1.0)
+        } else {
+            (self.door_anim - dt / tuning::DOOR_OPEN_TIME).max(0.0)
+        };
+        let opened = self.door_was_locked && !self.doors_locked;
+        self.door_was_locked = self.doors_locked;
+        opened
+    }
+
+    /// 문 칸 가운데(월드 좌표). 문이 열릴 때 효과를 낼 자리.
+    pub fn door_cells(&self) -> Vec<Vec2> {
+        let Some(g) = &self.grid else {
+            return Vec::new();
+        };
+        let mut v = Vec::new();
+        for y in 0..g.h {
+            for x in 0..g.w {
+                if g.get(x, y) == Cell::Door {
+                    v.push(vec2(x as f32 * 16.0 + 8.0, y as f32 * 16.0 + 8.0));
+                }
+            }
+        }
+        v
+    }
+
     pub fn set_doors_locked(&mut self, locked: bool) {
         if self.doors_locked != locked {
             self.doors_locked = locked;
