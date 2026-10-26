@@ -33,9 +33,9 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 - 테스트용 방 구성은 `src/scenario.rs`에 한 줄 추가(타이틀 "개발"). 컷씬은 `src/cutscene.rs`의 `Step` 스크립트, JRPG식(docs/decisions/0008). 화면 전체 그림은 `Step::Illust` + `Step::Narrate`, 그림 목록·패닝·입자는 `src/illust.rs`(0039). 튜토리얼은 `src/tutorial.rs`의 단계 + 포포의 말(docs/decisions/0023).
 - 설정 저장은 `src/prefs.rs`(웹 localStorage 정수 칸). 칸 형식을 바꾸면 `MAGIC`을 올린다. 런을 넘어 남는 기록은 `src/profile.rs`(깃발 + 수, 문자열 키 — 키 이름은 바꾸지 않는다, 0041). 저장 슬롯 셋(칸 0 = 마지막 슬롯, 슬롯 1 = 예전 한 칸 저장 자리), 슬롯 창은 `app/slots.rs`, 설정(prefs)은 슬롯 밖(0078). 쉼터부터 이어하기는 `suspend.rs`(런 상태 형식) + `app/run.rs`(적기·되돌리기): 쉼터에서만 적고 런이 끝나면 지운다. 런에 남는 상태를 새로 만들면 `RunSave`에 칸을 더한다(0080). 기록은 첫 시작(Normal)만 남긴다. 런 사이 한마디는 `src/story.rs` 표(조건이 가장 구체적인 줄, `once`는 한 번).
 - UI 텍스트는 `assets/fonts/Galmuri11-Condensed.ttf`(KS X 1001 2,350자 서브셋)로 실제 해상도에 찍는다. 그 밖의 한자·확장 한글은 안 나온다.
-- 플레이어가 보는 글은 `src/i18n.rs`의 언어별 표에만 쓴다(한국어·영어·일본어·중국어 간체·브라질 포르투갈어). 코드에 글 리터럴을 두지 않는다. 숫자는 `{0}` + `fill()`, 데이터 표는 `Tr`. 개발 전용 화면만 예외(docs/decisions/0013).
+- 플레이어가 보는 글은 `src/i18n.rs`의 언어별 표에만 쓴다(한국어·영어·일본어·중국어 간체·브라질 포르투갈어·프랑스어·스페인어, 0084). 코드에 글 리터럴을 두지 않는다. 숫자는 `{0}` + `fill()`, 데이터 표는 `Tr`. 개발 전용 화면만 예외(docs/decisions/0013).
 - 번역은 직접 쓴다. DeepL 같은 기계 번역은 사장이 따로 말할 때만 쓴다(초안 품질이 낮다: 굴 → oyster, 보리 → barley, 털빛 → feather 같은 게임 용어 오독이 많았다). 기존 표의 용어를 먼저 찾아 맞춘다.
-- 글을 넣거나 바꾸면 다섯 언어를 다 쓰고, 일본어·간체 표를 고쳤으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font 체크아웃>`으로 폰트를 다시 만든다. 새 화면은 가짜 언어 Pseudo(설정 → 언어 끝)와 일본어로 넘침을 본다. 고정 칸은 `ui.fit`, 긴 글은 `ui::wrap`(docs/decisions/0014).
+- 글을 넣거나 바꾸면 일곱 언어를 다 쓰고, 일본어·간체 표를 고쳤으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font 체크아웃>`으로 폰트를 다시 만든다. 새 화면은 가짜 언어 Pseudo(설정 → 언어 끝)와 일본어로 넘침을 본다. 고정 칸은 `ui.fit`, 긴 글은 `ui::wrap`(docs/decisions/0014).
 
 ## 커밋 전
 ```sh

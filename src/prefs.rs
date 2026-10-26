@@ -30,6 +30,8 @@ fn lang_code(l: Lang) -> u32 {
         Lang::Ja => 3,
         Lang::ZhHans => 4,
         Lang::PtBr => 5,
+        Lang::Fr => 6,
+        Lang::Es => 7,
         #[cfg(feature = "dev")]
         Lang::Pseudo => 0,
     }
@@ -42,6 +44,8 @@ fn lang_from(c: u32) -> Option<Lang> {
         3 => Some(Lang::Ja),
         4 => Some(Lang::ZhHans),
         5 => Some(Lang::PtBr),
+        6 => Some(Lang::Fr),
+        7 => Some(Lang::Es),
         _ => None,
     }
 }

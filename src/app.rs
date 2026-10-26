@@ -2931,8 +2931,13 @@ impl App {
                 }
                 let ms = wp.moveset;
                 let last = &ms.hits[ms.last()];
+                // 언어마다 길이가 달라 칸 폭에 맞춘다(프랑스어·스페인어에서 넘쳤다, 0084).
                 ui.text(
-                    &fill(s.bag_combo, &[&ms.hits.len(), &last.damage]),
+                    &ui.fit(
+                        &fill(s.bag_combo, &[&ms.hits.len(), &last.damage]),
+                        desc_w,
+                        FONT_PX,
+                    ),
                     desc_x,
                     y + 4.0,
                     FONT_PX,
