@@ -336,6 +336,8 @@ pub struct World {
     pub knots: crate::knots::Knots,
     /// 모모(0046): 첫 길 끝에서 싸우나(앱이 기록에서 정하고, 모모에게 쓰러지면 이번 런엔 끈다), 지금까지 이긴 수(빈 자리의 꽃잎).
     pub momo_fight: bool,
+    /// 굴토끼 옛 굴(0165)이 길 지도에 열렸나(모모가 돌아온 뒤). 길을 짤 때 본다.
+    pub warren_open: bool,
     pub momo_wins: u8,
     /// 도토(0052): 둘째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다). 묻힌 도토리.
     pub doto_fight: bool,
@@ -445,6 +447,7 @@ impl World {
             auto_waves: true,
             knots: crate::knots::Knots::default(),
             momo_fight: false,
+            warren_open: false,
             momo_wins: 0,
             doto_fight: false,
             mines: Vec::new(),

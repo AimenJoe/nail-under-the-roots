@@ -68,6 +68,7 @@ fn node_text(kind: Option<NodeKind>, last: bool) -> (Tr, Tr) {
         Some(NodeKind::Spring) => (|s| s.node_spring, |s| s.node_spring_desc),
         Some(NodeKind::Elite) => (|s| s.node_elite, |s| s.node_elite_desc),
         Some(NodeKind::Boss) => (|s| s.node_boss, |s| s.node_boss_desc),
+        Some(NodeKind::Warren) => (|s| s.node_warren, |s| s.node_warren_desc),
         None => (|s| s.node_unknown, |s| s.node_unknown_desc),
     }
 }
@@ -160,7 +161,7 @@ fn dotted(ui: &Ui, a: Vec2, b: Vec2, c: Color) {
 fn draw_node_icon(ui: &Ui, p: Vec2, kind: Option<NodeKind>, dim: bool) {
     let a = if dim { 0.45 } else { 1.0 };
     let col = |r: f32, g: f32, b: f32| Color::new(r, g, b, a);
-    let big = kind == Some(NodeKind::Boss);
+    let big = matches!(kind, Some(NodeKind::Boss | NodeKind::Warren));
     let r = if big { 8.0 } else { 6.0 };
     circle(ui, p, r + 1.0, col(0.17, 0.11, 0.16));
     circle(ui, p, r, col(0.30, 0.22, 0.20));
@@ -236,6 +237,26 @@ fn draw_node_icon(ui: &Ui, p: Vec2, kind: Option<NodeKind>, dim: bool) {
             }
             ui.rect(Rect::new(p.x - 3.0, p.y, 2.0, 2.0), col(1.0, 0.25, 0.4));
             ui.rect(Rect::new(p.x + 1.0, p.y, 2.0, 2.0), col(1.0, 0.25, 0.4));
+        }
+        Some(NodeKind::Warren) => {
+            // 흰 실이 감긴 굴 구멍 + 시든 꽃잎 하나(0165).
+            ui.rect(
+                Rect::new(p.x - 4.0, p.y - 2.0, 8.0, 5.0),
+                col(0.05, 0.03, 0.06),
+            );
+            for (dx, dy, w) in [
+                (-5.0, -3.0, 4.0),
+                (1.0, -4.0, 4.0),
+                (-2.0, 3.0, 5.0),
+                (3.0, 1.0, 3.0),
+            ] {
+                ui.rect(Rect::new(p.x + dx, p.y + dy, w, 1.0), col(0.94, 0.92, 0.99));
+            }
+            ui.rect(
+                Rect::new(p.x - 1.0, p.y - 1.0, 2.0, 1.0),
+                col(0.74, 0.56, 0.60),
+            );
+            ui.rect(Rect::new(p.x, p.y - 1.0, 1.0, 1.0), col(0.98, 0.70, 0.78));
         }
         None => ui.text_center("?", p.x, p.y - 6.0, FONT_PX, col(0.75, 0.70, 0.66)),
     }
@@ -714,7 +735,7 @@ impl App {
                 let passed = r.at.is_some_and(|(al, _)| l <= al) && !walked(l, i);
                 draw_node_icon(ui, p, kind, passed);
                 if choosable {
-                    let rr = if node.kind == NodeKind::Boss {
+                    let rr = if matches!(node.kind, NodeKind::Boss | NodeKind::Warren) {
                         10.0
                     } else {
                         8.0
@@ -1676,7 +1697,7 @@ mod tests {
         let area = Rect::new(14.0, 26.0, 292.0, 88.0);
         for seed in 0..200u64 {
             for stage in 1..=3 {
-                let r = Route::generate(seed, stage);
+                let r = Route::generate(seed, stage, seed % 2 == 0);
                 for (l, layer) in r.layers.iter().enumerate() {
                     let ys: Vec<f32> = (0..layer.len())
                         .map(|i| node_pos(&r, area, l, i).y)

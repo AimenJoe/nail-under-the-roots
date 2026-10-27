@@ -30,6 +30,8 @@ pub enum NodeKind {
     Elite,
     /// 그 길의 보스.
     Boss,
+    /// 굴토끼 옛 굴(0165): 셋째 길 보스 층의 둘째 칸. 흰 실 굴 네 방, 끝에 물든 어미 굴토끼. 모모가 돌아온 뒤에만.
+    Warren,
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +54,10 @@ pub struct Route {
 }
 
 impl Route {
-    pub fn generate(seed: u64, stage: u32) -> Self {
+    /// `warren`이면(모모가 돌아온 뒤, 0165) 마지막 길의 보스 층이 둘이 된다: 콩이의 문 / 굴토끼 옛 굴.
+    /// 보스 앞 층의 모든 칸이 두 칸으로 다 이어진다(어느 샘에서 와도 고를 수 있게).
+    pub fn generate(seed: u64, stage: u32, warren: bool) -> Self {
+        let warren = warren && stage >= crate::tuning::FINAL_STAGE;
         let mut rng = Rng::new(seed ^ 0x5157_0A7E);
         let mut counts: Vec<usize> = Vec::new();
         for l in 0..CHOICE_LAYERS {
@@ -60,7 +65,7 @@ impl Route {
             let narrow = l > 0 && counts.last() != Some(&1) && rng.chance(0.2);
             counts.push(if narrow { 1 } else { 2 + rng.below(2) as usize });
         }
-        counts.push(1); // 보스
+        counts.push(if warren { 2 } else { 1 }); // 보스(+ 옛 굴)
         let mut layers: Vec<Vec<Node>> = counts
             .iter()
             .map(|&n| {
@@ -159,6 +164,12 @@ impl Route {
         }
         let boss = layers.len() - 1;
         layers[boss][0].kind = NodeKind::Boss;
+        if warren {
+            layers[boss][1].kind = NodeKind::Warren;
+            for n in layers[boss - 1].iter_mut() {
+                n.next = vec![0, 1];
+            }
+        }
         // 환경: 첫 길은 뿌리 지대, 둥지·깊은 길은 어두운 심층이 섞인다.
         for layer in layers.iter_mut() {
             for n in layer.iter_mut() {
@@ -166,7 +177,13 @@ impl Route {
                     NodeKind::Nest | NodeKind::Boss => stage >= 1,
                     _ => stage >= 2 && rng.chance(0.5),
                 };
-                n.biome = if deep { Biome::Deep } else { Biome::Roots };
+                n.biome = if n.kind == NodeKind::Warren {
+                    Biome::Silk
+                } else if deep {
+                    Biome::Deep
+                } else {
+                    Biome::Roots
+                };
             }
         }
         Self {
@@ -249,7 +266,7 @@ impl Route {
                 goal: Goal::Spring,
                 ..Params::new(depth)
             },
-            NodeKind::Boss => Params {
+            NodeKind::Boss | NodeKind::Warren => Params {
                 rooms: 4,
                 goal: Goal::Boss,
                 ..Params::new(depth + 1)
@@ -269,7 +286,7 @@ mod tests {
     #[test]
     fn every_node_reachable_and_edges_never_cross() {
         for seed in 1..300 {
-            let r = Route::generate(seed, 1);
+            let r = Route::generate(seed, 1, false);
             assert_eq!(r.layers.len(), CHOICE_LAYERS + 1);
             for l in 0..r.layers.len() - 1 {
                 let nb = r.layers[l + 1].len();
@@ -296,7 +313,7 @@ mod tests {
     fn tangle_nodes_appear_after_the_first_layer() {
         let mut seen = 0;
         for seed in 1..300 {
-            let r = Route::generate(seed, 2);
+            let r = Route::generate(seed, 2, false);
             assert!(!kinds(&r, 0).contains(&NodeKind::Elite));
             seen += (1..CHOICE_LAYERS)
                 .filter(|&l| kinds(&r, l).contains(&NodeKind::Elite))
@@ -308,7 +325,7 @@ mod tests {
     #[test]
     fn kind_rules_hold() {
         for seed in 1..300 {
-            let r = Route::generate(seed, 1);
+            let r = Route::generate(seed, 1, false);
             assert!(!kinds(&r, 0).contains(&NodeKind::Nest));
             assert!(!kinds(&r, 0).contains(&NodeKind::Spring));
             assert!(kinds(&r, CHOICE_LAYERS - 1).contains(&NodeKind::Spring));
@@ -336,17 +353,43 @@ mod tests {
         }
     }
 
+    /// 굴토끼 옛 굴(0165): 모모가 돌아온 뒤 마지막 길만 보스 층이 둘(콩이의 문·옛 굴), 보스 앞 층의 모든 칸이 둘 다로 이어진다.
+    #[test]
+    fn warren_branch_only_on_the_final_road_after_momo() {
+        for seed in 1..200 {
+            let r = Route::generate(seed, 3, true);
+            assert_eq!(
+                kinds(&r, CHOICE_LAYERS),
+                vec![NodeKind::Boss, NodeKind::Warren],
+                "seed {seed}"
+            );
+            assert_eq!(r.layers[CHOICE_LAYERS][1].biome, Biome::Silk);
+            for n in &r.layers[CHOICE_LAYERS - 1] {
+                assert_eq!(n.next, vec![0, 1], "seed {seed}: 샘에서 둘 다로");
+            }
+            assert_eq!(
+                kinds(&Route::generate(seed, 3, false), CHOICE_LAYERS),
+                vec![NodeKind::Boss]
+            );
+            assert_eq!(
+                kinds(&Route::generate(seed, 2, true), CHOICE_LAYERS),
+                vec![NodeKind::Boss],
+                "셋째 길만"
+            );
+        }
+    }
+
     #[test]
     fn walking_the_route_reaches_the_boss_and_hides_far_layers() {
-        let mut r = Route::generate(42, 1);
+        let mut r = Route::generate(42, 1, false);
         assert!(r.revealed(0) && !r.revealed(1) && r.revealed(CHOICE_LAYERS));
         assert!(!r.pick((1, 0)), "건너뛸 수 없다");
         while let Some(&c) = r.choices().first() {
             assert!(r.pick(c));
         }
         assert_eq!(r.node(r.at.unwrap()).kind, NodeKind::Boss);
-        let a = Route::generate(9, 2);
-        let b = Route::generate(9, 2);
+        let a = Route::generate(9, 2, false);
+        let b = Route::generate(9, 2, false);
         assert_eq!(
             (0..a.layers.len())
                 .map(|l| kinds(&a, l))

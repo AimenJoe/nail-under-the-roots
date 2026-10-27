@@ -1017,6 +1017,16 @@ impl App {
             self.world.doto_fight = s == Scenario::Normal && !self.profile.flag(key::DOTO_MEMORY);
             // 콩이(0054)도 첫 시작에서만, 이기기 전까지.
             self.world.kongi_fight = s == Scenario::Normal && !self.profile.flag(key::KONGI_BACK);
+            // 굴토끼 옛 굴(0165): 첫 시작은 모모가 돌아온 뒤, 오늘의 굴엔 없고, 개발 시나리오는 늘.
+            self.world.warren_open = match s {
+                Scenario::Normal => self.profile.flag(key::MOMO_BACK),
+                Scenario::Daily => false,
+                _ => true,
+            };
+            // 개발 시나리오는 길을 이미 짰으니(쉼터에서 시작) 갈래를 넣어 다시 짠다.
+            if self.world.warren_open {
+                self.world.reroll_route();
+            }
         }
         self.inventory = match s {
             Scenario::Normal if veteran => Inventory::new(&[start]),

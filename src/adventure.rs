@@ -574,7 +574,9 @@ impl World {
                         None => self.start_fade(Transition::ExitDungeon),
                         Some(at) => {
                             let route = self.adv.route.as_ref();
-                            let boss = route.is_some_and(|r| r.node(at).kind == NodeKind::Boss);
+                            let boss = route.is_some_and(|r| {
+                                matches!(r.node(at).kind, NodeKind::Boss | NodeKind::Warren)
+                            });
                             let last = route.is_some_and(|r| r.is_final());
                             if boss && last {
                                 if stepped {
@@ -881,6 +883,14 @@ impl World {
         self.adv.events.push(AdvEvent::DeepIntro);
     }
 
+    /// 길을 같은 시드로 다시 짠다(0165): 개발 시나리오가 쉼터에서 시작한 뒤 `warren_open`을 정했을 때.
+    pub fn reroll_route(&mut self) {
+        if let Some(r) = self.adv.route.as_ref() {
+            let stage = r.stage;
+            self.adv.route = Some(Route::generate(self.adv.seed, stage, self.warren_open));
+        }
+    }
+
     /// 개발: 가장 깊은 곳으로 바로(전환 없이).
     pub fn enter_deep_now(&mut self) {
         self.enter_deep();
@@ -941,7 +951,7 @@ impl World {
         self.adv.place = Place::Camp;
         self.adv.heart_sold = false;
         self.adv.seed = self.adv.seed.wrapping_add(CAMP_SEED_STEP);
-        self.adv.route = Some(Route::generate(self.adv.seed, stage));
+        self.adv.route = Some(Route::generate(self.adv.seed, stage, self.warren_open));
         self.adv.last_cell = None;
         self.adv.events.push(AdvEvent::CampArrive(stage));
         self.biome = crate::camp::biome(stage);
@@ -992,7 +1002,7 @@ impl World {
             // 길은 새로 짠다(같은 쉼터에서 다시 고른다).
             let stage = self.adv.stage;
             self.adv.seed = self.adv.seed.wrapping_add(0x7F4A_7C15);
-            self.adv.route = Some(Route::generate(self.adv.seed, stage));
+            self.adv.route = Some(Route::generate(self.adv.seed, stage, self.warren_open));
         }
         self.player.revive();
         self.player.hp = self.player.stats.max_hp;
