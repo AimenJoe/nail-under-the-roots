@@ -537,7 +537,7 @@ struct TouchStick {
 pub struct TouchOverlay {
     pub stick: Option<(Vec2, Vec2)>,
     pub stick_radius: f32,
-    pub buttons: [TouchButton; 7],
+    pub buttons: [TouchButton; 6],
 }
 
 #[derive(Clone, Copy)]
@@ -587,12 +587,6 @@ fn layout_for(w: f32, h: f32) -> TouchOverlay {
                 center: dig,
                 radius: dig_r,
                 label: "DIG",
-                ready: 1.0,
-            },
-            TouchButton {
-                center: vec2(w - r * 1.4, r * 1.4),
-                radius: r * 0.85,
-                label: "R",
                 ready: 1.0,
             },
             TouchButton {
@@ -782,7 +776,6 @@ impl Input {
                                 self.touch.dig = Some(t.id);
                             }
                         }
-                        "R" => a.restart = true,
                         "SP" => a.special = true,
                         "ITEM" => a.use_item = true,
                         "<>" => a.item_next = true,
