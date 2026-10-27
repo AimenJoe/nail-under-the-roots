@@ -265,6 +265,10 @@ pub const DRILL_SPEED: f32 = 380.0;
 pub const DRILL_ACCEL: f32 = 0.2;
 /// 직진성: 초당 이만큼(라디안)만 방향을 틀 수 있다.
 pub const DRILL_TURN: f32 = 2.2;
+/// 겨누기(0139): 시동 동안 입력 방향 ±이 각도(라디안), 이 거리 안의 적 가운데 방향이 가장 가까운 적 쪽으로 맞춘다.
+/// 8방향 입력의 틈(45°)을 덮게 반각 ~34°. 거리는 돌진 거리(~320)보다 짧게: 화면 끝의 적보다 눈앞의 적.
+pub const DRILL_ASSIST_CONE: f32 = 0.6;
+pub const DRILL_ASSIST_RANGE: f32 = 240.0;
 /// 연타 간격과 한 번의 피해. 넉백이 돌진보다 세서 적이 앞으로 튕겨 나갔다가 다시 잡힌다(벽까지 끌고 간다).
 pub const DRILL_HIT_EVERY: f32 = 0.06;
 pub const DRILL_RADIUS: f32 = 12.0;

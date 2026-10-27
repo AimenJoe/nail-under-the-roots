@@ -32,9 +32,11 @@ pub enum State {
         time: f32,
     },
     /// 필살기: 시동(`time < DRILL_REV`, 제자리) 뒤 직진하며 연타. `dir`은 조금씩만 틀어진다. `next_hit`까지 남은 시간.
+    /// `aim`은 시동 중 입력이 가리킨 쪽, `dir`은 거기서 가까운 적 쪽으로 맞춘 실제 방향(`drill_assist`, 0139).
     Drill {
         time: f32,
         dir: Vec2,
+        aim: Vec2,
         next_hit: f32,
     },
     /// 드릴 뒤 경직.
@@ -111,6 +113,10 @@ pub struct Player {
     /// 줄인 피해의 소수 부분을 모아 둔다(체력은 정수라 1이 차면 그때 깎는다).
     dmg_acc: f32,
     pub events: Vec<Event>,
+    /// 드릴 겨누기용 적 자리(월드가 틱마다 채운다, 맞을 수 있는 적만). 시동 중 방향을 맞추는 데만 쓴다(0139).
+    pub targets: Vec<Vec2>,
+    /// 시동 중 겨눈 적(그리기용 표시). 없으면 입력 방향 그대로.
+    pub drill_lock: Option<Vec2>,
     /// 콤보 표. 무기·캐릭터에 따라 바뀐다(moveset.rs).
     pub moveset: &'static Moveset,
     /// 스프라이트 좌우(마지막으로 본 가로 방향).
@@ -155,6 +161,8 @@ impl Player {
             resist: 0.0,
             dmg_acc: 0.0,
             events: Vec::new(),
+            targets: Vec::new(),
+            drill_lock: None,
             moveset: &moveset::CLAWS,
             face_left: false,
             kit: crate::equipment::Character::Mole,
@@ -528,18 +536,25 @@ impl Player {
             State::Drill {
                 time,
                 dir,
+                aim,
                 next_hit,
             } => {
                 let time = time + dt;
                 let mut dir = dir;
+                let mut aim = aim;
                 let mut next_hit = next_hit;
                 if time < t::DRILL_REV {
-                    // 시동: 제자리. 방향은 입력대로 바로.
-                    let aim = if a.aim != Vec2::ZERO { a.aim } else { move_dir };
-                    if aim != Vec2::ZERO {
-                        dir = aim.normalize();
+                    // 시동: 제자리. 방향은 입력대로 바로, 그 둘레(콘) 안의 적이 있으면 그 적 쪽으로(0139).
+                    let want = if a.aim != Vec2::ZERO { a.aim } else { move_dir };
+                    if want != Vec2::ZERO {
+                        aim = want.normalize();
                     }
+                    self.drill_lock = drill_assist(self.pos, aim, &self.targets);
+                    dir = self
+                        .drill_lock
+                        .map_or(aim, |q| (q - self.pos).try_normalize().unwrap_or(aim));
                 } else {
+                    self.drill_lock = None;
                     if time - dt < t::DRILL_REV {
                         self.events.push(Event::Drill);
                     }
@@ -581,6 +596,7 @@ impl Player {
                     State::Drill {
                         time,
                         dir,
+                        aim,
                         next_hit,
                     }
                 };
@@ -684,9 +700,13 @@ impl Player {
         self.dodge_buf = 0.0;
         self.combo_timer = 0.0;
         self.vel = Vec2::ZERO;
+        self.drill_lock = drill_assist(self.pos, dir, &self.targets);
         self.state = State::Drill {
             time: 0.0,
-            dir,
+            dir: self
+                .drill_lock
+                .map_or(dir, |q| (q - self.pos).try_normalize().unwrap_or(dir)),
+            aim: dir,
             next_hit: 0.0,
         };
         self.events.push(Event::DrillRev);
@@ -790,6 +810,25 @@ impl Player {
 }
 
 /// 돌진 속도: 시동 뒤 `dash_t`초. 처음엔 붙고(DRILL_ACCEL), 그 뒤 최고 속도.
+/// 드릴 겨누기(0139): `aim`에서 DRILL_ASSIST_CONE 안, DRILL_ASSIST_RANGE 안의 적 가운데 방향이 가장 가까운 적.
+/// 입력이 8방향(키보드·패드·터치)뿐이라 그 사이 각도의 적을 겨눌 수 없었고, 돌진 중에는 반지름 ~170px로만 틀 수 있어
+/// 빗나간 걸 알아도 고치지 못했다. 고르는 것은 시동 동안뿐이다(돌진 중 방향을 바꿔 주면 예측이 안 된다).
+pub fn drill_assist(pos: Vec2, aim: Vec2, targets: &[Vec2]) -> Option<Vec2> {
+    let mut best: Option<(f32, Vec2)> = None;
+    for &q in targets {
+        let d = q - pos;
+        let dist = d.length();
+        if dist < 1.0 || dist > t::DRILL_ASSIST_RANGE {
+            continue;
+        }
+        let ang = aim.angle_between(d).abs();
+        if ang <= t::DRILL_ASSIST_CONE && best.is_none_or(|(b, _)| ang < b) {
+            best = Some((ang, q));
+        }
+    }
+    best.map(|(_, q)| q)
+}
+
 pub fn drill_speed(dash_t: f32) -> f32 {
     let k = (dash_t / t::DRILL_ACCEL).clamp(0.0, 1.0);
     t::DRILL_SPEED_START + (t::DRILL_SPEED - t::DRILL_SPEED_START) * k
@@ -846,6 +885,69 @@ mod tests {
         }
         assert_eq!(stomps, t::CHAIN_HOPS as usize);
         assert_eq!(p.state, State::Free);
+    }
+
+    /// 드릴 겨누기(0139): 입력 둘레 콘 안·거리 안의 적 가운데 방향이 가장 가까운 적. 콘 밖·멀리·없으면 입력 그대로.
+    #[test]
+    fn drill_assist_picks_the_enemy_closest_to_the_aim() {
+        let o = vec2(100.0, 100.0);
+        let right = vec2(1.0, 0.0);
+        // 오른쪽 30°(8방향 사이) 적은 잡고, 50°는 콘 밖.
+        let at = |deg: f32, d: f32| o + Vec2::from_angle(deg.to_radians()) * d;
+        assert_eq!(
+            drill_assist(o, right, &[at(30.0, 100.0)]),
+            Some(at(30.0, 100.0))
+        );
+        assert_eq!(drill_assist(o, right, &[at(50.0, 100.0)]), None);
+        // 둘이면 방향이 더 가까운 쪽(거리는 보지 않는다).
+        assert_eq!(
+            drill_assist(o, right, &[at(25.0, 60.0), at(-10.0, 200.0)]),
+            Some(at(-10.0, 200.0))
+        );
+        // 너무 멀면 안 잡는다.
+        assert_eq!(
+            drill_assist(o, right, &[at(0.0, t::DRILL_ASSIST_RANGE + 10.0)]),
+            None
+        );
+        assert_eq!(drill_assist(o, right, &[]), None);
+    }
+
+    /// 겨누기가 실제 돌진 방향이 된다: 오른쪽만 누르고 있어도 오른쪽 위 30°의 적 쪽으로 나간다.
+    #[test]
+    fn drill_launches_toward_the_assisted_enemy() {
+        let room = Room::new();
+        let start = room.center() + vec2(-60.0, 40.0);
+        let mut p = Player::new(start);
+        let foe = start + Vec2::from_angle((-30f32).to_radians()) * 110.0;
+        p.targets = vec![foe];
+        p.sp = t::SP_MAX;
+        let go = Actions {
+            move_dir: vec2(1.0, 0.0),
+            special: true,
+            ..Default::default()
+        };
+        tick(&mut p, &room, &go);
+        let hold = Actions {
+            move_dir: vec2(1.0, 0.0),
+            ..Default::default()
+        };
+        for _ in 0..((t::DRILL_REV / t::TICK_DT) as usize - 1) {
+            tick(&mut p, &room, &hold);
+        }
+        assert_eq!(p.drill_lock, Some(foe), "시동 중 적을 겨눈다");
+        let State::Drill { dir, aim, .. } = p.state else {
+            panic!("드릴 중이 아니다")
+        };
+        assert!((aim - vec2(1.0, 0.0)).length() < 1e-4, "입력은 오른쪽");
+        assert!(
+            dir.angle_between(foe - start).abs() < 0.01,
+            "실제 방향은 적 쪽"
+        );
+        // 돌진에 들어가면 겨눈 표시는 사라진다.
+        for _ in 0..3 {
+            tick(&mut p, &room, &hold);
+        }
+        assert_eq!(p.drill_lock, None);
     }
 
     /// 필살기: SP가 차야 나가고, 벽에 부딪히면 충격파(DrillWall) + 경직.

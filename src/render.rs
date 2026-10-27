@@ -1178,6 +1178,29 @@ fn draw_player_fx(p: &Player, alpha: f32) {
                     Color::new(rage.r, rage.g, rage.b, 0.5 + 0.5 * k),
                 );
             }
+            // 겨누기(0139): 나갈 쪽으로 점선, 겨눈 적에는 모서리 표시. 8방향 입력 사이의 적도 맞춘다는 것을 보여 준다.
+            let guide = Color::new(rage.r, rage.g, rage.b, 0.35 + 0.45 * k);
+            let len = p
+                .drill_lock
+                .map_or(72.0, |q| ((q - pos).length() - 8.0).clamp(14.0, 240.0));
+            let mut d = 14.0;
+            while d < len {
+                let q = (pos + dir * d).round();
+                draw_rectangle(q.x, q.y, 1.0, 1.0, guide);
+                d += 6.0;
+            }
+            if let Some(q) = p.drill_lock {
+                let q = q.round();
+                let r = 9.0 - 2.0 * k;
+                for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                    let c = vec2(q.x + sx * r, q.y + sy * r);
+                    // 모서리 점에서 안쪽으로 3px씩(그 점 포함 4px).
+                    let x0 = if sx < 0.0 { c.x } else { c.x - 3.0 };
+                    let y0 = if sy < 0.0 { c.y } else { c.y - 3.0 };
+                    draw_rectangle(x0, c.y, 4.0, 1.0, guide);
+                    draw_rectangle(c.x, y0, 1.0, 4.0, guide);
+                }
+            }
         }
         player::State::Drill { time: dt, dir, .. } => {
             // 앞쪽 원뿔 드릴: 줄무늬가 돌아간다.

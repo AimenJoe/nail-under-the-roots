@@ -327,7 +327,14 @@ impl World {
             return;
         }
 
-        // 1. 플레이어
+        // 1. 플레이어. 드릴 겨누기용으로 맞을 수 있는 적 자리를 넘긴다(0139).
+        self.player.targets.clear();
+        self.player.targets.extend(
+            self.enemies
+                .iter()
+                .filter(|e| e.alive && e.hittable())
+                .map(|e| e.pos),
+        );
         let strike = self.player.update(a, &self.room, dt);
         self.last_strike = strike;
         let mut ate = None;
