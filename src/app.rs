@@ -621,13 +621,16 @@ impl App {
         if w.hush && self.scene == Scene::Cutscene {
             return (None, false);
         }
-        let boss = self.dream.is_some() || w.enemies.iter().any(|e| e.is_boss() && !e.asleep);
+        let boss = self.dream.is_some()
+            || w.enemies.iter().any(|e| e.is_boss() && !e.asleep)
+            || w.deep.as_ref().is_some_and(|d| d.done_t.is_none());
         let track = if boss {
             Track::Boss
         } else {
             match w.adv.place {
                 Place::Village => Track::Village,
                 Place::Camp => Track::Camp,
+                Place::Deep => Track::Deep,
                 Place::Field => Track::Field,
                 Place::Dungeon | Place::Arena => match w.biome {
                     crate::biome::Biome::Meadow => Track::Field,
@@ -826,6 +829,9 @@ impl App {
             }
             self.world.effects = self.settings.effects_f();
             self.world.tick(&a, &self.sfx);
+            for id in self.world.sounds.drain(..) {
+                self.sfx.play(id);
+            }
             self.acc -= t::TICK_DT;
         }
         if self.world.player.is_alive() {
@@ -1081,7 +1087,9 @@ impl App {
             self.cutscene = Some(cutscene::opening(&self.world));
             self.scene = Scene::Cutscene;
         } else if s == Scenario::Deepest {
-            self.reach_deepest();
+            // 가장 깊은 곳(0162): 할매와 매듭 셋. 들어서면 할매의 말, 셋 다 끊으면 반쪽 엔딩.
+            self.world.enter_deep_now();
+            self.scene = Scene::Game;
         } else if s == Scenario::Dream {
             self.begin_dream();
             self.scene = Scene::Game;
@@ -3370,6 +3378,7 @@ impl App {
             Place::Field => fill(s.map_field, &[&biome]),
             Place::Camp => fill(s.map_camp, &[&self.world.adv.stage]),
             Place::Village => s.village_name.to_string(),
+            Place::Deep => s.node_deepest.to_string(),
             Place::Dungeon => fill(
                 s.map_dungeon,
                 &[

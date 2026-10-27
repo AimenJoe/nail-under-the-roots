@@ -1382,6 +1382,22 @@ fn momo_steps() -> Vec<Step> {
 }
 
 /// 반쪽 엔딩: 가장 깊은 곳에 처음 닿았다. 할매는 실을 거두지만 놓지 않는다.
+/// 가장 깊은 곳에 들어섰다(0162): 이름 카드 + 할매의 말. 그 뒤 실매듭 끊기(월드). 반쪽 엔딩의 첫 두 줄이 여기로 왔다.
+pub fn halmae_meet(w: &World) -> Cutscene {
+    let steps = vec![
+        Step::Wait(0.4),
+        Step::Card {
+            name: i18n::s().name_halmae,
+            sub: |s| s.deep_sub,
+            secs: 3.2,
+        },
+        Step::Narrate(|s| s.half_1),
+        say(2, Face::Normal, |s| s.half_2),
+        say(0, Face::Determined, |s| s.deep_1),
+    ];
+    Cutscene::new(story_actors(w), steps)
+}
+
 fn half_ending_steps() -> Vec<Step> {
     vec![
         Step::Illust(Some(Illust::HalmaeDeep)),
@@ -1389,8 +1405,7 @@ fn half_ending_steps() -> Vec<Step> {
             to_clear: true,
             secs: 1.0,
         },
-        Step::Narrate(|s| s.half_1),
-        say(2, Face::Normal, |s| s.half_2),
+        // 첫 두 줄(장소·"왔구나")은 들어설 때 했다(`halmae_meet`, 0162).
         say(0, Face::Worried, |s| s.half_3),
         say(2, Face::Normal, |s| s.half_4),
         Step::Narrate(|s| s.half_5),

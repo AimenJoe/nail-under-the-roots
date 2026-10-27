@@ -212,7 +212,7 @@ pub const LIST: [Entry; 34] = [
     },
     Entry {
         name: "가장 깊은 곳",
-        desc: "런의 끝: 반쪽 엔딩을 보고 타이틀로.",
+        desc: "런의 끝: 할매와 실매듭 셋(0162). 셋 다 끊으면 반쪽 엔딩을 보고 타이틀로. 세 번 감기면 쉼터로.",
         scenario: Scenario::Deepest,
     },
     Entry {

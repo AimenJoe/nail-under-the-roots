@@ -23,6 +23,14 @@ pub enum Shape {
 
 impl Shape {
     /// 원(적·투사체)과 겹치는가.
+    /// 부채꼴이면 그 방향, 원이면 None(0162 매듭 불똥 방향용).
+    pub fn dir(&self) -> Option<Vec2> {
+        match *self {
+            Shape::Sector { dir, .. } => Some(dir),
+            Shape::Circle { .. } => None,
+        }
+    }
+
     pub fn overlaps_circle(&self, c: Vec2, cr: f32) -> bool {
         match *self {
             Shape::Circle { center, r } => (c - center).length_squared() <= (r + cr) * (r + cr),
@@ -69,6 +77,13 @@ pub struct Strike {
     pub finisher: bool,
     /// 맞은 적에게 거는 독(초).
     pub poison: f32,
+}
+
+impl Strike {
+    /// 공격이 향한 쪽(원형이면 `fallback`).
+    pub fn shape_dir_or(&self, fallback: Vec2) -> Vec2 {
+        self.shape.dir().unwrap_or(fallback)
+    }
 }
 
 /// 전투감 상태. 수치는 tuning.rs.

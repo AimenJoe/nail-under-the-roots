@@ -176,6 +176,93 @@ pub struct Cloud {
     pub time: f32,
 }
 
+/// 가장 깊은 곳의 실매듭(0162): 할매와 실로 이어진 매듭. 발톱으로 끊는다. 감기면 가장 가까운 매듭이 다시 조여진다.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Knot {
+    pub pos: Vec2,
+    pub hp: i32,
+    pub cut: bool,
+    /// 맞은 직후 떨림(초).
+    pub shake: f32,
+    /// 같은 공격 번호로 두 번 맞지 않게.
+    last_hit_by: u32,
+}
+
+/// 할매의 당기기 한 번(0162): 가운데에서 `dir`로 실이 뻗는다. 예고(`DEEP_PULL_WINDUP`) 뒤 `DEEP_PULL_TIME` 동안 뻗은 채.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Pull {
+    pub dir: Vec2,
+    pub len: f32,
+    pub time: f32,
+    /// 뻗는 틱에 판정을 한 번만.
+    pub judged: bool,
+    /// 받아쳐 끊겼다(남은 시간 동안 끊긴 실을 그린다).
+    pub snapped: bool,
+}
+
+/// 가장 깊은 곳(0162): 할매는 때릴 수 없고, 매듭 셋을 끊으면 놓아준다. 세 번 감기면 실에 잠긴다(쉼터로).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Deep {
+    pub center: Vec2,
+    pub knots: Vec<Knot>,
+    pub time: f32,
+    pub pull: Option<Pull>,
+    pub next_pull: f32,
+    pub wraps: u32,
+    /// 감겨 있는 남은 시간(> 0이면 움직이지도 때리지도 못하고 가운데로 끌려간다).
+    pub wrapped: f32,
+    /// 셋 다 끊은 뒤 흐른 시간(엔딩까지 `DEEP_DONE_DELAY`). None = 아직.
+    pub done_t: Option<f32>,
+    /// 실에 잠겼다(앱이 쉼터로).
+    pub asleep: bool,
+    /// 감긴 뒤 한 번 알려 준 힌트.
+    hinted: bool,
+}
+
+impl Deep {
+    pub fn new(center: Vec2) -> Self {
+        // 매듭 셋: 할매 앞쪽(아래) 반원에, 플레이어가 서는 자리를 비워 둔다.
+        let knots = [-0.78f32, 0.0, 0.78]
+            .iter()
+            .map(|a| {
+                let ang = std::f32::consts::FRAC_PI_2 + a;
+                Knot {
+                    pos: center + vec2(ang.cos() * 92.0, ang.sin() * 52.0),
+                    hp: t::DEEP_KNOT_HP,
+                    cut: false,
+                    shake: 0.0,
+                    last_hit_by: 0,
+                }
+            })
+            .collect();
+        Self {
+            center,
+            knots,
+            time: 0.0,
+            pull: None,
+            next_pull: t::DEEP_PULL_EVERY,
+            wraps: 0,
+            wrapped: 0.0,
+            done_t: None,
+            asleep: false,
+            hinted: false,
+        }
+    }
+
+    pub fn cut_count(&self) -> usize {
+        self.knots.iter().filter(|k| k.cut).count()
+    }
+
+    pub fn all_cut(&self) -> bool {
+        self.knots.iter().all(|k| k.cut)
+    }
+
+    /// 당기기 사이: 끊은 매듭마다 짧아진다.
+    fn pull_every(&self) -> f32 {
+        (t::DEEP_PULL_EVERY - t::DEEP_PULL_STEP * self.cut_count() as f32).max(1.2)
+    }
+}
+
 /// 바닥에 놓인 무기. 닿으면 얻는다.
 pub struct Pickup {
     pub pos: Vec2,
@@ -266,6 +353,8 @@ pub struct World {
     pub slams: u32,
     /// 길의 샘(0159): 쉼방 가운데의 맑은 샘. 발을 담그면 한 번 가득 회복.
     pub spring: Option<Spring>,
+    /// 가장 깊은 곳의 실매듭 끊기(0162). 있으면 할매·매듭·당기기가 돈다.
+    pub deep: Option<Deep>,
     /// 끝방의 출구 자리(0159)와 생긴 뒤 흐른 초: 화면 밖이면 HUD 가장자리 표시가 가리킨다(`EXIT_MARK_DELAY` 뒤).
     /// 장소를 옮기면 없어진다.
     pub exit_at: Option<Vec2>,
@@ -360,6 +449,7 @@ impl World {
             chests: 0,
             springs: 0,
             spring: None,
+            deep: None,
             exit_at: None,
             exit_age: 0.0,
             hush: false,
@@ -459,6 +549,13 @@ impl World {
             return;
         }
 
+        // 가장 깊은 곳(0162): 감겨 있는 동안은 입력이 닿지 않고 가운데로 끌려간다.
+        let still = Actions::default();
+        let a = if self.deep.as_ref().is_some_and(|d| d.wrapped > 0.0) {
+            &still
+        } else {
+            a
+        };
         // 1. 플레이어. 드릴 겨누기용으로 맞을 수 있는 적 자리를 넘긴다(0139).
         self.player.targets.clear();
         self.player.targets.extend(
@@ -469,6 +566,10 @@ impl World {
         );
         let strike = self.player.update(a, &self.room, dt);
         self.last_strike = strike;
+        self.deep_tick(dt);
+        if let Some(s) = &strike {
+            self.deep_hit(s);
+        }
         // 땅속에서 힘을 모으는 동안(0158) 땅이 운다: 힘에 비례해 흔들리고 흙알이 튄다.
         if self.player.is_burrowed() {
             let charge = self.player.burrow_charge();
@@ -1747,6 +1848,176 @@ impl World {
         true
     }
 
+    /// 가장 깊은 곳(0162) 한 틱: 당기기 예고 → 뻗기(판정 한 번) → 감김, 매듭 떨림, 셋 다 끊으면 엔딩, 세 번 감기면 잠.
+    fn deep_tick(&mut self, dt: f32) {
+        let Some(d) = self.deep.as_mut() else {
+            return;
+        };
+        d.time += dt;
+        for k in &mut d.knots {
+            k.shake = (k.shake - dt).max(0.0);
+        }
+        if let Some(t_done) = d.done_t.as_mut() {
+            *t_done += dt;
+            if *t_done >= t::DEEP_DONE_DELAY {
+                d.done_t = Some(f32::MAX);
+                self.adv.events.push(crate::adventure::AdvEvent::DeepDone);
+            }
+            return;
+        }
+        if d.asleep {
+            return;
+        }
+        // 감겨 있다: 가운데로 끌려간다.
+        if d.wrapped > 0.0 {
+            d.wrapped -= dt;
+            let to = d.center + vec2(0.0, 30.0) - self.player.pos;
+            if to.length() > 4.0 {
+                let step = to.normalize() * t::DEEP_PULL_SPEED * dt;
+                self.player.pos += step.clamp_length_max(to.length());
+            }
+            if d.wrapped <= 0.0 {
+                d.wrapped = 0.0;
+                if d.wraps >= t::DEEP_WRAPS {
+                    d.asleep = true;
+                    self.adv.events.push(crate::adventure::AdvEvent::DeepSleep);
+                }
+            }
+            return;
+        }
+        match d.pull.as_mut() {
+            None => {
+                d.next_pull -= dt;
+                if d.next_pull <= 0.0 {
+                    let to = self.player.pos - d.center;
+                    let dir = to.normalize_or(vec2(0.0, 1.0));
+                    d.pull = Some(Pull {
+                        dir,
+                        len: (to.length() + 24.0).min(t::DEEP_PULL_REACH),
+                        time: 0.0,
+                        judged: false,
+                        snapped: false,
+                    });
+                }
+            }
+            Some(p) => {
+                p.time += dt;
+                if p.time >= t::DEEP_PULL_WINDUP && !p.judged {
+                    p.judged = true;
+                    // 뻗는 틱: 실 줄에 걸렸나. 땅속·무적이면 안 걸린다. 받아치면 끊긴다.
+                    let (a, b) = (d.center, d.center + p.dir * p.len);
+                    let pp = self.player.pos;
+                    let caught = self.player.is_alive()
+                        && !self.player.is_invulnerable()
+                        && dist_to_segment(pp, a, b) <= self.player.radius() + t::DEEP_THREAD_W;
+                    if caught {
+                        let from = (d.center - pp).normalize_or_zero();
+                        if self
+                            .player
+                            .parry_dir()
+                            .is_some_and(|dir| dir.dot(from) > t::PARRY_FRONT)
+                        {
+                            p.snapped = true;
+                            self.player.on_parry();
+                            self.sounds.push(sfx::Id::Parry);
+                            self.toast = Some((|s| s.toast_parry, 0.8));
+                            self.feel.add_hitstop(t::PARRY_HITSTOP);
+                            self.fx.push(ring(pp, 4.0, 18.0, 0.2, WHITE));
+                            unravel(&mut self.fx, pp + from * 8.0, 10.0);
+                        } else {
+                            d.wraps += 1;
+                            d.wrapped = t::DEEP_WRAP_TIME;
+                            self.player.recoil(pp - from, 0.0, t::DEEP_WRAP_TIME);
+                            self.sounds.push(sfx::Id::Rumble);
+                            self.feel.add_trauma(0.3);
+                            self.fx.push(ring(pp, 6.0, 20.0, 0.3, THREAD));
+                            // 가장 가까운 안 끊긴 매듭이 다시 조여진다.
+                            if let Some(k) = d.knots.iter_mut().filter(|k| !k.cut).min_by(|x, y| {
+                                (x.pos - pp)
+                                    .length_squared()
+                                    .total_cmp(&(y.pos - pp).length_squared())
+                            }) {
+                                k.hp = t::DEEP_KNOT_HP;
+                                k.shake = 0.5;
+                                self.fx.push(ring(k.pos, 16.0, 4.0, 0.4, THREAD));
+                            }
+                            if !d.hinted {
+                                d.hinted = true;
+                                self.toast = Some((|s| s.deep_wrap, 3.5));
+                            }
+                        }
+                    }
+                }
+                if p.time >= t::DEEP_PULL_WINDUP + t::DEEP_PULL_TIME {
+                    d.pull = None;
+                    d.next_pull = d.pull_every();
+                }
+            }
+        }
+    }
+
+    /// 플레이어의 공격이 매듭에 닿았나(0162). 평타 1·마무리 2, 강공격은 두 배. 끊기면 실이 풀린다.
+    fn deep_hit(&mut self, s: &Strike) {
+        let Some(d) = self.deep.as_mut() else {
+            return;
+        };
+        if d.done_t.is_some() || d.wrapped > 0.0 {
+            return;
+        }
+        let mut cut_now = None;
+        for (i, k) in d.knots.iter_mut().enumerate() {
+            if k.cut || k.last_hit_by == s.id || !s.shape.overlaps_circle(k.pos, t::DEEP_KNOT_R) {
+                continue;
+            }
+            k.last_hit_by = s.id;
+            let dmg = if s.kind == crate::combat::StrikeKind::Heavy {
+                s.damage * t::DEEP_HEAVY_MUL
+            } else {
+                s.damage
+            };
+            k.hp -= dmg;
+            k.shake = 0.35;
+            self.feel.add_hitstop(s.hitstop.min(0.08));
+            self.fx.push(ring(k.pos, 3.0, 12.0, 0.15, WHITE));
+            spray(
+                &mut self.fx,
+                k.pos,
+                s.shape_dir_or(self.player.facing),
+                4,
+                THREAD,
+                120.0,
+            );
+            self.sounds.push(sfx::Id::EnemyHit);
+            if k.hp <= 0 {
+                k.cut = true;
+                cut_now = Some(i);
+            }
+        }
+        if let Some(i) = cut_now {
+            let at = d.knots[i].pos;
+            let n = d.cut_count();
+            self.sounds.push(sfx::Id::Unbind);
+            self.feel.add_trauma(0.35);
+            self.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
+            self.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
+            unravel(&mut self.fx, at, 14.0);
+            unravel(&mut self.fx, at, 22.0);
+            // 할매의 한마디(0162): 첫 매듭, 둘째 매듭.
+            self.toast = Some((
+                match n {
+                    1 => |s| s.deep_k1,
+                    2 => |s| s.deep_k2,
+                    _ => |s| s.deep_k3,
+                },
+                3.5,
+            ));
+            if d.all_cut() {
+                d.done_t = Some(0.0);
+                d.pull = None;
+            }
+        }
+    }
+
     pub fn freeze(&mut self) {
         self.freeze_interp();
     }
@@ -2022,6 +2293,95 @@ fn burst(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
 mod tests {
     use super::*;
     use crate::enemy::{Enemy, Kind};
+
+    /// 가장 깊은 곳(0162): 매듭은 평타 여섯(강공격은 두 배)에 끊기고, 당기기에 세 번 감기면 실에 잠긴다.
+    /// 감기면 가장 가까운 매듭이 다시 조여진다. 셋 다 끊으면 잠시 뒤 엔딩.
+    #[test]
+    fn deep_knots_cut_and_three_wraps_put_you_to_sleep() {
+        use crate::adventure::AdvEvent;
+        use crate::combat::{Shape, StrikeKind};
+        let mut w = World::new();
+        let c = w.player.pos + vec2(0.0, -80.0);
+        w.deep = Some(Deep::new(c));
+        let strike = |id: u32, kind: StrikeKind, at: Vec2, damage: i32| Strike {
+            id,
+            kind,
+            shape: Shape::Circle { center: at, r: 4.0 },
+            damage,
+            knockback: 0.0,
+            stun: 0.0,
+            hitstop: 0.0,
+            shake: 0.0,
+            finisher: false,
+            poison: 0.0,
+        };
+        let k1 = w.deep.as_ref().unwrap().knots[1].pos;
+        let s0 = strike(1, StrikeKind::Claw(0), k1, 1);
+        w.deep_hit(&s0);
+        w.deep_hit(&s0);
+        assert_eq!(
+            w.deep.as_ref().unwrap().knots[1].hp,
+            t::DEEP_KNOT_HP - 1,
+            "같은 공격 번호는 한 번만"
+        );
+        for id in 2..=t::DEEP_KNOT_HP as u32 {
+            w.deep_hit(&strike(id, StrikeKind::Claw(0), k1, 1));
+        }
+        assert!(w.deep.as_ref().unwrap().knots[1].cut, "평타 여섯에 끊긴다");
+        let k0 = w.deep.as_ref().unwrap().knots[0].pos;
+        w.deep_hit(&strike(50, StrikeKind::Heavy, k0, 2));
+        assert_eq!(
+            w.deep.as_ref().unwrap().knots[0].hp,
+            t::DEEP_KNOT_HP - 2 * t::DEEP_HEAVY_MUL,
+            "강공격은 두 배"
+        );
+        // 당기기: 뻗는 틱에 줄 위에 서 있으면 감긴다. 감긴 동안 가장 가까운 매듭(0)이 다시 조여진다.
+        for n in 1..=t::DEEP_WRAPS {
+            // 매듭 0 쪽에 서서(1은 끊겼고 2는 반대편) 줄에 걸린다.
+            w.player.pos = c + (k0 - c).normalize() * 80.0;
+            let d = w.deep.as_mut().unwrap();
+            let dir = (w.player.pos - c).normalize();
+            d.pull = Some(Pull {
+                dir,
+                len: t::DEEP_PULL_REACH,
+                time: t::DEEP_PULL_WINDUP - 0.001,
+                judged: false,
+                snapped: false,
+            });
+            w.deep_tick(t::TICK_DT);
+            assert_eq!(w.deep.as_ref().unwrap().wraps, n, "감겼다");
+            if n == 1 {
+                assert_eq!(
+                    w.deep.as_ref().unwrap().knots[0].hp,
+                    t::DEEP_KNOT_HP,
+                    "매듭이 다시 조여진다"
+                );
+            }
+            for _ in 0..((t::DEEP_WRAP_TIME / t::TICK_DT) as usize + 2) {
+                w.deep_tick(t::TICK_DT);
+            }
+        }
+        assert!(w.deep.as_ref().unwrap().asleep, "세 번이면 실에 잠긴다");
+        assert!(w.adv.events.contains(&AdvEvent::DeepSleep));
+        // 셋 다 끊으면 잠시 뒤 엔딩.
+        let mut w = World::new();
+        w.deep = Some(Deep::new(c));
+        for (i, k) in w.deep.clone().unwrap().knots.iter().enumerate() {
+            for id in 0..t::DEEP_KNOT_HP as u32 {
+                w.deep_hit(&strike(
+                    100 + i as u32 * 10 + id,
+                    StrikeKind::Claw(0),
+                    k.pos,
+                    1,
+                ));
+            }
+        }
+        assert!(w.deep.as_ref().unwrap().all_cut());
+        for _ in 0..((t::DEEP_DONE_DELAY / t::TICK_DT) as usize + 2) {
+            w.deep_tick(t::TICK_DT);
+        }
+        assert!(w.adv.events.contains(&AdvEvent::DeepDone));
+    }
 
     /// 길의 샘(0159): 들어서는 게 아니라 발을 담가야 가득 회복, 한 번만.
     #[test]

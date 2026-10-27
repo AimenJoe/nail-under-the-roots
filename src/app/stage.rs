@@ -275,7 +275,21 @@ impl App {
                     self.play(cutscene::camp_arrive(&self.world, n));
                 }
                 AdvEvent::RouteOpen => self.open_route(false),
-                AdvEvent::Deepest => self.reach_deepest(),
+                // 오늘의 굴은 싸움 없이 기록만(0162). 이야기 런은 가장 깊은 곳의 실매듭 끊기로.
+                AdvEvent::Deepest => {
+                    if self.current == crate::scenario::Scenario::Daily {
+                        self.reach_deepest();
+                    } else {
+                        self.world
+                            .start_fade(crate::adventure::Transition::EnterDeep);
+                    }
+                }
+                AdvEvent::DeepIntro => self.play(cutscene::halmae_meet(&self.world)),
+                AdvEvent::DeepDone => self.reach_deepest(),
+                AdvEvent::DeepSleep => {
+                    self.world.toast = Some((|s| s.deep_sleep, 4.0));
+                    self.world.start_fade(crate::adventure::Transition::Respawn);
+                }
                 AdvEvent::MomoIntro => {
                     let level = self.world.momo_wins.saturating_add(1);
                     let at = self.world.adv.boss_last;

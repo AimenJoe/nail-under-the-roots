@@ -39,6 +39,8 @@ pub enum Place {
     Camp,
     /// 큰 나무 아래 마을(village.rs, docs/decisions/0045). 런과 런 사이.
     Village,
+    /// 가장 깊은 곳(0162): 할매와 매듭 셋의 한 방. 콩이를 이기고 출구를 밟으면 온다.
+    Deep,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -49,12 +51,17 @@ pub enum Transition {
     EnterCamp,
     /// 길 지도에서 고른 굴로.
     EnterNode,
+    /// 가장 깊은 곳으로(마지막 길의 보스 출구, 0162). 내려가는 전환.
+    EnterDeep,
 }
 
 impl Transition {
     /// 더 깊이 내려가는 전환: 검정 대신 지층 단면이 흐르고(0156) 조금 더 길다.
     pub fn descends(self) -> bool {
-        matches!(self, Transition::EnterCamp | Transition::EnterNode)
+        matches!(
+            self,
+            Transition::EnterCamp | Transition::EnterNode | Transition::EnterDeep
+        )
     }
 
     /// 어두워지는(=밝아지는) 반의 길이.
@@ -111,6 +118,10 @@ pub enum AdvEvent {
     /// 셋째 길 끝 방에 콩이가 있다 / 콩이를 이겼다(0054).
     KongiIntro,
     KongiBeaten,
+    /// 가장 깊은 곳(0162): 들어섰다(할매의 말) / 매듭 셋을 끊었다(엔딩) / 세 번 감겨 실에 잠겼다(쉼터로).
+    DeepIntro,
+    DeepDone,
+    DeepSleep,
 }
 
 /// 확인 버튼으로 하는 일(쉼터).
@@ -505,6 +516,7 @@ impl World {
             Transition::Respawn => self.respawn_at_save(),
             Transition::EnterCamp => self.enter_camp(),
             Transition::EnterNode => self.enter_node(),
+            Transition::EnterDeep => self.enter_deep(),
         }
         f.to_m = self.depth_m();
         if f.kind.descends() && self.adv.shown_biome != Some(self.biome) {
@@ -664,6 +676,7 @@ impl World {
     pub fn depth_m(&self) -> u32 {
         match self.adv.place {
             Place::Arena | Place::Field | Place::Village => 0,
+            Place::Deep => depth::DEEPEST_M,
             Place::Camp => depth::camp(self.adv.stage),
             Place::Dungeon => match (self.adv.node, self.adv.route.as_ref()) {
                 (Some((l, _)), Some(r)) => depth::node(r.stage, l, r.layers.len()),
@@ -676,6 +689,7 @@ impl World {
     fn next_depth_m(&self, kind: Transition) -> Option<u32> {
         match kind {
             Transition::EnterCamp => Some(depth::camp(self.adv.stage + 1)),
+            Transition::EnterDeep => Some(depth::DEEPEST_M),
             Transition::EnterNode => {
                 let r = self.adv.route.as_ref()?;
                 let (l, _) = r.at?;
@@ -833,6 +847,39 @@ impl World {
         self.adv.node = None;
     }
 
+    /// 가장 깊은 곳(0162): 굴은 버리고(맡겨 둔 쉼터는 그대로 — 실에 잠기면 거기로 돌아간다) 한 방을 짓는다.
+    /// 가운데 할매, 앞쪽 반원에 매듭 셋, 플레이어는 아래 가운데. 들어서면 할매의 말(`DeepIntro`).
+    fn enter_deep(&mut self) {
+        self.adv.dungeon = None;
+        self.adv.node = None;
+        self.adv.place = Place::Deep;
+        let mut room = Room::new();
+        room.props.clear();
+        self.room = room;
+        self.enemies.clear();
+        self.loot.clear();
+        self.projectiles.clear();
+        self.clouds.clear();
+        self.rocks.clear();
+        self.mines.clear();
+        self.npc = None;
+        self.neighbors.clear();
+        self.biome = Biome::Deep;
+        let center = vec2(t::VIEW_W / 2.0, t::WALL_TOP + 34.0);
+        self.deep = Some(crate::world::Deep::new(center));
+        self.player.pos = vec2(t::VIEW_W / 2.0, t::VIEW_H - 34.0);
+        self.player.prev_pos = self.player.pos;
+        self.player.vel = Vec2::ZERO;
+        self.toast = None;
+        self.snap_cam();
+        self.adv.events.push(AdvEvent::DeepIntro);
+    }
+
+    /// 개발: 가장 깊은 곳으로 바로(전환 없이).
+    pub fn enter_deep_now(&mut self) {
+        self.enter_deep();
+    }
+
     /// 다음 쉼터: 필드·굴은 버리고 쉼터를 새로 짓는다. 체력 가득, 저장 고리가 다시 설 곳, 새 길.
     fn enter_camp(&mut self) {
         self.adv.field = None;
@@ -920,6 +967,11 @@ impl World {
         self.mines.clear();
         self.clouds.clear();
         self.rocks.clear();
+        if self.adv.place == Place::Deep {
+            // 실에 잠겼다(0162): 맡겨 둔 쉼터로 돌아간다. 매듭은 다음에 다시.
+            self.deep = None;
+            self.restore_field();
+        }
         if self.adv.place == Place::Dungeon {
             self.restore_field();
         }
@@ -1159,7 +1211,7 @@ impl World {
     /// 카메라가 머무는 사각형.
     pub fn cam_bounds(&self) -> Rect {
         match self.adv.place {
-            Place::Arena => Rect::new(0.0, 0.0, t::VIEW_W, t::VIEW_H),
+            Place::Arena | Place::Deep => Rect::new(0.0, 0.0, t::VIEW_W, t::VIEW_H),
             Place::Field => match (self.adv.boss, self.adv.glade) {
                 // 대장과 싸우는 동안은 공터를 한 방처럼 보여 준다.
                 (BossFight::Fight, Some(g)) => g,

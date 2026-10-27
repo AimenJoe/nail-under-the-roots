@@ -62,6 +62,25 @@ pub const CLAW_STUN: [f32; 3] = [0.15, 0.15, 0.50];
 pub const CLAW_HITSTOP: [f32; 3] = [0.05, 0.05, 0.13];
 pub const CLAW_SHAKE: [f32; 3] = [0.15, 0.15, 0.55];
 
+// ---- 가장 깊은 곳: 실매듭 끊기(0162) ----------------------------------------
+/// 매듭 체력(평타 1, 마무리 타 2, 강공격은 `DEEP_HEAVY_MUL`배). 매듭 반지름(판정·그림).
+pub const DEEP_KNOT_HP: i32 = 6;
+pub const DEEP_KNOT_R: f32 = 10.0;
+pub const DEEP_HEAVY_MUL: i32 = 2;
+/// 할매의 당기기: 사이 시간(초, 끊은 매듭마다 `DEEP_PULL_STEP`씩 짧아진다), 예고(초), 뻗는 시간(초), 닿는 거리, 실의 반폭.
+pub const DEEP_PULL_EVERY: f32 = 3.2;
+pub const DEEP_PULL_STEP: f32 = 0.7;
+pub const DEEP_PULL_WINDUP: f32 = 0.9;
+pub const DEEP_PULL_TIME: f32 = 0.3;
+pub const DEEP_PULL_REACH: f32 = 150.0;
+pub const DEEP_THREAD_W: f32 = 5.0;
+/// 감기면: 가운데로 끌려가는 속도, 감겨 있는 시간, 몇 번 감기면 실에 잠기나(쉼터 모닥불로).
+pub const DEEP_PULL_SPEED: f32 = 240.0;
+pub const DEEP_WRAP_TIME: f32 = 1.3;
+pub const DEEP_WRAPS: u32 = 3;
+/// 셋 다 끊은 뒤 엔딩까지(마지막 실이 풀리는 걸 본다).
+pub const DEEP_DONE_DELAY: f32 = 1.4;
+
 // ---- 강공격(0161) --------------------------------------------------------
 /// 공격은 떼는 순간 평타(사장 선택 2026-10-27: 1타부터 강공격이 되게). 누른 지 이만큼(초) 안에 떼면 평타,
 /// 그 뒤로는 모으는 자세(느려지고 발톱에 빛). 모으기 수치는 누른 때부터 센다.
