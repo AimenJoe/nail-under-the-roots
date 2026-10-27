@@ -379,6 +379,8 @@ enum Hit {
     KnotGo,
     /// 큰 나무의 재주 칸(자리, 갈래).
     TreeCell(usize, usize),
+    /// 큰 나무의 캐릭터 탭(0 Naïl, 1 모모, 0142).
+    TreeTab(usize),
     /// 실의 꿈 줄.
     DreamRow(usize),
     /// 캐릭터 고르기 칸.
@@ -466,6 +468,8 @@ pub struct App {
     decor_cursor: usize,
     /// 재주 창 커서(자리, 갈래).
     tree_cursor: (usize, usize),
+    /// 큰 나무에서 보고 있는 캐릭터의 재주 표(0142).
+    tree_char: Character,
     /// 실의 꿈(0055): 고르기 창의 줄, 꾸고 있는 꿈.
     dream_cursor: usize,
     dream: Option<dream::DreamRun>,
@@ -573,6 +577,7 @@ impl App {
             after_cutscene: AfterCut::Game,
             decor_cursor: 0,
             tree_cursor: (0, 0),
+            tree_char: Character::Mole,
             dream_cursor: 0,
             dream: None,
             dream_lock: 0.0,
@@ -957,7 +962,7 @@ impl App {
         self.world.player.parry_mul = knots.parry_mul();
         self.world.player.burrow_knot = knots.burrow_cd_mul();
         // 저널 보상(0048): 상자에서 나올 장신구, 털빛. 통계 기준은 새 월드에서 0부터.
-        self.world.charm_pool = crate::journal::charm_pool(&self.profile);
+        self.world.charm_pool = crate::journal::charm_pool(&self.profile, ch);
         self.world.fur = crate::journal::fur(&self.profile);
         self.tally = Tally::of(&self.world);
         self.journal_ready = crate::journal::ready_count(&self.profile);
@@ -1008,7 +1013,7 @@ impl App {
         }
         // 저널로 받은 장신구는 런마다 가방에 들고 시작한다(0050). 상자에서는 다시 안 나온다.
         if s != Scenario::Tutorial {
-            for c in crate::journal::owned_charms(&self.profile) {
+            for c in crate::journal::owned_charms(&self.profile, ch) {
                 self.inventory.add_charm(c);
                 if !self.world.charms_found.contains(&c) {
                     self.world.charms_found.push(c);
@@ -2818,7 +2823,7 @@ impl App {
         labeled(&mut y, s.special_name, gauge.color(), &desc);
         labeled(&mut y, s.charms_label, ui::ACCENT, &charms);
         // 낀 재주(0047): 자리 순서로. 없으면 어디서 깨우는지.
-        let picked: Vec<&str> = crate::talents::TABLE
+        let picked: Vec<&str> = crate::talents::table(self.world.character)
             .iter()
             .zip(p.talents.pick)
             .filter(|(_, side)| *side > 0)

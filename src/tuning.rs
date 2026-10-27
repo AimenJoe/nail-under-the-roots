@@ -365,6 +365,18 @@ pub const TAL_SHORT_DRILL_SP: f32 = 1.6;
 pub const TAL_CHEW_TIME: f32 = 2.0;
 pub const TAL_CHEW_HEAL: i32 = 2;
 pub const TAL_GULP_TIME: f32 = 0.4;
+/// 모모(0142) 자리 1 A 멀리뛰기: 깡충 거리·대기 배율. B 발 구르기: 깡충 착지 밟기 피해·반지름·대기 배율.
+pub const TAL_LEAP_DIST: f32 = 80.0;
+pub const TAL_LEAP_CD: f32 = 1.3;
+pub const TAL_STAMP_DAMAGE: i32 = 1;
+pub const TAL_STAMP_RADIUS: f32 = 18.0;
+pub const TAL_STAMP_CD: f32 = 1.25;
+/// 모모 자리 3 A 네 번 뛰기: 이어 뛰기 수·기 게이지 배율. B 높이 뛰기: 뛰기 수·밟기 반지름·경직.
+pub const TAL_FOUR_HOPS: u32 = 4;
+pub const TAL_FOUR_HOPS_SP: f32 = 0.75;
+pub const TAL_HIGH_HOPS: u32 = 2;
+pub const TAL_HIGH_RADIUS: f32 = 40.0;
+pub const TAL_HIGH_STUN: f32 = 0.9;
 
 // ---- 모모(첫 길의 보스, 세 번, docs/decisions/0046) -----------------------------------
 /// 뒷발 차기(짧은 돌진) 시간. 높이 뛰기 체공은 종 표의 dash_time.

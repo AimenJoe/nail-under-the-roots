@@ -81,6 +81,8 @@ pub enum Event {
     /// 모모가 뛰어오름 / 내려앉음(이어 뛰기 착지는 true).
     Hop,
     Land(bool),
+    /// 모모 깡충 착지 밟기(재주 발 구르기, 0142).
+    Stamp,
 }
 
 pub struct Player {
@@ -260,11 +262,16 @@ impl Player {
         self.vel = Vec2::ZERO;
         self.facing = dir;
         self.state = State::Chain {
-            left: t::CHAIN_HOPS,
+            left: self.talents.chain_hops(),
             time: 0.0,
             dir,
         };
         self.events.push(Event::Hop);
+    }
+
+    /// 이어 뛰기 밟기 반지름(재주 높이 뛰기 + 들꽃 화관, 0142). 월드의 고리도 이 값.
+    pub fn chain_radius(&self) -> f32 {
+        self.talents.chain_radius() + self.stats.chain_radius
     }
 
     fn stomp_strike(&mut self) -> Strike {
@@ -274,15 +281,30 @@ impl Player {
             kind: StrikeKind::Stomp,
             shape: Shape::Circle {
                 center: self.pos,
-                r: t::CHAIN_RADIUS,
+                r: self.chain_radius(),
             },
             damage: t::CHAIN_DAMAGE + self.stats.damage,
             knockback: t::CHAIN_KNOCKBACK,
-            stun: t::CHAIN_STUN,
+            stun: self.talents.chain_stun(),
             hitstop: t::CHAIN_HITSTOP,
             shake: t::CHAIN_SHAKE,
             finisher: false,
             poison: 0.0,
+        }
+    }
+
+    /// 발 구르기(0142): 깡충 착지의 작은 밟기. 이어 뛰기 밟기보다 작고 약하다.
+    fn stamp_strike(&mut self) -> Strike {
+        Strike {
+            damage: t::TAL_STAMP_DAMAGE + self.stats.damage,
+            shape: Shape::Circle {
+                center: self.pos,
+                r: t::TAL_STAMP_RADIUS,
+            },
+            knockback: t::CHAIN_KNOCKBACK * 0.5,
+            stun: t::CHAIN_STUN * 0.6,
+            shake: t::CHAIN_SHAKE * 0.4,
+            ..self.stomp_strike()
         }
     }
 
@@ -491,10 +513,14 @@ impl Player {
             }
             State::Hop { time, dir } => {
                 let time = time + dt;
-                self.pos += dir * (t::HOP_DIST / t::HOP_TIME) * dt;
+                self.pos += dir * (self.talents.hop_dist() / t::HOP_TIME) * dt;
                 if time >= t::HOP_TIME {
                     self.burrow_cd = self.burrow_cd_full();
                     self.events.push(Event::Land(false));
+                    if self.talents.hop_stamp() {
+                        strike = Some(self.stamp_strike());
+                        self.events.push(Event::Stamp);
+                    }
                     self.state = State::Free;
                 } else {
                     self.state = State::Hop { time, dir };
@@ -762,7 +788,11 @@ impl Player {
                 r: h.range,
             },
             damage: h.damage + self.stats.damage,
-            knockback: h.knockback,
+            knockback: if idx == self.moveset.last() {
+                h.knockback * self.stats.finisher_knockback
+            } else {
+                h.knockback
+            },
             stun: h.stun,
             hitstop: h.hitstop,
             shake: h.shake,
@@ -885,6 +915,56 @@ mod tests {
         }
         assert_eq!(stomps, t::CHAIN_HOPS as usize);
         assert_eq!(p.state, State::Free);
+    }
+
+    /// 모모 재주(0142): 발 구르기는 깡충 착지에 작은 밟기, 네 번 뛰기는 밟기 넷, 높이 뛰기는 둘이고 넓다.
+    #[test]
+    fn momo_talents_change_hop_and_chain() {
+        let room = Room::new();
+        let none = Actions::default();
+        let momo = |pick: [u8; 4]| {
+            let mut p = Player::new(room.center());
+            p.kit = crate::equipment::Character::Momo;
+            p.moveset = &moveset::KICKS;
+            p.talents = crate::talents::Talents { pick, momo: true };
+            p
+        };
+        // 발 구르기: 착지 한 번에 밟기 하나(반지름 TAL_STAMP_RADIUS).
+        let mut p = momo([2, 0, 0, 0]);
+        let hop = Actions {
+            dodge: true,
+            ..Default::default()
+        };
+        tick(&mut p, &room, &hop);
+        let mut stamps = Vec::new();
+        for _ in 0..40 {
+            if let (Some(s), _) = tick(&mut p, &room, &none) {
+                stamps.push(s);
+            }
+        }
+        assert_eq!(stamps.len(), 1);
+        assert!(matches!(stamps[0].shape, Shape::Circle { r, .. } if r == t::TAL_STAMP_RADIUS));
+        // 이어 뛰기: 네 번 뛰기 = 넷, 높이 뛰기 = 둘(넓게).
+        for (side, hops, radius) in [
+            (1, t::TAL_FOUR_HOPS, t::CHAIN_RADIUS),
+            (2, t::TAL_HIGH_HOPS, t::TAL_HIGH_RADIUS),
+        ] {
+            let mut p = momo([0, 0, side, 0]);
+            p.sp = t::SP_MAX;
+            let go = Actions {
+                special: true,
+                ..Default::default()
+            };
+            tick(&mut p, &room, &go);
+            let mut n = 0;
+            for _ in 0..160 {
+                if let (Some(s), _) = tick(&mut p, &room, &none) {
+                    assert!(matches!(s.shape, Shape::Circle { r, .. } if r == radius));
+                    n += 1;
+                }
+            }
+            assert_eq!(n, hops as usize, "갈래 {side}");
+        }
     }
 
     /// 드릴 겨누기(0139): 입력 둘레 콘 안·거리 안의 적 가운데 방향이 가장 가까운 적. 콘 밖·멀리·없으면 입력 그대로.

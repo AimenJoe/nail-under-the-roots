@@ -65,7 +65,7 @@ pub enum Reward {
     Decor(usize),
     /// 털빛 번호(1~3, 0은 기본).
     Fur(u8),
-    /// equipment::CHARMS 번호(저널로 여는 것은 BASE_CHARMS부터).
+    /// equipment::CHARMS 번호(저널로 여는 것은 `Charm::journal`).
     Charm(usize),
 }
 
@@ -194,7 +194,7 @@ pub const GOALS: &[Goal] = &[
         Some("deeper"),
         Light(40)
     ),
-    // 모모와 가장 깊은 곳(0056): 모모를 골라 끝까지.
+    // 모모와 가장 깊은 곳(0056): 모모를 골라 끝까지. 보상은 들꽃 화관(0142, 그 전에는 반딧불 40).
     goal!(
         "momo_deep",
         Story,
@@ -203,7 +203,7 @@ pub const GOALS: &[Goal] = &[
         Flag(key::MOMO_DEEP),
         1,
         Some("momo3"),
-        Light(40)
+        Charm(crate::equipment::CROWN)
     ),
     // 실의 꿈(0055): 꿈에서 넷을 다 이기기 → 이어서 꾸기.
     goal!(
@@ -540,9 +540,8 @@ impl Goal {
             Bought => (0..crate::village::DECOR.len())
                 .filter(|i| p.flag(&crate::village::key_decor(*i)))
                 .count() as u32,
-            Talents => crate::talents::SLOTS
+            Talents => crate::talents::all_awake_keys()
                 .iter()
-                .flat_map(|s| [0, 1].map(|side| crate::talents::key_awake(*s, side)))
                 .filter(|k| p.flag(k))
                 .count() as u32,
         };
@@ -603,10 +602,17 @@ pub fn claim(p: &mut Profile, g: &Goal) -> Option<Reward> {
     Some(g.reward)
 }
 
-/// 저널로 받은 장신구(docs/decisions/0050): 받으면 바로 가방에, 그 뒤 런마다 들고 시작한다.
-pub fn owned_charms(p: &Profile) -> Vec<usize> {
-    (crate::equipment::BASE_CHARMS..crate::equipment::CHARMS.len())
-        .filter(|i| p.flag(&key_charm(*i)))
+/// 저널로 받은 장신구인가. 깃발이 없어도 그 장신구를 주는 목표를 이미 받았으면 가진 것으로 친다:
+/// 목표의 보상을 나중에 장신구로 바꿔도(momo_deep, 0142) 옛 기록이 그대로 받는다.
+fn has_charm(p: &Profile, i: usize) -> bool {
+    p.flag(&key_charm(i)) || GOALS.iter().any(|g| g.reward == Charm(i) && g.claimed(p))
+}
+
+/// 저널로 받은 장신구(docs/decisions/0050): 받으면 바로 가방에, 그 뒤 런마다 들고 시작한다. 그 캐릭터가 낄 것만(0142).
+pub fn owned_charms(p: &Profile, ch: crate::equipment::Character) -> Vec<usize> {
+    use crate::equipment::CHARMS;
+    (0..CHARMS.len())
+        .filter(|i| CHARMS[*i].journal && CHARMS[*i].fits(ch) && has_charm(p, *i))
         .collect()
 }
 
@@ -621,10 +627,11 @@ pub fn reward_place(r: Reward) -> Tr {
     }
 }
 
-/// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것).
-pub fn charm_pool(p: &Profile) -> Vec<usize> {
-    (0..crate::equipment::CHARMS.len())
-        .filter(|i| *i < crate::equipment::BASE_CHARMS || p.flag(&key_charm(*i)))
+/// 상자·가게에서 나올 수 있는 장신구(기본 + 저널로 연 것, 그 캐릭터가 낄 것만, 0142).
+pub fn charm_pool(p: &Profile, ch: crate::equipment::Character) -> Vec<usize> {
+    use crate::equipment::CHARMS;
+    (0..CHARMS.len())
+        .filter(|i| CHARMS[*i].fits(ch) && (!CHARMS[*i].journal || has_charm(p, *i)))
         .collect()
 }
 
@@ -695,14 +702,39 @@ mod tests {
         claim(&mut p, by_id("chest").unwrap());
         assert_eq!(claim(&mut p, by_id("chest2").unwrap()), Some(Fur(2)));
         assert_eq!(fur(&p), 2);
-        assert!(!charm_pool(&p).contains(&5));
+        let mole = crate::equipment::Character::Mole;
+        assert!(!charm_pool(&p, mole).contains(&5));
         p.set(key::BORI_BACK);
-        assert!(owned_charms(&p).is_empty());
+        assert!(owned_charms(&p, mole).is_empty());
         claim(&mut p, by_id("bori").unwrap());
-        assert!(charm_pool(&p).contains(&5));
-        assert_eq!(owned_charms(&p), vec![5], "받은 장신구는 들고 시작한다");
+        assert!(charm_pool(&p, mole).contains(&5));
+        assert_eq!(
+            owned_charms(&p, mole),
+            vec![5],
+            "받은 장신구는 들고 시작한다"
+        );
         p.add(stat::LIGHT, 300);
         claim(&mut p, by_id("light").unwrap());
         assert!(p.flag(&crate::village::key_decor(6)));
+    }
+
+    /// 모모 장신구(0142): 모모 런에서만 상자·가게에 나오고, 화관은 momo_deep을 받으면(옛 기록이 반딧불로 받았어도) 들고 시작한다.
+    #[test]
+    fn momo_charms_only_in_momo_runs() {
+        use crate::equipment::{Character, CHARMS, CROWN};
+        let mut p = Profile::default();
+        let momo_only: Vec<usize> = (0..CHARMS.len())
+            .filter(|i| CHARMS[*i].only.is_some())
+            .collect();
+        assert_eq!(momo_only.len(), 3);
+        for i in &momo_only {
+            assert!(!charm_pool(&p, Character::Mole).contains(i));
+        }
+        let pool = charm_pool(&p, Character::Momo);
+        assert!(pool.contains(&8) && pool.contains(&9) && !pool.contains(&CROWN));
+        // 옛 기록: momo_deep을 받은 깃발만 있다(그때 보상은 반딧불).
+        p.set(&key_claimed("momo_deep"));
+        assert_eq!(owned_charms(&p, Character::Momo), vec![CROWN]);
+        assert!(owned_charms(&p, Character::Mole).is_empty());
     }
 }

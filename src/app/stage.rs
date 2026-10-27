@@ -9,7 +9,7 @@ use macroquad::prelude::*;
 use super::{App, Hit, Scene};
 use crate::adventure::{AdvEvent, Interact};
 use crate::cutscene::{self, Cutscene, Face, Speaker};
-use crate::equipment::CHARMS;
+use crate::equipment::{Character, CHARMS};
 use crate::i18n::{self, fill, tr, Tr};
 use crate::input::{self, Act, Actions, Verb};
 use crate::items::Consumable;
@@ -473,6 +473,7 @@ impl App {
             // 큰 나무: 반딧불로 재주를 깨운다(0047).
             Interact::Tree => {
                 self.tree_cursor = (0, 0);
+                self.tree_char = self.world.character;
                 self.shop_msg = None;
                 self.world.freeze();
                 self.scene = Scene::Tree;
@@ -1158,27 +1159,47 @@ impl App {
         n
     }
 
-    /// 기록 → 이번 런에 낄 재주(깨운 갈래만).
+    /// 기록 → 이번 런에 낄 재주(깨운 갈래만, 지금 캐릭터의 표, 0142).
     pub(super) fn talents(&self) -> crate::talents::Talents {
         use crate::talents::{key_awake, key_pick, Talents, SLOTS};
-        let mut k = Talents::default();
+        let ch = self.world.character;
+        let mut k = Talents {
+            momo: ch == Character::Momo,
+            ..Talents::default()
+        };
         for (i, slot) in SLOTS.iter().enumerate() {
-            let side = self.profile.count(&key_pick(*slot)).min(2) as u8;
-            if side > 0 && self.profile.flag(&key_awake(*slot, side as usize - 1)) {
+            let side = self.profile.count(&key_pick(ch, *slot)).min(2) as u8;
+            if side > 0 && self.profile.flag(&key_awake(ch, *slot, side as usize - 1)) {
                 k.pick[i] = side;
             }
         }
         k
     }
 
+    /// 큰 나무에 탭이 있나: 모모가 돌아오면 Naïl/모모(0142).
+    fn tree_tabs(&self) -> bool {
+        self.profile.flag(crate::profile::key::MOMO_BACK)
+    }
+
     /// 맡긴 반딧불로 지금 깨울 수 있는 것이 있나(재주 갈래 또는 도토 뒤 독 발톱). 나무 밑동 빛·HUD가 본다(0061).
     pub(super) fn tree_affordable(&self) -> bool {
         use crate::profile::key;
-        use crate::talents::{key_awake, KEY_LIGHT, SLOTS, TABLE};
+        use crate::talents::{key_awake, table, KEY_LIGHT, SLOTS};
         let have = self.profile.count(KEY_LIGHT);
-        let talent = SLOTS.iter().zip(TABLE.iter()).any(|(slot, (_, sides))| {
-            (0..2)
-                .any(|side| !self.profile.flag(&key_awake(*slot, side)) && sides[side].cost <= have)
+        let chars: &[Character] = if self.tree_tabs() {
+            &[Character::Mole, Character::Momo]
+        } else {
+            &[Character::Mole]
+        };
+        let talent = chars.iter().any(|ch| {
+            SLOTS
+                .iter()
+                .zip(table(*ch).iter())
+                .any(|(slot, (_, sides))| {
+                    (0..2).any(|side| {
+                        !self.profile.flag(&key_awake(*ch, *slot, side)) && sides[side].cost <= have
+                    })
+                })
         });
         let venom = self.profile.flag(key::DOTO_MEMORY)
             && !self.profile.flag(key::VENOM)
@@ -1187,17 +1208,37 @@ impl App {
     }
 
     /// 큰 나무의 재주(0047): 위아래 = 자리, 좌우 = 갈래, 확인 = 깨우기(반딧불)·끼기·빼기. 닫기: 뒤로·✕·바깥.
+    /// 모모가 돌아오면 탭(LB·RB 또는 탭 누르기)으로 Naïl/모모 표를 바꾼다(0142).
     pub(super) fn update_tree(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
-        use crate::talents::{key_awake, key_pick, KEY_LIGHT, SLOTS, TABLE};
+        use crate::talents::{key_awake, key_pick, table, KEY_LIGHT, SLOTS};
         if let Some((_, t)) = self.shop_msg.as_mut() {
             *t -= dt;
             if *t <= 0.0 {
                 self.shop_msg = None;
             }
         }
+        if self.tree_tabs() {
+            let tab = match tap_hit {
+                Some(Hit::TreeTab(i)) => Some(i),
+                _ if a.tab_prev || a.tab_next => {
+                    Some(usize::from(self.tree_char == Character::Mole))
+                }
+                _ => None,
+            };
+            let ch = [Character::Mole, Character::Momo][tab.unwrap_or(0).min(1)];
+            if tab.is_some() && ch != self.tree_char {
+                self.tree_char = ch;
+                // 모모 탭에는 독 발톱 줄이 없다: 커서가 그 줄이면 마지막 자리로.
+                self.tree_cursor = (self.tree_cursor.0.min(SLOTS.len() - 1), 0);
+                self.shop_msg = None;
+                self.sfx.play(crate::sfx::Id::UiMove);
+            }
+        }
+        let ch = self.tree_char;
         let (mut row, mut side) = self.tree_cursor;
-        // 도토 뒤엔 다섯째 줄: Naïl 자신의 독 발톱(한 칸, 0052).
-        let venom_row = self.profile.flag(crate::profile::key::DOTO_MEMORY);
+        // 도토 뒤엔 다섯째 줄: Naïl 자신의 독 발톱(한 칸, 0052). 모모 탭에는 없다.
+        let venom_row =
+            ch == Character::Mole && self.profile.flag(crate::profile::key::DOTO_MEMORY);
         let n = SLOTS.len() + usize::from(venom_row);
         if a.up {
             row = (row + n - 1) % n;
@@ -1213,6 +1254,7 @@ impl App {
             (row, side) = (r, c);
             act = true;
         }
+        row = row.min(n - 1);
         if row >= SLOTS.len() {
             side = 0;
         }
@@ -1239,16 +1281,16 @@ impl App {
             }
         } else if act {
             let slot = SLOTS[row];
-            let pick = key_pick(slot);
-            if !self.profile.flag(&key_awake(slot, side)) {
-                let cost = TABLE[row].1[side].cost;
+            let pick = key_pick(ch, slot);
+            if !self.profile.flag(&key_awake(ch, slot, side)) {
+                let cost = table(ch)[row].1[side].cost;
                 let have = self.profile.count(KEY_LIGHT);
                 if have < cost {
                     self.shop_msg = Some((|s| s.tree_poor, 3.0));
                     self.sfx.play(crate::sfx::Id::Deny);
                 } else {
                     self.profile.set_count(KEY_LIGHT, have - cost);
-                    self.profile.set(&key_awake(slot, side));
+                    self.profile.set(&key_awake(ch, slot, side));
                     self.profile.set_count(&pick, side as u32 + 1);
                     self.shop_msg = Some((|s| s.tree_awake, 2.5));
                     self.sfx.play(crate::sfx::Id::Heal);
@@ -1271,20 +1313,38 @@ impl App {
     }
 
     pub(super) fn draw_tree(&mut self, ui: &Ui) {
-        use crate::talents::{key_awake, key_pick, KEY_LIGHT, SLOTS, TABLE};
+        use crate::talents::{key_awake, key_pick, table, KEY_LIGHT, SLOTS};
         let s = i18n::s();
         let panel = Rect::new(20.0, 8.0, 280.0, 156.0);
         ui.panel(panel, Some(s.tree_title));
         self.close_button(ui, panel);
         let have = self.profile.count(KEY_LIGHT);
+        let light = fill(s.tree_light, &[&have]);
         ui.text_right(
-            &fill(s.tree_light, &[&have]),
+            &light,
             panel.right() - 20.0,
             panel.y + 3.0,
             FONT_PX,
             ui::TEXT,
         );
-        let venom_row = self.profile.flag(crate::profile::key::DOTO_MEMORY);
+        let ch = self.tree_char;
+        if self.tree_tabs() {
+            // 제목과 반딧불 수 사이 제목 줄에 Naïl/모모 탭(0142).
+            let x = panel.x + 6.0 + ui.text_w(s.tree_title, FONT_PX) + 6.0;
+            let right = panel.right() - 20.0 - ui.text_w(&light, FONT_PX) - 6.0;
+            let names = [Character::Mole.name(), Character::Momo.name()];
+            let active = usize::from(ch == Character::Momo);
+            for (i, r) in ui
+                .tabs(&names, active, x, panel.y + 1.0, right - x)
+                .into_iter()
+                .enumerate()
+            {
+                self.hits.push((r, Hit::TreeTab(i)));
+            }
+        }
+        let tal_table = table(ch);
+        let venom_row =
+            ch == Character::Mole && self.profile.flag(crate::profile::key::DOTO_MEMORY);
         let venom = self.profile.flag(crate::profile::key::VENOM);
         let rows = SLOTS.len() + usize::from(venom_row);
         let row_h = if venom_row { 18.0 } else { 21.0 };
@@ -1293,14 +1353,14 @@ impl App {
         let cell_w = ((panel.right() - 6.0 - x0 - 4.0) / 2.0).floor();
         for (r, slot) in SLOTS.iter().enumerate() {
             let y = y0 + r as f32 * row_h;
-            let (slot_name, sides) = &TABLE[r];
+            let (slot_name, sides) = &tal_table[r];
             let label = ui.fit(tr(*slot_name), x0 - panel.x - 10.0, FONT_PX);
             ui.text(&label, panel.x + 6.0, y + 4.0, FONT_PX, ui::TEXT_DIM);
-            let pick = self.profile.count(&key_pick(*slot));
+            let pick = self.profile.count(&key_pick(ch, *slot));
             for (c, tal) in sides.iter().enumerate() {
                 let cell = Rect::new(x0 + c as f32 * (cell_w + 4.0), y, cell_w, row_h - 2.0);
                 self.hits.push((cell, Hit::TreeCell(r, c)));
-                let awake = self.profile.flag(&key_awake(*slot, c));
+                let awake = self.profile.flag(&key_awake(ch, *slot, c));
                 let on = pick == c as u32 + 1 && awake;
                 let focus = self.tree_cursor == (r, c);
                 ui.rect(cell, if focus { ui::PANEL_LIGHT } else { ui::PANEL });
@@ -1371,9 +1431,9 @@ impl App {
         }
         // 고른 칸의 설명 + 상태(또는 방금 한 일).
         let (r, c) = self.tree_cursor;
-        let on_venom = r >= SLOTS.len();
+        let on_venom = venom_row && r >= SLOTS.len();
         let r = r.min(SLOTS.len() - 1);
-        let tal = &TABLE[r].1[c];
+        let tal = &tal_table[r].1[c];
         let dy = y0 + rows as f32 * row_h + 3.0;
         let desc = if on_venom {
             s.tree_venom_desc
@@ -1387,20 +1447,28 @@ impl App {
         {
             ui.text(l, panel.x + 6.0, dy + k as f32 * 12.0, FONT_PX, ui::TEXT);
         }
-        let awake = self.profile.flag(&key_awake(SLOTS[r], c));
+        let awake = self.profile.flag(&key_awake(ch, SLOTS[r], c));
         let state = match self.shop_msg {
             Some((m, _)) => tr(m).to_string(),
             None if on_venom && venom => s.tree_venom_on.to_string(),
             None if on_venom => fill(s.tree_cost, &[&t::VENOM_AWAKE_COST]),
             None if !awake => fill(s.tree_cost, &[&tal.cost]),
-            None if self.profile.count(&key_pick(SLOTS[r])) == c as u32 + 1 => {
+            None if self.profile.count(&key_pick(ch, SLOTS[r])) == c as u32 + 1 => {
                 s.tree_on.to_string()
             }
             None => s.tree_off.to_string(),
         };
         let state = ui.fit(&state, panel.w - 12.0, FONT_PX);
         ui.text(&state, panel.x + 6.0, dy + 26.0, FONT_PX, ui::ACCENT);
-        let hint = super::vfill(s.tree_hint, &[Verb::Confirm, Verb::Back]);
+        let mut hint = super::vfill(s.tree_hint, &[Verb::Confirm, Verb::Back]);
+        if self.tree_tabs() {
+            // 탭 안내를 앞에. 다 안 들어가는 언어(일본어)는 원래 안내만(탭은 제목 줄에 보이고 누를 수 있다).
+            let tabs = super::device_hint(s.tab_hint, s.tab_hint_touch, &[Verb::Tabs]);
+            let both = format!("{tabs} · {hint}");
+            if ui.text_w(&both, FONT_PX) <= panel.w - 8.0 {
+                hint = both;
+            }
+        }
         let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
         // 뒤의 마을 그림 위에서도 읽히게 띠를 깐다.
         let hw = ui.text_w(&hint, FONT_PX) + 8.0;
@@ -1457,7 +1525,8 @@ impl App {
             Reward::Fur(_) => self.world.fur = crate::journal::fur(&self.profile),
             // 장신구는 바로 가방에(0050). 이번 런의 상자에서는 다시 안 나온다.
             Reward::Charm(c) => {
-                self.world.charm_pool = crate::journal::charm_pool(&self.profile);
+                self.world.charm_pool =
+                    crate::journal::charm_pool(&self.profile, self.world.character);
                 self.inventory.add_charm(c);
                 if !self.world.charms_found.contains(&c) {
                     self.world.charms_found.push(c);

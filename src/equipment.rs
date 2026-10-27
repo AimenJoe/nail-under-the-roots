@@ -137,6 +137,10 @@ pub struct Stats {
     pub burrow_cd: f32,
     /// SP 차는 배율.
     pub sp_gain: f32,
+    /// 마지막 타(콤보 끝) 넉백 배율.
+    pub finisher_knockback: f32,
+    /// 모모 이어 뛰기 밟기 반지름에 더한다(px).
+    pub chain_radius: f32,
 }
 
 impl Stats {
@@ -146,6 +150,8 @@ impl Stats {
         attack_speed: 1.0,
         burrow_cd: 1.0,
         sp_gain: 1.0,
+        finisher_knockback: 1.0,
+        chain_radius: 0.0,
     };
 
     /// 기본값에 장신구와 뿌리 심장을 더한다. 배율은 곱, 더하기는 합. 너무 극단으로 가지 않게 묶는다.
@@ -158,6 +164,8 @@ impl Stats {
             s.attack_speed *= m.attack_speed;
             s.burrow_cd *= m.burrow_cd;
             s.sp_gain *= m.sp_gain;
+            s.finisher_knockback *= m.finisher_knockback;
+            s.chain_radius += m.chain_radius;
         }
         s.max_hp = (s.max_hp + root_hearts.min(crate::tuning::ROOT_HEART_MAX)).max(1);
         s.attack_speed = s.attack_speed.clamp(0.6, 1.8);
@@ -174,6 +182,8 @@ pub struct Mods {
     pub attack_speed: f32,
     pub burrow_cd: f32,
     pub sp_gain: f32,
+    pub finisher_knockback: f32,
+    pub chain_radius: f32,
 }
 
 const NO_MODS: Mods = Mods {
@@ -182,22 +192,34 @@ const NO_MODS: Mods = Mods {
     attack_speed: 1.0,
     burrow_cd: 1.0,
     sp_gain: 1.0,
+    finisher_knockback: 1.0,
+    chain_radius: 0.0,
 };
 
-/// 장신구: 캐릭터와 상관없이 낀다. 2칸. 얻는 곳은 상자·상점(맵 단계).
+/// 장신구: 2칸. 얻는 곳은 상자·상점(맵 단계)·저널. 대부분 누구나 끼고, 모모 것(0142)은 모모 런에서만 나온다.
 pub struct Charm {
     pub name: Tr,
     pub desc: Tr,
     pub mods: Mods,
     pub color: Color,
+    /// 이 캐릭터의 런에서만 나온다(상자·가게·저널로 받은 것 모두, 0142). None = 누구나.
+    pub only: Option<Character>,
+    /// 저널로 연다(0048): 받기 전에는 상자·가게에 없다.
+    pub journal: bool,
+}
+
+impl Charm {
+    pub fn fits(&self, ch: Character) -> bool {
+        self.only.is_none_or(|c| c == ch)
+    }
 }
 
 /// 동시에 낄 수 있는 장신구 수.
 pub const CHARM_SLOTS: usize = 2;
-/// 처음부터 상자에서 나오는 장신구 수. 그 뒤는 저널로 연다(docs/decisions/0048).
-pub const BASE_CHARMS: usize = 5;
+/// 들꽃 화관(저널 momo_deep의 보상).
+pub const CROWN: usize = 10;
 
-pub static CHARMS: [Charm; 8] = [
+pub static CHARMS: [Charm; 11] = [
     Charm {
         name: |s| s.c_shell,
         desc: |s| s.c_shell_desc,
@@ -206,6 +228,8 @@ pub static CHARMS: [Charm; 8] = [
             ..NO_MODS
         },
         color: Color::new(0.80, 0.62, 0.42, 1.0),
+        only: None,
+        journal: false,
     },
     Charm {
         name: |s| s.c_whisker,
@@ -215,6 +239,8 @@ pub static CHARMS: [Charm; 8] = [
             ..NO_MODS
         },
         color: Color::new(0.86, 0.86, 0.92, 1.0),
+        only: None,
+        journal: false,
     },
     Charm {
         name: |s| s.c_soil,
@@ -224,6 +250,8 @@ pub static CHARMS: [Charm; 8] = [
             ..NO_MODS
         },
         color: Color::new(0.50, 0.36, 0.26, 1.0),
+        only: None,
+        journal: false,
     },
     Charm {
         name: |s| s.c_flint,
@@ -234,6 +262,8 @@ pub static CHARMS: [Charm; 8] = [
             ..NO_MODS
         },
         color: Color::new(0.62, 0.66, 0.74, 1.0),
+        only: None,
+        journal: false,
     },
     Charm {
         name: |s| s.c_amulet,
@@ -243,6 +273,8 @@ pub static CHARMS: [Charm; 8] = [
             ..NO_MODS
         },
         color: Color::new(0.95, 0.80, 0.35, 1.0),
+        only: None,
+        journal: false,
     },
     // 저널로 연다(0048). 옆으로: 얻는 만큼 잃는다.
     // 들쥐 방울(보리를 되찾으면): 분노가 빨리 차고 발톱이 조금 느리다.
@@ -255,6 +287,8 @@ pub static CHARMS: [Charm; 8] = [
             ..NO_MODS
         },
         color: Color::new(0.90, 0.74, 0.30, 1.0),
+        only: None,
+        journal: true,
     },
     // 할매의 실(가장 깊은 곳): 굴을 자주 파지만 분노가 느리다.
     Charm {
@@ -266,6 +300,8 @@ pub static CHARMS: [Charm; 8] = [
             ..NO_MODS
         },
         color: Color::new(0.90, 0.88, 0.96, 1.0),
+        only: None,
+        journal: true,
     },
     // 모모의 꽃잎(모모가 돌아오면): 체력 +2, 발톱이 느리다.
     Charm {
@@ -277,6 +313,47 @@ pub static CHARMS: [Charm; 8] = [
             ..NO_MODS
         },
         color: Color::new(1.0, 0.66, 0.77, 1.0),
+        only: None,
+        journal: true,
+    },
+    // 모모 런에서만(0142). 토끼풀 잎: 깡충이 금방 돌아오지만 몸이 약하다.
+    Charm {
+        name: |s| s.c_clover,
+        desc: |s| s.c_clover_desc,
+        mods: Mods {
+            burrow_cd: 0.7,
+            max_hp: -1,
+            ..NO_MODS
+        },
+        color: Color::new(0.52, 0.80, 0.44, 1.0),
+        only: Some(Character::Momo),
+        journal: false,
+    },
+    // 솜꼬리: 뒷발 마지막 타가 멀리 날리지만 발차기가 조금 느리다.
+    Charm {
+        name: |s| s.c_cotton,
+        desc: |s| s.c_cotton_desc,
+        mods: Mods {
+            finisher_knockback: 1.4,
+            attack_speed: 0.9,
+            ..NO_MODS
+        },
+        color: Color::new(0.96, 0.95, 0.92, 1.0),
+        only: Some(Character::Momo),
+        journal: false,
+    },
+    // 들꽃 화관(저널 "모모와 가장 깊은 곳"): 이어 뛰기 밟기가 넓지만 기가 느리게 찬다.
+    Charm {
+        name: |s| s.c_crown,
+        desc: |s| s.c_crown_desc,
+        mods: Mods {
+            chain_radius: 8.0,
+            sp_gain: 0.85,
+            ..NO_MODS
+        },
+        color: Color::new(0.98, 0.84, 0.48, 1.0),
+        only: Some(Character::Momo),
+        journal: true,
     },
 ];
 

@@ -269,7 +269,10 @@ impl World {
             mines: Vec::new(),
             kongi_fight: false,
             dream: false,
-            charm_pool: (0..crate::equipment::BASE_CHARMS).collect(),
+            charm_pool: crate::journal::charm_pool(
+                &crate::profile::Profile::default(),
+                crate::equipment::Character::Mole,
+            ),
             fur: 0,
             chests: 0,
             springs: 0,
@@ -469,11 +472,11 @@ impl World {
                 player::Event::Land(big) => {
                     let p = self.player.pos;
                     if *big {
+                        let r = self.player.chain_radius();
                         sfx.play(sfx::Id::WallHit);
                         self.feel.add_trauma(0.25);
-                        self.fx
-                            .push(ring(p, 4.0, t::CHAIN_RADIUS + 4.0, 0.25, PETAL));
-                        self.fx.push(ring(p, 2.0, t::CHAIN_RADIUS, 0.2, DIRT));
+                        self.fx.push(ring(p, 4.0, r + 4.0, 0.25, PETAL));
+                        self.fx.push(ring(p, 2.0, r, 0.2, DIRT));
                         burst(&mut self.fx, p, 12, DIRT, 110.0);
                         burst(&mut self.fx, p, 6, PETAL, 80.0);
                     } else {
@@ -487,6 +490,13 @@ impl World {
                         5.0,
                         0.4,
                     );
+                }
+                player::Event::Stamp => {
+                    let p = self.player.pos;
+                    sfx.play(sfx::Id::Emerge);
+                    self.feel.add_trauma(0.1);
+                    self.fx.push(ring(p, 2.0, t::TAL_STAMP_RADIUS, 0.18, PETAL));
+                    burst(&mut self.fx, p, 5, DIRT, 70.0);
                 }
                 player::Event::Hurt | player::Event::Die | player::Event::Parry => {}
             }

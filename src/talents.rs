@@ -3,7 +3,9 @@
 //! 자리 넷(굴파기·패링·드릴·먹기), 자리마다 둘 중 하나를 고른다(Hades 밤의 거울의 두 갈래). 한쪽을 얻으면 다른 쪽의
 //! 좋은 점을 버린다 — 세지는 것보다 "다르게 싸우는 것"(0040). 깨운 것끼리는 마을에서 언제든 바꿔 낀다(공짜).
 //! 수치는 이미 있는 것(tuning)에 배율·값을 얹는다. 플레이어·월드는 `Talents`만 본다.
+//! 모모(0142)는 자리 1·3이 모모 것(깡충·이어 뛰기, `MOMO_TABLE`·키 `talent.hop.*`·`talent.chain.*`), 2·4는 함께.
 
+use crate::equipment::Character;
 use crate::i18n::Tr;
 use crate::tuning as t;
 
@@ -24,102 +26,126 @@ pub struct Talent {
     pub cost: u32,
 }
 
-/// 자리별 (이름, [갈래 A, 갈래 B]).
+const fn talent(name: Tr, desc: Tr, cost: u32) -> Talent {
+    Talent { name, desc, cost }
+}
+
+/// 자리 2·4(패링·먹기)는 두 캐릭터가 함께 쓴다(0142).
+const PARRY: (Tr, [Talent; 2]) = (
+    |s| s.tal_parry,
+    [
+        talent(|s| s.tal_parry_a, |s| s.tal_parry_a_desc, 60),
+        talent(|s| s.tal_parry_b, |s| s.tal_parry_b_desc, 60),
+    ],
+);
+const EAT: (Tr, [Talent; 2]) = (
+    |s| s.tal_eat,
+    [
+        talent(|s| s.tal_eat_a, |s| s.tal_eat_a_desc, 50),
+        talent(|s| s.tal_eat_b, |s| s.tal_eat_b_desc, 50),
+    ],
+);
+
+/// 자리별 (이름, [갈래 A, 갈래 B]). Naïl.
 pub const TABLE: [(Tr, [Talent; 2]); 4] = [
     (
         |s| s.tal_burrow,
         [
-            Talent {
-                name: |s| s.tal_burrow_a,
-                desc: |s| s.tal_burrow_a_desc,
-                cost: 40,
-            },
-            Talent {
-                name: |s| s.tal_burrow_b,
-                desc: |s| s.tal_burrow_b_desc,
-                cost: 40,
-            },
+            talent(|s| s.tal_burrow_a, |s| s.tal_burrow_a_desc, 40),
+            talent(|s| s.tal_burrow_b, |s| s.tal_burrow_b_desc, 40),
         ],
     ),
-    (
-        |s| s.tal_parry,
-        [
-            Talent {
-                name: |s| s.tal_parry_a,
-                desc: |s| s.tal_parry_a_desc,
-                cost: 60,
-            },
-            Talent {
-                name: |s| s.tal_parry_b,
-                desc: |s| s.tal_parry_b_desc,
-                cost: 60,
-            },
-        ],
-    ),
+    PARRY,
     (
         |s| s.tal_drill,
         [
-            Talent {
-                name: |s| s.tal_drill_a,
-                desc: |s| s.tal_drill_a_desc,
-                cost: 80,
-            },
-            Talent {
-                name: |s| s.tal_drill_b,
-                desc: |s| s.tal_drill_b_desc,
-                cost: 80,
-            },
+            talent(|s| s.tal_drill_a, |s| s.tal_drill_a_desc, 80),
+            talent(|s| s.tal_drill_b, |s| s.tal_drill_b_desc, 80),
         ],
     ),
-    (
-        |s| s.tal_eat,
-        [
-            Talent {
-                name: |s| s.tal_eat_a,
-                desc: |s| s.tal_eat_a_desc,
-                cost: 50,
-            },
-            Talent {
-                name: |s| s.tal_eat_b,
-                desc: |s| s.tal_eat_b_desc,
-                cost: 50,
-            },
-        ],
-    ),
+    EAT,
 ];
+
+/// 모모(0142): 자리 1 = 깡충(멀리뛰기·발 구르기), 자리 3 = 이어 뛰기(네 번 뛰기·높이 뛰기). 값은 Naïl과 같다.
+pub const MOMO_TABLE: [(Tr, [Talent; 2]); 4] = [
+    (
+        |s| s.tal_hop,
+        [
+            talent(|s| s.tal_hop_a, |s| s.tal_hop_a_desc, 40),
+            talent(|s| s.tal_hop_b, |s| s.tal_hop_b_desc, 40),
+        ],
+    ),
+    PARRY,
+    (
+        |s| s.tal_chain,
+        [
+            talent(|s| s.tal_chain_a, |s| s.tal_chain_a_desc, 80),
+            talent(|s| s.tal_chain_b, |s| s.tal_chain_b_desc, 80),
+        ],
+    ),
+    EAT,
+];
+
+/// 캐릭터의 재주 표.
+pub fn table(ch: Character) -> &'static [(Tr, [Talent; 2]); 4] {
+    match ch {
+        Character::Mole => &TABLE,
+        Character::Momo => &MOMO_TABLE,
+    }
+}
 
 impl Slot {
     pub fn index(self) -> usize {
         SLOTS.iter().position(|s| *s == self).unwrap_or(0)
     }
 
-    fn key(self) -> &'static str {
-        match self {
-            Slot::Burrow => "burrow",
-            Slot::Parry => "parry",
-            Slot::Drill => "drill",
-            Slot::Eat => "eat",
+    /// 기록 키의 자리 이름. 모모의 자리 1·3은 따로(0142), 2·4는 Naïl과 같은 키.
+    fn key(self, ch: Character) -> &'static str {
+        match (self, ch) {
+            (Slot::Burrow, Character::Momo) => "hop",
+            (Slot::Drill, Character::Momo) => "chain",
+            (Slot::Burrow, _) => "burrow",
+            (Slot::Parry, _) => "parry",
+            (Slot::Drill, _) => "drill",
+            (Slot::Eat, _) => "eat",
         }
     }
 }
 
 /// 기록 키(바꾸지 않는다, 0041): 깨움(깃발), 낀 갈래(수 0 = 없음, 1 = A, 2 = B), 맡긴 반딧불(수).
-pub fn key_awake(slot: Slot, side: usize) -> String {
+pub fn key_awake(ch: Character, slot: Slot, side: usize) -> String {
     format!(
         "talent.{}.{}",
-        slot.key(),
+        slot.key(ch),
         if side == 0 { "a" } else { "b" }
     )
 }
-pub fn key_pick(slot: Slot) -> String {
-    format!("talent_pick.{}", slot.key())
+pub fn key_pick(ch: Character, slot: Slot) -> String {
+    format!("talent_pick.{}", slot.key(ch))
+}
+
+/// 두 캐릭터의 모든 갈래 깨움 키(겹치는 자리 2·4는 한 번). 저널 "깨운 재주 수"가 센다.
+pub fn all_awake_keys() -> Vec<String> {
+    let mut keys: Vec<String> = Vec::new();
+    for ch in &[Character::Mole, Character::Momo] {
+        for slot in SLOTS {
+            for side in 0..2 {
+                let k = key_awake(*ch, slot, side);
+                if !keys.contains(&k) {
+                    keys.push(k);
+                }
+            }
+        }
+    }
+    keys
 }
 pub const KEY_LIGHT: &str = "glowbugs_banked";
 
-/// 이번 런에 낀 재주. 자리마다 0 = 없음, 1 = A, 2 = B.
+/// 이번 런에 낀 재주. 자리마다 0 = 없음, 1 = A, 2 = B. `momo`면 자리 1·3은 모모 표(0142).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Talents {
     pub pick: [u8; 4],
+    pub momo: bool,
 }
 
 impl Talents {
@@ -127,23 +153,44 @@ impl Talents {
         self.pick[slot.index()]
     }
 
+    /// Naïl 표의 자리 1·3 갈래(모모면 없음).
+    fn mole(self, slot: Slot) -> u8 {
+        if self.momo {
+            0
+        } else {
+            self.side(slot)
+        }
+    }
+
+    /// 모모 표의 자리 1·3 갈래(Naïl이면 없음).
+    fn momo_side(self, slot: Slot) -> u8 {
+        if self.momo {
+            self.side(slot)
+        } else {
+            0
+        }
+    }
+
     /// 굴파기 A 깊은 굴: 오래 숨고 크게 솟구치지만 다시 파기까지 길다. B 얕은 굴: 짧게 숨고 금방 다시.
     pub fn burrow_time(self) -> f32 {
-        match self.side(Slot::Burrow) {
+        match self.mole(Slot::Burrow) {
             1 => t::TAL_DEEP_TIME,
             2 => t::TAL_SHALLOW_TIME,
             _ => t::BURROW_MAX_TIME,
         }
     }
+    /// 회피 대기 배율. 모모는 깡충(A 멀리뛰기·B 발 구르기 모두 길어진다).
     pub fn burrow_cd_mul(self) -> f32 {
-        match self.side(Slot::Burrow) {
-            1 => t::TAL_DEEP_CD,
-            2 => t::TAL_SHALLOW_CD,
+        match (self.momo, self.side(Slot::Burrow)) {
+            (false, 1) => t::TAL_DEEP_CD,
+            (false, 2) => t::TAL_SHALLOW_CD,
+            (true, 1) => t::TAL_LEAP_CD,
+            (true, 2) => t::TAL_STAMP_CD,
             _ => 1.0,
         }
     }
     pub fn emerge_radius(self) -> f32 {
-        match self.side(Slot::Burrow) {
+        match self.mole(Slot::Burrow) {
             1 => t::TAL_DEEP_RADIUS,
             2 => t::TAL_SHALLOW_RADIUS,
             _ => t::EMERGE_RADIUS,
@@ -168,17 +215,55 @@ impl Talents {
 
     /// 드릴 A 긴 드릴: 길게 달리지만 게이지가 느리게 찬다. B 짧은 드릴: 짧게, 자주.
     pub fn drill_mul(self) -> f32 {
-        match self.side(Slot::Drill) {
+        match self.mole(Slot::Drill) {
             1 => t::TAL_LONG_DRILL,
             2 => t::TAL_SHORT_DRILL,
             _ => 1.0,
         }
     }
+    /// 게이지 차는 배율: Naïl은 드릴 갈래, 모모는 네 번 뛰기(느리게 찬다).
     pub fn sp_gain_mul(self) -> f32 {
-        match self.side(Slot::Drill) {
-            1 => t::TAL_LONG_DRILL_SP,
-            2 => t::TAL_SHORT_DRILL_SP,
+        match (self.momo, self.side(Slot::Drill)) {
+            (false, 1) => t::TAL_LONG_DRILL_SP,
+            (false, 2) => t::TAL_SHORT_DRILL_SP,
+            (true, 1) => t::TAL_FOUR_HOPS_SP,
             _ => 1.0,
+        }
+    }
+
+    /// 모모 깡충 A 멀리뛰기: 더 멀리 뛴다(대기가 길다).
+    pub fn hop_dist(self) -> f32 {
+        if self.momo_side(Slot::Burrow) == 1 {
+            t::TAL_LEAP_DIST
+        } else {
+            t::HOP_DIST
+        }
+    }
+    /// 모모 깡충 B 발 구르기: 착지에 작은 밟기(회피가 공격도 된다, 0090의 모모 쪽 답).
+    pub fn hop_stamp(self) -> bool {
+        self.momo_side(Slot::Burrow) == 2
+    }
+
+    /// 모모 이어 뛰기: A 네 번 뛰기, B 높이 뛰기(두 번, 넓고 오래 멈추게).
+    pub fn chain_hops(self) -> u32 {
+        match self.momo_side(Slot::Drill) {
+            1 => t::TAL_FOUR_HOPS,
+            2 => t::TAL_HIGH_HOPS,
+            _ => t::CHAIN_HOPS,
+        }
+    }
+    pub fn chain_radius(self) -> f32 {
+        if self.momo_side(Slot::Drill) == 2 {
+            t::TAL_HIGH_RADIUS
+        } else {
+            t::CHAIN_RADIUS
+        }
+    }
+    pub fn chain_stun(self) -> f32 {
+        if self.momo_side(Slot::Drill) == 2 {
+            t::TAL_HIGH_STUN
+        } else {
+            t::CHAIN_STUN
         }
     }
 
@@ -207,6 +292,40 @@ mod tests {
         let mut k = Talents::default();
         k.pick[slot.index()] = side;
         k
+    }
+
+    fn momo(slot: Slot, side: u8) -> Talents {
+        Talents {
+            momo: true,
+            ..with(slot, side)
+        }
+    }
+
+    /// 모모(0142): 자리 1·3은 모모 것. 갈래마다 맞바꿈이 있고, Naïl의 굴파기·드릴 수치는 먹지 않는다.
+    #[test]
+    fn momo_sides_trade_and_ignore_mole_numbers() {
+        let base = Talents {
+            momo: true,
+            ..Talents::default()
+        };
+        assert_eq!(base.hop_dist(), t::HOP_DIST);
+        assert_eq!(base.chain_hops(), t::CHAIN_HOPS);
+        let leap = momo(Slot::Burrow, 1);
+        assert!(leap.hop_dist() > t::HOP_DIST && leap.burrow_cd_mul() > 1.0);
+        assert_eq!(leap.emerge_radius(), t::EMERGE_RADIUS);
+        let stamp = momo(Slot::Burrow, 2);
+        assert!(
+            stamp.hop_stamp() && stamp.burrow_cd_mul() > 1.0 && stamp.hop_dist() == t::HOP_DIST
+        );
+        let four = momo(Slot::Drill, 1);
+        assert!(four.chain_hops() > t::CHAIN_HOPS && four.sp_gain_mul() < 1.0);
+        assert_eq!(four.drill_mul(), 1.0);
+        let high = momo(Slot::Drill, 2);
+        assert!(high.chain_hops() < t::CHAIN_HOPS);
+        assert!(high.chain_radius() > t::CHAIN_RADIUS && high.chain_stun() > t::CHAIN_STUN);
+        // Naïl에게 모모 갈래는 없다.
+        assert!(!with(Slot::Burrow, 2).hop_stamp());
+        assert_eq!(with(Slot::Drill, 1).chain_hops(), t::CHAIN_HOPS);
     }
 
     #[test]
@@ -243,7 +362,12 @@ mod tests {
 
     #[test]
     fn keys_are_stable() {
-        assert_eq!(key_awake(Slot::Drill, 1), "talent.drill.b");
-        assert_eq!(key_pick(Slot::Eat), "talent_pick.eat");
+        assert_eq!(key_awake(Character::Mole, Slot::Drill, 1), "talent.drill.b");
+        assert_eq!(key_pick(Character::Mole, Slot::Eat), "talent_pick.eat");
+        assert_eq!(key_awake(Character::Momo, Slot::Burrow, 0), "talent.hop.a");
+        assert_eq!(key_pick(Character::Momo, Slot::Drill), "talent_pick.chain");
+        // 패링·먹기는 함께.
+        assert_eq!(key_pick(Character::Momo, Slot::Parry), "talent_pick.parry");
+        assert_eq!(all_awake_keys().len(), 12);
     }
 }
