@@ -113,6 +113,7 @@ Scene (a tall image that the game slowly pans from top to bottom), built in step
 ```
 Scene: Inside a snug underground burrow chamber with a nest of dry grass. A large mother mole gently nudges her tiny baby Naïl with her nose toward a tunnel that leads out of the chamber; warm daylight glows at the far end of the tunnel. The mother's expression is happy and proud: eyes closed in a contented smile, the corners of her mouth turned up, rosy cheeks. Her brows are relaxed, never drooping; nothing about her is sad or worried. Naïl is small, stands facing the light, and looks eager. The mood is warm and encouraging, like a parent proudly cheering a child off on a first adventure. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
 ```
+- 이 장면은 공통 스타일의 "The mood is tender and a little lonely, never scary"도 "The mood is tender and warm, never scary"로 바꿔 붙인다(슬픔이 다시 새지 않게).
 - 2026-10-27 고침: 첫 판은 "eyes closed and tender … warm and a little lonely"로 뽑았더니 눈꼬리·입꼬리가 처져 슬퍼 보였다(사장: "엄마가 너무 슬퍼 보여"). 웃는 입꼬리·볼 홍조·편안한 눈썹을 글로 못 박고 "쓸쓸"을 뺐다. 다시 뽑으면 `tools/art/sources/ai/illust/mother_burrow.png`를 바꾸고 `strip_logo.py` → `ai_illust.py`(0125·0133).
 
 ### `bori_freed` — 16:9 (640×360)
