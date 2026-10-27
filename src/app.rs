@@ -157,13 +157,6 @@ pub enum Item {
     Charm(usize),
 }
 
-/// 독 발톱(equipment::WEAPONS 번호, 큰 나무에서 깨운다, 0052).
-pub(crate) const VENOM_CLAW: usize = 3;
-/// 새싹 발톱(수수가 만들어 준다, 0053).
-pub(crate) const SPROUT_CLAW: usize = 0;
-/// 바위 발톱(콩이가 준다, 0054).
-pub(crate) const STONE_CLAW: usize = 2;
-
 /// 가방. 지금은 무기만 들어간다. 그 밖의 아이템은 2단계(방 클리어 보상)에서.
 pub struct Inventory {
     pub slots: Vec<Option<Item>>,
@@ -951,9 +944,9 @@ impl App {
         // 수수의 새싹 발톱(0053)·큰 나무에서 깨운 독 발톱(0052)도 런마다 가방에(끼는 건 가방에서).
         // 맨손 시작(튜토리얼 전)은 빼고.
         for (k, w) in [
-            (crate::profile::key::SPROUT, SPROUT_CLAW),
-            (crate::profile::key::STONE, STONE_CLAW),
-            (crate::profile::key::VENOM, VENOM_CLAW),
+            (crate::profile::key::SPROUT, crate::equipment::SPROUT_CLAW),
+            (crate::profile::key::STONE, crate::equipment::STONE_CLAW),
+            (crate::profile::key::VENOM, crate::equipment::VENOM_CLAW),
         ] {
             if self.profile.flag(k)
                 && self.inventory.equipped.is_some()

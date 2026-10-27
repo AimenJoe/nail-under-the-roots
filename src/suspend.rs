@@ -228,6 +228,26 @@ mod tests {
         );
     }
 
+    /// v0.3.8이 쉼터에서 쓴 이어하기 글의 고정 샘플(0169 R8). 키 이름·번호 +1 약속이 바뀌면 여기서 깨진다
+    /// (바꾸면 VERSION을 올리고 옛 글을 읽는 길을 둔다).
+    #[test]
+    fn reads_and_writes_the_fixed_v0_3_run_text() {
+        let text = "nail-profile 1\nflag doto_fight\nflag heart_sold\nflag kongi_fight\ncount berries 2\ncount character 1\ncount charm.2 0\ncount depth 2\ncount equipped 5\ncount found.0 1\ncount found.1 6\ncount glowbugs 0\ncount knots 3\ncount root_hearts 1\ncount run.version 1\ncount run_secs 412\ncount seed.hi 3735928559\ncount seed.lo 5351397\ncount seeds 41\ncount selected 1\ncount slots 4\ncount sp 6500\ncount stage 2\ncount stat.kills 17\ncount stat.parries 3\ncount weapon.0 4\ncount weapon.3 0\ncount worms 1\ncount worn.0 1\n";
+        let r = sample();
+        assert_eq!(r.to_profile().encode(), text);
+        let back = RunSave::from_profile(&Profile::decode(text).unwrap()).unwrap();
+        let mut stats = back.stats.clone();
+        stats.sort();
+        assert_eq!(stats, r.stats);
+        assert_eq!(
+            RunSave {
+                stats: vec![],
+                ..back
+            },
+            RunSave { stats: vec![], ..r }
+        );
+    }
+
     /// 빈 기록·다른 형식 번호는 이어하기가 아니다.
     #[test]
     fn empty_or_other_version_is_not_a_run() {

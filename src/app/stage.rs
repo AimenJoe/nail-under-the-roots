@@ -518,7 +518,7 @@ impl App {
             // 수수: 처음엔 새싹 발톱을 만들어 준다(0053). 개발 시나리오는 기록 없이 이번 런에만.
             Interact::Talk(Who::Susu)
                 if !self.profile.flag(crate::profile::key::SPROUT)
-                    && !self.inventory.has(super::SPROUT_CLAW) =>
+                    && !self.inventory.has(crate::equipment::SPROUT_CLAW) =>
             {
                 if self.recording() {
                     self.profile.set(crate::profile::key::SPROUT);
@@ -1443,7 +1443,7 @@ impl App {
                     .set_count(KEY_LIGHT, have - t::VENOM_AWAKE_COST);
                 self.profile.set(key::VENOM);
                 crate::profile::save(&self.profile);
-                self.inventory.add(super::VENOM_CLAW);
+                self.inventory.add(crate::equipment::VENOM_CLAW);
                 self.shop_msg = Some((|s| s.tree_venom_on, 3.0));
                 self.sfx.play(crate::sfx::Id::Heal);
             }

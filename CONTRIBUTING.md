@@ -28,7 +28,7 @@ CI(`deploy-web.yml`)는 fmt·clippy·test·wasm 빌드를 다시 돈다. 로컬�
 - **입력**은 `Actions`로만. `KeyCode`는 `input.rs` 밖에서 보지 않는다.
 - **소리**는 로직에서 `self.juice.audio.play(id)`(큐)로만. `Sfx`(오디오 장치)는 `app`만 안다 — 그래서 월드를 테스트에서 틱 단위로 돌릴 수 있다. 새 메커닉은 `World::step`의 단계 메서드 중 맞는 곳에 넣고, 쓰러짐은 `enemy_down`을 부른다.
 - **파일 자리**: 그리기는 `src/render/`(hud·actors·fx·props·sorted·shadow·lights·deep·descent), 장면은 `src/app/`(stage·slots·dream·pick·run·pause·settings·album·title). 자식 모듈은 `use super::*;`, 항목은 `pub(super)`. 한 파일이 2~3천 줄을 넘으면 쪼갠다(0169).
-- **그림**은 PNG를 손으로 고치지 않는다. 직접 그린 것은 `tools/art/*.py`를 고치고 다시 생성, 나노바나나 원본은 `tools/art/sources/ai/`에 넣고 `strip_logo.py` 한 번 → `ai_portraits.py`/`ai_illust.py`가 옮긴다. 유료 팩 원본은 커밋하지 않는다(`assets/vendor/`, gitignore). 출처는 `assets/LICENSES.md`.
+- **그림**은 PNG를 손으로 고치지 않는다. 직접 그린 것은 `tools/art/*.py`를 고치고 다시 생성, 나노바나나 원본은 `tools/art/sources/ai/`에 넣고 `strip_logo.py` 한 번 → `ai_portraits.py`/`ai_illust.py`가 옮긴다. 옛 코드 그림은 `tools/art/legacy/`(고치지 않는다). 유료 팩 원본은 커밋하지 않는다(`assets/vendor/`, gitignore). 출처는 `assets/LICENSES.md`.
 - **저장 형식**: `profile.rs`의 키 이름은 바꾸지 않는다. `prefs.rs` 칸 형식을 바꾸면 `MAGIC`을 올린다. 런 상태를 새로 만들면 `suspend.rs`의 `RunSave`에 칸을 더한다.
 
 ## 결정 기록
@@ -39,6 +39,7 @@ CI(`deploy-web.yml`)는 fmt·clippy·test·wasm 빌드를 다시 돈다. 로컬�
 ## 테스트
 - 새 메커닉에는 단위 테스트 하나 이상: 규칙(순서·수치·버려지지 않음)을 테스트 이름으로 읽을 수 있게(`combo_on_the_beat_is_fastest_and_mashing_is_slower`).
 - 눈으로 봐야 하는 것(연출·화면)은 헤드리스 Chromium으로 찍어 본다(Playwright, 개발 시나리오로 진입). 스크린숏은 결정 기록의 "확인"에 적는다.
+- 웹 빌드 연기 시험 `node tools/test/smoke.js dist`(0169 R7): 타이틀·개발 시나리오 아홉 개에 입력을 넣고 콘솔 에러·패닉·멈춘 화면을 잡는다. CI(`smoke-web.yml`)가 main push마다 돌리므로 로컬에서는 wasm·JS 번들·로딩 화면을 건드렸을 때만.
 - 손맛은 테스트로 못 잰다. "사람이 볼 것"에 남기고 사장이 판정한다.
 
 ## 하지 않는 것

@@ -2,10 +2,10 @@ name: build-ios
 # iOS 빌드(docs/decisions/0086). 지금은 **서명하지 않은 .ipa**만 만든다(Actions 아티팩트).
 # 내 기기에서 시험: 받은 nail-ios-unsigned.ipa를 Sideloadly·AltStore로 내 Apple ID로 서명해 설치(무료 계정은 7일마다 다시).
 # 나중에 TestFlight·App Store로 내려면 Apple Developer Program 인증서·프로비저닝 프로필을 Secrets에 두고 서명 단계를 더한다.
-# 공개 레포의 macOS 러너는 무료. 모든 브랜치 push(관련 파일)와 수동 실행.
+# 공개 레포의 macOS 러너는 무료. main push(관련 파일)와 수동 실행(작업 브랜치는 Run workflow에서 고른다, 0169 R8).
 on:
   push:
-    branches: ['**']
+    branches: [main]
     paths:
       - 'src/**'
       - 'assets/**'

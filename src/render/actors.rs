@@ -578,10 +578,16 @@ pub(super) fn draw_momo_player(art: &Art, p: &Player, alpha: f32, time: f32) {
     } else {
         WHITE
     };
+    // 모으는 동안 한 줄 웅크린다(0168, Naïl과 같게 — 0169 R8).
+    let crouch = if matches!(p.state, player::State::Charging { .. }) {
+        1.0
+    } else {
+        0.0
+    };
     draw_texture_ex(
         tex,
         (pos.x - 8.0).round(),
-        (pos.y - 9.0).round(),
+        (pos.y - 9.0).round() + crouch,
         tint,
         DrawTextureParams {
             source: Some(art::cell(frame, row)),

@@ -87,6 +87,13 @@ pub struct Weapon {
     pub color: Color,
 }
 
+/// 새싹 발톱(수수가 만들어 준다, 0053). `WEAPONS` 번호.
+pub const SPROUT_CLAW: usize = 0;
+/// 바위 발톱(콩이가 준다, 0054).
+pub const STONE_CLAW: usize = 2;
+/// 독 발톱(큰 나무에서 깨운다, 0052).
+pub const VENOM_CLAW: usize = 3;
+
 pub static WEAPONS: [Weapon; 5] = [
     Weapon {
         name: |s| s.w_sprout,

@@ -1177,7 +1177,7 @@ pub fn kongi_returns(w: &World, at: Vec2) -> Cutscene {
     ]);
     steps.extend(cut_to(None));
     steps.extend([
-        Step::Give(crate::app::STONE_CLAW),
+        Step::Give(crate::equipment::STONE_CLAW),
         say(0, Face::Happy, |s| s.kongi_b5),
         say(1, Face::Happy, |s| s.kongi_b6),
         Step::Move {
@@ -1207,7 +1207,7 @@ pub fn susu_meet(w: &World) -> Cutscene {
         say(0, Face::Normal, |s| s.susu_2),
         say(1, Face::Normal, |s| s.susu_3),
         say(1, Face::Happy, |s| s.susu_4),
-        Step::Give(crate::app::SPROUT_CLAW),
+        Step::Give(crate::equipment::SPROUT_CLAW),
         say(0, Face::Happy, |s| s.susu_5),
     ];
     Cutscene::new(actors, steps)

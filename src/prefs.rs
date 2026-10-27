@@ -154,6 +154,38 @@ pub fn save(p: &Prefs) {
 mod tests {
     use super::*;
 
+    /// v0.3.8이 쓴 칸 배열의 고정 샘플(0169 R8): 칸 번호 ↔ 값 약속이 바뀌면 여기서 깨진다(바꾸면 MAGIC을 올린다).
+    #[test]
+    fn reads_a_fixed_v0_3_cell_sample() {
+        let mut v = [0u32; CELLS];
+        v[0] = MAGIC;
+        v[1] = 8; // 소리 7
+        v[2] = 1; // 흔들림 0
+        v[3] = 2; // 영어
+        v[18] = 4; // 음악 3
+        v[19] = 11; // 입자 10
+        for i in 0..7 {
+            v[4 + i] = Bindings::DEFAULT.keys[i] as u32 + 1;
+            v[11 + i] = Bindings::DEFAULT.pads[i] as u32 + 1;
+        }
+        v[4] = 8; // 공격 키를 표의 7번(Space)으로 바꿔 둔 저장(기본 키와 겹치면 sanitized가 되돌린다)
+        let p = decode(&v).unwrap();
+        assert_eq!(p.volume, 7);
+        assert_eq!(p.shake, 0);
+        assert_eq!(p.lang, Some(Lang::En));
+        assert_eq!(p.music, 3);
+        assert_eq!(p.effects, 10);
+        assert_eq!(p.bindings.keys[0], 7);
+        assert_eq!(p.bindings.keys[1..], Bindings::DEFAULT.keys[1..]);
+        assert_eq!(p.bindings.pads, Bindings::DEFAULT.pads);
+        assert_eq!(encode(&p), v);
+        // 음악(0081)·입자(0141) 칸이 없던 옛 저장: 0은 기본값 7·10.
+        v[18] = 0;
+        v[19] = 0;
+        let old = decode(&v).unwrap();
+        assert_eq!((old.music, old.effects), (7, 10));
+    }
+
     #[test]
     fn round_trip_and_rejects_foreign_data() {
         let mut b = Bindings::DEFAULT;

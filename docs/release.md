@@ -7,7 +7,8 @@
 |---|---|---|---|
 | 웹(게임) | `main` push | `deploy-web.yml` | fmt·clippy·test·wasm 빌드 → Netlify 프로덕션(https://nail-under-the-roots.netlify.app). PR이면 미리보기 `pr-<번호>--…` |
 | Release + APK | `main` push에 `Cargo.toml` 버전이 새 값 **그리고** `docs/releases/v<버전>.md`가 있음 | `release.yml` → `build-android.yml` | 태그 `v<버전>`, GitHub Release(본문 = 그 md), `nail.apk` 첨부 |
-| APK(시험용) | 모든 브랜치 push(`src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`) | `build-android.yml` | Actions 아티팩트 `nail-apk-<sha>` |
+| APK(시험용) | `main` push(`src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`), 또는 Actions → build-android → Run workflow에서 브랜치를 골라 수동 실행(0169 R8) | `build-android.yml` | Actions 아티팩트 `nail-apk-<sha>` |
+| 웹 연기 시험 | `main` push(`src/`·`assets/`·`web/`·`Cargo.*`·`tools/test/`), 또는 수동 | `smoke-web.yml` | 헤드리스 Chromium으로 타이틀·개발 시나리오 아홉 개(콘솔 에러·패닉·멈춘 화면), 스크린숏 아티팩트 `smoke-shots` |
 | iOS(서명 없음) | push | `build-ios.yml` | 아티팩트 `nail-ios-unsigned`(.ipa). 기기 시험은 Sideloadly·AltStore로 직접 서명 |
 | 공식 페이지 | `main` push(`site/`) | `pages.yml` | GitHub Pages(https://aimenjoe.github.io/nail-under-the-roots/). 최신 버전·소식은 `site.js`가 Releases API에서 읽고, 못 읽으면 HTML에 적은 값 |
 

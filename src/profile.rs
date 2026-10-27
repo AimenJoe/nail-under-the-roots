@@ -342,6 +342,25 @@ pub fn save_run(i: usize, p: Option<&Profile>) {
 mod tests {
     use super::*;
 
+    /// v0.3.8이 쓴 기록 글의 고정 샘플(0169 R8): 형식이 바뀌어도 옛 저장을 같은 값으로 읽어야 한다.
+    /// 모르는 줄·빈 줄은 버리고, 다시 쓰면 키 순서로 정렬된 같은 형식이다.
+    #[test]
+    fn reads_a_fixed_v0_3_sample() {
+        let text = "nail-profile 1\nflag tutorial\nflag bori\nflag line.village_intro\ncount clears.Mole 4\ncount momo_wins 3\ncount glowbugs_banked 300\ncount daily.20261027 95\nbogus line here\n\n";
+        let p = Profile::decode(text).unwrap();
+        assert!(p.flag("tutorial") && p.flag("bori") && p.flag("line.village_intro"));
+        assert!(!p.flag("momo"));
+        assert_eq!(p.count("clears.Mole"), 4);
+        assert_eq!(p.count("momo_wins"), 3);
+        assert_eq!(p.count("glowbugs_banked"), 300);
+        assert_eq!(p.count("daily.20261027"), 95);
+        assert_eq!(p.count("nothing"), 0);
+        assert_eq!(
+            p.encode(),
+            "nail-profile 1\nflag bori\nflag line.village_intro\nflag tutorial\ncount clears.Mole 4\ncount daily.20261027 95\ncount glowbugs_banked 300\ncount momo_wins 3\n"
+        );
+    }
+
     /// 슬롯 1은 예전 한 칸 저장 파일 그대로(업데이트해도 기록이 슬롯 1로 남는다, 0078).
     #[test]
     fn slot_one_keeps_old_save_file() {

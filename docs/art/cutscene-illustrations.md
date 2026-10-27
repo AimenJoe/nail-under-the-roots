@@ -69,4 +69,4 @@
 1. PNG를 같은 이름으로 `assets/art/illust/`에 넣는다. 크기가 바뀌면 `src/illust.rs`의 패닝 값도 고친다.
 2. `assets/LICENSES.md`의 일러스트 행을 작가·계약으로 고친다.
 3. 개발 → "이야기 일러스트"와 새 게임 오프닝으로 확인한다. 화면 배율 2·3에서 모두 본다.
-4. `tools/art/illust.py`를 다시 돌려도 덮이지 않게 그 장면의 나노바나나 원본(`tools/art/sources/ai/illust/<이름>.png`)과 `ai_illust.SIZE` 줄을 빼고, `illust.py`의 `SCENES`에서도 뺀다.
+4. `tools/art/illust.py`를 다시 돌려도 덮이지 않게 그 장면의 나노바나나 원본(`tools/art/sources/ai/illust/<이름>.png`)과 `ai_illust.SIZE` 줄을 빼고, `illust.py`의 `AI_SCENES`에서도 뺀다(코드 그림은 `tools/art/legacy/illust.py`에만 있다, 0169 R8).
