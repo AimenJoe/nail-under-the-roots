@@ -30,6 +30,9 @@ pub enum Id {
     Charge,
     /// 박자에 맞춘 타(0167).
     Beat,
+    /// 모으기 시작(0168), 맞힘 '틱'(0168).
+    ChargeUp,
+    HitTick,
     WallHit,
     /// 반딧불 줍기. 연달아 주우면 음이 조금씩 올라간다.
     Glowbug,
@@ -103,6 +106,10 @@ pub struct Sfx {
     shoot: Sound,
     charge: Sound,
     beat: Sound,
+    /// 모으기 시작부터 올라가는 소리(0168).
+    charge_up: Sound,
+    /// 맞힘 소리 위에 얹는 짧고 높은 '틱'(0168).
+    hit_tick: Sound,
     wall_hit: Sound,
     impact: Sound,
     unbind: Sound,
@@ -220,6 +227,12 @@ impl Sfx {
             charge: make(&[Layer::tone(0.12, 90.0, 260.0, Wave::Triangle, 0.45, 0.8)]).await,
             // 박자 콤보(0167): 짧고 높은 '틱'.
             beat: make(&[Layer::tone(0.04, 1800.0, 1400.0, Wave::Triangle, 0.22, 0.9)]).await,
+            charge_up: make(&[Layer::tone(0.45, 110.0, 440.0, Wave::Triangle, 0.2, 0.25)]).await,
+            hit_tick: make(&[
+                Layer::tone(0.03, 2600.0, 1900.0, Wave::Triangle, 0.18, 1.0),
+                Layer::noise(0.02, 0.1, 1.5),
+            ])
+            .await,
             wall_hit: make(&[
                 Layer::noise(0.1, 0.6, 2.0),
                 Layer::tone(0.12, 90.0, 50.0, Wave::Sine, 0.6, 1.5),
@@ -379,6 +392,8 @@ impl Sfx {
             Id::Shoot => &self.shoot,
             Id::Charge => &self.charge,
             Id::Beat => &self.beat,
+            Id::ChargeUp => &self.charge_up,
+            Id::HitTick => &self.hit_tick,
             Id::WallHit => &self.wall_hit,
             Id::Impact => &self.impact,
             Id::Unbind => &self.unbind,

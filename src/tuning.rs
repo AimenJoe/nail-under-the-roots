@@ -59,7 +59,7 @@ pub const CLAW_DAMAGE: [i32; 3] = [1, 1, 2];
 /// 마무리 타의 충격 이펙트·소리는 world(`finisher_impact`).
 pub const CLAW_KNOCKBACK: [f32; 3] = [90.0, 90.0, 330.0];
 pub const CLAW_STUN: [f32; 3] = [0.15, 0.15, 0.50];
-pub const CLAW_HITSTOP: [f32; 3] = [0.05, 0.05, 0.13];
+pub const CLAW_HITSTOP: [f32; 3] = [0.08, 0.08, 0.15];
 pub const CLAW_SHAKE: [f32; 3] = [0.15, 0.15, 0.55];
 
 // ---- 가장 깊은 곳: 실매듭 끊기(0162) ----------------------------------------
@@ -114,6 +114,32 @@ pub const HEAVY_CHARGE: f32 = 0.45;
 /// 활성 구간이 끝나는 순간 이어진다(가장 빠름). 창 전에 누르면(연타) 스윙·후딜레이를 다 마치고 `MASH_PENALTY`만큼 더 늦는다.
 pub const BEAT_GRACE: f32 = 0.03;
 pub const MASH_PENALTY: f32 = 0.08;
+/// 박자에 맞춰 나간 타는 조금 더 세게 느껴진다(0168, 사장 "내 아이디어도 차용"): 멈춤·흔들림·카메라 킥 덤.
+pub const BEAT_HITSTOP_BONUS: f32 = 0.02;
+pub const BEAT_SHAKE_BONUS: f32 = 0.05;
+/// 콤보의 모든 이음이 박자였으면 마무리 타 넉백 배율.
+pub const FULL_BEAT_KNOCK: f32 = 1.25;
+/// 다 모인 뒤 이만큼(초) 안에 떼면 "딱 맞춘 강타"(0168): 피해 +1, 더 긴 멈춤·큰 킥.
+pub const HEAVY_PERFECT: f32 = 0.15;
+pub const HEAVY_PERFECT_DAMAGE: i32 = 1;
+pub const HEAVY_PERFECT_HITSTOP: f32 = 0.04;
+/// 카메라 킥(0168): 맞힌 쪽으로 이만큼(px) 찼다가 `KICK_DECAY`/초의 지수로 돌아온다. 평타 / 마무리 타 / 강공격 / 박자·딱 맞춤 덤.
+pub const KICK_LIGHT: f32 = 2.0;
+pub const KICK_FINISHER: f32 = 3.0;
+pub const KICK_HEAVY: f32 = 4.0;
+pub const KICK_BONUS: f32 = 1.0;
+pub const KICK_DECAY: f32 = 22.0;
+/// 강공격이 맞은 순간·다 모인 순간의 흰 번쩍(초, 흔들림 설정을 따른다).
+pub const HEAVY_HIT_FLASH: f32 = 0.04;
+pub const HEAVY_READY_FLASH: f32 = 0.03;
+/// 벽 쿵(0168): 강공격 넉백으로 이 속도(px/s) 넘게 벽에 박히면 피해 +1 + 파편 + 긴 멈춤.
+pub const WALL_SLAM_DAMAGE: i32 = 1;
+pub const WALL_SLAM_SPEED: f32 = 120.0;
+pub const WALL_SLAM_HITSTOP: f32 = 0.12;
+pub const WALL_SLAM_SHAKE: f32 = 0.5;
+/// 모으는 동안 발 쪽으로 빨려 드는 먼지: 간격(초)·반지름.
+pub const CHARGE_PULL_EVERY: f32 = 0.07;
+pub const CHARGE_PULL_R: f32 = 13.0;
 /// 모으는 동안 이동 배율.
 pub const HEAVY_MOVE_FACTOR: f32 = 0.5;
 

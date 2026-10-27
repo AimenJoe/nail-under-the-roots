@@ -97,6 +97,8 @@ pub struct Feel {
     pub shake_offset: Vec2,
     /// 화면 번쩍임(남은 초). 렌더가 하얗게 덮는다.
     pub flash: f32,
+    /// 카메라 킥(0168): 맞힌 쪽으로 찼다가 지수로 돌아오는 오프셋(px). 흔들림의 제곱 곡선이 못 담는 작은 타격을 맡는다.
+    pub kick: Vec2,
 }
 
 impl Feel {
@@ -104,6 +106,10 @@ impl Feel {
     pub fn tick(&mut self, dt: f32) {
         self.trauma = (self.trauma - tuning::SHAKE_DECAY * dt).max(0.0);
         self.flash = (self.flash - dt).max(0.0);
+        self.kick *= (-tuning::KICK_DECAY * dt).exp();
+        if self.kick.length_squared() < 0.04 {
+            self.kick = Vec2::ZERO;
+        }
         let amount = tuning::SHAKE_MAX_OFFSET * self.trauma * self.trauma;
         self.shake_offset = if amount < 0.5 {
             Vec2::ZERO
@@ -121,6 +127,14 @@ impl Feel {
 
     pub fn add_trauma(&mut self, t: f32) {
         self.trauma = (self.trauma + t).min(1.0);
+    }
+
+    /// 카메라를 `dir` 쪽으로 `px`만큼 찬다(큰 쪽이 남는다).
+    pub fn add_kick(&mut self, dir: Vec2, px: f32) {
+        let k = dir.normalize_or_zero() * px;
+        if k.length_squared() > self.kick.length_squared() {
+            self.kick = k;
+        }
     }
 }
 

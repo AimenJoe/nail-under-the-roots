@@ -126,6 +126,10 @@ pub struct Enemy {
     pub alive: bool,
     /// 마지막으로 맞은 스윙 번호. 같은 스윙에 두 번 맞지 않는다.
     pub last_hit_by: u32,
+    /// 벽 쿵(0168): 강공격에 맞아 날아가는 동안 벽에 박히면 입을 피해(0 = 없음). 경직이 끝나면 사라진다.
+    pub slam: i32,
+    /// 이번 틱에 벽에 박혔다(월드가 소리·파편을 낸다).
+    pub slammed: bool,
     fire_cd: f32,
     /// 남은 독(초)과 다음 독 피해까지 남은 시간.
     pub poison: f32,
@@ -223,6 +227,8 @@ impl Enemy {
             poison: 0.0,
             poison_tick: t::POISON_TICK,
             died_of_poison: false,
+            slam: 0,
+            slammed: false,
             asleep: false,
             wake_delay: 0.0,
             pattern: 0,
@@ -709,10 +715,27 @@ impl Enemy {
             }
         }
 
+        let before = self.vel;
         self.pos += self.vel * dt;
         combat::apply_friction(&mut self.vel, dt);
         let r = self.radius();
-        room.resolve_circle(&mut self.pos, r);
+        let hit_wall = room.resolve_circle(&mut self.pos, r);
+        // 벽 쿵(0168): 강공격 넉백으로 날아가다 벽에 박히면 한 번 더 아프고 튕긴다.
+        if self.slam > 0 {
+            if hit_wall && before.length() >= t::WALL_SLAM_SPEED {
+                let dmg = self.slam;
+                self.slam = 0;
+                self.slammed = true;
+                let back = -before.normalize_or_zero();
+                let stun = match self.state {
+                    State::Stunned { time } => time.max(0.4),
+                    _ => 0.4,
+                };
+                self.hurt(dmg, back, 70.0, stun);
+            } else if !matches!(self.state, State::Stunned { .. }) || before.length() < 20.0 {
+                self.slam = 0;
+            }
+        }
     }
 
     fn idle_state(&self) -> State {
@@ -1057,6 +1080,65 @@ fn idle_of(b: Behavior) -> State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 벽 쿵(0168): 강공격 넉백(`slam`)으로 빠르게 날아가다 벽에 박히면 피해 +1·튕김·`slammed`. 느리거나 `slam`이 없으면 그냥 멈춘다.
+    #[test]
+    fn heavy_knockback_slams_into_the_wall_for_extra_damage() {
+        let room = Room::new();
+        let mut pr = Vec::new();
+        let mut ev = Vec::new();
+        let left = vec2(-1.0, 0.0);
+        let make = |speed: f32, slam: i32| {
+            let mut e = Enemy::new(Kind::FieldMouse, vec2(room.inner.x + 12.0, 100.0));
+            e.hurt(0, left, speed, 0.5);
+            e.slam = slam;
+            e
+        };
+        let mut e = make(400.0, 1);
+        let hp = e.hp;
+        for _ in 0..6 {
+            e.update(
+                vec2(300.0, 100.0),
+                true,
+                &room,
+                t::TICK_DT,
+                &mut pr,
+                &mut ev,
+            );
+        }
+        assert_eq!(e.hp, hp - 1, "벽에 박히면 한 번 더 아프다");
+        assert!(
+            e.slammed && e.slam == 0,
+            "월드가 소리·파편을 낼 표시, 한 번만"
+        );
+        assert!(e.vel.x > 0.0, "벽에서 튕긴다 {:?}", e.vel);
+        let mut e = make(400.0, 0);
+        let hp = e.hp;
+        for _ in 0..6 {
+            e.update(
+                vec2(300.0, 100.0),
+                true,
+                &room,
+                t::TICK_DT,
+                &mut pr,
+                &mut ev,
+            );
+        }
+        assert_eq!(e.hp, hp, "평타 넉백은 벽 쿵이 없다");
+        let mut e = make(60.0, 1);
+        let hp = e.hp;
+        for _ in 0..6 {
+            e.update(
+                vec2(300.0, 100.0),
+                true,
+                &room,
+                t::TICK_DT,
+                &mut pr,
+                &mut ev,
+            );
+        }
+        assert_eq!(e.hp, hp, "느리게 닿으면 쿵이 아니다");
+    }
 
     /// 토끼풀(0165): 발 구르기(Thump 이벤트) → 높이 뛰기 → 가까우면 두 번 차기(첫 발을 받아치면 끊김), 반 아래면 한 번 품기
     /// (실 한 가닥 Thread 이벤트). 멀면 고치 앞 자리로 간다.

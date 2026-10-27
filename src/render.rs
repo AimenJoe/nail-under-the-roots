@@ -237,8 +237,9 @@ impl Renderer {
     /// `alpha`: 마지막 틱 이후 지난 비율(0..1), 위치 보간. `shake_mul`: 설정의 흔들림 배율.
     pub fn begin_world(&mut self, w: Option<&World>, alpha: f32, shake_mul: f32) {
         let center = vec2(RW / 2.0, RH / 2.0);
+        // 흔들림 + 카메라 킥(0168), 둘 다 설정 배율을 따른다.
         let shake = w
-            .map(|w| (w.feel.shake_offset * shake_mul).round())
+            .map(|w| ((w.feel.shake_offset + w.feel.kick) * shake_mul).round())
             .unwrap_or(Vec2::ZERO);
         // 모험: 카메라 왼쪽 위(보간, 정수 px). 아레나·타이틀은 0.
         // 카메라는 반올림하지 않는다(`lerp`는 그림 위치용으로 반올림한다). 소수점은 아래에서 따로 쓴다.
@@ -368,7 +369,7 @@ impl Renderer {
                 draw_projectile(p, alpha);
             }
             for e in &w.enemies {
-                draw_enemy(None, e, alpha, w.time);
+                draw_enemy(None, e, alpha, w.time, w.feel.hitstop);
             }
             draw_drill_trail(None, &w.player, alpha);
             draw_player(&w.player, alpha, w.time);
@@ -4273,7 +4274,9 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
             Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
             Drawable::Loot(i) => draw_loot(&w.loot[i], alpha, w.time, false),
             Drawable::Player => draw_nail(art, &w.player, w.fur, alpha, w.time),
-            Drawable::Enemy(i) => draw_enemy(Some(art), &w.enemies[i], alpha, w.time),
+            Drawable::Enemy(i) => {
+                draw_enemy(Some(art), &w.enemies[i], alpha, w.time, w.feel.hitstop)
+            }
             Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
             Drawable::Npc => {
                 if let (Some(n), Some(tex)) = (&w.npc, art.critters.as_ref()) {
@@ -4816,10 +4819,16 @@ fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
         }
         _ => 0.0,
     };
+    // 모으는 동안 한 줄 웅크린다(0168).
+    let crouch = if matches!(p.state, player::State::Charging { .. }) {
+        1.0
+    } else {
+        0.0
+    };
     draw_texture_ex(
         art.nail_fur(fur),
         pos.x - 8.0 + jitter,
-        pos.y - 8.0 - pop,
+        pos.y - 8.0 - pop + crouch,
         tint,
         DrawTextureParams {
             source: Some(art::cell(col, row)),
@@ -4912,10 +4921,30 @@ fn draw_mushrooms(art: &Art, w: &World, cam: Vec2) {
 
 /// 적: 그림(critters.png)이 있으면 종류의 줄에서 상태에 맞는 칸, 없으면 색 원.
 /// 예고(떨림·웅크림·조준)는 칸 4 + 떨림/밝아짐, 공격은 칸 5, 맞음·경직은 칸 6. 번쩍일 때는 흰 실루엣 줄.
-fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
+fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, stop: f32) {
     let sp = e.sp();
     let mut pos = lerp(e.prev_pos, e.pos, alpha);
     let r = e.radius();
+    // 맞은 쪽 진동·찌그러짐(0168, 사쿠라이): 히트스톱 동안 맞은 축으로 ±1px(센 타격은 2px) 번갈아,
+    // 첫 순간은 맞은 축으로 눌린다. 렌더만, 상태 없음.
+    let mut body = vec2(16.0, 16.0);
+    if e.flash > 0.0 && stop > 0.0 && !shadow_pass() {
+        let axis = e.vel.normalize_or(vec2(1.0, 0.0));
+        let amp = if e.vel.length() > 300.0 { 2.0 } else { 1.0 };
+        let sign = if ((macroquad::time::get_time() * 30.0) as i64) % 2 == 0 {
+            1.0
+        } else {
+            -1.0
+        };
+        pos += axis * amp * sign;
+        if e.flash > t::HIT_FLASH - 0.035 {
+            body = if axis.x.abs() >= axis.y.abs() {
+                vec2(14.0, 18.0)
+            } else {
+                vec2(18.0, 14.0)
+            };
+        }
+    }
     if let enemy::State::Under { time: ut } = e.state {
         draw_dig_mound(pos, ut, e.windup(), time);
         return;
@@ -5160,14 +5189,15 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
     if let (true, Some(tex)) = (chief, art.and_then(|a| a.chief.as_ref())) {
         // 대장: 32×32(발바닥 y=30).
         let row = art::CHIEF_TAINTED + if flash { art::CHIEF_ROWS } else { 0 };
+        let big = body * 2.0;
         draw_texture_ex(
             tex,
-            (pos.x - 16.0).round(),
-            (pos.y + r - 30.0).round(),
+            (pos.x - big.x / 2.0).round(),
+            (pos.y + r - 30.0 - (big.y - 32.0)).round(),
             if flash { WHITE } else { tint },
             DrawTextureParams {
                 source: Some(art::chief_cell(frame, row)),
-                dest_size: Some(vec2(32.0, 32.0)),
+                dest_size: Some(big),
                 flip_x: e.facing.x < 0.0,
                 ..Default::default()
             },
@@ -5179,12 +5209,12 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             let row = sp.sheet_row + if flash { art::CRITTER_ROWS } else { 0 };
             draw_texture_ex(
                 tex,
-                (pos.x - 8.0).round(),
-                (pos.y + r - 15.0).round(),
+                (pos.x - body.x / 2.0).round(),
+                (pos.y + r - 15.0 - (body.y - 16.0)).round(),
                 if flash { WHITE } else { tint },
                 DrawTextureParams {
                     source: Some(art::cell(frame, row)),
-                    dest_size: Some(vec2(16.0, 16.0)),
+                    dest_size: Some(body),
                     flip_x: e.facing.x < 0.0,
                     ..Default::default()
                 },

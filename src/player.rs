@@ -34,10 +34,12 @@ pub enum State {
         after: usize,
     },
     /// 강공격 스윙(0161): `Moveset::heavy`. 첫머리 창은 둘레 공격(진홍)도 받아친다. 끝나면 `after`번 타로 콤보가 이어진다.
+    /// `perfect` = 다 모인 뒤 `HEAVY_PERFECT` 안에 뗐다(0168): 피해 +1, 더 긴 멈춤.
     Heavy {
         time: f32,
         dir: Vec2,
         after: usize,
+        perfect: bool,
     },
     Burrow {
         time: f32,
@@ -84,9 +86,12 @@ pub enum Event {
     Swing(usize),
     /// 박자에 맞춰 이어진 타(0167): 작은 반짝임·소리.
     Beat,
-    /// 강공격이 나갔다 / 다 모여 발톱이 빛난다(0161).
+    /// 강공격이 나갔다 / 다 모여 발톱이 빛난다(0161). `HeavyPerfect`는 다 모인 직후에 뗐다(0168).
     Heavy,
     HeavyReady,
+    HeavyPerfect,
+    /// 모으기 시작(0168): 올라가는 소리.
+    ChargeStart,
     Burrow,
     Emerge,
     /// 정한 시간을 지나 누르고 있다: 힘을 모으기 시작(땅이 운다, 0158).
@@ -164,8 +169,10 @@ pub struct Player {
     /// 박자 콤보(0167): 스윙·강공격 중에 눌러 둔 다음 타. `Some(true)` = 박자 창 안에서 눌렀다(가장 빠르게 이어진다),
     /// `Some(false)` = 창이 열리기 전에 눌렀다(연타) — 스윙이 다 끝나고 `MASH_PENALTY`만큼 늦게 나간다. 먼저 누른 것이 남는다.
     queued: Option<bool>,
-    /// 지금 스윙이 박자에 맞아 나갔나(그림·소리).
+    /// 지금 스윙이 박자에 맞아 나갔나(그림·소리, 맞히면 멈춤·킥 덤 0168).
     pub on_beat: bool,
+    /// 이번 콤보에서 박자에 맞춘 이음 수(0168): 모두 맞추면 마무리 타 넉백 `FULL_BEAT_KNOCK`배.
+    combo_beats: usize,
     swing_id: u32,
     /// 지금 스윙을 시작하고 흐른 실제 시간(패링 창).
     swing_age: f32,
@@ -210,6 +217,7 @@ impl Player {
             no_attack: 0.0,
             queued: None,
             on_beat: false,
+            combo_beats: 0,
             swing_id: 0,
             swing_age: f32::MAX,
         }
@@ -608,6 +616,7 @@ impl Player {
                     // 활성 구간이 지났는데 아직 누르고 있다: 바로 강공격 모으기(0161). 어느 타 뒤든.
                     // 강공격(또는 덜 모으고 뗀 것) 뒤 콤보는 다음 타로 이어진다.
                     self.combo_timer = 0.0;
+                    self.events.push(Event::ChargeStart);
                     self.state = State::Charging {
                         time: 0.0,
                         dir,
@@ -647,7 +656,7 @@ impl Player {
                     self.start_dodge(move_dir);
                 } else if !a.attack_held {
                     if time >= t::HEAVY_CHARGE {
-                        self.start_heavy(dir, after);
+                        self.start_heavy(dir, after, time - t::HEAVY_CHARGE <= t::HEAVY_PERFECT);
                     } else {
                         // 덜 모으고 뗐다: 아무것도 안 나가고(평타는 이미 나갔다), 콤보는 거기서 이어진다.
                         self.state = State::Free;
@@ -658,22 +667,33 @@ impl Player {
                     }
                 }
             }
-            State::Heavy { time, dir, after } => {
+            State::Heavy {
+                time,
+                dir,
+                after,
+                perfect,
+            } => {
                 let ms = self.moveset;
                 let hit = ms.heavy();
                 let sdt = dt * self.stats.attack_speed;
                 let time = time + sdt;
                 let (a0, a1) = hit.active;
                 if time >= a0 && time - sdt < a1 {
-                    strike = Some(self.heavy_strike(dir));
+                    strike = Some(self.heavy_strike(dir, perfect));
                 }
                 self.pos += move_dir * self.speed() * ms.move_factor * dt;
-                self.state = State::Heavy { time, dir, after };
+                self.state = State::Heavy {
+                    time,
+                    dir,
+                    after,
+                    perfect,
+                };
                 if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
                     self.start_dodge(move_dir);
                 } else if time >= a1 && a.attack_held {
                     // 강공격 뒤에도 누르고 있으면 다시 모은다.
                     self.combo_timer = 0.0;
+                    self.events.push(Event::ChargeStart);
                     self.state = State::Charging {
                         time: 0.0,
                         dir,
@@ -924,6 +944,11 @@ impl Player {
         self.attack_buf = 0.0;
         self.queued = None;
         self.on_beat = beat;
+        self.combo_beats = if idx == 0 {
+            0
+        } else {
+            self.combo_beats + usize::from(beat)
+        };
         self.combo_timer = 0.0;
         self.state = State::Attack {
             idx,
@@ -1012,20 +1037,37 @@ impl Player {
             },
             damage: h.damage + self.stats.damage,
             knockback: if idx == self.moveset.last() {
-                h.knockback * self.stats.finisher_knockback
+                // 콤보의 이음을 모두 박자에 맞췄으면 마무리 타가 더 멀리 민다(0168).
+                let full = if self.combo_beats >= self.moveset.last() {
+                    t::FULL_BEAT_KNOCK
+                } else {
+                    1.0
+                };
+                h.knockback * self.stats.finisher_knockback * full
             } else {
                 h.knockback
             },
             stun: h.stun,
-            hitstop: h.hitstop,
-            shake: h.shake,
+            // 박자에 맞춘 타는 멈춤·흔들림이 조금 더(0168).
+            hitstop: h.hitstop
+                + if self.on_beat {
+                    t::BEAT_HITSTOP_BONUS
+                } else {
+                    0.0
+                },
+            shake: h.shake
+                + if self.on_beat {
+                    t::BEAT_SHAKE_BONUS
+                } else {
+                    0.0
+                },
             finisher: idx == self.moveset.last(),
             poison: h.poison,
         }
     }
 
     /// 강공격(0161): 다 모으고 뗐다. 받아치기 창은 늘 열린다(모으는 데 0.45초가 들어 연타가 안 된다).
-    fn start_heavy(&mut self, dir: Vec2, after: usize) {
+    fn start_heavy(&mut self, dir: Vec2, after: usize, perfect: bool) {
         self.facing = dir;
         self.swing_id += 1;
         self.swing_age = 0.0;
@@ -1034,16 +1076,22 @@ impl Player {
         self.vel += dir * self.moveset.heavy().lunge;
         self.attack_buf = 0.0;
         self.combo_timer = 0.0;
+        self.on_beat = false;
         self.state = State::Heavy {
             time: 0.0,
             dir,
             after,
+            perfect,
         };
         self.events.push(Event::Heavy);
+        if perfect {
+            self.events.push(Event::HeavyPerfect);
+        }
     }
 
-    fn heavy_strike(&self, dir: Vec2) -> Strike {
+    fn heavy_strike(&self, dir: Vec2, perfect: bool) -> Strike {
         let h = self.moveset.heavy();
+        let bonus = if perfect { 1 } else { 0 };
         Strike {
             id: self.swing_id,
             kind: StrikeKind::Heavy,
@@ -1052,10 +1100,10 @@ impl Player {
                 dir,
                 r: h.range,
             },
-            damage: h.damage + self.stats.damage,
+            damage: h.damage + self.stats.damage + bonus * t::HEAVY_PERFECT_DAMAGE,
             knockback: h.knockback * self.stats.finisher_knockback,
             stun: h.stun,
-            hitstop: h.hitstop,
+            hitstop: h.hitstop + bonus as f32 * t::HEAVY_PERFECT_HITSTOP,
             shake: h.shake,
             finisher: true,
             poison: h.poison,
@@ -1638,7 +1686,14 @@ mod tests {
         assert!(ready, "다 모이면 발톱이 빛난다");
         let (_, ev) = tick(&mut p, &room, &release);
         assert!(ev.contains(&Event::Heavy));
-        assert!(matches!(p.state, State::Heavy { after: 1, .. }));
+        assert!(matches!(
+            p.state,
+            State::Heavy {
+                after: 1,
+                perfect: true,
+                ..
+            }
+        ));
         assert!(p.parry_heavy(), "강공격 첫머리는 둘레 공격도 받아친다");
         let mut strike = None;
         for _ in 0..60 {
@@ -1650,7 +1705,19 @@ mod tests {
         }
         let s = strike.expect("강공격 판정");
         assert_eq!(s.kind, StrikeKind::Heavy);
-        assert!(s.damage >= 2 && s.finisher);
+        assert!(s.finisher);
+        let heavy = p.moveset.heavy();
+        assert_eq!(
+            s.damage,
+            heavy.damage + t::HEAVY_PERFECT_DAMAGE,
+            "다 모인 직후에 뗐다: 딱 맞춘 강타는 +1(0168)"
+        );
+        assert!(
+            heavy.damage >= 3,
+            "강공격은 마무리 타보다 세다(0168) {}",
+            heavy.damage
+        );
+        assert!((s.hitstop - heavy.hitstop - t::HEAVY_PERFECT_HITSTOP).abs() < 1e-5);
         let Shape::Sector { r, .. } = s.shape else {
             panic!("부채꼴");
         };
@@ -1687,6 +1754,109 @@ mod tests {
             matches!(q.state, State::Free),
             "덜 모으고 떼면 아무것도 {:?}",
             q.state
+        );
+    }
+
+    /// 딱 맞춘 강타(0168): 다 모인 뒤 `HEAVY_PERFECT`를 넘겨 떼면 보통 강공격(피해 그대로, `perfect` 아님).
+    #[test]
+    fn late_release_is_an_ordinary_heavy_strike() {
+        let room = Room::new();
+        let press = Actions {
+            attack: true,
+            attack_held: true,
+            ..Default::default()
+        };
+        let hold = Actions {
+            attack_held: true,
+            ..Default::default()
+        };
+        let release = Actions::default();
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &press);
+        let mut n = 0;
+        while !matches!(p.state, State::Charging { .. }) && n < 100 {
+            tick(&mut p, &room, &hold);
+            n += 1;
+        }
+        for _ in 0..(((t::HEAVY_CHARGE + t::HEAVY_PERFECT + 0.06) / t::TICK_DT) as usize) {
+            tick(&mut p, &room, &hold);
+        }
+        let (_, ev) = tick(&mut p, &room, &release);
+        assert!(ev.contains(&Event::Heavy) && !ev.contains(&Event::HeavyPerfect));
+        assert!(matches!(p.state, State::Heavy { perfect: false, .. }));
+        let mut strike = None;
+        for _ in 0..60 {
+            let (s, _) = tick(&mut p, &room, &release);
+            if s.is_some() {
+                strike = s;
+                break;
+            }
+        }
+        let s = strike.expect("강공격 판정");
+        assert_eq!(s.damage, p.moveset.heavy().damage);
+    }
+
+    /// 박자에 맞춘 타는 멈춤이 조금 더 길고, 이음을 모두 맞춘 콤보의 마무리 타는 더 멀리 민다(0168, 사장 아이디어).
+    #[test]
+    fn on_beat_hits_stop_longer_and_a_full_beat_combo_knocks_farther() {
+        let room = Room::new();
+        let tap = Actions {
+            attack: true,
+            ..Default::default()
+        };
+        let none = Actions::default();
+        let ms = &crate::moveset::CLAWS;
+        // 박자 콤보: 활성 끝 직전에 한 번씩 누른다.
+        let mut p = Player::new(room.center());
+        let mut strikes = vec![];
+        let mut pressed_for = usize::MAX;
+        tick(&mut p, &room, &tap);
+        for _ in 0..200 {
+            let a = match p.state {
+                State::Attack { idx, time, .. }
+                    if idx < ms.last()
+                        && pressed_for != idx
+                        && time >= ms.hits[idx].active.1 - t::BEAT_GRACE =>
+                {
+                    pressed_for = idx;
+                    &tap
+                }
+                _ => &none,
+            };
+            let (s, _) = tick(&mut p, &room, a);
+            // 활성 구간은 여러 틱이라 같은 스윙은 한 번만.
+            if let Some(s) = s.filter(|s| strikes.last().map(|l: &Strike| l.id) != Some(s.id)) {
+                strikes.push(s);
+            }
+            if strikes.len() == ms.hits.len() {
+                break;
+            }
+        }
+        assert_eq!(strikes.len(), 3, "{strikes:?}");
+        let beat_1 = strikes[1];
+        let beat_fin = strikes[2];
+        // 연타 콤보: 매 틱 누른다.
+        let mut q = Player::new(room.center());
+        let mut mashed = vec![];
+        for _ in 0..200 {
+            let (s, _) = tick(&mut q, &room, &tap);
+            if let Some(s) = s.filter(|s| mashed.last().map(|l: &Strike| l.id) != Some(s.id)) {
+                mashed.push(s);
+            }
+            if mashed.len() == ms.hits.len() {
+                break;
+            }
+        }
+        assert_eq!(mashed.len(), 3, "{mashed:?}");
+        assert!(
+            (beat_1.hitstop - mashed[1].hitstop - t::BEAT_HITSTOP_BONUS).abs() < 1e-5,
+            "박자 타의 멈춤이 더 길다"
+        );
+        assert!(
+            (beat_fin.knockback - mashed[2].knockback * t::FULL_BEAT_KNOCK).abs() < 1e-3,
+            "이음을 다 맞춘 마무리 타가 더 멀리 민다 {} vs {}",
+            beat_fin.knockback,
+            mashed[2].knockback
         );
     }
 

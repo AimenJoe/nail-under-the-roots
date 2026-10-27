@@ -341,6 +341,8 @@ pub struct World {
     /// 모험 구조: 장소·카메라·던전·저장 지점(adventure.rs).
     pub adv: Adventure,
     pub feel: Feel,
+    /// 모으는 동안 빨려 드는 먼지의 간격 시계(0168).
+    charge_fx_t: f32,
     pub debug: Debug,
     /// 적을 다 잡으면 다음 웨이브를 자동으로 띄운다. 시나리오는 끌 수 있다.
     pub auto_waves: bool,
@@ -465,6 +467,7 @@ impl World {
             emerge_hits: 0,
             adv: Adventure::default(),
             feel: Feel::default(),
+            charge_fx_t: 0.0,
             debug: Debug {
                 overlay: false,
                 hitboxes: false,
@@ -658,11 +661,20 @@ impl World {
                     spray(&mut self.fx, p, self.player.facing, 6, WHITE, 120.0);
                 }
                 player::Event::HeavyReady => {
-                    // 다 모였다: 발톱이 번쩍.
+                    // 다 모였다: 발톱이 번쩍 + 짧은 흰 번쩍(0168, 흔들림 설정을 따른다).
                     sfx.play(sfx::Id::Charge);
+                    self.feel.flash = self.feel.flash.max(t::HEAVY_READY_FLASH);
                     let p = self.player.pos + self.player.facing * 7.0;
                     self.fx.push(glint(p, WHITE, 0.35));
                     self.fx.push(ring(p, 2.0, 10.0, 0.2, WHITE));
+                }
+                player::Event::ChargeStart => sfx.play(sfx::Id::ChargeUp),
+                player::Event::HeavyPerfect => {
+                    // 딱 맞춘 강타(0168): 박자 '틱' + 큰 반짝임.
+                    sfx.play(sfx::Id::Beat);
+                    let p = self.player.pos + self.player.facing * 8.0;
+                    self.fx.push(glint(p, WHITE, 0.3));
+                    self.fx.push(ring(p, 4.0, 16.0, 0.18, WHITE));
                 }
                 player::Event::Burrow => {
                     // 파고들기(0160): 흙이 확 튀고 화면이 살짝 — 톡 한 번이 "동작"으로 읽히게.
@@ -1028,6 +1040,46 @@ impl World {
             burst(&mut self.fx, e.pos, 10, color, 90.0);
             unravel(&mut self.fx, e.pos, e.radius());
         }
+        // 벽 쿵(0168): 강공격에 날아가다 벽에 박힌 적.
+        for e in self.enemies.iter_mut().filter(|e| e.slammed) {
+            e.slammed = false;
+            sfx.play(sfx::Id::WallHit);
+            self.feel.add_hitstop(t::WALL_SLAM_HITSTOP);
+            self.feel.add_trauma(t::WALL_SLAM_SHAKE);
+            let back = e.vel.normalize_or_zero();
+            self.fx.push(ring(e.pos, 3.0, 18.0, 0.2, WHITE));
+            spray(&mut self.fx, e.pos, back, 6, WHITE, 160.0);
+            clods(&mut self.fx, e.pos - back * e.radius(), 5, DIRT, 90.0);
+            if !e.alive {
+                self.kills += 1;
+                deaths.push((e.pos, e.kind));
+                sfx.play(sfx::Id::EnemyDie);
+                let color = enemy_color(e.kind);
+                burst(&mut self.fx, e.pos, 12, color, 110.0);
+                unravel(&mut self.fx, e.pos, e.radius());
+            }
+        }
+        // 모으는 동안(0168): 발 쪽으로 빨려 드는 먼지.
+        if let player::State::Charging { .. } = self.player.state {
+            self.charge_fx_t += dt;
+            while self.charge_fx_t >= t::CHARGE_PULL_EVERY {
+                self.charge_fx_t -= t::CHARGE_PULL_EVERY;
+                let ang = rand::gen_range(0.0, std::f32::consts::TAU);
+                let off = vec2(ang.cos(), ang.sin()) * t::CHARGE_PULL_R;
+                let foot = self.player.pos + vec2(0.0, 4.0);
+                self.fx.push(Fx {
+                    pos: foot + off,
+                    vel: -off / 0.2,
+                    time: 0.0,
+                    dur: 0.2,
+                    kind: FxKind::Spark {
+                        color: self.biome.dust(),
+                    },
+                });
+            }
+        } else {
+            self.charge_fx_t = 0.0;
+        }
         let mut summon = false;
         let mut bury = 0;
         let mut thumps = Vec::new();
@@ -1295,6 +1347,7 @@ impl World {
             let origin = self.player.pos;
             let mut shell_from = None;
             let mut broke_at = None;
+            let mut hit_any = false;
             // 마무리 타·솟구치기가 맞힌 첫 자리(0090): 한 번만 쿵 소리와 충격 고리.
             let mut impact_at = None;
             for e in &mut self.enemies {
@@ -1308,13 +1361,9 @@ impl World {
                 }
                 e.last_hit_by = s.id;
                 // 콩이의 등딱지(0054): 발톱은 튕긴다(패링 거울). 솟구치기(아래 배)·드릴은 뚫고 연다.
+                // 강공격은 튕기지 않고 자세를 깬다(0168: 모으기 = 자세 깨기).
                 let guarded = e.guarding();
-                if guarded
-                    && matches!(
-                        s.kind,
-                        crate::combat::StrikeKind::Claw(_) | crate::combat::StrikeKind::Heavy
-                    )
-                {
+                if guarded && matches!(s.kind, crate::combat::StrikeKind::Claw(_)) {
                     e.shell_hit();
                     shell_from = Some((e.pos, e.kind));
                     continue;
@@ -1353,6 +1402,49 @@ impl World {
                 }
                 self.feel.add_hitstop(s.hitstop);
                 self.feel.add_trauma(s.shake);
+                // 맞혔다는 확인(0168): 카메라를 맞힌 쪽으로 찬다. 박자·딱 맞춤이면 조금 더.
+                let kick = match s.kind {
+                    crate::combat::StrikeKind::Heavy => {
+                        t::KICK_HEAVY
+                            + if matches!(
+                                self.player.state,
+                                player::State::Heavy { perfect: true, .. }
+                            ) {
+                                t::KICK_BONUS
+                            } else {
+                                0.0
+                            }
+                    }
+                    crate::combat::StrikeKind::Claw(_) if s.finisher => {
+                        t::KICK_FINISHER
+                            + if self.player.on_beat {
+                                t::KICK_BONUS
+                            } else {
+                                0.0
+                            }
+                    }
+                    crate::combat::StrikeKind::Claw(_) => {
+                        t::KICK_LIGHT
+                            + if self.player.on_beat {
+                                t::KICK_BONUS
+                            } else {
+                                0.0
+                            }
+                    }
+                    crate::combat::StrikeKind::Emerge => t::KICK_FINISHER,
+                    _ => 0.0,
+                };
+                if kick > 0.0 {
+                    self.feel.add_kick(dir, kick);
+                }
+                hit_any = true;
+                if s.kind == crate::combat::StrikeKind::Heavy {
+                    self.feel.flash = self.feel.flash.max(t::HEAVY_HIT_FLASH);
+                    // 벽 쿵(0168): 강공격 넉백으로 벽에 박히면 한 번 더.
+                    if e.alive {
+                        e.slam = t::WALL_SLAM_DAMAGE;
+                    }
+                }
                 let hit_point = e.pos - dir * e.radius() * 0.5;
                 if (s.finisher || s.kind == crate::combat::StrikeKind::Emerge)
                     && impact_at.is_none()
@@ -1364,6 +1456,7 @@ impl World {
                 spray(&mut self.fx, hit_point, dir, 4, WHITE, 140.0);
                 if e.alive {
                     sfx.play(sfx::Id::EnemyHit);
+                    sfx.play(sfx::Id::HitTick);
                 } else {
                     self.kills += 1;
                     deaths.push((e.pos, e.kind));
@@ -1378,6 +1471,10 @@ impl World {
                     burst(&mut self.fx, e.pos, 12, color, 110.0);
                     unravel(&mut self.fx, e.pos, e.radius());
                 }
+            }
+            if hit_any {
+                // 맞히면 전진이 멈춘다(0168): 빗나감과 맞힘이 손에서 다르다.
+                self.player.vel = Vec2::ZERO;
             }
             if let Some((p, dir)) = impact_at {
                 sfx.play(sfx::Id::Impact);
