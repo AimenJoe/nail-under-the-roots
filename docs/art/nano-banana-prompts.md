@@ -60,6 +60,8 @@ Edit the last attached image, the portrait of [이름]. Add only [고칠 것], c
 | 콩이 | 36~37 | `calm` · `happy, eyes closed in a smile` |
 | 도토·콩이·들쥐 대장(물듦) | 30·35·9 | `glaring, small glowing eyes` — 도토는 amber, 콩이는 pale sky blue, 대장은 red(0052·0054) |
 | 엄마 | 17 | `gentle, eyes closed` |
+| 토끼풀(돌아옴, 0165) | (새 칸 둘) | `calm, tired but warm, eyes half open` · `happy, eyes closed in a soft smile` — 돌아온 토끼풀은 보통·웃음 둘 |
+| 토끼풀(물듦, 0165) | (새 칸 하나) | `distant, glowing green eyes like Momo's, ears laid flat back` |
 
 참고 그림(팩 그림 없음, 0064):
 - **캐릭터는 확정한 시트**(`sheet_<이름>.png`)와 시트가 없는 모습의 초상화(`ref_mom`·`ref_momo_tainted`·`ref_bori_tainted`·`ref_doto_tainted`·`ref_kongi_tainted`)를 쓴다(0124). `python3 tools/art/ref_pack.py <폴더>`가 `tools/art/sources/ai/sheets/`와 초상화 원본에서 만든다: 시트의 글자 띠를 잘라 낸다(첨부에 글자가 있으면 장면에도 글자가 들어가기 쉽다). ✦ 로고는 원본에서 이미 지웠다(0133). `overview.png`는 확인용 한 장.
@@ -98,6 +100,9 @@ World rules: The violet threads belong to Halmae, an ancient and lonely fungus g
 | 수수 | `sheet_susu.png` | `Susu: a cute mole-cricket craftsman, a small digging insect drawn as a round, friendly animal: a big rounded, velvety brown thorax like a soft helmet, a small round head with two long thin antennae and big gentle eyes, a pair of large dark shovel-like front legs for digging, a short segmented abdomen, and brass goggles with round sky-blue lenses pushed up on his forehead. Match the attached character sheet of Susu.` |
 | 콩이 | `sheet_kongi.png` | `Kongi: a small, chubby, cute armadillo with a soft pink face, belly and limbs, a domed banded grey shell on his back and a grey head plate, a long rounded pink snout, two tall pink ears, small gentle dark eyes and rosy cheeks. Match the attached character sheet of Kongi.` (확정한 시트가 귀가 길고 분홍이라 시트에 맞췄다. 예전 글 "짧고 뾰족한 귀"는 시트 전 것) |
 | 포포 | `sheet_popo.png` | `Popo: a raccoon with grey fur, a black eye mask, a white muzzle and round ears, with a small trinket tucked behind one ear. Match the attached character sheet of Popo.` |
+| 토끼풀(0165) | (시트 없음: 모모 시트를 첨부하고 "larger, older" 글로) | `Clover: Momo's mother, a grown European wild rabbit: the same kind of rabbit as the attached Momo sheet but larger and heavier, with slightly darker grey-brown fur, long ears that she lays flat back along her head, a cream chest, soft tired eyes and a pink clover flower at the base of one ear. Gentle and protective.` |
+| 토끼풀(물듦) | 위와 같음 | `Clover while bound: the same mother rabbit with dusky plum-grey fur and glowing green eyes like Momo's, violet threads coiled around her body, ears laid flat back.` |
+| 박하·민들레(0165) | 모모 시트 첨부 | `Mint and Dandelion: two tiny rabbit kits, round and fluffy, the same kind of rabbit as the attached Momo sheet but much smaller and younger, warm grey-brown fur, big dark eyes, short ears. One is sleepy, the other curious.` |
 
 ## 4. 장면
 비율은 나노바나나에서 고를 비율, 괄호는 게임 그림 크기(Claude가 잘라 맞춘다).
@@ -173,6 +178,12 @@ Scene (a wide image that the game slowly pans from left to right): The deepest p
 첨부: `sheet_kongi.png`. 공통 스타일·세계 규칙·콩이 글을 앞에 붙인다(첫 판은 스타일 없이 그려 도트가 아닌 그림이 나왔다).
 ```
 Scene: The entrance to the deepest place: a huge stone door in the darkness. The gap in the middle has just begun to open, and pale golden light leaks out; the light lights a haze of dust and spills across the floor. The brown roots that bound the door now hang slack and loose, with a few violet threads sliding off them. In front of the door, a little to the left of the light, Kongi has just uncurled from a ball and lifts his head toward the gap, eyes softly closed. The warm light from the gap rims his shell and ears, and his pink face and belly are still clearly visible in the soft glow; he is not a dark silhouette. Kongi is clearly visible, about a third of the image height, and his feet stand above the bottom quarter of the image; the bottom quarter is plain dark floor, because a text box covers it. Letting go, relief. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
+```
+
+### `clover_cocoon` — 16:9 (640×360) · 0165, 아직 게임에 자리가 없다(토끼풀 귀환 장면 `clover_returns`의 "…막내는?" 앞에 끼울 것)
+첨부: `sheet_momo.png`(토끼풀·아기들의 글이 모모 시트를 참고한다). 공통 스타일·세계 규칙·토끼풀(물듦)·박하·민들레 글을 앞에 붙인다.
+```
+Scene: Deep inside the rabbits' old warren, a round earthen chamber whose walls are wrapped in white silk threads, with a few violet threads mixed in. In the middle, the mother rabbit Clover sleeps curled around two silk cocoons, each cocoon a soft white oval with a tiny rabbit kit faintly visible inside, breathing. Her long ears are laid back over the cocoons like a blanket. Violet threads coil loosely around her body and fade to white where they touch the cocoons. A faint pale light glows from inside the cocoons and lights her face from below. Her eyes are closed; she looks tired but at peace, protecting. Clover and the cocoons fill the middle of the image, above the bottom quarter; the bottom quarter is plain silk-covered floor, because a text box covers it. Quiet, tender, a little sad. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
 ```
 
 ### `title` (타이틀 바탕) — 16:9 (640×360)
