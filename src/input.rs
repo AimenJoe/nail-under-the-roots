@@ -473,8 +473,8 @@ impl Actions {
 }
 
 pub struct Input {
-    /// Android에서는 gamepads 크레이트가 빠진다. 패드 버튼은 패치한 miniquad가 F13~F25 키로, D패드는 화살표 키로 넘긴다
-    /// (스틱은 앱이 처리하지 않으면 Android가 D패드 키로 바꿔 준다, 0075).
+    /// Android에서는 gamepads 크레이트가 빠진다. 패드 버튼은 패치한 miniquad가 F13~F25 키로(0075),
+    /// 스틱·HAT D패드는 축으로(joystick_axes, 0143), 키코드로 오는 D패드는 화살표 키로 넘긴다.
     #[cfg(not(target_os = "android"))]
     pads: Gamepads,
     /// Android: 패드 버튼을 한 번이라도 받았나(연결된 패드 수 대신).
@@ -851,7 +851,7 @@ impl Input {
         None
     }
 
-    /// Android: 패드 버튼은 F13~F25 키(Pad::key), D패드·스틱은 화살표 키로 들어온다. 화살표도 패드로 센다
+    /// Android: 패드 버튼은 F13~F25 키(Pad::key), 스틱·HAT은 축(android_axes), 키코드 D패드는 화살표 키로 들어온다. 화살표도 패드로 센다
     /// (Android에 키보드를 붙이는 일은 드물고, 키보드로 세면 D패드를 누를 때마다 안내 글이 키보드 글자로 바뀐다).
     #[cfg(target_os = "android")]
     fn read_gamepads(&mut self) -> (Actions, usize) {
@@ -869,7 +869,9 @@ impl Input {
         if is_key_down(KeyCode::Down) {
             m.y += 1.0;
         }
-        a.move_dir = m.normalize_or_zero();
+        let (mv, aim) = android_axes(macroquad::miniquad::native::joystick_axes(), m);
+        a.move_dir = mv;
+        a.aim = aim;
         let b = bindings();
         let j = |p: Pad| is_key_pressed(p.key());
         a.attack = j(b.pad(Act::Attack));
@@ -890,11 +892,31 @@ impl Input {
         a.down = is_key_pressed(KeyCode::Down);
         a.left = is_key_pressed(KeyCode::Left);
         a.right = is_key_pressed(KeyCode::Right);
-        if PADS.iter().any(|p| is_key_down(p.key())) {
+        if mv != Vec2::ZERO || aim != Vec2::ZERO || PADS.iter().any(|p| is_key_down(p.key())) {
             self.pad_seen = true;
         }
         (a, usize::from(self.pad_seen))
     }
+}
+
+/// Android 패드 축(패치한 miniquad의 joystick_axes: 왼쪽 X·Y, 오른쪽 Z·RZ, HAT X·Y, 아래가 +y) + 화살표 키(키코드로 오는 D패드)
+/// → (이동, 조준). 왼쪽 스틱이 데드존을 넘으면 그 세기 그대로, 아니면 D패드(HAT·화살표)를 8방향으로.
+/// 조준은 오른쪽 스틱 방향(길이 1). 데스크톱·웹 패드(read_gamepads)와 같은 데드존을 쓴다(0143).
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+fn android_axes(axes: [f32; 6], keys: Vec2) -> (Vec2, Vec2) {
+    let stick = apply_deadzone(vec2(axes[0], axes[1]));
+    let mv = if stick != Vec2::ZERO {
+        stick
+    } else {
+        let hat = vec2(axes[4].round(), axes[5].round());
+        (keys + hat)
+            .clamp(Vec2::splat(-1.0), Vec2::ONE)
+            .normalize_or_zero()
+    };
+    (
+        mv,
+        apply_deadzone(vec2(axes[2], axes[3])).normalize_or_zero(),
+    )
 }
 
 /// 이동 벡터 → 메뉴 방향 한 축. 지금 잡힌 방향은 NAV_RELEASE까지 유지하고,
@@ -1039,7 +1061,6 @@ fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
 }
 
 /// 반지름 데드존. 데드존 바깥을 0..1로 다시 펴서 작은 기울기도 쓸 수 있게 한다.
-#[cfg(not(target_os = "android"))]
 fn apply_deadzone(v: Vec2) -> Vec2 {
     let len = v.length();
     if len < tuning::STICK_DEADZONE {
@@ -1052,6 +1073,35 @@ fn apply_deadzone(v: Vec2) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Android 패드 축(0143): 왼쪽 스틱은 세기 그대로, 데드존 안이면 D패드(HAT·화살표), 오른쪽 스틱은 조준 방향.
+    #[test]
+    fn android_axes_map_sticks_and_hat() {
+        let none = [0.0; 6];
+        assert_eq!(android_axes(none, Vec2::ZERO), (Vec2::ZERO, Vec2::ZERO));
+        // 데드존 안 떨림은 움직이지 않는다.
+        assert_eq!(
+            android_axes([0.1, -0.1, 0.15, 0.0, 0.0, 0.0], Vec2::ZERO),
+            (Vec2::ZERO, Vec2::ZERO)
+        );
+        // 반쯤 기울인 왼쪽 스틱 = 반보다 작은 세기(데드존을 빼고 편 값), 방향 그대로(아래가 +y).
+        let (mv, _) = android_axes([0.0, 0.6, 0.0, 0.0, 0.0, 0.0], Vec2::ZERO);
+        assert!((mv - vec2(0.0, 0.5)).length() < 1e-5, "{mv:?}");
+        // 스틱이 서 있으면 HAT, HAT도 없으면 화살표 키. 대각선은 길이 1.
+        let (mv, _) = android_axes([0.0, 0.0, 0.0, 0.0, -1.0, 1.0], Vec2::ZERO);
+        assert!((mv - vec2(-1.0, 1.0).normalize()).length() < 1e-5);
+        let (mv, _) = android_axes(none, vec2(1.0, 0.0));
+        assert_eq!(mv, vec2(1.0, 0.0));
+        // HAT와 같은 쪽 화살표가 함께 와도 한 칸 세기.
+        let (mv, _) = android_axes([0.0, 0.0, 0.0, 0.0, 1.0, 0.0], vec2(1.0, 0.0));
+        assert_eq!(mv, vec2(1.0, 0.0));
+        // 스틱이 기울면 D패드보다 스틱.
+        let (mv, _) = android_axes([0.0, -1.0, 0.0, 0.0, 1.0, 0.0], Vec2::ZERO);
+        assert_eq!(mv, vec2(0.0, -1.0));
+        // 오른쪽 스틱(Z·RZ)은 조준 방향만(살짝 기울여도 길이 1).
+        let (_, aim) = android_axes([0.0, 0.0, 0.4, -0.4, 0.0, 0.0], Vec2::ZERO);
+        assert!((aim - vec2(1.0, -1.0).normalize()).length() < 1e-5);
+    }
 
     /// Android 패드 버튼: 패치한 miniquad 표(KEYCODE_BUTTON_* → F13~F25)와 Pad::key가 같은 짝이고, 키가 겹치지 않는다.
     /// 한쪽만 고치면 Android에서 버튼이 엉뚱하게 눌린다(0075).

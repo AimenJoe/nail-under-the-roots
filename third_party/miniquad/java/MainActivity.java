@@ -17,6 +17,7 @@ import android.view.SurfaceView;
 import android.view.SurfaceHolder;
 import android.view.MotionEvent;
 import android.view.KeyEvent;
+import android.view.InputDevice;
 import android.view.inputmethod.InputMethodManager;
 
 import android.content.Context;
@@ -173,6 +174,23 @@ class QuadSurface
         }
 
         return true;
+    }
+
+    // nail-under-the-roots 패치(docs/decisions/0143): 패드 스틱 축을 Rust로 넘긴다.
+    // 왼쪽 AXIS_X/Y, 오른쪽 AXIS_Z/RZ, D패드 HAT_X/Y(developer.android.com "Handle controller actions").
+    // 받았으면 true: 처리하지 않으면 Android가 왼쪽 스틱·HAT를 D패드 키로 바꿔 다시 넣어(SyntheticJoystickHandler)
+    // 같은 기울기가 아날로그와 화살표 키로 두 번 들어온다. HAT도 여기서 받으니 D패드 키 대신 축으로 간다.
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
+        if ((event.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+                && event.getAction() == MotionEvent.ACTION_MOVE) {
+            QuadNative.surfaceOnJoystick(
+                event.getAxisValue(MotionEvent.AXIS_X), event.getAxisValue(MotionEvent.AXIS_Y),
+                event.getAxisValue(MotionEvent.AXIS_Z), event.getAxisValue(MotionEvent.AXIS_RZ),
+                event.getAxisValue(MotionEvent.AXIS_HAT_X), event.getAxisValue(MotionEvent.AXIS_HAT_Y));
+            return true;
+        }
+        return super.onGenericMotionEvent(event);
     }
 
     // There is an Android bug when screen is in landscape,

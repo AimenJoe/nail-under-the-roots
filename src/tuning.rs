@@ -29,8 +29,7 @@ pub const PLAYER_HURT_HITSTOP: f32 = 0.12;
 pub const PLAYER_HURT_SHAKE: f32 = 0.55;
 /// 입력 버퍼. 이 시간 안에 들어온 공격/굴파기 입력은 가능해지는 순간 실행된다.
 pub const INPUT_BUFFER: f32 = 0.10;
-/// 스틱 데드존(반지름). Android 빌드에는 gamepads 크레이트가 없어 쓰이지 않는다.
-#[cfg_attr(target_os = "android", allow(dead_code))]
+/// 스틱 데드존(반지름). 데스크톱·웹 패드와 Android 패드 축(0143)이 같이 쓴다.
 pub const STICK_DEADZONE: f32 = 0.2;
 /// 메뉴 탐색(스틱): 큰 축이 이만큼 기울면 한 칸, 이 밑으로 돌아와야 다음 칸(히스테리시스).
 /// 데드존을 뺀 뒤 0..1 값 기준. 0.5/0.3은 흔한 UI 내비게이션 기본값 근처(KB gamepad-and-android-input).

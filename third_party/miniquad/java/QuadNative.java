@@ -21,4 +21,6 @@ public class QuadNative {
     public native static void surfaceOnKeyDown(int keycode);
     public native static void surfaceOnKeyUp(int keycode);
     public native static void surfaceOnCharacter(int character);
+    // nail-under-the-roots 패치(0143): 패드 축 여섯(왼쪽 X·Y, 오른쪽 Z·RZ, HAT X·Y)
+    public native static void surfaceOnJoystick(float x, float y, float z, float rz, float hatX, float hatY);
 }

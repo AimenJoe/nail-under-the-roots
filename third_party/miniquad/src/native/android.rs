@@ -675,6 +675,36 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnCharacter(
     });
 }
 
+// nail-under-the-roots 패치(0143): 패드 축. Java UI 스레드에서 쓰고 게임 스레드에서 읽는다(f32 비트를 원자값으로).
+#[allow(clippy::declare_interior_mutable_const)]
+const AXIS_ZERO: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static JOYSTICK: [std::sync::atomic::AtomicU32; 6] = [AXIS_ZERO; 6];
+
+#[no_mangle]
+extern "C" fn Java_quad_1native_QuadNative_surfaceOnJoystick(
+    _: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    x: f32,
+    y: f32,
+    z: f32,
+    rz: f32,
+    hat_x: f32,
+    hat_y: f32,
+) {
+    for (cell, v) in JOYSTICK.iter().zip([x, y, z, rz, hat_x, hat_y]) {
+        cell.store(v.to_bits(), std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// 마지막으로 받은 패드 축: [왼쪽 X, 왼쪽 Y, 오른쪽 X(AXIS_Z), 오른쪽 Y(AXIS_RZ), HAT X, HAT Y]. 아래가 +y. 패드가 없으면 0.
+pub fn joystick_axes() -> [f32; 6] {
+    let mut out = [0.0; 6];
+    for (o, cell) in out.iter_mut().zip(JOYSTICK.iter()) {
+        *o = f32::from_bits(cell.load(std::sync::atomic::Ordering::Relaxed));
+    }
+    out
+}
+
 unsafe fn set_full_screen(env: *mut ndk_sys::JNIEnv, fullscreen: bool) {
     ndk_utils::call_void_method!(env, ACTIVITY, "setFullScreen", "(Z)V", fullscreen as i32);
 }
