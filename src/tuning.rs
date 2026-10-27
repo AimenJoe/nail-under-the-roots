@@ -81,6 +81,30 @@ pub const DEEP_WRAPS: u32 = 3;
 /// 셋 다 끊은 뒤 엔딩까지: 놓아주기 이펙트(0163, 실이 풀리고 흰 꽃잎, 빛이 커진다)를 본다.
 pub const DEEP_DONE_DELAY: f32 = 3.4;
 
+// ---- 토끼풀(물든 어미 굴토끼, 0165) ----------------------------------------
+/// 발 구르기 예고(초, 반 아래면 짧게). 충격파 반지름·퍼지는 시간·떨어지는 실 그물 수·밀어내는 힘.
+pub const CLOVER_THUMP_WINDUP: f32 = 0.7;
+pub const CLOVER_THUMP_WINDUP_HURT: f32 = 0.5;
+pub const CLOVER_WAVE_R: f32 = 44.0;
+pub const CLOVER_WAVE_TIME: f32 = 0.35;
+pub const CLOVER_WAVE_WEBS: usize = 3;
+pub const CLOVER_WAVE_KNOCK: f32 = 180.0;
+/// 뒷발 차기: 연달아 차는 수, 차기를 고르는 거리, 둘째 차기 예고에서 건너뛰는 비율.
+pub const CLOVER_KICKS: u32 = 2;
+pub const CLOVER_KICK_NEAR: f32 = 40.0;
+pub const CLOVER_KICK_REAIM: f32 = 0.6;
+/// 품기(반 아래, 한 번): 고치로 가 실을 감는 시간, 실 한 가닥을 뻗는 때·닿는 길이·반폭, 걸리면 끌려가는 힘·잠금.
+pub const CLOVER_GATHER_TIME: f32 = 2.2;
+pub const CLOVER_THREAD_AT: f32 = 1.0;
+pub const CLOVER_THREAD_REACH: f32 = 150.0;
+pub const CLOVER_THREAD_WIDTH: f32 = 5.0;
+pub const CLOVER_PULL: f32 = 220.0;
+pub const CLOVER_PULL_LOCK: f32 = 0.6;
+/// 늘 고치와 Naïl 사이에 서려 한다: 고치 가운데에서 플레이어 쪽으로 이만큼.
+pub const CLOVER_GUARD_DIST: f32 = 34.0;
+/// 아기들의 고치(때릴 수 없다) 반지름.
+pub const COCOON_R: f32 = 9.0;
+
 // ---- 강공격(0161) --------------------------------------------------------
 /// 공격은 떼는 순간 평타(사장 선택 2026-10-27: 1타부터 강공격이 되게). 누른 지 이만큼(초) 안에 떼면 평타,
 /// 그 뒤로는 모으는 자세(느려지고 발톱에 빛). 모으기 수치는 누른 때부터 센다.

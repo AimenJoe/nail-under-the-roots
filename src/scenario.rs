@@ -67,6 +67,8 @@ pub enum Scenario {
     Doto,
     /// 셋째 길 끝 굴(콩이가 지킨다)에 바로(docs/decisions/0054).
     Kongi,
+    /// 굴토끼 옛 굴 끝의 토끼풀(0165).
+    Clover,
     /// 길의 샘 칸(0159): 쉼방의 샘 곁에서 시작(체력은 깎인 채).
     Spring,
     /// 출구 확인(0159): 적 없는 한 방짜리 굴 — 들어서면 바로 출구가 열린다.
@@ -79,7 +81,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 36] = [
+pub const LIST: [Entry; 37] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -260,6 +262,11 @@ pub const LIST: [Entry; 36] = [
         desc: "흰 실 굴 3방 + 흰 실 그물(걸으면 느림, 발톱으로 끊김).",
         scenario: Scenario::Tangle(Biome::Silk),
     },
+    Entry {
+        name: "토끼풀",
+        desc: "굴토끼 옛 굴(흰 실 굴). 끝방의 토끼풀: 발 구르기(충격파·실 그물)·두 번 차기·내려앉기, 반 아래면 품기(실 한 가닥). 고치는 못 때린다.",
+        scenario: Scenario::Clover,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -297,11 +304,11 @@ pub fn build(s: Scenario) -> World {
             w.adv.events.clear();
             w
         }
-        Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi => {
+        Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi | Scenario::Clover => {
             let doto = s == Scenario::Doto;
             let stage = match s {
                 Scenario::Doto => 2,
-                Scenario::Kongi => crate::tuning::FINAL_STAGE,
+                Scenario::Kongi | Scenario::Clover => crate::tuning::FINAL_STAGE,
                 _ => 1,
             };
             let mut w = World::camp_start(stage);
@@ -313,7 +320,14 @@ pub fn build(s: Scenario) -> World {
             }
             w.doto_fight = doto;
             w.kongi_fight = s == Scenario::Kongi;
-            w.enter_route_boss_now();
+            if s == Scenario::Clover {
+                w.clover_fight = true;
+                w.warren_open = true;
+                w.reroll_route();
+                w.enter_route_warren_now();
+            } else {
+                w.enter_route_boss_now();
+            }
             // 끝방 문 안쪽에 바로 선다(들어서면 잠기고 모모가 말한다).
             let boss = w.adv.dungeon.as_ref().and_then(|d| {
                 d.rooms

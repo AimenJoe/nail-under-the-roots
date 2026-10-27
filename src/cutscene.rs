@@ -836,6 +836,10 @@ pub enum Speaker {
     /// 물든 콩이(셋째 길의 보스, 이름표 "???") / 돌아온 콩이(마을, 0054).
     KongiTainted,
     Kongi,
+    /// 물든 토끼풀(굴토끼 옛 굴의 보스, 이름표 "???") / 돌아온 토끼풀(0165). 초상화는 아직 없다(색 네모).
+    CloverTainted,
+    #[allow(dead_code)] // 0165 ④(가족 귀환·마을)에서 쓴다.
+    Clover,
 }
 
 fn speaker_actor(w: &World, who: Speaker) -> Actor {
@@ -873,7 +877,55 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
             ..story_actor("???", KONGI_SHELL)
         },
         Speaker::Kongi => kongi_actor(w.player.pos),
+        Speaker::CloverTainted => Actor {
+            sprite: Some(Sprite::Critter(crate::art::CLOVER_ROW)),
+            pos: w.player.pos,
+            ..story_actor("???", CLOVER_FUR)
+        },
+        Speaker::Clover => clover_actor(w.player.pos),
     }
+}
+
+/// 토끼풀의 색(초상화가 올 때까지 이름표 옆 네모, 0165).
+const CLOVER_FUR: Color = Color::new(0.62, 0.52, 0.48, 1.0);
+
+/// 돌아온 토끼풀 배우(월드 그림 = 맑은 눈). 초상화는 사장의 나노바나나 원본이 오면 끼운다.
+fn clover_actor(pos: Vec2) -> Actor {
+    Actor {
+        sprite: Some(Sprite::Critter(crate::art::CLOVER_BACK_ROW)),
+        pos,
+        ..story_actor(i18n::s().name_clover, CLOVER_FUR)
+    }
+}
+
+/// 굴토끼 옛 굴 끝 방에 토끼풀이 있다(0165). 모모 런이면 서로 알아보지 못하는 모녀의 말.
+pub fn clover_meet(w: &World) -> Cutscene {
+    let at = w.adv.boss_last;
+    let actors = vec![nail_actor(w), tainted_actor(w, Speaker::CloverTainted, at)];
+    let momo = w.character == crate::equipment::Character::Momo;
+    let lines = if momo {
+        vec![
+            say(1, Face::Normal, |s| s.clover_meet_momo_1),
+            say(0, Face::Worried, |s| s.clover_meet_momo_1b),
+        ]
+    } else {
+        vec![
+            say(1, Face::Normal, |s| s.clover_meet_1),
+            say(0, Face::Determined, |s| s.clover_meet_1b),
+        ]
+    };
+    Cutscene::new(actors, tainted_meet_steps(w, at, |s| s.mob_clover, lines))
+}
+
+/// 토끼풀을 이겼다(0165): 실이 풀리고 맑은 눈으로 돌아온다. (가족 귀환 장면은 다음 단계에서 채운다.)
+pub fn clover_returns(w: &World, at: Vec2) -> Cutscene {
+    let mut clover = clover_actor(at);
+    clover.visible = false;
+    clover.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
+    let actors = vec![nail_actor(w), clover];
+    let mut steps = unbind_steps(at, 1, false);
+    steps.push(say(1, Face::Normal, |s| s.clover_b1));
+    Cutscene::new(actors, steps)
 }
 
 /// 콩이의 색(초상화를 못 읽었을 때 이름표 옆 네모).

@@ -42,6 +42,8 @@ pub mod key {
     pub const SPROUT: &str = "weapon.sprout";
     /// 콩이를 이겼다(셋째 길, 0054): 마을에 온다. 그때 받은 바위 발톱은 런마다 가방에.
     pub const KONGI_BACK: &str = "kongi";
+    /// 토끼풀(어미 굴토끼)이 아기들과 마을로 돌아왔다(0165).
+    pub const CLOVER_BACK: &str = "clover";
     pub const STONE: &str = "weapon.stone";
     /// 마을 뿌리 길에서 마지막으로 고른 캐릭터(0 = Naïl, 1 = 모모, 0056). 모모로 가장 깊은 곳에 닿았다.
     pub const CHAR_PICK: &str = "char_pick";

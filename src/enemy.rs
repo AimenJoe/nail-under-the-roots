@@ -30,6 +30,8 @@ pub enum Kind {
     Doto,
     /// 셋째 길의 보스: 물든 세띠아르마딜로 콩이. 굴러 튕기고, 웅크려 버틴다(docs/decisions/0054).
     Kongi,
+    /// 굴토끼 옛 굴의 보스: 물든 어미 굴토끼 토끼풀. 발을 구르고, 두 번 차고, 뛰어 내려앉고, 고치에 실을 감는다(0165).
+    Clover,
     /// 새 잡몹(0146): 뒤쥐(두 번 물기)·고슴도치(공으로 구르기)·두꺼비(혀)·박쥐(날며 내리꽂기)·실버섯(포자 구름).
     Shrew,
     Hedgehog,
@@ -76,9 +78,13 @@ pub enum State {
     Lash { time: f32, dir: Vec2 },
     /// 실버섯: 포자를 터뜨림(시작 틱에 월드가 구름을 놓는다, 0146).
     Puff { time: f32 },
+    /// 토끼풀(0165): 뒷발 구르기 예고. 끝나면 `Event::Thump`(월드가 충격파와 실 그물을 놓는다).
+    Thump { time: f32 },
+    /// 토끼풀(0165): 고치로 가 실을 더 감는다(반 아래, 한 번). `CLOVER_THREAD_AT`에 `Event::Thread`(실 한 가닥).
+    Gather { time: f32 },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Event {
     Charge,
     WallHit,
@@ -96,6 +102,9 @@ pub enum Event {
     /// 두꺼비가 혀를 내밀었다 / 실버섯이 포자를 터뜨렸다(소리용, 판정은 월드가 상태로 본다).
     Tongue,
     Spore,
+    /// 토끼풀이 발을 굴렀다(그 자리) / 실 한 가닥을 뻗었다(자리, 방향). 판정은 월드가(0165).
+    Thump(Vec2),
+    Thread(Vec2, Vec2),
 }
 
 pub struct Enemy {
@@ -137,6 +146,8 @@ pub struct Enemy {
     pub elite: bool,
     /// 흰 실 그물(0165)에 걸린 남은 시간. 걷는 속도가 `WEB_SLOW`배(나는 것·보스는 안 걸린다).
     pub webbed: f32,
+    /// 토끼풀(0165): 지키는 자리의 가운데(아기들의 고치). 늘 여기와 플레이어 사이에 선다.
+    pub guard: Option<Vec2>,
 }
 
 pub struct Projectile {
@@ -220,6 +231,7 @@ impl Enemy {
             level: 1,
             elite: false,
             webbed: 0.0,
+            guard: None,
         }
     }
 
@@ -350,7 +362,11 @@ impl Enemy {
             State::Approach
                 if matches!(
                     sp.behavior,
-                    Behavior::Chief | Behavior::Momo | Behavior::Doto | Behavior::Kongi
+                    Behavior::Chief
+                        | Behavior::Momo
+                        | Behavior::Doto
+                        | Behavior::Kongi
+                        | Behavior::Clover
                 ) =>
             {
                 if player_targetable {
@@ -359,15 +375,60 @@ impl Enemy {
                         Behavior::Chief => self.chief_next(dist, player_pos),
                         Behavior::Momo => self.momo_next(dist, player_pos, events),
                         Behavior::Kongi => self.kongi_next(dist),
+                        Behavior::Clover => self.clover_next(dist, player_pos),
                         _ => self.doto_next(dist, player_pos),
                     };
                     if matches!(self.state, State::Approach) {
-                        // 도토는 너무 가까우면 물러난다(던지는 보스).
-                        let away = sp.behavior == Behavior::Doto && dist < sp.keep.0;
-                        let dir = if away { -dir_to_player } else { dir_to_player };
-                        self.pos += dir * self.speed() * dt;
+                        if sp.behavior == Behavior::Clover {
+                            // 토끼풀(0165): 플레이어가 아니라 "고치 앞 자리"로 간다.
+                            let to = self.clover_post(player_pos) - self.pos;
+                            if to.length() > 3.0 {
+                                self.pos += to.normalize() * self.speed() * dt;
+                            }
+                        } else {
+                            // 도토는 너무 가까우면 물러난다(던지는 보스).
+                            let away = sp.behavior == Behavior::Doto && dist < sp.keep.0;
+                            let dir = if away { -dir_to_player } else { dir_to_player };
+                            self.pos += dir * self.speed() * dt;
+                        }
                     }
                 }
+            }
+            State::Thump { time } => {
+                let time = time + dt;
+                if player_targetable {
+                    self.facing = dir_to_player;
+                }
+                if time >= self.thump_windup() {
+                    events.push(Event::Thump(self.pos));
+                    self.state = State::Rest { time: sp.rest };
+                } else {
+                    self.state = State::Thump { time };
+                }
+            }
+            State::Gather { time } => {
+                let was = time;
+                let time = time + dt;
+                // 고치 쪽으로 가서 실을 감는다. 그동안 플레이어를 본다(실을 뻗을 쪽).
+                if let Some(g) = self.guard {
+                    let to = g + vec2(0.0, 14.0) - self.pos;
+                    if to.length() > 3.0 {
+                        self.pos += to.normalize() * self.speed() * 1.5 * dt;
+                    }
+                }
+                if player_targetable {
+                    self.facing = dir_to_player;
+                }
+                if was < t::CLOVER_THREAD_AT && time >= t::CLOVER_THREAD_AT {
+                    events.push(Event::Thread(self.pos, self.facing));
+                }
+                self.state = if time >= t::CLOVER_GATHER_TIME {
+                    State::Rest {
+                        time: sp.rest * 0.5,
+                    }
+                } else {
+                    State::Gather { time }
+                };
             }
             State::Howl { time } => {
                 let time = time + dt;
@@ -449,11 +510,19 @@ impl Enemy {
                     self.state = State::Rest { time: sp.wall_rest };
                     self.flash = t::HIT_FLASH;
                     events.push(Event::WallHit);
-                } else if time >= dur && sp.behavior == Behavior::Darter && self.chain > 0 {
-                    // 뒤쥐: 곧바로 다시 겨눠 한 번 더 문다(예고는 짧게).
+                } else if time >= dur
+                    && matches!(sp.behavior, Behavior::Darter | Behavior::Clover)
+                    && self.chain > 0
+                {
+                    // 뒤쥐: 곧바로 다시 겨눠 한 번 더 문다(예고는 짧게). 토끼풀도 둘째 차기(0165).
                     self.chain -= 1;
+                    let skip = if sp.behavior == Behavior::Clover {
+                        t::CLOVER_KICK_REAIM
+                    } else {
+                        t::SHREW_REAIM
+                    };
                     self.state = State::Windup {
-                        time: self.windup() * (1.0 - t::SHREW_REAIM),
+                        time: self.windup() * (1.0 - skip),
                     };
                 } else if time >= dur {
                     self.chain = 0;
@@ -755,6 +824,57 @@ impl Enemy {
         }
     }
 
+    /// 토끼풀의 다음 수(0165): 반 아래면 한 번 품기. 아니면 발 구르기 → 높이 뛰기(조금 멀어도) → 가까우면 두 번 차기를 돈다.
+    /// 수가 안 되면 고치 앞 자리로 간다.
+    fn clover_next(&mut self, dist: f32, player_pos: Vec2) -> State {
+        let sp = self.sp();
+        if self.hurt_half() && self.summons == 0 {
+            self.summons = 1;
+            return State::Gather { time: 0.0 };
+        }
+        match self.pattern % 3 {
+            0 => {
+                self.pattern += 1;
+                State::Thump { time: 0.0 }
+            }
+            1 if dist < sp.trigger * 1.5 => {
+                self.pattern += 1;
+                State::Crouch {
+                    time: 0.0,
+                    target: player_pos,
+                }
+            }
+            2 => {
+                self.pattern += 1;
+                if dist < t::CLOVER_KICK_NEAR * 1.5 {
+                    self.chain = t::CLOVER_KICKS - 1;
+                    State::Windup { time: 0.0 }
+                } else {
+                    State::Approach
+                }
+            }
+            _ => State::Approach,
+        }
+    }
+
+    /// 토끼풀이 서려는 자리: 고치 가운데에서 플레이어 쪽으로 `CLOVER_GUARD_DIST`. 고치가 없으면 플레이어 쪽.
+    fn clover_post(&self, player_pos: Vec2) -> Vec2 {
+        match self.guard {
+            Some(g) => g + (player_pos - g).normalize_or(vec2(0.0, 1.0)) * t::CLOVER_GUARD_DIST,
+            None => player_pos,
+        }
+    }
+
+    /// 발 구르기 예고(0165): 반 아래면 짧다. 실뜨기 배율은 그대로.
+    pub fn thump_windup(&self) -> f32 {
+        let base = if self.hurt_half() {
+            t::CLOVER_THUMP_WINDUP_HURT
+        } else {
+            t::CLOVER_THUMP_WINDUP
+        };
+        base * self.windup_mul
+    }
+
     /// 콩이·고슴도치가 공으로 말려 있다(웅크림·버티기·구르기): 발톱은 등딱지·가시에 튕긴다.
     pub fn guarding(&self) -> bool {
         matches!(self.sp().behavior, Behavior::Kongi | Behavior::Roller)
@@ -787,6 +907,10 @@ impl Enemy {
 
     /// 패링에 받아쳐졌다: 구르던 콩이는 멈춰 어질어질(다른 보스는 `hurt`가 다룬다).
     pub fn on_parried(&mut self) {
+        // 토끼풀(0165): 첫 발을 받아치면 둘째 차기가 끊긴다.
+        if self.sp().behavior == Behavior::Clover {
+            self.chain = 0;
+        }
         if matches!(self.sp().behavior, Behavior::Kongi | Behavior::Roller)
             && matches!(self.state, State::Charge { .. })
         {
@@ -815,6 +939,8 @@ impl Enemy {
                     | State::Pop { .. }
                     | State::Aim { .. }
                     | State::Guard { .. }
+                    | State::Thump { .. }
+                    | State::Gather { .. }
             )
     }
 
@@ -822,7 +948,7 @@ impl Enemy {
     pub fn is_boss(&self) -> bool {
         matches!(
             self.sp().behavior,
-            Behavior::Chief | Behavior::Momo | Behavior::Doto | Behavior::Kongi
+            Behavior::Chief | Behavior::Momo | Behavior::Doto | Behavior::Kongi | Behavior::Clover
         )
     }
 
@@ -903,6 +1029,8 @@ impl Enemy {
             State::Guard { .. } => "GUARD",
             State::Lash { .. } => "LASH",
             State::Puff { .. } => "PUFF",
+            State::Thump { .. } => "THUMP",
+            State::Gather { .. } => "gather",
         }
     }
 }
@@ -914,6 +1042,7 @@ fn idle_of(b: Behavior) -> State {
         | Behavior::Momo
         | Behavior::Doto
         | Behavior::Kongi
+        | Behavior::Clover
         | Behavior::Darter
         | Behavior::Roller => State::Approach,
         Behavior::Shooter
@@ -928,6 +1057,106 @@ fn idle_of(b: Behavior) -> State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 토끼풀(0165): 발 구르기(Thump 이벤트) → 높이 뛰기 → 가까우면 두 번 차기(첫 발을 받아치면 끊김), 반 아래면 한 번 품기
+    /// (실 한 가닥 Thread 이벤트). 멀면 고치 앞 자리로 간다.
+    #[test]
+    fn clover_thumps_leaps_double_kicks_and_gathers_once() {
+        let room = Room::new();
+        let mut ev = Vec::new();
+        let mut pr = Vec::new();
+        let cocoon = vec2(160.0, 40.0);
+        let mut e = Enemy::new(Kind::Clover, vec2(160.0, 70.0));
+        e.guard = Some(cocoon);
+        let near = vec2(160.0, 100.0);
+        let far = vec2(160.0, 170.0);
+        let mut tick = |e: &mut Enemy, p: Vec2, ev: &mut Vec<Event>| {
+            e.update(p, true, &room, t::TICK_DT, &mut pr, ev);
+        };
+        // 1. 발 구르기: 예고 뒤 Thump.
+        tick(&mut e, near, &mut ev);
+        assert!(matches!(e.state, State::Thump { .. }), "{:?}", e.state);
+        for _ in 0..((t::CLOVER_THUMP_WINDUP / t::TICK_DT) as usize + 2) {
+            tick(&mut e, near, &mut ev);
+        }
+        assert!(ev.iter().any(|x| matches!(x, Event::Thump(_))), "쿵");
+        while matches!(e.state, State::Rest { .. }) {
+            tick(&mut e, near, &mut ev);
+        }
+        tick(&mut e, near, &mut ev);
+        // 2. 높이 뛰기.
+        assert!(matches!(e.state, State::Crouch { .. }), "{:?}", e.state);
+        let mut n = 0;
+        while !matches!(e.state, State::Approach) && n < 400 {
+            tick(&mut e, near, &mut ev);
+            n += 1;
+        }
+        // 3. 가까우면 두 번 차기: 첫 차기가 끝나면 둘째 예고로.
+        let mut n = 0;
+        while !matches!(e.state, State::Windup { .. }) && n < 400 {
+            tick(&mut e, near, &mut ev);
+            n += 1;
+        }
+        assert!(
+            matches!(e.state, State::Windup { .. }),
+            "차기 예고 {:?}",
+            e.state
+        );
+        assert_eq!(e.chain, t::CLOVER_KICKS - 1);
+        let mut n = 0;
+        while !matches!(e.state, State::Charge { .. }) && n < 100 {
+            tick(&mut e, near, &mut ev);
+            n += 1;
+        }
+        assert!(e.parryable(), "차기는 받아칠 수 있다(황금)");
+        let mut n = 0;
+        while matches!(e.state, State::Charge { .. }) && n < 100 {
+            tick(&mut e, near, &mut ev);
+            n += 1;
+        }
+        assert!(
+            matches!(e.state, State::Windup { .. }),
+            "둘째 차기 {:?}",
+            e.state
+        );
+        assert_eq!(e.chain, 0);
+        // 받아치면 남은 차기가 끊긴다.
+        e.chain = 1;
+        e.on_parried();
+        assert_eq!(e.chain, 0);
+        // 4. 멀면 고치 앞 자리로(플레이어가 아니라).
+        e.state = State::Approach;
+        e.pattern = 2;
+        let before = e.pos;
+        for _ in 0..30 {
+            tick(&mut e, far, &mut ev);
+        }
+        assert!(e.pos != before, "자리로 간다");
+        assert!(
+            (e.pos - cocoon).length() < (far - cocoon).length(),
+            "고치와 플레이어 사이"
+        );
+        // 5. 반 아래면 한 번 품기: 1초에 실 한 가닥.
+        e.hp = e.max_hp / 2;
+        e.state = State::Approach;
+        ev.clear();
+        tick(&mut e, near, &mut ev);
+        assert!(matches!(e.state, State::Gather { .. }), "{:?}", e.state);
+        for _ in 0..((t::CLOVER_THREAD_AT / t::TICK_DT) as usize + 2) {
+            tick(&mut e, near, &mut ev);
+        }
+        assert!(
+            ev.iter().any(|x| matches!(x, Event::Thread(..))),
+            "실 한 가닥"
+        );
+        for _ in 0..((t::CLOVER_GATHER_TIME / t::TICK_DT) as usize + 2) {
+            tick(&mut e, near, &mut ev);
+        }
+        while matches!(e.state, State::Rest { .. }) {
+            tick(&mut e, near, &mut ev);
+        }
+        assert!(!matches!(e.state, State::Gather { .. }), "품기는 한 번");
+    }
 
     /// 받아치기 규칙(0160): 곧게 오는 돌진만, 내려앉기는 안 된다.
     #[test]

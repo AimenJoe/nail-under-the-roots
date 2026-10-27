@@ -122,6 +122,9 @@ pub enum AdvEvent {
     DeepIntro,
     DeepDone,
     DeepSleep,
+    /// 굴토끼 옛 굴 끝 방에 토끼풀이 있다 / 토끼풀을 이겼다(0165).
+    CloverIntro,
+    CloverBeaten,
     /// 모모가 남긴 시든 꽃잎을 주웠다(0164): 기록에 남기고 도감 '???' 칸.
     PetalFound,
 }
@@ -359,6 +362,19 @@ impl World {
         self.enter_node();
     }
 
+    /// 개발: 굴토끼 옛 굴(0165)로 바로. 길에 그 칸이 없으면 보스 칸.
+    pub fn enter_route_warren_now(&mut self) {
+        if let Some(r) = self.adv.route.as_mut() {
+            let last = r.layers.len() - 1;
+            let i = r.layers[last]
+                .iter()
+                .position(|n| n.kind == NodeKind::Warren)
+                .unwrap_or(0);
+            r.at = Some((last, i));
+        }
+        self.enter_node();
+    }
+
     /// 개발: 길의 샘 칸(0159)으로 바로. 샘 칸이 없는 길이면 끝방 앞 층 첫 칸.
     pub fn enter_route_spring_now(&mut self) {
         if let Some(r) = self.adv.route.as_mut() {
@@ -511,6 +527,9 @@ impl World {
         f.swapped = true;
         self.spring = None;
         self.petal_at = None;
+        self.cocoons.clear();
+        self.waves.clear();
+        self.thread_lash = None;
         self.exit_at = None;
         self.exit_age = 0.0;
         self.petals = false;
@@ -802,6 +821,10 @@ impl World {
         if self.kongi_fight && stage == t::FINAL_STAGE && kind == NodeKind::Boss {
             prm.boss = Some(Kind::Kongi);
         }
+        // 굴토끼 옛 굴의 끝은 토끼풀이 지킨다(0165). 이기면 출구가 가장 깊은 곳으로.
+        if self.clover_fight && stage == t::FINAL_STAGE && kind == NodeKind::Warren {
+            prm.boss = Some(Kind::Clover);
+        }
         self.adv.node = Some(at);
         self.build_dungeon(&prm, biome);
     }
@@ -980,6 +1003,9 @@ impl World {
         if self.enemies.iter().any(|e| e.kind == Kind::Kongi) {
             self.kongi_fight = false;
         }
+        if self.enemies.iter().any(|e| e.kind == Kind::Clover) {
+            self.clover_fight = false;
+        }
         self.mines.clear();
         self.clouds.clear();
         self.rocks.clear();
@@ -1064,6 +1090,7 @@ impl World {
         {
             self.room.set_doors_locked(true);
             let elite = room.elite;
+            let interior = room.interior();
             for (n, (kind, pos)) in room.enemies.drain(..).enumerate() {
                 for off in crate::species::pack_offsets(kind) {
                     let mut e = Enemy::new(kind, pos + off);
@@ -1083,6 +1110,14 @@ impl World {
                     if kind == Kind::Kongi {
                         self.adv.boss_last = e.pos;
                         self.adv.events.push(AdvEvent::KongiIntro);
+                    }
+                    if kind == Kind::Clover {
+                        // 아기들의 고치 둘은 방 위쪽 가운데(0165). 토끼풀은 그 앞을 지킨다.
+                        let c = vec2(interior.center().x, interior.y + 22.0);
+                        self.cocoons = vec![c + vec2(-13.0, 0.0), c + vec2(13.0, 2.0)];
+                        e.guard = Some(c);
+                        self.adv.boss_last = e.pos;
+                        self.adv.events.push(AdvEvent::CloverIntro);
                     }
                     self.enemies.push(e);
                 }
@@ -1141,6 +1176,9 @@ impl World {
                     } else if named == Some(Kind::Kongi) {
                         // 콩이는 문을 열고 바위 발톱을 준다(장면은 앱).
                         self.adv.events.push(AdvEvent::KongiBeaten);
+                    } else if named == Some(Kind::Clover) {
+                        // 토끼풀은 맑은 눈으로 돌아오고 고치가 풀린다(장면은 앱, 0165).
+                        self.adv.events.push(AdvEvent::CloverBeaten);
                     } else {
                         self.toast = Some((|s| s.toast_boss, 3.0));
                     }

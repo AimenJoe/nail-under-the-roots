@@ -111,7 +111,7 @@ pub const PORTRAIT_COLS: u32 = 12;
 pub const CELL: f32 = 16.0;
 
 /// critters.png에서 실루엣 줄까지의 거리(그림 줄 수).
-pub const CRITTER_ROWS: u32 = 19;
+pub const CRITTER_ROWS: u32 = 22;
 /// critters.png의 라쿤 줄.
 pub const RACCOON_ROW: u32 = 6;
 /// critters.png의 모모(물든 굴토끼) 줄(docs/decisions/0029).
@@ -132,6 +132,11 @@ pub const HEDGEHOG_ROW: u32 = 15;
 pub const TOAD_ROW: u32 = 16;
 pub const BAT_ROW: u32 = 17;
 pub const SPORE_ROW: u32 = 18;
+/// 토끼풀(물든 어미 굴토끼, 0165)과 돌아온 토끼풀, 아기 굴토끼(박하·민들레, 깨어난 모습).
+pub const CLOVER_ROW: u32 = 19;
+pub const CLOVER_BACK_ROW: u32 = 20;
+#[allow(dead_code)] // 0165 ④(가족 귀환·마을)에서 쓴다.
+pub const BABY_ROW: u32 = 21;
 
 impl Art {
     /// 털빛 n의 Naïl 시트(0 또는 없으면 기본).

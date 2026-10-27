@@ -328,6 +328,8 @@ impl App {
                 AdvEvent::DotoBeaten => self.doto_beaten(),
                 AdvEvent::KongiIntro => self.play(cutscene::kongi_meet(&self.world)),
                 AdvEvent::KongiBeaten => self.kongi_beaten(),
+                AdvEvent::CloverIntro => self.play(cutscene::clover_meet(&self.world)),
+                AdvEvent::CloverBeaten => self.clover_beaten(),
             }
         }
     }
@@ -381,6 +383,18 @@ impl App {
         }
         let at = self.world.adv.boss_last;
         self.play(cutscene::kongi_returns(&self.world, at));
+    }
+
+    /// 토끼풀을 이겼다(0165): 가족이 돌아온다(장면). 이번 런엔 다시 안 싸운다.
+    fn clover_beaten(&mut self) {
+        use crate::profile::key;
+        self.world.clover_fight = false;
+        if self.recording() {
+            self.profile.set(key::CLOVER_BACK);
+            self.save_profile();
+        }
+        let at = self.world.adv.boss_last;
+        self.play(cutscene::clover_returns(&self.world, at));
     }
 
     /// 가장 깊은 곳(0042): 클리어를 남기고 엔딩을 튼다. 끝나면 타이틀로(런이 끝났다).

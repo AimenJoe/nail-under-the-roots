@@ -387,6 +387,19 @@ impl Player {
     }
 
     /// 패링 창이 열려 있으면 공격 방향. 스윙 시작 직후 PARRY_WINDOW 동안(실뜨기 8단계면 짧다).
+    /// 테스트용: 이 방향으로 받아치기 창을 연다(월드 테스트가 받아치기 길을 밟아 본다).
+    #[cfg(test)]
+    pub fn open_parry_for_test(&mut self, dir: Vec2) {
+        self.state = State::Attack {
+            idx: 0,
+            time: 0.0,
+            dir,
+        };
+        self.facing = dir;
+        self.parry_open = true;
+        self.swing_age = 0.0;
+    }
+
     pub fn parry_dir(&self) -> Option<Vec2> {
         match self.state {
             State::Attack { dir, .. } | State::Heavy { dir, .. }

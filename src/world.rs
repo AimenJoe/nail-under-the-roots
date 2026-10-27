@@ -68,6 +68,14 @@ pub struct Fx {
     pub kind: FxKind,
 }
 
+/// 토끼풀의 충격파(0165): 발을 구른 자리에서 퍼지는 고리. 고리가 지나는 순간 한 번 아프다(땅속·깡충은 안 맞는다).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Wave {
+    pub pos: Vec2,
+    pub time: f32,
+    pub hit: bool,
+}
+
 /// 길의 샘(0159). 들어서는 순간이 아니라 발을 담가야 회복한다(말로만 샘이었다).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Spring {
@@ -354,6 +362,17 @@ pub struct World {
     rock_cd: f32,
     /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
     pub kongi_fight: bool,
+    /// 토끼풀(0165): 굴토끼 옛 굴 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
+    pub clover_fight: bool,
+    /// 아기들의 고치(0165): 토끼풀의 끝방에 둘. 때릴 수 없다(발톱이 튕긴다). 장소를 옮기면 없어진다.
+    pub cocoons: Vec<Vec2>,
+    /// 토끼풀의 충격파(0165).
+    pub waves: Vec<Wave>,
+    /// 뻗은 실 한 가닥(0165): 시작·끝·흐른 초. 잠깐 그린다.
+    pub thread_lash: Option<(Vec2, Vec2, f32)>,
+    /// 고치를 쳤을 때 한 번 알려 줬나 / 마지막으로 튕긴 공격 번호.
+    cocoon_told: bool,
+    cocoon_bounce_id: u32,
     /// 실의 꿈(0055): 쓰러진 적이 아무것도 떨어뜨리지 않는다(기록이 공정하게).
     pub dream: bool,
     /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것, 0048)와 Naïl의 털빛(그리기만).
@@ -458,6 +477,12 @@ impl World {
             web_told: false,
             rock_cd: t::ROCK_EVERY.1,
             kongi_fight: false,
+            clover_fight: false,
+            cocoons: Vec::new(),
+            waves: Vec::new(),
+            thread_lash: None,
+            cocoon_told: false,
+            cocoon_bounce_id: 0,
             dream: false,
             charm_pool: crate::journal::charm_pool(
                 &crate::profile::Profile::default(),
@@ -591,6 +616,7 @@ impl World {
         if let Some(s) = &strike {
             self.deep_hit(s);
             self.web_cut(s);
+            self.cocoon_hit(s);
         }
         // 땅속에서 힘을 모으는 동안(0158) 땅이 운다: 힘에 비례해 흔들리고 흙알이 튄다.
         if self.player.is_burrowed() {
@@ -991,6 +1017,8 @@ impl World {
         }
         let mut summon = false;
         let mut bury = 0;
+        let mut thumps = Vec::new();
+        let mut threads = Vec::new();
         for ev in &self.enemy_events {
             match ev {
                 enemy::Event::Charge => sfx.play(sfx::Id::Charge),
@@ -1013,7 +1041,15 @@ impl World {
                 }
                 enemy::Event::Tongue => sfx.play(sfx::Id::Shoot),
                 enemy::Event::Spore => sfx.play(sfx::Id::Burrow),
+                enemy::Event::Thump(at) => thumps.push(*at),
+                enemy::Event::Thread(at, dir) => threads.push((*at, *dir)),
             }
+        }
+        for at in thumps {
+            self.thump_at(at);
+        }
+        for (at, dir) in threads {
+            self.thread_at(at, dir);
         }
         // 모모가 숨는·튀어나오는 자리에 흙.
         for e in &self.enemies {
@@ -1039,6 +1075,16 @@ impl World {
             c.time += dt;
         }
         self.clouds.retain(|c| c.time < t::SPORE_CLOUD_TIME);
+        for wv in self.waves.iter_mut().filter(|_| !frozen) {
+            wv.time += dt;
+        }
+        self.waves.retain(|w| w.time < t::CLOVER_WAVE_TIME + 0.25);
+        if let Some((_, _, age)) = self.thread_lash.as_mut() {
+            *age += dt;
+        }
+        if self.thread_lash.is_some_and(|(_, _, age)| age > 0.3) {
+            self.thread_lash = None;
+        }
         // 무너지는 천장(0147): 심층 싸움방에서 문이 잠긴 동안(보스·꿈은 빼고) 몇 초마다 돌 하나.
         // 플레이어 둘레가 많고, 가끔 적 둘레에 떨어져 적도 맞는다. 땅속은 괜찮다.
         let quake = self.adv.place == Place::Dungeon
@@ -1493,6 +1539,24 @@ impl World {
                     hurt_from = Some((*p, 1));
                 }
             }
+            // 토끼풀의 충격파(0165): 퍼지는 고리가 지나는 순간 한 번, 멀리 밀린다. 땅속·깡충·드릴은 안 맞는다.
+            if hurt_from.is_none() && !parried && self.player.on_foot() {
+                for wv in self.waves.iter_mut() {
+                    if wv.hit {
+                        continue;
+                    }
+                    let r = t::CLOVER_WAVE_R * (wv.time / t::CLOVER_WAVE_TIME).min(1.0);
+                    let d = (ppos - wv.pos).length();
+                    if d <= r + pr && d >= r - 10.0 {
+                        wv.hit = true;
+                        hurt_from = Some((wv.pos, 1));
+                        pull = Some(
+                            (ppos - wv.pos).normalize_or(vec2(0.0, 1.0)) * t::CLOVER_WAVE_KNOCK,
+                        );
+                        break;
+                    }
+                }
+            }
             // 덤불은 걸어 들어갈 때만(땅속·드릴·깡충은 아래로·위로 지나간다).
             let mut thorned = false;
             if hurt_from.is_none() && !parried && self.player.on_foot() {
@@ -1925,6 +1989,127 @@ impl World {
                 },
                 2.5,
             ));
+        }
+    }
+
+    /// 토끼풀이 발을 굴렀다(0165): 충격파 고리 + 흙·흔들림, 플레이어 둘레에 흰 실 그물이 몇 개 떨어진다.
+    fn thump_at(&mut self, at: Vec2) {
+        self.sounds.push(sfx::Id::Impact);
+        self.feel.add_trauma(0.45);
+        self.feel.add_hitstop(0.03);
+        self.waves.push(Wave {
+            pos: at,
+            time: 0.0,
+            hit: false,
+        });
+        clods(&mut self.fx, at, 10, DIRT, 90.0);
+        self.fx.push(ring(at, 6.0, 20.0, 0.2, DIRT));
+        let pp = self.player.pos;
+        let mut placed = 0;
+        for k in 0..12 {
+            if placed >= t::CLOVER_WAVE_WEBS {
+                break;
+            }
+            let ang = rand::gen_range(0.0, std::f32::consts::TAU) + k as f32;
+            let d = rand::gen_range(22.0, 56.0);
+            let p = pp + vec2(ang.cos() * d, ang.sin() * d);
+            if self.room.is_solid(p, t::WEB_R) || !self.room.inner.contains(p) {
+                continue;
+            }
+            if self
+                .room
+                .webs
+                .iter()
+                .any(|c| (*c - p).length() < t::WEB_R * 2.0)
+            {
+                continue;
+            }
+            self.room.webs.push(p);
+            // 천장에서 떨어진 실뭉치: 흰 보풀.
+            puff(
+                &mut self.fx,
+                p,
+                4,
+                Color::new(0.92, 0.90, 0.98, 1.0),
+                6.0,
+                0.5,
+            );
+            placed += 1;
+        }
+    }
+
+    /// 토끼풀이 실 한 가닥을 뻗었다(0165): 줄 위에 서 있으면 받아치거나(끊김·토끼풀 멈칫) 감겨 끌려간다(피해 없음).
+    /// 땅속·깡충·무적이면 안 걸린다.
+    fn thread_at(&mut self, at: Vec2, dir: Vec2) {
+        let dir = dir.normalize_or(vec2(0.0, 1.0));
+        let reach = self.room.ray_len(at, dir, 1.0, t::CLOVER_THREAD_REACH);
+        let end = at + dir * reach;
+        self.thread_lash = Some((at, end, 0.0));
+        self.sounds.push(sfx::Id::Shoot);
+        let ppos = self.player.pos;
+        let pr = self.player.radius();
+        if !self.player.is_alive() || !self.player.on_foot() || self.player.is_invulnerable() {
+            return;
+        }
+        if dist_to_segment(ppos, at, end) > pr + t::CLOVER_THREAD_WIDTH {
+            return;
+        }
+        let from = (at - ppos).normalize_or_zero();
+        if self
+            .player
+            .parry_dir()
+            .is_some_and(|d| d.dot(from) > t::PARRY_FRONT)
+        {
+            let counter = self.player.talents.parry_counter();
+            if let Some(e) = self.enemies.iter_mut().find(|e| e.kind == Kind::Clover) {
+                e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                e.on_parried();
+            }
+            self.thread_lash = Some((at, ppos, 0.1));
+            self.player.on_parry();
+            self.sounds.push(sfx::Id::Parry);
+            self.toast = Some((|s| s.toast_parry, 0.8));
+            self.feel.add_hitstop(t::PARRY_HITSTOP);
+            self.fx.push(ring(ppos, 4.0, 18.0, 0.2, WHITE));
+            unravel(&mut self.fx, ppos + from * 8.0, 10.0);
+            return;
+        }
+        // 감긴다: 토끼풀 쪽으로 끌려가고 잠깐 손을 못 쓴다.
+        self.player.recoil(ppos - from, 0.0, t::CLOVER_PULL_LOCK);
+        self.player.vel = from * t::CLOVER_PULL;
+        self.sounds.push(sfx::Id::Rumble);
+        self.feel.add_trauma(0.25);
+        self.fx.push(ring(ppos, 6.0, 18.0, 0.3, THREAD));
+    }
+
+    /// 아기들의 고치(0165): 발톱이 닿으면 튕긴다(피해 없음). 처음엔 한마디.
+    fn cocoon_hit(&mut self, s: &Strike) {
+        if self.cocoon_bounce_id == s.id {
+            return;
+        }
+        let Some(c) = self
+            .cocoons
+            .iter()
+            .copied()
+            .find(|c| s.shape.overlaps_circle(*c, t::COCOON_R))
+        else {
+            return;
+        };
+        self.cocoon_bounce_id = s.id;
+        self.sounds.push(sfx::Id::WallHit);
+        self.feel.add_hitstop(0.04);
+        self.fx.push(ring(c, 4.0, 14.0, 0.2, WHITE));
+        puff(
+            &mut self.fx,
+            c,
+            3,
+            Color::new(0.92, 0.90, 0.98, 1.0),
+            5.0,
+            0.4,
+        );
+        if !self.cocoon_told {
+            self.cocoon_told = true;
+            self.toast = Some((|s| s.toast_cocoon, 2.5));
         }
     }
 
@@ -2494,6 +2679,64 @@ fn burst(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
 mod tests {
     use super::*;
     use crate::enemy::{Enemy, Kind};
+
+    /// 토끼풀(0165): 발 구르기는 충격파 + 플레이어 둘레에 실 그물, 고치는 발톱이 튕기며 한마디, 실 한 가닥은 받아치면
+    /// 토끼풀이 멈칫하고 아니면 끌려간다.
+    #[test]
+    fn clover_thump_drops_webs_cocoons_bounce_and_thread_pulls_or_parries() {
+        use crate::combat::{Shape, StrikeKind};
+        let mut w = World::new();
+        let at = w.player.pos + vec2(0.0, -60.0);
+        w.thump_at(at);
+        assert_eq!(w.waves.len(), 1);
+        assert_eq!(w.room.webs.len(), t::CLOVER_WAVE_WEBS, "실 그물이 떨어진다");
+        assert!(w.sounds.contains(&sfx::Id::Impact));
+        // 고치: 튕기고 한마디.
+        let c = w.player.pos + vec2(20.0, 0.0);
+        w.cocoons.push(c);
+        w.toast = None;
+        w.cocoon_hit(&Strike {
+            id: 7,
+            kind: StrikeKind::Claw(0),
+            shape: Shape::Circle { center: c, r: 4.0 },
+            damage: 1,
+            knockback: 0.0,
+            stun: 0.0,
+            hitstop: 0.0,
+            shake: 0.0,
+            finisher: false,
+            poison: 0.0,
+        });
+        assert!(w.toast.is_some(), "고치는 때릴 수 없다");
+        assert!(w.sounds.contains(&sfx::Id::WallHit));
+        // 실 한 가닥: 줄 위에 서 있으면 끌려간다.
+        let mut e = Enemy::new(Kind::Clover, at);
+        e.hp = 10;
+        w.enemies.push(e);
+        w.thread_at(at, vec2(0.0, 1.0));
+        assert!(
+            w.player.vel.y < 0.0,
+            "토끼풀 쪽(위)으로 끌려간다 {:?}",
+            w.player.vel
+        );
+        assert!(w.thread_lash.is_some());
+        // 받아치면 토끼풀이 멈칫.
+        w.player.vel = Vec2::ZERO;
+        w.player.open_parry_for_test(vec2(0.0, -1.0));
+        let i = w
+            .enemies
+            .iter()
+            .position(|e| e.kind == Kind::Clover)
+            .unwrap();
+        let hp0 = w.enemies[i].hp;
+        w.thread_at(at, vec2(0.0, 1.0));
+        assert!(
+            matches!(w.enemies[i].state, enemy::State::Stunned { .. }) || w.enemies[i].hp < hp0,
+            "받아치기 {:?}",
+            w.enemies[i].state
+        );
+        assert!(w.sounds.contains(&sfx::Id::Parry));
+    }
 
     /// 흰 실 그물(0165): 그물 위를 걸으면 느리고(처음엔 한마디), 땅속은 안 걸리고, 발톱이 닿으면 끊긴다.
     #[test]

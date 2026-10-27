@@ -319,6 +319,9 @@ impl Renderer {
             if let Some(at) = w.petal_at {
                 draw_left_petal(at, w.time);
             }
+            for c in &w.cocoons {
+                draw_cocoon(*c, w.time);
+            }
             if let Some(d) = &w.deep {
                 draw_deep(d, w, alpha);
             }
@@ -333,6 +336,7 @@ impl Renderer {
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
             draw_falling_rocks(w);
+            draw_waves(w);
             draw_ambient(w, cam, false);
             draw_overhead_falls(w, cam);
             if self.cut.is_some() {
@@ -371,6 +375,7 @@ impl Renderer {
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
             draw_falling_rocks(w);
+            draw_waves(w);
             if draw_super_dim(w, cam) {
                 draw_player(&w.player, alpha, w.time);
                 draw_player_fx(&w.player, alpha);
@@ -2669,6 +2674,106 @@ fn draw_knot(k: &world::Knot, t: f32) {
     draw_circle(x, y, 2.0, Color::new(0.20, 0.10, 0.28, 1.0));
 }
 
+/// 토끼풀의 충격파(0165): 퍼지는 두꺼운 흰 고리 + 안쪽 옅은 빛, 다 퍼지면 옅어진다. 뻗은 실 한 가닥도 여기서.
+fn draw_waves(w: &World) {
+    for wv in &w.waves {
+        let k = (wv.time / t::CLOVER_WAVE_TIME).min(1.0);
+        let r = t::CLOVER_WAVE_R * k;
+        let fade = 1.0 - ((wv.time - t::CLOVER_WAVE_TIME) / 0.25).clamp(0.0, 1.0);
+        draw_circle(
+            wv.pos.x.round(),
+            wv.pos.y.round(),
+            r,
+            Color::new(0.92, 0.88, 1.0, 0.10 * fade),
+        );
+        draw_circle_lines(
+            wv.pos.x.round(),
+            wv.pos.y.round(),
+            r,
+            3.0,
+            Color::new(0.96, 0.94, 1.0, 0.85 * fade),
+        );
+        draw_circle_lines(
+            wv.pos.x.round(),
+            wv.pos.y.round(),
+            r - 3.0,
+            1.0,
+            Color::new(0.70, 0.55, 0.95, 0.6 * fade),
+        );
+    }
+    if let Some((a, b, age)) = w.thread_lash {
+        let k = 1.0 - (age / 0.3).clamp(0.0, 1.0);
+        draw_line(
+            a.x,
+            a.y,
+            b.x,
+            b.y,
+            3.0,
+            Color::new(0.30, 0.15, 0.45, 0.5 * k),
+        );
+        draw_line(
+            a.x,
+            a.y,
+            b.x,
+            b.y,
+            1.0,
+            Color::new(0.96, 0.92, 1.0, 0.9 * k),
+        );
+    }
+}
+
+/// 아기들의 고치(0165): 흰 실에 감긴 타원, 숨 쉬듯 부풀고 분홍빛이 조금 비친다. 위에 작은 Z.
+fn draw_cocoon(c: Vec2, time: f32) {
+    let (x, y) = (c.x.round(), c.y.round());
+    let br = 1.0 + 0.04 * (time * 1.2 + c.x * 0.1).sin();
+    draw_ellipse(x, y + 5.0, 10.0, 4.0, 0.0, SHADOW_SOFT);
+    draw_ellipse(x, y, 10.0 * br, 8.0 * br, 0.0, OUTLINE);
+    draw_ellipse(
+        x,
+        y,
+        9.0 * br,
+        7.0 * br,
+        0.0,
+        Color::new(0.90, 0.88, 0.96, 1.0),
+    );
+    draw_ellipse(
+        x - 2.0,
+        y - 2.0,
+        5.0,
+        3.0,
+        0.0,
+        Color::new(0.97, 0.95, 0.99, 1.0),
+    );
+    draw_ellipse(
+        x + 1.0,
+        y + 1.0,
+        4.0,
+        2.5,
+        0.0,
+        Color::new(0.98, 0.78, 0.84, 0.55),
+    );
+    for i in 0..3 {
+        let ang = i as f32 * 1.1 + 0.4;
+        draw_ellipse_lines(
+            x + ang.cos() * 1.5,
+            y + ang.sin(),
+            7.5,
+            4.0,
+            ang * 57.3,
+            1.0,
+            Color::new(0.74, 0.66, 0.86, 0.8),
+        );
+    }
+    if !shadow_pass() {
+        let ph = (time * 0.7 + c.x * 0.01).fract();
+        let z = vec2(x + 6.0 + ph * 3.0, y - 9.0 - ph * 6.0);
+        let col = Color::new(0.95, 0.9, 1.0, 1.0 - ph);
+        draw_line(z.x, z.y, z.x + 2.0, z.y, 1.0, col);
+        draw_line(z.x + 2.0, z.y, z.x, z.y + 2.0, 1.0, col);
+        draw_line(z.x, z.y + 2.0, z.x + 2.0, z.y + 2.0, 1.0, col);
+    }
+}
+
 /// 흰 실 굴의 보풀(0165): 흰 실 보풀이 아주 천천히 떠오르며 옆으로 흔들린다.
 fn draw_silk_fluff(w: &World, cam: Vec2) {
     let (tw, th) = (RW + 48.0, RH + 48.0);
@@ -4918,6 +5023,36 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             frame = 7;
         }
     }
+    // 토끼풀(0165): 발 구르기 예고는 웅크려 떨고(점점 붉게), 품기는 보랏빛으로 실을 감는다.
+    match e.state {
+        enemy::State::Thump { time: tt } => {
+            frame = 4;
+            pos.x += if ((time * 40.0) as i32) % 2 == 0 {
+                1.0
+            } else {
+                -1.0
+            };
+            let k = (tt / e.thump_windup()).min(1.0);
+            tint = Color::new(1.0, 1.0 - 0.45 * k, 1.0 - 0.45 * k, 1.0);
+        }
+        enemy::State::Gather { time: gt } => {
+            frame = 4;
+            tint = Color::new(0.88, 0.82, 1.0, 1.0);
+            if marks {
+                for k in 0..3 {
+                    let ph = (gt * 1.4 + k as f32 / 3.0).fract();
+                    draw_circle_lines(
+                        pos.x.round(),
+                        (pos.y - 2.0).round(),
+                        r + 2.0 + ph * 10.0,
+                        1.0,
+                        Color::new(0.80, 0.62, 0.98, 0.6 * (1.0 - ph)),
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
     if let (enemy::State::Howl { time: ht }, false) = (e.state, e.kind == crate::enemy::Kind::Doto)
     {
         // 울음: 퍼지는 고리 둘.
@@ -5232,6 +5367,10 @@ fn draw_telegraphs(w: &World, alpha: f32) {
             }
             enemy::State::Aim { time } => ((time / e.windup()).min(1.0), 1),
             enemy::State::Crouch { time, .. } => ((time / e.windup()).min(1.0), 2),
+            enemy::State::Thump { time } => ((time / e.thump_windup()).min(1.0), 4),
+            enemy::State::Gather { time } if time < t::CLOVER_THREAD_AT => {
+                ((time / t::CLOVER_THREAD_AT).min(1.0), 1)
+            }
             enemy::State::Leap { .. } => (1.0, 2),
             _ => continue,
         };
@@ -5277,6 +5416,13 @@ fn draw_telegraphs(w: &World, alpha: f32) {
                     draw_line(a.x + s.x, a.y + s.y, b.x + s.x, b.y + s.y, 1.0, edge);
                     draw_line(b.x + s.x, b.y + s.y, tip.x, tip.y, 1.0, edge);
                 }
+            }
+            4 => {
+                // 토끼풀 발 구르기(0165): 충격파가 닿을 둘레. 못 받아치니 진홍 고리 + ✕. 땅속으로.
+                let r = t::CLOVER_WAVE_R;
+                draw_circle(pos.x, pos.y, r, fill);
+                draw_no_parry_ring(pos, r * (0.4 + 0.6 * k), edge);
+                draw_no_parry_mark(pos + vec2(0.0, -r - 6.0), edge);
             }
             3 => {
                 // 포자버섯: 구름이 덮을 자리. 고리가 안에서 밖으로 부푼다.
@@ -5907,6 +6053,14 @@ pub fn light_sources(w: &World, alpha: f32, cam: Vec2, player_radius: f32) -> Ve
                 strength: 0.55,
             });
         }
+    }
+    // 아기들의 고치(0165): 흰 빛이 조금.
+    for c in &w.cocoons {
+        v.push(LightSrc {
+            pos: *c,
+            radius: 30.0,
+            strength: 0.5,
+        });
     }
     // 길의 샘(0159): 어두운 굴에서도 샘이 먼저 보인다.
     if let Some(sp) = &w.spring {

@@ -97,6 +97,8 @@ FUR = {
     'toad':   [(84, 82, 48), (122, 118, 66), (164, 158, 94), (206, 196, 140)],
     'bat':    [(56, 44, 58), (90, 72, 88), (128, 108, 120), (176, 150, 150)],
     'spore':  [(120, 52, 62), (170, 78, 86), (212, 118, 116), (236, 224, 206)],
+    # 토끼풀(어미 굴토끼, 0165): 모모보다 짙은 회갈색. 물든 줄은 taint로 보라 쪽, 돌아온 줄·아기들은 그대로.
+    'clover': [(92, 72, 66), (138, 112, 98), (178, 152, 132), (224, 206, 186)],
 }
 
 
@@ -304,6 +306,67 @@ MOMO_BLOOM = grid([
     "..cddbbbbbbll...",
     "....ddbbbbll....",
     ".....pp..pp.....",
+    "",
+])
+
+# 토끼풀(물든 어미 굴토끼, 0165): 모모보다 크고 무겁다. 귀는 뒤로 눕혔고(경계), 귀 밑동에 시든 꽃(f), 물든 눈은
+# 모모와 같은 초록(g/G, 가족), 몸에 보라 뿌리(v/V), 솜꼬리(c). 오른쪽을 본다.
+CLOVER = grid([
+    "....bb..bb......",
+    "...bhhbbhhb.....",
+    "...bhqbbhqb.....",
+    "....bqbbqbb.....",
+    ".....bbbbbbb....",
+    "......hhhhhhhf..",
+    ".....hhbbbbbbbh.",
+    "....hbbbbbbbGgbh",
+    "...hbbbbbbbbggbp",
+    "..hbbbbbbbbbrlll",
+    ".ccbvVbbbbbbblll",
+    "cccdvbbbbbbbblll",
+    ".cddbbbbbbbbbll.",
+    "..ddbbbbbbbbll..",
+    "....pp..pp..pp..",
+    "",
+])
+
+# 돌아온 토끼풀(0165): 같은 자세. 꽃이 피고(F·Y), 귀 안이 분홍, 눈은 검고 맑다(n + 반사 W), 보라 뿌리는 없다.
+CLOVER_BACK = grid([
+    "....bb..bb......",
+    "...bhhbbhhb.....",
+    "...bhpbbhpb.....",
+    "....bpbbpbb.....",
+    ".....bbbbbbb....",
+    "......hhhhhhhF..",
+    ".....hhbbbbbbFYF",
+    "....hbbbbbbbWnbh",
+    "...hbbbbbbbbnnbp",
+    "..hbbbbbbbbbrlll",
+    ".ccbbbbbbbbbblll",
+    "cccdbbbbbbbbblll",
+    ".cddbbbbbbbbbll.",
+    "..ddbbbbbbbbll..",
+    "....pp..pp..pp..",
+    "",
+])
+
+# 아기 굴토끼(박하·민들레, 0165, 깨어난 모습): 작고 둥글다. 귀 둘, 검은 눈, 솜꼬리. 고치는 코드 그림(render.rs).
+BABY = grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "......bb.bb.....",
+    "......bpbbpb....",
+    ".......bbbb.....",
+    "......hbbnWb....",
+    ".....hbbbbbbb...",
+    "....cbbbbbbrl...",
+    "....cbbbbbbbl...",
+    ".....dbbbbbl....",
+    "......pp.pp.....",
+    "",
     "",
 ])
 
@@ -783,6 +846,9 @@ def sheet():
     rows.append((FUR['toad'], toad_frames(TOAD), True))
     rows.append((FUR['bat'], bat_frames(), True))
     rows.append((FUR['spore'], spore_frames(SPORE), True))
+    rows.append((FUR['clover'], frames_of(CLOVER), True))
+    rows.append((FUR['clover'], frames_of(CLOVER_BACK), False))
+    rows.append((FUR['clover'], frames_of(BABY), False))
     img = Image.new('RGBA', (N * 7, N * len(rows) * 2), (0, 0, 0, 0))
     for ry, (pal, frames, tainted) in enumerate(rows):
         for rx, g in enumerate(frames):

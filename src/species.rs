@@ -39,6 +39,9 @@ pub enum Behavior {
     /// 콩이(셋째 길의 보스, 0054): 공으로 굴러 벽에 튕기기 ↔ 웅크려 버티기(발톱은 튕긴다, 치면 바로 굴러 온다 — 패링 거울).
     /// 솟구치기·드릴은 등딱지를 뚫고 오래 어질어질하게 한다. 구르기 뒤 어질어질할 때가 틈. 반 아래면 더 많이 튕긴다.
     Kongi,
+    /// 토끼풀(굴토끼 옛 굴의 보스, 0165): 늘 고치와 플레이어 사이에 선다. 발 구르기(둘레 충격파 + 실 그물) → 높이 뛰기 →
+    /// 가까우면 두 번 차기(첫 발을 받아치면 끊긴다). 반 아래면 한 번 고치로 가 실을 감으며 실 한 가닥을 뻗는다(받아치면 끊김).
+    Clover,
 }
 
 pub struct Species {
@@ -439,8 +442,34 @@ pub static KONGI: Species = Species {
     ..BASE
 };
 
+/// 토끼풀(물든 어미 굴토끼, 0165). 굴토끼 옛 굴의 끝에서 아기들의 고치를 지킨다. 모모보다 크고 무겁다.
+pub static CLOVER: Species = Species {
+    name: |s| s.mob_clover,
+    lore: |s| s.mob_clover_lore,
+    attack: |s| s.mob_clover_atk,
+    tip: |s| s.mob_clover_tip,
+    behavior: Behavior::Clover,
+    hp: 44,
+    radius: 10.0,
+    speed: 36.0,
+    damage: 1,
+    knock_mul: 0.15,
+    trigger: 90.0,
+    windup: 0.5,
+    dash_speed: 300.0,
+    dash_time: 0.22,
+    rest: 0.9,
+    wall_rest: 1.6,
+    land_radius: 22.0,
+    glowbugs: (26, 30),
+    seed_chance: 1.0,
+    color: Color::new(0.58, 0.46, 0.56, 1.0),
+    sheet_row: crate::art::CLOVER_ROW,
+    ..BASE
+};
+
 /// 도감 순서(허수아비는 빼고).
-pub const BESTIARY: [Kind; 14] = [
+pub const BESTIARY: [Kind; 15] = [
     Kind::FieldMouse,
     Kind::HouseMouse,
     Kind::SewerRat,
@@ -455,6 +484,7 @@ pub const BESTIARY: [Kind; 14] = [
     Kind::Momo,
     Kind::Doto,
     Kind::Kongi,
+    Kind::Clover,
 ];
 
 pub fn of(kind: Kind) -> &'static Species {
@@ -474,6 +504,7 @@ pub fn of(kind: Kind) -> &'static Species {
         Kind::Momo => &MOMO,
         Kind::Doto => &DOTO,
         Kind::Kongi => &KONGI,
+        Kind::Clover => &CLOVER,
     }
 }
 
