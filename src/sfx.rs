@@ -28,8 +28,8 @@ pub enum Id {
     Die,
     Shoot,
     Charge,
-    /// 박자에 맞춘 타(0167).
-    Beat,
+    /// 박자에 맞춘 타(0167 → 0174): 값은 연속으로 맞춘 수(1부터) — 도·미·솔·높은 도로 오르고 되풀이.
+    Beat(usize),
     /// 모으기 시작(0168), 맞힘 '틱'(0168).
     ChargeUp,
     HitTick,
@@ -143,7 +143,7 @@ pub struct Sfx {
     die: Sound,
     shoot: Sound,
     charge: Sound,
-    beat: Sound,
+    beat: [Sound; 4],
     /// 모으기 시작부터 올라가는 소리(0168).
     charge_up: Sound,
     /// 맞힘 소리 위에 얹는 짧고 높은 '틱'(0168).
@@ -263,8 +263,13 @@ impl Sfx {
             .await,
             shoot: make(&[Layer::tone(0.09, 760.0, 420.0, Wave::Sine, 0.4, 1.0)]).await,
             charge: make(&[Layer::tone(0.12, 90.0, 260.0, Wave::Triangle, 0.45, 0.8)]).await,
-            // 박자 콤보(0167): 짧고 높은 '틱'.
-            beat: make(&[Layer::tone(0.04, 1800.0, 1400.0, Wave::Triangle, 0.22, 0.9)]).await,
+            // 박자 콤보(0167 → 0174): 짧은 종소리, 연속으로 맞추면 도·미·솔·높은 도.
+            beat: [
+                make(&beat_layers(1046.5)).await,
+                make(&beat_layers(1318.5)).await,
+                make(&beat_layers(1568.0)).await,
+                make(&beat_layers(2093.0)).await,
+            ],
             charge_up: make(&[Layer::tone(0.45, 110.0, 440.0, Wave::Triangle, 0.2, 0.25)]).await,
             hit_tick: make(&[
                 Layer::tone(0.03, 2600.0, 1900.0, Wave::Triangle, 0.18, 1.0),
@@ -439,7 +444,7 @@ impl Sfx {
             Id::Die => &self.die,
             Id::Shoot => &self.shoot,
             Id::Charge => &self.charge,
-            Id::Beat => &self.beat,
+            Id::Beat(n) => &self.beat[n.saturating_sub(1) % self.beat.len()],
             Id::ChargeUp => &self.charge_up,
             Id::HitTick => &self.hit_tick,
             Id::WallHit => &self.wall_hit,
@@ -503,6 +508,15 @@ impl Layer {
             decay,
         }
     }
+}
+
+/// 박자 종소리(0174): 기본음 + 한 옥타브 위를 살짝, 아주 짧은 때림 소음.
+fn beat_layers(f: f32) -> [Layer; 3] {
+    [
+        Layer::tone(0.09, f, f * 0.99, Wave::Triangle, 0.3, 0.55),
+        Layer::tone(0.05, f * 2.0, f * 2.0, Wave::Sine, 0.08, 1.0),
+        Layer::noise(0.012, 0.12, 2.0),
+    ]
 }
 
 async fn make(layers: &[Layer]) -> Sound {

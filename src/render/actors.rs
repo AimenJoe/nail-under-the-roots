@@ -264,6 +264,51 @@ pub(super) fn draw_player_fx(p: &Player, alpha: f32) {
         }
         _ => {}
     }
+    draw_beat_cue(p, pos);
+}
+
+/// 박자 고리와 음표(0174): 스윙이 시작되면 큰 고리가 과녁 고리로 닫히고, 닿는 순간이 박자. 창 안이면 둘 다 밝게,
+/// 창 전에 눌러 기다리는 중이면 호박색. 박자가 지나면 흐려진다. 맞춘 박자 수는 머리 위 음표.
+fn draw_beat_cue(p: &Player, pos: Vec2) {
+    let (x, y) = (pos.x.round(), pos.y.round());
+    if let Some(c) = p.beat_cue() {
+        let k = c.k.min(1.0);
+        let r = t::BEAT_RING_START + (t::BEAT_RING_END - t::BEAT_RING_START) * k;
+        // 박자가 지난 뒤는 창 하나만큼에 걸쳐 사라진다.
+        let fade = if c.k > 1.0 {
+            (1.0 - (c.k - 1.0) * t::BEAT_PERIOD / (t::BEAT_WINDOW * 2.0)).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        let (col, w) = if c.window {
+            (Color::new(1.0, 1.0, 1.0, 0.95 * fade), 1.5)
+        } else if c.waiting {
+            (Color::new(1.0, 0.8, 0.35, 0.8 * fade), 1.0)
+        } else {
+            (Color::new(1.0, 1.0, 1.0, 0.4 * fade), 1.0)
+        };
+        draw_circle_lines(
+            x,
+            y,
+            t::BEAT_RING_END,
+            1.0,
+            Color::new(1.0, 1.0, 1.0, 0.3 * fade),
+        );
+        draw_circle_lines(x, y, r, w, col);
+    }
+    let (n, show) = p.beat_pips();
+    if n > 0 && show > 0.0 {
+        let a = (show / 0.3).min(1.0);
+        let n = n.min(6);
+        let x0 = x - 2.0 * (n as f32 - 1.0);
+        for i in 0..n {
+            let px = x0 + 4.0 * i as f32;
+            let py = y - 15.0;
+            // 작은 음표: 머리(2×2)와 꼬리(1×3).
+            draw_rectangle(px - 1.0, py + 1.0, 2.0, 2.0, Color::new(1.0, 1.0, 1.0, a));
+            draw_rectangle(px + 1.0, py - 2.0, 1.0, 4.0, Color::new(1.0, 1.0, 1.0, a));
+        }
+    }
 }
 
 /// 드릴 돌진 잔상: 지나온 길에 분노색 그림자 셋. 그림이 있으면 Naïl 실루엣, 없으면 원.

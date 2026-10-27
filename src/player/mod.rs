@@ -85,12 +85,30 @@ pub enum State {
     Dead,
 }
 
+/// 콤보 중에 눌러 둔 다음 타(0174): 박자 창 안이면 `Beat`(그 자리에서 나가고 덤), 창 전이면 `Early`(박자까지 기다렸다 나간다).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Queued {
+    Early,
+    Beat,
+}
+
+/// 박자 고리를 그릴 때 보는 것(0174).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BeatCue {
+    /// 스윙 시작 0 → 박자 1(그 뒤로도 자란다).
+    pub k: f32,
+    /// 지금 박자 창 안인가.
+    pub window: bool,
+    /// 창 전에 눌러 박자를 기다리는 중인가.
+    pub waiting: bool,
+}
+
 /// 이번 틱에 일어난 일(사운드·이펙트용). 로직은 이걸 다시 읽지 않는다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Event {
     Swing(usize),
-    /// 박자에 맞춰 이어진 타(0167): 작은 반짝임·소리.
-    Beat,
+    /// 박자에 맞춰 이어진 타(0167·0174): 퍼지는 고리·연속 수만큼 오르는 음. 값은 연속 수(1부터).
+    Beat(usize),
     /// 강공격이 나갔다 / 다 모여 발톱이 빛난다(0161). `HeavyPerfect`는 다 모인 직후에 뗐다(0168).
     Heavy,
     HeavyReady,
@@ -171,13 +189,19 @@ pub struct Player {
     combo_next: usize,
     combo_timer: f32,
     no_attack: f32,
-    /// 박자 콤보(0167): 스윙·강공격 중에 눌러 둔 다음 타. `Some(true)` = 박자 창 안에서 눌렀다(가장 빠르게 이어진다),
-    /// `Some(false)` = 창이 열리기 전에 눌렀다(연타) — 스윙이 다 끝나고 `MASH_PENALTY`만큼 늦게 나간다. 먼저 누른 것이 남는다.
-    queued: Option<bool>,
+    /// 박자 콤보(0167 → 0174): 콤보 중(스윙·강공격·콤보 창)에 눌러 둔 다음 타. 먼저 누른 것이 남는다.
+    queued: Option<Queued>,
+    /// 지금 스윙(평타·강타)을 시작하고 흐른 시간(공격 속도 배율로 센다). 다음 타의 박자는 `beat_at`.
+    beat_clock: f32,
+    beat_at: f32,
     /// 지금 스윙이 박자에 맞아 나갔나(그림·소리, 맞히면 멈춤·킥 덤 0168).
     pub on_beat: bool,
     /// 이번 콤보에서 박자에 맞춘 이음 수(0168): 모두 맞추면 마무리 타 넉백 `FULL_BEAT_KNOCK`배.
     combo_beats: usize,
+    /// 연달아 박자에 맞춘 타 수(0174, 머리 위 음표·오름음). 박자를 놓치면 0.
+    beat_streak: usize,
+    /// 음표가 남는 시간.
+    beat_show: f32,
     swing_id: u32,
     /// 지금 스윙을 시작하고 흐른 실제 시간(패링 창).
     swing_age: f32,
@@ -228,8 +252,12 @@ impl Player {
             combo_timer: 0.0,
             no_attack: 0.0,
             queued: None,
+            beat_clock: 0.0,
+            beat_at: t::BEAT_PERIOD,
             on_beat: false,
             combo_beats: 0,
+            beat_streak: 0,
+            beat_show: 0.0,
             swing_id: 0,
             swing_age: f32::MAX,
         }
@@ -410,26 +438,54 @@ impl Player {
         self.combo_timer = 0.0;
     }
 
+    /// 콤보가 이어지는 중인가(0174): 스윙·강공격 중이거나, 서서 콤보 창이 열려 있거나(눌러 둔 타가 있으면 창이 닫혀도).
+    fn combo_pending(&self) -> bool {
+        match self.state {
+            State::Attack { .. } | State::Heavy { .. } => true,
+            State::Free => self.combo_timer > 0.0 || self.queued.is_some(),
+            _ => false,
+        }
+    }
+
+    /// 박자 고리(0174): 콤보 중일 때만. 박자가 지나고 한 창만큼 더 보이고 사라진다.
+    pub fn beat_cue(&self) -> Option<BeatCue> {
+        if !self.armed || !self.combo_pending() {
+            return None;
+        }
+        let d = self.beat_clock - self.beat_at;
+        if d > t::BEAT_WINDOW * 2.0 {
+            return None;
+        }
+        Some(BeatCue {
+            k: self.beat_clock / self.beat_at,
+            window: d.abs() <= t::BEAT_WINDOW,
+            waiting: self.queued == Some(Queued::Early),
+        })
+    }
+
+    /// 연달아 맞춘 박자 수와 그 표시가 남은 시간(0174, 머리 위 음표).
+    pub fn beat_pips(&self) -> (usize, f32) {
+        (self.beat_streak, self.beat_show)
+    }
+
     /// 히트스톱 중에도 호출된다: 눌림을 버퍼에 넣기만 한다.
     pub fn buffer(&mut self, a: &Actions) {
         if a.attack {
-            // 박자 콤보(0167): 스윙 중의 눌림은 버퍼가 아니라 `queued`에. 활성 구간 끝(조금 앞 `BEAT_GRACE`까지) 전이면 "이르다".
-            let beat = match self.state {
-                State::Attack { idx, time, .. } => {
-                    Some(time >= self.moveset.hits[idx].active.1 - t::BEAT_GRACE)
-                }
-                State::Heavy { time, .. } => {
-                    Some(time >= self.moveset.heavy().active.1 - t::BEAT_GRACE)
-                }
-                _ => None,
-            };
-            match beat {
-                Some(on_beat) => {
-                    if self.queued.is_none() {
-                        self.queued = Some(on_beat);
+            // 박자 콤보(0174): 콤보 중의 눌림은 버퍼가 아니라 `queued`에 — 박자 창 전이면 `Early`(박자까지 기다린다),
+            // 창 안이면 `Beat`. 창 뒤의 눌림은 보통 버퍼(그 자리에서 나간다, 덤 없음).
+            if self.combo_pending() {
+                if self.queued.is_none() {
+                    let d = self.beat_clock - self.beat_at;
+                    if d < -t::BEAT_WINDOW {
+                        self.queued = Some(Queued::Early);
+                    } else if d <= t::BEAT_WINDOW {
+                        self.queued = Some(Queued::Beat);
+                    } else {
+                        self.attack_buf = t::INPUT_BUFFER;
                     }
                 }
-                None => self.attack_buf = t::INPUT_BUFFER,
+            } else {
+                self.attack_buf = t::INPUT_BUFFER;
             }
         }
         if a.dodge {
@@ -491,18 +547,30 @@ impl Player {
             self.start_special(move_dir);
         } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
             self.start_dodge(move_dir);
-        } else if self.armed && self.attack_buf > 0.0 && self.no_attack <= 0.0 {
-            // 누르는 순간 평타(0167). 누르고 있으면 활성 구간 뒤에 모으기로 간다.
-            let idx = if self.combo_timer > 0.0 {
+        } else if self.armed && self.no_attack <= 0.0 && (self.attack_buf > 0.0 || self.queue_due())
+        {
+            // 누르는 순간 평타(0167). 콤보 중에 눌러 둔 타(0174)는 박자 창 안이면 바로(덤), 창 전이면 박자에 나간다.
+            // 누르고 있으면 활성 구간 뒤에 모으기로 간다.
+            let beat = self.queued == Some(Queued::Beat);
+            let idx = if self.combo_timer > 0.0 || self.queued.is_some() {
                 self.combo_next
             } else {
                 0
             };
-            self.start_swing(idx, a.aim, false);
+            self.start_swing(idx, a.aim, beat);
         } else {
             self.pos += move_dir * self.speed() * dt;
         }
         None
+    }
+
+    /// 눌러 둔 다음 타가 지금 나갈 때인가(0174): 박자 창 안에서 누른 것은 바로, 창 전에 누른 것은 박자에.
+    pub(super) fn queue_due(&self) -> bool {
+        match self.queued {
+            Some(Queued::Beat) => true,
+            Some(Queued::Early) => self.beat_clock >= self.beat_at,
+            None => false,
+        }
     }
 
     /// 먹기: 시간이 차면 효과, 맞으면 끊긴다.
@@ -536,7 +604,12 @@ impl Player {
         self.parry_cd = (self.parry_cd - dt).max(0.0);
         self.no_attack = (self.no_attack - dt).max(0.0);
         self.swing_age += dt;
-        if !matches!(self.state, State::Attack { .. } | State::Heavy { .. }) {
+        self.beat_clock = (self.beat_clock + dt * self.stats.attack_speed).min(60.0);
+        self.beat_show = (self.beat_show - dt).max(0.0);
+        if !matches!(
+            self.state,
+            State::Attack { .. } | State::Heavy { .. } | State::Free
+        ) {
             self.queued = None;
         }
 
@@ -994,7 +1067,8 @@ mod tests {
         tick(&mut p, &room, &atk);
         assert!(p.parry_dir().is_some());
         p.on_parry();
-        for _ in 0..((0.13 / t::TICK_DT) as usize) {
+        // 다음 타의 박자(0174)에 누른다: 그 자리에서 나가고 창이 열린다.
+        for _ in 0..((t::BEAT_PERIOD / t::TICK_DT) as usize) {
             tick(&mut p, &room, &Actions::default());
         }
         tick(&mut p, &room, &atk);
@@ -1312,22 +1386,20 @@ mod tests {
         };
         let none = Actions::default();
         let ms = &crate::moveset::CLAWS;
-        // 박자 콤보: 활성 끝 직전에 한 번씩 누른다.
+        // 박자 콤보: 박자 창이 열리면 한 번씩 누른다(0174).
         let mut p = Player::new(room.center());
         let mut strikes = vec![];
-        let mut pressed_for = usize::MAX;
+        let mut pressed = 0;
         tick(&mut p, &room, &tap);
         for _ in 0..200 {
-            let a = match p.state {
-                State::Attack { idx, time, .. }
-                    if idx < ms.last()
-                        && pressed_for != idx
-                        && time >= ms.hits[idx].active.1 - t::BEAT_GRACE =>
-                {
-                    pressed_for = idx;
-                    &tap
-                }
-                _ => &none,
+            let a = if strikes.len() <= ms.last()
+                && pressed + 1 == strikes.len()
+                && p.beat_cue().is_some_and(|c| c.window)
+            {
+                pressed += 1;
+                &tap
+            } else {
+                &none
             };
             let (s, _) = tick(&mut p, &room, a);
             // 활성 구간은 여러 틱이라 같은 스윙은 한 번만.
@@ -1366,10 +1438,11 @@ mod tests {
         );
     }
 
-    /// 박자 콤보(0167): 활성 구간 끝(조금 앞까지)에 맞춰 누르면 그 순간 다음 타(가장 빠름, `Beat`), 그 전에 누르면(연타)
-    /// 스윙을 다 마치고 `MASH_PENALTY`만큼 늦게 — 그래도 버려지지는 않는다. 강공격 뒤도 같다.
+    /// 박자 콤보(0174): 다음 타의 박자는 스윙 시작 `BEAT_PERIOD` 뒤. 창(±`BEAT_WINDOW`) 안에서 누르면 그 자리에서
+    /// 다음 타(`Beat`), 창 전에 누르면(연타) 박자까지 기다렸다 나간다(`Beat` 없음, 버려지지 않음), 창 뒤에 누르면 그 자리에서
+    /// `Beat` 없이. 강공격 뒤도 같고, 마지막 타 뒤는 1타부터.
     #[test]
-    fn combo_on_the_beat_is_fastest_and_mashing_is_slower() {
+    fn combo_on_the_beat_chains_at_the_press_and_early_presses_wait_for_the_beat() {
         let room = Room::new();
         let tap = Actions {
             attack: true,
@@ -1377,59 +1450,61 @@ mod tests {
         };
         let none = Actions::default();
         let hit0 = crate::moveset::CLAWS.hits[0];
-        let a1 = hit0.active.1;
-        // 박자: 활성 구간이 끝나기 직전에 한 번 누른다 → 활성 끝에 2타.
+        let beat_at = t::BEAT_PERIOD.max(hit0.swing + hit0.recovery);
+        // 박자: 창이 열리자마자 한 번 누른다 → 그 틱에 2타 + Beat(1).
         let mut p = Player::new(room.center());
         tick(&mut p, &room, &tap);
         let mut ticks = 0;
-        let mut beat_at = None;
+        let mut pressed = false;
         for n in 1..60 {
-            // 눌림은 틱 머리에서 보니, 그때의 스윙 시간은 (n-1)틱.
-            let time = (n - 1) as f32 * t::TICK_DT;
-            let a = if time >= a1 - t::BEAT_GRACE && beat_at.is_none() {
-                beat_at = Some(n);
+            // 눌림은 틱 머리에서 보니, 그때의 박자 시계는 (n-1)틱.
+            let clock = (n - 1) as f32 * t::TICK_DT;
+            let a = if clock >= beat_at - t::BEAT_WINDOW && !pressed {
+                pressed = true;
                 &tap
             } else {
                 &none
             };
             let (_, ev) = tick(&mut p, &room, a);
             if ev.contains(&Event::Swing(1)) {
-                assert!(ev.contains(&Event::Beat), "박자에 맞췄다");
+                assert!(ev.contains(&Event::Beat(1)), "박자에 맞췄다: {ev:?}");
                 ticks = n;
                 break;
             }
         }
         assert!(ticks > 0, "2타가 나간다");
-        assert!(
-            (ticks as f32 * t::TICK_DT - a1).abs() <= t::TICK_DT + 1e-4,
-            "활성 구간 끝에 바로 이어진다: {ticks}틱"
-        );
-        let beat_ticks = ticks;
-        // 연타: 매 틱 누른다 → 첫 눌림이 박자 전이라 스윙 + 벌칙 뒤에야 2타, Beat 없음.
+        let pressed_at = ((beat_at - t::BEAT_WINDOW) / t::TICK_DT).ceil() as usize + 1;
+        assert_eq!(ticks, pressed_at, "누른 틱에 바로 이어진다");
+        assert!(p.beat_cue().is_some(), "콤보 중엔 박자 고리가 보인다");
+        // 연타: 매 틱 누른다 → 첫 눌림이 창 전이라 박자에야 2타, Beat 없음.
         let mut p = Player::new(room.center());
         tick(&mut p, &room, &tap);
         let mut mash_ticks = 0;
         for n in 1..60 {
             let (_, ev) = tick(&mut p, &room, &tap);
             if ev.contains(&Event::Swing(1)) {
-                assert!(!ev.contains(&Event::Beat), "연타는 박자가 아니다");
+                assert!(
+                    !ev.iter().any(|e| matches!(e, Event::Beat(_))),
+                    "연타는 박자가 아니다"
+                );
                 mash_ticks = n;
                 break;
             }
         }
+        assert!(mash_ticks > ticks, "연타 {mash_ticks} > 박자 {ticks}");
         assert!(
-            mash_ticks > beat_ticks,
-            "연타 {mash_ticks} > 박자 {beat_ticks}"
+            (mash_ticks as f32 * t::TICK_DT - beat_at).abs() <= t::TICK_DT + 1e-4,
+            "박자에 나간다: {mash_ticks}틱"
         );
-        let want = hit0.swing + hit0.recovery + t::MASH_PENALTY;
-        assert!(
-            (mash_ticks as f32 * t::TICK_DT - want).abs() <= t::TICK_DT + 1e-4,
-            "스윙 + 벌칙 뒤: {mash_ticks}틱"
-        );
-        // 이른 눌림 한 번도 버려지지 않는다: 그 뒤 아무것도 안 눌러도 벌칙 뒤에 나간다.
+        // 이른 눌림 한 번도 버려지지 않는다: 그 뒤 아무것도 안 눌러도 박자에 나간다. 기다리는 동안 고리는 '기다림'.
         let mut p = Player::new(room.center());
         tick(&mut p, &room, &tap);
         tick(&mut p, &room, &tap);
+        assert!(
+            p.beat_cue().is_some_and(|c| c.waiting),
+            "{:?}",
+            p.beat_cue()
+        );
         let mut out = false;
         for _ in 0..60 {
             let (_, ev) = tick(&mut p, &room, &none);
@@ -1439,7 +1514,20 @@ mod tests {
             }
         }
         assert!(out, "이른 눌림도 나간다");
-        // 마지막 타 뒤의 연타는 1타부터, 역시 벌칙 뒤.
+        // 늦은 눌림(창 뒤, 콤보 창 안): 그 자리에서 2타, Beat 없음.
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &tap);
+        let late = ((beat_at + t::BEAT_WINDOW) / t::TICK_DT).ceil() as usize + 2;
+        for _ in 0..late {
+            tick(&mut p, &room, &none);
+        }
+        let (_, ev) = tick(&mut p, &room, &tap);
+        assert!(ev.contains(&Event::Swing(1)), "늦어도 바로 나간다: {ev:?}");
+        assert!(
+            !ev.iter().any(|e| matches!(e, Event::Beat(_))),
+            "늦은 눌림은 박자가 아니다"
+        );
+        // 마지막 타 뒤의 연타는 1타부터, 타마다 박자(마무리 타는 스윙·후딜레이 끝)에.
         let mut p = Player::new(room.center());
         let mut swings = vec![];
         for n in 0..200 {
@@ -1458,6 +1546,22 @@ mod tests {
             vec![0, 1, 2, 0],
             "{swings:?}"
         );
+        let fin = crate::moveset::CLAWS.hits[2];
+        let gaps: Vec<f32> = swings
+            .windows(2)
+            .map(|w| (w[1].0 - w[0].0) as f32 * t::TICK_DT)
+            .collect();
+        let want = [
+            beat_at,
+            beat_at,
+            t::BEAT_PERIOD.max(fin.swing + fin.recovery),
+        ];
+        for (g, w) in gaps.iter().zip(want) {
+            assert!(
+                (g - w).abs() <= t::TICK_DT + 1e-4,
+                "연타 간격 {gaps:?} vs {want:?}"
+            );
+        }
     }
 
     /// 땅속 대시(0160): 정한 시간까지는 빠르게, 힘을 모으는 동안은 느리게 간다.

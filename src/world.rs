@@ -789,9 +789,13 @@ impl World {
         for ev in &self.player.events {
             match ev {
                 player::Event::Swing(i) => self.juice.audio.play(sfx::Id::Claw(*i)),
-                player::Event::Beat => {
-                    // 박자에 맞췄다(0167): 발톱 끝 작은 반짝임 + 높은 '틱'.
-                    self.juice.audio.play(sfx::Id::Beat);
+                player::Event::Beat(n) => {
+                    // 박자에 맞췄다(0167 → 0174): 몸에서 퍼지는 고리 + 연속 수만큼 오르는 음 + 발톱 끝 반짝임.
+                    self.juice.audio.play(sfx::Id::Beat(*n));
+                    let r1 = 16.0 + 2.0 * (*n).min(4) as f32;
+                    self.juice
+                        .fx
+                        .push(ring(self.player.pos, 6.0, r1, 0.22, WHITE));
                     let p = self.player.pos + self.player.facing * 7.0;
                     self.juice.fx.push(glint(p, WHITE, 0.18));
                 }
@@ -811,8 +815,8 @@ impl World {
                 }
                 player::Event::ChargeStart => self.juice.audio.play(sfx::Id::ChargeUp),
                 player::Event::HeavyPerfect => {
-                    // 딱 맞춘 강타(0168): 박자 '틱' + 큰 반짝임.
-                    self.juice.audio.play(sfx::Id::Beat);
+                    // 딱 맞춘 강타(0168): 박자 음(가장 높은 것) + 큰 반짝임.
+                    self.juice.audio.play(sfx::Id::Beat(4));
                     let p = self.player.pos + self.player.facing * 8.0;
                     self.juice.fx.push(glint(p, WHITE, 0.3));
                     self.juice.fx.push(ring(p, 4.0, 16.0, 0.18, WHITE));

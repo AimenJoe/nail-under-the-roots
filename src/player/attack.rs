@@ -34,9 +34,6 @@ impl Player {
         } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
             // 굴파기(깡충) 캔슬: 후딜레이를 끊고 다음 콤보로 섞는다.
             self.start_dodge(move_dir);
-        } else if time >= a1 && self.queued == Some(true) && idx < last {
-            // 박자에 맞춰 눌렀다(0167): 활성 구간이 끝나는 순간 다음 타 — 가장 빠르다.
-            self.start_swing(idx + 1, a.aim, true);
         } else if time >= a1 && a.attack_held {
             // 활성 구간이 지났는데 아직 누르고 있다: 바로 강공격 모으기(0161). 어느 타 뒤든.
             // 강공격(또는 덜 모으고 뗀 것) 뒤 콤보는 다음 타로 이어진다.
@@ -47,17 +44,16 @@ impl Player {
                 dir,
                 after: idx + 1,
             };
-        } else if self.queued.is_some() && time >= hit.swing + hit.recovery + t::MASH_PENALTY {
-            // 박자 전에 눌렀다(연타, 0167): 스윙을 다 마치고 `MASH_PENALTY`만큼 늦게. 마지막 타 뒤면 1타부터.
+        } else if time >= hit.swing + hit.recovery {
+            // 스윙이 끝났다. 박자 창 안에서 눌러 뒀으면 그 자리에서 다음 타(0174; 창이 후딜레이 안에 열리는 마무리 타).
+            // 아니면 서서 콤보 창을 연다 — 창 전에 눌러 둔 타는 `tick_free`가 박자에 내보낸다. 마지막 타 뒤는 1타부터.
             let next = if idx < last { idx + 1 } else { 0 };
-            self.start_swing(next, a.aim, false);
-        } else if self.queued.is_none() && time >= hit.swing + hit.recovery {
-            self.state = State::Free;
-            if idx < last {
-                self.combo_next = idx + 1;
-                self.combo_timer = ms.combo_window;
+            if self.queue_due() {
+                self.start_swing(next, a.aim, self.queued == Some(super::Queued::Beat));
             } else {
-                self.combo_timer = 0.0;
+                self.state = State::Free;
+                self.combo_next = next;
+                self.combo_timer = ms.combo_window;
             }
         }
         strike
@@ -144,24 +140,15 @@ impl Player {
                 after,
             };
         } else if time >= hit.swing + hit.recovery {
-            // 강공격의 후딜레이는 끊지 못한다(0167: 0161 덧붙임의 0.3초 잠금은 뺐다). 박자 창 안에서 눌렀으면
-            // 후딜레이가 끝나는 순간 다음 타, 그 전에 눌렀으면(연타) `MASH_PENALTY`만큼 늦게.
+            // 강공격의 후딜레이는 끊지 못한다(0167: 0161 덧붙임의 0.3초 잠금은 뺐다). 박자 창 안에서 눌러 뒀으면
+            // 후딜레이가 끝나는 순간 다음 타, 아니면 서서 콤보 창(창 전에 눌러 둔 타는 박자에, 0174).
             let next = if after <= ms.last() { after } else { 0 };
-            match self.queued {
-                Some(true) => self.start_swing(next, a.aim, true),
-                Some(false) if time >= hit.swing + hit.recovery + t::MASH_PENALTY => {
-                    self.start_swing(next, a.aim, false)
-                }
-                Some(false) => {}
-                None => {
-                    self.state = State::Free;
-                    if after <= ms.last() {
-                        self.combo_next = after;
-                        self.combo_timer = ms.combo_window;
-                    } else {
-                        self.combo_timer = 0.0;
-                    }
-                }
+            if self.queue_due() {
+                self.start_swing(next, a.aim, self.queued == Some(super::Queued::Beat));
+            } else {
+                self.state = State::Free;
+                self.combo_next = next;
+                self.combo_timer = ms.combo_window;
             }
         }
         strike
@@ -202,6 +189,11 @@ impl Player {
         } else {
             self.combo_beats + usize::from(beat)
         };
+        self.beat_streak = if beat { self.beat_streak + 1 } else { 0 };
+        if beat {
+            self.beat_show = t::BEAT_PIP_SHOW;
+        }
+        self.set_beat(self.moveset.hits[idx]);
         self.combo_timer = 0.0;
         self.state = State::Attack {
             idx,
@@ -210,8 +202,14 @@ impl Player {
         };
         self.events.push(Event::Swing(idx));
         if beat {
-            self.events.push(Event::Beat);
+            self.events.push(Event::Beat(self.beat_streak));
         }
+    }
+
+    /// 박자 시계를 되감고 다음 타의 박자를 정한다(0174): 스윙 시작부터 `BEAT_PERIOD`, 스윙·후딜레이가 더 길면 그 끝.
+    fn set_beat(&mut self, hit: crate::moveset::Hit) {
+        self.beat_clock = 0.0;
+        self.beat_at = t::BEAT_PERIOD.max(hit.swing + hit.recovery);
     }
 
     pub(super) fn claw_strike(&self, idx: usize, dir: Vec2) -> Strike {
@@ -264,8 +262,10 @@ impl Player {
         self.parry_cd = t::PARRY_COOLDOWN;
         self.vel += dir * self.moveset.heavy().lunge;
         self.attack_buf = 0.0;
+        self.queued = None;
         self.combo_timer = 0.0;
         self.on_beat = false;
+        self.set_beat(self.moveset.heavy());
         self.state = State::Heavy {
             time: 0.0,
             dir,

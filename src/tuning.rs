@@ -110,10 +110,16 @@ pub const COCOON_R: f32 = 9.0;
 /// 그 뒤로는 모으는 자세(느려지고 발톱에 빛). 모으기 수치는 누른 때부터 센다.
 /// 누른 때(또는 평타 뒤 계속 누른 때)부터 이만큼(초) 지나 떼면 강공격(수치는 `moveset::heavy_of`).
 pub const HEAVY_CHARGE: f32 = 0.45;
-/// 박자 콤보(0167): 스윙 중에 다음 타를 누르는 창은 활성 구간 끝의 이만큼(초) 앞에서 열린다. 창 안에서 누르면
-/// 활성 구간이 끝나는 순간 이어진다(가장 빠름). 창 전에 누르면(연타) 스윙·후딜레이를 다 마치고 `MASH_PENALTY`만큼 더 늦는다.
-pub const BEAT_GRACE: f32 = 0.03;
-pub const MASH_PENALTY: f32 = 0.08;
+/// 박자 콤보(0167 → 0174): 다음 타의 박자는 이번 스윙(평타·강타) 시작부터 `BEAT_PERIOD`(초) — 스윙·후딜레이가 더 길면 그 끝.
+/// 박자 ±`BEAT_WINDOW` 안에서 누르면 그 자리에서 나가고 덤(`Event::Beat`). 창 전에 누르면 박자까지 기다렸다 나간다(스냅,
+/// 덤 없음 — 연타는 박자보다 빠를 수 없다). 창 뒤에 누르면 그 자리에서 나간다(덤 없음). 0.25초 = 120 BPM의 8분음표.
+pub const BEAT_PERIOD: f32 = 0.25;
+pub const BEAT_WINDOW: f32 = 0.06;
+/// 박자 고리(0174): 스윙 시작에 `BEAT_RING_START` 반지름에서 박자에 `BEAT_RING_END`(과녁 고리)로 닫힌다. 창 안이면 밝게.
+pub const BEAT_RING_START: f32 = 18.0;
+pub const BEAT_RING_END: f32 = 7.0;
+/// 박자를 맞춘 뒤 머리 위 음표(연속 수)가 남는 시간(초).
+pub const BEAT_PIP_SHOW: f32 = 0.9;
 /// 박자에 맞춰 나간 타는 조금 더 세게 느껴진다(0168, 사장 "내 아이디어도 차용"): 멈춤·흔들림·카메라 킥 덤.
 pub const BEAT_HITSTOP_BONUS: f32 = 0.02;
 pub const BEAT_SHAKE_BONUS: f32 = 0.05;
