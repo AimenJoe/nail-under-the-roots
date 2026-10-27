@@ -7,7 +7,7 @@
 
 - 글자 원본: Ark Pixel Font 12px 비례(proportional)·공통(common) PNG(OFL 1.1, TakWolf). 파일 이름의 언어 표시
   (`76F4 zh_hant,ja,ko.png`)로 그 언어의 모양을 고르고, 없으면 기본 모양(`76F4.png`).
-- 넣는 글자: src/i18n.rs의 그 언어 표에 실제로 쓰인 글자 + ASCII + 코드의 UI 기호(▶ ♥ 등) + (일본어) 가나 전부.
+- 넣는 글자: src/i18n/<언어>.rs의 그 언어 표에 실제로 쓰인 글자 + ASCII + 코드의 UI 기호(▶ ♥ 등) + (일본어) 가나 전부.
   표가 바뀌면 다시 돌린다. 빠진 글자는 `cargo test`(i18n::tests::every_glyph_is_in_the_font)가 잡는다.
 - 번체(0144): Ark에는 번체 한자가 많이 빠졌다(擊 裝 沒 換 層 …, Ark README "仍然缺少大量字符"). Ark에 없으면 俐方體11號(Cubic 11)를
   12px로 찍어 메운다. Ark의 자매 폰트 fusion-pixel-font가 12px 번체를 메우는 방법 그대로(크기 12, 찍는 자리 (-1, +1),
@@ -36,7 +36,7 @@ ASCENT, DESCENT = 1200, -200     # Galmuri11 Condensed와 같게(줄 높이·기
 KANA = [chr(c) for c in range(0x3041, 0x3097)] + [chr(c) for c in range(0x30A1, 0x30FB)] + ['ー', '・', '、', '。', '「', '」']
 
 TARGETS = {
-    # 언어 표(src/i18n.rs의 static 이름), Ark 언어 표시, 출력 파일, 이름 꼬리
+    # 언어 표(src/i18n/<키>.rs의 static 이름), Ark 언어 표시, 출력 파일, 이름 꼬리
     'ja': ('JA', 'ja', 'NailCJK-ja.ttf', 'JA'),
     'zh_hans': ('ZH_HANS', 'zh_hans', 'NailCJK-zh-Hans.ttf', 'SC'),
     # 번체는 대만 모양: Ark의 zh_tw 표시가 먼저, 없으면 zh_hant, 그다음 기본. 홍콩·마카오(zh_hk)도 이 폰트 하나로(0144).
@@ -47,19 +47,20 @@ CUBIC_FILL = {'zh_hant'}
 CUBIC_OFFSET = (-1, 1)   # fusion-pixel-font assets/configs/dump.yaml cubic-11 rasterize-offset
 
 
-def table_chars(static_name):
-    src = open(os.path.join(ROOT, 'src', 'i18n.rs'), encoding='utf-8').read()
+def table_chars(lang, static_name):
+    path = os.path.join(ROOT, 'src', 'i18n', lang + '.rs')
+    src = open(path, encoding='utf-8').read()
     m = re.search(r'pub static %s: Strings = Strings \{(.*?)\n\};' % static_name, src, re.S)
     if not m:
-        sys.exit(f'src/i18n.rs에 {static_name} 표가 없다')
+        sys.exit(f'src/i18n/{lang}.rs에 {static_name} 표가 없다')
     return set(''.join(re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(1))))
 
 
 def ui_symbol_chars():
     """i18n 밖 코드가 직접 찍는 기호(▶ ◀ ▼ ■ □ ♥ ♡ …). 한글은 개발 화면용(기본 폰트)이라 뺀다."""
     out = set()
-    for p in glob.glob(os.path.join(ROOT, 'src', '*.rs')):
-        if p.endswith('i18n.rs'):
+    for p in glob.glob(os.path.join(ROOT, 'src', '**', '*.rs'), recursive=True):
+        if os.sep + 'i18n' + os.sep in p or p.endswith('i18n.rs'):
             continue
         code = '\n'.join(l for l in open(p, encoding='utf-8') if not l.lstrip().startswith('//'))
         for lit in re.findall(r'"((?:[^"\\]|\\.)*)"', code) + re.findall(r"'(.)'", code):
@@ -161,7 +162,7 @@ def build(ark, lang, cubic=None):
     flavors = (flavors,) if isinstance(flavors, str) else flavors
     flavor = flavors[0]
     ark_sha = subprocess.run(['git', '-C', ark, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip() or '?'
-    chars = table_chars(static_name) | ui_symbol_chars() | {chr(c) for c in range(0x20, 0x7F)}
+    chars = table_chars(lang, static_name) | ui_symbol_chars() | {chr(c) for c in range(0x20, 0x7F)}
     if lang == 'ja':
         chars |= set(KANA)
     chars.discard('\n')
