@@ -15,7 +15,8 @@
   줄 13 돌아온 콩이: 검고 맑은 눈, 뿌리 없음
   줄 14~18 새 졸개(0146): 땃쥐 · 고슴도치(4·5 가시 공) · 두꺼비(5 입 벌림, 혀는 게임이 그린다) ·
        박쥐(0~3 날갯짓, 4 접기, 5 내리꽂기) · 포자버섯(4 움츠림, 5 뿜기)
-  줄 19~37: 줄 0~18의 흰 실루엣(피격 번쩍임용)
+  줄 19 돌아온 모모 파 내려가기 4칸(땅 단면 전환, 0156)
+  줄 20~39: 줄 0~19의 흰 실루엣(피격 번쩍임용)
 
 그리는 법(nail.py와 같다): 채움 색만 글자로 찍고 외곽선('o')은 자동으로 두른다. 종마다 기본 자세 한 장을 손으로 찍고,
 동작은 그 자세를 옮기거나(통통·웅크림·내밀기) 몇 점만 바꿔 만든다(발, 눈, 꼬리).
@@ -306,6 +307,55 @@ MOMO_BLOOM = grid([
     ".....pp..pp.....",
     "",
 ])
+
+# 돌아온 모모의 파 내려가기(0156, 땅 단면 전환): 머리를 아래로 한 옆모습. 위에 솜뭉치 꼬리(c), 긴 귀는 등을 따라
+# 뒤(위)로 눕히고(h 가장자리 + p 안쪽), 귀 밑동에 꽃(F·Y). 눈(n·W)·볼(r)·코(p)는 아래. 뒷발은 위에서 흙을 찬다.
+MOMO_DIG = grid([
+    "................",
+    ".......cc.......",
+    "......hbbb...hb.",
+    ".....hbbbbb..hp.",
+    "....hbbbbbbd.hp.",
+    "....hbbbbbbd.hp.",
+    "...hbbbbbbbd.hp.",
+    "...hbbbbbbbd.hp.",
+    "...hbbbbbbbd.bp.",
+    "...hbbbbbbdd.bq.",
+    "....hbbbbbdFYb..",
+    "....lbbbbnWdF...",
+    ".....lbbbnnd....",
+    ".....llbbrd.....",
+    "......lll.......",
+    ".......p........",
+])
+
+
+def momo_dig_frames():
+    """네 칸: 0 가까운 앞발 내리긋기 + 왼 뒷발 차기, 1 두 앞발을 코 앞에, 2 먼 앞발(그늘) + 오른 뒷발, 3 앞발 벌리기."""
+    out = []
+    for i in range(4):
+        g = copy(MOMO_DIG)
+        if i == 0:
+            put(g, 3, 12, 'll')
+            put(g, 2, 13, 'lp')
+            put(g, 3, 2, 'pp')
+        elif i == 1:
+            put(g, 4, 14, 'lp')
+            put(g, 9, 14, 'dq')
+            put(g, 3, 3, 'p')
+            put(g, 10, 3, 'p')
+        elif i == 2:
+            put(g, 10, 13, 'dd')
+            put(g, 10, 14, 'qq')
+            put(g, 10, 2, 'pp')
+        else:
+            put(g, 2, 11, 'lp')
+            put(g, 11, 12, 'dq')
+            put(g, 3, 3, 'pp')
+            put(g, 10, 3, 'pp')
+        out.append(g)
+    return out
+
 
 # 도토(물든 청설모, 0052): 청설모 실루엣(큰 꼬리·귀 술) + 머리에 도토리 갓 모자(u/U). 물든 눈은 호박색(A/a), 몸에 보라 뿌리.
 DOTO = grid([
@@ -783,6 +833,8 @@ def sheet():
     rows.append((FUR['toad'], toad_frames(TOAD), True))
     rows.append((FUR['bat'], bat_frames(), True))
     rows.append((FUR['spore'], spore_frames(SPORE), True))
+    # 줄 19: 돌아온 모모 파 내려가기 4칸(0156). 흰 실루엣은 그 아래(줄 수가 하나 늘었다 → art.rs CRITTER_ROWS).
+    rows.append((FUR['momo_bloom'], momo_dig_frames(), False))
     img = Image.new('RGBA', (N * 7, N * len(rows) * 2), (0, 0, 0, 0))
     for ry, (pal, frames, tainted) in enumerate(rows):
         for rx, g in enumerate(frames):

@@ -5,7 +5,7 @@
   줄 0: idle 2, walk 4
   줄 1: 치기 3(앞발·뒷발·두 발), hurt, dead, 들기 3(앞발·뒷발·두 발), 마지막 타 거두기
         (한 타 = 들기 → 치기 → 거두기, docs/decisions/0082. 1·2타는 가까운 발·먼 발을 번갈아, 마지막 타는 두 발)
-  줄 2: 흙더미 2(굴파기), 그림자
+  줄 2: 흙더미 2(굴파기), 그림자, 3~6열 파 내려가기 4칸(땅 단면 전환, 0156)
   줄 3~5: 줄 0~2의 흰 실루엣(피격 플래시용)
 그리는 법: 채움 색만 문자로 적고 외곽선('o')은 자동으로 두른다. 그래서 부위를 옮겨도 외곽선이 깨지지 않는다.
 """
@@ -100,6 +100,28 @@ MOUND_B = """
 .kmmmmmmmmmmmk..
 ................
 ................
+"""
+
+# 파 내려가기(0156): 머리를 아래로 한 옆모습(땅 단면 전환에서 쓴다). 위가 엉덩이·꼬리, 아래가 코.
+# 빛은 그대로 왼쪽 위라 왼쪽 가장자리가 밝고(h) 오른쪽이 어둡다(d). 배(밝은 털)는 왼쪽 아래, 눈은 오른쪽 아래.
+# 동작은 `dig`가 앞발(삽 같은 손바닥 + 크림 발톱)을 번갈아 내리긋고, 뒷발이 위에서 흙을 찬다.
+DIG = """
+................
+......qq........
+.....hbbb.......
+....hbbbbb......
+....hbbbbbd.....
+...hbbbbbbbd....
+...hbbbbbbbd....
+..hbbbbbbbbbd...
+..hbbbbbbbbbd...
+..hbbbbbbbbdd...
+...hbbbbbwed....
+...lbbbbbeed....
+....llbbbrd.....
+.....llbbd......
+......lll.......
+.......pp.......
 """
 
 SHADOW = """
@@ -264,6 +286,44 @@ def dead(a):
     return f
 
 
+def dig(a, i):
+    """파 내려가기 네 칸(0156). 두더지 앞발은 몸 옆으로 튀어나온 넓은 삽(분홍 손바닥 + 크림 발톱)이다.
+    0 가까운(왼) 앞발로 코 옆을 내리긋고 먼 발은 위로 당김, 1 두 앞발을 코 앞에 모아 파기,
+    2 먼(오른, 그늘 색) 앞발로 내리긋기, 3 두 앞발을 옆으로 크게 벌려 흙을 밀어냄. 뒷발은 위에서 번갈아 찬다."""
+    f = list(a)
+    if i == 0:
+        put(f, 1, 11, 'ppb')
+        put(f, 0, 12, 'ppc')
+        put(f, 0, 13, 'cc')
+        put(f, 12, 6, 'qq')
+        put(f, 13, 7, 'qC')
+        put(f, 3, 3, 'p')
+    elif i == 1:
+        put(f, 2, 12, 'pp')
+        put(f, 3, 13, 'pc')
+        put(f, 4, 14, 'c')
+        put(f, 10, 12, 'qq')
+        put(f, 9, 13, 'qC')
+        put(f, 9, 14, 'C')
+        put(f, 10, 3, 'p')
+    elif i == 2:
+        put(f, 12, 10, 'dqq')
+        put(f, 12, 11, 'qqC')
+        put(f, 13, 12, 'CC')
+        put(f, 1, 6, 'pp')
+        put(f, 1, 7, 'cp')
+        put(f, 10, 3, 'p')
+    else:
+        put(f, 0, 9, 'c')
+        put(f, 0, 10, 'cpp')
+        put(f, 1, 11, 'pp')
+        put(f, 13, 9, 'qC')
+        put(f, 13, 10, 'qqC')
+        put(f, 3, 3, 'p')
+        put(f, 10, 3, 'p')
+    return f
+
+
 def paint(img, ox, oy, rows, silhouette=False, pal=P):
     for y, r in enumerate(rows):
         for x, ch in enumerate(r):
@@ -284,7 +344,8 @@ def sheet(fur=0):
         [a, idle_b(a), walk(a, 0), walk(a, 1), walk(a, 2), walk(a, 3)],
         [attack(a, 0), attack(a, 1), attack(a, 2), hurt(a), dead(a),
          windup(a, 0), windup(a, 1), windup(a, 2), settle(a)],
-        [grid(MOUND_A), grid(MOUND_B), grid(SHADOW)],
+        # 줄 2: 흙더미 2·그림자, 3~6열 = 파 내려가기 4칸(0156)
+        [grid(MOUND_A), grid(MOUND_B), grid(SHADOW)] + [dig(grid(DIG), i) for i in range(4)],
     ]
     img = Image.new('RGBA', (16 * max(len(r) for r in rows), 16 * 6), (0, 0, 0, 0))
     for ry, row in enumerate(rows):

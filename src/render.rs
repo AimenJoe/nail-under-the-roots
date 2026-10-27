@@ -5537,42 +5537,41 @@ fn draw_descent(
             shade(soil, 1.35, a * (1.0 - ph)),
         );
     }
-    // Naïl(또는 모모): 옆모습을 90° 돌려 머리가 아래로. 걷기 칸을 빨리 돌려 앞발로 긁는 것처럼.
+    // Naïl(또는 모모): 머리를 아래로 한 파 내려가기 4칸(nail.png 줄 2의 3~6열, critters.png 줄 19). 앞발을 번갈아
+    // 내리긋는 동안 몸이 좌우로 1px 흔들린다.
     if let Some(art) = art {
-        let jit = ((clock * 30.0) as i32 % 2) as f32;
+        let frame = ((clock * 10.0) as u32) % 4;
+        let sway = [0.0, 1.0, 0.0, -1.0][frame as usize];
         let (tex, src) = if w.player.kit == crate::equipment::Character::Momo {
             match art.critters.as_ref() {
                 Some(t) => (
                     t,
                     Rect::new(
-                        (2 + ((clock * 10.0) as u32) % 2) as f32 * 16.0,
-                        art::MOMO_BLOOM_ROW as f32 * 16.0,
+                        frame as f32 * 16.0,
+                        art::MOMO_DIG_ROW as f32 * 16.0,
                         16.0,
                         16.0,
                     ),
                 ),
-                None => (&art.nail, Rect::new(32.0, 0.0, 16.0, 16.0)),
+                None => (
+                    &art.nail,
+                    Rect::new((3 + frame) as f32 * 16.0, 32.0, 16.0, 16.0),
+                ),
             }
         } else {
             (
                 art.nail_fur(w.fur),
-                Rect::new(
-                    (2 + ((clock * 14.0) as u32) % 4) as f32 * 16.0,
-                    0.0,
-                    16.0,
-                    16.0,
-                ),
+                Rect::new((3 + frame) as f32 * 16.0, 32.0, 16.0, 16.0),
             )
         };
         draw_texture_ex(
             tex,
-            152.0 + jit,
-            DESCENT_DIG_Y - 4.0,
+            152.0 + sway,
+            DESCENT_DIG_Y - 2.0,
             Color::new(1.0, 1.0, 1.0, a),
             DrawTextureParams {
                 source: Some(src),
                 dest_size: Some(vec2(16.0, 16.0)),
-                rotation: std::f32::consts::FRAC_PI_2,
                 ..Default::default()
             },
         );

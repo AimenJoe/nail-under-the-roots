@@ -82,15 +82,28 @@ fn node_pos(r: &Route, area: Rect, layer: usize, i: usize) -> Vec2 {
     let n = r.layers[layer].len() as f32;
     let node = &r.layers[layer][i];
     let mid = area.y + ROUTE_TOP + f * (area.h - ROUTE_TOP - ROUTE_BOTTOM);
-    let y = (mid + (i as f32 - (n - 1.0) / 2.0) * ROUTE_GAP + node.jy * 4.0)
-        .clamp(area.y + 7.0, area.bottom() - 7.0);
+    // 층 전체(맨 위 칸 ~ 맨 아래 칸 + 흔들림)가 위아래 여백 안에 들어오게 층의 가운데를 옮긴다.
+    // 칸마다 따로 자르면 끝 칸이 가장자리에 붙거나 두 칸이 겹쳤다(사장 피드백 2026-10-27).
+    let half = (n - 1.0) / 2.0 * ROUTE_GAP + 4.0;
+    let (lo, hi) = (
+        area.y + ROUTE_EDGE + half,
+        area.bottom() - ROUTE_EDGE - half,
+    );
+    let mid = if lo <= hi {
+        mid.clamp(lo, hi)
+    } else {
+        area.center().y
+    };
+    let y = mid + (i as f32 - (n - 1.0) / 2.0) * ROUTE_GAP + node.jy * 4.0;
     vec2((x + node.jx * 6.0).round(), y.round())
 }
 
-/// 비스듬한 길 지도: 쉼터 높이(위에서)·보스 높이(아래에서)·같은 층 칸 사이.
-const ROUTE_TOP: f32 = 12.0;
-const ROUTE_BOTTOM: f32 = 14.0;
+/// 비스듬한 길 지도: 쉼터 높이(위에서)·보스 높이(아래에서)·같은 층 칸 사이·칸 가운데와 위아래 끝 사이 최소 여백
+/// (큰 칸 반지름 8 + 테두리·고른 표시 3).
+const ROUTE_TOP: f32 = 14.0;
+const ROUTE_BOTTOM: f32 = 16.0;
 const ROUTE_GAP: f32 = 22.0;
+const ROUTE_EDGE: f32 = 13.0;
 
 fn camp_pos(area: Rect) -> Vec2 {
     vec2(area.x + 18.0, area.y + ROUTE_TOP)
@@ -1628,4 +1641,35 @@ impl App {
 /// 칸 왼쪽의 ●/○ 뒤 이름이 시작할 x. 일본어·간체 폰트의 ●는 전각(12px)이라 고정 +13이면 이름에 붙었다(0089).
 fn mark_end(ui: &Ui, x: f32) -> f32 {
     (x + 3.0 + ui.text_w("●", FONT_PX) + 2.0).max(x + 13.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 길 지도(0156): 어떤 시드·길이든 칸이 위아래 끝에 붙지 않고, 같은 층 칸끼리 겹치지 않는다.
+    #[test]
+    fn route_nodes_keep_off_the_edges() {
+        let area = Rect::new(14.0, 26.0, 292.0, 88.0);
+        for seed in 0..200u64 {
+            for stage in 1..=3 {
+                let r = Route::generate(seed, stage);
+                for (l, layer) in r.layers.iter().enumerate() {
+                    let ys: Vec<f32> = (0..layer.len())
+                        .map(|i| node_pos(&r, area, l, i).y)
+                        .collect();
+                    for y in &ys {
+                        assert!(*y - 8.0 >= area.y + 4.0, "위 {seed}/{stage}/{l}: {y}");
+                        assert!(
+                            *y + 8.0 <= area.bottom() - 4.0,
+                            "아래 {seed}/{stage}/{l}: {y}"
+                        );
+                    }
+                    for w in ys.windows(2) {
+                        assert!(w[1] - w[0] >= 14.0, "겹침 {seed}/{stage}/{l}: {ys:?}");
+                    }
+                }
+            }
+        }
+    }
 }
