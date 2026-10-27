@@ -1,7 +1,7 @@
 # 0170. 추상화 수준 판정과 다음 리팩터링 목표(R9~R13)
 
 - 날짜: 2026-10-27
-- 상태: **제안**(사장: "좋은 추상화 수준을 가졌는지 판단해서, 다음 리팩터링 목표를 설정하자"). 0169 R1~R8 뒤의 코드를 잰 것.
+- 상태: R9·R-소·R11·R10·R12·**R14(캐릭터 표, 사장 추가)** 구현(2026-10-27, 사장: "보스표 및 플레이어블 캐릭터 표까지 포함해서 다음 단계 진행해"). R13은 미룸(다섯째 장애물을 더할 때). 결과는 맨 아래 "구현" 절. 처음은 제안(사장: "좋은 추상화 수준을 가졌는지 판단해서, 다음 리팩터링 목표를 설정하자"). 0169 R1~R8 뒤의 코드를 잰 것.
 - 잰 것: `src/` Rust 46,272줄, 함수 1,138개(100줄 넘는 50, 200줄 넘는 9), 테스트 158개. 수치는 전부 이 커밋에서 `wc`·`grep`·`awk`·짧은 파이썬으로 잰 것(1차).
 
 ## 1. 판정 기준
@@ -54,3 +54,18 @@
 ## 확인
 - 수치는 1차(이 커밋에서 직접 잼). 기준의 출처는 2차: Ousterhout의 깊은 모듈(서평·요약), Sandi Metz의 "잘못된 추상화"(요약·비평). 비용은 추정.
 - 사람이 정할 것: 어디까지 할지(R9·R-소·R11·R10 추천, R12는 보스를 하나 더 만들 계획이 있을 때 가장 값지다), 언제(마일스톤 판정 뒤).
+
+## 구현(2026-10-27, 커밋 일곱: R9 → R-소 → R11 → R10 → R12 → R14, v0.3.9 배포 뒤)
+| | 전 | 후 | 동작 변화 |
+|---|---|---|---|
+| R9 | `Player::update` 383줄(상태 12 가지) | 92줄 + `player/{attack,burrow,momo}.rs`의 `tick_*` 11개(`Ctx`: Actions·dt·move_dir), 시작 함수도 가족별 | 없음 |
+| R-소 | `terrain`·`sunny` → `render::{shadow_dir,…}`, `Inventory::default`가 `journal::charm_pool(&Profile::default())` | `shade.rs`(해·모닥불 그림자 모델), 장신구 풀은 앱이 넣음. 아래층 → 위층 참조 0, `world.rs`에 `profile::`·`journal::` 0 | 없음(모든 시작이 풀을 덮어쓴다) |
+| R11 | 앱이 `world.story.*`에 12곳 대입, 기록 ↔ 월드 복사가 흩어짐 | `Story` 필드 비공개. 기록 → `StorySeed` 한 번, 이긴 건 `Story::beat(kind) -> BossBeaten`, 읽기는 `fight(kind)` 등 게터. 앱의 대입 0 | 없음 |
+| R10 | `apply_strike` 233줄·if 44·종 규칙 16(박쥐·등딱지·벽 쿵·독이 월드의 if) | `Enemy::receive(&Strike) -> Struck{Miss,Deflected,Hit}` 한 곳 + `strike_feel`·`strike_projectiles`·`dig_mines`. `apply_strike` 120줄(연출·통계·소리만). 혀는 `Enemy::tongue_reaches` | 없음. 적 테스트 셋(등딱지·벽 쿵, 한 스윙 한 번·밀 방향, 박쥐) |
+| R12 | 보스마다 나란한 코드: `AdvEvent` 변종 8, `stage.rs` `*_beaten` 4, 장면 호출 4 | `bosses.rs` 표(종·몇째 길·칸·꽃잎·기록 키) + `KeeperIntro(kind)`·`KeeperBeaten(kind)` + `keeper_beaten` 하나 + `cutscene::keeper_meet/keeper_beaten`(주인마다 가지 하나). 새 보스 = 표 + 수 + 종 표 + 컷씬 함수·가지 둘 + 그림·글 | 없음. 테스트: 기록 키 그대로, 표의 주인마다 장면 있음 |
+| R14 | `Character::Momo` 비교 분기 24곳(회피·특기·재주 키·고르기·큰 나무 탭·이어하기 번호·상태 탭·토스트 셋·그림 줄·클리어 합) | `characters.rs` 표(`CharacterDef` 18열) + `Character::def()`·`from_code()`·`available()`. 남은 비교 7: 모모에 관한 이야기 글 5, 그림 고르기 1, `Talents.momo` 1 | 없음 |
+
+- 잰 것(뒤): 함수 1,150개 중 200줄 넘는 것 9 → 6(`draw_enemy`·`draw_sorted`·`draw_descent`·`scenario::build`·`dungeon::generate`·`tick_player`), `world.rs`의 종 이름은 `Story`의 보스 넷·소환·지뢰·죽은 포자버섯·토끼풀 실 정도(규칙은 적 안). 테스트 158 → 164.
+- 하지 않은 것: R13(장애물 수명 공통)은 다섯째 장애물이 올 때. `draw_nail`의 모모 분기(그림의 예외는 그림에), 모모 이야기 글의 분기(글은 글), `Talents.momo`(모모 표의 자리 1·3 해석)는 정체성이라 남긴다.
+- 바깥 확인: v0.3.9 main push에서 `smoke-web` 첫 실행이 팩 그림 404로 실패 → 잡음으로 거르고 팩을 받게 고쳐 작업 브랜치 수동 실행 성공.
+
