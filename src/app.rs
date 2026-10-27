@@ -13,6 +13,7 @@ mod slots;
 mod stage;
 // 0169 R4: 장면별로 나눴다. 자식은 `use super::*`로 부모의 가져오기·App 필드를 함께 쓴다.
 mod album;
+mod help;
 mod pause;
 mod settings;
 mod title;
@@ -74,6 +75,10 @@ enum Scene {
     },
     /// 조작 설정(설정 안). 돌아가면 설정.
     Controls {
+        back: Back,
+    },
+    /// 안내(0178): 기능 설명. 일시정지 메뉴·타이틀에서.
+    Help {
         back: Back,
     },
     /// 개발용 시나리오 목록.
@@ -237,6 +242,9 @@ enum Hit {
     BestiaryItem(usize),
     /// 도감 설명(누르면 다음 쪽).
     BestiaryPage,
+    /// 안내 주제·설명(누르면 다음 쪽, 0178).
+    HelpItem(usize),
+    HelpPage,
     /// 상태 탭 ▲(-1)·▼(+1).
     StatusScroll(i8),
     DevItem(usize),
@@ -291,6 +299,8 @@ pub struct App {
     bestiary_cursor: usize,
     /// 도감 설명 쪽(0 이야기 · 1 공격 · 2 요령). 칸마다 두 줄로 자르던 것을 쪽으로 나눴다(0051).
     bestiary_page: usize,
+    help_cursor: usize,
+    help_page: usize,
     /// 상태 탭을 내린 만큼(논리 px)과 내릴 수 있는 끝. 끝은 그릴 때 잰다.
     status_scroll: f32,
     status_max: f32,
@@ -417,6 +427,8 @@ impl App {
             journal_cursor: 0,
             bestiary_cursor: 0,
             bestiary_page: 0,
+            help_cursor: 0,
+            help_page: 0,
             status_scroll: 0.0,
             status_max: 0.0,
             controls_cursor: 0,
@@ -481,7 +493,9 @@ impl App {
             Scene::Intro | Scene::Title | Scene::Slots | Scene::Album | Scene::Dev
         ) || matches!(
             self.scene,
-            Scene::Settings { back: Back::Title } | Scene::Controls { back: Back::Title }
+            Scene::Settings { back: Back::Title }
+                | Scene::Controls { back: Back::Title }
+                | Scene::Help { back: Back::Title }
         );
         if title {
             return (Some(Track::Title), false);
@@ -1077,6 +1091,11 @@ impl App {
                         self.settings_cursor = 0;
                         self.scene = Scene::Settings { back: Back::Title };
                     }
+                    Some(TitleItem::Help) => {
+                        self.help_cursor = 0;
+                        self.help_page = 0;
+                        self.scene = Scene::Help { back: Back::Title };
+                    }
                     #[cfg(feature = "dev")]
                     Some(TitleItem::Dev) => {
                         self.dev_cursor = 0;
@@ -1182,6 +1201,7 @@ impl App {
                 }
             }
             Scene::Controls { back } => self.update_controls(a, tap_hit, back, dt),
+            Scene::Help { back } => self.update_help(a, tap_hit, back),
             Scene::Pause => self.update_pause(a, tap_hit),
             Scene::Route => self.update_route(a, tap_hit),
             Scene::Shop => self.update_shop(a, tap_hit, dt),
@@ -1211,6 +1231,7 @@ impl App {
                 | Scene::CharPick
                 | Scene::Settings { back: Back::Pause }
                 | Scene::Controls { back: Back::Pause }
+                | Scene::Help { back: Back::Pause }
         );
         let alpha = if self.scene == Scene::Game {
             self.acc / t::TICK_DT
@@ -1252,7 +1273,9 @@ impl App {
         let title_bg = matches!(self.scene, Scene::Title | Scene::Slots | Scene::Dev)
             || matches!(
                 self.scene,
-                Scene::Settings { back: Back::Title } | Scene::Controls { back: Back::Title }
+                Scene::Settings { back: Back::Title }
+                    | Scene::Controls { back: Back::Title }
+                    | Scene::Help { back: Back::Title }
             );
         if title_bg {
             self.renderer.draw_title_art(&ui, get_time() as f32);
@@ -1301,6 +1324,14 @@ impl App {
                     ui.dim();
                 }
                 self.draw_controls(&ui);
+            }
+            Scene::Help { back } => {
+                if back == Back::Pause {
+                    self.renderer
+                        .draw_hud(&ui, &self.world, self.input.gamepad_count);
+                    ui.dim();
+                }
+                self.draw_help(&ui);
             }
             Scene::Game => {
                 self.draw_letterbox(&ui);

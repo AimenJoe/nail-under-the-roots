@@ -14,10 +14,11 @@ pub(super) const PAUSE_TABS: [Tr; 6] = [
 ];
 /// 지도 탭 번호(지도 버튼으로 바로 연다).
 pub(super) const TAB_MAP: usize = 5;
-pub(super) const PAUSE_MENU: [Tr; 4] = [
+pub(super) const PAUSE_MENU: [Tr; 5] = [
     |s| s.pm_resume,
     |s| s.pm_restart,
     |s| s.pm_settings,
+    |s| s.pm_help,
     |s| s.pm_title,
 ];
 /// 가방 칸의 발톱 아이콘: 크림/무기 색 발톱 세 개.
@@ -109,6 +110,11 @@ impl App {
                         self.scene = Scene::Settings { back: Back::Pause };
                     }
                     Some(3) => {
+                        self.help_cursor = 0;
+                        self.help_page = 0;
+                        self.scene = Scene::Help { back: Back::Pause };
+                    }
+                    Some(4) => {
                         self.bank_glowbugs();
                         // 쉼터에서 나가면 그 쉼터부터 이어한다(굴 안이면 마지막 쉼터, 0080).
                         self.checkpoint_run();

@@ -210,28 +210,8 @@ pub(super) fn draw_quick_slots(ui: &Ui, w: &World) {
         let k = ui.scale * 2.0;
         match c {
             Consumable::Berry => {
-                let s = k;
-                draw_rectangle(
-                    center.x - 2.0 * s,
-                    center.y - 2.0 * s,
-                    4.0 * s,
-                    5.0 * s,
-                    OUTLINE,
-                );
-                draw_rectangle(
-                    center.x - 1.5 * s,
-                    center.y - 1.5 * s,
-                    3.0 * s,
-                    4.0 * s,
-                    Color::new(0.93 * dim, 0.30 * dim, 0.38 * dim, 1.0),
-                );
-                draw_rectangle(
-                    center.x - 1.0 * s,
-                    center.y - 3.0 * s,
-                    2.0 * s,
-                    1.0 * s,
-                    Color::new(0.45 * dim, 0.75 * dim, 0.35 * dim, 1.0),
-                );
+                // 산딸기(0178): 바닥 아이템과 같은 송이 그림, 칸 크기에 맞춰 반 배율.
+                super::props::draw_berry(center.x, center.y + k * 0.5, k * 0.5, dim);
             }
             Consumable::Worm => {
                 if n > 0 {

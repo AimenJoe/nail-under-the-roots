@@ -704,6 +704,45 @@ pub(super) fn draw_breakable(b: crate::room::Breakable, r: Rect, time: f32) {
     }
 }
 
+/// 산딸기(0178): 작은 알(드루플렛)이 모인 송이 + 초록 꽃받침. `x`·`y`는 송이 가운데, `s`는 픽셀 크기(HUD는 배율),
+/// `dim`은 흐리게(가방이 비었을 때). 바닥 아이템과 가방 칸이 같은 그림을 쓴다.
+pub(super) fn draw_berry(x: f32, y: f32, s: f32, dim: f32) {
+    // 9×10 비트맵. O 테두리, r 빨강, R 밝은 알, d 어두운 틈, g 꽃받침, G 밝은 잎, k 꼭지.
+    const ROWS: [&str; 10] = [
+        "....k....",
+        "..GgGgG..",
+        ".OrRrRrO.",
+        "ORrRrRrRO",
+        "OrRrRrRrO",
+        "ORrRrRrRO",
+        ".OrdrdrO.",
+        ".OdrRrdO.",
+        "..OdrdO..",
+        "...OOO...",
+    ];
+    let col = |ch: u8| -> Option<Color> {
+        let c = match ch {
+            b'O' => OUTLINE,
+            b'r' => Color::new(0.86 * dim, 0.22 * dim, 0.34 * dim, 1.0),
+            b'R' => Color::new(1.0 * dim, 0.48 * dim, 0.56 * dim, 1.0),
+            b'd' => Color::new(0.58 * dim, 0.10 * dim, 0.24 * dim, 1.0),
+            b'g' => Color::new(0.36 * dim, 0.62 * dim, 0.28 * dim, 1.0),
+            b'G' => Color::new(0.55 * dim, 0.80 * dim, 0.40 * dim, 1.0),
+            b'k' => Color::new(0.42 * dim, 0.30 * dim, 0.20 * dim, 1.0),
+            _ => return None,
+        };
+        Some(c)
+    };
+    let (x0, y0) = (x - 4.0 * s, y - 5.0 * s);
+    for (j, row) in ROWS.iter().enumerate() {
+        for (i, ch) in row.bytes().enumerate() {
+            if let Some(c) = col(ch) {
+                draw_rectangle(x0 + i as f32 * s, y0 + j as f32 * s, s, s, c);
+            }
+        }
+    }
+}
+
 pub(super) fn draw_campfire_stones(sunny: Option<&art::Sunny>, r: Rect) {
     if let Some(sunny) = sunny {
         let c = vec2(r.center().x, r.bottom() - 4.0);
@@ -1640,21 +1679,8 @@ pub(super) fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool)
             if light_only {
                 return;
             }
-            let p = vec2(q.x.round(), (q.y - l.z).round() - 3.0);
-            let dark = Color::new(0.62, 0.14, 0.24, 1.0);
-            draw_rectangle(p.x - 2.0, p.y - 1.0, 5.0, 4.0, OUTLINE);
-            draw_rectangle(p.x - 1.0, p.y - 2.0, 3.0, 6.0, OUTLINE);
-            draw_rectangle(p.x - 1.0, p.y - 1.0, 3.0, 4.0, world::BERRY);
-            draw_rectangle(p.x - 1.0, p.y + 2.0, 3.0, 1.0, dark);
-            draw_rectangle(
-                p.x - 1.0,
-                p.y - 1.0,
-                1.0,
-                1.0,
-                Color::new(1.0, 0.85, 0.85, 1.0),
-            );
-            // 잎
-            draw_rectangle(p.x, p.y - 3.0, 2.0, 1.0, Color::new(0.45, 0.75, 0.35, 1.0));
+            // 산딸기(0178): 알이 모인 송이 + 꽃받침. 가방 칸도 같은 그림(`draw_berry`).
+            draw_berry(q.x.round(), (q.y - l.z).round() - 4.0, 1.0, 1.0);
         }
     }
 }

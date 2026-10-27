@@ -14,6 +14,8 @@ pub(super) enum TitleItem {
     Daily,
     Album,
     Settings,
+    /// 안내(0178).
+    Help,
     #[cfg(feature = "dev")]
     Dev,
 }
@@ -63,6 +65,7 @@ impl App {
         }
         v.push(TitleItem::Album);
         v.push(TitleItem::Settings);
+        v.push(TitleItem::Help);
         #[cfg(feature = "dev")]
         v.push(TitleItem::Dev);
         v
@@ -86,6 +89,7 @@ impl App {
             }
             TitleItem::Album => s.title_album.to_string(),
             TitleItem::Settings => s.title_settings.to_string(),
+            TitleItem::Help => s.title_help.to_string(),
             #[cfg(feature = "dev")]
             TitleItem::Dev => s.title_dev.to_string(),
         }

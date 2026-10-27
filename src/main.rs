@@ -22,6 +22,7 @@ mod dungeon;
 mod enemy;
 mod equipment;
 mod field;
+mod help;
 mod i18n;
 mod illust;
 mod input;
