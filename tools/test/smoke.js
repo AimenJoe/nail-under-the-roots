@@ -20,7 +20,11 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 const MIN_SHOT_BYTES = 6000;
 // 알려진 잡음(실패 아님). mq_js_bundle.js(macroquad 0.4.16, 상류와 바이트 같음)의 quad_net 플러그인이 "use strict" 아래에서
 // 선언 없는 `register_plugin=`에 대입해 번들 끝에서 ReferenceError가 난다. 이 게임은 quad-net을 안 써 영향 없다(web/README.md).
-const KNOWN_NOISE = [/ReferenceError: register_plugin is not defined/];
+const KNOWN_NOISE = [
+  /ReferenceError: register_plugin is not defined/,
+  // 유료 팩(assets/vendor, 0010)이 없는 빌드는 팩 그림을 찾다 404를 받고 직접 그린 그림으로 간다 — 정상.
+  /404 \(Not Found\) @ .*\/assets\/vendor\//,
+];
 // 타이틀 메뉴가 다 보이게(이어하기·저장 슬롯·…·개발): 튜토리얼을 마친 프로필.
 const PROFILE = 'nail-profile 1\nflag tutorial\nflag bori\nflag line.village_intro\n';
 
@@ -51,7 +55,7 @@ async function run() {
     const page = await ctx.newPage();
     const errors = [];
     const note = (t) => { if (!KNOWN_NOISE.some((re) => re.test(t))) errors.push(t); };
-    page.on('console', (m) => { if (m.type() === 'error') note(m.text()); });
+    page.on('console', (m) => { if (m.type() === 'error') note(`${m.text()} @ ${(m.location() || {}).url || ''}`); });
     page.on('pageerror', (e) => note(String(e)));
     await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'load' });
     // 로딩 화면(web/index.html)은 게임이 첫 프레임을 그리면 .done이 된다(src/loading.rs).

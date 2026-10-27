@@ -22,8 +22,18 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    env:
+      ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
     steps:
       - uses: actions/checkout@v4
+      # 유료 에셋 팩(레포 밖, 0010). 시크릿이 없으면 건너뛰고 직접 그린 대체 타일로(팩 그림의 404는 smoke.js가 잡음으로 거른다).
+      - name: Fetch vendor assets (private repo)
+        if: env.ASSETS_REPO != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.ASSETS_REPO }}
+          token: ${{ secrets.ASSETS_TOKEN }}
+          path: assets/vendor
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
