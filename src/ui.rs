@@ -136,7 +136,15 @@ impl Ui {
             check::text(&plain(s), Rect::new(x, y, self.text_w(s, size), size));
         }
         if s.contains(KEY_OPEN) {
-            // 키캡(0153): 보통 글은 받은 색, 키 이름은 테두리 칸 + 밝은 글.
+            // 키캡(0153): 키 이름은 테두리 칸 + 밝은 글. 보통 글은 받은 색이 흐리면(TEXT_DIM) 밝게 올리고 늘 테두리를
+            // 두른다: 밝은 풀밭에서 키캡만 보이고 안내가 묻혔다(사장 피드백 2026-10-27).
+            let dim = (c.r + c.g + c.b) / 3.0 < 0.7;
+            let hc = if dim {
+                Color::new(TEXT.r, TEXT.g, TEXT.b, c.a)
+            } else {
+                c
+            };
+            let body = self.with_outline();
             let mut cx = x;
             for (seg, is_key) in key_segments(s) {
                 if is_key {
@@ -160,7 +168,7 @@ impl Ui {
                     self.plain_text(&seg, cx + KEY_PAD, y, size, kc);
                     cx += w + KEY_GAP;
                 } else {
-                    self.plain_text(&seg, cx, y, size, c);
+                    body.plain_text(&seg, cx, y, size, hc);
                     cx += self.plain_w(&seg, size);
                 }
             }
