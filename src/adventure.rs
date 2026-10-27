@@ -25,7 +25,7 @@ use crate::loot::{Loot, LootKind};
 use crate::map::Cell;
 use crate::room::{PropKind, Room};
 use crate::route::{NodeKind, Route};
-use crate::sfx::{self, Sfx};
+use crate::sfx;
 use crate::tuning as t;
 use crate::world::{clods, puff, ring, Gift, Npc, Spring, Who, World, DIRT};
 
@@ -508,7 +508,7 @@ impl World {
     }
 
     /// 틱 앞: 장소를 바꾸는 중이면 진행하고 true(이번 틱 로직은 건너뛴다).
-    pub fn adventure_pre(&mut self, sfx: &Sfx) -> bool {
+    pub fn adventure_pre(&mut self) -> bool {
         let Some(mut f) = self.adv.fade else {
             return false;
         };
@@ -516,7 +516,7 @@ impl World {
         let half = f.kind.half();
         if !f.swapped && f.t >= half {
             self.swap_place(&mut f);
-            sfx.play(sfx::Id::Emerge);
+            self.audio.play(sfx::Id::Emerge);
         }
         self.adv.fade = if f.t >= half * 2.0 { None } else { Some(f) };
         self.adv.prev_cam = self.adv.cam;
@@ -549,26 +549,26 @@ impl World {
     }
 
     /// 틱 뒤: 칸 위의 것(입구·출구·저장), 던전 방(잠금·클리어·보상), 카메라.
-    pub fn adventure_post(&mut self, sfx: &Sfx) {
+    pub fn adventure_post(&mut self) {
         if self.adv.place == Place::Arena {
             return;
         }
         if self.cell_triggers() {
-            sfx.play(sfx::Id::Heal);
+            self.audio.play(sfx::Id::Heal);
         }
         if self.spring_tick() {
-            sfx.play(sfx::Id::Heal);
+            self.audio.play(sfx::Id::Heal);
         }
         if self.petal_tick() {
-            sfx.play(sfx::Id::Glowbug);
+            self.audio.play(sfx::Id::Glowbug);
         }
         if self.adv.place == Place::Field {
             if let Some(id) = self.field_boss() {
-                sfx.play(id);
+                self.audio.play(id);
             }
         }
         if self.adv.place == Place::Dungeon {
-            self.dungeon_rooms(sfx);
+            self.dungeon_rooms();
         }
         self.update_cam();
     }
@@ -1041,7 +1041,7 @@ impl World {
     }
 
     /// 던전: 방이 바뀌면 들르고, 전투방이면 안에 들어선 순간 잠그고 적을 깨운다. 다 잡으면 열고 보상.
-    fn dungeon_rooms(&mut self, sfx: &Sfx) {
+    fn dungeon_rooms(&mut self) {
         let at = dungeon::room_at(self.player.pos);
         let Some(d) = self.adv.dungeon.as_mut() else {
             return;
@@ -1123,14 +1123,14 @@ impl World {
                     self.enemies.push(e);
                 }
             }
-            sfx.play(sfx::Id::WallHit);
+            self.audio.play(sfx::Id::WallHit);
             self.feel.add_trauma(0.25);
         }
         let mut gift_at = None;
         if self.room.doors_locked() && self.enemies.is_empty() {
             self.room.set_doors_locked(false);
             room.cleared = true;
-            sfx.play(sfx::Id::Emerge);
+            self.audio.play(sfx::Id::Emerge);
             if room.kind == RoomKind::Boss {
                 // 보상은 마지막으로 쓰러진 자리(플레이어 곁)에, 출구는 거기와 플레이어에서 떨어진 바닥 칸에.
                 // 예전엔 출구가 방 한가운데라, 가운데서 끝내면 서 있던 칸이 곧 출구가 되어 보상을 못 줍고 나갔다(0060).
@@ -1206,7 +1206,7 @@ impl World {
         });
         if let Some(i) = near {
             self.room.open_chest(i);
-            sfx.play(sfx::Id::Chest);
+            self.audio.play(sfx::Id::Chest);
             let at = self.room.props[i].rect.center();
             // 상자가 열리면 반짝임 셋(0081).
             for (k, d) in [vec2(-5.0, -8.0), vec2(4.0, -11.0), vec2(7.0, -5.0)]
@@ -1228,7 +1228,7 @@ impl World {
             }
             self.chests += 1;
             self.charm_gift(at);
-            sfx.play(sfx::Id::Emerge);
+            self.audio.play(sfx::Id::Emerge);
         }
     }
 

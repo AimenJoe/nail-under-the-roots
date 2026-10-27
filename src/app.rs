@@ -722,9 +722,7 @@ impl App {
                 }
                 if let Some(c) = self.cutscene.as_mut() {
                     c.update(&a, dt, &mut self.world);
-                    for id in self.world.sounds.drain(..) {
-                        self.sfx.play(id);
-                    }
+                    self.sfx.flush(&mut self.world.audio);
                     // 본 일러스트는 앨범에 남는다(개발 시나리오에서 봐도).
                     if let Some(il) = c.illust {
                         if self
@@ -834,10 +832,8 @@ impl App {
                 restart = true;
             }
             self.world.effects = self.settings.effects_f();
-            self.world.tick(&a, &self.sfx);
-            for id in self.world.sounds.drain(..) {
-                self.sfx.play(id);
-            }
+            self.world.tick(&a);
+            self.sfx.flush(&mut self.world.audio);
             self.acc -= t::TICK_DT;
         }
         if self.world.player.is_alive() {

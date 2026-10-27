@@ -93,6 +93,44 @@ fn file_of(id: Id) -> Option<usize> {
     })
 }
 
+/// 로직이 낼 소리 한 건: 내기 / (길게 우는 소리) 끊기.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cmd {
+    Play(Id),
+    Stop(Id),
+}
+
+/// 로직이 쌓아 두는 소리 큐(0169 R1). 월드·모험·컷씬은 오디오 장치(`Sfx`)를 모르고 여기에만 쌓는다 — 그래서 테스트에서
+/// 월드를 틱 단위로 돌리고 "어떤 소리가 났나"를 물을 수 있다. 앱이 틱·컷씬 뒤에 `Sfx::flush`로 비운다.
+#[derive(Debug, Default)]
+pub struct Queue(Vec<Cmd>);
+
+impl Queue {
+    pub fn play(&mut self, id: Id) {
+        self.0.push(Cmd::Play(id));
+    }
+
+    pub fn stop(&mut self, id: Id) {
+        self.0.push(Cmd::Stop(id));
+    }
+
+    /// 이 소리를 내라고 쌓였나(테스트).
+    #[cfg(test)]
+    pub fn played(&self, id: Id) -> bool {
+        self.0.contains(&Cmd::Play(id))
+    }
+
+    /// 이 소리를 몇 번 내라고 쌓였나(테스트).
+    #[cfg(test)]
+    pub fn count(&self, id: Id) -> usize {
+        self.0.iter().filter(|c| **c == Cmd::Play(id)).count()
+    }
+
+    pub fn drain(&mut self) -> std::vec::Drain<'_, Cmd> {
+        self.0.drain(..)
+    }
+}
+
 pub struct Sfx {
     claw: [Sound; 3],
     burrow: Sound,
@@ -342,6 +380,16 @@ impl Sfx {
                 volume: tuning::MASTER_VOLUME * self.volume.get() * gain,
             },
         );
+    }
+
+    /// 로직이 쌓아 둔 소리 큐를 비우며 낸다.
+    pub fn flush(&self, q: &mut Queue) {
+        for c in q.drain() {
+            match c {
+                Cmd::Play(id) => self.play(id),
+                Cmd::Stop(id) => self.stop(id),
+            }
+        }
     }
 
     /// 길게 울리는 소리를 끊는다(드릴이 벽에 부딪혔을 때).

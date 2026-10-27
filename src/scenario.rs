@@ -518,3 +518,64 @@ fn spawn_point(w: &World, i: usize) -> Vec2 {
         .collect();
     far[i % far.len()]
 }
+
+/// 시나리오를 통째로 돌리는 시험(0169 R1): 소리가 큐(`sfx::Queue`)라 월드를 틱 단위로 돌릴 수 있다.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::Actions;
+    use crate::tuning as t;
+    use macroquad::math::Vec2;
+
+    /// 개발 시나리오 전부: 가만히 서서 600틱(10초)을 돌려도 panic이 없고 플레이어가 살아 있거나 쓰러졌거나 둘 중 하나다.
+    #[test]
+    fn every_dev_scenario_runs_ten_seconds_without_panicking() {
+        let idle = Actions::default();
+        for e in LIST.iter() {
+            let mut w = build(e.scenario);
+            for _ in 0..600 {
+                w.tick(&idle);
+            }
+            assert!(w.time > 0.0, "{} 시나리오가 돌았다", e.name);
+        }
+    }
+
+    /// 들쥐 한 마리 방: 다가가 연타하면 쓰러진다 — 공격·피격·쓰러짐·떨어뜨림·소리가 한 틱 흐름 안에서 이어진다.
+    #[test]
+    fn mashing_at_a_field_mouse_kills_it_and_queues_the_sounds() {
+        let mut w = build(Scenario::Chargers(1));
+        w.player.armed = true;
+        let mut tick = 0;
+        while tick < 60 * 20 && w.kills == 0 && w.player.is_alive() {
+            let target = w
+                .enemies
+                .iter()
+                .filter(|e| e.alive)
+                .map(|e| e.pos)
+                .min_by(|a, b| {
+                    (*a - w.player.pos)
+                        .length()
+                        .total_cmp(&(*b - w.player.pos).length())
+                });
+            let Some(target) = target else {
+                break;
+            };
+            let to = target - w.player.pos;
+            let near = to.length() < 14.0;
+            let dir = to.normalize_or(Vec2::X);
+            let a = Actions {
+                move_dir: if near { Vec2::ZERO } else { dir },
+                aim: dir,
+                attack: near && tick % 2 == 0,
+                ..Default::default()
+            };
+            w.tick(&a);
+            tick += 1;
+        }
+        assert!(w.kills >= 1, "{}틱 안에 들쥐를 쓰러뜨린다", tick);
+        assert!(
+            w.audio.played(crate::sfx::Id::EnemyHit) || w.audio.played(crate::sfx::Id::EnemyDie)
+        );
+        assert!(w.time >= t::TICK_DT);
+    }
+}

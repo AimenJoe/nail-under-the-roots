@@ -144,7 +144,7 @@ mod device_tests {
         assert!(w.hush, "말하기 전엔 음악이 내려가 있다");
         assert!(w.gloom.amount > 0.5, "어둠이 덮인다 {}", w.gloom.amount);
         assert!(
-            w.sounds.contains(&crate::sfx::Id::Rumble)
+            w.audio.played(crate::sfx::Id::Rumble)
                 || w.fx
                     .iter()
                     .any(|f| matches!(f.kind, crate::world::FxKind::Petal { .. })),
@@ -209,10 +209,7 @@ mod device_tests {
         }
         assert!(w.hush);
         assert!(w.gloom.amount > 0.95, "{}", w.gloom.amount);
-        assert!(
-            w.sounds.contains(&crate::sfx::Id::Rumble),
-            "실이 휘감는 울림"
-        );
+        assert!(w.audio.played(crate::sfx::Id::Rumble), "실이 휘감는 울림");
         // 도망(0163): 사라지는 자리에 흙·실.
         let at = w.player.pos + vec2(60.0, 0.0);
         let c = momo_flee(&w, at, 1);

@@ -13,7 +13,7 @@ use crate::items::{Bag, Consumable};
 use crate::loot::{self, Loot, LootKind};
 use crate::player::{self, Player};
 use crate::room::Room;
-use crate::sfx::{self, Sfx};
+use crate::sfx;
 use crate::tuning as t;
 
 #[derive(Debug, Clone, Copy)]
@@ -407,7 +407,8 @@ pub struct World {
     pub hush: bool,
     pub gloom: Gloom,
     /// 컷씬 이펙트가 낸 소리(0159): 앱이 프레임마다 꺼내 튼다(컷씬은 Sfx를 모른다 — 테스트에서 돌릴 수 있게).
-    pub sounds: Vec<sfx::Id>,
+    /// 이번 틱에 낼 소리(0169 R1): 앱이 `Sfx::flush`로 비운다. 로직은 오디오 장치를 모른다.
+    pub audio: sfx::Queue,
     pub boss_card: Option<(&'static str, Tr, f32)>,
     pub petals: bool,
     /// 지금 환경. `biome_by_wave`면 웨이브가 깊이를 대신해 바뀐다.
@@ -509,7 +510,7 @@ impl World {
             exit_age: 0.0,
             hush: false,
             gloom: Gloom::NONE,
-            sounds: Vec::new(),
+            audio: sfx::Queue::default(),
             boss_card: None,
             petals: false,
             slams: 0,
@@ -546,8 +547,8 @@ impl World {
         self.enemies.push(Enemy::new(kind, pos));
     }
 
-    pub fn tick(&mut self, a: &Actions, sfx: &Sfx) {
-        self.step(a, sfx);
+    pub fn tick(&mut self, a: &Actions) {
+        self.step(a);
         self.thin_fx();
     }
 
@@ -574,10 +575,10 @@ impl World {
         self.fx_checked = self.fx.len();
     }
 
-    fn step(&mut self, a: &Actions, sfx: &Sfx) {
+    fn step(&mut self, a: &Actions) {
         let dt = t::TICK_DT;
         self.time += dt;
-        if self.adventure_pre(sfx) {
+        if self.adventure_pre() {
             // 장소를 바꾸는 중(어두워졌다 밝아짐): 로직은 멈춘다.
             self.freeze_interp();
             return;
@@ -611,6 +612,40 @@ impl World {
         } else {
             a
         };
+        // 1. 플레이어 → 아이템·줍기
+        let strike = self.tick_player(a, dt);
+        self.tick_items(a, dt);
+        self.tick_pickups(dt);
+        // 2. 적·투사체·장애물. 쓰러진 적은 모았다가 공격 판정 뒤에 떨어뜨린다. 필살기 시동 중에는 멈춘다.
+        let frozen = self.player.drill_revving();
+        let mut deaths: Vec<(Vec2, Kind)> = Vec::new();
+        self.tick_enemies(dt);
+        self.tick_deaths(&mut deaths);
+        self.charge_dust(dt);
+        let (summon, bury) = self.enemy_events();
+        self.enemy_dirt(dt, frozen);
+        let landed = self.rockfall(dt, frozen, &mut deaths);
+        self.thorn_pricks(&mut deaths);
+        self.summon_mice(summon);
+        self.bury_mines(bury);
+        let popped = self.tick_mines_and_projectiles(dt, frozen, &mut deaths);
+        // 3. 플레이어 공격 → 적·투사체
+        self.apply_strike(strike, &mut deaths);
+        self.settle_deaths(deaths);
+        // 4. 적·투사체·위험물 → 플레이어
+        self.hit_player(&landed, &popped);
+        // 5. 적끼리 겹침 방지
+        self.separate_enemies(dt);
+        // 6. 정리
+        self.cleanup(dt);
+        // 7. 모험(입구·출구·저장, 던전 방, 카메라)
+        self.adventure_post();
+        // 8. 웨이브(아레나)
+        self.tick_waves(dt);
+    }
+
+    /// 1. 플레이어: 입력·공격·먹기, 플레이어 이벤트의 소리·효과. 이번 틱의 공격 판정을 돌려준다.
+    fn tick_player(&mut self, a: &Actions, dt: f32) -> Option<Strike> {
         // 1. 플레이어. 드릴 겨누기용으로 맞을 수 있는 적 자리를 넘긴다(0139).
         self.player.targets.clear();
         self.player.targets.extend(
@@ -647,31 +682,31 @@ impl World {
         let mut ate = None;
         for ev in &self.player.events {
             match ev {
-                player::Event::Swing(i) => sfx.play(sfx::Id::Claw(*i)),
+                player::Event::Swing(i) => self.audio.play(sfx::Id::Claw(*i)),
                 player::Event::Beat => {
                     // 박자에 맞췄다(0167): 발톱 끝 작은 반짝임 + 높은 '틱'.
-                    sfx.play(sfx::Id::Beat);
+                    self.audio.play(sfx::Id::Beat);
                     let p = self.player.pos + self.player.facing * 7.0;
                     self.fx.push(glint(p, WHITE, 0.18));
                 }
                 player::Event::Heavy => {
                     // 강공격(0161): 마무리 타 소리 + 앞으로 튀는 불똥.
-                    sfx.play(sfx::Id::Claw(2));
+                    self.audio.play(sfx::Id::Claw(2));
                     let p = self.player.pos + self.player.facing * 6.0;
                     spray(&mut self.fx, p, self.player.facing, 6, WHITE, 120.0);
                 }
                 player::Event::HeavyReady => {
                     // 다 모였다: 발톱이 번쩍 + 짧은 흰 번쩍(0168, 흔들림 설정을 따른다).
-                    sfx.play(sfx::Id::Charge);
+                    self.audio.play(sfx::Id::Charge);
                     self.feel.flash = self.feel.flash.max(t::HEAVY_READY_FLASH);
                     let p = self.player.pos + self.player.facing * 7.0;
                     self.fx.push(glint(p, WHITE, 0.35));
                     self.fx.push(ring(p, 2.0, 10.0, 0.2, WHITE));
                 }
-                player::Event::ChargeStart => sfx.play(sfx::Id::ChargeUp),
+                player::Event::ChargeStart => self.audio.play(sfx::Id::ChargeUp),
                 player::Event::HeavyPerfect => {
                     // 딱 맞춘 강타(0168): 박자 '틱' + 큰 반짝임.
-                    sfx.play(sfx::Id::Beat);
+                    self.audio.play(sfx::Id::Beat);
                     let p = self.player.pos + self.player.facing * 8.0;
                     self.fx.push(glint(p, WHITE, 0.3));
                     self.fx.push(ring(p, 4.0, 16.0, 0.18, WHITE));
@@ -679,7 +714,7 @@ impl World {
                 player::Event::Burrow => {
                     // 파고들기(0160): 흙이 확 튀고 화면이 살짝 — 톡 한 번이 "동작"으로 읽히게.
                     self.burrows += 1;
-                    sfx.play(sfx::Id::Burrow);
+                    self.audio.play(sfx::Id::Burrow);
                     self.feel.add_trauma(0.12);
                     self.fx.push(ring(self.player.pos, 4.0, 18.0, 0.22, DIRT));
                     clods(&mut self.fx, self.player.pos, 10, DIRT, 85.0);
@@ -694,7 +729,7 @@ impl World {
                 }
                 player::Event::Rumble => {
                     // 힘 모으기 시작(0158): 땅이 울기 시작하는 소리 + 작은 흙 고리.
-                    sfx.play(sfx::Id::Rumble);
+                    self.audio.play(sfx::Id::Rumble);
                     self.fx.push(ring(self.player.pos, 3.0, 10.0, 0.25, DIRT));
                 }
                 player::Event::Emerge => {
@@ -702,8 +737,8 @@ impl World {
                     // 모은 힘(0158)만큼 고리·흙·흔들림이 크고, 다 모았으면 소리도 무겁다.
                     let charge = self.player.burrow_charge();
                     let k = 1.0 + (t::EMERGE_CHARGE_RADIUS - 1.0) * charge;
-                    sfx.stop(sfx::Id::Rumble);
-                    sfx.play(if charge >= 0.5 {
+                    self.audio.stop(sfx::Id::Rumble);
+                    self.audio.play(if charge >= 0.5 {
                         sfx::Id::EmergeBig
                     } else {
                         sfx::Id::Emerge
@@ -738,7 +773,8 @@ impl World {
                 }
                 player::Event::DrillRev => {
                     // 부아아…: 소리 하나가 시동부터 돌진 끝까지 간다.
-                    sfx.play(sfx::Id::Drill(self.player.talents.pick[2] as usize));
+                    self.audio
+                        .play(sfx::Id::Drill(self.player.talents.pick[2] as usize));
                     self.fx
                         .push(ring(self.player.pos, 22.0, 3.0, t::DRILL_REV, RAGE));
                 }
@@ -752,8 +788,9 @@ impl World {
                 }
                 player::Event::DrillWall => {
                     self.slams += 1;
-                    sfx.stop(sfx::Id::Drill(self.player.talents.pick[2] as usize));
-                    sfx.play(sfx::Id::DrillWall);
+                    self.audio
+                        .stop(sfx::Id::Drill(self.player.talents.pick[2] as usize));
+                    self.audio.play(sfx::Id::DrillWall);
                     let p = self.player.pos + self.player.facing * 6.0;
                     self.fx
                         .push(ring(p, 6.0, t::DRILL_WALL_RADIUS + 10.0, 0.35, WHITE));
@@ -770,7 +807,7 @@ impl World {
                 // 모모(0056): 뛰어오를 때 흙먼지, 내려앉을 때 작은 고리(이어 뛰기는 크게 + 흔들림).
                 player::Event::Hop => {
                     self.burrows += 1;
-                    sfx.play(sfx::Id::Charge);
+                    self.audio.play(sfx::Id::Charge);
                     burst(&mut self.fx, self.player.pos, 6, DIRT, 50.0);
                     puff(
                         &mut self.fx,
@@ -785,7 +822,7 @@ impl World {
                     let p = self.player.pos;
                     if *big {
                         let r = self.player.chain_radius();
-                        sfx.play(sfx::Id::WallHit);
+                        self.audio.play(sfx::Id::WallHit);
                         self.feel.add_trauma(0.25);
                         self.fx.push(ring(p, 4.0, r + 4.0, 0.25, PETAL));
                         self.fx.push(ring(p, 2.0, r, 0.2, DIRT));
@@ -805,7 +842,7 @@ impl World {
                 }
                 player::Event::Stamp => {
                     let p = self.player.pos;
-                    sfx.play(sfx::Id::Emerge);
+                    self.audio.play(sfx::Id::Emerge);
                     self.feel.add_trauma(0.1);
                     self.fx.push(ring(p, 2.0, t::TAL_STAMP_RADIUS, 0.18, PETAL));
                     burst(&mut self.fx, p, 5, DIRT, 70.0);
@@ -814,7 +851,7 @@ impl World {
             }
         }
         if let Some(c) = ate {
-            self.finish_eating(c, sfx);
+            self.finish_eating(c);
         }
         // 드릴: 시동 중엔 불꽃이 모이고, 돌진 중엔 흙이 튀고 화면이 계속 떨린다.
         if let player::State::Drill { dir, time, .. } = self.player.state {
@@ -844,9 +881,13 @@ impl World {
         }
         // 쓰러졌다: 쥬시 지렁이가 있으면 저절로 먹고 일어난다(목숨).
         if self.player.events.contains(&player::Event::Die) && self.bag.take(Consumable::Worm) {
-            self.revive(sfx);
+            self.revive();
         }
+        strike
+    }
 
+    /// 1a. 퀵 아이템·거절 표시·먹기 시작·토스트 시계.
+    fn tick_items(&mut self, a: &Actions, dt: f32) {
         // 1a. 퀵 아이템
         self.bag.flash = (self.bag.flash - t::TICK_DT).max(0.0);
         if a.item_prev || a.item_next {
@@ -858,7 +899,7 @@ impl World {
         // 할 수 없는 행동(0149): 눌렀는데 아무 일도 안 일어나면 고장 난 줄 안다(0093과 같은 까닭).
         // "안 돼" 소리 + 그 HUD 칸이 붉게 떤다. 필살기는 발치에 김이 픽 빠진다.
         if self.player.is_alive() && self.player.special_denied(a) {
-            self.deny_feedback(0, sfx);
+            self.deny_feedback(0);
             puff(
                 &mut self.fx,
                 self.player.pos + vec2(0.0, 4.0),
@@ -872,10 +913,10 @@ impl World {
             && self.player.is_alive()
             && (self.bag.count(self.bag.selected) == 0 || self.player.item_cooling())
         {
-            self.deny_feedback(1, sfx);
+            self.deny_feedback(1);
         }
         if self.player.wants_to_eat() {
-            self.start_eating(sfx);
+            self.start_eating();
         }
         if let Some((_, time)) = self.toast.as_mut() {
             *time -= dt;
@@ -889,7 +930,10 @@ impl World {
                 self.adv.biome_card = None;
             }
         }
+    }
 
+    /// 1b·1c. 획득물(무기)과 떨어진 것(반딧불·씨앗·가방 아이템·뿌리 심장) 줍기.
+    fn tick_pickups(&mut self, dt: f32) {
         // 1b. 획득물
         let ppos = self.player.pos;
         let mut got = Vec::new();
@@ -903,7 +947,7 @@ impl World {
         });
         for (pos, w) in got {
             self.gifts.push(Gift::Weapon(w));
-            sfx.play(sfx::Id::Emerge);
+            self.audio.play(sfx::Id::Emerge);
             self.fx.push(ring(pos, 4.0, 18.0, 0.3, WHITE));
             burst(&mut self.fx, pos, 14, PROJECTILE, 80.0);
         }
@@ -944,16 +988,16 @@ impl World {
         self.glowbugs += bugs;
         self.seeds += seeds;
         if bugs > 0 || seeds > 0 {
-            sfx.play(sfx::Id::Glowbug);
+            self.audio.play(sfx::Id::Glowbug);
         }
         if items > 0 {
-            sfx.play(sfx::Id::Claw(0));
+            self.audio.play(sfx::Id::Claw(0));
         }
         if hearts > 0 {
             self.root_hearts += hearts;
             self.refresh_stats();
             self.player.heal(self.player.stats.max_hp);
-            sfx.play(sfx::Id::Heal);
+            self.audio.play(sfx::Id::Heal);
             self.toast = Some((|s| s.toast_heart, 2.5));
         }
         for (pos, kind) in picked_at {
@@ -976,7 +1020,10 @@ impl World {
                 }
             }
         }
+    }
 
+    /// 2. 적·이웃 한 틱(필살기 시동 중엔 멈춘다). 깨어 있는 적은 도감에 적는다.
+    fn tick_enemies(&mut self, dt: f32) {
         // 2. 적·투사체
         let targetable = self.player.is_alive() && !self.player.is_burrowed();
         self.enemy_events.clear();
@@ -1027,23 +1074,27 @@ impl World {
                 self.seen.push(e.kind);
             }
         }
+    }
+
+    /// 적 틱 안에서 쓰러진 적(독·벽 쿵). 떨어뜨릴 것은 `deaths`에 모았다가 `settle_deaths`에서.
+    fn tick_deaths(&mut self, deaths: &mut Vec<(Vec2, Kind)>) {
         // 쓰러진 적(독·공격). 떨어뜨릴 것은 루프가 끝난 뒤에.
-        let mut deaths: Vec<(Vec2, Kind)> = Vec::new();
         for e in self.enemies.iter_mut().filter(|e| e.died_of_poison) {
             e.died_of_poison = false;
-            self.kills += 1;
-            deaths.push((e.pos, e.kind));
-            sfx.play(sfx::Id::EnemyDie);
-            let color = enemy_color(e.kind);
-            self.fx
-                .push(ring(e.pos, e.radius(), e.radius() * 3.0, 0.25, POISON));
-            burst(&mut self.fx, e.pos, 10, color, 90.0);
-            unravel(&mut self.fx, e.pos, e.radius());
+            enemy_down(
+                &mut self.fx,
+                &mut self.audio,
+                &mut self.feel,
+                &mut self.kills,
+                deaths,
+                e,
+                POISON,
+            );
         }
         // 벽 쿵(0168): 강공격에 날아가다 벽에 박힌 적.
         for e in self.enemies.iter_mut().filter(|e| e.slammed) {
             e.slammed = false;
-            sfx.play(sfx::Id::WallHit);
+            self.audio.play(sfx::Id::WallHit);
             self.feel.add_hitstop(t::WALL_SLAM_HITSTOP);
             self.feel.add_trauma(t::WALL_SLAM_SHAKE);
             let back = e.vel.normalize_or_zero();
@@ -1051,14 +1102,21 @@ impl World {
             spray(&mut self.fx, e.pos, back, 6, WHITE, 160.0);
             clods(&mut self.fx, e.pos - back * e.radius(), 5, DIRT, 90.0);
             if !e.alive {
-                self.kills += 1;
-                deaths.push((e.pos, e.kind));
-                sfx.play(sfx::Id::EnemyDie);
-                let color = enemy_color(e.kind);
-                burst(&mut self.fx, e.pos, 12, color, 110.0);
-                unravel(&mut self.fx, e.pos, e.radius());
+                enemy_down(
+                    &mut self.fx,
+                    &mut self.audio,
+                    &mut self.feel,
+                    &mut self.kills,
+                    deaths,
+                    e,
+                    enemy_color(e.kind),
+                );
             }
         }
+    }
+
+    /// 모으는 동안(0168) 발 쪽으로 빨려 드는 먼지.
+    fn charge_dust(&mut self, dt: f32) {
         // 모으는 동안(0168): 발 쪽으로 빨려 드는 먼지.
         if let player::State::Charging { .. } = self.player.state {
             self.charge_fx_t += dt;
@@ -1080,32 +1138,36 @@ impl World {
         } else {
             self.charge_fx_t = 0.0;
         }
+    }
+
+    /// 적 이벤트의 소리·효과. 대장의 소환과 도토의 묻기는 (소환, 묻을 수)로 돌려줘 장애물 처리 뒤에 한다.
+    fn enemy_events(&mut self) -> (bool, usize) {
         let mut summon = false;
         let mut bury = 0;
         let mut thumps = Vec::new();
         let mut threads = Vec::new();
         for ev in &self.enemy_events {
             match ev {
-                enemy::Event::Charge => sfx.play(sfx::Id::Charge),
+                enemy::Event::Charge => self.audio.play(sfx::Id::Charge),
                 enemy::Event::WallHit => {
-                    sfx.play(sfx::Id::WallHit);
+                    self.audio.play(sfx::Id::WallHit);
                     self.feel.add_trauma(0.2);
                 }
-                enemy::Event::Shoot => sfx.play(sfx::Id::Shoot),
-                enemy::Event::Leap => sfx.play(sfx::Id::Charge),
+                enemy::Event::Shoot => self.audio.play(sfx::Id::Shoot),
+                enemy::Event::Leap => self.audio.play(sfx::Id::Charge),
                 enemy::Event::Land => {
-                    sfx.play(sfx::Id::WallHit);
+                    self.audio.play(sfx::Id::WallHit);
                     self.feel.add_trauma(0.12);
                 }
                 enemy::Event::Summon => summon = true,
                 enemy::Event::Bury(n) => bury = *n,
-                enemy::Event::Dig => sfx.play(sfx::Id::Burrow),
+                enemy::Event::Dig => self.audio.play(sfx::Id::Burrow),
                 enemy::Event::Pop => {
-                    sfx.play(sfx::Id::Emerge);
+                    self.audio.play(sfx::Id::Emerge);
                     self.feel.add_trauma(0.25);
                 }
-                enemy::Event::Tongue => sfx.play(sfx::Id::Shoot),
-                enemy::Event::Spore => sfx.play(sfx::Id::Burrow),
+                enemy::Event::Tongue => self.audio.play(sfx::Id::Shoot),
+                enemy::Event::Spore => self.audio.play(sfx::Id::Burrow),
                 enemy::Event::Thump(at) => thumps.push(*at),
                 enemy::Event::Thread(at, dir) => threads.push((*at, *dir)),
             }
@@ -1116,6 +1178,11 @@ impl World {
         for (at, dir) in threads {
             self.thread_at(at, dir);
         }
+        (summon, bury)
+    }
+
+    /// 모모가 숨는·튀어나오는 자리의 흙, 포자 구름·충격파·실 가닥의 시계.
+    fn enemy_dirt(&mut self, dt: f32, frozen: bool) {
         // 모모가 숨는·튀어나오는 자리에 흙.
         for e in &self.enemies {
             match e.state {
@@ -1150,6 +1217,10 @@ impl World {
         if self.thread_lash.is_some_and(|(_, _, age)| age > 0.3) {
             self.thread_lash = None;
         }
+    }
+
+    /// 무너지는 천장(0147): 돌을 떨어뜨리고, 이번 틱에 떨어진 자리를 돌려준다(적은 여기서 맞고, 플레이어는 `hit_player`에서).
+    fn rockfall(&mut self, dt: f32, frozen: bool, deaths: &mut Vec<(Vec2, Kind)>) -> Vec<Vec2> {
         // 무너지는 천장(0147): 심층 싸움방에서 문이 잠긴 동안(보스·꿈은 빼고) 몇 초마다 돌 하나.
         // 플레이어 둘레가 많고, 가끔 적 둘레에 떨어져 적도 맞는다. 땅속은 괜찮다.
         let quake = self.adv.place == Place::Dungeon
@@ -1189,7 +1260,7 @@ impl World {
         }
         self.rocks.retain(|r| r.time < t::ROCK_FALL);
         for &p in &landed {
-            sfx.play(sfx::Id::WallHit);
+            self.audio.play(sfx::Id::WallHit);
             self.feel.add_trauma(0.18);
             self.fx.push(ring(p, 3.0, t::ROCK_R + 3.0, 0.25, DIRT));
             clods(&mut self.fx, p, 8, ROCK, 100.0);
@@ -1202,14 +1273,23 @@ impl World {
                 let away = (e.pos - p).normalize_or(vec2(1.0, 0.0));
                 e.hurt(t::ROCK_ENEMY_DAMAGE, away, 140.0, 0.8);
                 if !e.alive {
-                    self.kills += 1;
-                    deaths.push((e.pos, e.kind));
-                    sfx.play(sfx::Id::EnemyDie);
-                    burst(&mut self.fx, e.pos, 12, enemy_color(e.kind), 110.0);
-                    unravel(&mut self.fx, e.pos, e.radius());
+                    enemy_down(
+                        &mut self.fx,
+                        &mut self.audio,
+                        &mut self.feel,
+                        &mut self.kills,
+                        deaths,
+                        e,
+                        enemy_color(e.kind),
+                    );
                 }
             }
         }
+        landed
+    }
+
+    /// 가시뿌리 덤불(0147): 돌진하던 적이 박혀 멈춘다.
+    fn thorn_pricks(&mut self, deaths: &mut Vec<(Vec2, Kind)>) {
         // 가시뿌리 덤불(0147): 돌진하다 덤불에 박으면 찔려 멈춘다. 나는 박쥐·말린 고슴도치·보스는 그대로 지나간다.
         if !self.room.thorns.is_empty() {
             for e in self.enemies.iter_mut() {
@@ -1229,20 +1309,28 @@ impl World {
                     continue;
                 }
                 e.hurt(t::THORN_ENEMY_DAMAGE, -dir, 60.0, t::THORN_STUN);
-                sfx.play(sfx::Id::EnemyHit);
+                self.audio.play(sfx::Id::EnemyHit);
                 self.fx.push(ring(e.pos, 2.0, 10.0, 0.15, THORN));
                 if !e.alive {
-                    self.kills += 1;
-                    deaths.push((e.pos, e.kind));
-                    sfx.play(sfx::Id::EnemyDie);
-                    burst(&mut self.fx, e.pos, 12, enemy_color(e.kind), 110.0);
-                    unravel(&mut self.fx, e.pos, e.radius());
+                    enemy_down(
+                        &mut self.fx,
+                        &mut self.audio,
+                        &mut self.feel,
+                        &mut self.kills,
+                        deaths,
+                        e,
+                        enemy_color(e.kind),
+                    );
                 }
             }
         }
+    }
+
+    /// 대장이 울부짖으면 양옆에 생쥐 떼.
+    fn summon_mice(&mut self, summon: bool) {
         // 대장이 울부짖으면 양옆에 생쥐 떼(셋).
         if summon {
-            sfx.play(sfx::Id::Shoot);
+            self.audio.play(sfx::Id::Shoot);
             self.feel.add_trauma(0.2);
             let chief: Vec<Vec2> = self
                 .enemies
@@ -1263,9 +1351,13 @@ impl World {
                 burst(&mut self.fx, p, 10, DIRT, 70.0);
             }
         }
+    }
+
+    /// 도토가 묻는 도토리 지뢰(0052).
+    fn bury_mines(&mut self, bury: usize) {
         // 도토가 묻으면: 하나는 플레이어 발밑, 나머지는 둘레에 고르게(바닥 안으로).
         if bury > 0 {
-            sfx.play(sfx::Id::Burrow);
+            self.audio.play(sfx::Id::Burrow);
             let fuse = t::DOTO_MINE_FUSE
                 * self
                     .enemies
@@ -1288,6 +1380,15 @@ impl World {
                 burst(&mut self.fx, p, 6, DIRT, 50.0);
             }
         }
+    }
+
+    /// 묻힌 도토리의 터짐(터진 자리를 돌려준다), 투사체 한 틱, 되돌린 투사체 → 적.
+    fn tick_mines_and_projectiles(
+        &mut self,
+        dt: f32,
+        frozen: bool,
+        deaths: &mut Vec<(Vec2, Kind)>,
+    ) -> Vec<Vec2> {
         // 묻힌 도토리가 터진다(필살기 시동 중엔 멈춘다). 도토가 없으면 다 사라진다.
         let mut popped = Vec::new();
         if !self.enemies.iter().any(|e| e.kind == Kind::Doto) {
@@ -1301,7 +1402,7 @@ impl World {
         }
         self.mines.retain(|m| m.time < m.fuse);
         for &p in &popped {
-            sfx.play(sfx::Id::Emerge);
+            self.audio.play(sfx::Id::Emerge);
             self.feel.add_trauma(0.15);
             self.fx
                 .push(ring(p, 3.0, t::DOTO_MINE_RADIUS + 2.0, 0.25, PROJECTILE));
@@ -1329,19 +1430,28 @@ impl World {
                         0.4,
                     );
                     p.alive = false;
-                    sfx.play(sfx::Id::EnemyHit);
+                    self.audio.play(sfx::Id::EnemyHit);
                     self.fx.push(ring(p.pos, 3.0, 12.0, 0.18, WHITE));
                     if !e.alive {
-                        self.kills += 1;
-                        deaths.push((e.pos, e.kind));
-                        burst(&mut self.fx, e.pos, 12, enemy_color(e.kind), 110.0);
-                        unravel(&mut self.fx, e.pos, e.radius());
+                        enemy_down(
+                            &mut self.fx,
+                            &mut self.audio,
+                            &mut self.feel,
+                            &mut self.kills,
+                            deaths,
+                            e,
+                            enemy_color(e.kind),
+                        );
                     }
                     break;
                 }
             }
         }
+        popped
+    }
 
+    /// 3. 플레이어 공격 → 적·투사체·지뢰. 맞힌 확인(킥·멈춤·소리), 등딱지·자세 깨기, 벽 쿵 표시, 패링.
+    fn apply_strike(&mut self, strike: Option<Strike>, deaths: &mut Vec<(Vec2, Kind)>) {
         // 3. 플레이어 공격 → 적·투사체
         if let Some(s) = strike {
             let origin = self.player.pos;
@@ -1455,21 +1565,21 @@ impl World {
                 // 맞은 쪽으로 튀는 불똥(0081): 어디로 밀었는지 보인다.
                 spray(&mut self.fx, hit_point, dir, 4, WHITE, 140.0);
                 if e.alive {
-                    sfx.play(sfx::Id::EnemyHit);
-                    sfx.play(sfx::Id::HitTick);
+                    self.audio.play(sfx::Id::EnemyHit);
+                    self.audio.play(sfx::Id::HitTick);
                 } else {
-                    self.kills += 1;
-                    deaths.push((e.pos, e.kind));
                     if s.kind == crate::combat::StrikeKind::Emerge {
                         self.emerge_kills += 1;
                     }
-                    sfx.play(sfx::Id::EnemyDie);
-                    self.feel.add_trauma(t::ENEMY_DIE_SHAKE);
-                    let color = enemy_color(e.kind);
-                    self.fx
-                        .push(ring(e.pos, e.radius(), e.radius() * 3.0, 0.25, color));
-                    burst(&mut self.fx, e.pos, 12, color, 110.0);
-                    unravel(&mut self.fx, e.pos, e.radius());
+                    enemy_down(
+                        &mut self.fx,
+                        &mut self.audio,
+                        &mut self.feel,
+                        &mut self.kills,
+                        deaths,
+                        e,
+                        enemy_color(e.kind),
+                    );
                 }
             }
             if hit_any {
@@ -1477,7 +1587,7 @@ impl World {
                 self.player.vel = Vec2::ZERO;
             }
             if let Some((p, dir)) = impact_at {
-                sfx.play(sfx::Id::Impact);
+                self.audio.play(sfx::Id::Impact);
                 self.fx.push(ring(p, 3.0, 22.0, 0.2, WHITE));
                 spray(&mut self.fx, p, dir, 8, WHITE, 200.0);
                 clods(&mut self.fx, p, 6, DIRT, 90.0);
@@ -1496,7 +1606,7 @@ impl World {
             if let Some((from, kind)) = shell_from {
                 self.player
                     .recoil(from, t::KONGI_RECOIL, t::KONGI_RECOIL_LOCK);
-                sfx.play(sfx::Id::WallHit);
+                self.audio.play(sfx::Id::WallHit);
                 self.feel.add_hitstop(t::PARRY_HITSTOP * 0.6);
                 self.feel.add_trauma(0.2);
                 let p = (self.player.pos + from) * 0.5;
@@ -1514,7 +1624,7 @@ impl World {
                 ));
             }
             if let Some(at) = broke_at {
-                sfx.play(sfx::Id::DrillWall);
+                self.audio.play(sfx::Id::DrillWall);
                 self.feel.add_trauma(0.3);
                 self.fx.push(ring(at, 4.0, 24.0, 0.3, SHELL));
                 burst(&mut self.fx, at, 14, SHELL, 130.0);
@@ -1540,7 +1650,7 @@ impl World {
                 }
             }
             if parried {
-                self.parry_feedback(sfx);
+                self.parry_feedback();
             }
             // 발톱이 닿은 묻힌 도토리는 파낸다(터지지 않는다).
             let before = self.mines.len();
@@ -1553,14 +1663,17 @@ impl World {
                 !hit
             });
             if self.mines.len() < before {
-                sfx.play(sfx::Id::Claw(0));
+                self.audio.play(sfx::Id::Claw(0));
             }
             for p in dug {
                 self.fx.push(ring(p, 2.0, 8.0, 0.15, DIRT));
                 burst(&mut self.fx, p, 6, DIRT, 70.0);
             }
         }
+    }
 
+    /// 이번 틱에 쓰러진 적이 떨어뜨리는 것(루프 밖에서).
+    fn settle_deaths(&mut self, deaths: Vec<(Vec2, Kind)>) {
         for (pos, kind) in deaths {
             // 포자버섯은 쓰러지면서도 한 번 뿜는다.
             if kind == Kind::SporeCap {
@@ -1569,7 +1682,10 @@ impl World {
             self.adv.last_kill = pos;
             self.drop_loot(pos, kind);
         }
+    }
 
+    /// 4. 적·투사체·위험물(구름·돌·충격파·덤불·지뢰) → 플레이어. 받아치기 판정도 여기.
+    fn hit_player(&mut self, landed: &[Vec2], popped: &[Vec2]) {
         // 4. 적·투사체 → 플레이어
         if self.player.is_alive() && !self.player.is_invulnerable() {
             let pr = self.player.radius();
@@ -1630,7 +1746,7 @@ impl World {
                 }
             }
             if parried {
-                self.parry_feedback(sfx);
+                self.parry_feedback();
             }
             if hurt_from.is_none() && !parried {
                 let rr = pr + t::SPORE_CLOUD_R;
@@ -1721,15 +1837,18 @@ impl World {
                     self.feel.add_trauma(t::PLAYER_HURT_SHAKE);
                     self.fx.push(ring(self.player.pos, 4.0, 14.0, 0.2, RED));
                     if self.player.is_alive() {
-                        sfx.play(sfx::Id::Hurt);
+                        self.audio.play(sfx::Id::Hurt);
                     } else {
-                        sfx.play(sfx::Id::Die);
+                        self.audio.play(sfx::Id::Die);
                         burst(&mut self.fx, self.player.pos, 16, MOLE, 90.0);
                     }
                 }
             }
         }
+    }
 
+    /// 5. 적끼리 겹치지 않게 민다.
+    fn separate_enemies(&mut self, dt: f32) {
         // 5. 적끼리 겹침 방지
         for i in 0..self.enemies.len() {
             for j in (i + 1)..self.enemies.len() {
@@ -1753,7 +1872,10 @@ impl World {
                 }
             }
         }
+    }
 
+    /// 6. 정리: 쓰러진 것 치우기, 효과 시계, 출구·보스 카드 시계, 발걸음 먼지.
+    fn cleanup(&mut self, dt: f32) {
         // 6. 정리
         self.enemies.retain(|e| e.alive);
         self.projectiles.retain(|p| p.alive);
@@ -1780,10 +1902,10 @@ impl World {
         } else {
             self.step_dist = STEP_DUST_EVERY * 0.6;
         }
+    }
 
-        // 7. 모험(입구·출구·저장, 던전 방, 카메라)
-        self.adventure_post(sfx);
-
+    /// 8. 웨이브(아레나).
+    fn tick_waves(&mut self, dt: f32) {
         // 8. 웨이브(아레나)
         if self.auto_waves
             && self.adv.place == Place::Arena
@@ -1800,14 +1922,14 @@ impl World {
 
     /// 패링 성공 연출: 번쩍, 히트스톱, SP.
     /// 할 수 없는 행동(0149): 소리 하나 + HUD 칸 떨기. 칸이 이미 떨고 있으면 소리를 다시 내지 않는다(연타).
-    fn deny_feedback(&mut self, k: usize, sfx: &Sfx) {
+    fn deny_feedback(&mut self, k: usize) {
         if self.deny[k] < t::DENY_TIME * 0.5 {
-            sfx.play(sfx::Id::Deny);
+            self.audio.play(sfx::Id::Deny);
         }
         self.deny[k] = t::DENY_TIME;
     }
 
-    fn parry_feedback(&mut self, sfx: &Sfx) {
+    fn parry_feedback(&mut self) {
         self.parries += 1;
         self.player.on_parry();
         self.feel.add_hitstop(t::PARRY_HITSTOP);
@@ -1816,7 +1938,7 @@ impl World {
         self.fx.push(ring(p, 2.0, 18.0, 0.22, WHITE));
         self.fx.push(ring(p, 2.0, 10.0, 0.15, PROJECTILE));
         burst(&mut self.fx, p, 10, WHITE, 120.0);
-        sfx.play(sfx::Id::Parry);
+        self.audio.play(sfx::Id::Parry);
         self.toast = Some((|s| s.toast_parry, 0.8));
     }
 
@@ -1828,7 +1950,7 @@ impl World {
 
     /// 퀵 슬롯 아이템을 먹기 시작한다. 체력이 가득이거나 슬롯이 비었으면 먹지 않는다(아깝지 않게).
     /// 회복은 다 먹었을 때(`Event::Ate`, docs/decisions/0038).
-    fn start_eating(&mut self, sfx: &Sfx) {
+    fn start_eating(&mut self) {
         let p = &mut self.player;
         let c = self.bag.selected;
         if self.bag.count(c) == 0 {
@@ -1838,14 +1960,14 @@ impl World {
             // 아무 일도 안 일어나면 고장 난 줄 안다(튜토리얼에서 막혔다, 0093): 왜 안 먹는지 알린다.
             p.drop_item_press();
             self.toast = Some((|s| s.toast_eat_full, 1.6));
-            self.deny_feedback(1, sfx);
+            self.deny_feedback(1);
             return;
         }
         p.start_eat(c);
     }
 
     /// 다 먹었다: 가방에서 꺼내 회복. 먹는 사이 체력이 가득 찼으면(샘 등) 꺼내지 않는다.
-    fn finish_eating(&mut self, c: Consumable, sfx: &Sfx) {
+    fn finish_eating(&mut self, c: Consumable) {
         let p = &mut self.player;
         if p.hp >= p.stats.max_hp || !self.bag.take(c) {
             return;
@@ -1854,7 +1976,7 @@ impl World {
             Consumable::Berry => p.heal(p.talents.berry_heal()),
             Consumable::Worm => p.heal(p.stats.max_hp),
         }
-        sfx.play(sfx::Id::Heal);
+        self.audio.play(sfx::Id::Heal);
         self.items_used += 1;
         let pos = p.pos;
         self.fx.push(ring(pos, 3.0, 14.0, 0.3, BERRY));
@@ -1862,7 +1984,7 @@ impl World {
     }
 
     /// 쥬시 지렁이로 일어난다: 체력 일부, 잠깐 무적, 주변을 밀어낸다.
-    fn revive(&mut self, sfx: &Sfx) {
+    fn revive(&mut self) {
         self.player.revive();
         let pos = self.player.pos;
         for e in &mut self.enemies {
@@ -1876,7 +1998,7 @@ impl World {
                 p.alive = false;
             }
         }
-        sfx.play(sfx::Id::Heal);
+        self.audio.play(sfx::Id::Heal);
         self.fx
             .push(ring(pos, 4.0, t::REVIVE_PUSH_RADIUS, 0.4, BERRY));
         burst(&mut self.fx, pos, 20, BERRY, 120.0);
@@ -1967,7 +2089,7 @@ impl World {
     pub fn cue(&mut self, cue: Cue, at: Vec2) {
         match cue {
             Cue::Unbind => {
-                self.sounds.push(sfx::Id::Unbind);
+                self.audio.play(sfx::Id::Unbind);
                 self.feel.add_trauma(0.3);
                 self.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
                 self.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
@@ -1994,7 +2116,7 @@ impl World {
                 petals(&mut self.fx, at, 18, color, 70.0);
             }
             Cue::Rise => {
-                self.sounds.push(sfx::Id::Rumble);
+                self.audio.play(sfx::Id::Rumble);
                 self.feel.add_trauma(0.4);
                 self.fx.push(ring(at, 26.0, 4.0, 0.5, THREAD));
                 self.fx
@@ -2010,7 +2132,7 @@ impl World {
                 clods(&mut self.fx, at, 8, DIRT, 70.0);
             }
             Cue::Vanish => {
-                self.sounds.push(sfx::Id::Burrow);
+                self.audio.play(sfx::Id::Burrow);
                 self.feel.add_trauma(0.15);
                 self.fx.push(ring(at, 16.0, 2.0, 0.35, THREAD));
                 puff(
@@ -2025,7 +2147,7 @@ impl World {
                 unravel(&mut self.fx, at, 10.0);
             }
             Cue::Wrap => {
-                self.sounds.push(sfx::Id::Rumble);
+                self.audio.play(sfx::Id::Rumble);
                 self.feel.add_trauma(0.35);
                 for (k, r) in [48.0, 36.0, 24.0].into_iter().enumerate() {
                     let mut f = ring(at, r, 3.0, 0.7, THREAD);
@@ -2056,7 +2178,7 @@ impl World {
                 petals(&mut self.fx, at, 6, Color::new(0.74, 0.56, 0.60, 1.0), 30.0);
             }
             Cue::Hatch => {
-                self.sounds.push(sfx::Id::Unbind);
+                self.audio.play(sfx::Id::Unbind);
                 let cocoons = std::mem::take(&mut self.cocoons);
                 for (k, c) in cocoons.into_iter().enumerate() {
                     self.fx.push(ring(c, 3.0, 22.0, 0.4, WHITE));
@@ -2072,7 +2194,7 @@ impl World {
                 }
             }
             Cue::Sparkle => {
-                self.sounds.push(sfx::Id::Glowbug);
+                self.audio.play(sfx::Id::Glowbug);
                 for k in 0..6 {
                     let ang = k as f32 / 6.0 * std::f32::consts::TAU + 0.4;
                     let mut g = glint(
@@ -2120,7 +2242,7 @@ impl World {
 
     /// 토끼풀이 발을 굴렀다(0165): 충격파 고리 + 흙·흔들림, 플레이어 둘레에 흰 실 그물이 몇 개 떨어진다.
     fn thump_at(&mut self, at: Vec2) {
-        self.sounds.push(sfx::Id::Impact);
+        self.audio.play(sfx::Id::Impact);
         self.feel.add_trauma(0.45);
         self.feel.add_hitstop(0.03);
         self.waves.push(Wave {
@@ -2171,7 +2293,7 @@ impl World {
         let reach = self.room.ray_len(at, dir, 1.0, t::CLOVER_THREAD_REACH);
         let end = at + dir * reach;
         self.thread_lash = Some((at, end, 0.0));
-        self.sounds.push(sfx::Id::Shoot);
+        self.audio.play(sfx::Id::Shoot);
         let ppos = self.player.pos;
         let pr = self.player.radius();
         if !self.player.is_alive() || !self.player.on_foot() || self.player.is_invulnerable() {
@@ -2193,7 +2315,7 @@ impl World {
             }
             self.thread_lash = Some((at, ppos, 0.1));
             self.player.on_parry();
-            self.sounds.push(sfx::Id::Parry);
+            self.audio.play(sfx::Id::Parry);
             self.toast = Some((|s| s.toast_parry, 0.8));
             self.feel.add_hitstop(t::PARRY_HITSTOP);
             self.fx.push(ring(ppos, 4.0, 18.0, 0.2, WHITE));
@@ -2207,7 +2329,7 @@ impl World {
             t::CLOVER_PULL_LOCK * self.player.stats.wrap_mul,
         );
         self.player.vel = from * t::CLOVER_PULL;
-        self.sounds.push(sfx::Id::Rumble);
+        self.audio.play(sfx::Id::Rumble);
         self.feel.add_trauma(0.25);
         self.fx.push(ring(ppos, 6.0, 18.0, 0.3, THREAD));
     }
@@ -2226,7 +2348,7 @@ impl World {
             return;
         };
         self.cocoon_bounce_id = s.id;
-        self.sounds.push(sfx::Id::WallHit);
+        self.audio.play(sfx::Id::WallHit);
         self.feel.add_hitstop(0.04);
         self.fx.push(ring(c, 4.0, 14.0, 0.2, WHITE));
         puff(
@@ -2255,7 +2377,7 @@ impl World {
             }
         });
         for c in cut {
-            self.sounds.push(sfx::Id::Unbind);
+            self.audio.play(sfx::Id::Unbind);
             self.fx.push(ring(c, 3.0, 16.0, 0.3, WHITE));
             puff(
                 &mut self.fx,
@@ -2399,7 +2521,7 @@ impl World {
                         {
                             p.snapped = true;
                             self.player.on_parry();
-                            self.sounds.push(sfx::Id::Parry);
+                            self.audio.play(sfx::Id::Parry);
                             self.toast = Some((|s| s.toast_parry, 0.8));
                             self.feel.add_hitstop(t::PARRY_HITSTOP);
                             self.fx.push(ring(pp, 4.0, 18.0, 0.2, WHITE));
@@ -2409,7 +2531,7 @@ impl World {
                             let wrap = t::DEEP_WRAP_TIME * self.player.stats.wrap_mul;
                             d.wrapped = wrap;
                             self.player.recoil(pp - from, 0.0, wrap);
-                            self.sounds.push(sfx::Id::Rumble);
+                            self.audio.play(sfx::Id::Rumble);
                             self.feel.add_trauma(0.3);
                             self.fx.push(ring(pp, 6.0, 20.0, 0.3, THREAD));
                             // 가장 가까운 안 끊긴 매듭이 다시 조여진다.
@@ -2443,7 +2565,7 @@ impl World {
         let crossed = |at: f32| was < at && now >= at;
         let white = Color::new(0.98, 0.96, 1.0, 1.0);
         if crossed(0.4) {
-            self.sounds.push(sfx::Id::Unbind);
+            self.audio.play(sfx::Id::Unbind);
             self.feel.add_trauma(0.25);
             self.fx.push(ring(c, 10.0, 60.0, 0.7, WHITE));
             self.fx.push(ring(c, 6.0, 40.0, 0.5, THREAD));
@@ -2455,14 +2577,14 @@ impl World {
             petals(&mut self.fx, c + vec2(0.0, -10.0), 24, white, 60.0);
         }
         if crossed(1.6) {
-            self.sounds.push(sfx::Id::Unbind);
+            self.audio.play(sfx::Id::Unbind);
             self.feel.add_trauma(0.2);
             self.fx.push(ring(c, 20.0, 90.0, 0.9, WHITE));
             unravel(&mut self.fx, c, 46.0);
             unravel(&mut self.fx, c + vec2(0.0, 12.0), 34.0);
         }
         if crossed(2.3) {
-            self.sounds.push(sfx::Id::Glowbug);
+            self.audio.play(sfx::Id::Glowbug);
             for k in 0..10 {
                 let ang = k as f32 / 10.0 * std::f32::consts::TAU;
                 let mut g = glint(c + vec2(ang.cos() * 40.0, ang.sin() * 26.0), white, 0.7);
@@ -2504,7 +2626,7 @@ impl World {
                 THREAD,
                 120.0,
             );
-            self.sounds.push(sfx::Id::EnemyHit);
+            self.audio.play(sfx::Id::EnemyHit);
             if k.hp <= 0 {
                 k.cut = true;
                 cut_now = Some(i);
@@ -2513,7 +2635,7 @@ impl World {
         if let Some(i) = cut_now {
             let at = d.knots[i].pos;
             let n = d.cut_count();
-            self.sounds.push(sfx::Id::Unbind);
+            self.audio.play(sfx::Id::Unbind);
             self.feel.add_trauma(0.35);
             self.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
             self.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
@@ -2666,6 +2788,27 @@ fn emerge_push(
             t::EMERGE_PUSH_STUN,
         );
     }
+}
+
+/// 적이 쓰러졌다(0169 R1): 수·떨어뜨릴 자리·소리·고리·터짐·실 풀림·흔들림을 한 곳에서. 어떤 원인(공격·독·돌·덤불·벽 쿵·
+/// 되돌린 투사체)이든 같은 손맛이다. 자기 필드들을 따로 받는 건 `self.enemies`를 도는 중에 부르기 때문(빌림이 겹치지 않게).
+/// `ring_color`는 고리 색(보통 그 적의 색, 독이면 초록).
+fn enemy_down(
+    fx: &mut Vec<Fx>,
+    audio: &mut sfx::Queue,
+    feel: &mut Feel,
+    kills: &mut u32,
+    deaths: &mut Vec<(Vec2, Kind)>,
+    e: &Enemy,
+    ring_color: Color,
+) {
+    *kills += 1;
+    deaths.push((e.pos, e.kind));
+    audio.play(sfx::Id::EnemyDie);
+    feel.add_trauma(t::ENEMY_DIE_SHAKE);
+    fx.push(ring(e.pos, e.radius(), e.radius() * 3.0, 0.25, ring_color));
+    burst(fx, e.pos, 12, enemy_color(e.kind), 110.0);
+    unravel(fx, e.pos, e.radius());
 }
 
 pub(crate) fn ring(pos: Vec2, r0: f32, r1: f32, dur: f32, color: Color) -> Fx {
@@ -2821,7 +2964,7 @@ mod tests {
         w.thump_at(at);
         assert_eq!(w.waves.len(), 1);
         assert_eq!(w.room.webs.len(), t::CLOVER_WAVE_WEBS, "실 그물이 떨어진다");
-        assert!(w.sounds.contains(&sfx::Id::Impact));
+        assert!(w.audio.played(sfx::Id::Impact));
         // 고치: 튕기고 한마디.
         let c = w.player.pos + vec2(20.0, 0.0);
         w.cocoons.push(c);
@@ -2839,7 +2982,7 @@ mod tests {
             poison: 0.0,
         });
         assert!(w.toast.is_some(), "고치는 때릴 수 없다");
-        assert!(w.sounds.contains(&sfx::Id::WallHit));
+        assert!(w.audio.played(sfx::Id::WallHit));
         // 실 한 가닥: 줄 위에 서 있으면 끌려간다.
         let mut e = Enemy::new(Kind::Clover, at);
         e.hp = 10;
@@ -2866,7 +3009,7 @@ mod tests {
             "받아치기 {:?}",
             w.enemies[i].state
         );
-        assert!(w.sounds.contains(&sfx::Id::Parry));
+        assert!(w.audio.played(sfx::Id::Parry));
     }
 
     /// 흰 실 그물(0165): 그물 위를 걸으면 느리고(처음엔 한마디), 땅속은 안 걸리고, 발톱이 닿으면 끊긴다.
@@ -2906,7 +3049,7 @@ mod tests {
             poison: 0.0,
         });
         assert!(w.room.webs.is_empty(), "발톱이 그물을 끊는다");
-        assert!(w.sounds.contains(&sfx::Id::Unbind));
+        assert!(w.audio.played(sfx::Id::Unbind));
         w.web_tick();
         let y1 = w.player.pos.y;
         w.player.update(&walk, &room, t::TICK_DT);
@@ -3006,9 +3149,9 @@ mod tests {
         }
         assert!(w.adv.events.contains(&AdvEvent::DeepDone));
         assert!(
-            w.sounds.iter().filter(|s| **s == sfx::Id::Unbind).count() >= 3,
+            w.audio.count(sfx::Id::Unbind) >= 3,
             "놓아주기: 매듭 셋 + 할매의 실이 풀리는 소리가 더 난다(0163) {:?}",
-            w.sounds
+            w.audio
         );
         assert!(
             w.fx.iter().any(|f| matches!(f.kind, FxKind::Petal { .. })),
