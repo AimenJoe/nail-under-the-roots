@@ -59,6 +59,8 @@ pub enum Scenario {
     Boss,
     /// 첫 쉼터에서 씨앗 40개로(가게·길 지도, docs/decisions/0030, 0031).
     Camp,
+    /// 둘째 쉼터(뿌리 동굴 지도, 0151).
+    Camp2,
     /// 첫 길 끝 굴(모모가 지킨다)에 바로. 숫자 = 이미 이긴 수(0 → 첫 만남, 2 → 세 번째, docs/decisions/0046).
     Momo(u8),
     /// 둘째 길 끝 굴(도토가 지킨다)에 바로(docs/decisions/0052).
@@ -73,7 +75,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 31] = [
+pub const LIST: [Entry; 32] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -83,6 +85,11 @@ pub const LIST: [Entry; 31] = [
         name: "쉼터",
         desc: "첫 쉼터, 씨앗 40. 포포 가게·보리·빈 자리, 아래 뿌리 길에서 길 지도.",
         scenario: Scenario::Camp,
+    },
+    Entry {
+        name: "쉼터: 둘째",
+        desc: "둘째 쉼터 지도(뿌리 동굴). 오른쪽 아래 바위 너머 숨은 자리에 반딧불·씨앗. 셋째는 \"마지막 쉼터\".",
+        scenario: Scenario::Camp2,
     },
     Entry {
         name: "필드(모험)",
@@ -295,6 +302,12 @@ pub fn build(s: Scenario) -> World {
                 w.player.prev_pos = w.player.pos;
                 w.snap_cam();
             }
+            w
+        }
+        Scenario::Camp2 => {
+            let mut w = World::camp_start(2);
+            w.seeds = 40;
+            w.adv.events.clear();
             w
         }
         Scenario::Camp => {

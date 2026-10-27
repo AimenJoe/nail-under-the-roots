@@ -1037,6 +1037,8 @@ impl App {
             self.world.open_glade();
             if self.profile.flag(crate::profile::key::BORI_BACK) {
                 self.world.skip_glade_boss();
+                // 지름길(0151): 이미 다 아는 필드를 런마다 걷지 않는다.
+                self.world.start_near_entrance();
             }
             self.scene = Scene::Game;
             if !self.resuming {

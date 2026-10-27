@@ -230,6 +230,16 @@ impl World {
         }
     }
 
+    /// 지름길(0151): 보리가 돌아온 뒤의 런은 넓은 필드를 다 걷지 않고, 남쪽 공터 굴 입구 바로 위에서 시작한다.
+    /// 쓰러지면 돌아올 자리(저장)도 여기. 필드는 첫 런·튜토리얼, 그리고 걸어서 올라가 보고 싶을 때를 위해 그대로 둔다.
+    pub fn start_near_entrance(&mut self) {
+        let at = self.adv.entrance_pos - vec2(0.0, t::FIELD_SHORTCUT_UP);
+        self.player.pos = at;
+        self.player.prev_pos = at;
+        self.adv.save_pos = at;
+        self.snap_cam();
+    }
+
     /// 큰 나무 아래 마을(0045). 이웃·꾸미기·나무는 `v`(앱이 기록에서 만든 것)를 따른다.
     pub fn village(v: crate::village::State) -> World {
         let p = crate::village::parse();
@@ -717,12 +727,13 @@ impl World {
 
     /// 다음 쉼터: 필드·굴은 버리고 쉼터를 새로 짓는다. 체력 가득, 저장 고리가 다시 설 곳, 새 길.
     fn enter_camp(&mut self) {
-        let p = crate::camp::parse();
         self.adv.field = None;
         self.adv.dungeon = None;
         self.adv.node = None;
         self.adv.stage += 1;
         let stage = self.adv.stage;
+        // 쉼터마다 지도가 다르다(0151).
+        let p = crate::camp::parse(stage);
         self.room = Room::from_grid(p.grid, p.props, p.spawn_points);
         self.enemies.clear();
         self.loot.clear();
@@ -737,6 +748,22 @@ impl World {
                 'b' => self.neighbors.push(Npc::standing(Who::Bori, *at)),
                 // 수수는 첫 쉼터(꽃 핀 입구 바로 아래)에만 있다(0053).
                 'z' if stage == 1 => self.neighbors.push(Npc::standing(Who::Susu, *at)),
+                // 숨은 자리(0151): 반딧불 한 줌과 씨앗 둘(구르지 않게 제자리에).
+                '*' => {
+                    for k in 0..t::CAMP_NOOK_BUGS {
+                        let a = k as f32 * std::f32::consts::TAU / t::CAMP_NOOK_BUGS as f32;
+                        self.loot.push(Loot::place(
+                            LootKind::Glowbug,
+                            *at + Vec2::from_angle(a) * 5.0,
+                        ));
+                    }
+                    for k in 0..t::CAMP_NOOK_SEEDS {
+                        self.loot.push(Loot::place(
+                            LootKind::Seed,
+                            *at + vec2(-4.0 + 8.0 * k as f32, 7.0),
+                        ));
+                    }
+                }
                 _ => {}
             }
         }
@@ -756,7 +783,7 @@ impl World {
         self.adv.route = Some(Route::generate(self.adv.seed, stage));
         self.adv.last_cell = None;
         self.adv.events.push(AdvEvent::CampArrive(stage));
-        self.biome = Biome::Roots;
+        self.biome = crate::camp::biome(stage);
         self.toast = Some((|s| s.toast_camp, 2.5));
         self.snap_cam();
     }
@@ -1107,6 +1134,44 @@ fn exit_cell(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 지름길(0151): 공터 안, 굴 입구 바로 위의 걸을 수 있는 칸에서 시작하고, 저장도 거기.
+    #[test]
+    fn veteran_shortcut_starts_in_glade_above_entrance() {
+        let mut w = World::field();
+        w.open_glade();
+        w.skip_glade_boss();
+        w.start_near_entrance();
+        let g = w.adv.glade.expect("공터");
+        assert!(g.contains(w.player.pos));
+        assert_eq!(w.room.cell_at(w.player.pos), Some(Cell::Floor));
+        assert!((w.player.pos - w.adv.entrance_pos).length() < 80.0);
+        assert_eq!(w.adv.save_pos, w.player.pos);
+    }
+
+    /// 쉼터마다 지도가 다르고(0151), 숨은 자리의 반딧불·씨앗이 놓인다. 마지막 길 앞은 심층.
+    #[test]
+    fn each_camp_has_its_own_map_and_nook() {
+        let mut w = World::camp_start(1);
+        let first: Vec<Cell> = (0..26)
+            .map(|x| w.room.grid.as_ref().unwrap().get(x, 2))
+            .collect();
+        let bugs = |w: &World| {
+            w.loot
+                .iter()
+                .filter(|l| l.kind == LootKind::Glowbug)
+                .count()
+        };
+        assert_eq!(bugs(&w), t::CAMP_NOOK_BUGS as usize);
+        w = World::camp_start(2);
+        let second: Vec<Cell> = (0..26)
+            .map(|x| w.room.grid.as_ref().unwrap().get(x, 2))
+            .collect();
+        assert_ne!(first, second);
+        assert_eq!(bugs(&w), t::CAMP_NOOK_BUGS as usize);
+        w = World::camp_start(3);
+        assert_eq!(w.biome, Biome::Deep);
+    }
 
     #[test]
     fn dungeon_round_trip_and_respawn() {

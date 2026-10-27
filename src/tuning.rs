@@ -352,6 +352,11 @@ pub const CHIEF_STUN_MUL: f32 = 0.35;
 
 // ---- 새 잡몹(src/species.rs, docs/decisions/0146) -------------------------------------
 /// 뒤쥐: 한 번 예고에 몇 번 무나, 다음 물기 예고는 종 예고 × 이것(짧게 다시 겨눈다).
+/// 지름길(0151): 보리가 돌아온 뒤의 런은 굴 입구(D) 이만큼 위(공터 안)에서 시작한다.
+pub const FIELD_SHORTCUT_UP: f32 = 64.0;
+/// 쉼터의 숨은 자리(0151): 반딧불·씨앗 수.
+pub const CAMP_NOOK_BUGS: u32 = 6;
+pub const CAMP_NOOK_SEEDS: u32 = 2;
 /// 할 수 없는 행동(0149): 눌렀는데 조건 때문에 안 되면 HUD 칸이 이 시간 동안 붉게 떤다.
 pub const DENY_TIME: f32 = 0.35;
 
