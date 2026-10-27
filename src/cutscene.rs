@@ -259,12 +259,28 @@ mod device_tests {
                 ..
             }
         ));
-        // 끝까지 돌리면 자리에 꽃잎이 남는다.
+        // 건너뛰기는 모모 앞에서 멈춘다(덧붙임): 한 번 누르면 일러스트·내레이션만 넘기고 모모는 아직 안 나왔다.
         let mut c = c;
         let skip = Actions {
             cancel: true,
             ..Default::default()
         };
+        c.update(&skip, 1.0 / 60.0, &mut w);
+        assert!(!c.is_done(), "한 번 건너뛰면 모모 등장은 남는다");
+        assert!(c.illust.is_none() && !c.actors[1].visible && !w.hush);
+        // 그대로 두면 모모가 나온다(어둠·음악 끊김).
+        let go = Actions::default();
+        for _ in 0..240 {
+            c.update(&go, 1.0 / 60.0, &mut w);
+            if c.actors[1].visible {
+                break;
+            }
+        }
+        assert!(
+            c.actors[1].visible && w.hush,
+            "멈춘 자리부터 재생돼 모모가 걸어 나온다"
+        );
+        // 한 번 더 건너뛰면 끝까지, 자리에 꽃잎이 남는다.
         for _ in 0..400 {
             c.update(&skip, 1.0 / 60.0, &mut w);
             if c.is_done() {
@@ -411,6 +427,8 @@ pub enum Step {
         dir: Vec2,
     },
     Wait(f32),
+    /// 건너뛰기가 멈추는 자리: 앞을 건너뛰면 여기서 다시 재생한다(한 번 더 건너뛰면 그다음까지). 오프닝의 모모 등장 앞(0164 덧붙임).
+    Checkpoint,
     /// 무기를 준다(equipment::WEAPONS 번호). 스토리 보상. 앱이 가방에 넣고 획득 창을 띄운다.
     /// 첫 사용처는 2단계 보스 처치 컷씬(docs/decisions/0012). 그때까지 쓰는 스크립트가 없다.
     #[allow(dead_code)]
@@ -590,6 +608,7 @@ impl Cutscene {
                 true
             }
             Step::Wait(secs) => self.t >= secs,
+            Step::Checkpoint => true,
             Step::Give(i) => {
                 w.gifts.push(crate::world::Gift::Weapon(i));
                 true
@@ -706,8 +725,17 @@ impl Cutscene {
     }
 
     fn finish_fast(&mut self, w: &mut World) {
-        // 끝내는 길이므로 남은 스텝을 빼내 적용한다.
-        let rest = self.steps.split_off(self.idx);
+        // 다음 멈춤 자리(Checkpoint)까지만, 없으면 끝까지. 멈춤 자리가 있으면 거기서 다시 재생한다.
+        let stop = self.steps[self.idx..]
+            .iter()
+            .position(|s| matches!(s, Step::Checkpoint));
+        let end = stop.map_or(self.steps.len(), |k| self.idx + k + 1);
+        let rest: Vec<Step> = self.steps.drain(self.idx..end).collect();
+        if stop.is_some() {
+            self.t = 0.0;
+            self.shown = 0.0;
+            self.fresh = true;
+        }
         for step in rest {
             match step {
                 Step::Move { actor, to, .. } => *self.actor_pos(w, actor) = to,
@@ -747,8 +775,10 @@ impl Cutscene {
                 _ => {}
             }
         }
-        self.done = true;
-        w.freeze();
+        if stop.is_none() {
+            self.done = true;
+            w.freeze();
+        }
     }
 
     /// 지금 보여 줄 대화창.
@@ -1646,6 +1676,8 @@ pub fn opening(w: &World) -> Cutscene {
         },
         Step::Wait(0.3),
         say(0, Face::Worried, |s| s.op_1),
+        // 건너뛰기는 여기서 멈춘다: 일러스트·내레이션을 넘겨도 모모의 등장은 본다(한 번 더 건너뛰면 그것도 넘긴다).
+        Step::Checkpoint,
         // 모모의 첫 등장(0159 → 0164, 사장 "아직도 임팩트 없지? 궁금해하는 게 없나"): 음악이 끊기고 시든 꽃잎이
         // 날아들며 대낮에 어둠이 Naïl 둘레만 남긴다. 어둠 속에 보라 눈빛 두 점 → 모모가 걸어 나와 빛 가장자리에 선다
         // → '???' 카드 → 순간에 덮쳐 한 방(피해 없음, Naïl이 밀려난다) → 스스로 멈춘다("…아니야.") → Naïl을
