@@ -7050,7 +7050,7 @@ pub static PL: Strings = Strings {
     tut_parry: "Tuż przed trafieniem żołędzia {0}: paruj",
     tut_special: "{0}: superatak! Wbij strachy na wróble w ścianę",
     tut_item: "{0}: zjedz malinkę",
-    mob_chief: "Wódz myszy polnych",
+    mob_chief: "Wódz myszy",
     mob_chief_lore: "Stary wódz myszy polnych. Skażony jadem korzeni, strzeże południowej polany.",
     mob_chief_atk: "Długo się trzęsie, a potem szarżuje prosto; przykuca i spada w wielkim skoku. Osłabiony wzywa stado myszy. W trakcie ataku się nie wzdryga.",
     mob_chief_tip: "Naprowadź jego szarżę na skałę lub ścianę, a na długo zakręci mu się w głowie. Wtedy bij.",
