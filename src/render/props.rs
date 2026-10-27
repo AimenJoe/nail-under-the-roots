@@ -709,8 +709,8 @@ pub(super) fn draw_breakable(b: crate::room::Breakable, r: Rect, time: f32) {
 pub(super) fn draw_berry(x: f32, y: f32, s: f32, dim: f32) {
     // 9×10 비트맵. O 테두리, r 빨강, R 밝은 알, d 어두운 틈, g 꽃받침, G 밝은 잎, k 꼭지.
     const ROWS: [&str; 10] = [
-        "....k....",
-        "..GgGgG..",
+        "...OkO...",
+        ".OGgGgGO.",
         ".OrRrRrO.",
         "ORrRrRrRO",
         "OrRrRrRrO",
