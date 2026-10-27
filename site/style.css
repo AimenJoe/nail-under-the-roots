@@ -132,6 +132,8 @@ p { margin: 0; }
 .split .copy h2, .split .copy h3 { color: var(--glow); }
 .split + .split, .cast + .split { margin-top: 2.6rem; }
 .frame { margin: 0; border: 2px solid var(--soil-3); background: #000; box-shadow: 6px 6px 0 rgba(0, 0, 0, .35); min-width: 0; }
+/* 칸이 그림 원본보다 넓으면(큰 글자 설정·넓은 화면) 그림을 칸 폭에 맞춰 키운다. 안 그러면 오른쪽에 검은 여백(사장 피드백 2026-10-27). */
+.frame > img { width: 100%; }
 .frame figcaption { font-size: .85rem; color: var(--muted); padding: .35rem .6rem; background: var(--soil-2); font-family: var(--f-pixel); }
 
 /* 싸움 */
