@@ -42,6 +42,8 @@ impl Shape {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StrikeKind {
     Claw(usize),
+    /// 강공격(0161): 모았다 떼는 한 방. 발톱처럼 등딱지에 튕기고 분노를 채운다.
+    Heavy,
     Emerge,
     /// 필살기 드릴의 연타 한 번.
     Drill,

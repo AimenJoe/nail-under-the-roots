@@ -418,6 +418,8 @@ pub struct Actions {
     /// 조준 방향(오른쪽 스틱). 없으면 0. 공격 방향은 이게 있으면 이걸, 없으면 마지막 이동 방향.
     pub aim: Vec2,
     pub attack: bool,
+    /// 공격 버튼을 누르고 있다(지금 상태). 평타 뒤에도 누르고 있으면 강공격을 모은다(0161).
+    pub attack_held: bool,
     pub dodge: bool,
     /// 굴파기 버튼을 누르고 있다(눌림 에지가 아니라 지금 상태). 누르고 있는 동안 땅속에 더 머문다(0101).
     pub dodge_held: bool,
@@ -519,6 +521,8 @@ struct TouchState {
     known: Vec<u64>,
     /// 굴파기 버튼 위에서 시작해 아직 떼지 않은 손가락(누르고 있기, 0101).
     dig: Option<u64>,
+    /// 공격 버튼 위에서 시작해 아직 떼지 않은 손가락(강공격 모으기, 0161).
+    atk: Option<u64>,
 }
 
 #[derive(Clone, Copy)]
@@ -684,6 +688,7 @@ impl Input {
         }
         now.aim = pad.aim;
         now.dodge_held = kb.dodge_held || pad.dodge_held || touch.dodge_held;
+        now.attack_held = kb.attack_held || pad.attack_held || touch.attack_held;
 
         // 메뉴 탐색 에지(반복 포함)는 이동 방향에서 만든다. 키·D패드의 눌림 에지(아래 read_*)와
         // 같은 프레임에 겹치면 |=라 한 칸이다. 스틱에는 눌림 에지가 없으므로 첫 칸도 여기서 낸다.
@@ -703,6 +708,7 @@ impl Input {
         a.move_dir = self.held.move_dir;
         a.aim = self.held.aim;
         a.dodge_held = self.held.dodge_held;
+        a.attack_held = self.held.attack_held;
         self.pending = Actions::default();
         a
     }
@@ -766,6 +772,9 @@ impl Input {
                         "ATK" => {
                             a.attack = true;
                             a.confirm = true;
+                            if !ended {
+                                self.touch.atk = Some(t.id);
+                            }
                         }
                         "DIG" => {
                             a.dodge = true;
@@ -797,6 +806,9 @@ impl Input {
                 if self.touch.dig == Some(t.id) {
                     self.touch.dig = None;
                 }
+                if self.touch.atk == Some(t.id) {
+                    self.touch.atk = None;
+                }
                 if self.touch.stick.map(|s| s.id) == Some(t.id) {
                     self.touch.stick = None;
                 }
@@ -816,7 +828,13 @@ impl Input {
                 self.touch.dig = None;
             }
         }
+        if let Some(id) = self.touch.atk {
+            if !touches.iter().any(|t| t.id == id) {
+                self.touch.atk = None;
+            }
+        }
         a.dodge_held = self.touch.dig.is_some();
+        a.attack_held = self.touch.atk.is_some();
         if let Some(s) = self.touch.stick {
             let v = (s.pos - s.origin) / layout.stick_radius;
             let len = v.length();
@@ -883,6 +901,7 @@ impl Input {
         a.attack = j(b.pad(Act::Attack));
         a.dodge = j(b.pad(Act::Dodge));
         a.dodge_held = is_key_down(b.pad(Act::Dodge).key());
+        a.attack_held = is_key_down(b.pad(Act::Attack).key());
         a.special = j(b.pad(Act::Special));
         a.use_item = j(b.pad(Act::UseItem));
         a.item_prev = j(b.pad(Act::ItemPrev));
@@ -964,6 +983,7 @@ fn read_keyboard() -> Actions {
         attack: k(Act::Attack),
         dodge: k(Act::Dodge),
         dodge_held: is_key_down(b.key(Act::Dodge)),
+        attack_held: is_key_down(b.key(Act::Attack)),
         special: k(Act::Special),
         use_item: k(Act::UseItem),
         item_prev: k(Act::ItemPrev),
@@ -1048,6 +1068,7 @@ fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
         a.attack |= j(Act::Attack);
         a.dodge |= j(Act::Dodge);
         a.dodge_held |= pad.is_currently_pressed(b.pad(Act::Dodge).button());
+        a.attack_held |= pad.is_currently_pressed(b.pad(Act::Attack).button());
         a.special |= j(Act::Special);
         a.use_item |= j(Act::UseItem);
         a.item_prev |= j(Act::ItemPrev);

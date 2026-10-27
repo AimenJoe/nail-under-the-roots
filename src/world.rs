@@ -287,6 +287,8 @@ pub struct World {
     pub emerge_kills: u32,
     /// 콤보 마지막 타가 명중한 수(튜토리얼용).
     pub finisher_hits: u32,
+    /// 강공격 명중 수(튜토리얼용, 0161).
+    pub heavy_hits: u32,
     /// 굴파기 횟수(튜토리얼용).
     pub burrows: u32,
     pub time: f32,
@@ -372,6 +374,7 @@ impl World {
             kills: 0,
             emerge_kills: 0,
             finisher_hits: 0,
+            heavy_hits: 0,
             burrows: 0,
             time: 0.0,
             last_strike: None,
@@ -486,6 +489,19 @@ impl World {
         for ev in &self.player.events {
             match ev {
                 player::Event::Swing(i) => sfx.play(sfx::Id::Claw(*i)),
+                player::Event::Heavy => {
+                    // 강공격(0161): 마무리 타 소리 + 앞으로 튀는 불똥.
+                    sfx.play(sfx::Id::Claw(2));
+                    let p = self.player.pos + self.player.facing * 6.0;
+                    spray(&mut self.fx, p, self.player.facing, 6, WHITE, 120.0);
+                }
+                player::Event::HeavyReady => {
+                    // 다 모였다: 발톱이 번쩍.
+                    sfx.play(sfx::Id::Charge);
+                    let p = self.player.pos + self.player.facing * 7.0;
+                    self.fx.push(glint(p, WHITE, 0.35));
+                    self.fx.push(ring(p, 2.0, 10.0, 0.2, WHITE));
+                }
                 player::Event::Burrow => {
                     // 파고들기(0160): 흙이 확 튀고 화면이 살짝 — 톡 한 번이 "동작"으로 읽히게.
                     self.burrows += 1;
@@ -1098,7 +1114,12 @@ impl World {
                 e.last_hit_by = s.id;
                 // 콩이의 등딱지(0054): 발톱은 튕긴다(패링 거울). 솟구치기(아래 배)·드릴은 뚫고 연다.
                 let guarded = e.guarding();
-                if guarded && matches!(s.kind, crate::combat::StrikeKind::Claw(_)) {
+                if guarded
+                    && matches!(
+                        s.kind,
+                        crate::combat::StrikeKind::Claw(_) | crate::combat::StrikeKind::Heavy
+                    )
+                {
                     e.shell_hit();
                     shell_from = Some((e.pos, e.kind));
                     continue;
@@ -1117,8 +1138,14 @@ impl World {
                     e.break_guard();
                     broke_at = Some(e.pos);
                 }
-                if matches!(s.kind, crate::combat::StrikeKind::Claw(_)) {
+                if matches!(
+                    s.kind,
+                    crate::combat::StrikeKind::Claw(_) | crate::combat::StrikeKind::Heavy
+                ) {
                     self.player.gain_sp(s.finisher);
+                }
+                if s.kind == crate::combat::StrikeKind::Heavy {
+                    self.heavy_hits += 1;
                 }
                 if s.poison > 0.0 && e.alive {
                     e.apply_poison(s.poison);
@@ -1265,7 +1292,9 @@ impl World {
                         let from = (e.pos - ppos).normalize_or_zero();
                         // 곧게 오는 것(돌진·물기·구르기·내리꽂기)만 받아친다(0160). 내려앉기·튀어나오기 같은 둘레 공격은
                         // 고리로 예고하고 비켜야 한다 — "띠·점선은 튕겨내고 고리는 피한다".
-                        if e.parryable() && parry.is_some_and(|d| d.dot(from) > t::PARRY_FRONT) {
+                        if (e.parryable() || self.player.parry_heavy())
+                            && parry.is_some_and(|d| d.dot(from) > t::PARRY_FRONT)
+                        {
                             // 패링: 돌진을 받아쳐 크게 멈칫하게 한다. 피해 없음.
                             // 되받아치기(재주, 0047)면 피해도 준다.
                             let counter = self.player.talents.parry_counter();

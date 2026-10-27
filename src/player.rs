@@ -25,6 +25,16 @@ pub enum State {
         time: f32,
         dir: Vec2,
     },
+    /// 강공격 모으기(0161): 평타 뒤 공격을 계속 누르고 있으면. `HEAVY_CHARGE` 뒤 떼면 `Heavy`, 그 전에 떼면 그냥 선다.
+    Charging {
+        time: f32,
+        dir: Vec2,
+    },
+    /// 강공격 스윙(0161): `Moveset::heavy`. 첫머리 창은 둘레 공격(진홍)도 받아친다.
+    Heavy {
+        time: f32,
+        dir: Vec2,
+    },
     Burrow {
         time: f32,
     },
@@ -68,6 +78,9 @@ pub enum State {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Event {
     Swing(usize),
+    /// 강공격이 나갔다 / 다 모여 발톱이 빛난다(0161).
+    Heavy,
+    HeavyReady,
     Burrow,
     Emerge,
     /// 정한 시간을 지나 누르고 있다: 힘을 모으기 시작(땅이 운다, 0158).
@@ -192,7 +205,10 @@ impl Player {
 
     /// 땅 위를 걷고 있다(발걸음 먼지, 0081): 굴 속·공중·드릴 돌진이 아니다.
     pub fn on_foot(&self) -> bool {
-        matches!(self.state, State::Free | State::Attack { .. })
+        matches!(
+            self.state,
+            State::Free | State::Attack { .. } | State::Charging { .. } | State::Heavy { .. }
+        )
     }
 
     pub fn is_alive(&self) -> bool {
@@ -352,13 +368,18 @@ impl Player {
     /// 패링 창이 열려 있으면 공격 방향. 스윙 시작 직후 PARRY_WINDOW 동안(실뜨기 8단계면 짧다).
     pub fn parry_dir(&self) -> Option<Vec2> {
         match self.state {
-            State::Attack { dir, .. }
+            State::Attack { dir, .. } | State::Heavy { dir, .. }
                 if self.parry_open && self.swing_age < t::PARRY_WINDOW * self.parry_mul =>
             {
                 Some(dir)
             }
             _ => None,
         }
+    }
+
+    /// 강공격의 받아치기 창(0161): 이 동안은 둘레 공격(내려앉기·튀어나오기)도 받아친다.
+    pub fn parry_heavy(&self) -> bool {
+        matches!(self.state, State::Heavy { .. }) && self.parry_dir().is_some()
     }
 
     /// 패링 성공: SP를 크게 채운다. 다음 창은 바로 열 수 있다.
@@ -473,7 +494,9 @@ impl Player {
         self.swing_age += dt;
 
         let move_dir = a.move_dir;
-        if move_dir != Vec2::ZERO && !matches!(self.state, State::Attack { .. }) {
+        if move_dir != Vec2::ZERO
+            && !matches!(self.state, State::Attack { .. } | State::Heavy { .. })
+        {
             self.facing = move_dir.normalize();
         }
 
@@ -523,13 +546,62 @@ impl Player {
                     // 활성 구간이 끝났으면 다음 타로 바로 이어진다.
                     self.start_swing(idx + 1, a.aim);
                 } else if time >= hit.swing + hit.recovery {
-                    self.state = State::Free;
-                    if idx < last {
-                        self.combo_next = idx + 1;
-                        self.combo_timer = ms.combo_window;
-                    } else {
+                    if a.attack_held {
+                        // 아직 누르고 있다: 강공격 모으기(0161). 콤보는 끊긴다.
                         self.combo_timer = 0.0;
+                        self.state = State::Charging { time: 0.0, dir };
+                    } else {
+                        self.state = State::Free;
+                        if idx < last {
+                            self.combo_next = idx + 1;
+                            self.combo_timer = ms.combo_window;
+                        } else {
+                            self.combo_timer = 0.0;
+                        }
                     }
+                }
+            }
+            State::Charging { time, dir } => {
+                let was = time;
+                let time = time + dt;
+                // 모으는 동안은 느리게 걷고, 조준·이동 쪽으로 겨눈다.
+                let want = if a.aim != Vec2::ZERO { a.aim } else { move_dir };
+                let dir = want.normalize_or(dir);
+                self.facing = dir;
+                self.pos += move_dir * t::PLAYER_SPEED * t::HEAVY_MOVE_FACTOR * dt;
+                if was < t::HEAVY_CHARGE && time >= t::HEAVY_CHARGE {
+                    self.events.push(Event::HeavyReady);
+                }
+                self.state = State::Charging { time, dir };
+                if a.special && self.armed && self.sp_full() {
+                    self.start_special(move_dir);
+                } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
+                    self.start_dodge(move_dir);
+                } else if !a.attack_held {
+                    if time >= t::HEAVY_CHARGE {
+                        self.start_heavy(dir);
+                    } else {
+                        // 덜 모으고 뗐다: 아무것도 안 나간다.
+                        self.state = State::Free;
+                    }
+                }
+            }
+            State::Heavy { time, dir } => {
+                let ms = self.moveset;
+                let hit = ms.heavy();
+                let sdt = dt * self.stats.attack_speed;
+                let time = time + sdt;
+                let (a0, a1) = hit.active;
+                if time >= a0 && time - sdt < a1 {
+                    strike = Some(self.heavy_strike(dir));
+                }
+                self.pos += move_dir * t::PLAYER_SPEED * ms.move_factor * dt;
+                self.state = State::Heavy { time, dir };
+                if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
+                    self.start_dodge(move_dir);
+                } else if time >= hit.swing + hit.recovery {
+                    self.state = State::Free;
+                    self.combo_timer = 0.0;
                 }
             }
             State::Burrow { time: was } => {
@@ -850,10 +922,48 @@ impl Player {
         }
     }
 
+    /// 강공격(0161): 다 모으고 뗐다. 받아치기 창은 늘 열린다(모으는 데 0.45초가 들어 연타가 안 된다).
+    fn start_heavy(&mut self, dir: Vec2) {
+        self.facing = dir;
+        self.swing_id += 1;
+        self.swing_age = 0.0;
+        self.parry_open = true;
+        self.parry_cd = t::PARRY_COOLDOWN;
+        self.vel += dir * self.moveset.heavy().lunge;
+        self.attack_buf = 0.0;
+        self.combo_timer = 0.0;
+        self.state = State::Heavy { time: 0.0, dir };
+        self.events.push(Event::Heavy);
+    }
+
+    fn heavy_strike(&self, dir: Vec2) -> Strike {
+        let h = self.moveset.heavy();
+        Strike {
+            id: self.swing_id,
+            kind: StrikeKind::Heavy,
+            shape: Shape::Sector {
+                origin: self.pos + dir * 2.0,
+                dir,
+                r: h.range,
+            },
+            damage: h.damage + self.stats.damage,
+            knockback: h.knockback * self.stats.finisher_knockback,
+            stun: h.stun,
+            hitstop: h.hitstop,
+            shake: h.shake,
+            finisher: true,
+            poison: h.poison,
+        }
+    }
+
     /// 피해를 입힌다. 무적이면 false.
     pub fn take_damage(&mut self, from: Vec2, dmg: i32) -> bool {
         if self.is_invulnerable() {
             return false;
+        }
+        // 모으다 맞으면 끊긴다(0161).
+        if matches!(self.state, State::Charging { .. }) {
+            self.state = State::Free;
         }
         // 도움 모드: 피해를 비율만큼 줄인다. 소수는 모아 두었다가 1이 되면 깎는다(맞은 반응은 그대로).
         let dmg = if self.resist > 0.0 {
@@ -920,6 +1030,17 @@ mod tests {
     fn tick(p: &mut Player, room: &Room, a: &Actions) -> (Option<Strike>, Vec<Event>) {
         let s = p.update(a, room, t::TICK_DT);
         (s, p.events.clone())
+    }
+
+    impl Player {
+        /// 갈림길 시험용 복사(플레이어는 Clone이 아니다: 통계·재주가 커서).
+        fn clone_for_test(&self) -> Player {
+            let mut q = Player::new(self.pos);
+            q.state = self.state;
+            q.facing = self.facing;
+            q.armed = self.armed;
+            q
+        }
     }
 
     /// 모모(0056): 회피 버튼 = 깡충(공중 무적, HOP_DIST만큼), 특기 = 이어 뛰기(기 게이지, 착지 셋 = 쿵 셋).
@@ -1377,6 +1498,68 @@ mod tests {
         let mut p = Player::new(room.center());
         let half = secs(&mut p, 36); // 0.6초에 뗀다
         assert!((half - 0.6).abs() < 0.04, "떼면 바로 솟구친다 {half}");
+    }
+
+    /// 강공격(0161): 누르면 평타가 바로, 스윙 뒤에도 누르고 있으면 모으기, 0.45초 뒤 떼면 피해 2 이상·넓은 한 방.
+    /// 덜 모으고 떼면 아무것도 안 나간다.
+    #[test]
+    fn holding_attack_after_a_swing_charges_a_heavy_strike() {
+        let room = Room::new();
+        let mut p = Player::new(room.center());
+        let press = Actions {
+            attack: true,
+            attack_held: true,
+            ..Default::default()
+        };
+        let hold = Actions {
+            attack_held: true,
+            ..Default::default()
+        };
+        tick(&mut p, &room, &press);
+        assert!(
+            matches!(p.state, State::Attack { idx: 0, .. }),
+            "누르면 평타가 바로"
+        );
+        let mut n = 0;
+        while matches!(p.state, State::Attack { .. }) && n < 100 {
+            tick(&mut p, &room, &hold);
+            n += 1;
+        }
+        assert!(
+            matches!(p.state, State::Charging { .. }),
+            "스윙 뒤에도 누르고 있으면 모은다"
+        );
+        // 덜 모으고 떼면 그냥 선다.
+        let mut q = p.clone_for_test();
+        let (s, _) = tick(&mut q, &room, &Actions::default());
+        assert!(s.is_none() && matches!(q.state, State::Free));
+        // 다 모으면 빛나고(HeavyReady), 떼면 강공격.
+        let mut ready = false;
+        for _ in 0..((t::HEAVY_CHARGE / t::TICK_DT) as usize + 2) {
+            let (_, ev) = tick(&mut p, &room, &hold);
+            ready |= ev.contains(&Event::HeavyReady);
+        }
+        assert!(ready, "다 모이면 발톱이 빛난다");
+        let (_, ev) = tick(&mut p, &room, &Actions::default());
+        assert!(ev.contains(&Event::Heavy));
+        assert!(matches!(p.state, State::Heavy { .. }));
+        assert!(p.parry_heavy(), "강공격 첫머리는 둘레 공격도 받아친다");
+        let mut strike = None;
+        for _ in 0..60 {
+            let (s, _) = tick(&mut p, &room, &Actions::default());
+            if s.is_some() {
+                strike = s;
+                break;
+            }
+        }
+        let s = strike.expect("강공격 판정");
+        assert_eq!(s.kind, StrikeKind::Heavy);
+        assert!(s.damage >= 2 && s.finisher);
+        let Shape::Sector { r, .. } = s.shape else {
+            panic!("부채꼴");
+        };
+        let last = p.moveset.hits[p.moveset.last()].range;
+        assert!((r - last * 1.3).abs() < 1e-3, "반지름 1.3배 {r}");
     }
 
     /// 땅속 대시(0160): 정한 시간까지는 빠르게, 힘을 모으는 동안은 느리게 간다.

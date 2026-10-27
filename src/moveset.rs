@@ -46,6 +46,30 @@ impl Moveset {
     pub fn last(&self) -> usize {
         self.hits.len() - 1
     }
+
+    /// 강공격(0161): 누르고 있다가 떼면. 마지막 타를 바탕으로 더 세고 넓고 조금 느리다.
+    pub fn heavy(&self) -> Hit {
+        heavy_of(self.hits[self.last()])
+    }
+}
+
+/// 강공격 수치(0161): 마지막 타에서 — 피해는 2 이상, 반지름 1.3배, 넉백 1.15배, 경직·멈춤·흔들림 조금 더,
+/// 스윙·후딜레이 조금 더 길고, 활성 구간이 끝나야 굴파기로 끊는다. 무기마다 따로 적지 않는다.
+pub fn heavy_of(last: Hit) -> Hit {
+    Hit {
+        swing: last.swing + 0.06,
+        active: (last.active.0 + 0.02, last.active.1 + 0.05),
+        recovery: last.recovery + 0.08,
+        damage: last.damage.max(2),
+        knockback: last.knockback * 1.15,
+        stun: last.stun + 0.1,
+        hitstop: last.hitstop + 0.03,
+        shake: last.shake + 0.1,
+        range: last.range * 1.3,
+        lunge: last.lunge + 10.0,
+        dodge_cancel_after: last.active.1 + 0.05,
+        poison: last.poison,
+    }
 }
 
 const BASE: Hit = Hit {

@@ -1,10 +1,10 @@
 //! 체계적인 튜토리얼: 라쿤 포포가 단계마다 짧게 말하고(대화창), 그 자리에서 해 본다(docs/decisions/0023).
 //!
-//! 단계: 이동 → 발톱 줍기 → 3연타 → 굴파기 → 솟구치기 → 패링 → 필살기 → 아이템 → 메뉴·저장 안내.
+//! 단계: 이동 → 발톱 줍기 → 3연타 → 강공격(0161) → 굴파기 → 솟구치기 → 패링 → 필살기 → 아이템 → 메뉴·저장 안내.
 //! 그 뒤(모험이면): 공터 문이 열리고 "남쪽 공터의 대장" 힌트가 대장을 이길 때까지 남는다(docs/decisions/0032).
 //! 각 단계는 (1) 포포의 말(`take_talk`로 앱이 컷씬을 띄운다) (2) 상황 만들기(허수아비·연습 다람쥐·게이지·산딸기)
 //! (3) 월드 통계로 판정(이동 거리, 마지막 타 명중, 굴파기·솟구침·패링·필살기·먹기 횟수).
-//! 화면 아래 힌트는 "[3/9] X 세 번…"처럼 몇 번째인지와 지금 버튼 이름을 보인다. 연습 동안은 맞아도 체력이 줄지 않는다.
+//! 화면 아래 힌트는 "[3/10] X 세 번…"처럼 몇 번째인지와 지금 버튼 이름을 보인다. 연습 동안은 맞아도 체력이 줄지 않는다.
 //! 패링은 어려우니 오래 못 하면 포포가 "괜찮아" 하고 넘어간다. 첫 시작(Scenario::Normal)과 개발 시나리오 "튜토리얼"에서만.
 
 use macroquad::prelude::*;
@@ -23,6 +23,8 @@ pub enum Stage {
     /// 반짝이는 두더지 발톱을 줍는다. 줍기 전에는 공격이 안 나간다.
     Pickup,
     Attack,
+    /// 강공격(0161): 누르고 있다 빛나면 떼기. 허수아비에 한 번 맞히면 된다.
+    Heavy,
     Burrow,
     Emerge,
     Parry,
@@ -35,10 +37,11 @@ pub enum Stage {
 }
 
 /// 힌트에 보이는 단계 수(Done 제외).
-const STEPS: [Stage; 9] = [
+const STEPS: [Stage; 10] = [
     Stage::Move,
     Stage::Pickup,
     Stage::Attack,
+    Stage::Heavy,
     Stage::Burrow,
     Stage::Emerge,
     Stage::Parry,
@@ -94,6 +97,7 @@ impl Tutorial {
             Stage::Move => (|s| s.tut_move, None),
             Stage::Pickup => (|s| s.tut_pickup, None),
             Stage::Attack => (|s| s.tut_attack, Some(Act::Attack)),
+            Stage::Heavy => (|s| s.tut_heavy, Some(Act::Attack)),
             Stage::Burrow => (|s| s.tut_burrow, Some(Act::Dodge)),
             Stage::Emerge => (|s| s.tut_emerge, Some(Act::Dodge)),
             Stage::Parry => (|s| s.tut_parry, Some(Act::Attack)),
@@ -157,6 +161,13 @@ impl Tutorial {
             }
             Stage::Attack => {
                 if w.finisher_hits > self.base {
+                    // 허수아비는 강공격 연습까지 쓴다(0161).
+                    self.say(&[(|s| s.popo_heavy, Face::Happy, Some(Act::Attack))]);
+                    self.enter(Stage::Heavy, w.heavy_hits);
+                }
+            }
+            Stage::Heavy => {
+                if w.heavy_hits > self.base {
                     // 허수아비는 역할을 다했다.
                     clear_kind(w, Kind::Dummy);
                     let p = spot(w, 2);
@@ -359,6 +370,10 @@ mod tests {
         assert_eq!(tu.stage, Stage::Attack);
         assert!(!tu.take_talk().is_empty());
         w.finisher_hits += 1;
+        tu.update(&mut w, 0.1);
+        assert_eq!(tu.stage, Stage::Heavy, "3연타 뒤 강공격(0161)");
+        assert!(tu.hint().unwrap().starts_with("[4/10]"));
+        w.heavy_hits += 1;
         tu.update(&mut w, 0.1);
         assert_eq!(tu.stage, Stage::Burrow);
         w.burrows += 1;

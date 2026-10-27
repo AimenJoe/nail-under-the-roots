@@ -1323,6 +1323,67 @@ fn draw_player_fx(p: &Player, alpha: f32) {
                 );
             }
         }
+        // 강공격 모으기(0161): 발톱 끝에 빛이 모이고, 다 모이면 밝게 맥박친다.
+        player::State::Charging { time: ct, dir } => {
+            let k = (ct / t::HEAVY_CHARGE).clamp(0.0, 1.0);
+            let claw = pos + dir * 7.0;
+            let pulse = if k >= 1.0 {
+                0.7 + 0.3 * (ct * 20.0).sin()
+            } else {
+                k * 0.6
+            };
+            draw_circle(
+                claw.x.round(),
+                claw.y.round(),
+                2.0 + 3.0 * k,
+                Color::new(1.0, 0.95, 0.8, 0.35 * pulse),
+            );
+            draw_rectangle(
+                claw.x.round(),
+                claw.y.round(),
+                1.0,
+                1.0,
+                Color::new(1.0, 1.0, 1.0, pulse),
+            );
+            if k >= 1.0 {
+                draw_sector_lines(
+                    pos + dir * 2.0,
+                    dir,
+                    p.moveset.heavy().range * 0.5,
+                    Color::new(1.0, 0.9, 0.6, 0.5),
+                );
+            }
+        }
+        player::State::Heavy { time: at, dir } => {
+            let hit = p.moveset.heavy();
+            let (a0, a1) = hit.active;
+            let origin = pos + dir * 2.0;
+            if at >= a0 && at <= a1 + 0.04 {
+                let k = ((at - a0) / (a1 - a0 + 0.04)).clamp(0.0, 1.0);
+                draw_sector(
+                    origin,
+                    dir,
+                    hit.range,
+                    Color::new(1.0, 0.95, 0.8, 0.35 * (1.0 - k)),
+                );
+                let mark = p.moveset.mark;
+                draw_claw_marks(origin, dir, hit.range, k, true, mark, 1.0);
+                draw_claw_marks(origin, dir, hit.range, k, true, mark, -1.0);
+                draw_sector_lines(
+                    origin,
+                    dir,
+                    hit.range,
+                    Color::new(1.0, 0.9, 0.6, 0.8 * (1.0 - k)),
+                );
+            } else if at < a0 {
+                draw_sector_lines(
+                    origin,
+                    dir,
+                    hit.range * 0.6,
+                    Color::new(1.0, 0.85, 0.5, 0.7),
+                );
+            }
+        }
         player::State::Drill { time: dt, dir, .. } if dt < t::DRILL_REV => {
             // 시동: 몸이 떨리고, 앞에 작은 드릴이 점점 커지며 돈다. 주변에 기운 고리가 조여 든다.
             let k = dt / t::DRILL_REV;
@@ -4101,7 +4162,8 @@ fn draw_momo_player(art: &Art, p: &Player, alpha: f32, time: f32) {
                 5
             }
         }
-        player::State::Attack { .. } => 5,
+        player::State::Attack { .. } | player::State::Heavy { .. } => 5,
+        player::State::Charging { .. } => 5,
         player::State::Recover { .. } => 4,
         _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => 6,
         _ if moving => 2 + ((time * 10.0) as u32) % 2,
@@ -4205,6 +4267,19 @@ fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
             };
             (col, 1)
         }
+        // 강공격(0161): 모으는 동안 마지막 타의 "들기" 자세(다 모이면 떨린다), 스윙은 마지막 타 그림.
+        player::State::Charging { .. } => (7, 1),
+        player::State::Heavy { time: at, .. } => {
+            let (a0, a1) = p.moveset.heavy().active;
+            let col = if at < a0 {
+                7
+            } else if at > a1 + 0.04 {
+                8
+            } else {
+                2
+            };
+            (col, 1)
+        }
         _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => (3, 1),
         _ if moving => (2 + ((time * 10.0) as u32) % 4, 0),
         _ => (((time * 2.0) as u32) % 2, 0),
@@ -4220,9 +4295,16 @@ fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     if pop > 0.0 {
         draw_ellipse(pos.x, pos.y + 6.0, 7.0 - pop * 0.25, 2.5, 0.0, SHADOW_SOFT);
     }
+    // 다 모이면 떨린다(0161).
+    let jitter = match p.state {
+        player::State::Charging { time: ct, .. } if ct >= t::HEAVY_CHARGE => {
+            ((time * 60.0) as i32 % 2) as f32
+        }
+        _ => 0.0,
+    };
     draw_texture_ex(
         art.nail_fur(fur),
-        pos.x - 8.0,
+        pos.x - 8.0 + jitter,
         pos.y - 8.0 - pop,
         tint,
         DrawTextureParams {
@@ -5111,6 +5193,7 @@ fn draw_hitboxes(w: &World, alpha: f32) {
     if let Some(s) = w.last_strike {
         let col = match s.kind {
             StrikeKind::Claw(_) => YELLOW,
+            StrikeKind::Heavy => GOLD,
             StrikeKind::Emerge => ORANGE,
             StrikeKind::Drill => SKYBLUE,
             StrikeKind::DrillWall => RED,
@@ -5323,6 +5406,8 @@ fn short_state(s: &player::State) -> &'static str {
     match s {
         player::State::Free => "free",
         player::State::Attack { .. } => "attack",
+        player::State::Charging { .. } => "charging",
+        player::State::Heavy { .. } => "heavy",
         player::State::Burrow { .. } => "burrow",
         player::State::Emerge { .. } => "emerge",
         player::State::Drill { .. } => "drill",
