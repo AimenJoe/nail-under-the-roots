@@ -197,7 +197,7 @@
   - Sunnyside 그림(큰 나무·들판 나무·꽃·모닥불·버섯)이 나오는지, 장소를 바꿀 때 멈칫 없이 밝아지는지(검정이 0.2초쯤 길어진 게 거슬리지 않는지)
   - Android Chrome 글자 색, 타이틀 "v<버전> · <커밋>"
   - 모모 런: 포포 배웅과 쉼터 빈 자리 말(나일은 마을에서 기다린다)
-- [ ] GitHub에서 Secret `SECRETS_TOKEN`과 그 fine-grained 토큰을 지운다(0067, 이미 했으면 체크)
+- [x] GitHub에서 Secret `SECRETS_TOKEN`과 그 fine-grained 토큰을 지운다(0067, 2026-10-27 사장 "Secret은 지웠어")
 - [x] 공식 페이지 켜기(0069, 2026-10-25 사장이 Source = GitHub Actions, `pages` 4번째 실행 성공)
 - [ ] **공식 페이지 보기**: https://aimenjoe.github.io/nail-under-the-roots/ 를 폰·PC로 보고 글·그림이 어색한 곳을 알려 준다
 
