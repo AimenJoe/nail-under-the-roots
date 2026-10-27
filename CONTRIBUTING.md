@@ -26,6 +26,8 @@ CI(`deploy-web.yml`)는 fmt·clippy·test·wasm 빌드를 다시 돈다. 로컬�
 - **표로 끝나는 것**은 표에: 콤보 `moveset.rs`, 적 `species.rs`, 장비·장신구 `equipment.rs`, 재주 `talents.rs`, 저널 `journal.rs`, 런 사이 한마디 `story.rs`, 개발 시나리오 `scenario.rs`, 그림 줄 `art.rs`, 소리 `sfx.rs`·`tools/audio/make_audio.py`.
 - **플레이어가 보는 글**은 `src/i18n.rs`에만, **열한 언어 전부**(한국어·영어·일본어·중국어 간체·브라질 포르투갈어·프랑스어·스페인어·독일어·러시아어·중국어 번체·폴란드어, 이 순서). 직접 번역한다(기계 번역은 사장이 말할 때만). 일본어·중국어 글을 바꿨으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font> <Cubic_11.woff2>`로 폰트를 다시 만든다 — `cargo test`가 빠진 글자를 잡는다.
 - **입력**은 `Actions`로만. `KeyCode`는 `input.rs` 밖에서 보지 않는다.
+- **소리**는 로직에서 `self.juice.audio.play(id)`(큐)로만. `Sfx`(오디오 장치)는 `app`만 안다 — 그래서 월드를 테스트에서 틱 단위로 돌릴 수 있다. 새 메커닉은 `World::step`의 단계 메서드 중 맞는 곳에 넣고, 쓰러짐은 `enemy_down`을 부른다.
+- **파일 자리**: 그리기는 `src/render/`(hud·actors·fx·props·sorted·shadow·lights·deep·descent), 장면은 `src/app/`(stage·slots·dream·pick·run·pause·settings·album·title). 자식 모듈은 `use super::*;`, 항목은 `pub(super)`. 한 파일이 2~3천 줄을 넘으면 쪼갠다(0169).
 - **그림**은 PNG를 손으로 고치지 않는다. 직접 그린 것은 `tools/art/*.py`를 고치고 다시 생성, 나노바나나 원본은 `tools/art/sources/ai/`에 넣고 `strip_logo.py` 한 번 → `ai_portraits.py`/`ai_illust.py`가 옮긴다. 유료 팩 원본은 커밋하지 않는다(`assets/vendor/`, gitignore). 출처는 `assets/LICENSES.md`.
 - **저장 형식**: `profile.rs`의 키 이름은 바꾸지 않는다. `prefs.rs` 칸 형식을 바꾸면 `MAGIC`을 올린다. 런 상태를 새로 만들면 `suspend.rs`의 `RunSave`에 칸을 더한다.
 
