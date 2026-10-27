@@ -1123,6 +1123,19 @@ mod tests {
         assert!((aim - vec2(1.0, -1.0).normalize()).length() < 1e-5);
     }
 
+    /// Android 키 반복(0171): 패치한 miniquad가 반복 이벤트의 repeat 플래그를 Java → JNI → key_down_event까지 넘기는지.
+    /// 빠지면 패드 버튼을 누르고 있는 동안 is_key_pressed가 계속 참이라 땅파기·강타를 모을 수 없다.
+    #[test]
+    fn android_key_repeat_reaches_macroquad() {
+        let java = include_str!("../third_party/miniquad/java/MainActivity.java");
+        assert!(java.contains("QuadNative.surfaceOnKeyDown(keyCode, event.getRepeatCount() > 0)"));
+        let native = include_str!("../third_party/miniquad/java/QuadNative.java");
+        assert!(native.contains("surfaceOnKeyDown(int keycode, boolean repeat)"));
+        let rs = include_str!("../third_party/miniquad/src/native/android.rs");
+        assert!(rs.contains("repeat: ndk_sys::jboolean"));
+        assert!(rs.contains(".key_down_event(keycode, self.keymods, repeat)"));
+    }
+
     /// Android 패드 버튼: 패치한 miniquad 표(KEYCODE_BUTTON_* → F13~F25)와 Pad::key가 같은 짝이고, 키가 겹치지 않는다.
     /// 한쪽만 고치면 Android에서 버튼이 엉뚱하게 눌린다(0075).
     #[test]

@@ -61,6 +61,8 @@ enum Message {
     },
     KeyDown {
         keycode: KeyCode,
+        /// nail-under-the-roots 패치(0171): 누르고 있어서 생긴 반복 이벤트인가.
+        repeat: bool,
     },
     KeyUp {
         keycode: KeyCode,
@@ -210,7 +212,7 @@ impl MainThreadState {
                         .char_event(character, Default::default(), false);
                 }
             }
-            Message::KeyDown { keycode } => {
+            Message::KeyDown { keycode, repeat } => {
                 match keycode {
                     KeyCode::LeftShift | KeyCode::RightShift => self.keymods.shift = true,
                     KeyCode::LeftControl | KeyCode::RightControl => self.keymods.ctrl = true,
@@ -219,7 +221,7 @@ impl MainThreadState {
                     _ => {}
                 }
                 self.event_handler
-                    .key_down_event(keycode, self.keymods, false);
+                    .key_down_event(keycode, self.keymods, repeat);
             }
             Message::KeyUp { keycode } => {
                 match keycode {
@@ -647,10 +649,14 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnKeyDown(
     _: *mut ndk_sys::JNIEnv,
     _: ndk_sys::jobject,
     keycode: ndk_sys::jint,
+    repeat: ndk_sys::jboolean,
 ) {
     let keycode = keycodes::translate_keycode(keycode as _);
 
-    send_message(Message::KeyDown { keycode });
+    send_message(Message::KeyDown {
+        keycode,
+        repeat: repeat != 0,
+    });
 }
 
 #[no_mangle]

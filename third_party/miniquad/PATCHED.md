@@ -12,3 +12,7 @@ miniquad를 올릴 때는 새 원본을 받아 같은 패치를 다시 넣는다
 - 패드 축(0143): `java/MainActivity.java` `QuadSurface.onGenericMotionEvent`(조이스틱 축 여섯을 넘기고 true, import `InputDevice`),
   `java/QuadNative.java` `surfaceOnJoystick`, `src/native/android.rs`의 JNI 진입점 `surfaceOnJoystick` + `pub fn joystick_axes()`.
   cargo-quad-apk는 `QuadNative.java`도 이 폴더에서 가져간다(build.rs의 `miniquad_root_path.join("java")`).
+- 키 반복(0171): 원본은 Android가 버튼을 누르고 있는 동안 보내는 반복 `ACTION_DOWN`(`getRepeatCount() > 0`)을 전부 새 누름으로
+  넘겨(`key_down_event(…, false)`) macroquad의 `is_key_pressed`가 누르고 있는 내내 다시 참이 됐다 — 땅파기·강타 모으기가 안 됐다.
+  `java/MainActivity.java` `onKey`가 `surfaceOnKeyDown(keyCode, repeat)`로 플래그를 넘기고, `QuadNative.java`·`src/native/android.rs`
+  (`Message::KeyDown { repeat }`)가 `key_down_event`까지 전한다. 웹(`event.repeat`)·데스크톱과 같아졌다.

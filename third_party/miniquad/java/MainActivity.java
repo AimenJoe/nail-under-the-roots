@@ -152,7 +152,8 @@ class QuadSurface
     @Override
     public boolean onKey(View v, int keyCode, KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode != 0) {
-            QuadNative.surfaceOnKeyDown(keyCode);
+            // nail-under-the-roots 패치(0171): 누르고 있을 때의 반복 이벤트는 새 누름이 아니다(repeat 플래그).
+            QuadNative.surfaceOnKeyDown(keyCode, event.getRepeatCount() > 0);
         }
 
         if (event.getAction() == KeyEvent.ACTION_UP && keyCode != 0) {
