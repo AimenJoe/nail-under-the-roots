@@ -39,6 +39,7 @@ mod room;
 mod route;
 mod scenario;
 mod sfx;
+mod shade;
 mod species;
 mod story;
 mod sunny;

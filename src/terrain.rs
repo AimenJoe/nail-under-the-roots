@@ -654,7 +654,7 @@ impl Baker {
                 .iter()
                 .copied()
                 .min_by(|a, c| (*a - foot).length().total_cmp(&(*c - foot).length()));
-            let k = crate::render::shadow_dir(foot, fire, bright)?;
+            let k = crate::shade::shadow_dir(foot, fire, bright)?;
             Some(crate::sunny::StampShadow {
                 k: k * lift,
                 alpha: if bright {

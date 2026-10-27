@@ -466,10 +466,8 @@ impl Default for Inventory {
             bag: Bag::default(),
             charms: Vec::new(),
             charms_found: Vec::new(),
-            charm_pool: crate::journal::charm_pool(
-                &crate::profile::Profile::default(),
-                crate::equipment::Character::Mole,
-            ),
+            // 상자에서 나올 장신구는 기록이 정한다 → 앱이 `seed_run_from_profile`에서 넣는다(0170 R-소). 월드는 기록을 모른다.
+            charm_pool: Vec::new(),
             glowbugs: 0,
             seeds: 0,
             root_hearts: 0,

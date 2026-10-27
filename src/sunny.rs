@@ -128,7 +128,7 @@ pub fn stamp(
     }
 }
 
-/// 구운 장식 하나의 그림자(0102·0103): 방향·길이(`render::shadow_dir` × 높이 비율)와,
+/// 구운 장식 하나의 그림자(0102·0103): 방향·길이(`shade::shadow_dir` × 높이 비율)와,
 /// 어두운 곳이면 옅어지는 기준(불 자리, 닿는 거리). 진하기는 `alpha`.
 pub struct StampShadow {
     pub k: Vec2,
@@ -137,7 +137,7 @@ pub struct StampShadow {
 }
 
 /// 해·모닥불 그림자를 CPU 그림(지도 굽기)에 찍는다: 팩 한 칸의 모양을 발 줄(왼쪽 위 (x, y) + 높이) 축으로 눕힌다.
-/// 실시간 그림자(`render::sun_shear`)와 같은 식. 같은 자리를 두 번 어둡게 하지 않는다. `skip`(벽 위)은 건너뛴다.
+/// 실시간 그림자(`shade::sun_shear`)와 같은 식. 같은 자리를 두 번 어둡게 하지 않는다. `skip`(벽 위)은 건너뛴다.
 pub fn stamp_sun_shadow(
     dst: &mut Image,
     sheet: &Image,
@@ -147,7 +147,7 @@ pub fn stamp_sun_shadow(
     skip: impl Fn(i32, i32) -> bool,
 ) {
     let k = sh.k;
-    let shade = crate::render::SUN_SHADE;
+    let shade = crate::shade::SUN_SHADE;
     let (w, h) = (dst.width as i32, dst.height as i32);
     let foot = y + r.3 as i32 - 1;
     let mut spots: Vec<(i32, i32)> = Vec::new();
