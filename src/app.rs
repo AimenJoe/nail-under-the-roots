@@ -120,10 +120,10 @@ enum Back {
 
 /// 런 통계를 기록에 쌓을 때의 기준(저널, docs/decisions/0048). 월드가 새로 만들어지면 0부터.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
-struct Tally([u32; 9]);
+struct Tally([u32; 10]);
 
 impl Tally {
-    const KEYS: [&'static str; 9] = [
+    const KEYS: [&'static str; 10] = [
         crate::journal::stat::KILLS,
         crate::journal::stat::EMERGE_KILLS,
         crate::journal::stat::PARRIES,
@@ -133,6 +133,7 @@ impl Tally {
         crate::journal::stat::EATEN,
         crate::journal::stat::CHESTS,
         crate::journal::stat::SPRINGS,
+        crate::journal::stat::HEAVY,
     ];
 
     fn of(w: &World) -> Self {
@@ -146,6 +147,7 @@ impl Tally {
             w.stats.items_used,
             w.stats.chests,
             w.stats.springs,
+            w.stats.heavy_hits,
         ])
     }
 }

@@ -755,23 +755,54 @@ impl App {
     }
 
     /// 저널 탭(0048): 왼쪽 목록(◆ 받을 수 있음, ■ 받았음, □ 하는 중), 오른쪽 갈래·글·보상·상태.
+    /// 저널(0048, 모양은 0173): 왼쪽은 목록(받을 것 → 하는 중 → 받은 것, 갈래 띠·상태 표시·진행 막대), 오른쪽은 고른 목표
+    /// (갈래·제목·설명·보상 아이콘·진행 막대 또는 받기 상자·어디 있나). 머리에 이룬 수와 받을 것.
     pub(super) fn draw_journal(&mut self, ui: &Ui, c: Rect) {
         use crate::journal::{visible, Reward};
         let s = i18n::s();
-        let goals = visible(&self.profile);
+        let p = &self.profile;
+        let goals = visible(p);
         if goals.is_empty() {
             return;
         }
         self.journal_cursor = self.journal_cursor.min(goals.len() - 1);
+        let blink = ((macroquad::time::get_time() * 2.5) as i64) % 2 == 0;
+        let list_w = 150.0;
+        // 머리: 이룸 n/m · 받을 것 k(깜박).
+        let done = goals.iter().filter(|g| g.claimed(p)).count();
+        let waiting = goals.iter().filter(|g| g.ready(p)).count();
+        ui.text(
+            &fill(s.j_done, &[&done, &goals.len()]),
+            c.x,
+            c.y,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+        if waiting > 0 {
+            let done_w = ui.text_w(&fill(s.j_done, &[&done, &goals.len()]), FONT_PX);
+            ui.text(
+                &ui.fit(
+                    &fill(s.j_waiting, &[&waiting]),
+                    list_w - done_w - 22.0,
+                    FONT_PX,
+                ),
+                c.x + done_w + 8.0,
+                c.y,
+                FONT_PX,
+                if blink { ui::ACCENT } else { ui::TEXT },
+            );
+        }
+        let top = c.y + 15.0;
         let row_h = FONT_PX + 4.0;
-        let rows = ((c.h / row_h).floor() as usize).max(1);
+        let rows = (((c.bottom() - top) / row_h).floor() as usize).max(1);
         if self.journal_cursor < self.journal_scroll {
             self.journal_scroll = self.journal_cursor;
         }
         if self.journal_cursor >= self.journal_scroll + rows {
             self.journal_scroll = self.journal_cursor + 1 - rows;
         }
-        let list_w = 150.0;
+        let bar_bg = Color::new(0.22, 0.17, 0.24, 1.0);
+        let bar_w = 24.0;
         for (k, g) in goals
             .iter()
             .enumerate()
@@ -780,47 +811,77 @@ impl App {
         {
             let r = Rect::new(
                 c.x,
-                c.y + (k - self.journal_scroll) as f32 * row_h,
+                top + (k - self.journal_scroll) as f32 * row_h,
                 list_w,
                 row_h,
             );
             let selected = k == self.journal_cursor;
+            let claimed = g.claimed(p);
+            let ready = g.ready(p);
             if selected {
                 ui.rect(r, ui::PANEL_LIGHT);
             }
-            let (mark, mc) = if g.claimed(&self.profile) {
-                ("■", ui::TEXT_DIM)
-            } else if g.ready(&self.profile) {
-                ("◆", ui::ACCENT)
+            // 갈래 띠(왼쪽 2px).
+            ui.rect(Rect::new(r.x, r.y + 1.0, 2.0, r.h - 2.0), g.cat.color());
+            // 상태: 받을 것 = 채운 마름모(깜박), 받음 = 체크, 하는 중 = 빈 네모.
+            let (cx, cy) = (r.x + 9.0, r.y + r.h / 2.0);
+            if claimed {
+                ui.line(vec2(cx - 3.0, cy), vec2(cx - 1.0, cy + 2.0), ui::TEXT_DIM);
+                ui.line(
+                    vec2(cx - 1.0, cy + 2.0),
+                    vec2(cx + 3.0, cy - 2.0),
+                    ui::TEXT_DIM,
+                );
+            } else if ready {
+                let col = if blink { ui::ACCENT } else { ui::TEXT };
+                ui.tri(
+                    vec2(cx, cy - 4.0),
+                    vec2(cx + 4.0, cy),
+                    vec2(cx - 4.0, cy),
+                    col,
+                );
+                ui.tri(
+                    vec2(cx - 4.0, cy),
+                    vec2(cx + 4.0, cy),
+                    vec2(cx, cy + 4.0),
+                    col,
+                );
             } else {
-                ("□", ui::TEXT_DIM)
-            };
-            let col = if g.claimed(&self.profile) {
+                ui.rect_lines(Rect::new(cx - 3.0, cy - 3.0, 6.0, 6.0), ui::TEXT_DIM);
+            }
+            let col = if claimed {
                 ui::TEXT_DIM
-            } else if selected || g.ready(&self.profile) {
+            } else if selected || ready {
                 ui::TEXT
             } else {
                 Color::new(0.78, 0.72, 0.64, 1.0)
             };
-            ui.text(mark, r.x + 2.0, r.y + 2.0, FONT_PX, mc);
-            let prog = format!("{}/{}", g.progress(&self.profile), g.goal);
-            let pw = ui.text_w(&prog, FONT_PX);
-            let title = ui.fit(tr(g.title), r.w - 22.0 - pw, FONT_PX);
-            ui.text(&title, r.x + 14.0, r.y + 2.0, FONT_PX, col);
-            ui.text_right(&prog, r.right() - 3.0, r.y + 2.0, FONT_PX, col);
+            let title = ui.fit(tr(g.title), r.w - 16.0 - bar_w - 8.0, FONT_PX);
+            ui.text(&title, r.x + 16.0, r.y + 2.0, FONT_PX, col);
+            // 진행 막대(받은 것은 없다).
+            if !claimed {
+                let b = Rect::new(r.right() - 3.0 - bar_w, cy - 1.0, bar_w, 3.0);
+                ui.rect(b, bar_bg);
+                let k = (g.progress(p) as f32 / g.goal.max(1) as f32).min(1.0);
+                ui.rect(
+                    Rect::new(b.x, b.y, (b.w * k).round(), b.h),
+                    if ready { ui::ACCENT } else { ui::TEXT_DIM },
+                );
+            }
             self.hits.push((r, Hit::JournalItem(k)));
         }
         // 목록이 더 있으면 ▲▼.
         if self.journal_scroll > 0 {
-            ui.text_right("▲", c.x + list_w, c.y - 10.0, FONT_PX, ui::TEXT_DIM);
+            ui.text_right("▲", c.x + list_w, top - 11.0, FONT_PX, ui::TEXT_DIM);
         }
         if self.journal_scroll + rows < goals.len() {
             ui.text_right("▼", c.x + list_w, c.bottom() - 4.0, FONT_PX, ui::TEXT_DIM);
         }
+        // 오른쪽: 고른 목표.
         let g = goals[self.journal_cursor];
         let dx = c.x + list_w + 8.0;
         let dw = c.right() - dx;
-        ui.text(tr(g.cat.name()), dx, c.y, FONT_PX, ui::TEXT_DIM);
+        ui.text(tr(g.cat.name()), dx, c.y, FONT_PX, g.cat.color());
         ui.text(
             &ui.fit(tr(g.title), dw, FONT_PX),
             dx,
@@ -838,37 +899,56 @@ impl App {
             Reward::Charm(i) => fill(s.r_charm, &[&tr(crate::equipment::CHARMS[i].name)]),
         };
         let what = fill(s.j_reward, &[&what]);
-        // 상태: 받은 뒤엔 보상이 어디 있는지(가방·마을·큰 나무…, 0050).
-        let state = if g.claimed(&self.profile) {
-            tr(crate::journal::reward_place(g.reward)).to_string()
-        } else if g.ready(&self.profile) {
-            vfill(s.j_claim, &[Verb::Confirm])
+        // 아래에서부터 쌓는다: 상태(받기 상자 / 어디 있나 두 줄 / 진행 막대) 위에 보상(아이콘 + 두 줄까지), 남은 자리에 설명(세 줄까지).
+        let claimed = g.claimed(p);
+        let ready = g.ready(p);
+        let state_l: Vec<String> = if claimed {
+            let mut l = ui::wrap(ui, tr(crate::journal::reward_place(g.reward)), ww, FONT_PX);
+            if l.len() > 2 {
+                l.truncate(2);
+                l[1] = ui.fit(&format!("{}…", l[1]), dw, FONT_PX);
+            }
+            l
+        } else if ready {
+            vec![ui.fit(&vfill(s.j_claim, &[Verb::Confirm]), ww - 6.0, FONT_PX)]
         } else {
-            fill(s.j_progress, &[&g.progress(&self.profile), &g.goal])
+            vec![]
         };
-        let sc = if g.ready(&self.profile) {
-            ui::ACCENT
+        let state_h = if ready {
+            17.0
+        } else if claimed {
+            13.0 * state_l.len() as f32
         } else {
-            ui::TEXT_DIM
+            18.0
         };
-        // 아래에서부터 쌓는다: 상태(두 줄까지) 위에 보상(두 줄까지), 남은 자리에 설명(세 줄까지).
-        // 보상을 한 줄로 자르면 "보상: 장신구 · 들쥐 방…"처럼 무엇인지가 잘렸다(0089).
-        let mut state_l = ui::wrap(ui, &state, ww, FONT_PX);
-        if state_l.len() > 2 {
-            state_l.truncate(2);
-            state_l[1] = ui.fit(&format!("{}…", state_l[1]), dw, FONT_PX);
-        }
-        let what_l: Vec<String> = ui::wrap(ui, &what, ww, FONT_PX)
+        let what_l: Vec<String> = ui::wrap(ui, &what, ww - 11.0, FONT_PX)
             .into_iter()
             .take(2)
             .collect();
-        let by = c.bottom() - 13.0 * (state_l.len() + what_l.len()) as f32;
+        let by = c.bottom() - state_h - 13.0 * what_l.len() as f32;
+        draw_reward_icon(ui, g.reward, dx, by + 2.0);
         for (k, l) in what_l.iter().enumerate() {
-            ui.text(l, dx, by + k as f32 * 13.0, FONT_PX, ui::TEXT);
+            ui.text(l, dx + 11.0, by + k as f32 * 13.0, FONT_PX, ui::TEXT);
         }
         let sy = by + 13.0 * what_l.len() as f32;
-        for (k, l) in state_l.iter().enumerate() {
-            ui.text(l, dx, sy + k as f32 * 13.0, FONT_PX, sc);
+        if ready {
+            // 받기 상자: 확인으로 받는다(깜박이는 테두리).
+            let b = Rect::new(dx, sy + 1.0, dw, 15.0);
+            ui.rect(b, ui::PANEL_LIGHT);
+            ui.rect_lines(b, if blink { ui::ACCENT } else { ui::BORDER });
+            ui.text(&state_l[0], dx + 3.0, sy + 3.0, FONT_PX, ui::ACCENT);
+        } else if claimed {
+            for (k, l) in state_l.iter().enumerate() {
+                ui.text(l, dx, sy + k as f32 * 13.0, FONT_PX, ui::TEXT_DIM);
+            }
+        } else {
+            // 진행 막대 + 숫자.
+            let prog = fill(s.j_progress, &[&g.progress(p), &g.goal]);
+            ui.text_right(&prog, dx + dw, sy + 1.0, FONT_PX, ui::TEXT_DIM);
+            let b = Rect::new(dx, sy + 14.0, dw, 3.0);
+            ui.rect(b, bar_bg);
+            let k = (g.progress(p) as f32 / g.goal.max(1) as f32).min(1.0);
+            ui.rect(Rect::new(b.x, b.y, (b.w * k).round(), b.h), ui::TEXT);
         }
         let top = c.y + 29.0;
         let room = (((by - 2.0 - top) / 13.0).floor().max(1.0) as usize).min(3);
@@ -1021,6 +1101,59 @@ impl App {
                 let c = rect.center();
                 ui.rect(Rect::new(c.x - 1.5, c.y - 1.5, 3.0, 3.0), WHITE);
             }
+        }
+    }
+}
+
+/// 저널 보상 아이콘(0173, 7×7 게임 px): 반딧불(빛나는 점), 마을 씨앗(싹 튼 씨앗), 꾸미기(작은 집), 털빛(색 견본), 장신구(그 색 칸).
+fn draw_reward_icon(ui: &Ui, r: crate::journal::Reward, x: f32, y: f32) {
+    use crate::journal::Reward;
+    match r {
+        Reward::Light(_) => {
+            let glow = Color::new(1.0, 0.92, 0.5, 1.0);
+            let dim = Color::new(0.75, 0.65, 0.3, 1.0);
+            ui.rect(Rect::new(x + 2.0, y + 2.0, 3.0, 3.0), glow);
+            for (dx, dy) in [(3.0, 0.0), (3.0, 6.0), (0.0, 3.0), (6.0, 3.0)] {
+                ui.rect(Rect::new(x + dx, y + dy, 1.0, 1.0), dim);
+            }
+        }
+        Reward::Seeds(_) => {
+            ui.rect(
+                Rect::new(x + 2.0, y + 3.0, 3.0, 4.0),
+                Color::new(0.55, 0.35, 0.2, 1.0),
+            );
+            let leaf = Color::new(0.45, 0.75, 0.4, 1.0);
+            ui.rect(Rect::new(x + 3.0, y + 1.0, 1.0, 2.0), leaf);
+            ui.rect(Rect::new(x + 4.0, y, 2.0, 1.0), leaf);
+        }
+        Reward::Decor(_) => {
+            ui.rect(
+                Rect::new(x + 1.0, y + 3.0, 5.0, 4.0),
+                Color::new(0.6, 0.45, 0.35, 1.0),
+            );
+            ui.tri(
+                vec2(x, y + 3.0),
+                vec2(x + 7.0, y + 3.0),
+                vec2(x + 3.5, y),
+                Color::new(0.75, 0.32, 0.3, 1.0),
+            );
+        }
+        Reward::Fur(n) => {
+            let fur = match n {
+                1 => Color::new(0.62, 0.62, 0.66, 1.0),
+                2 => Color::new(0.42, 0.28, 0.22, 1.0),
+                3 => Color::new(0.86, 0.76, 0.58, 1.0),
+                _ => Color::new(0.55, 0.4, 0.32, 1.0),
+            };
+            ui.rect(Rect::new(x, y, 7.0, 7.0), fur);
+            ui.rect_lines(Rect::new(x, y, 7.0, 7.0), ui::BORDER);
+        }
+        Reward::Charm(i) => {
+            ui.rect(
+                Rect::new(x + 1.0, y + 1.0, 5.0, 5.0),
+                crate::equipment::CHARMS[i].color,
+            );
+            ui.rect_lines(Rect::new(x, y, 7.0, 7.0), ui::BORDER);
         }
     }
 }

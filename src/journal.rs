@@ -21,6 +21,8 @@ pub mod stat {
     /// 마을로 보낸 반딧불 누적(쓴 것과 무관).
     pub const LIGHT: &str = "stat.light";
     pub const DAILY_CLEARS: &str = "stat.daily_clears";
+    /// 강공격 명중(0168·0173).
+    pub const HEAVY: &str = "stat.heavy_hits";
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,6 +35,18 @@ pub enum Cat {
 }
 
 impl Cat {
+    /// 저널 목록의 갈래 띠 색(0173). 갈래 이름은 자세히 칸에 글로도 나온다(색만으로 가르지 않는다).
+    pub fn color(self) -> macroquad::prelude::Color {
+        use macroquad::prelude::Color;
+        match self {
+            Cat::Story => Color::new(0.90, 0.71, 0.47, 1.0),
+            Cat::Fight => Color::new(0.85, 0.45, 0.40, 1.0),
+            Cat::Explore => Color::new(0.55, 0.75, 0.45, 1.0),
+            Cat::Neighbors => Color::new(0.50, 0.70, 0.85, 1.0),
+            Cat::Village => Color::new(0.85, 0.55, 0.75, 1.0),
+        }
+    }
+
     pub fn name(self) -> Tr {
         match self {
             Cat::Story => |s| s.cat_story,
@@ -349,6 +363,27 @@ pub const GOALS: &[Goal] = &[
         None,
         Seeds(5)
     ),
+    // 강공격(0161·0168·0173): 모아서 맞히는 손맛을 목표로.
+    goal!(
+        "heavy",
+        Fight,
+        jg_heavy,
+        jg_heavy_d,
+        Count(stat::HEAVY),
+        30,
+        None,
+        Light(30)
+    ),
+    goal!(
+        "heavy2",
+        Fight,
+        jg_heavy2,
+        jg_heavy2_d,
+        Count(stat::HEAVY),
+        150,
+        Some("heavy"),
+        Seeds(10)
+    ),
     // 탐험
     goal!(
         "chest",
@@ -437,9 +472,20 @@ pub const GOALS: &[Goal] = &[
         jg_mobs2,
         jg_mobs2_d,
         Mobs,
-        7,
+        10,
         Some("mobs"),
         Decor(7)
+    ),
+    // 도감은 열다섯 종(0146·0165): 다 적으면 하나 더(0173).
+    goal!(
+        "mobs3",
+        Neighbors,
+        jg_mobs3,
+        jg_mobs3_d,
+        Mobs,
+        crate::species::BESTIARY.len() as u32,
+        Some("mobs2"),
+        Light(60)
     ),
     goal!(
         "light",
@@ -579,10 +625,21 @@ fn by_id(id: &str) -> Option<&'static Goal> {
 
 /// 지금 보이는 목표(앞 목표를 이룬 것만), 표 순서.
 pub fn visible(p: &Profile) -> Vec<&'static Goal> {
-    GOALS
+    let mut v: Vec<&'static Goal> = GOALS
         .iter()
         .filter(|g| g.after.and_then(by_id).is_none_or(|a| a.done(p)))
-        .collect()
+        .collect();
+    // 받을 것이 맨 위, 하는 중이 가운데, 받은 것은 아래(같은 묶음 안에서는 표 순서, 0173).
+    v.sort_by_key(|g| {
+        if g.ready(p) {
+            0
+        } else if g.claimed(p) {
+            2
+        } else {
+            1
+        }
+    });
+    v
 }
 
 /// 받을 수 있는 목표 수(알림·표시).
