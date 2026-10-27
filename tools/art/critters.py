@@ -13,7 +13,9 @@
   줄 12 콩이(물든 세띠아르마딜로, 셋째 길 보스, docs/decisions/0054): 0·1 서 있기, 2·3 걷기, 4 웅크림(공), 5 구르기(공, 띠가 돈다), 6 맞음.
        물든 눈은 옅은 하늘빛(모모 초록·도토 호박색·졸개 붉은 눈과 다르다)
   줄 13 돌아온 콩이: 검고 맑은 눈, 뿌리 없음
-  줄 14~27: 줄 0~13의 흰 실루엣(피격 번쩍임용)
+  줄 14~18 새 졸개(0146): 땃쥐 · 고슴도치(4·5 가시 공) · 두꺼비(5 입 벌림, 혀는 게임이 그린다) ·
+       박쥐(0~3 날갯짓, 4 접기, 5 내리꽂기) · 포자버섯(4 움츠림, 5 뿜기)
+  줄 19~37: 줄 0~18의 흰 실루엣(피격 번쩍임용)
 
 그리는 법(nail.py와 같다): 채움 색만 글자로 찍고 외곽선('o')은 자동으로 두른다. 종마다 기본 자세 한 장을 손으로 찍고,
 동작은 그 자세를 옮기거나(통통·웅크림·내밀기) 몇 점만 바꿔 만든다(발, 눈, 꼬리).
@@ -88,6 +90,13 @@ FUR = {
     'susu':   [(66, 46, 36), (108, 78, 56), (156, 120, 84), (214, 180, 132)],
     # 콩이(세띠아르마딜로): 잿빛 도는 황갈색 등딱지(띠 = d·h 번갈아), 분홍빛 도는 맨살(l·p).
     'kongi':  [(92, 80, 74), (138, 122, 106), (186, 168, 142), (222, 190, 170)],
+    # 새 졸개(0146). 땃쥐 = 짙은 잿빛 갈색, 고슴도치 = 가시 갈색 + 크림 얼굴, 두꺼비 = 올리브, 박쥐 = 자두빛 잿색,
+    # 포자버섯 = 팥빛 갓 + 크림 대.
+    'shrew':  [(72, 58, 58), (108, 90, 86), (146, 128, 118), (196, 178, 160)],
+    'hedgehog': [(92, 70, 56), (140, 110, 84), (196, 170, 130), (232, 212, 184)],
+    'toad':   [(84, 82, 48), (122, 118, 66), (164, 158, 94), (206, 196, 140)],
+    'bat':    [(56, 44, 58), (90, 72, 88), (128, 108, 120), (176, 150, 150)],
+    'spore':  [(120, 52, 62), (170, 78, 86), (212, 118, 116), (236, 224, 206)],
 }
 
 
@@ -419,6 +428,145 @@ KONGI_BALL = [grid([
     "",
 ]) for band in ("bdbdbdbdbdbd", "dbdbdbdbdbdb")]
 
+# 땃쥐(0146): 낮고 긴 몸, 몸 밖으로 길게 나온 뾰족 주둥이(코 끝 n), 작은 눈, 귀는 털에 묻혔다, 짧은 꼬리.
+SHREW = grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "......hhhhh",
+    "....hhvVbbbhh",
+    "...hbvvbbbbbwhh",
+    "dd.dbbbbbbbbebbn",
+    "..ddbbbbbbbblll",
+    "....ddbbbbbll",
+    ".....pp...pp",
+    "",
+])
+
+# 고슴도치(0146): 등을 덮은 가시(짙은 k·밝은 끝 h), 앞에 크림빛 얼굴(l)과 뾰족 코, 짧은 다리.
+HEDGEHOG = grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "....h.h.h.h",
+    "...hkhkhkhkh",
+    "..hkbkbkbkbkh",
+    ".hkbkvkbkbkbkh",
+    "hkbkbVbkbkbkbl",
+    "kbkbkbkbkbkllw",
+    "dbkbkbkbkbklleln",
+    "ddbdbdbdbdbllll",
+    ".ddddddddddll",
+    "..pp......pp",
+    "",
+])
+
+# 말린 고슴도치(웅크림·구르기): 가시 공. 콩이 공과 같은 틀, 가시 위상만 바꾼다.
+HEDGEHOG_BALL = [grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    ".....h.h.h",
+    "....h" + band[0:6] + "h",
+    "...h" + band[1:9] + "h",
+    "..h" + band[0:10] + "h",
+    "..h" + band[1:11] + "d",
+    "...d" + band[0:8] + "d",
+    "...d" + band[1:9] + "d",
+    "....d" + band[0:6] + "d",
+    ".....ddddd",
+    "",
+    "",
+]) for band in ("khkhkhkhkhkh", "hkhkhkhkhkhk")]
+
+# 두꺼비(0146): 넓고 납작한 몸, 머리 위로 불룩한 눈, 앞쪽 긴 입선(k), 등에 사마귀(d)와 보라 뿌리, 벌린 다리.
+TOAD = grid([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "..........hh",
+    ".........hwh",
+    "....hhhhhheh",
+    "..hhbbdbVbbbh",
+    ".hbbdbvbbdbbbh",
+    "hbbbbbbbbbkkkkk",
+    "hbdbbbbbblllllh",
+    ".ddbbbbblllll",
+    "..pp.pp..pp.pp",
+    "",
+])
+
+# 박쥐(0146): 늘 떠 있다(높이는 게임이 올린다). 작은 몸, 뾰족 귀 둘, 날개막(d)과 날개뼈(b).
+BAT_UP = grid([
+    "",
+    "",
+    "",
+    ".d............d",
+    ".dd....h.h...dd",
+    ".ddd...hbhh.ddd",
+    "..dddbhbbwbbdd",
+    "...ddbbbbebbd",
+    "....bbvbbbbb",
+    ".....dbbbbl",
+    "......dbbl",
+    ".......pp",
+    "",
+    "",
+    "",
+    "",
+])
+
+BAT_DOWN = grid([
+    "",
+    "",
+    "",
+    "",
+    ".......h.h",
+    ".......hbhh",
+    ".....bhbbwbb",
+    "...ddbbbbebbdd",
+    "..dddbbvbbbbddd",
+    ".ddd..dbbbl..ddd",
+    ".dd....dbbl...dd",
+    ".d.....pp......d",
+    "",
+    "",
+    "",
+    "",
+])
+
+# 포자버섯(0146): 점박이 갓(c 점), 크림빛 대(l)에 물든 눈 둘, 밑동에 보라 뿌리. 움직이지 않는다.
+SPORE = grid([
+    "",
+    "",
+    "",
+    "......hhhh",
+    "....hhhchhhh",
+    "...hhcchhhchh",
+    "..hbbbbbbbcbbh",
+    "..bbcbbbbbbbbb",
+    "..dbbbbbbcbbbd",
+    "...dddddddddd",
+    ".....llllll",
+    ".....lwllwl",
+    ".....lelle",
+    ".....llllll",
+    "...vvpllllpvv",
+    "",
+])
+
 # 허수아비: 말뚝 + 짚 몸 + 천 머리(단추 눈).
 DUMMY = grid([
     "",
@@ -569,6 +717,42 @@ def kongi_frames(g):
     return [g, breathe(g), walk(g, 0), walk(g, 1), balls[0], balls[1], hurt(g)]
 
 
+def hedgehog_frames(g):
+    """고슴도치: 콩이처럼 예고·구르기는 가시 공 두 장."""
+    return [g, breathe(g), walk(g, 0), walk(g, 1), HEDGEHOG_BALL[0], HEDGEHOG_BALL[1], hurt(g)]
+
+
+def toad_frames(g):
+    """두꺼비: 공격 칸은 입을 벌린다(분홍 혀뿌리). 혀 줄은 게임이 그린다."""
+    lash = copy(g)
+    put(lash, 10, 11, 'kqqqp')
+    put(lash, 10, 12, 'lkkkk')
+    return [g, breathe(g), walk(g, 0), walk(g, 1), crouch(g), lash, hurt(g)]
+
+
+def bat_frames():
+    """박쥐: 0·1 서 있기 = 날갯짓, 2·3 걷기 = 날갯짓, 4 예고 = 날개를 모은다, 5 내리꽂기 = 날개를 뒤로."""
+    up, down = BAT_UP, BAT_DOWN
+    fold = copy(up)
+    for y in range(N):
+        for x in range(N):
+            if fold[y][x] == 'd' and (x < 4 or x > 12):
+                fold[y][x] = '.'
+    for x, y in find(fold, 'v'):
+        fold[y][x] = 'V'
+    dive = shift(down, dx=1)
+    return [up, down, up, down, fold, dive, hurt(up)]
+
+
+def spore_frames(g):
+    """포자버섯: 숨쉬기만, 4 움츠림(갓이 내려앉음), 5 뿜기(갓이 부풀고 점이 밝다)."""
+    squash = shift(g, dy=1, rows=range(0, 10))
+    puff = shift(g, dy=-1, rows=range(0, 10))
+    for x, y in find(puff, 'c'):
+        puff[y][x] = 'W'
+    return [g, breathe(g), g, breathe(g), squash, puff, hurt(g)]
+
+
 def paint(img, ox, oy, g, pal, silhouette=False, tainted=False):
     d, b, h, l = (taint(c) for c in pal) if tainted else pal
     colors = dict(COMMON, d=d, b=b, h=h, l=l, o=OUTLINE_TAINTED if tainted else OUTLINE)
@@ -594,6 +778,11 @@ def sheet():
     rows.append((FUR['susu'], susu_frames(), False))
     rows.append((FUR['kongi'], kongi_frames(KONGI), True))
     rows.append((FUR['kongi'], kongi_frames(KONGI_BACK), False))
+    rows.append((FUR['shrew'], frames_of(SHREW), True))
+    rows.append((FUR['hedgehog'], hedgehog_frames(HEDGEHOG), True))
+    rows.append((FUR['toad'], toad_frames(TOAD), True))
+    rows.append((FUR['bat'], bat_frames(), True))
+    rows.append((FUR['spore'], spore_frames(SPORE), True))
     img = Image.new('RGBA', (N * 7, N * len(rows) * 2), (0, 0, 0, 0))
     for ry, (pal, frames, tainted) in enumerate(rows):
         for rx, g in enumerate(frames):

@@ -30,6 +30,12 @@ pub enum Kind {
     Doto,
     /// 셋째 길의 보스: 물든 세띠아르마딜로 콩이. 굴러 튕기고, 웅크려 버틴다(docs/decisions/0054).
     Kongi,
+    /// 새 잡몹(0146): 뒤쥐(두 번 물기)·고슴도치(공으로 구르기)·두꺼비(혀)·박쥐(날며 내리꽂기)·실버섯(포자 구름).
+    Shrew,
+    Hedgehog,
+    Toad,
+    Bat,
+    SporeCap,
 }
 
 impl Kind {
@@ -66,6 +72,10 @@ pub enum State {
     Pop { time: f32 },
     /// 콩이: 웅크려 버티기. 발톱은 등딱지에 튕긴다(`guarding`).
     Guard { time: f32 },
+    /// 두꺼비: 혀를 내민 채(시작 틱에 월드가 맞았는지 본다, 0146).
+    Lash { time: f32, dir: Vec2 },
+    /// 실버섯: 포자를 터뜨림(시작 틱에 월드가 구름을 놓는다, 0146).
+    Puff { time: f32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +93,9 @@ pub enum Event {
     Pop,
     /// 도토가 도토리를 묻었다(월드가 플레이어 발밑·둘레에 묻힌 도토리를 놓는다). 몇 개인지.
     Bury(usize),
+    /// 두꺼비가 혀를 내밀었다 / 실버섯이 포자를 터뜨렸다(소리용, 판정은 월드가 상태로 본다).
+    Tongue,
+    Spore,
 }
 
 pub struct Enemy {
@@ -237,13 +250,20 @@ impl Enemy {
         !matches!(self.state, State::Under { .. })
     }
 
-    /// 체공 높이(그리기용 px). 바닥 = 0.
+    /// 날고 있다(박쥐, 0146): 솟구치기·솟구침 밀어내기가 닿지 않는다. 발톱·드릴은 닿는다.
+    pub fn flying(&self) -> bool {
+        self.sp().behavior == Behavior::Swooper
+    }
+
+    /// 체공 높이(그리기용 px). 바닥 = 0. 박쥐는 늘 떠 있고, 내리꽂을 때 낮아진다.
     pub fn height(&self) -> f32 {
         match self.state {
             State::Leap { time, .. } => {
                 let k = (time / self.sp().dash_time).clamp(0.0, 1.0);
                 4.0 * t::LEAP_HEIGHT * k * (1.0 - k)
             }
+            State::Charge { .. } if self.flying() => t::BAT_HEIGHT * 0.4,
+            _ if self.flying() => t::BAT_HEIGHT,
             _ => 0.0,
         }
     }
@@ -357,6 +377,9 @@ impl Enemy {
                 if player_targetable {
                     self.facing = dir_to_player;
                     if dist < sp.trigger {
+                        if sp.behavior == Behavior::Darter {
+                            self.chain = t::SHREW_BITES - 1;
+                        }
                         self.state = State::Windup { time: 0.0 };
                     } else {
                         self.pos += dir_to_player * self.speed() * dt;
@@ -405,7 +428,14 @@ impl Enemy {
                     self.state = State::Rest { time: sp.wall_rest };
                     self.flash = t::HIT_FLASH;
                     events.push(Event::WallHit);
+                } else if time >= dur && sp.behavior == Behavior::Darter && self.chain > 0 {
+                    // 뒤쥐: 곧바로 다시 겨눠 한 번 더 문다(예고는 짧게).
+                    self.chain -= 1;
+                    self.state = State::Windup {
+                        time: self.windup() * (1.0 - t::SHREW_REAIM),
+                    };
                 } else if time >= dur {
+                    self.chain = 0;
                     self.state = State::Rest { time: sp.rest };
                 } else {
                     self.state = State::Charge { time, dir };
@@ -427,18 +457,22 @@ impl Enemy {
                         self.pos -= dir_to_player * self.speed() * dt;
                     } else if dist > far {
                         self.pos += dir_to_player * self.speed() * dt;
-                    } else if sp.behavior == Behavior::Leaper {
-                        // 청설모: 거리 안에서는 옆으로 돈다(가만히 있지 않는다).
+                    } else if matches!(sp.behavior, Behavior::Leaper | Behavior::Swooper) {
+                        // 청설모·박쥐: 거리 안에서는 옆으로 돈다(가만히 있지 않는다).
                         let side = vec2(-dir_to_player.y, dir_to_player.x);
                         self.pos += side * self.speed() * 0.6 * dt;
                     }
-                    self.fire_cd -= dt;
+                    // 실버섯은 가까이 와야 부푼다. 다른 것은 늘 센다.
+                    if sp.behavior != Behavior::Spore || dist < sp.trigger {
+                        self.fire_cd -= dt;
+                    }
                     if self.fire_cd <= 0.0 {
                         self.state = match sp.behavior {
                             Behavior::Leaper => State::Crouch {
                                 time: 0.0,
                                 target: player_pos,
                             },
+                            Behavior::Swooper => State::Windup { time: 0.0 },
                             _ => State::Aim { time: 0.0 },
                         };
                     }
@@ -519,12 +553,41 @@ impl Enemy {
                     State::Pop { time }
                 };
             }
+            State::Lash { time, dir } => {
+                let time = time + dt;
+                self.state = if time >= t::TOAD_LASH_TIME {
+                    State::Rest { time: sp.rest }
+                } else {
+                    State::Lash { time, dir }
+                };
+            }
+            State::Puff { time } => {
+                let time = time + dt;
+                self.state = if time >= t::SPORE_PUFF_TIME {
+                    State::Rest { time: sp.rest }
+                } else {
+                    State::Puff { time }
+                };
+            }
             State::Aim { time } => {
                 let time = time + dt;
                 if player_targetable {
                     self.facing = dir_to_player;
                 }
-                if time >= self.windup() {
+                if time >= self.windup() && sp.behavior == Behavior::Tongue {
+                    // 두꺼비: 겨눈 쪽으로 혀를 내민다(맞았는지는 월드가 이 틱에 본다).
+                    events.push(Event::Tongue);
+                    self.fire_cd = sp.fire_every;
+                    self.state = State::Lash {
+                        time: 0.0,
+                        dir: self.facing,
+                    };
+                } else if time >= self.windup() && sp.behavior == Behavior::Spore {
+                    // 포자버섯: 제자리에 포자 구름(월드가 놓는다).
+                    events.push(Event::Spore);
+                    self.fire_cd = sp.fire_every;
+                    self.state = State::Puff { time: 0.0 };
+                } else if time >= self.windup() {
                     // 도토: 부채꼴로 여럿(가운데가 플레이어 쪽), 던진 뒤 잠깐 쉰다.
                     let n = match sp.behavior {
                         Behavior::Doto if self.hurt_half() => t::DOTO_FAN_HURT,
@@ -671,9 +734,9 @@ impl Enemy {
         }
     }
 
-    /// 콩이가 공으로 말려 있다(웅크림·버티기·구르기): 발톱은 등딱지에 튕긴다.
+    /// 콩이·고슴도치가 공으로 말려 있다(웅크림·버티기·구르기): 발톱은 등딱지·가시에 튕긴다.
     pub fn guarding(&self) -> bool {
-        self.sp().behavior == Behavior::Kongi
+        matches!(self.sp().behavior, Behavior::Kongi | Behavior::Roller)
             && matches!(
                 self.state,
                 State::Windup { .. } | State::Charge { .. } | State::Guard { .. }
@@ -703,7 +766,9 @@ impl Enemy {
 
     /// 패링에 받아쳐졌다: 구르던 콩이는 멈춰 어질어질(다른 보스는 `hurt`가 다룬다).
     pub fn on_parried(&mut self) {
-        if self.sp().behavior == Behavior::Kongi && matches!(self.state, State::Charge { .. }) {
+        if matches!(self.sp().behavior, Behavior::Kongi | Behavior::Roller)
+            && matches!(self.state, State::Charge { .. })
+        {
             self.chain = 0;
             self.state = State::Rest {
                 time: self.sp().wall_rest,
@@ -814,16 +879,26 @@ impl Enemy {
             State::Under { .. } => "under",
             State::Pop { .. } => "POP",
             State::Guard { .. } => "GUARD",
+            State::Lash { .. } => "LASH",
+            State::Puff { .. } => "PUFF",
         }
     }
 }
 
 fn idle_of(b: Behavior) -> State {
     match b {
-        Behavior::Charger | Behavior::Chief | Behavior::Momo | Behavior::Doto | Behavior::Kongi => {
-            State::Approach
-        }
-        Behavior::Shooter | Behavior::Leaper => State::Keep,
+        Behavior::Charger
+        | Behavior::Chief
+        | Behavior::Momo
+        | Behavior::Doto
+        | Behavior::Kongi
+        | Behavior::Darter
+        | Behavior::Roller => State::Approach,
+        Behavior::Shooter
+        | Behavior::Leaper
+        | Behavior::Tongue
+        | Behavior::Swooper
+        | Behavior::Spore => State::Keep,
         Behavior::Dummy => State::Rest { time: f32::MAX },
     }
 }
@@ -993,6 +1068,132 @@ mod tests {
         assert!(matches!(g.state, State::Windup { time } if time > 0.0));
         g.break_guard();
         assert!(matches!(g.state, State::Stunned { .. }) && !g.guarding());
+    }
+
+    /// 땃쥐(0146): 한 번 떨고 두 번 연달아 돌진한 뒤에야 쉰다.
+    #[test]
+    fn shrew_bites_twice_then_rests() {
+        let room = Room::new();
+        let player = room.center() + vec2(40.0, 0.0);
+        let mut e = Enemy::new(Kind::Shrew, room.center());
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let (mut dashes, mut was_charging) = (0, false);
+        for _ in 0..600 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            let charging = matches!(e.state, State::Charge { .. });
+            if charging && !was_charging {
+                dashes += 1;
+            }
+            was_charging = charging;
+            if matches!(e.state, State::Rest { .. }) && dashes > 0 {
+                break;
+            }
+        }
+        assert_eq!(dashes, t::SHREW_BITES as usize);
+    }
+
+    /// 고슴도치(0146): 말려 구르는 동안 발톱이 튕기고, 벽에 박으면 어질어질(틈). 패링해도 멈춘다.
+    #[test]
+    fn hedgehog_rolls_guarded_and_is_dizzy_after_wall() {
+        let room = Room::new();
+        let player = room.center() + vec2(80.0, 0.0);
+        let mut e = Enemy::new(Kind::Hedgehog, room.center());
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let (mut rolled, mut dizzy) = (false, false);
+        for _ in 0..600 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            match e.state {
+                State::Charge { .. } => {
+                    rolled = true;
+                    assert!(e.guarding());
+                }
+                State::Rest { .. } if rolled => {
+                    dizzy = true;
+                    assert!(!e.guarding());
+                }
+                _ => {}
+            }
+        }
+        assert!(rolled && dizzy && ev.contains(&Event::WallHit));
+        let mut g = Enemy::new(Kind::Hedgehog, room.center());
+        g.state = State::Charge {
+            time: 0.1,
+            dir: vec2(1.0, 0.0),
+        };
+        g.on_parried();
+        assert!(matches!(g.state, State::Rest { .. }));
+    }
+
+    /// 두꺼비(0146): 거리를 두고 겨누다가 플레이어 쪽으로 혀를 내민다. 혀를 내민 동안은 몸으로 아프지 않다.
+    #[test]
+    fn toad_lashes_toward_player() {
+        let room = Room::new();
+        let player = room.center() + vec2(50.0, 0.0);
+        let mut e = Enemy::new(Kind::Toad, room.center());
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let mut lashed = None;
+        for _ in 0..600 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            if let State::Lash { time: 0.0, dir } = e.state {
+                lashed = Some(dir);
+                break;
+            }
+        }
+        let dir = lashed.expect("혀를 내민다");
+        assert!(dir.dot((player - e.pos).normalize()) > 0.95);
+        assert!(ev.contains(&Event::Tongue) && pr.is_empty());
+    }
+
+    /// 박쥐(0146): 늘 떠 있고(솟구치기 안 닿음), 내리꽂을 때 낮아진다.
+    #[test]
+    fn bat_flies_and_dives_lower() {
+        let room = Room::new();
+        let player = room.center() + vec2(60.0, 0.0);
+        let mut e = Enemy::new(Kind::Bat, room.center());
+        assert!(e.flying() && e.height() >= t::BAT_HEIGHT);
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let mut dove = false;
+        for _ in 0..600 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            if matches!(e.state, State::Charge { .. }) {
+                dove = true;
+                assert!(e.height() < t::BAT_HEIGHT && e.contact_damage().is_some());
+            }
+        }
+        assert!(dove);
+    }
+
+    /// 포자버섯(0146): 멀면 가만히, 가까이 오면 제자리에서 뿜는다. 움직이지 않는다.
+    #[test]
+    fn spore_cap_puffs_only_when_near() {
+        let room = Room::new();
+        let at = room.center();
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let mut far = Enemy::new(Kind::SporeCap, at);
+        for _ in 0..600 {
+            far.update(
+                at + vec2(120.0, 0.0),
+                true,
+                &room,
+                t::TICK_DT,
+                &mut pr,
+                &mut ev,
+            );
+        }
+        assert!(!ev.contains(&Event::Spore));
+        let mut near = Enemy::new(Kind::SporeCap, at);
+        for _ in 0..600 {
+            near.update(
+                at + vec2(30.0, 0.0),
+                true,
+                &room,
+                t::TICK_DT,
+                &mut pr,
+                &mut ev,
+            );
+        }
+        assert!(ev.contains(&Event::Spore));
+        assert!((near.pos - at).length() < 0.5);
     }
 
     #[test]

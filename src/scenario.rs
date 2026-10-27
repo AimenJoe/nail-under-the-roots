@@ -51,6 +51,8 @@ pub enum Scenario {
     Gear,
     /// 적 다섯 종을 한 마리씩(생쥐는 떼). 도감·그림 확인(docs/decisions/0021).
     AllSpecies,
+    /// 새 졸개 다섯(0146): 땃쥐·고슴도치·두꺼비·박쥐·포자버섯, 어두운 심층에서.
+    NewMobs,
     /// 튜토리얼 보스: 필드 공터 앞에서, 문은 열려 있다(docs/decisions/0032).
     Boss,
     /// 첫 쉼터에서 씨앗 40개로(가게·길 지도, docs/decisions/0030, 0031).
@@ -69,7 +71,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 28] = [
+pub const LIST: [Entry; 29] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -134,6 +136,11 @@ pub const LIST: [Entry; 28] = [
         name: "적 다섯 종",
         desc: "들쥐·생쥐 떼·시궁쥐·다람쥐·청설모. 도감 탭에 차례로 적힌다.",
         scenario: Scenario::AllSpecies,
+    },
+    Entry {
+        name: "새 졸개 다섯",
+        desc: "땃쥐(두 번 물기)·고슴도치(가시 공)·두꺼비(혀)·박쥐(솟구치기 안 닿음)·포자버섯(구름). 심층에서.",
+        scenario: Scenario::NewMobs,
     },
     Entry {
         name: "빈 방",
@@ -317,6 +324,22 @@ pub fn build(s: Scenario) -> World {
             for (i, k) in mobs.enumerate() {
                 let p = spawn_point(&w, i);
                 w.spawn_mob(*k, p);
+            }
+            w
+        }
+        Scenario::NewMobs => {
+            let mut w = World::empty();
+            w.biome = Biome::Deep;
+            let mobs = [
+                Kind::Shrew,
+                Kind::Hedgehog,
+                Kind::Toad,
+                Kind::Bat,
+                Kind::SporeCap,
+            ];
+            for (i, k) in mobs.into_iter().enumerate() {
+                let p = spawn_point(&w, i);
+                w.spawn_mob(k, p);
             }
             w
         }

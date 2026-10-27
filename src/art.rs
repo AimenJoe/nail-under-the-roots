@@ -18,7 +18,7 @@ pub struct Art {
     pub dark: Texture2D,
     /// 빛 구멍(0095): 가운데 불투명 → 가장자리 투명. 어둠 지도에서 이만큼 어둠을 뺀다.
     pub light: Texture2D,
-    /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이. 아래 CRITTER_ROWS줄은 흰 실루엣.
+    /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이, 줄 14~18 땃쥐·고슴도치·두꺼비·박쥐·포자버섯(0146). 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
@@ -109,7 +109,7 @@ pub const PORTRAIT_COLS: u32 = 12;
 pub const CELL: f32 = 16.0;
 
 /// critters.png에서 실루엣 줄까지의 거리(그림 줄 수).
-pub const CRITTER_ROWS: u32 = 14;
+pub const CRITTER_ROWS: u32 = 19;
 /// critters.png의 라쿤 줄.
 pub const RACCOON_ROW: u32 = 6;
 /// critters.png의 모모(물든 굴토끼) 줄(docs/decisions/0029).
@@ -124,6 +124,12 @@ pub const SUSU_ROW: u32 = 11;
 /// 콩이(물든 세띠아르마딜로, 셋째 길 보스)와 돌아온 콩이(docs/decisions/0054).
 pub const KONGI_ROW: u32 = 12;
 pub const KONGI_BACK_ROW: u32 = 13;
+/// 새 잡몹(0146): 뒤쥐·고슴도치(칸 4·5 = 공)·두꺼비(칸 5 = 혀 내밀기)·박쥐(칸 0~3 날갯짓, 5 내리꽂기)·실버섯(칸 4 = 부풂).
+pub const SHREW_ROW: u32 = 14;
+pub const HEDGEHOG_ROW: u32 = 15;
+pub const TOAD_ROW: u32 = 16;
+pub const BAT_ROW: u32 = 17;
+pub const SPORE_ROW: u32 = 18;
 
 impl Art {
     /// 털빛 n의 Naïl 시트(0 또는 없으면 기본).

@@ -11,6 +11,7 @@
 
 use macroquad::prelude::*;
 
+use crate::biome::Biome;
 use crate::enemy::Kind;
 use crate::map::{cell_center, Cell, Grid};
 use crate::room::{Prop, PropKind, Room};
@@ -154,6 +155,8 @@ pub struct Params {
     pub start_exit: bool,
     /// 보스방에 무리 대신 이 보스 혼자(첫 길의 모모, 0046).
     pub boss: Option<Kind>,
+    /// 적 뽑기 표를 고르는 지대(0146). 굴을 지을 때 장소가 정한다.
+    pub biome: Biome,
 }
 
 impl Params {
@@ -167,6 +170,7 @@ impl Params {
             tough: 0,
             start_exit: false,
             boss: None,
+            biome: Biome::Meadow,
         }
     }
 
@@ -339,7 +343,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                     _ => 2 + depth.min(2) as usize + rng.below(2) as usize,
                 };
                 for k in 0..count {
-                    let kind = crate::species::roll(rng.unit(), depth + prm.tough);
+                    let kind = crate::species::roll(rng.unit(), depth + prm.tough, prm.biome);
                     // 방 가장자리 쪽에(가운데는 들어오는 플레이어 자리).
                     let corner = [
                         (4, 4),

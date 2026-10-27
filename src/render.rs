@@ -1967,6 +1967,21 @@ fn draw_world_lights(
             Color::new(g.r, g.g, g.b, 0.16 * pulse * k),
         );
     }
+    // 포자 구름(0146)은 어둠 속에서도 옅게 빛난다(아플 때만 조금 더).
+    for c in &w.clouds {
+        let fade = 1.0 - ((c.time / t::SPORE_CLOUD_TIME - 0.75) / 0.25).clamp(0.0, 1.0);
+        let hot = if c.time < t::SPORE_CLOUD_GRACE {
+            0.5
+        } else {
+            1.0
+        };
+        draw_circle(
+            c.pos.x.round(),
+            c.pos.y.round(),
+            t::SPORE_CLOUD_R,
+            Color::new(0.55, 0.45, 0.80, 0.12 * fade * hot * k),
+        );
+    }
     for p in &w.room.props {
         if p.kind != PropKind::Campfire {
             continue;
@@ -3172,6 +3187,9 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
     for m in w.mines.iter().filter(|_| ground) {
         draw_mine(m, w.time);
     }
+    for c in w.clouds.iter().filter(|_| ground) {
+        draw_cloud(c, w.time);
+    }
     for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
         let q = lerp(p.prev_pos, p.pos, alpha);
         list.push((q.y + 3.0, Drawable::Projectile(i)));
@@ -3892,7 +3910,12 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             };
             let k = (wt / e.windup()).min(1.0);
             tint = Color::new(1.0, 1.0 - 0.45 * k, 1.0 - 0.45 * k, 1.0);
-            if matches!(e.state, enemy::State::Aim { .. }) {
+            if matches!(e.state, enemy::State::Aim { .. })
+                && !matches!(
+                    sp.behavior,
+                    crate::species::Behavior::Tongue | crate::species::Behavior::Spore
+                )
+            {
                 // 도토리를 쳐든다.
                 let hand = pos + e.facing * (r + 1.0) - vec2(0.0, 4.0);
                 draw_acorn(hand, 0.0);
@@ -3999,6 +4022,27 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             enemy::State::Guard { .. } => frame = 4,
             _ => {}
         }
+    }
+    // 새 졸개(0146): 고슴도치는 콩이처럼 공(칸 4·5), 혀 내밀기·포자 뿜기는 칸 5.
+    match (sp.behavior, e.state) {
+        (crate::species::Behavior::Roller, enemy::State::Charge { .. }) => {
+            frame = 4 + ((time * 14.0) as u32) % 2
+        }
+        (crate::species::Behavior::Roller, enemy::State::Windup { .. }) => frame = 4,
+        (_, enemy::State::Lash { .. } | enemy::State::Puff { .. }) => frame = 5,
+        _ => {}
+    }
+    if e.flying() {
+        // 박쥐: 예고·내리꽂기·맞음이 아니면 늘 날갯짓(칸 0·1). 높이만큼 떠서 살랑인다(그림자는 바닥에 남는다).
+        if !matches!(
+            e.state,
+            enemy::State::Windup { .. }
+                | enemy::State::Charge { .. }
+                | enemy::State::Stunned { .. }
+        ) {
+            frame = ((time * 10.0 + e.pos.x * 0.03) as u32) % 2;
+        }
+        pos.y -= (e.height() + (time * 5.0 + e.pos.x * 0.02).sin()).round();
     }
     if e.asleep {
         frame = 1;
@@ -4139,10 +4183,22 @@ fn draw_telegraphs(w: &World, alpha: f32) {
             enemy::State::Windup { time }
                 if matches!(
                     sp.behavior,
-                    Behavior::Charger | Behavior::Chief | Behavior::Kongi
+                    Behavior::Charger
+                        | Behavior::Chief
+                        | Behavior::Kongi
+                        | Behavior::Darter
+                        | Behavior::Roller
+                        | Behavior::Swooper
                 ) =>
             {
                 ((time / e.windup()).min(1.0), 0)
+            }
+            enemy::State::Lash { time, dir } => {
+                draw_tongue(w, pos, e.radius(), dir, time);
+                continue;
+            }
+            enemy::State::Aim { time } if sp.behavior == Behavior::Spore => {
+                ((time / e.windup()).min(1.0), 3)
             }
             enemy::State::Aim { time } => ((time / e.windup()).min(1.0), 1),
             enemy::State::Crouch { time, .. } => ((time / e.windup()).min(1.0), 2),
@@ -4181,10 +4237,22 @@ fn draw_telegraphs(w: &World, alpha: f32) {
                 draw_line(b.x + side.x, b.y + side.y, tip.x, tip.y, 1.0, edge);
                 draw_line(b.x - side.x, b.y - side.y, tip.x, tip.y, 1.0, edge);
             }
+            3 => {
+                // 포자버섯: 구름이 덮을 자리. 고리가 안에서 밖으로 부푼다.
+                let r = t::SPORE_CLOUD_R;
+                draw_circle(pos.x, pos.y, r, fill);
+                draw_circle_lines(pos.x, pos.y, r * (0.5 + 0.5 * k), 1.0, edge);
+            }
             1 => {
                 let dir = e.facing.normalize_or(vec2(1.0, 0.0));
                 let start = pos + dir * (e.radius() + 2.0);
-                let len = w.room.ray_len(start, dir, t::PROJECTILE_RADIUS, 150.0);
+                // 두꺼비 혀는 닿는 데까지만, 도토리는 멀리.
+                let reach = if sp.behavior == Behavior::Tongue {
+                    t::TOAD_TONGUE_REACH
+                } else {
+                    150.0
+                };
+                let len = w.room.ray_len(start, dir, t::PROJECTILE_RADIUS, reach);
                 // 점선: 3px 칠하고 2px 비움, 멀수록 옅게.
                 let mut d = 0.0;
                 while d < len {
@@ -4213,6 +4281,58 @@ fn draw_telegraphs(w: &World, alpha: f32) {
                 draw_circle_lines(at.x, at.y, r, 1.0, inner);
             }
         }
+    }
+}
+
+/// 두꺼비 혀(0146): 맞는 순간 다 뻗었다가 말려 들어간다(맞았는지는 월드가 뻗은 틱에 본다).
+fn draw_tongue(w: &World, pos: Vec2, r: f32, dir: Vec2, time: f32) {
+    let start = pos + dir * r;
+    let reach = w.room.ray_len(start, dir, 1.0, t::TOAD_TONGUE_REACH);
+    let k = (time / t::TOAD_LASH_TIME).clamp(0.0, 1.0);
+    let len = reach * (1.0 - k * k);
+    let (a, b) = (
+        (start - vec2(0.0, 2.0)).round(),
+        (start + dir * len - vec2(0.0, 2.0)).round(),
+    );
+    draw_line(a.x, a.y, b.x, b.y, 2.0, Color::new(0.94, 0.50, 0.60, 1.0));
+    draw_circle(b.x, b.y, 2.0, Color::new(0.98, 0.62, 0.70, 1.0));
+}
+
+/// 포자 구름(0146): 처음 잠깐(아프지 않을 때)은 옅게 부풀고, 끝에 흐려진다. 안의 점들이 천천히 돈다.
+fn draw_cloud(c: &world::Cloud, time: f32) {
+    let grow = (c.time / t::SPORE_CLOUD_GRACE).min(1.0);
+    let k = c.time / t::SPORE_CLOUD_TIME;
+    let fade = 1.0 - ((k - 0.75) / 0.25).clamp(0.0, 1.0);
+    let a = fade
+        * if c.time < t::SPORE_CLOUD_GRACE {
+            0.5
+        } else {
+            1.0
+        };
+    let r = t::SPORE_CLOUD_R * (0.55 + 0.45 * grow);
+    for i in 0..5 {
+        let ang = i as f32 * std::f32::consts::TAU / 5.0 + time * 0.5;
+        let p = c.pos + vec2(ang.cos(), ang.sin() * 0.7) * r * 0.45;
+        draw_circle(p.x, p.y, r * 0.55, Color::new(0.66, 0.56, 0.84, 0.16 * a));
+    }
+    draw_circle_lines(
+        c.pos.x,
+        c.pos.y,
+        r,
+        1.0,
+        Color::new(0.85, 0.75, 1.0, 0.7 * a),
+    );
+    for i in 0..8 {
+        let ph = (time * 0.4 + i as f32 * 0.37).fract();
+        let ang = i as f32 * 2.4 + time * 0.8;
+        let p = c.pos + vec2(ang.cos(), ang.sin() * 0.7) * r * (0.2 + 0.7 * ph);
+        draw_rectangle(
+            p.x.round(),
+            (p.y - ph * 4.0).round(),
+            1.0,
+            1.0,
+            Color::new(0.90, 0.85, 1.0, 0.7 * a * (1.0 - ph)),
+        );
     }
 }
 

@@ -349,6 +349,23 @@ pub const CHIEF_SUMMONS: u32 = 2;
 /// 공격이 아닐 때 맞으면 멈칫하는 시간 배율(보통 적의 경직 × 이것).
 pub const CHIEF_STUN_MUL: f32 = 0.35;
 
+// ---- 새 잡몹(src/species.rs, docs/decisions/0146) -------------------------------------
+/// 뒤쥐: 한 번 예고에 몇 번 무나, 다음 물기 예고는 종 예고 × 이것(짧게 다시 겨눈다).
+pub const SHREW_BITES: u32 = 2;
+pub const SHREW_REAIM: f32 = 0.4;
+/// 두꺼비: 혀가 닿는 거리·두께(플레이어 반지름에 더함)·내민 채 머무는 시간·맞으면 끌려가는 속도.
+pub const TOAD_TONGUE_REACH: f32 = 70.0;
+pub const TOAD_TONGUE_WIDTH: f32 = 4.0;
+pub const TOAD_LASH_TIME: f32 = 0.22;
+pub const TOAD_PULL: f32 = 260.0;
+/// 박쥐: 나는 높이(그리기용 px). 날고 있어 솟구치기가 닿지 않는다.
+pub const BAT_HEIGHT: f32 = 9.0;
+/// 실버섯: 포자 구름 반지름·남는 시간·터뜨리는 몸짓·구름이 다 퍼지기 전 비킬 틈(이 동안은 다치지 않는다).
+pub const SPORE_CLOUD_R: f32 = 22.0;
+pub const SPORE_CLOUD_TIME: f32 = 2.6;
+pub const SPORE_PUFF_TIME: f32 = 0.3;
+pub const SPORE_CLOUD_GRACE: f32 = 0.3;
+
 // ---- 큰 나무의 재주(src/talents.rs, docs/decisions/0047) -------------------------------
 /// 굴파기 A 깊은 굴: 땅속 시간·솟구침 반지름·대기 배율. B 얕은 굴.
 pub const TAL_DEEP_TIME: f32 = 0.6;

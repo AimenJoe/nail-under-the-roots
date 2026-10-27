@@ -122,6 +122,12 @@ pub struct Mine {
     pub fuse: f32,
 }
 
+/// 포자버섯이 뿜은 포자 구름(0146). 잠깐 뒤부터 안에 서 있으면 아프다(땅속은 괜찮다).
+pub struct Cloud {
+    pub pos: Vec2,
+    pub time: f32,
+}
+
 /// 바닥에 놓인 무기. 닿으면 얻는다.
 pub struct Pickup {
     pub pos: Vec2,
@@ -191,6 +197,7 @@ pub struct World {
     /// 도토(0052): 둘째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다). 묻힌 도토리.
     pub doto_fight: bool,
     pub mines: Vec<Mine>,
+    pub clouds: Vec<Cloud>,
     /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
     pub kongi_fight: bool,
     /// 실의 꿈(0055): 쓰러진 적이 아무것도 떨어뜨리지 않는다(기록이 공정하게).
@@ -267,6 +274,7 @@ impl World {
             momo_wins: 0,
             doto_fight: false,
             mines: Vec::new(),
+            clouds: Vec::new(),
             kongi_fight: false,
             dream: false,
             charm_pool: crate::journal::charm_pool(
@@ -709,6 +717,8 @@ impl World {
                     sfx.play(sfx::Id::Emerge);
                     self.feel.add_trauma(0.25);
                 }
+                enemy::Event::Tongue => sfx.play(sfx::Id::Shoot),
+                enemy::Event::Spore => sfx.play(sfx::Id::Burrow),
             }
         }
         // 모모가 숨는·튀어나오는 자리에 흙.
@@ -722,9 +732,19 @@ impl World {
                     self.fx.push(ring(e.pos, 4.0, r, 0.25, DIRT));
                     burst(&mut self.fx, e.pos, 14, DIRT, 110.0);
                 }
+                enemy::State::Puff { time: 0.0 } => {
+                    self.clouds.push(Cloud {
+                        pos: e.pos,
+                        time: 0.0,
+                    });
+                }
                 _ => {}
             }
         }
+        for c in self.clouds.iter_mut().filter(|_| !frozen) {
+            c.time += dt;
+        }
+        self.clouds.retain(|c| c.time < t::SPORE_CLOUD_TIME);
         // 대장이 울부짖으면 양옆에 생쥐 떼(셋).
         if summon {
             sfx.play(sfx::Id::Shoot);
@@ -838,6 +858,8 @@ impl World {
                 if e.last_hit_by == s.id
                     || !e.hittable()
                     || !s.shape.overlaps_circle(e.pos, e.radius())
+                    // 나는 박쥐에는 솟구치기가 닿지 않는다(0146).
+                    || (e.flying() && s.kind == crate::combat::StrikeKind::Emerge)
                 {
                     continue;
                 }
@@ -846,7 +868,7 @@ impl World {
                 let guarded = e.guarding();
                 if guarded && matches!(s.kind, crate::combat::StrikeKind::Claw(_)) {
                     e.shell_hit();
-                    shell_from = Some(e.pos);
+                    shell_from = Some((e.pos, e.kind));
                     continue;
                 }
                 let dir = (e.pos - origin).normalize_or_zero();
@@ -913,7 +935,7 @@ impl World {
             if s.kind == crate::combat::StrikeKind::Emerge {
                 emerge_push(&mut self.enemies, origin, self.player.facing, s.id);
             }
-            if let Some(from) = shell_from {
+            if let Some((from, kind)) = shell_from {
                 self.player
                     .recoil(from, t::KONGI_RECOIL, t::KONGI_RECOIL_LOCK);
                 sfx.play(sfx::Id::WallHit);
@@ -923,7 +945,9 @@ impl World {
                 self.fx.push(ring(p, 2.0, 14.0, 0.2, SHELL));
                 burst(&mut self.fx, p, 8, SHELL, 100.0);
                 self.toast = Some((
-                    if self.character == crate::equipment::Character::Momo {
+                    if kind == Kind::Hedgehog {
+                        |s| s.toast_spines
+                    } else if self.character == crate::equipment::Character::Momo {
                         |s| s.toast_shell_momo
                     } else {
                         |s| s.toast_shell
@@ -980,6 +1004,10 @@ impl World {
         }
 
         for (pos, kind) in deaths {
+            // 포자버섯은 쓰러지면서도 한 번 뿜는다.
+            if kind == Kind::SporeCap {
+                self.clouds.push(Cloud { pos, time: 0.0 });
+            }
             self.adv.last_kill = pos;
             self.drop_loot(pos, kind);
         }
@@ -1011,8 +1039,44 @@ impl World {
                     }
                 }
             }
+            // 두꺼비 혀(0146): 내민 틱에 혀 줄에 걸리면 맞고 두꺼비 쪽으로 끌려간다. 받아치면 두꺼비가 멈칫한다.
+            let mut pull = None;
+            if hurt_from.is_none() && !parried {
+                for e in &mut self.enemies {
+                    let enemy::State::Lash { time, dir } = e.state else {
+                        continue;
+                    };
+                    if time > 0.0 {
+                        continue;
+                    }
+                    let start = e.pos + dir * e.radius();
+                    let reach = self.room.ray_len(start, dir, 1.0, t::TOAD_TONGUE_REACH);
+                    if dist_to_segment(ppos, start, start + dir * reach) > pr + t::TOAD_TONGUE_WIDTH
+                    {
+                        continue;
+                    }
+                    let from = (e.pos - ppos).normalize_or_zero();
+                    if parry.is_some_and(|d| d.dot(from) > t::PARRY_FRONT) {
+                        let counter = self.player.talents.parry_counter();
+                        e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                        parried = true;
+                        break;
+                    }
+                    hurt_from = Some((e.pos, 1));
+                    pull = Some(from * t::TOAD_PULL);
+                    break;
+                }
+            }
             if parried {
                 self.parry_feedback(sfx);
+            }
+            if hurt_from.is_none() && !parried {
+                let rr = pr + t::SPORE_CLOUD_R;
+                if let Some(c) = self.clouds.iter().find(|c| {
+                    c.time >= t::SPORE_CLOUD_GRACE && (c.pos - ppos).length_squared() <= rr * rr
+                }) {
+                    hurt_from = Some((c.pos, 1));
+                }
             }
             if hurt_from.is_none() && !parried {
                 let rr = pr + t::DOTO_MINE_RADIUS;
@@ -1036,6 +1100,9 @@ impl World {
             if let Some((from, dmg)) = hurt_from {
                 let dmg = if self.no_damage { 0 } else { dmg };
                 if self.player.take_damage(from, dmg) {
+                    if let Some(v) = pull {
+                        self.player.vel = v;
+                    }
                     self.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
                     self.feel.add_trauma(t::PLAYER_HURT_SHAKE);
                     self.fx.push(ring(self.player.pos, 4.0, 14.0, 0.2, RED));
@@ -1305,7 +1372,7 @@ impl World {
         let depth = self.wave / 3;
         for _ in 0..(chargers + shooters) {
             if let Some(p) = it.next() {
-                let kind = crate::species::roll(rand::gen_range(0.0, 1.0), depth);
+                let kind = crate::species::roll(rand::gen_range(0.0, 1.0), depth, self.biome);
                 self.spawn_mob(kind, p);
             }
         }
@@ -1341,11 +1408,22 @@ pub fn enemy_color(kind: Kind) -> Color {
     kind.species().color
 }
 
+/// 점에서 선분까지 거리.
+fn dist_to_segment(p: Vec2, a: Vec2, b: Vec2) -> f32 {
+    let ab = b - a;
+    let k = if ab.length_squared() > 1e-6 {
+        ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (a + ab * k - p).length()
+}
+
 /// 밀쳐내기(0090): 솟구치기에 안 맞은 둘레의 잡몹을 피해 없이 바깥으로 민다. 가까울수록 세게. 보스는 버틴다.
 /// 같은 공격 번호(`id`)로 맞은 적은 이미 맞았으니 건너뛴다.
 fn emerge_push(enemies: &mut [crate::enemy::Enemy], origin: Vec2, facing: Vec2, id: u32) {
     for e in enemies {
-        if e.last_hit_by == id || e.is_boss() || !e.hittable() {
+        if e.last_hit_by == id || e.is_boss() || !e.hittable() || e.flying() {
             continue;
         }
         let d = e.pos - origin;
@@ -1531,6 +1609,24 @@ mod tests {
         w.fx.extend((0..5).map(|i| dust(i as f32)));
         w.thin_fx();
         assert_eq!(w.fx.len(), 8);
+    }
+
+    /// 혀 줄 맞기(0146): 선분까지 거리.
+    #[test]
+    fn distance_to_tongue_segment() {
+        let (a, b) = (vec2(0.0, 0.0), vec2(10.0, 0.0));
+        assert_eq!(dist_to_segment(vec2(5.0, 3.0), a, b), 3.0);
+        assert_eq!(dist_to_segment(vec2(-4.0, 0.0), a, b), 4.0);
+        assert_eq!(dist_to_segment(vec2(13.0, 4.0), a, b), 5.0);
+    }
+
+    /// 나는 박쥐는 솟구치기에 밀리지 않는다(0146).
+    #[test]
+    fn emerge_push_skips_flying_bats() {
+        let o = vec2(100.0, 100.0);
+        let mut es = vec![Enemy::new(Kind::Bat, o + vec2(20.0, 0.0))];
+        emerge_push(&mut es, o, vec2(1.0, 0.0), 3);
+        assert_eq!(es[0].vel, Vec2::ZERO);
     }
 
     /// 밀쳐내기(0090): 둘레의 잡몹은 피해 없이 바깥으로 밀리고 멈춘다. 가까울수록 세다. 이미 맞은 적·보스·멀리 있는 적은 그대로.

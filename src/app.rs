@@ -2881,7 +2881,9 @@ impl App {
         // 넘기면 목록 오른쪽 9px에 ▲▼(이름·설명과 겹쳤다). 목록 폭은 가장 긴 아는 이름에 맞춰 74~100
         // (더 넓히면 오른쪽 능력 말이 잘렸다. 아주 긴 이름은 목록에서만 "…", 오른쪽 제목엔 다 나온다)
         // (포르투갈어·프랑스어·러시아어 이름이 "Esquilo-listra…"처럼 잘렸다, 0089).
-        let arrows = if fits < BESTIARY.len() { 9.0 } else { 0.0 };
+        // ▲▼ 폭은 글꼴에서 잰다(일본어·중국어 글꼴은 12px라 9px 칸 밖으로 나왔다, 0146).
+        let arrow_w = ui.text_w("▼", FONT_PX).max(9.0);
+        let arrows = if fits < BESTIARY.len() { arrow_w } else { 0.0 };
         let list_w = BESTIARY
             .iter()
             .filter(|k| seen.contains(k))
@@ -2893,12 +2895,18 @@ impl App {
             .saturating_sub(fits - 1)
             .min(BESTIARY.len().saturating_sub(fits));
         if first > 0 {
-            ui.text("▲", c.x + list_w - 9.0, c.y + 1.0, FONT_PX, ui::TEXT_DIM);
+            ui.text(
+                "▲",
+                c.x + list_w - arrow_w,
+                c.y + 1.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
         }
         if first + fits < BESTIARY.len() {
             ui.text(
                 "▼",
-                c.x + list_w - 9.0,
+                c.x + list_w - arrow_w,
                 c.y + (fits - 1) as f32 * row_h + 1.0,
                 FONT_PX,
                 ui::TEXT_DIM,

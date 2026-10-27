@@ -656,7 +656,8 @@ impl World {
 
     fn build_dungeon(&mut self, prm: &Params, biome: Biome) {
         self.adv.seed = self.adv.seed.wrapping_add(0x9E37_79B9);
-        let (d, room) = dungeon::generate(self.adv.seed, prm);
+        let prm = Params { biome, ..*prm };
+        let (d, room) = dungeon::generate(self.adv.seed, &prm);
         let old_room = std::mem::replace(&mut self.room, room);
         if self.adv.place != Place::Dungeon {
             self.adv.field = Some(Stash {
@@ -672,6 +673,7 @@ impl World {
             self.loot.clear();
         }
         self.projectiles.clear();
+        self.clouds.clear();
         self.player.pos = d.start_pos();
         self.player.prev_pos = self.player.pos;
         self.adv.current_room = d.start;
@@ -694,6 +696,7 @@ impl World {
             self.biome = s.biome;
         }
         self.projectiles.clear();
+        self.clouds.clear();
         self.adv.dungeon = None;
         self.adv.node = None;
     }
@@ -710,6 +713,7 @@ impl World {
         self.enemies.clear();
         self.loot.clear();
         self.projectiles.clear();
+        self.clouds.clear();
         self.npc = None;
         self.neighbors.clear();
         for (ch, at) in &p.marks {
@@ -764,6 +768,7 @@ impl World {
             self.kongi_fight = false;
         }
         self.mines.clear();
+        self.clouds.clear();
         if self.adv.place == Place::Dungeon {
             self.restore_field();
         }
