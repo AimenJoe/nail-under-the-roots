@@ -18,6 +18,10 @@ pub enum Id {
     Claw(usize),
     Burrow,
     Emerge,
+    /// 힘을 다 모아 솟구쳤다(0158): 보통 솟구침보다 낮고 무겁게.
+    EmergeBig,
+    /// 땅속에서 힘을 모으는 동안 땅이 운다(0158). 솟구치면 끊는다.
+    Rumble,
     EnemyHit,
     EnemyDie,
     Hurt,
@@ -86,6 +90,8 @@ pub struct Sfx {
     claw: [Sound; 3],
     burrow: Sound,
     emerge: Sound,
+    emerge_big: Sound,
+    rumble: Sound,
     enemy_hit: Sound,
     enemy_die: Sound,
     hurt: Sound,
@@ -175,6 +181,17 @@ impl Sfx {
                 Layer::tone(0.14, 110.0, 520.0, Wave::Triangle, 0.6, 1.0),
                 Layer::noise(0.1, 0.6, 2.5),
                 Layer::tone(0.18, 70.0, 45.0, Wave::Sine, 0.8, 1.5),
+            ])
+            .await,
+            emerge_big: make(&[
+                Layer::tone(0.2, 80.0, 420.0, Wave::Triangle, 0.7, 0.9),
+                Layer::noise(0.22, 0.7, 1.6),
+                Layer::tone(0.34, 55.0, 32.0, Wave::Sine, 1.0, 1.2),
+            ])
+            .await,
+            rumble: make(&[
+                Layer::noise(0.5, 0.28, 0.3),
+                Layer::tone(0.5, 42.0, 58.0, Wave::Sine, 0.55, 0.2),
             ])
             .await,
             enemy_hit: make(&[Layer::noise(0.04, 0.6, 4.0)]).await,
@@ -339,6 +356,8 @@ impl Sfx {
             Id::Claw(i) => &self.claw[i.min(2)],
             Id::Burrow => &self.burrow,
             Id::Emerge => &self.emerge,
+            Id::EmergeBig => &self.emerge_big,
+            Id::Rumble => &self.rumble,
             Id::EnemyHit => &self.enemy_hit,
             Id::EnemyDie => &self.enemy_die,
             Id::Hurt => &self.hurt,

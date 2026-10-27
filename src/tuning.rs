@@ -70,6 +70,17 @@ pub const BURROW_SPEED_FACTOR: f32 = 1.3;
 pub const BURROW_HOLD_EXTRA: f32 = 0.45;
 /// 더 머문 1초마다 굴파기 대기가 이만큼(초) 늘어난다: 오래 숨을수록 다음 굴이 늦다.
 pub const BURROW_HOLD_CD: f32 = 1.0;
+/// 누르고 있기 = 힘 모으기(0158): 정한 시간을 지나 머무는 동안 힘이 BURROW_HOLD_EXTRA에 걸쳐 0→1로 찬다.
+/// 다 차면 솟구침이 이만큼 커진다(반지름·넉백은 배, 나머지는 더함). 밀쳐내기 반지름도 같은 배.
+pub const EMERGE_CHARGE_RADIUS: f32 = 1.45;
+pub const EMERGE_CHARGE_KNOCKBACK: f32 = 1.5;
+pub const EMERGE_CHARGE_DAMAGE: i32 = 1;
+pub const EMERGE_CHARGE_STUN: f32 = 0.3;
+pub const EMERGE_CHARGE_HITSTOP: f32 = 0.05;
+pub const EMERGE_CHARGE_SHAKE: f32 = 0.35;
+/// 힘을 모으는 동안 땅이 운다: 틱마다 더하는 흔들림(힘에 비례) · 흙알 튀는 간격(틱).
+pub const BURROW_RUMBLE_SHAKE: f32 = 0.012;
+pub const BURROW_RUMBLE_EVERY: u32 = 5;
 /// 쿨다운(솟구친 순간부터).
 pub const BURROW_COOLDOWN: f32 = 0.6;
 /// 모모의 회피 깡충(0056): 체공 시간·거리·높이(그림). 공중에서는 안 맞고 적·탄·묻힌 도토리를 넘는다. 대기는 굴파기 대기와 같은 값을 쓴다.

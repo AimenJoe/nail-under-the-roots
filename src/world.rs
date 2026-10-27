@@ -402,6 +402,22 @@ impl World {
         );
         let strike = self.player.update(a, &self.room, dt);
         self.last_strike = strike;
+        // 땅속에서 힘을 모으는 동안(0158) 땅이 운다: 힘에 비례해 흔들리고 흙알이 튄다.
+        if self.player.is_burrowed() {
+            let charge = self.player.burrow_charge();
+            if charge > 0.0 {
+                self.feel.add_trauma(t::BURROW_RUMBLE_SHAKE * charge);
+                if ((self.time / dt).round() as u32).is_multiple_of(t::BURROW_RUMBLE_EVERY) {
+                    clods(
+                        &mut self.fx,
+                        self.player.pos,
+                        1 + (2.0 * charge) as usize,
+                        DIRT,
+                        30.0 + 50.0 * charge,
+                    );
+                }
+            }
+        }
         let mut ate = None;
         for ev in &self.player.events {
             match ev {
@@ -420,33 +436,48 @@ impl World {
                         0.4,
                     );
                 }
+                player::Event::Rumble => {
+                    // 힘 모으기 시작(0158): 땅이 울기 시작하는 소리 + 작은 흙 고리.
+                    sfx.play(sfx::Id::Rumble);
+                    self.fx.push(ring(self.player.pos, 3.0, 10.0, 0.25, DIRT));
+                }
                 player::Event::Emerge => {
-                    sfx.play(sfx::Id::Emerge);
                     // 땅이 터진다(0090): 맞는 반지름의 밝은 고리 + 밀쳐내는 반지름까지 퍼지는 흙 고리.
+                    // 모은 힘(0158)만큼 고리·흙·흔들림이 크고, 다 모았으면 소리도 무겁다.
+                    let charge = self.player.burrow_charge();
+                    let k = 1.0 + (t::EMERGE_CHARGE_RADIUS - 1.0) * charge;
+                    sfx.stop(sfx::Id::Rumble);
+                    sfx.play(if charge >= 0.5 {
+                        sfx::Id::EmergeBig
+                    } else {
+                        sfx::Id::Emerge
+                    });
                     self.fx.push(ring(
                         self.player.pos,
                         6.0,
-                        self.player.talents.emerge_radius() + 4.0,
-                        0.22,
+                        self.player.emerge_radius_for(charge) + 4.0,
+                        0.22 + 0.08 * charge,
                         WHITE,
                     ));
                     self.fx.push(ring(
                         self.player.pos,
                         10.0,
-                        t::EMERGE_PUSH_RADIUS,
-                        0.32,
+                        t::EMERGE_PUSH_RADIUS * k,
+                        0.32 + 0.1 * charge,
                         DIRT,
                     ));
-                    self.feel.add_trauma(t::EMERGE_BURST_SHAKE);
-                    burst(&mut self.fx, self.player.pos, 14, DIRT, 110.0);
-                    clods(&mut self.fx, self.player.pos, 14, DIRT, 110.0);
+                    self.feel.add_trauma(t::EMERGE_BURST_SHAKE * (1.0 + charge));
+                    let n = 14 + (12.0 * charge) as usize;
+                    let speed = 110.0 * k;
+                    burst(&mut self.fx, self.player.pos, n, DIRT, speed);
+                    clods(&mut self.fx, self.player.pos, n, DIRT, speed);
                     puff(
                         &mut self.fx,
                         self.player.pos,
-                        4,
+                        4 + (4.0 * charge) as usize,
                         self.biome.dust(),
-                        8.0,
-                        0.45,
+                        8.0 + 4.0 * charge,
+                        0.45 + 0.15 * charge,
                     );
                 }
                 player::Event::DrillRev => {
@@ -1068,7 +1099,14 @@ impl World {
                 puff(&mut self.fx, p, 3, self.biome.dust(), 6.0, 0.4);
             }
             if s.kind == crate::combat::StrikeKind::Emerge {
-                emerge_push(&mut self.enemies, origin, self.player.facing, s.id);
+                let k = 1.0 + (t::EMERGE_CHARGE_RADIUS - 1.0) * self.player.burrow_charge();
+                emerge_push(
+                    &mut self.enemies,
+                    origin,
+                    self.player.facing,
+                    s.id,
+                    t::EMERGE_PUSH_RADIUS * k,
+                );
             }
             if let Some((from, kind)) = shell_from {
                 self.player
@@ -1602,13 +1640,20 @@ fn dist_to_segment(p: Vec2, a: Vec2, b: Vec2) -> f32 {
 
 /// 밀쳐내기(0090): 솟구치기에 안 맞은 둘레의 잡몹을 피해 없이 바깥으로 민다. 가까울수록 세게. 보스는 버틴다.
 /// 같은 공격 번호(`id`)로 맞은 적은 이미 맞았으니 건너뛴다.
-fn emerge_push(enemies: &mut [crate::enemy::Enemy], origin: Vec2, facing: Vec2, id: u32) {
+/// `radius`: 미는 반지름(모은 힘만큼 넓다, 0158).
+fn emerge_push(
+    enemies: &mut [crate::enemy::Enemy],
+    origin: Vec2,
+    facing: Vec2,
+    id: u32,
+    radius: f32,
+) {
     for e in enemies {
         if e.last_hit_by == id || e.is_boss() || !e.hittable() || e.flying() {
             continue;
         }
         let d = e.pos - origin;
-        let reach = t::EMERGE_PUSH_RADIUS + e.radius();
+        let reach = radius + e.radius();
         let dist = d.length();
         if dist >= reach {
             continue;
@@ -1806,7 +1851,7 @@ mod tests {
     fn emerge_push_skips_flying_bats() {
         let o = vec2(100.0, 100.0);
         let mut es = vec![Enemy::new(Kind::Bat, o + vec2(20.0, 0.0))];
-        emerge_push(&mut es, o, vec2(1.0, 0.0), 3);
+        emerge_push(&mut es, o, vec2(1.0, 0.0), 3, t::EMERGE_PUSH_RADIUS);
         assert_eq!(es[0].vel, Vec2::ZERO);
     }
 
@@ -1823,7 +1868,7 @@ mod tests {
         ];
         es[4].last_hit_by = 7; // 솟구치기에 이미 맞은 적
         let hp: Vec<i32> = es.iter().map(|e| e.hp).collect();
-        emerge_push(&mut es, o, vec2(1.0, 0.0), 7);
+        emerge_push(&mut es, o, vec2(1.0, 0.0), 7, t::EMERGE_PUSH_RADIUS);
         assert!(
             es[0].vel.x > 0.0 && es[0].vel.y.abs() < 1e-3,
             "오른쪽 적은 오른쪽으로"

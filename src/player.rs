@@ -28,8 +28,10 @@ pub enum State {
     Burrow {
         time: f32,
     },
+    /// `charge`: 땅속에서 모은 힘 0~1(0158). 솟구침 크기·이펙트가 따른다.
     Emerge {
         time: f32,
+        charge: f32,
     },
     /// 필살기: 시동(`time < DRILL_REV`, 제자리) 뒤 직진하며 연타. `dir`은 조금씩만 틀어진다. `next_hit`까지 남은 시간.
     /// `aim`은 시동 중 입력이 가리킨 쪽, `dir`은 거기서 가까운 적 쪽으로 맞춘 실제 방향(`drill_assist`, 0139).
@@ -68,6 +70,8 @@ pub enum Event {
     Swing(usize),
     Burrow,
     Emerge,
+    /// 정한 시간을 지나 누르고 있다: 힘을 모으기 시작(땅이 운다, 0158).
+    Rumble,
     Hurt,
     Die,
     /// 필살기 시동(소리 시작).
@@ -197,6 +201,26 @@ impl Player {
 
     pub fn is_burrowed(&self) -> bool {
         matches!(self.state, State::Burrow { .. })
+    }
+
+    /// 땅속에서 모은 힘 0~1(0158): 정한 시간을 지나 머문 만큼 BURROW_HOLD_EXTRA에 걸쳐 찬다.
+    /// 솟구치는 동안은 모았던 값. 그 밖에는 0.
+    pub fn burrow_charge(&self) -> f32 {
+        match self.state {
+            State::Burrow { time } => Self::charge_of(time - self.talents.burrow_time()),
+            State::Emerge { charge, .. } => charge,
+            _ => 0.0,
+        }
+    }
+
+    /// 정한 시간을 넘긴 첫 틱(톡 눌렀을 때 자동으로 솟구치는 틱)은 세지 않는다: 톡은 힘 0.
+    fn charge_of(held: f32) -> f32 {
+        ((held - t::TICK_DT) / (t::BURROW_HOLD_EXTRA - t::TICK_DT)).clamp(0.0, 1.0)
+    }
+
+    /// 솟구침 반지름: 재주 값 × 모은 힘만큼(0158). 이펙트·밀쳐내기도 같은 값.
+    pub fn emerge_radius_for(&self, charge: f32) -> f32 {
+        self.talents.emerge_radius() * (1.0 + (t::EMERGE_CHARGE_RADIUS - 1.0) * charge)
     }
 
     pub fn is_invulnerable(&self) -> bool {
@@ -508,13 +532,17 @@ impl Player {
                     }
                 }
             }
-            State::Burrow { time } => {
-                let time = time + dt;
+            State::Burrow { time: was } => {
+                let time = was + dt;
                 self.pos += move_dir * t::PLAYER_SPEED * t::BURROW_SPEED_FACTOR * dt;
                 self.state = State::Burrow { time };
                 let early = (self.dodge_buf > 0.0 && time > 0.05) || self.attack_buf > 0.0;
                 // 톡 누르면 정한 시간, 누르고 있으면 BURROW_HOLD_EXTRA까지 더 머문다(떼면 솟구침, 0101).
+                // 더 머무는 동안은 힘을 모은다(0158): 정한 시간을 넘기는 틱에 땅이 울기 시작.
                 let base = self.talents.burrow_time();
+                if a.dodge_held && was < base && time >= base {
+                    self.events.push(Event::Rumble);
+                }
                 let limit = if a.dodge_held {
                     base + t::BURROW_HOLD_EXTRA
                 } else {
@@ -564,12 +592,12 @@ impl Player {
                     self.state = State::Chain { left, time, dir };
                 }
             }
-            State::Emerge { time } => {
+            State::Emerge { time, charge } => {
                 let time = time + dt;
                 self.state = if time >= t::EMERGE_TIME {
                     State::Free
                 } else {
-                    State::Emerge { time }
+                    State::Emerge { time, charge }
                 };
             }
             State::Drill {
@@ -765,26 +793,28 @@ impl Player {
     }
 
     /// `held`: 정한 시간보다 더 머문 초. 그만큼 대기가 늘어 땅속에 숨어 지내지는 못한다(0101).
+    /// 그 시간에 모은 힘(0~1)만큼 솟구침이 커진다(0158): 톡은 작게 톡, 끝까지 누르면 크게 쾅.
     fn start_emerge(&mut self, held: f32) -> Strike {
+        let charge = Self::charge_of(held);
         self.dodge_buf = 0.0;
         self.attack_buf = 0.0;
         self.burrow_cd = self.burrow_cd_full() + held * t::BURROW_HOLD_CD;
         self.no_attack = t::EMERGE_NO_ATTACK;
         self.swing_id += 1;
-        self.state = State::Emerge { time: 0.0 };
+        self.state = State::Emerge { time: 0.0, charge };
         self.events.push(Event::Emerge);
         Strike {
             id: self.swing_id,
             kind: StrikeKind::Emerge,
             shape: Shape::Circle {
                 center: self.pos,
-                r: self.talents.emerge_radius(),
+                r: self.emerge_radius_for(charge),
             },
-            damage: t::EMERGE_DAMAGE,
-            knockback: t::EMERGE_KNOCKBACK,
-            stun: t::EMERGE_STUN,
-            hitstop: t::EMERGE_HITSTOP,
-            shake: t::EMERGE_SHAKE,
+            damage: t::EMERGE_DAMAGE + (t::EMERGE_CHARGE_DAMAGE as f32 * charge).round() as i32,
+            knockback: t::EMERGE_KNOCKBACK * (1.0 + (t::EMERGE_CHARGE_KNOCKBACK - 1.0) * charge),
+            stun: t::EMERGE_STUN + t::EMERGE_CHARGE_STUN * charge,
+            hitstop: t::EMERGE_HITSTOP + t::EMERGE_CHARGE_HITSTOP * charge,
+            shake: t::EMERGE_SHAKE + t::EMERGE_CHARGE_SHAKE * charge,
             finisher: false,
             poison: 0.0,
         }
@@ -1341,5 +1371,71 @@ mod tests {
         let mut p = Player::new(room.center());
         let half = secs(&mut p, 36); // 0.6초에 뗀다
         assert!((half - 0.6).abs() < 0.04, "떼면 바로 솟구친다 {half}");
+    }
+
+    /// 힘 모으기(0158): 톡은 보통 솟구침, 정한 시간을 넘겨 누르고 있으면 힘이 차고(땅이 운다) 끝까지 모으면
+    /// 반지름·피해·넉백이 큰 솟구침. 반지름은 재주 값 × EMERGE_CHARGE_RADIUS까지.
+    #[test]
+    fn holding_charges_a_bigger_emerge() {
+        let room = Room::new();
+        let run = |hold_ticks: usize| -> (Strike, bool, f32) {
+            let mut p = Player::new(room.center());
+            let dig = Actions {
+                dodge: true,
+                dodge_held: true,
+                ..Default::default()
+            };
+            tick(&mut p, &room, &dig);
+            let mut n = 1;
+            let mut rumbled = false;
+            let mut peak = 0.0f32;
+            loop {
+                let a = Actions {
+                    dodge_held: n < hold_ticks,
+                    ..Default::default()
+                };
+                let (strike, events) = tick(&mut p, &room, &a);
+                rumbled |= events.contains(&Event::Rumble);
+                peak = peak.max(p.burrow_charge());
+                if let Some(s) = strike {
+                    return (s, rumbled, peak);
+                }
+                n += 1;
+                assert!(n < 200, "솟구치지 않는다");
+            }
+        };
+        let base = t::EMERGE_RADIUS;
+        let (tap, rumbled, peak) = run(1);
+        assert!(!rumbled && peak == 0.0, "톡: 힘을 모으지 않는다");
+        assert_eq!(tap.damage, t::EMERGE_DAMAGE);
+        let Shape::Circle { r, .. } = tap.shape else {
+            panic!("원");
+        };
+        assert!((r - base).abs() < 1e-3, "톡 = 보통 반지름 {r}");
+
+        let (full, rumbled, peak) = run(usize::MAX);
+        assert!(rumbled, "정한 시간을 넘기면 땅이 운다");
+        assert!((peak - 1.0).abs() < 1e-3, "끝까지 누르면 다 찬다 {peak}");
+        let Shape::Circle { r, .. } = full.shape else {
+            panic!("원");
+        };
+        assert!(
+            (r - base * t::EMERGE_CHARGE_RADIUS).abs() < 1e-3,
+            "다 모으면 큰 반지름 {r}"
+        );
+        assert_eq!(full.damage, t::EMERGE_DAMAGE + t::EMERGE_CHARGE_DAMAGE);
+        assert!(full.knockback > tap.knockback && full.stun > tap.stun);
+
+        // 반쯤(정한 시간 + 더 머무는 시간의 절반) 떼면 그 사이.
+        let mid = ((t::BURROW_MAX_TIME + t::BURROW_HOLD_EXTRA * 0.5) / t::TICK_DT) as usize;
+        let (half, _, peak) = run(mid);
+        let Shape::Circle { r, .. } = half.shape else {
+            panic!("원");
+        };
+        assert!(
+            r > base + 1.0 && r < base * t::EMERGE_CHARGE_RADIUS - 1.0,
+            "반쯤 {r}"
+        );
+        assert!(peak > 0.3 && peak < 0.7, "반쯤 찬다 {peak}");
     }
 }

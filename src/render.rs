@@ -1193,10 +1193,19 @@ fn draw_player(p: &Player, alpha: f32, time: f32) {
             return;
         }
         player::State::Burrow { time: bt } => {
-            // 그림자(흙더미)만. 작게 꿈틀.
-            let wob = ((bt * 40.0).sin() * 1.0).round();
-            draw_ellipse(pos.x, pos.y + 2.0, 8.0 + wob, 4.0, 0.0, SHADOW);
-            draw_ellipse(pos.x, pos.y, 6.0, 3.0, 0.0, world::DIRT);
+            // 그림자(흙더미)만. 작게 꿈틀. 힘을 모으면(0158) 더 빨리·크게 들썩이고 더미가 부푼다.
+            let charge = p.burrow_charge();
+            let wob = ((bt * (40.0 + 40.0 * charge)).sin() * (1.0 + charge)).round();
+            let grow = 2.0 * charge;
+            draw_ellipse(
+                pos.x,
+                pos.y + 2.0,
+                8.0 + wob + grow,
+                4.0 + grow * 0.5,
+                0.0,
+                SHADOW,
+            );
+            draw_ellipse(pos.x, pos.y, 6.0 + grow, 3.0 + grow * 0.5, 0.0, world::DIRT);
             return;
         }
         _ => {}
@@ -1341,10 +1350,29 @@ fn draw_player_fx(p: &Player, alpha: f32) {
                 draw_line(a.x, a.y, b.x, b.y, 1.0, Color::new(1.0, 1.0, 1.0, 0.25));
             }
         }
-        player::State::Emerge { time: et } => {
+        player::State::Burrow { time: bt } if p.burrow_charge() > 0.0 => {
+            // 힘 모으기(0158): 솟구칠 반지름까지 자라는 흙빛 고리가 맥박친다. 다 모이면 밝게.
+            let charge = p.burrow_charge();
+            let r = p.emerge_radius_for(charge);
+            let pulse = 0.5 + 0.5 * (bt * 18.0).sin();
+            let a = 0.25 + 0.35 * charge + 0.15 * pulse;
+            let c = if charge >= 1.0 {
+                Color::new(1.0, 0.95, 0.8, a)
+            } else {
+                Color::new(world::DIRT.r, world::DIRT.g, world::DIRT.b, a)
+            };
+            draw_circle_lines(pos.x, pos.y, r, 1.0, c);
+        }
+        player::State::Emerge { time: et, charge } => {
             let p01 = et / t::EMERGE_TIME;
-            let r = 6.0 + (p.talents.emerge_radius() - 6.0) * p01;
-            draw_circle_lines(pos.x, pos.y, r, 1.5, Color::new(1.0, 1.0, 1.0, 1.0 - p01));
+            let r = 6.0 + (p.emerge_radius_for(charge) - 6.0) * p01;
+            draw_circle_lines(
+                pos.x,
+                pos.y,
+                r,
+                1.5 + charge,
+                Color::new(1.0, 1.0, 1.0, 1.0 - p01),
+            );
         }
         _ => {}
     }
@@ -3855,7 +3883,10 @@ fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     let moving = (p.pos - p.prev_pos).length() > 0.05;
     let (col, row) = match p.state {
         player::State::Dead => (4, 1),
-        player::State::Burrow { time: bt } => (((bt * 12.0) as u32) % 2, 2),
+        // 힘을 모으면(0158) 흙더미가 더 빨리 들썩인다.
+        player::State::Burrow { time: bt } => {
+            (((bt * (12.0 + 16.0 * p.burrow_charge())) as u32) % 2, 2)
+        }
         player::State::Emerge { .. } | player::State::Drill { .. } => (2, 1),
         player::State::Recover { .. } => (3, 1),
         // 한 타 = 들기 → 치기 → (마지막 타) 거두기. 1·2타는 가까운 발·먼 발을 번갈아, 마지막 타는 두 발(0082).
