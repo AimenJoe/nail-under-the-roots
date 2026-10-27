@@ -49,12 +49,16 @@ CHARACTERS = {
     'kongi': (36, ('normal', 'happy'), None, 16),
     # 물든 콩이: 콩이 보통 표정을 고쳐 그려 틀이 같다. 눈은 옅은 하늘빛 빛(0054).
     'kongi_tainted': (35, ('glare',), None, 16),
+    # 토끼풀(0165): 원본은 머리가 188~960줄(높이 75%)이라 틀을 높이 96%로 맞춘다. 꽃·잎은 vivid 칸으로.
+    'clover': (39, ('normal', 'happy'), 0.96, 16),
+    # 물든 토끼풀: 머리 틀은 보통과 같고 가슴이 1020줄까지 내려와 960줄에서 잘라(CUT_AT) 보통과 같은 틀로. 초록 빛 눈(FIXES).
+    'clover_tainted': (38, ('glare',), 0.96, 16),
 }
 # 크림색 가슴이 원본 아래 끝에 닿는 캐릭터: 배경 지우기를 아래 끝에서 시작하지 않는다(_character_mask).
-CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae', 'doto', 'doto_tainted'}
+CHEST_AT_BOTTOM = {'momo', 'momo_tainted', 'halmae', 'doto', 'doto_tainted', 'clover_tainted'}
 # 몸이 원본 아래 끝보다 위에서 잘린 캐릭터: 그 줄(원본 1024px)까지만 쓴다. 도토는 942줄에서 몸이 끝나고 아래가 배경 띠라,
 # 크림색 배(배경과 거리 30, 허용 34 안)가 그 띠를 타고 지워져 칸에 구멍이 났다. 잘라서 몸이 아래 끝에 닿게 하고 CHEST_AT_BOTTOM.
-CUT_AT = {'doto': 942, 'doto_tainted': 942}
+CUT_AT = {'doto': 942, 'doto_tainted': 942, 'clover_tainted': 960}
 # 몸에 둘러싸인 배경 틈을 지울 캐릭터(_clear_holes): 할매 갓·대 사이, 수수 다리 사이.
 HOLES = {'halmae', 'susu'}
 # 틀 맞출 때 가슴 아래를 칸 밖으로 보내는 몫(잘린 가슴 = Naïl의 칸 밖으로 나간 앞발과 같은 틀).
@@ -133,6 +137,9 @@ FIXES['doto_tainted_glare'] = lambda img: _glow_eyes(img, DOTO_TAINTED_EYES, (0.
 # 물든 콩이 눈 상자(원본 1024px). 흰빛 하늘색(색상 0.45~0.62, 채도 0.12 넘음)을 옅지만 분명한 하늘빛으로(0054).
 KONGI_TAINTED_EYES = [(490, 460, 630, 570)]
 FIXES['kongi_tainted_glare'] = lambda img: _glow_eyes(img, KONGI_TAINTED_EYES, (0.45, 0.62), 0.54, 0.12, 0.45)
+# 물든 토끼풀 눈 상자(원본 1024px): 왼눈·오른눈. 머리 위 토끼풀 잎(300~410줄)은 상자 밖. 초록(색상 0.2~0.45)을 밝은 풀빛으로(0165).
+CLOVER_TAINTED_EYES = [(455, 430, 625, 580), (695, 430, 830, 580)]
+FIXES['clover_tainted_glare'] = lambda img: _glow_eyes(img, CLOVER_TAINTED_EYES, (0.2, 0.45), 0.33)
 for _face in ('normal', 'happy', 'worried', 'tainted_normal', 'tainted_pained'):
     FIXES[f'momo_{_face}'] = lambda img: _plum_lines(img, MOMO_EYES)
 

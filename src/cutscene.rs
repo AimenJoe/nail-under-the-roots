@@ -101,6 +101,15 @@ impl Portrait {
         first: 36,
         faces: 2,
     };
+    /// 물든 토끼풀: 칸 38 하나. 돌아온 토끼풀: 칸 39~40(보통·기쁨, docs/decisions/0165).
+    pub const CLOVER_TAINTED: Portrait = Portrait {
+        first: 38,
+        faces: 1,
+    };
+    pub const CLOVER: Portrait = Portrait {
+        first: 39,
+        faces: 2,
+    };
 
     pub fn frame(self, face: Face) -> u32 {
         // 모모는 칸이 둘(차가움·괴로움)뿐이라 걱정 = 둘째 칸.
@@ -353,6 +362,9 @@ mod portrait_tests {
         assert_eq!(Portrait::BORI.frame(Face::Happy), 11);
         assert_eq!(Portrait::MOMO.frame(Face::Worried), 14);
         assert_eq!(Portrait::HALMAE.frame(Face::Worried), 15);
+        assert_eq!(Portrait::CLOVER_TAINTED.frame(Face::Worried), 38);
+        assert_eq!(Portrait::CLOVER.frame(Face::Happy), 40);
+        assert_eq!(Portrait::CLOVER.frame(Face::Worried), 39);
         assert_eq!(Portrait::MOM.frame(Face::Happy), 17);
     }
 }
@@ -913,6 +925,7 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
         Speaker::Kongi => kongi_actor(w.player.pos),
         Speaker::CloverTainted => Actor {
             sprite: Some(Sprite::Critter(crate::art::CLOVER_ROW)),
+            portrait: Some(Portrait::CLOVER_TAINTED),
             pos: w.player.pos,
             ..story_actor("???", CLOVER_FUR)
         },
@@ -920,13 +933,14 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
     }
 }
 
-/// 토끼풀의 색(초상화가 올 때까지 이름표 옆 네모, 0165).
+/// 토끼풀의 색(이름표·말풍선 테두리, 0165).
 const CLOVER_FUR: Color = Color::new(0.62, 0.52, 0.48, 1.0);
 
-/// 돌아온 토끼풀 배우(월드 그림 = 맑은 눈). 초상화는 사장의 나노바나나 원본이 오면 끼운다.
+/// 돌아온 토끼풀 배우(월드 그림 = 맑은 눈, 초상화 칸 39~40).
 fn clover_actor(pos: Vec2) -> Actor {
     Actor {
         sprite: Some(Sprite::Critter(crate::art::CLOVER_BACK_ROW)),
+        portrait: Some(Portrait::CLOVER),
         pos,
         ..story_actor(i18n::s().name_clover, CLOVER_FUR)
     }
