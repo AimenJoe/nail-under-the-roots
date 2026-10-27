@@ -1324,8 +1324,14 @@ fn draw_player_fx(p: &Player, alpha: f32) {
             }
         }
         // 강공격 모으기(0161): 발톱 끝에 빛이 모이고, 다 모이면 밝게 맥박친다.
-        player::State::Charging { time: ct, dir, .. } => {
-            let k = (ct / t::HEAVY_CHARGE).clamp(0.0, 1.0);
+        player::State::Charging {
+            time: ct,
+            dir,
+            pending,
+            ..
+        } if !(pending && ct < t::HEAVY_TAP) => {
+            let k0 = if pending { t::HEAVY_TAP } else { 0.0 };
+            let k = ((ct - k0) / (t::HEAVY_CHARGE - k0)).clamp(0.0, 1.0);
             let claw = pos + dir * 7.0;
             let pulse = if k >= 1.0 {
                 0.7 + 0.3 * (ct * 20.0).sin()
@@ -4163,7 +4169,9 @@ fn draw_momo_player(art: &Art, p: &Player, alpha: f32, time: f32) {
             }
         }
         player::State::Attack { .. } | player::State::Heavy { .. } => 5,
-        player::State::Charging { .. } => 5,
+        player::State::Charging {
+            time: ct, pending, ..
+        } if !(pending && ct < t::HEAVY_TAP) => 5,
         player::State::Recover { .. } => 4,
         _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => 6,
         _ if moving => 2 + ((time * 10.0) as u32) % 2,
@@ -4268,7 +4276,10 @@ fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
             (col, 1)
         }
         // 강공격(0161): 모으는 동안 마지막 타의 "들기" 자세(다 모이면 떨린다), 스윙은 마지막 타 그림.
-        player::State::Charging { .. } => (7, 1),
+        // 톡 판정 전(pending·HEAVY_TAP)엔 보통 그림.
+        player::State::Charging {
+            time: ct, pending, ..
+        } if !(pending && ct < t::HEAVY_TAP) => (7, 1),
         player::State::Heavy { time: at, .. } => {
             let (a0, a1) = p.moveset.heavy().active;
             let col = if at < a0 {

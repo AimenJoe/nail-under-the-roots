@@ -27,10 +27,13 @@ pub enum State {
     },
     /// 강공격 모으기(0161): 어느 타든 활성 구간이 지났는데 공격을 계속 누르고 있으면. `HEAVY_CHARGE` 뒤 떼면 `Heavy`,
     /// 그 전에 떼면 그냥 선다. `after`는 강공격 뒤 이어질 콤보 번호(1타 뒤면 2타) — 콤보 사이 어디에든 끼운다.
+    /// `pending`이면 아직 평타가 안 나간 채 누르고 있는 것(누른 순간부터): `HEAVY_CHARGE` 전에 떼면 `after`번 평타,
+    /// 넘겨 떼면 평타 없이 강공격(1타부터 강공격). `HEAVY_TAP` 전까지는 겉으로 보통 상태다.
     Charging {
         time: f32,
         dir: Vec2,
         after: usize,
+        pending: bool,
     },
     /// 강공격 스윙(0161): `Moveset::heavy`. 첫머리 창은 둘레 공격(진홍)도 받아친다. 끝나면 `after`번 타로 콤보가 이어진다.
     Heavy {
@@ -517,7 +520,23 @@ impl Player {
                     } else {
                         0
                     };
-                    self.start_swing(idx, a.aim);
+                    if a.attack_held {
+                        // 떼는 순간 평타(0161): 누르고 있는 동안은 기다린다. 길게 누르면 평타 없이 바로 모은다.
+                        self.attack_buf = 0.0;
+                        let dir = if a.aim != Vec2::ZERO {
+                            a.aim.normalize()
+                        } else {
+                            self.facing
+                        };
+                        self.state = State::Charging {
+                            time: 0.0,
+                            dir,
+                            after: idx,
+                            pending: true,
+                        };
+                    } else {
+                        self.start_swing(idx, a.aim);
+                    }
                 } else {
                     self.pos += move_dir * t::PLAYER_SPEED * dt;
                 }
@@ -556,6 +575,7 @@ impl Player {
                         time: 0.0,
                         dir,
                         after: idx + 1,
+                        pending: false,
                     };
                 } else if time >= hit.swing + hit.recovery {
                     self.state = State::Free;
@@ -567,25 +587,42 @@ impl Player {
                     }
                 }
             }
-            State::Charging { time, dir, after } => {
+            State::Charging {
+                time,
+                dir,
+                after,
+                pending,
+            } => {
                 let was = time;
                 let time = time + dt;
-                // 모으는 동안은 느리게 걷고, 조준·이동 쪽으로 겨눈다.
+                // 모으는 동안은 느리게 걷고, 조준·이동 쪽으로 겨눈다. 톡 판정 전(pending·HEAVY_TAP)엔 보통 걸음.
                 let want = if a.aim != Vec2::ZERO { a.aim } else { move_dir };
                 let dir = want.normalize_or(dir);
                 self.facing = dir;
-                self.pos += move_dir * t::PLAYER_SPEED * t::HEAVY_MOVE_FACTOR * dt;
+                let slow = !(pending && time < t::HEAVY_TAP);
+                let factor = if slow { t::HEAVY_MOVE_FACTOR } else { 1.0 };
+                self.pos += move_dir * t::PLAYER_SPEED * factor * dt;
                 if was < t::HEAVY_CHARGE && time >= t::HEAVY_CHARGE {
                     self.events.push(Event::HeavyReady);
                 }
-                self.state = State::Charging { time, dir, after };
+                self.state = State::Charging {
+                    time,
+                    dir,
+                    after,
+                    pending,
+                };
                 if a.special && self.armed && self.sp_full() {
                     self.start_special(move_dir);
                 } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
                     self.start_dodge(move_dir);
                 } else if !a.attack_held {
                     if time >= t::HEAVY_CHARGE {
-                        self.start_heavy(dir, after);
+                        // 강공격이 그 타를 대신한다: 다음은 그다음 타.
+                        let next = if pending { after + 1 } else { after };
+                        self.start_heavy(dir, next);
+                    } else if pending {
+                        // 짧게 눌렀다 뗐다: 평타.
+                        self.start_swing(after, a.aim);
                     } else {
                         // 덜 모으고 뗐다: 아무것도 안 나가고, 콤보는 거기서 이어진다.
                         self.state = State::Free;
@@ -1054,17 +1091,6 @@ mod tests {
         (s, p.events.clone())
     }
 
-    impl Player {
-        /// 갈림길 시험용 복사(플레이어는 Clone이 아니다: 통계·재주가 커서).
-        fn clone_for_test(&self) -> Player {
-            let mut q = Player::new(self.pos);
-            q.state = self.state;
-            q.facing = self.facing;
-            q.armed = self.armed;
-            q
-        }
-    }
-
     /// 모모(0056): 회피 버튼 = 깡충(공중 무적, HOP_DIST만큼), 특기 = 이어 뛰기(기 게이지, 착지 셋 = 쿵 셋).
     #[test]
     fn momo_hops_and_chain_hops() {
@@ -1522,12 +1548,11 @@ mod tests {
         assert!((half - 0.6).abs() < 0.04, "떼면 바로 솟구친다 {half}");
     }
 
-    /// 강공격(0161): 누르면 평타가 바로, 스윙 뒤에도 누르고 있으면 모으기, 0.45초 뒤 떼면 피해 2 이상·넓은 한 방.
-    /// 덜 모으고 떼면 아무것도 안 나간다.
+    /// 강공격(0161): 짧게 눌렀다 떼면 평타(떼는 순간), 누르고 있으면 모으기 → 0.45초 뒤 떼면 피해 2 이상·넓은 한 방.
+    /// 1타부터 강공격이 되고, 강공격 뒤 콤보는 다음 타로 이어진다. 평타 뒤에도 누르고 있으면 모은다.
     #[test]
-    fn holding_attack_after_a_swing_charges_a_heavy_strike() {
+    fn hold_attack_charges_a_heavy_strike_tap_is_a_light_one() {
         let room = Room::new();
-        let mut p = Player::new(room.center());
         let press = Actions {
             attack: true,
             attack_held: true,
@@ -1537,38 +1562,49 @@ mod tests {
             attack_held: true,
             ..Default::default()
         };
+        let release = Actions::default();
+        // 톡: 누른 틱엔 기다리고(겉으론 보통), 떼면 평타.
+        let mut p = Player::new(room.center());
         tick(&mut p, &room, &press);
         assert!(
-            matches!(p.state, State::Attack { idx: 0, .. }),
-            "누르면 평타가 바로"
+            matches!(p.state, State::Charging { pending: true, .. }),
+            "누르고 있는 동안은 기다린다"
         );
+        tick(&mut p, &room, &release);
+        assert!(matches!(p.state, State::Attack { idx: 0, .. }), "떼면 평타");
+        // 평타 뒤에도 누르고 있으면 모은다(활성 구간 뒤 바로).
         let mut n = 0;
         while matches!(p.state, State::Attack { .. }) && n < 100 {
             tick(&mut p, &room, &hold);
             n += 1;
         }
         assert!(
-            matches!(p.state, State::Charging { .. }),
+            matches!(p.state, State::Charging { pending: false, .. }),
             "스윙 뒤에도 누르고 있으면 모은다"
         );
-        // 덜 모으고 떼면 그냥 선다.
-        let mut q = p.clone_for_test();
-        let (s, _) = tick(&mut q, &room, &Actions::default());
-        assert!(s.is_none() && matches!(q.state, State::Free));
-        // 다 모으면 빛나고(HeavyReady), 떼면 강공격.
+        tick(&mut p, &room, &release);
+        assert!(
+            matches!(p.state, State::Free),
+            "덜 모으고 떼면 아무것도 안 나간다"
+        );
+
+        // 1타부터 강공격: 처음부터 누르고 있으면 평타 없이 모은다.
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &press);
         let mut ready = false;
         for _ in 0..((t::HEAVY_CHARGE / t::TICK_DT) as usize + 2) {
-            let (_, ev) = tick(&mut p, &room, &hold);
+            let (s, ev) = tick(&mut p, &room, &hold);
+            assert!(s.is_none(), "평타가 나가지 않는다");
             ready |= ev.contains(&Event::HeavyReady);
         }
         assert!(ready, "다 모이면 발톱이 빛난다");
-        let (_, ev) = tick(&mut p, &room, &Actions::default());
+        let (_, ev) = tick(&mut p, &room, &release);
         assert!(ev.contains(&Event::Heavy));
         assert!(matches!(p.state, State::Heavy { .. }));
         assert!(p.parry_heavy(), "강공격 첫머리는 둘레 공격도 받아친다");
         let mut strike = None;
         for _ in 0..60 {
-            let (s, _) = tick(&mut p, &room, &Actions::default());
+            let (s, _) = tick(&mut p, &room, &release);
             if s.is_some() {
                 strike = s;
                 break;
@@ -1582,13 +1618,20 @@ mod tests {
         };
         let last = p.moveset.hits[p.moveset.last()].range;
         assert!((r - last * 1.3).abs() < 1e-3, "반지름 1.3배 {r}");
-        // 콤보처럼: 1타 뒤 강공격이었으니 다음 공격은 2타.
+        // 콤보처럼: 1타 자리의 강공격이었으니 다음 공격은 2타.
         let mut n = 0;
         while matches!(p.state, State::Heavy { .. }) && n < 100 {
-            tick(&mut p, &room, &Actions::default());
+            tick(&mut p, &room, &release);
             n += 1;
         }
-        tick(&mut p, &room, &press);
+        tick(
+            &mut p,
+            &room,
+            &Actions {
+                attack: true,
+                ..Default::default()
+            },
+        );
         assert!(
             matches!(p.state, State::Attack { idx: 1, .. }),
             "강공격 뒤 콤보가 2타로 이어진다 {:?}",
