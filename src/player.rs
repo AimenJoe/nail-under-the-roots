@@ -397,6 +397,19 @@ impl Player {
         self.item_buf > 0.0 && self.item_cd <= 0.0 && self.state == State::Free
     }
 
+    /// 먹기 대기 중(먹은 지 얼마 안 됨).
+    pub fn item_cooling(&self) -> bool {
+        self.item_cd > 0.0
+    }
+
+    /// 필살기를 눌렀는데 낼 수 없다(게이지가 덜 찼거나 무기가 없다, 0149). 서 있거나 휘두르는 중일 때만 본다
+    /// (땅속·드릴·먹기 중에 누른 것은 원래 받지 않는 입력이다).
+    pub fn special_denied(&self, a: &Actions) -> bool {
+        a.special
+            && matches!(self.state, State::Free | State::Attack { .. })
+            && !(self.armed && self.sp_full())
+    }
+
     /// 먹기 버튼을 눌렀지만 먹지 않았다(체력이 가득 등): 버퍼를 비워 알림이 프레임마다 다시 뜨지 않게.
     pub fn drop_item_press(&mut self) {
         self.item_buf = 0.0;

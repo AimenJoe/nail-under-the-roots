@@ -205,6 +205,10 @@ pub struct World {
     pub mines: Vec<Mine>,
     pub clouds: Vec<Cloud>,
     pub rocks: Vec<Rockfall>,
+    /// 할 수 없는 행동을 눌렀을 때 HUD가 붉게 떠는 남은 시간(0 = 필살기 게이지, 1 = 퀵 슬롯, 0149).
+    pub deny: [f32; 2],
+    /// 이번 런에 덤불에 찔린 적이 있나(처음 한 번만 알려 준다, 0149).
+    thorn_told: bool,
     /// 다음 돌까지(초).
     rock_cd: f32,
     /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
@@ -285,6 +289,8 @@ impl World {
             mines: Vec::new(),
             clouds: Vec::new(),
             rocks: Vec::new(),
+            deny: [0.0; 2],
+            thorn_told: false,
             rock_cd: t::ROCK_EVERY.1,
             kongi_fight: false,
             dream: false,
@@ -559,8 +565,30 @@ impl World {
         if a.item_prev || a.item_next {
             self.bag.cycle(a.item_next);
         }
+        for d in &mut self.deny {
+            *d = (*d - dt).max(0.0);
+        }
+        // 할 수 없는 행동(0149): 눌렀는데 아무 일도 안 일어나면 고장 난 줄 안다(0093과 같은 까닭).
+        // "안 돼" 소리 + 그 HUD 칸이 붉게 떤다. 필살기는 발치에 김이 픽 빠진다.
+        if self.player.is_alive() && self.player.special_denied(a) {
+            self.deny_feedback(0, sfx);
+            puff(
+                &mut self.fx,
+                self.player.pos + vec2(0.0, 4.0),
+                2,
+                GRAY,
+                4.0,
+                0.3,
+            );
+        }
+        if a.use_item
+            && self.player.is_alive()
+            && (self.bag.count(self.bag.selected) == 0 || self.player.item_cooling())
+        {
+            self.deny_feedback(1, sfx);
+        }
         if self.player.wants_to_eat() {
-            self.start_eating();
+            self.start_eating(sfx);
         }
         if let Some((_, time)) = self.toast.as_mut() {
             *time -= dt;
@@ -1189,6 +1217,7 @@ impl World {
                 }
             }
             // 덤불은 걸어 들어갈 때만(땅속·드릴·깡충은 아래로·위로 지나간다).
+            let mut thorned = false;
             if hurt_from.is_none() && !parried && self.player.on_foot() {
                 let rr = pr + t::THORN_R;
                 if let Some(c) = self
@@ -1198,6 +1227,7 @@ impl World {
                     .find(|c| (**c - ppos).length_squared() <= rr * rr)
                 {
                     hurt_from = Some((*c, 1));
+                    thorned = true;
                 }
             }
             if hurt_from.is_none() && !parried {
@@ -1224,6 +1254,17 @@ impl World {
                 if self.player.take_damage(from, dmg) {
                     if let Some(v) = pull {
                         self.player.vel = v;
+                    }
+                    if thorned && !self.thorn_told {
+                        self.thorn_told = true;
+                        self.toast = Some((
+                            if self.character == crate::equipment::Character::Momo {
+                                |s| s.toast_thorn_momo
+                            } else {
+                                |s| s.toast_thorn
+                            },
+                            2.5,
+                        ));
                     }
                     self.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
                     self.feel.add_trauma(t::PLAYER_HURT_SHAKE);
@@ -1332,6 +1373,14 @@ impl World {
     }
 
     /// 패링 성공 연출: 번쩍, 히트스톱, SP.
+    /// 할 수 없는 행동(0149): 소리 하나 + HUD 칸 떨기. 칸이 이미 떨고 있으면 소리를 다시 내지 않는다(연타).
+    fn deny_feedback(&mut self, k: usize, sfx: &Sfx) {
+        if self.deny[k] < t::DENY_TIME * 0.5 {
+            sfx.play(sfx::Id::Deny);
+        }
+        self.deny[k] = t::DENY_TIME;
+    }
+
     fn parry_feedback(&mut self, sfx: &Sfx) {
         self.parries += 1;
         self.player.on_parry();
@@ -1353,7 +1402,7 @@ impl World {
 
     /// 퀵 슬롯 아이템을 먹기 시작한다. 체력이 가득이거나 슬롯이 비었으면 먹지 않는다(아깝지 않게).
     /// 회복은 다 먹었을 때(`Event::Ate`, docs/decisions/0038).
-    fn start_eating(&mut self) {
+    fn start_eating(&mut self, sfx: &Sfx) {
         let p = &mut self.player;
         let c = self.bag.selected;
         if self.bag.count(c) == 0 {
@@ -1363,6 +1412,7 @@ impl World {
             // 아무 일도 안 일어나면 고장 난 줄 안다(튜토리얼에서 막혔다, 0093): 왜 안 먹는지 알린다.
             p.drop_item_press();
             self.toast = Some((|s| s.toast_eat_full, 1.6));
+            self.deny_feedback(1, sfx);
             return;
         }
         p.start_eat(c);

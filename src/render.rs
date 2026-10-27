@@ -886,7 +886,7 @@ fn hud_plate(ui: &Ui, r: Rect) {
 /// 저절로 바뀐 칸(`Bag::flash`)은 하얗게 깜빡인다. 수는 테두리 글자로 칸 오른쪽 아래.
 fn draw_quick_slots(ui: &Ui, w: &World) {
     use crate::items::Consumable;
-    let (x0, y0, size, gap) = (5.0, 153.0, 22.0, 3.0);
+    let (x0, y0, size, gap) = (5.0 + deny_shake(w.deny[1]), 153.0, 22.0, 3.0);
     let hint = crate::i18n::fill(
         crate::i18n::s().quick_hint,
         &[&crate::input::prompt(crate::input::Act::UseItem)],
@@ -911,7 +911,9 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
                 Color::new(0.07, 0.05, 0.09, 0.85)
             },
         );
-        let border = if selected && flash_on {
+        let border = if selected && w.deny[1] > 0.0 {
+            DENY_RED
+        } else if selected && flash_on {
             WHITE
         } else if selected {
             crate::ui::ACCENT
@@ -1967,6 +1969,33 @@ fn draw_world_lights(
             (q.y - l.z - 3.0).round(),
             6.0,
             Color::new(g.r, g.g, g.b, 0.16 * pulse * k),
+        );
+    }
+    // 지대 장애물(0149): 어둠이 덮은 뒤에도 보이게. 덤불은 붉은 기운, 떨어질 돌 자리는 붉은 고리가 조여 든다.
+    for c in &w.room.thorns {
+        let pulse = 0.5 + 0.5 * (t * 3.0 + c.x * 0.1).sin();
+        draw_circle(
+            c.x.round(),
+            c.y.round(),
+            8.0,
+            Color::new(0.85, 0.15, 0.25, (0.10 + 0.08 * pulse) * k),
+        );
+    }
+    for r in &w.rocks {
+        let q = (r.time / t::ROCK_FALL).clamp(0.0, 1.0);
+        let rad = t::ROCK_R * (1.5 - 0.5 * q);
+        draw_circle_lines(
+            r.pos.x.round(),
+            r.pos.y.round(),
+            rad,
+            1.0,
+            Color::new(1.0, 0.35, 0.30, (0.25 + 0.5 * q) * k),
+        );
+        draw_circle(
+            r.pos.x.round(),
+            r.pos.y.round(),
+            t::ROCK_R * q,
+            Color::new(0.9, 0.2, 0.15, 0.12 * q * k),
         );
     }
     // 포자 구름(0146)은 어둠 속에서도 옅게 빛난다(아플 때만 조금 더).
@@ -3192,8 +3221,10 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
     for c in w.clouds.iter().filter(|_| ground) {
         draw_cloud(c, w.time);
     }
+    let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
     for c in w.room.thorns.iter().filter(|_| ground) {
-        draw_thorn(*c);
+        let near = 1.0 - ((*c - pp).length() - 14.0).clamp(0.0, 30.0) / 30.0;
+        draw_thorn(*c, w.time, near);
     }
     for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
         let q = lerp(p.prev_pos, p.pos, alpha);
@@ -4348,12 +4379,23 @@ fn draw_telegraphs(w: &World, alpha: f32) {
     }
 }
 
-/// 가시뿌리 덤불(0147): 칸 가운데에 낮은 덤불, 보라 가시가 삐죽. 자리마다 모양이 조금 다르다(좌표로 정한다).
-fn draw_thorn(c: Vec2) {
+/// 가시뿌리 덤불(0147·0149): 칸 가운데 낮은 덤불, 붉게 물든 가시가 사방으로 뻗는다. 발밑에 어두운 핏빛 얼룩이 숨 쉬고,
+/// Naïl이 다가오면(`near` 0..1) 가시가 곤두서 길어진다. 끝이 가끔 하얗게 번득인다.
+/// 예전(보라 가시 2px)은 "눈에 잘 띄지 않고 위험한 느낌이 없어"(사장).
+fn draw_thorn(c: Vec2, time: f32, near: f32) {
     let seed = ((c.x * 7.0 + c.y * 13.0) as i32).rem_euclid(97) as f32;
-    let dark = Color::new(0.24, 0.14, 0.22, 1.0);
-    let body = Color::new(0.36, 0.22, 0.32, 1.0);
-    let spike = Color::new(0.68, 0.46, 0.72, 1.0);
+    let pulse = 0.5 + 0.5 * (time * 3.0 + seed).sin();
+    draw_ellipse(
+        c.x.round(),
+        (c.y + 1.0).round(),
+        9.0,
+        6.0,
+        0.0,
+        Color::new(0.30, 0.02, 0.08, 0.30 + 0.15 * pulse + 0.15 * near),
+    );
+    let dark = Color::new(0.16, 0.05, 0.10, 1.0);
+    let body = Color::new(0.34, 0.12, 0.20, 1.0);
+    let spike = Color::new(0.96, 0.38, 0.50, 1.0);
     for (i, (dx, dy)) in [
         (-3.0, 1.0),
         (3.0, 1.5),
@@ -4368,12 +4410,17 @@ fn draw_thorn(c: Vec2) {
         draw_circle((c.x + dx).round(), (c.y + dy).round(), r + 1.0, dark);
         draw_circle((c.x + dx).round(), (c.y + dy - 0.5).round(), r, body);
     }
-    for i in 0..7 {
-        let a = (seed * 0.37 + i as f32 * 0.9) % std::f32::consts::TAU;
+    let grow = 3.0 + 2.0 * near;
+    for i in 0..10 {
+        let a = (seed * 0.37 + i as f32 * 0.63) % std::f32::consts::TAU;
         let d = Vec2::from_angle(a);
-        let p = (c + vec2(d.x * 5.0, d.y * 3.5 - 1.0)).round();
-        let q = (p + d * 2.0).round();
+        let p = (c + vec2(d.x * 4.0, d.y * 3.0 - 1.0)).round();
+        let q = (p + vec2(d.x, d.y * 0.8 - 0.4) * grow).round();
         draw_line(p.x, p.y, q.x, q.y, 1.0, spike);
+        // 끝 번득임: 가시마다 차례로 잠깐.
+        if (time * 2.0 + i as f32 * 0.31 + seed * 0.1).fract() < 0.08 {
+            draw_rectangle(q.x, q.y, 1.0, 1.0, WHITE);
+        }
     }
 }
 
@@ -4619,7 +4666,8 @@ fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
     // 34px, 바탕판, 칸마다 어두운 테두리, 가득 찬 SP는 금빛 테두리가 숨 쉰다.
     let cd = (w.player.burrow_cd / w.player.burrow_cd_full()).min(1.0);
     let bw = 34.0;
-    let x = t::VIEW_W - 4.0 - bw;
+    // 필살기를 못 냈다(0149): 게이지 판이 좌우로 떨고 붉은 테두리.
+    let x = t::VIEW_W - 4.0 - bw + deny_shake(w.deny[0]);
     hud_plate(ui, Rect::new(x - 3.0, -1.0, bw + 6.0, 16.0));
     let frame = Color::new(0.02, 0.01, 0.03, 1.0);
     ui.rect(Rect::new(x - 1.0, 1.0, bw + 2.0, 5.0), frame);
@@ -4645,6 +4693,9 @@ fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
         gc
     };
     ui.rect(Rect::new(x, 8.0, (bw * sp).round(), 5.0), gold);
+    if w.deny[0] > 0.0 {
+        ui.rect_lines(Rect::new(x - 2.0, 6.0, bw + 4.0, 9.0), DENY_RED);
+    }
     if full {
         let a = 0.5 + 0.5 * (w.time * 5.0).sin();
         let c = crate::ui::ACCENT;
@@ -4652,6 +4703,20 @@ fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
             Rect::new(x - 2.0, 6.0, bw + 4.0, 9.0),
             Color::new(c.r, c.g, c.b, a),
         );
+    }
+}
+
+/// 할 수 없는 행동(0149)의 붉은 테두리.
+const DENY_RED: Color = Color::new(1.0, 0.30, 0.32, 1.0);
+
+/// 떨림(px): 남은 시간 동안 1px씩 좌우로.
+fn deny_shake(left: f32) -> f32 {
+    if left <= 0.0 {
+        0.0
+    } else if ((left * 40.0) as i32) % 2 == 0 {
+        1.0
+    } else {
+        -1.0
     }
 }
 
@@ -4987,32 +5052,47 @@ fn draw_cast_shadows(w: &World, alpha: f32, cam: Vec2, fire_silhouettes: bool) {
         casters.push((q + vec2(0.0, 6.0), 6.0, false));
     }
     for (foot, size, is_player) in casters {
-        for (i, l) in lights.iter().enumerate() {
-            if i < skip_player || (is_player && i == 0) {
-                continue;
-            }
-            let d = foot - l.pos;
-            let dist = d.length();
-            let reach = l.radius * 1.15;
-            if dist < 3.0 || dist > reach {
-                continue;
-            }
-            let k = (1.0 - dist / reach) * l.strength;
-            if k < 0.05 {
-                continue;
-            }
-            let dir = d / dist;
-            let len = size * 0.8 + 16.0 * k;
+        // 가장 센 빛 둘만(0149): 버섯이 많은 방에서 빛마다 하나씩 그리면 발밑에서 별처럼 뾰족하게 뻗었다.
+        let mut shades: Vec<(f32, Vec2)> = lights
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| *i >= skip_player && !(is_player && *i == 0))
+            .filter_map(|(_, l)| {
+                let d = foot - l.pos;
+                let dist = d.length();
+                let reach = l.radius * 1.15;
+                if dist < 3.0 || dist > reach {
+                    return None;
+                }
+                let k = (1.0 - dist / reach) * l.strength;
+                (k >= 0.05).then_some((k, d / dist))
+            })
+            .collect();
+        shades.sort_by(|a, b| b.0.total_cmp(&a.0));
+        for (k, dir) in shades.into_iter().take(2) {
+            // 짧고 통통하게(0149): 예전 길이 size·0.8 + 16k, 폭 size·0.35(2px)라 바늘처럼 보였다(사장 "너무 뾰족").
+            let len = size * 0.9 + 8.0 * k;
             // 3/4 시점: 바닥에 눕힌 그림자는 세로가 줄어든다.
-            let c = foot + vec2(dir.x, dir.y * 0.5) * (len * 0.5);
+            let c = foot + vec2(dir.x, dir.y * 0.5) * (len * 0.4);
             let ang = (dir.y * 0.5).atan2(dir.x).to_degrees();
+            let (rx, ry) = (len * 0.5 + 2.0, (size * 0.55).max(3.0));
+            let a = (0.5 * k).min(0.4);
+            // 가장자리를 한 겹 옅게 둘러 끝이 뾰족하지 않게.
             draw_ellipse(
                 c.x.round(),
                 c.y.round(),
-                len * 0.5 + 2.0,
-                (size * 0.35).max(2.0),
+                rx + 1.5,
+                ry + 1.0,
                 ang,
-                Color::new(0.03, 0.01, 0.05, (0.55 * k).min(0.45)),
+                Color::new(0.03, 0.01, 0.05, a * 0.45),
+            );
+            draw_ellipse(
+                c.x.round(),
+                c.y.round(),
+                rx,
+                ry,
+                ang,
+                Color::new(0.03, 0.01, 0.05, a * 0.6),
             );
         }
     }

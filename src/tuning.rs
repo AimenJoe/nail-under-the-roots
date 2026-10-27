@@ -262,9 +262,10 @@ pub const SP_FINISHER_BONUS: f32 = 1.0;
 /// 이 동안은 방향을 마음대로 고른다.
 pub const DRILL_REV: f32 = 0.3;
 /// 돌진(…아앙): 시동 뒤 이 시간. 처음 DRILL_ACCEL 동안 START → SPEED로 붙는다. 거리 ≈ 화면 한 폭(320px).
-pub const DRILL_TIME: f32 = 0.9;
-pub const DRILL_SPEED_START: f32 = 230.0;
-pub const DRILL_SPEED: f32 = 380.0;
+/// 사장 "필살기 아직도 전진속도가 너무 빠른 것 같아"(0149): 최고 380 → 270, 시간을 늘려 거리는 거의 그대로(약 300px).
+pub const DRILL_TIME: f32 = 1.15;
+pub const DRILL_SPEED_START: f32 = 170.0;
+pub const DRILL_SPEED: f32 = 270.0;
 pub const DRILL_ACCEL: f32 = 0.2;
 /// 직진성: 초당 이만큼(라디안)만 방향을 틀 수 있다.
 pub const DRILL_TURN: f32 = 2.2;
@@ -351,6 +352,9 @@ pub const CHIEF_STUN_MUL: f32 = 0.35;
 
 // ---- 새 잡몹(src/species.rs, docs/decisions/0146) -------------------------------------
 /// 뒤쥐: 한 번 예고에 몇 번 무나, 다음 물기 예고는 종 예고 × 이것(짧게 다시 겨눈다).
+/// 할 수 없는 행동(0149): 눌렀는데 조건 때문에 안 되면 HUD 칸이 이 시간 동안 붉게 떤다.
+pub const DENY_TIME: f32 = 0.35;
+
 // 지대 장애물·엘리트(0147).
 /// 가시뿌리 덤불 하나(칸 가운데)의 반지름. 뿌리 지대 싸움방에 무리 1~2개.
 pub const THORN_R: f32 = 6.5;
