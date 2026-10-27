@@ -56,6 +56,8 @@ pub struct Room {
     door_was_locked: bool,
     /// 가시뿌리 덤불 자리(칸 가운데, 0147). 막지 않는다. 걸어 들어가면 찔린다.
     pub thorns: Vec<Vec2>,
+    /// 흰 실 그물 자리(칸 가운데, 0165). 막지 않는다. 걸으면 느려지고, 발톱으로 끊긴다.
+    pub webs: Vec<Vec2>,
 }
 
 impl Room {
@@ -97,6 +99,7 @@ impl Room {
             door_anim: 0.0,
             door_was_locked: false,
             thorns: Vec::new(),
+            webs: Vec::new(),
         }
     }
 
@@ -113,6 +116,7 @@ impl Room {
             door_anim: 0.0,
             door_was_locked: false,
             thorns: Vec::new(),
+            webs: Vec::new(),
         };
         r.rebuild_solids();
         r

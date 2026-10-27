@@ -514,6 +514,16 @@ pub fn roll(r: f32, depth: u32, biome: crate::biome::Biome) -> Kind {
             (Kind::Bat, 14.0 + d * 2.0),
             (Kind::SporeCap, 10.0 + d * 2.0),
         ],
+        // 흰 실 굴(0165): 새 잡몹 없이 섞는다. 실버섯(할매의 균사)과 박쥐가 대표.
+        Biome::Silk => vec![
+            (Kind::FieldMouse, 10.0),
+            (Kind::SewerRat, 14.0 + d * 3.0),
+            (Kind::Shrew, 10.0),
+            (Kind::Hedgehog, 6.0),
+            (Kind::Toad, 6.0),
+            (Kind::Bat, 16.0 + d * 2.0),
+            (Kind::SporeCap, 16.0 + d * 2.0),
+        ],
     };
     let total: f32 = table.iter().map(|e| e.1).sum();
     let mut x = r.clamp(0.0, 0.9999) * total;

@@ -79,7 +79,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 34] = [
+pub const LIST: [Entry; 36] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -249,6 +249,16 @@ pub const LIST: [Entry; 34] = [
         name: "콩이",
         desc: "셋째 길 끝 굴. 끝방의 콩이: 굴러 튕기기·웅크려 버티기(발톱은 튕김, 솟구치기·드릴은 뚫음). 이기면 바위 발톱.",
         scenario: Scenario::Kongi,
+    },
+    Entry {
+        name: "환경: 흰 실 굴",
+        desc: "굴토끼 옛 굴의 지대(0165). 보랏빛 흙에 흰 실 얼룩, 보풀.",
+        scenario: Scenario::InBiome(Biome::Silk),
+    },
+    Entry {
+        name: "실타래 굴: 흰 실",
+        desc: "흰 실 굴 3방 + 흰 실 그물(걸으면 느림, 발톱으로 끊김).",
+        scenario: Scenario::Tangle(Biome::Silk),
     },
 ];
 

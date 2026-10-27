@@ -89,6 +89,29 @@ fn palette(b: Biome) -> Palette {
             roots_on_top: true,
             stone_top: true,
         },
+        // 흰 실 굴(0165): 보랏빛 흙 위에 흰 실 얼룩(얼룩이 흙이 아니라 실), 연보라 돌 윗면에 뿌리.
+        Biome::Silk => Palette {
+            floor: [
+                (118, 92, 106),
+                (130, 104, 118),
+                (100, 78, 92),
+                (146, 118, 132),
+            ],
+            soil: [(226, 218, 236), (206, 196, 222), (240, 236, 246)],
+            patch_is_soil: false,
+            patch_at: 0.60,
+            path: [(160, 136, 160), (138, 114, 140)],
+            top: [
+                (132, 118, 150),
+                (150, 138, 168),
+                (104, 92, 122),
+                (176, 166, 192),
+            ],
+            face,
+            roots_on_face: 0.5,
+            roots_on_top: true,
+            stone_top: true,
+        },
     }
 }
 
@@ -902,7 +925,7 @@ mod tests {
                 }
             }
         }
-        for b in [Biome::Meadow, Biome::Roots, Biome::Deep] {
+        for b in [Biome::Meadow, Biome::Roots, Biome::Deep, Biome::Silk] {
             let img = bake(
                 &g,
                 b,

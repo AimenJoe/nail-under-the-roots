@@ -8,6 +8,8 @@ pub enum Biome {
     Meadow,
     Roots,
     Deep,
+    /// 흰 실 굴(0165): 굴토끼 옛 굴. 할매의 흰 실이 흙과 돌에 감겨 있다. 셋째 길 갈래 칸의 굴에만.
+    Silk,
 }
 
 /// 장식 타일(tiles.png 칸).
@@ -38,6 +40,7 @@ impl Biome {
             Biome::Meadow => |s| s.biome_meadow,
             Biome::Roots => |s| s.biome_roots,
             Biome::Deep => |s| s.biome_deep,
+            Biome::Silk => |s| s.biome_silk,
         }
     }
 
@@ -46,6 +49,7 @@ impl Biome {
             Biome::Meadow => Color::new(0.16, 0.20, 0.14, 1.0),
             Biome::Roots => Color::new(0.13, 0.11, 0.12, 1.0),
             Biome::Deep => Color::new(0.05, 0.04, 0.08, 1.0),
+            Biome::Silk => Color::new(0.09, 0.07, 0.12, 1.0),
         }
     }
 
@@ -55,6 +59,7 @@ impl Biome {
             Biome::Meadow => Color::new(0.80, 0.72, 0.55, 1.0),
             Biome::Roots => Color::new(0.58, 0.46, 0.38, 1.0),
             Biome::Deep => Color::new(0.50, 0.50, 0.62, 1.0),
+            Biome::Silk => Color::new(0.80, 0.76, 0.88, 1.0),
         }
     }
 
@@ -63,6 +68,7 @@ impl Biome {
             Biome::Meadow => WHITE,
             Biome::Roots => Color::new(0.80, 0.76, 0.80, 1.0),
             Biome::Deep => Color::new(0.48, 0.48, 0.62, 1.0),
+            Biome::Silk => Color::new(0.72, 0.68, 0.82, 1.0),
         }
     }
 
@@ -71,12 +77,13 @@ impl Biome {
             Biome::Meadow => WHITE,
             Biome::Roots => Color::new(0.78, 0.72, 0.76, 1.0),
             Biome::Deep => Color::new(0.42, 0.40, 0.56, 1.0),
+            Biome::Silk => Color::new(0.64, 0.60, 0.78, 1.0),
         }
     }
 
     /// 바닥 기본이 흙인가(심층). 아니면 풀.
     pub fn dirt_floor(self) -> bool {
-        self == Biome::Deep
+        matches!(self, Biome::Deep | Biome::Silk)
     }
 
     /// 기본 바닥 위에 반대 재질 얼룩(풀 위 흙, 흙 위 풀)을 덮을 확률. 칸 경계가 안 보이게 한다.
@@ -85,6 +92,7 @@ impl Biome {
             Biome::Meadow => 0.07,
             Biome::Roots => 0.34,
             Biome::Deep => 0.22,
+            Biome::Silk => 0.30,
         }
     }
 
@@ -94,6 +102,7 @@ impl Biome {
             Biome::Meadow => (0.0, 0.0),
             Biome::Roots => (0.38, 150.0),
             Biome::Deep => (0.78, 92.0),
+            Biome::Silk => (0.55, 120.0),
         }
     }
 
@@ -123,6 +132,12 @@ impl Biome {
                 (0.26, &[Decor::Mushroom]),
                 (0.38, &[Decor::RootVine]),
                 (0.43, &[Decor::Pebble]),
+            ],
+            // 흰 실 굴(0165): 바닥은 흰 실 얼룩이 그림이라 장식은 적게. 야광버섯이 길잡이.
+            Biome::Silk => &[
+                (0.10, &[Decor::Mushroom]),
+                (0.18, &[Decor::Pebble]),
+                (0.24, &[Decor::Moss]),
             ],
         };
         for (limit, opts) in table {

@@ -135,6 +135,8 @@ pub struct Enemy {
     pub level: u8,
     /// 엘리트(실타래 칸, 0147): 체력 셋 배, 예고가 짧고 덜 밀린다.
     pub elite: bool,
+    /// 흰 실 그물(0165)에 걸린 남은 시간. 걷는 속도가 `WEB_SLOW`배(나는 것·보스는 안 걸린다).
+    pub webbed: f32,
 }
 
 pub struct Projectile {
@@ -183,7 +185,8 @@ impl Enemy {
 
     /// 걷기(거리 맞추기) 속도(종 수치 × 실뜨기 배율).
     pub fn speed(&self) -> f32 {
-        self.kind.species().speed * self.speed_mul
+        let web = if self.webbed > 0.0 { t::WEB_SLOW } else { 1.0 };
+        self.kind.species().speed * self.speed_mul * web
     }
 
     pub fn new(kind: Kind, pos: Vec2) -> Self {
@@ -216,6 +219,7 @@ impl Enemy {
             chain: 0,
             level: 1,
             elite: false,
+            webbed: 0.0,
         }
     }
 

@@ -140,6 +140,8 @@ pub struct Player {
     pub events: Vec<Event>,
     /// 드릴 겨누기용 적 자리(월드가 틱마다 채운다, 맞을 수 있는 적만). 시동 중 방향을 맞추는 데만 쓴다(0139).
     pub targets: Vec<Vec2>,
+    /// 흰 실 그물(0165)에 걸려 있다: 월드가 틱마다 정한다. 걷는 속도 `WEB_SLOW`배.
+    pub slow: bool,
     /// 시동 중 겨눈 적(그리기용 표시). 없으면 입력 방향 그대로.
     pub drill_lock: Option<Vec2>,
     /// 콤보 표. 무기·캐릭터에 따라 바뀐다(moveset.rs).
@@ -189,6 +191,7 @@ impl Player {
             dmg_acc: 0.0,
             events: Vec::new(),
             targets: Vec::new(),
+            slow: false,
             drill_lock: None,
             moveset: &moveset::CLAWS,
             face_left: false,
@@ -213,6 +216,15 @@ impl Player {
     }
 
     /// 땅 위를 걷고 있다(발걸음 먼지, 0081): 굴 속·공중·드릴 돌진이 아니다.
+    /// 걷는 속도: 흰 실 그물에 걸렸으면 느리다(0165).
+    fn speed(&self) -> f32 {
+        if self.slow {
+            t::PLAYER_SPEED * t::WEB_SLOW
+        } else {
+            t::PLAYER_SPEED
+        }
+    }
+
     pub fn on_foot(&self) -> bool {
         matches!(
             self.state,
@@ -546,7 +558,7 @@ impl Player {
                         self.start_swing(idx, a.aim);
                     }
                 } else {
-                    self.pos += move_dir * t::PLAYER_SPEED * dt;
+                    self.pos += move_dir * self.speed() * dt;
                 }
             }
             State::Attack { idx, time, dir } => {
@@ -560,7 +572,7 @@ impl Player {
                 if time >= a0 && time - sdt < a1 {
                     strike = Some(self.claw_strike(idx, dir));
                 }
-                self.pos += move_dir * t::PLAYER_SPEED * ms.move_factor * dt;
+                self.pos += move_dir * self.speed() * ms.move_factor * dt;
                 self.state = State::Attack { idx, time, dir };
 
                 if a.special && self.sp_full() && time >= a1 {
@@ -609,7 +621,7 @@ impl Player {
                 self.facing = dir;
                 let slow = !(pending && time < t::HEAVY_TAP);
                 let factor = if slow { t::HEAVY_MOVE_FACTOR } else { 1.0 };
-                self.pos += move_dir * t::PLAYER_SPEED * factor * dt;
+                self.pos += move_dir * self.speed() * factor * dt;
                 if was < t::HEAVY_CHARGE && time >= t::HEAVY_CHARGE {
                     self.events.push(Event::HeavyReady);
                 }
@@ -650,7 +662,7 @@ impl Player {
                 if time >= a0 && time - sdt < a1 {
                     strike = Some(self.heavy_strike(dir));
                 }
-                self.pos += move_dir * t::PLAYER_SPEED * ms.move_factor * dt;
+                self.pos += move_dir * self.speed() * ms.move_factor * dt;
                 self.state = State::Heavy { time, dir, after };
                 if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
                     self.start_dodge(move_dir);
@@ -689,7 +701,7 @@ impl Player {
                 } else {
                     t::BURROW_CHARGE_FACTOR
                 };
-                self.pos += move_dir * t::PLAYER_SPEED * factor * dt;
+                self.pos += move_dir * self.speed() * factor * dt;
                 self.state = State::Burrow { time };
                 let early = (self.dodge_buf > 0.0 && time > 0.05) || self.attack_buf > 0.0;
                 // 톡 누르면 정한 시간, 누르고 있으면 BURROW_HOLD_EXTRA까지 더 머문다(떼면 솟구침, 0101).
@@ -832,7 +844,7 @@ impl Player {
             }
             State::Eat { item, time } => {
                 let time = time + dt;
-                self.pos += move_dir * t::PLAYER_SPEED * t::EAT_MOVE_FACTOR * dt;
+                self.pos += move_dir * self.speed() * t::EAT_MOVE_FACTOR * dt;
                 if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
                     // 굴파기(깡충)로 끊는다: 먹지 않은 것으로. 대기는 이미 흐르고 있다.
                     self.start_dodge(move_dir);

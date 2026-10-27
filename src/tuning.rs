@@ -423,6 +423,9 @@ pub const DENY_TIME: f32 = 0.35;
 // 지대 장애물·엘리트(0147).
 /// 가시뿌리 덤불 하나(칸 가운데)의 반지름. 뿌리 지대 싸움방에 무리 1~2개.
 pub const THORN_R: f32 = 6.5;
+/// 흰 실 그물(0165, 흰 실 굴의 장애물): 반지름(판정·그림), 걸린 동안 걷는 속도 배율(Naïl·모모·걷는 적).
+pub const WEB_R: f32 = 9.0;
+pub const WEB_SLOW: f32 = 0.5;
 /// 돌진하다 덤불에 박은 적: 피해·멈칫.
 pub const THORN_ENEMY_DAMAGE: i32 = 1;
 pub const THORN_STUN: f32 = 0.9;

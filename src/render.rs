@@ -2375,6 +2375,10 @@ fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
     if glow != deep || w.room.grid.is_none() {
         return;
     }
+    if w.biome == Biome::Silk {
+        draw_silk_fluff(w, cam);
+        return;
+    }
     if w.petals && !glow {
         draw_wilted_petals(w, cam);
     }
@@ -2400,6 +2404,8 @@ fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
                 Color::new(0.90, 0.85, 0.72, 0.45),
                 1.0,
             ),
+            // 흰 실 굴은 위에서 따로 그렸다(`draw_silk_fluff`).
+            Biome::Silk => return,
             // 빛 알갱이: 아주 천천히 떠오른다.
             Biome::Deep => (
                 vec2((t * 0.5 + hs * 7.0).sin() * 5.0, -3.0 - hs * 3.0),
@@ -2663,6 +2669,58 @@ fn draw_knot(k: &world::Knot, t: f32) {
     draw_circle(x, y, 2.0, Color::new(0.20, 0.10, 0.28, 1.0));
 }
 
+/// 흰 실 굴의 보풀(0165): 흰 실 보풀이 아주 천천히 떠오르며 옆으로 흔들린다.
+fn draw_silk_fluff(w: &World, cam: Vec2) {
+    let (tw, th) = (RW + 48.0, RH + 48.0);
+    let t = w.time;
+    for i in 0..20u32 {
+        if !keep_share(i as usize, w.effects) {
+            continue;
+        }
+        let (hx, hy, hs) = (hash01(i, 21), hash01(i, 22), hash01(i, 23));
+        let flow = vec2(
+            (t * (0.4 + hs * 0.5) + hs * 8.0).sin() * 5.0,
+            -(2.0 + hs * 2.0) * t,
+        );
+        let x = (cam.x - 24.0 + (hx * tw + flow.x - cam.x).rem_euclid(tw)).round();
+        let y = (cam.y - 24.0 + (hy * th + flow.y - cam.y).rem_euclid(th)).round();
+        let a = 0.35 + 0.25 * (t * 1.5 + hs * 9.0).sin().abs();
+        let c = Color::new(0.95, 0.92, 1.0, a);
+        if hs > 0.6 {
+            draw_rectangle(x - 1.0, y, 3.0, 1.0, c);
+            draw_rectangle(x, y - 1.0, 1.0, 3.0, c);
+        } else {
+            draw_rectangle(x, y, 1.0, 1.0, c);
+        }
+    }
+}
+
+/// 흰 실 그물(0165): 바닥에 깔린 흰 실 — 가운데 매듭에서 뻗는 가닥 몇 개와 작은 고리. 가까우면 조금 밝다.
+fn draw_web(c: Vec2, time: f32, near: f32) {
+    let seed = ((c.x * 11.0 + c.y * 7.0) as i32).rem_euclid(89) as f32;
+    let (x, y) = (c.x.round(), c.y.round());
+    let a = 0.55 + 0.25 * near;
+    let silk = Color::new(0.94, 0.92, 0.99, a);
+    let dim = Color::new(0.70, 0.64, 0.82, a * 0.7);
+    draw_ellipse(
+        x,
+        y + 1.0,
+        t::WEB_R + 1.0,
+        (t::WEB_R + 1.0) * 0.6,
+        0.0,
+        Color::new(0.80, 0.74, 0.92, 0.12 + 0.08 * near),
+    );
+    for i in 0..6 {
+        let ang = i as f32 * 1.05 + seed * 0.1 + (time * 0.7 + i as f32).sin() * 0.05;
+        let len = t::WEB_R - 1.0 + ((seed + i as f32 * 5.0) % 3.0);
+        let (ex, ey) = (x + ang.cos() * len, y + ang.sin() * len * 0.6);
+        draw_line(x, y, ex, ey, 1.0, if i % 2 == 0 { silk } else { dim });
+        draw_rectangle(ex.round(), ey.round(), 1.0, 1.0, silk);
+    }
+    draw_ellipse_lines(x, y, 5.0, 3.0, 0.0, 1.0, dim);
+    draw_circle(x, y, 1.5, silk);
+}
+
 /// 시든 꽃잎(0159): 모모가 지키는 굴에서 방마다 떠도는 복선. 마을 빈 자리의 시든 꽃잎과 같은 색.
 /// 옆으로 흘러가며 위아래로 팔랑이고, 흔들림에 따라 가로·세로로 바뀐다.
 fn draw_wilted_petals(w: &World, cam: Vec2) {
@@ -2727,6 +2785,15 @@ fn draw_world_lights(
             c.y.round(),
             8.0,
             Color::new(0.85, 0.15, 0.25, (0.10 + 0.08 * pulse) * k),
+        );
+    }
+    // 흰 실 그물(0165)은 어둠 속에서 희게 비친다.
+    for c in &w.room.webs {
+        draw_circle(
+            c.x.round(),
+            c.y.round(),
+            t::WEB_R,
+            Color::new(0.92, 0.90, 1.0, 0.10 * k),
         );
     }
     for r in &w.rocks {
@@ -3830,6 +3897,7 @@ fn draw_room_art(art: &Art, w: &World) {
             crate::biome::Biome::Meadow => roll < 0.15,
             crate::biome::Biome::Roots => roll < 0.55,
             crate::biome::Biome::Deep => roll < 0.8,
+            crate::biome::Biome::Silk => roll < 0.6,
         };
         let src = if roots {
             tile_src(2, 1)
@@ -3973,6 +4041,10 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
     for c in w.room.thorns.iter().filter(|_| ground) {
         let near = 1.0 - ((*c - pp).length() - 14.0).clamp(0.0, 30.0) / 30.0;
         draw_thorn(*c, w.time, near);
+    }
+    for c in w.room.webs.iter().filter(|_| ground) {
+        let near = 1.0 - ((*c - pp).length() - 14.0).clamp(0.0, 30.0) / 30.0;
+        draw_web(*c, w.time, near);
     }
     for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
         let q = lerp(p.prev_pos, p.pos, alpha);
@@ -6638,7 +6710,7 @@ fn draw_light_shafts(w: &World, cam: Vec2, k: f32) {
 /// 상태 없이 시간으로 정한다(같은 번호·같은 주기 = 같은 자리).
 fn draw_overhead_falls(w: &World, cam: Vec2) {
     let drip = match w.biome {
-        Biome::Roots => false,
+        Biome::Roots | Biome::Silk => false,
         Biome::Deep => true,
         Biome::Meadow => return,
     };

@@ -346,6 +346,8 @@ pub struct World {
     pub deny: [f32; 2],
     /// 이번 런에 덤불에 찔린 적이 있나(처음 한 번만 알려 준다, 0149).
     thorn_told: bool,
+    /// 흰 실 그물(0165)에 처음 걸렸을 때 한 번 알려 줬나.
+    web_told: bool,
     /// 다음 돌까지(초).
     rock_cd: f32,
     /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
@@ -450,6 +452,7 @@ impl World {
             rocks: Vec::new(),
             deny: [0.0; 2],
             thorn_told: false,
+            web_told: false,
             rock_cd: t::ROCK_EVERY.1,
             kongi_fight: false,
             dream: false,
@@ -578,11 +581,13 @@ impl World {
                 .filter(|e| e.alive && e.hittable())
                 .map(|e| e.pos),
         );
+        self.web_tick();
         let strike = self.player.update(a, &self.room, dt);
         self.last_strike = strike;
         self.deep_tick(dt);
         if let Some(s) = &strike {
             self.deep_hit(s);
+            self.web_cut(s);
         }
         // 땅속에서 힘을 모으는 동안(0158) 땅이 운다: 힘에 비례해 흔들리고 흙알이 튄다.
         if self.player.is_burrowed() {
@@ -924,6 +929,19 @@ impl World {
         // 필살기 시동 중에는 적·투사체가 멈춘다(필살기 정지 연출).
         let frozen = self.player.drill_revving();
         for e in self.enemies.iter_mut().filter(|_| !frozen) {
+            // 흰 실 그물(0165): 걷는 적은 느려진다. 나는 것·보스는 그대로.
+            e.webbed = (e.webbed - dt).max(0.0);
+            if !self.room.webs.is_empty() && !e.flying() && !e.is_boss() {
+                let rr = e.radius() + t::WEB_R - 3.0;
+                if self
+                    .room
+                    .webs
+                    .iter()
+                    .any(|c| (*c - e.pos).length_squared() <= rr * rr)
+                {
+                    e.webbed = 0.1;
+                }
+            }
             e.update(
                 self.player.pos,
                 targetable,
@@ -1877,6 +1895,62 @@ impl World {
     }
 
     /// 길의 샘(0159): 발을 담그면 가득 회복. 한 번만. 회복했으면 true(소리는 부르는 쪽).
+    /// 흰 실 그물(0165): 걸어 들어가면 느려진다(땅속·깡충·드릴은 지나간다). 처음엔 한마디. 플레이어 틱 전에.
+    fn web_tick(&mut self) {
+        self.player.slow = false;
+        if self.room.webs.is_empty() || !self.player.on_foot() {
+            return;
+        }
+        let pp = self.player.pos;
+        let rr = self.player.radius() + t::WEB_R - 3.0;
+        if !self
+            .room
+            .webs
+            .iter()
+            .any(|c| (*c - pp).length_squared() <= rr * rr)
+        {
+            return;
+        }
+        self.player.slow = true;
+        if !self.web_told {
+            self.web_told = true;
+            self.toast = Some((
+                if self.character == crate::equipment::Character::Momo {
+                    |s| s.toast_web_momo
+                } else {
+                    |s| s.toast_web
+                },
+                2.5,
+            ));
+        }
+    }
+
+    /// 흰 실 그물(0165): 플레이어의 공격(발톱·솟구침·드릴)이 닿으면 끊긴다 — 흰 고리·보풀, 실 풀리는 소리.
+    fn web_cut(&mut self, s: &Strike) {
+        let mut cut = Vec::new();
+        self.room.webs.retain(|c| {
+            if s.shape.overlaps_circle(*c, t::WEB_R) {
+                cut.push(*c);
+                false
+            } else {
+                true
+            }
+        });
+        for c in cut {
+            self.sounds.push(sfx::Id::Unbind);
+            self.fx.push(ring(c, 3.0, 16.0, 0.3, WHITE));
+            puff(
+                &mut self.fx,
+                c,
+                5,
+                Color::new(0.92, 0.90, 0.98, 1.0),
+                6.0,
+                0.5,
+            );
+            unravel(&mut self.fx, c, 8.0);
+        }
+    }
+
     /// 시든 꽃잎(0164): 밟으면 줍는다 — 토스트, 분홍 반짝임, 도감 '???'. 앱이 기록에 남긴다(`AdvEvent::PetalFound`).
     pub fn petal_tick(&mut self) -> bool {
         let Some(at) = self.petal_at else {
@@ -2417,6 +2491,55 @@ fn burst(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
 mod tests {
     use super::*;
     use crate::enemy::{Enemy, Kind};
+
+    /// 흰 실 그물(0165): 그물 위를 걸으면 느리고(처음엔 한마디), 땅속은 안 걸리고, 발톱이 닿으면 끊긴다.
+    #[test]
+    fn silk_webs_slow_walking_and_are_cut_by_claws() {
+        use crate::combat::{Shape, StrikeKind};
+        let mut w = World::new();
+        let at = w.player.pos + vec2(0.0, -8.0);
+        w.room.webs.push(at);
+        let walk = Actions {
+            move_dir: vec2(0.0, -1.0),
+            ..Default::default()
+        };
+        let room = Room::new();
+        let y0 = w.player.pos.y;
+        w.web_tick();
+        assert!(w.player.slow, "그물 위에서 느리다");
+        assert!(w.toast.is_some(), "처음엔 한마디");
+        w.player.update(&walk, &room, t::TICK_DT);
+        let slowed = y0 - w.player.pos.y;
+        // 땅속은 안 걸린다.
+        w.player.state = crate::player::State::Burrow { time: 0.0 };
+        w.web_tick();
+        assert!(!w.player.slow, "땅속은 지나간다");
+        w.player.state = crate::player::State::Free;
+        // 발톱이 닿으면 끊긴다.
+        w.web_cut(&Strike {
+            id: 1,
+            kind: StrikeKind::Claw(0),
+            shape: Shape::Circle { center: at, r: 4.0 },
+            damage: 1,
+            knockback: 0.0,
+            stun: 0.0,
+            hitstop: 0.0,
+            shake: 0.0,
+            finisher: false,
+            poison: 0.0,
+        });
+        assert!(w.room.webs.is_empty(), "발톱이 그물을 끊는다");
+        assert!(w.sounds.contains(&sfx::Id::Unbind));
+        w.web_tick();
+        let y1 = w.player.pos.y;
+        w.player.update(&walk, &room, t::TICK_DT);
+        let free = y1 - w.player.pos.y;
+        assert!(!w.player.slow);
+        assert!(
+            free > slowed * 1.5,
+            "끊기면 다시 빨라진다 {free} vs {slowed}"
+        );
+    }
 
     /// 가장 깊은 곳(0162): 매듭은 평타 여섯(강공격은 두 배)에 끊기고, 당기기에 세 번 감기면 실에 잠긴다.
     /// 감기면 가장 가까운 매듭이 다시 조여진다. 셋 다 끊으면 잠시 뒤 엔딩.

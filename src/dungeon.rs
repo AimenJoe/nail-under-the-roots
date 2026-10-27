@@ -284,6 +284,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
     let mut grid = Grid::filled(GRID as usize * ROOM_W, GRID as usize * ROOM_H, Cell::Wall);
     let mut props = Vec::new();
     let mut thorns = Vec::new();
+    let mut webs = Vec::new();
     for room in &mut rooms {
         let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
         for y in 2..ROOM_H - 1 {
@@ -399,6 +400,17 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                         &mut thorns,
                     );
                 }
+                // 흰 실 굴(0165): 흰 실 그물 무리 1~2개. 덤불과 같은 자리 규칙(길·적 자리·소품 밖).
+                if prm.biome == Biome::Silk && prm.boss.is_none() {
+                    thorn_patches(
+                        &grid,
+                        &props,
+                        ox,
+                        oy,
+                        seed ^ hash_at(room.at) ^ 0x5E1C_0B1A,
+                        &mut webs,
+                    );
+                }
             }
             RoomKind::Rest => {}
         }
@@ -412,6 +424,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
     };
     let mut room = Room::from_grid(grid, props, Vec::new());
     room.thorns = thorns;
+    room.webs = webs;
     (dungeon, room)
 }
 
@@ -621,6 +634,43 @@ fn distances(rooms: &[DRoom], from: (i32, i32)) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 흰 실 굴에만 흰 실 그물(0165). 덤불과 같은 규칙, 다른 지대엔 없다.
+    #[test]
+    fn webs_only_in_silk_warrens() {
+        let silk = Params {
+            biome: Biome::Silk,
+            ..Params::new(1)
+        };
+        let mut any = false;
+        for seed in 1..40 {
+            let (_, room) = generate(seed, &silk);
+            let (_, again) = generate(seed, &silk);
+            assert_eq!(room.webs, again.webs, "seed {seed}");
+            any |= !room.webs.is_empty();
+            assert!(room.thorns.is_empty(), "흰 실 굴엔 덤불이 없다");
+            for c in &room.webs {
+                let (x, y) = (
+                    ((c.x / 16.0) as i32).rem_euclid(ROOM_W as i32),
+                    ((c.y / 16.0) as i32).rem_euclid(ROOM_H as i32),
+                );
+                assert!(
+                    !(8..=11).contains(&x) && !(5..=8).contains(&y),
+                    "seed {seed}: 길 위"
+                );
+                assert!(!room.props.iter().any(|p| p.rect.contains(*c)));
+            }
+            let (_, deep) = generate(
+                seed,
+                &Params {
+                    biome: Biome::Deep,
+                    ..silk
+                },
+            );
+            assert!(deep.webs.is_empty());
+        }
+        assert!(any);
+    }
 
     /// 뿌리 지대 굴에만 가시 덤불(0147). 문 앞 길·적 자리·소품 칸은 비우고, 같은 시드면 같은 자리.
     #[test]

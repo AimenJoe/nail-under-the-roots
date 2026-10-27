@@ -637,7 +637,7 @@ impl App {
                 Place::Dungeon | Place::Arena => match w.biome {
                     crate::biome::Biome::Meadow => Track::Field,
                     crate::biome::Biome::Roots => Track::Roots,
-                    crate::biome::Biome::Deep => Track::Deep,
+                    crate::biome::Biome::Deep | crate::biome::Biome::Silk => Track::Deep,
                 },
             }
         };
