@@ -53,6 +53,8 @@ pub enum Scenario {
     AllSpecies,
     /// 새 졸개 다섯(0146): 땃쥐·고슴도치·두꺼비·박쥐·포자버섯, 어두운 심층에서.
     NewMobs,
+    /// 실타래 칸 굴(0147): 방 셋, 끝방에 엘리트. 지대가 장애물을 정한다(뿌리 = 가시 덤불, 심층 = 무너지는 천장).
+    Tangle(Biome),
     /// 튜토리얼 보스: 필드 공터 앞에서, 문은 열려 있다(docs/decisions/0032).
     Boss,
     /// 첫 쉼터에서 씨앗 40개로(가게·길 지도, docs/decisions/0030, 0031).
@@ -71,7 +73,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 29] = [
+pub const LIST: [Entry; 31] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -141,6 +143,16 @@ pub const LIST: [Entry; 29] = [
         name: "새 졸개 다섯",
         desc: "땃쥐(두 번 물기)·고슴도치(가시 공)·두꺼비(혀)·박쥐(솟구치기 안 닿음)·포자버섯(구름). 심층에서.",
         scenario: Scenario::NewMobs,
+    },
+    Entry {
+        name: "실타래 굴: 뿌리",
+        desc: "방 셋, 싸움방마다 가시뿌리 덤불. 끝방에 엘리트 + 졸개 둘, 이기면 장신구.",
+        scenario: Scenario::Tangle(Biome::Roots),
+    },
+    Entry {
+        name: "실타래 굴: 심층",
+        desc: "방 셋, 싸움하는 동안 천장에서 돌이 떨어진다. 끝방에 엘리트 + 졸개 둘.",
+        scenario: Scenario::Tangle(Biome::Deep),
     },
     Entry {
         name: "빈 방",
@@ -295,6 +307,11 @@ pub fn build(s: Scenario) -> World {
         Scenario::Dungeon => {
             let mut w = World::field();
             w.enter_dungeon_now();
+            w
+        }
+        Scenario::Tangle(b) => {
+            let mut w = World::field();
+            w.enter_tangle_now(b);
             w
         }
         Scenario::Arena => World::new(),

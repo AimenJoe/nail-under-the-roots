@@ -15,6 +15,7 @@ use crate::biome::Biome;
 use crate::enemy::Kind;
 use crate::map::{cell_center, Cell, Grid};
 use crate::room::{Prop, PropKind, Room};
+use crate::tuning as t;
 
 pub const ROOM_W: usize = 20;
 pub const ROOM_H: usize = 12;
@@ -41,6 +42,8 @@ pub struct DRoom {
     pub visited: bool,
     /// 들어설 때 나오는 적(월드 좌표).
     pub enemies: Vec<(Kind, Vec2)>,
+    /// 첫 적이 엘리트(실타래 칸의 끝방, 0147).
+    pub elite: bool,
 }
 
 impl DRoom {
@@ -155,8 +158,10 @@ pub struct Params {
     pub start_exit: bool,
     /// 보스방에 무리 대신 이 보스 혼자(첫 길의 모모, 0046).
     pub boss: Option<Kind>,
-    /// 적 뽑기 표를 고르는 지대(0146). 굴을 지을 때 장소가 정한다.
+    /// 적 뽑기 표를 고르는 지대(0146). 굴을 지을 때 장소가 정한다. 장애물도 정한다(0147).
     pub biome: Biome,
+    /// 끝방에 엘리트 하나 + 졸개 둘(실타래 칸, 0147).
+    pub elite: bool,
 }
 
 impl Params {
@@ -171,6 +176,7 @@ impl Params {
             start_exit: false,
             boss: None,
             biome: Biome::Meadow,
+            elite: false,
         }
     }
 
@@ -200,6 +206,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
         cleared: true,
         visited: true,
         enemies: Vec::new(),
+        elite: false,
     }];
     // 가지 뻗기
     let mut guard = 0;
@@ -223,6 +230,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             cleared: false,
             visited: false,
             enemies: Vec::new(),
+            elite: false,
         });
     }
     // 고리 하나: 이웃인데 안 이어진 쌍(큰 굴만)
@@ -275,6 +283,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
     // 격자
     let mut grid = Grid::filled(GRID as usize * ROOM_W, GRID as usize * ROOM_H, Cell::Wall);
     let mut props = Vec::new();
+    let mut thorns = Vec::new();
     for room in &mut rooms {
         let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
         for y in 2..ROOM_H - 1 {
@@ -363,6 +372,33 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                 if let (RoomKind::Boss, Some(k)) = (room.kind, prm.boss) {
                     room.enemies = vec![(k, cell_center(ox + 10, oy + 4))];
                 }
+                // 실타래 칸(0147): 끝방은 엘리트 하나(방 가운데 위) + 무리에서 둘. 생쥐 떼·포자버섯은 엘리트가 되지 않는다.
+                if room.kind == RoomKind::Boss && prm.elite && prm.boss.is_none() {
+                    let mut k = Kind::FieldMouse;
+                    for _ in 0..8 {
+                        k = crate::species::roll(rng.unit(), depth + 1, prm.biome);
+                        if !matches!(k, Kind::HouseMouse | Kind::SporeCap) {
+                            break;
+                        }
+                    }
+                    if matches!(k, Kind::HouseMouse | Kind::SporeCap) {
+                        k = Kind::SewerRat;
+                    }
+                    room.enemies.truncate(t::ELITE_ESCORTS);
+                    room.enemies.insert(0, (k, cell_center(ox + 10, oy + 4)));
+                    room.elite = true;
+                }
+                // 뿌리 지대(0147): 가시뿌리 덤불 무리 1~2개. 굴 모양·적과 다른 난수라 다른 지대의 굴은 그대로다.
+                if prm.biome == Biome::Roots && prm.boss.is_none() {
+                    thorn_patches(
+                        &grid,
+                        &props,
+                        ox,
+                        oy,
+                        seed ^ hash_at(room.at) ^ 0x7407_2A11,
+                        &mut thorns,
+                    );
+                }
             }
             RoomKind::Rest => {}
         }
@@ -374,7 +410,56 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
         goal: prm.goal,
         boss: prm.boss,
     };
-    (dungeon, Room::from_grid(grid, props, Vec::new()))
+    let mut room = Room::from_grid(grid, props, Vec::new());
+    room.thorns = thorns;
+    (dungeon, room)
+}
+
+/// 가시뿌리 덤불 무리(0147): 바닥 칸 하나에서 이웃 바닥 칸으로 1~2칸 더. 문 앞 십자 길·`KEEP` 자리·소품 칸은 피한다.
+fn thorn_patches(
+    grid: &Grid,
+    props: &[Prop],
+    ox: usize,
+    oy: usize,
+    seed: u64,
+    out: &mut Vec<Vec2>,
+) {
+    let mut rng = Rng::new(seed | 1);
+    let lane = |x: usize, y: usize| (8..=11).contains(&x) || (5..=8).contains(&y);
+    let ok = |x: usize, y: usize, out: &Vec<Vec2>| {
+        let c = cell_center(ox + x, oy + y);
+        (2..=17).contains(&x)
+            && (3..=10).contains(&y)
+            && !lane(x, y)
+            && !KEEP.contains(&(x, y))
+            && grid.get(ox + x, oy + y) == Cell::Floor
+            && !props.iter().any(|p| p.rect.contains(c))
+            && !out.contains(&c)
+    };
+    for _ in 0..1 + rng.below(2) {
+        let (mut x, mut y) = (0, 0);
+        let mut found = false;
+        for _ in 0..12 {
+            x = 2 + rng.below(16) as usize;
+            y = 3 + rng.below(8) as usize;
+            if ok(x, y, out) {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            continue;
+        }
+        out.push(cell_center(ox + x, oy + y));
+        for _ in 0..1 + rng.below(2) {
+            let (dx, dy) = DIRS[rng.below(4) as usize];
+            let (nx, ny) = ((x as i32 + dx) as usize, (y as i32 + dy) as usize);
+            if ok(nx, ny, out) {
+                out.push(cell_center(ox + nx, oy + ny));
+                (x, y) = (nx, ny);
+            }
+        }
+    }
 }
 
 /// 적·보스·상자·출구·시작 자리(방 안 칸). 방 모양이 이 칸과 그 둘레 한 칸을 벽으로 만들지 않는다.
@@ -536,6 +621,73 @@ fn distances(rooms: &[DRoom], from: (i32, i32)) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 뿌리 지대 굴에만 가시 덤불(0147). 문 앞 길·적 자리·소품 칸은 비우고, 같은 시드면 같은 자리.
+    #[test]
+    fn thorns_only_in_roots_and_off_the_lanes() {
+        let roots = Params {
+            biome: Biome::Roots,
+            ..Params::new(1)
+        };
+        let mut any = false;
+        for seed in 1..40 {
+            let (d, room) = generate(seed, &roots);
+            let (_, again) = generate(seed, &roots);
+            assert_eq!(room.thorns, again.thorns, "seed {seed}");
+            any |= !room.thorns.is_empty();
+            for c in &room.thorns {
+                let (cx, cy) = ((c.x / 16.0) as i32, (c.y / 16.0) as i32);
+                let r = d
+                    .rooms
+                    .iter()
+                    .find(|r| r.rect().contains(*c))
+                    .expect("방 안");
+                assert!(matches!(r.kind, RoomKind::Combat | RoomKind::Boss));
+                let (x, y) = (
+                    (cx - r.at.0 * ROOM_W as i32) as usize,
+                    (cy - r.at.1 * ROOM_H as i32) as usize,
+                );
+                assert!(
+                    !(8..=11).contains(&x) && !(5..=8).contains(&y),
+                    "seed {seed}: 길 위"
+                );
+                assert!(!KEEP.contains(&(x, y)), "seed {seed}: 적 자리");
+                assert!(!room.props.iter().any(|p| p.rect.contains(*c)));
+            }
+            let (_, deep) = generate(
+                seed,
+                &Params {
+                    biome: Biome::Deep,
+                    ..roots
+                },
+            );
+            assert!(deep.thorns.is_empty());
+        }
+        assert!(any);
+    }
+
+    /// 실타래 칸(0147): 끝방 첫 적이 엘리트(생쥐 떼·포자버섯이 아님) + 졸개 둘까지.
+    #[test]
+    fn tangle_goal_room_starts_with_an_elite() {
+        let prm = Params {
+            rooms: 3,
+            goal: Goal::Pack,
+            elite: true,
+            biome: Biome::Deep,
+            ..Params::new(2)
+        };
+        for seed in 1..60 {
+            let (d, _) = generate(seed, &prm);
+            let goal = d.rooms.iter().find(|r| r.kind == RoomKind::Boss).unwrap();
+            assert!(goal.elite);
+            assert!(goal.enemies.len() <= 1 + t::ELITE_ESCORTS);
+            assert!(!matches!(
+                goal.enemies[0].0,
+                Kind::HouseMouse | Kind::SporeCap
+            ));
+            assert!(d.rooms.iter().filter(|r| r.elite).count() == 1);
+        }
+    }
 
     #[test]
     fn named_boss_replaces_the_pack_and_keeps_the_layout() {

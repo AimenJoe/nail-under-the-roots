@@ -133,6 +133,8 @@ pub struct Enemy {
     chain: u32,
     /// 보스가 몇 번째 만남인가(모모: 1~3, 한 수씩 는다). 다른 적은 1.
     pub level: u8,
+    /// 엘리트(실타래 칸, 0147): 체력 셋 배, 예고가 짧고 덜 밀린다.
+    pub elite: bool,
 }
 
 pub struct Projectile {
@@ -175,8 +177,8 @@ impl Enemy {
             self.max_hp = (self.max_hp as f32 * k.boss_hp_mul()).ceil() as i32;
         }
         self.hp = self.max_hp;
-        self.windup_mul = k.windup_mul();
-        self.speed_mul = k.enemy_speed_mul();
+        self.windup_mul *= k.windup_mul();
+        self.speed_mul *= k.enemy_speed_mul();
     }
 
     /// 걷기(거리 맞추기) 속도(종 수치 × 실뜨기 배율).
@@ -213,7 +215,16 @@ impl Enemy {
             summons: 0,
             chain: 0,
             level: 1,
+            elite: false,
         }
+    }
+
+    /// 엘리트로(0147). 실뜨기보다 먼저 건다(실뜨기는 배율을 곱한다).
+    pub fn make_elite(&mut self) {
+        self.elite = true;
+        self.max_hp = (self.max_hp as f32 * t::ELITE_HP).ceil() as i32;
+        self.hp = self.max_hp;
+        self.windup_mul *= t::ELITE_WINDUP;
     }
 
     pub fn sp(&self) -> &'static Species {
@@ -840,7 +851,8 @@ impl Enemy {
         self.wake_delay = 0.0;
         self.hp -= dmg;
         self.flash = t::HIT_FLASH;
-        self.vel = knock_dir * knockback * self.sp().knock_mul;
+        let elite = if self.elite { t::ELITE_KNOCK } else { 1.0 };
+        self.vel = knock_dir * knockback * self.sp().knock_mul * elite;
         if self.is_boss() && dmg > 0 {
             if !self.armored() {
                 let left = match self.state {
@@ -1068,6 +1080,28 @@ mod tests {
         assert!(matches!(g.state, State::Windup { time } if time > 0.0));
         g.break_guard();
         assert!(matches!(g.state, State::Stunned { .. }) && !g.guarding());
+    }
+
+    /// 엘리트(0147): 체력 셋 배, 예고가 짧고 덜 밀린다. 실뜨기는 그 위에 곱한다.
+    #[test]
+    fn elite_is_tougher_and_knots_stack() {
+        let mut e = Enemy::new(Kind::FieldMouse, vec2(0.0, 0.0));
+        let plain = Enemy::new(Kind::FieldMouse, vec2(0.0, 0.0));
+        e.make_elite();
+        assert_eq!(e.max_hp, (plain.max_hp as f32 * t::ELITE_HP).ceil() as i32);
+        assert!(e.windup() < plain.windup());
+        let before = e.windup();
+        e.apply_knots(crate::knots::Knots::new(2));
+        assert!(
+            e.windup() <= before,
+            "실뜨기가 엘리트 예고를 덮어쓰지 않는다"
+        );
+        let mut p = Enemy::new(Kind::FieldMouse, vec2(0.0, 0.0));
+        let mut q = Enemy::new(Kind::FieldMouse, vec2(0.0, 0.0));
+        q.make_elite();
+        p.hurt(0, vec2(1.0, 0.0), 100.0, 0.1);
+        q.hurt(0, vec2(1.0, 0.0), 100.0, 0.1);
+        assert!(q.vel.length() < p.vel.length());
     }
 
     /// 땃쥐(0146): 한 번 떨고 두 번 연달아 돌진한 뒤에야 쉰다.

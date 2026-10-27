@@ -54,6 +54,8 @@ pub struct Room {
     pub door_anim: f32,
     /// 지난 틱에 잠겨 있었나(열리는 순간을 알기 위해).
     door_was_locked: bool,
+    /// 가시뿌리 덤불 자리(칸 가운데, 0147). 막지 않는다. 걸어 들어가면 찔린다.
+    pub thorns: Vec<Vec2>,
 }
 
 impl Room {
@@ -94,6 +96,7 @@ impl Room {
             doors_locked: false,
             door_anim: 0.0,
             door_was_locked: false,
+            thorns: Vec::new(),
         }
     }
 
@@ -109,6 +112,7 @@ impl Room {
             doors_locked: false,
             door_anim: 0.0,
             door_was_locked: false,
+            thorns: Vec::new(),
         };
         r.rebuild_solids();
         r

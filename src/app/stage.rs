@@ -66,6 +66,7 @@ fn node_text(kind: Option<NodeKind>, last: bool) -> (Tr, Tr) {
         Some(NodeKind::Nest) => (|s| s.node_nest, |s| s.node_nest_desc),
         Some(NodeKind::Cache) => (|s| s.node_cache, |s| s.node_cache_desc),
         Some(NodeKind::Spring) => (|s| s.node_spring, |s| s.node_spring_desc),
+        Some(NodeKind::Elite) => (|s| s.node_elite, |s| s.node_elite_desc),
         Some(NodeKind::Boss) => (|s| s.node_boss, |s| s.node_boss_desc),
         None => (|s| s.node_unknown, |s| s.node_unknown_desc),
     }
@@ -165,6 +166,20 @@ fn draw_node_icon(ui: &Ui, p: Vec2, kind: Option<NodeKind>, dim: bool) {
                 col(0.45, 0.75, 1.0),
             );
             ui.rect(Rect::new(p.x - 1.0, p.y, 1.0, 1.0), col(0.9, 0.97, 1.0));
+        }
+        Some(NodeKind::Elite) => {
+            // 실타래(0147): 엇갈려 감긴 보라 실 + 가운데 붉은 눈 하나.
+            circle_lines(ui, p, 4.0, col(0.75, 0.50, 0.95));
+            for (dx, dy) in [(-3.0, -1.0), (-2.0, 1.0), (1.0, -3.0), (2.0, 2.0)] {
+                ui.rect(
+                    Rect::new(p.x + dx, p.y + dy, 2.0, 1.0),
+                    col(0.75, 0.50, 0.95),
+                );
+            }
+            ui.rect(
+                Rect::new(p.x - 1.0, p.y - 1.0, 2.0, 2.0),
+                col(1.0, 0.25, 0.4),
+            );
         }
         Some(NodeKind::Boss) => {
             // 뿌리 왕관 + 붉은 눈.

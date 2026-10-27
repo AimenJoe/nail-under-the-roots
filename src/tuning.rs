@@ -351,6 +351,25 @@ pub const CHIEF_STUN_MUL: f32 = 0.35;
 
 // ---- 새 잡몹(src/species.rs, docs/decisions/0146) -------------------------------------
 /// 뒤쥐: 한 번 예고에 몇 번 무나, 다음 물기 예고는 종 예고 × 이것(짧게 다시 겨눈다).
+// 지대 장애물·엘리트(0147).
+/// 가시뿌리 덤불 하나(칸 가운데)의 반지름. 뿌리 지대 싸움방에 무리 1~2개.
+pub const THORN_R: f32 = 6.5;
+/// 돌진하다 덤불에 박은 적: 피해·멈칫.
+pub const THORN_ENEMY_DAMAGE: i32 = 1;
+pub const THORN_STUN: f32 = 0.9;
+/// 심층 싸움방의 무너지는 천장: 다음 돌까지(초, 사이에서 고른다), 떨어지기까지 예고, 맞는 반지름.
+pub const ROCK_EVERY: (f32, f32) = (2.6, 4.2);
+pub const ROCK_FALL: f32 = 1.0;
+pub const ROCK_R: f32 = 11.0;
+/// 돌이 떨어지는 자리: 플레이어(또는 적) 둘레 이만큼 안.
+pub const ROCK_SPREAD: f32 = 26.0;
+pub const ROCK_ENEMY_DAMAGE: i32 = 2;
+/// 엘리트(실타래 칸의 끝방, 0147): 체력 배수, 예고 배수, 넉백 배수, 함께 나오는 졸개 수.
+pub const ELITE_HP: f32 = 3.0;
+pub const ELITE_WINDUP: f32 = 0.8;
+pub const ELITE_KNOCK: f32 = 0.5;
+pub const ELITE_ESCORTS: usize = 2;
+
 pub const SHREW_BITES: u32 = 2;
 pub const SHREW_REAIM: f32 = 0.4;
 /// 두꺼비: 혀가 닿는 거리·두께(플레이어 반지름에 더함)·내민 채 머무는 시간·맞으면 끌려가는 속도.

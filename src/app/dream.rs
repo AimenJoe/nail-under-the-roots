@@ -103,6 +103,7 @@ impl App {
         w.projectiles.clear();
         w.mines.clear();
         w.clouds.clear();
+        w.rocks.clear();
         w.loot.clear();
         let mut e = Enemy::new(k, c - vec2(0.0, 30.0));
         e.wake_delay = 1.0;
@@ -152,6 +153,7 @@ impl App {
         self.world.enemies.clear();
         self.world.mines.clear();
         self.world.clouds.clear();
+        self.world.rocks.clear();
         if run.at + 1 < run.queue.len() {
             run.at += 1;
             let heal = dream::RUSH_HEAL;

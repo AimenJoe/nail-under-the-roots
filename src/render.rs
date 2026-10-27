@@ -308,6 +308,7 @@ impl Renderer {
             draw_sorted(art, w, alpha, None);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
+            draw_falling_rocks(w);
             draw_ambient(w, cam, false);
             if self.cut.is_some() {
                 self.draw_light_map(art, w, alpha, cam);
@@ -343,6 +344,7 @@ impl Renderer {
             draw_player(&w.player, alpha, w.time);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);
+            draw_falling_rocks(w);
             if draw_super_dim(w, cam) {
                 draw_player(&w.player, alpha, w.time);
                 draw_player_fx(&w.player, alpha);
@@ -3190,6 +3192,9 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
     for c in w.clouds.iter().filter(|_| ground) {
         draw_cloud(c, w.time);
     }
+    for c in w.room.thorns.iter().filter(|_| ground) {
+        draw_thorn(*c);
+    }
     for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
         let q = lerp(p.prev_pos, p.pos, alpha);
         list.push((q.y + 3.0, Drawable::Projectile(i)));
@@ -4056,6 +4061,28 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             draw_line(z.x, z.y + 3.0, z.x + 3.0, z.y + 3.0, 1.0, c);
         }
     }
+    // 엘리트(0147): 발밑에 보라 실 고리가 숨 쉬고, 실 매듭 셋이 돈다.
+    if e.elite && marks {
+        let ph = time * 3.0 + e.pos.x * 0.05;
+        draw_circle_lines(
+            pos.x.round(),
+            (pos.y + r * 0.4).round(),
+            r + 3.0 + ph.sin() * 0.8,
+            1.0,
+            Color::new(0.75, 0.50, 0.95, 0.55),
+        );
+        for i in 0..3 {
+            let a = ph * 0.8 + i as f32 * std::f32::consts::TAU / 3.0;
+            let q = pos + vec2(a.cos() * (r + 3.0), a.sin() * (r + 3.0) * 0.6 - 2.0);
+            draw_rectangle(
+                q.x.round(),
+                q.y.round(),
+                1.0,
+                1.0,
+                Color::new(0.85, 0.65, 1.0, 0.9),
+            );
+        }
+    }
     let flash = e.flash > 0.0;
     let chief = e.kind == crate::enemy::Kind::Chief;
     if let (true, Some(tex)) = (chief, art.and_then(|a| a.chief.as_ref())) {
@@ -4102,8 +4129,20 @@ fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32) {
             draw_circle(nose.x.round(), nose.y.round(), 1.5, BLACK);
         }
     }
+    // 엘리트는 처음부터 작은 막대(점이 너무 많다).
+    if marks && e.elite {
+        let (w, y) = (18.0, (pos.y - r - 9.0).round());
+        let x = (pos.x - w / 2.0).round();
+        draw_rectangle(x - 1.0, y - 1.0, w + 2.0, 4.0, OUTLINE);
+        draw_rectangle(x, y, w, 2.0, DARKGRAY);
+        let k = (e.hp.max(0) as f32 / e.max_hp.max(1) as f32).clamp(0.0, 1.0);
+        draw_rectangle(x, y, (w * k).round(), 2.0, Color::new(0.80, 0.58, 1.0, 1.0));
+    }
     // 체력 점(맞은 적만: 처음부터 숫자를 늘어놓지 않는다). 보스는 화면 아래 막대.
-    if marks && !e.is_boss() && (e.hp < e.max_hp || sp.behavior == crate::species::Behavior::Dummy)
+    if marks
+        && !e.is_boss()
+        && !e.elite
+        && (e.hp < e.max_hp || sp.behavior == crate::species::Behavior::Dummy)
     {
         let max = e.max_hp;
         for i in 0..max {
@@ -4176,6 +4215,31 @@ const TELEGRAPH_EDGE: (f32, f32) = (0.15, 0.5);
 /// 진하기 k = 예고 경과 / 예고 시간(0→1). 마지막 15%는 깜빡여 "지금"을 알린다.
 fn draw_telegraphs(w: &World, alpha: f32) {
     use crate::species::Behavior;
+    // 무너지는 천장(0147): 떨어질 자리에 그림자가 커지고, 붉은 고리가 조여 든다(청설모 내려앉기와 같은 말).
+    for r in &w.rocks {
+        let k = (r.time / t::ROCK_FALL).clamp(0.0, 1.0);
+        let rad = t::ROCK_R;
+        draw_ellipse(
+            r.pos.x,
+            r.pos.y,
+            rad * (0.35 + 0.65 * k),
+            rad * (0.35 + 0.65 * k) * 0.7,
+            0.0,
+            Color::new(0.0, 0.0, 0.0, 0.18 + 0.27 * k),
+        );
+        let blink = k > 0.85 && ((w.time * 16.0) as i32) % 2 == 0;
+        let edge = if blink {
+            Color::new(1.0, 0.62, 0.6, TELEGRAPH_EDGE.1 + 0.12)
+        } else {
+            Color::new(
+                0.95,
+                0.38,
+                0.38,
+                TELEGRAPH_EDGE.0 + (TELEGRAPH_EDGE.1 - TELEGRAPH_EDGE.0) * k,
+            )
+        };
+        draw_circle_lines(r.pos.x, r.pos.y, rad * (1.5 - 0.5 * k), 1.0, edge);
+    }
     for e in w.enemies.iter().filter(|e| e.alive && !e.asleep) {
         let sp = e.sp();
         let pos = lerp(e.prev_pos, e.pos, alpha);
@@ -4281,6 +4345,56 @@ fn draw_telegraphs(w: &World, alpha: f32) {
                 draw_circle_lines(at.x, at.y, r, 1.0, inner);
             }
         }
+    }
+}
+
+/// 가시뿌리 덤불(0147): 칸 가운데에 낮은 덤불, 보라 가시가 삐죽. 자리마다 모양이 조금 다르다(좌표로 정한다).
+fn draw_thorn(c: Vec2) {
+    let seed = ((c.x * 7.0 + c.y * 13.0) as i32).rem_euclid(97) as f32;
+    let dark = Color::new(0.24, 0.14, 0.22, 1.0);
+    let body = Color::new(0.36, 0.22, 0.32, 1.0);
+    let spike = Color::new(0.68, 0.46, 0.72, 1.0);
+    for (i, (dx, dy)) in [
+        (-3.0, 1.0),
+        (3.0, 1.5),
+        (0.0, -1.5),
+        (-1.0, 3.0),
+        (2.0, -3.0),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let r = 2.5 + ((seed + i as f32 * 3.0) % 3.0) * 0.5;
+        draw_circle((c.x + dx).round(), (c.y + dy).round(), r + 1.0, dark);
+        draw_circle((c.x + dx).round(), (c.y + dy - 0.5).round(), r, body);
+    }
+    for i in 0..7 {
+        let a = (seed * 0.37 + i as f32 * 0.9) % std::f32::consts::TAU;
+        let d = Vec2::from_angle(a);
+        let p = (c + vec2(d.x * 5.0, d.y * 3.5 - 1.0)).round();
+        let q = (p + d * 2.0).round();
+        draw_line(p.x, p.y, q.x, q.y, 1.0, spike);
+    }
+}
+
+/// 무너지는 돌(0147): 떨어지기 전 반쯤부터 위에서 내려오는 돌(땅 그림자·고리는 `draw_telegraphs`).
+fn draw_falling_rocks(w: &World) {
+    for r in &w.rocks {
+        let k = (r.time / t::ROCK_FALL).clamp(0.0, 1.0);
+        if k < 0.45 {
+            continue;
+        }
+        let h = (1.0 - k) * (1.0 - k) * 150.0;
+        let p = vec2(r.pos.x, r.pos.y - 4.0 - h).round();
+        draw_circle(p.x, p.y, 5.0, OUTLINE);
+        draw_circle(p.x, p.y, 4.0, Color::new(0.46, 0.42, 0.44, 1.0));
+        draw_rectangle(
+            p.x - 2.0,
+            p.y - 2.0,
+            2.0,
+            1.0,
+            Color::new(0.68, 0.64, 0.64, 1.0),
+        );
     }
 }
 

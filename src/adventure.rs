@@ -620,6 +620,18 @@ impl World {
         self.enter_dungeon();
     }
 
+    /// 개발 시나리오용(0147): 실타래 칸 굴(엘리트 끝방)에 바로. 뿌리 지대 = 가시 덤불, 심층 = 무너지는 천장.
+    pub fn enter_tangle_now(&mut self, biome: Biome) {
+        let prm = Params {
+            rooms: 3,
+            goal: dungeon::Goal::Pack,
+            elite: true,
+            ..Params::new(1)
+        };
+        self.adv.node = None;
+        self.build_dungeon(&prm, biome);
+    }
+
     fn enter_dungeon(&mut self) {
         let prm = Params::classic(self.adv.depth);
         let biome = if self.adv.depth == 0 {
@@ -674,6 +686,7 @@ impl World {
         }
         self.projectiles.clear();
         self.clouds.clear();
+        self.rocks.clear();
         self.player.pos = d.start_pos();
         self.player.prev_pos = self.player.pos;
         self.adv.current_room = d.start;
@@ -697,6 +710,7 @@ impl World {
         }
         self.projectiles.clear();
         self.clouds.clear();
+        self.rocks.clear();
         self.adv.dungeon = None;
         self.adv.node = None;
     }
@@ -714,6 +728,7 @@ impl World {
         self.loot.clear();
         self.projectiles.clear();
         self.clouds.clear();
+        self.rocks.clear();
         self.npc = None;
         self.neighbors.clear();
         for (ch, at) in &p.marks {
@@ -769,6 +784,7 @@ impl World {
         }
         self.mines.clear();
         self.clouds.clear();
+        self.rocks.clear();
         if self.adv.place == Place::Dungeon {
             self.restore_field();
         }
@@ -838,10 +854,14 @@ impl World {
             && room.interior().contains(self.player.pos)
         {
             self.room.set_doors_locked(true);
-            for (kind, pos) in room.enemies.drain(..) {
+            let elite = room.elite;
+            for (n, (kind, pos)) in room.enemies.drain(..).enumerate() {
                 for off in crate::species::pack_offsets(kind) {
                     let mut e = Enemy::new(kind, pos + off);
                     e.wake_delay = t::ROOM_WAKE_DELAY;
+                    if elite && n == 0 {
+                        e.make_elite();
+                    }
                     if kind == Kind::Momo {
                         e.level = self.momo_wins.saturating_add(1);
                         self.adv.boss_last = e.pos;
@@ -861,6 +881,7 @@ impl World {
             sfx.play(sfx::Id::WallHit);
             self.feel.add_trauma(0.25);
         }
+        let mut gift_at = None;
         if self.room.doors_locked() && self.enemies.is_empty() {
             self.room.set_doors_locked(false);
             room.cleared = true;
@@ -911,8 +932,15 @@ impl World {
                         self.loot.push(Loot::spawn(LootKind::Seed, at));
                     }
                     self.toast = Some((|s| s.toast_goal, 2.5));
+                    // 실타래 칸(0147): 엘리트를 풀어 주면 상자처럼 장신구 하나(다 있으면 반딧불).
+                    if room.elite {
+                        gift_at = Some(at);
+                    }
                 }
             }
+        }
+        if let Some(at) = gift_at {
+            self.charm_gift(at);
         }
         // 보물 상자: 닿으면 연다 → 씨앗 한 줌 + 아직 없는 장신구 하나(다 있으면 반딧불).
         let ppos = self.player.pos;
@@ -943,25 +971,27 @@ impl World {
                 self.push_loot(Loot::spawn(LootKind::Seed, at));
             }
             self.chests += 1;
-            let missing: Vec<usize> = self
-                .charm_pool
-                .iter()
-                .copied()
-                .filter(|c| !self.charms_found.contains(c))
-                .collect();
-            if missing.is_empty() {
-                for _ in 0..12 {
-                    self.push_loot(Loot::spawn(
-                        LootKind::Glowbug,
-                        self.room.props[i].rect.center(),
-                    ));
-                }
-            } else {
-                let c = missing[rand::gen_range(0, missing.len())];
-                self.charms_found.push(c);
-                self.gifts.push(Gift::Charm(c));
-            }
+            self.charm_gift(at);
             sfx.play(sfx::Id::Emerge);
+        }
+    }
+
+    /// 아직 없는 장신구 하나(다 있으면 반딧불 한 줌). 상자·실타래 끝방(0147).
+    fn charm_gift(&mut self, at: Vec2) {
+        let missing: Vec<usize> = self
+            .charm_pool
+            .iter()
+            .copied()
+            .filter(|c| !self.charms_found.contains(c))
+            .collect();
+        if missing.is_empty() {
+            for _ in 0..12 {
+                self.push_loot(Loot::spawn(LootKind::Glowbug, at));
+            }
+        } else {
+            let c = missing[rand::gen_range(0, missing.len())];
+            self.charms_found.push(c);
+            self.gifts.push(Gift::Charm(c));
         }
     }
 

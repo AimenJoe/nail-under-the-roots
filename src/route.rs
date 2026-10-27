@@ -26,6 +26,8 @@ pub enum NodeKind {
     Cache,
     /// 샘: 싸움 없음. 체력을 채우고 산딸기.
     Spring,
+    /// 실타래: 작은 굴, 끝방에 실에 단단히 감긴 엘리트 하나 + 졸개 둘. 이기면 장신구(0147). 첫 층에는 없다.
+    Elite,
     /// 그 길의 보스.
     Boss,
 }
@@ -112,10 +114,12 @@ impl Route {
                     } else {
                         NodeKind::Cache
                     }
-                } else if r < 0.42 {
+                } else if r < 0.36 {
                     NodeKind::Burrow
-                } else if r < 0.64 {
+                } else if r < 0.54 {
                     NodeKind::Nest
+                } else if r < 0.66 {
+                    NodeKind::Elite
                 } else if r < 0.8 {
                     NodeKind::Cache
                 } else if parents_spring {
@@ -234,6 +238,12 @@ impl Route {
                 goal: Goal::Treasure,
                 ..Params::new(depth)
             },
+            NodeKind::Elite => Params {
+                rooms: 3,
+                goal: Goal::Pack,
+                elite: true,
+                ..Params::new(depth)
+            },
             NodeKind::Spring => Params {
                 rooms: 2,
                 goal: Goal::Spring,
@@ -279,6 +289,20 @@ mod tests {
                 assert!(hit.iter().all(|h| *h), "seed {seed}: 갈 수 없는 칸");
             }
         }
+    }
+
+    /// 실타래 칸(0147)은 첫 층에 없고, 여러 길 가운데 나온다.
+    #[test]
+    fn tangle_nodes_appear_after_the_first_layer() {
+        let mut seen = 0;
+        for seed in 1..300 {
+            let r = Route::generate(seed, 2);
+            assert!(!kinds(&r, 0).contains(&NodeKind::Elite));
+            seen += (1..CHOICE_LAYERS)
+                .filter(|&l| kinds(&r, l).contains(&NodeKind::Elite))
+                .count();
+        }
+        assert!(seen > 50, "{seen}");
     }
 
     #[test]

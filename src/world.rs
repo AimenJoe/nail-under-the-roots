@@ -122,6 +122,12 @@ pub struct Mine {
     pub fuse: f32,
 }
 
+/// 심층 싸움방에서 무너지는 천장 돌(0147). `time`이 `ROCK_FALL`이 되면 떨어진다.
+pub struct Rockfall {
+    pub pos: Vec2,
+    pub time: f32,
+}
+
 /// 포자버섯이 뿜은 포자 구름(0146). 잠깐 뒤부터 안에 서 있으면 아프다(땅속은 괜찮다).
 pub struct Cloud {
     pub pos: Vec2,
@@ -198,6 +204,9 @@ pub struct World {
     pub doto_fight: bool,
     pub mines: Vec<Mine>,
     pub clouds: Vec<Cloud>,
+    pub rocks: Vec<Rockfall>,
+    /// 다음 돌까지(초).
+    rock_cd: f32,
     /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
     pub kongi_fight: bool,
     /// 실의 꿈(0055): 쓰러진 적이 아무것도 떨어뜨리지 않는다(기록이 공정하게).
@@ -275,6 +284,8 @@ impl World {
             doto_fight: false,
             mines: Vec::new(),
             clouds: Vec::new(),
+            rocks: Vec::new(),
+            rock_cd: t::ROCK_EVERY.1,
             kongi_fight: false,
             dream: false,
             charm_pool: crate::journal::charm_pool(
@@ -745,6 +756,96 @@ impl World {
             c.time += dt;
         }
         self.clouds.retain(|c| c.time < t::SPORE_CLOUD_TIME);
+        // 무너지는 천장(0147): 심층 싸움방에서 문이 잠긴 동안(보스·꿈은 빼고) 몇 초마다 돌 하나.
+        // 플레이어 둘레가 많고, 가끔 적 둘레에 떨어져 적도 맞는다. 땅속은 괜찮다.
+        let quake = self.adv.place == Place::Dungeon
+            && self.biome == Biome::Deep
+            && self.room.doors_locked()
+            && !self.dream
+            && !self.enemies.iter().any(|e| e.is_boss());
+        if !quake {
+            self.rock_cd = self.rock_cd.max(t::ROCK_EVERY.0);
+        } else if !frozen {
+            self.rock_cd -= dt;
+            if self.rock_cd <= 0.0 {
+                self.rock_cd = rand::gen_range(t::ROCK_EVERY.0, t::ROCK_EVERY.1);
+                let foes: Vec<Vec2> = self
+                    .enemies
+                    .iter()
+                    .filter(|e| e.alive && !e.asleep && !e.flying())
+                    .map(|e| e.pos)
+                    .collect();
+                let base = if !foes.is_empty() && rand::gen_range(0.0, 1.0) < 0.4 {
+                    foes[rand::gen_range(0, foes.len())]
+                } else {
+                    self.player.pos
+                };
+                let a = rand::gen_range(0.0, std::f32::consts::TAU);
+                let mut p = base + Vec2::from_angle(a) * rand::gen_range(0.0, t::ROCK_SPREAD);
+                self.room.resolve_circle(&mut p, 6.0);
+                self.rocks.push(Rockfall { pos: p, time: 0.0 });
+            }
+        }
+        let mut landed = Vec::new();
+        for r in self.rocks.iter_mut().filter(|_| !frozen) {
+            r.time += dt;
+            if r.time >= t::ROCK_FALL {
+                landed.push(r.pos);
+            }
+        }
+        self.rocks.retain(|r| r.time < t::ROCK_FALL);
+        for &p in &landed {
+            sfx.play(sfx::Id::WallHit);
+            self.feel.add_trauma(0.18);
+            self.fx.push(ring(p, 3.0, t::ROCK_R + 3.0, 0.25, DIRT));
+            clods(&mut self.fx, p, 8, ROCK, 100.0);
+            puff(&mut self.fx, p, 3, self.biome.dust(), 7.0, 0.5);
+            for e in self.enemies.iter_mut().filter(|e| e.alive && e.hittable()) {
+                let rr = t::ROCK_R + e.radius();
+                if (e.pos - p).length_squared() > rr * rr {
+                    continue;
+                }
+                let away = (e.pos - p).normalize_or(vec2(1.0, 0.0));
+                e.hurt(t::ROCK_ENEMY_DAMAGE, away, 140.0, 0.8);
+                if !e.alive {
+                    self.kills += 1;
+                    deaths.push((e.pos, e.kind));
+                    sfx.play(sfx::Id::EnemyDie);
+                    burst(&mut self.fx, e.pos, 12, enemy_color(e.kind), 110.0);
+                    unravel(&mut self.fx, e.pos, e.radius());
+                }
+            }
+        }
+        // 가시뿌리 덤불(0147): 돌진하다 덤불에 박으면 찔려 멈춘다. 나는 박쥐·말린 고슴도치·보스는 그대로 지나간다.
+        if !self.room.thorns.is_empty() {
+            for e in self.enemies.iter_mut() {
+                let enemy::State::Charge { dir, .. } = e.state else {
+                    continue;
+                };
+                if e.flying() || e.guarding() || e.is_boss() {
+                    continue;
+                }
+                let rr = e.radius() + t::THORN_R - 2.0;
+                if !self
+                    .room
+                    .thorns
+                    .iter()
+                    .any(|c| (*c - e.pos).length_squared() <= rr * rr)
+                {
+                    continue;
+                }
+                e.hurt(t::THORN_ENEMY_DAMAGE, -dir, 60.0, t::THORN_STUN);
+                sfx.play(sfx::Id::EnemyHit);
+                self.fx.push(ring(e.pos, 2.0, 10.0, 0.15, THORN));
+                if !e.alive {
+                    self.kills += 1;
+                    deaths.push((e.pos, e.kind));
+                    sfx.play(sfx::Id::EnemyDie);
+                    burst(&mut self.fx, e.pos, 12, enemy_color(e.kind), 110.0);
+                    unravel(&mut self.fx, e.pos, e.radius());
+                }
+            }
+        }
         // 대장이 울부짖으면 양옆에 생쥐 떼(셋).
         if summon {
             sfx.play(sfx::Id::Shoot);
@@ -1079,6 +1180,27 @@ impl World {
                 }
             }
             if hurt_from.is_none() && !parried {
+                let rr = pr + t::ROCK_R;
+                if let Some(p) = landed
+                    .iter()
+                    .find(|p| (**p - ppos).length_squared() <= rr * rr)
+                {
+                    hurt_from = Some((*p, 1));
+                }
+            }
+            // 덤불은 걸어 들어갈 때만(땅속·드릴·깡충은 아래로·위로 지나간다).
+            if hurt_from.is_none() && !parried && self.player.on_foot() {
+                let rr = pr + t::THORN_R;
+                if let Some(c) = self
+                    .room
+                    .thorns
+                    .iter()
+                    .find(|c| (**c - ppos).length_squared() <= rr * rr)
+                {
+                    hurt_from = Some((*c, 1));
+                }
+            }
+            if hurt_from.is_none() && !parried {
                 let rr = pr + t::DOTO_MINE_RADIUS;
                 if let Some(p) = popped
                     .iter()
@@ -1389,6 +1511,9 @@ impl World {
 // ---- 팔레트(렌더와 공유) ---------------------------------------------------------
 pub const MOLE: Color = Color::new(0.90, 0.71, 0.47, 1.0);
 pub const DIRT: Color = Color::new(0.55, 0.40, 0.28, 1.0);
+/// 가시뿌리 덤불(0147)·무너지는 돌.
+pub const THORN: Color = Color::new(0.52, 0.34, 0.58, 1.0);
+pub const ROCK: Color = Color::new(0.46, 0.42, 0.44, 1.0);
 pub const PROJECTILE: Color = Color::new(1.0, 0.85, 0.30, 1.0);
 /// 분노 게이지·드릴 불꽃(주황).
 pub const RAGE: Color = Color::new(1.0, 0.55, 0.22, 1.0);
