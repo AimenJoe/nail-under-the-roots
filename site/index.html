@@ -4,22 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Naïl: Under the Roots</title>
-<meta name="description" content="아기 두더지 나일이 뿌리를 따라 땅속으로 내려가는 귀여운 탑다운 액션 로그라이트. 브라우저에서 바로, Android에서도.">
+<meta name="description" content="아기 두더지 나일이 뿌리를 따라 땅속으로 내려가는 귀여운 탑다운 액션 로그라이트. 브라우저에서 바로, Android에서도. 무료.">
 <link rel="icon" href="img/favicon.png" type="image/png">
 <link rel="alternate" hreflang="ko" href="https://aimenjoe.github.io/nail-under-the-roots/">
 <link rel="alternate" hreflang="en" href="https://aimenjoe.github.io/nail-under-the-roots/en/">
 <meta property="og:title" content="Naïl: Under the Roots">
 <meta property="og:description" content="큰 나무가 시들어 간다. 아기 두더지 나일이 처음으로 혼자 굴을 나선다.">
-<meta property="og:image" content="https://aimenjoe.github.io/nail-under-the-roots/img/s_village.png">
+<meta property="og:image" content="https://aimenjoe.github.io/nail-under-the-roots/img/i_title.png">
 <meta property="og:type" content="website">
+<meta name="theme-color" content="#17130f">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<a class="skip" href="#story">본문으로</a>
 <header class="top">
   <div class="wrap">
     <a class="brand" href="./"><img class="px" src="img/favicon.png" alt="" width="24" height="24">Naïl</a>
     <nav aria-label="페이지 안">
-      <a href="#about">소개</a>
+      <a href="#fight">싸움</a>
+      <a href="#zones">지대</a>
       <a href="#cast">이웃들</a>
       <a href="#play">해 보기</a>
       <a href="#news">소식</a>
@@ -28,143 +31,315 @@
   </div>
 </header>
 
+<!-- 깊이 눈금(0155): 스크롤하면 나일이 땅속으로 내려간다(site.js). 넓은 화면에서만 -->
+<aside class="depth" aria-hidden="true">
+  <ol>
+    <li data-for="top">땅 위</li>
+    <li data-for="story">굴</li>
+    <li data-for="zones">뿌리</li>
+    <li data-for="deep">심층</li>
+    <li data-for="play">가장 깊은 곳</li>
+  </ol>
+  <span class="depth-mole sprite" style="--sp: url(img/sp_nail.png); --n: 4"></span>
+</aside>
+
 <main>
-  <section class="wrap hero">
-    <figure><img class="px" src="img/i_great_tree.png" alt="잎이 거의 없는 큰 나무와, 그 뿌리 사이로 번진 보라색 실" width="640" height="560"></figure>
+  <section class="hero" id="top" data-depth="top">
+    <img class="hero-bg px" src="img/i_title.png" alt="노을 진 들판 아래 굴에서 잠든 아기 두더지와 반딧불 병, 오른쪽에는 보라 실이 뿌리에 감긴 큰 나무" width="640" height="360">
+    <div class="flies" data-flies="14"></div>
     <div class="hero-text">
       <p class="eyebrow">귀여운 탑다운 액션 로그라이트</p>
       <h1 class="logo">Naïl<small>Under the Roots</small></h1>
-      <p class="lede">땅 위의 큰 나무는 올봄 잎을 거의 틔우지 못했다. 그 아래, 뿌리 사이로 낯선 보라색 실이 번져 갔다. 그날은 아기 두더지 <b>나일</b>이 처음으로 혼자 굴을 나서는 날이었다.</p>
+      <p class="lede">큰 나무가 시들어 간다. 뿌리 사이로 보라색 실이 번졌다. 아기 두더지 <b>나일</b>이 처음으로 혼자 굴을 나선다.</p>
       <div class="cta">
         <a class="btn" href="https://nail-under-the-roots.netlify.app" target="_blank" rel="noopener">브라우저에서 하기</a>
         <a class="btn alt" data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">Android APK</a>
       </div>
       <p class="meta">무료 · 설치 없이 · 키보드 · 게임패드 · 터치 · 최신 <b data-latest-version>v0.3.2</b> (<span data-latest-date>2026-10-27</span>)</p>
     </div>
+    <a class="scroll-hint" href="#story">땅속으로 ▼</a>
   </section>
 
-  <section class="wrap features" id="about" aria-label="소개">
-    <article class="feature">
-      <img class="shot px" src="img/s_fight.png" alt="풀밭에서 나일이 물든 들쥐·청설모와 싸우는 장면. 바닥에 돌진 예고선이 보인다" width="960" height="540" loading="lazy">
+  <div class="parade" aria-hidden="true">
+    <span class="sprite walker" style="--sp: url(img/sp_nail.png); --n: 4"></span>
+    <span class="sprite walker w2" style="--sp: url(img/sp_popo.png); --n: 2"></span>
+  </div>
+
+  <section class="layer-burrow section" id="story" data-depth="story">
+    <div class="wrap split">
+      <figure class="frame"><img class="px" src="img/i_mother_burrow.png" alt="둥근 굴 안에서 엄마 두더지가 아기 두더지 나일에게 코를 맞대고 있다. 굴 입구로 빛이 들어온다" width="640" height="360" loading="lazy"></figure>
       <div class="copy">
+        <p class="tag">이야기</p>
+        <h2>땅속 이웃들이 하나씩 홀려 간다</h2>
+        <p>올봄 큰 나무는 잎을 거의 틔우지 못했다. 뿌리를 타고 번진 보라색 실은 땅속 이웃들을 하나씩 감아, 길을 막게 만들었다.</p>
+        <p>나일은 엄마 굴을 떠나 길잡이 라쿤 <b>포포</b>와 함께 뿌리를 따라 내려간다. 홀린 이웃을 쓰러뜨리면 실이 풀리고, 이웃이 깨어난다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-burrow section" id="fight" data-depth="story">
+    <div class="wrap">
+      <header class="head">
         <p class="tag">싸움</p>
         <h2>파고들고, 솟구치고, 할퀴고</h2>
-        <p>땅속으로 파고들어 공격을 피하고, 솟구치며 들이받은 뒤 발톱 3연타. 세 번째가 가장 묵직하다. 적이 휘두르는 순간에 맞받아치면 튕겨 낸다(패링). 게이지가 차면 화면을 가로지르는 드릴.</p>
-      </div>
-    </article>
-    <article class="feature">
-      <img class="shot px" src="img/s_deep.png" alt="파란 버섯이 빛나는 어두운 굴에서 물든 청설모 도토와 맞선 장면" width="960" height="540" loading="lazy">
-      <div class="copy">
-        <p class="tag">길</p>
-        <h2>매번 다른 갈래 길</h2>
-        <p>쉼터에서 길 지도를 펴고 다음 굴을 고른다. 굴은 매번 새로 파이고, 세 길 끝마다 뿌리에 홀린 이웃이 길을 막고 있다. 쓰러져도 맡긴 반딧불은 남는다.</p>
-      </div>
-    </article>
-    <article class="feature">
-      <img class="shot px" src="img/s_village.png" alt="꽃이 핀 큰 나무 아래 마을. 이웃들과 꾸민 소품이 보인다" width="960" height="540" loading="lazy">
-      <div class="copy">
-        <p class="tag">마을</p>
-        <h2>돌아오는 이웃, 다시 피는 큰 나무</h2>
-        <p>홀렸던 이웃을 깨우면 큰 나무 아래 마을로 돌아온다. 모은 반딧불로 큰 나무의 재주를 깨우고, 씨앗으로 마을을 꾸민다. 깰수록 잎이 돋고, 끝내 꽃이 핀다.</p>
-      </div>
-    </article>
-  </section>
-
-  <section class="wrap section" id="cast">
-    <header>
-      <h2>이웃들</h2>
-      <p>땅속에 사는 이웃들. 몇은 뿌리의 보라색 실에 홀려 있다.</p>
-    </header>
-    <ul class="cast">
-      <li><img class="px" src="img/p_nail.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">아기 두더지</p><h3>나일</h3><p>오늘 처음으로 혼자 굴을 나선다. 발톱과 굴파기가 특기.</p></div></li>
-      <li><img class="px" src="img/p_popo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">라쿤</p><h3>포포</h3><p>길잡이이자 쉼터 가게 주인. 씨앗을 받고 물건을 판다.</p></div></li>
-      <li><img class="px" src="img/p_bori.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">들쥐 대장</p><h3>보리</h3><p>들쥐 마을의 늙은 대장. 남쪽 공터를 지키고 있다.</p></div></li>
-      <li><img class="px" src="img/p_momo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">굴토끼</p><h3>모모</h3><p>첫 길 끝에서 세 번 만난다. 나중엔 직접 데리고 내려갈 수 있다.</p></div></li>
-      <li><img class="px" src="img/p_doto.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">청설모</p><h3>도토</h3><p>둘째 길 끝, 뿌리 엉킨 곳. 묻어 둔 것은 아무에게도 안 준다.</p></div></li>
-      <li><img class="px" src="img/p_kongi.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">세띠아르마딜로</p><h3>콩이</h3><p>깊은 곳의 문지기. 아무도 못 지나가게 몸을 만다.</p></div></li>
-      <li><img class="px" src="img/p_halmae.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">누룩 할매</p><h3>할매</h3><p>실을 뜨는 버섯 할매. 실뜨기로 다음 런의 어려움을 고른다.</p></div></li>
-      <li><img class="px" src="img/p_susu.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">땅강아지 장인</p><h3>수수</h3><p>첫 쉼터 그루터기 곁. 새싹 발톱을 만들어 준다.</p></div></li>
-    </ul>
-  </section>
-
-  <section class="wrap section" id="more">
-    <header>
-      <h2>더 있는 것</h2>
-    </header>
-    <ul class="more">
-      <li><b>지대마다 다른 굴</b><span>뿌리 지대는 땃쥐·두꺼비와 가시 덤불, 심층은 박쥐·포자버섯과 무너지는 천장. 실타래 칸의 센 이웃을 풀면 장신구.</span></li>
-      <li><b>두 번째 캐릭터, 모모</b><span>뒷발차기, 깡충 피하기, 이어 뛰기로 세 번 밟기.</span></li>
-      <li><b>큰 나무의 재주</b><span>맡긴 반딧불로 깨우는 영구 재주. 자리마다 두 갈래 중 하나, 캐릭터마다 다르다.</span></li>
-      <li><b>실뜨기 1~10단계</b><span>깰 때마다 한 단계씩 열리는 어려움. 캐릭터마다 따로.</span></li>
-      <li><b>오늘의 굴</b><span>날짜마다 같은 굴. 그날 가장 멀리 간 기록이 남는다.</span></li>
-      <li><b>실의 꿈</b><span>이긴 길의 주인과 꿈속에서 다시 싸우기.</span></li>
-      <li><b>저널 · 도감 · 앨범</b><span>런을 넘는 목표와 보상, 만난 적, 본 그림.</span></li>
-      <li><b>포포의 응원 · 편하게 하기</b><span>쓰러질수록 받는 피해가 줄어드는 도움 모드. 화면 흔들림·입자 효과 줄이기, 버튼 다시 붙이기.</span></li>
-      <li><b>열한 언어</b><span>한국어 · English · 日本語 · 简体中文 · 繁體中文 · Português · Français · Español · Deutsch · Русский · Polski.</span></li>
-    </ul>
-    <div class="gallery">
-      <figure><img class="px" src="img/s_camp.png" alt="모닥불 둘레에 이웃이 모인 뿌리 밑 쉼터" width="960" height="540" loading="lazy"><figcaption>쉼터: 길이 끝날 때마다 내려오는 뿌리 밑 빈터</figcaption></figure>
-      <figure><img class="px" src="img/s_story.png" alt="어두운 굴에서 홀린 굴토끼가 말을 거는 대화창" width="960" height="540" loading="lazy"><figcaption>"또 너야. 돌아가라고 했잖아."</figcaption></figure>
-      <figure><img class="px" src="img/i_molehill.png" alt="풀밭 위 두더지 굴 둔덕들과 작은 나무" width="640" height="360" loading="lazy"><figcaption>컷씬 일러스트</figcaption></figure>
-    </div>
-  </section>
-
-  <section class="wrap section" id="play">
-    <header>
-      <h2>해 보기</h2>
-      <p>아직 만드는 중이다(v0.2). 움직이는 캐릭터는 임시 그림, 배경·소품은 Sunnyside World 팩, 대화 초상화·컷씬 일러스트는 이미지 생성 모델로 그린 원본을 도트로 옮긴 것이다. 음악·효과음은 CC0. 기록은 브라우저(웹)나 기기(Android)에 남는다.</p>
-    </header>
-    <div class="play">
-      <div>
-        <h3>브라우저</h3>
-        <p>PC·맥·폰 브라우저에서 바로. 키보드나 게임패드가 가장 편하다. 폰은 화면 버튼으로.</p>
-        <p><a href="https://nail-under-the-roots.netlify.app" target="_blank" rel="noopener">nail-under-the-roots.netlify.app</a></p>
-      </div>
-      <div>
-        <h3>Android</h3>
-        <ul>
-          <li>릴리스에서 <code>nail.apk</code>(arm64)를 받는다.</li>
-          <li>"출처를 알 수 없는 앱" 설치를 한 번 허락한다.</li>
-          <li>새 버전은 지우지 않고 덮어 설치하면 기록이 남는다.</li>
+        <p>두더지라서 할 수 있는 싸움. 손에 익을수록 빨라진다.</p>
+      </header>
+      <div class="fight">
+        <figure class="frame"><img class="px" src="img/s_fight.png" alt="풀밭에서 나일이 물든 들쥐·청설모와 싸우는 장면. 바닥에 돌진 예고선이 보인다" width="960" height="540" loading="lazy"></figure>
+        <ul class="moves">
+          <li><span class="keys"><kbd>J</kbd></span><b>발톱 3연타</b><span>세 번째가 가장 묵직하다. 발톱은 넷(새싹·두더지·바위·독).</span></li>
+          <li><span class="keys"><kbd>K</kbd></span><b>굴파기 → 솟구치기</b><span>땅속으로 숨어 공격을 흘리고, 튀어나오며 들이받는다. 누르고 있으면 더 오래 숨는다.</span></li>
+          <li><span class="keys"><kbd>J</kbd></span><b>패링</b><span>적이 휘두르는 순간 맞받아치면 튕겨 낸다.</span></li>
+          <li><span class="keys"><kbd>L</kbd></span><b>드릴</b><span>게이지가 차면 화면 한 폭을 가로지르는 필살기.</span></li>
         </ul>
-        <p><a data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">최신 APK 받기</a></p>
-      </div>
-      <div class="keys">
-        <h3>조작(기본)</h3>
-        <table>
-          <thead><tr><th>동작</th><th>키보드</th><th>게임패드</th></tr></thead>
-          <tbody>
-            <tr><td>이동</td><td><kbd>WASD</kbd> / 화살표</td><td>왼쪽 스틱</td></tr>
-            <tr><td>공격(3연타)</td><td><kbd>J</kbd></td><td>X</td></tr>
-            <tr><td>굴파기 → 솟구침</td><td><kbd>K</kbd></td><td>A</td></tr>
-            <tr><td>필살기</td><td><kbd>L</kbd></td><td>B</td></tr>
-            <tr><td>먹기 / 넘기기</td><td><kbd>I</kbd> / <kbd>Q</kbd>·<kbd>E</kbd></td><td>Y / LB·RB</td></tr>
-            <tr><td>메뉴</td><td><kbd>Esc</kbd></td><td>Start</td></tr>
-          </tbody>
-        </table>
-        <p>설정 → 조작 설정에서 바꿀 수 있다.</p>
       </div>
     </div>
   </section>
 
-  <section class="wrap section" id="news">
-    <header>
-      <h2>소식</h2>
-    </header>
-    <ul class="news" data-news>
-      <li><span class="v">v0.3.2</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.2">쉼터마다 다른 지도, 피아노·바이올린 음악, 안내 키캡</a></li>
-      <li><span class="v">v0.3.1</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.1">드릴 속도, 그림자, '안 됨' 알림, 색약에게도 보이는 위험 표시</a></li>
-      <li><span class="v">v0.3.0</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.0">새 잡몹 다섯, 지대 장애물, 실타래 칸</a></li>
-      <li><span class="v">v0.2.4</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.2.4">쉼터 보리 그림자, 공식 페이지 새 스크린숏</a></li>
-    </ul>
-    <p><a href="https://github.com/AimenJoe/nail-under-the-roots/releases">모든 릴리스</a></p>
+  <section class="layer-roots section" id="zones" data-depth="zones">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">지대</p>
+        <h2>내려갈수록 어두워지는 세 지대</h2>
+        <p>지대마다 사는 동물이 다르고, 바닥이 위험해진다. 실제 동물의 습성에서 꺼낸 적들이다.</p>
+      </header>
+      <ol class="zones">
+        <li class="zone">
+          <img class="px shot" src="img/s_meadow.png" alt="" width="960" height="540" loading="lazy">
+          <div>
+            <h3><span class="z-n">1</span>꽃 핀 입구</h3>
+            <p>밝은 풀밭. 물든 들쥐 떼, 도토리를 던지는 다람쥐, 덮치는 청설모.</p>
+            <p class="crit"><span class="sprite" style="--sp: url(img/sp_rat.png); --n: 2" title="들쥐"></span><span class="sprite" style="--sp: url(img/sp_squirrel.png); --n: 2" title="다람쥐"></span></p>
+          </div>
+        </li>
+        <li class="zone">
+          <img class="px shot" src="img/s_roots.png" alt="" width="960" height="540" loading="lazy">
+          <div>
+            <h3><span class="z-n">2</span>뿌리 지대</h3>
+            <p>혀를 쭉 내미는 <b>두꺼비</b>, 두 번 연달아 무는 <b>땃쥐</b>, 몸을 말아 굴러오는 <b>고슴도치</b>. 바닥엔 <b>가시뿌리 덤불</b>.</p>
+            <p class="crit"><span class="sprite" style="--sp: url(img/sp_toad.png); --n: 2" title="두꺼비"></span><span class="sprite" style="--sp: url(img/sp_shrew.png); --n: 2" title="땃쥐"></span><span class="sprite" style="--sp: url(img/sp_hedgehog.png); --n: 2" title="고슴도치"></span></p>
+          </div>
+        </li>
+        <li class="zone" id="deep" data-depth="deep">
+          <img class="px shot" src="img/s_mobs.png" alt="" width="960" height="540" loading="lazy">
+          <div>
+            <h3><span class="z-n">3</span>어두운 심층</h3>
+            <p>빛은 나일 곁뿐. 솟구치기가 닿지 않는 <b>박쥐</b>, 포자 구름을 뿜는 <b>포자버섯</b>. 싸우는 동안 <b>천장이 무너진다</b>.</p>
+            <p class="crit"><span class="sprite" style="--sp: url(img/sp_bat.png); --n: 4" title="박쥐"></span><span class="sprite" style="--sp: url(img/sp_sporecap.png); --n: 2" title="포자버섯"></span></p>
+          </div>
+        </li>
+      </ol>
+      <p class="note">길 지도의 <b>실타래</b> 칸에는 실에 단단히 감긴 센 적이 기다린다. 풀어 주면 장신구를 준다.</p>
+    </div>
+  </section>
+
+  <section class="layer-roots section" id="route" data-depth="zones">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">길 · 쉼터</p>
+        <h2>매번 다른 갈래 길, 길마다 다른 쉼터</h2>
+        <p>쉼터에서 길 지도를 펴고 다음 굴을 고른다. 굴은 매번 새로 파인다. 쉼터는 세 곳이고 구석마다 숨은 자리가 있다. 쓰러져도 맡긴 반딧불은 남고, 두 번째 런부터는 굴 입구 곁에서 바로 시작한다.</p>
+      </header>
+      <div class="gallery">
+        <figure class="frame"><img class="px" src="img/s_camp.png" alt="모닥불 둘레에 이웃이 모인 첫 쉼터" width="960" height="540" loading="lazy"><figcaption>첫 쉼터</figcaption></figure>
+        <figure class="frame"><img class="px" src="img/s_camp2.png" alt="뿌리가 얽힌 동굴 쉼터" width="960" height="540" loading="lazy"><figcaption>뿌리 동굴</figcaption></figure>
+        <figure class="frame"><img class="px" src="img/s_camp3.png" alt="파란 버섯이 빛나는 어두운 버섯 숲 쉼터" width="960" height="540" loading="lazy"><figcaption>버섯 숲</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="cast" data-depth="deep">
+    <div class="flies" data-flies="8"></div>
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">이웃들</p>
+        <h2>깨운 이웃은 마을로 돌아온다</h2>
+        <p>길 끝마다 실에 홀린 이웃이 길을 막고 있다. 깨운 이웃은 큰 나무 아래 마을에서 다시 산다.</p>
+      </header>
+      <ul class="cast">
+        <li><img class="px" src="img/p_nail.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">아기 두더지</p><h3>나일</h3><p>오늘 처음으로 혼자 굴을 나선다. 발톱과 굴파기가 특기.</p></div></li>
+        <li><img class="px" src="img/p_popo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">라쿤</p><h3>포포</h3><p>길잡이이자 쉼터 가게 주인. 씨앗을 받고 물건을 판다.</p></div></li>
+        <li><img class="px" src="img/p_bori.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">들쥐 대장</p><h3>보리</h3><p>들쥐 마을의 늙은 대장. 남쪽 공터를 지키고 있다.</p></div></li>
+        <li><img class="px" src="img/p_momo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">굴토끼</p><h3>모모</h3><p>첫 길 끝에서 세 번 만난다. 나중엔 직접 데리고 내려갈 수 있다.</p></div></li>
+        <li><img class="px" src="img/p_doto.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">청설모</p><h3>도토</h3><p>둘째 길 끝, 뿌리 엉킨 곳. 묻어 둔 것은 아무에게도 안 준다.</p></div></li>
+        <li><img class="px" src="img/p_kongi.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">세띠아르마딜로</p><h3>콩이</h3><p>깊은 곳의 문지기. 아무도 못 지나가게 몸을 만다.</p></div></li>
+        <li><img class="px" src="img/p_halmae.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">누룩 할매</p><h3>할매</h3><p>실을 뜨는 버섯 할매. 실뜨기로 다음 런의 어려움을 고른다.</p></div></li>
+        <li><img class="px" src="img/p_susu.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">땅강아지 장인</p><h3>수수</h3><p>첫 쉼터 그루터기 곁. 새싹 발톱을 만들어 준다.</p></div></li>
+      </ul>
+      <div class="split">
+        <figure class="frame"><img class="px" src="img/s_village.png" alt="꽃이 핀 큰 나무 아래 마을. 이웃들과 꾸민 소품이 보인다" width="960" height="540" loading="lazy"></figure>
+        <div class="copy">
+          <p class="tag">마을</p>
+          <h3>다시 피는 큰 나무</h3>
+          <p>모은 반딧불로 큰 나무의 재주를 깨우고, 씨앗으로 마을을 꾸민다. 이웃을 깨울수록 잎이 돋고, 끝내 꽃이 핀다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="two" data-depth="deep">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">두 캐릭터</p>
+        <h2>발톱의 나일, 뒷발의 모모</h2>
+      </header>
+      <div class="duo">
+        <article>
+          <span class="sprite big" style="--sp: url(img/sp_nail.png); --n: 4"></span>
+          <h3>나일</h3>
+          <p>발톱 3연타, 땅속으로 숨는 굴파기, 솟구치기, 드릴.</p>
+        </article>
+        <article>
+          <span class="sprite big" style="--sp: url(img/sp_momo.png); --n: 2"></span>
+          <h3>모모</h3>
+          <p>뒷발차기, 깡충 피하기, 이어 뛰며 세 번 밟기. 모모만의 재주와 장신구가 따로 있다.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="more" data-depth="deep">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">더 있는 것</p>
+        <h2>오래 내려갈 이유</h2>
+      </header>
+      <ul class="more">
+        <li><b>큰 나무의 재주</b><span>맡긴 반딧불로 깨우는 영구 재주. 자리마다 두 갈래 중 하나, 캐릭터마다 다르다.</span></li>
+        <li><b>실뜨기 1~10단계</b><span>깰 때마다 한 단계씩 열리는 어려움. 캐릭터마다 따로.</span></li>
+        <li><b>오늘의 굴</b><span>날짜마다 같은 굴. 그날 가장 멀리 간 기록이 남는다.</span></li>
+        <li><b>실의 꿈</b><span>이긴 길의 주인과 꿈속에서 다시 싸우기.</span></li>
+        <li><b>저널 · 도감 · 앨범</b><span>런을 넘는 목표와 보상, 만난 적 열네 종, 본 그림.</span></li>
+        <li><b>저장 슬롯 셋 · 쉼터에서 이어하기</b><span>쉼터까지 온 런은 껐다 켜도 이어진다.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="sound" data-depth="deep">
+    <div class="wrap split">
+      <div class="copy">
+        <p class="tag">소리</p>
+        <h2>쉬는 곳은 피아노와 바이올린, 모험은 칩튠</h2>
+        <p>타이틀은 바이올린과 하프, 마을은 피아노와 바이올린, 쉼터는 피아노 왈츠. 들판과 굴, 보스는 레트로 칩튠으로 긴장을 올린다. 대사와 메뉴에서는 음악이 살짝 물러난다.</p>
+      </div>
+      <ul class="credits">
+        <li><b>Prologue Theme</b><span>Cleyton Kauffman · 타이틀</span></li>
+        <li><b>Lovely town</b><span>fluffclipse · 마을</span></li>
+        <li><b>Snowfall</b><span>Kistol · 쉼터</span></li>
+        <li><b>15 Melodic RPG Chiptunes</b><span>Aureolus_Omicron · 들판·굴·보스</span></li>
+        <li><b>효과음</b><span>Kenney</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="access" data-depth="deep">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">누구나</p>
+        <h2>편하게, 내 방식대로</h2>
+      </header>
+      <ul class="more">
+        <li><b>키보드 · 게임패드 · 터치</b><span>지금 쓰는 장치에 맞춰 안내의 버튼 이름이 바뀐다. 버튼은 설정에서 다시 붙인다.</span></li>
+        <li><b>포포의 응원</b><span>쓰러질수록 받는 피해가 줄어드는 도움 모드.</span></li>
+        <li><b>색약에게도 보이게</b><span>위험·공격 예고·"안 돼" 표시는 색만이 아니라 밝기와 모양으로도 알 수 있다(색약 시뮬레이션으로 확인).</span></li>
+        <li><b>흔들림 · 입자 줄이기</b><span>화면 흔들림과 입자 효과를 설정에서 줄인다.</span></li>
+      </ul>
+      <ul class="langs" aria-label="열한 언어">
+        <li lang="ko">한국어</li><li lang="en">English</li><li lang="ja">日本語</li><li lang="zh-Hans">简体中文</li><li lang="zh-Hant">繁體中文</li><li lang="pt-BR">Português</li><li lang="fr">Français</li><li lang="es">Español</li><li lang="de">Deutsch</li><li lang="ru">Русский</li><li lang="pl">Polski</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="layer-core section" id="play" data-depth="play">
+    <div class="flies" data-flies="6"></div>
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">해 보기</p>
+        <h2>지금 바로, 무료로</h2>
+        <p>아직 만드는 중이다. 기록은 브라우저(웹)나 기기(Android)에 남는다.</p>
+      </header>
+      <div class="play">
+        <div>
+          <h3>브라우저</h3>
+          <p>PC·맥·폰 브라우저에서 바로. 키보드나 게임패드가 가장 편하다. 폰은 화면 버튼으로.</p>
+          <p><a class="btn small" href="https://nail-under-the-roots.netlify.app" target="_blank" rel="noopener">브라우저에서 하기</a></p>
+        </div>
+        <div>
+          <h3>Android</h3>
+          <ul>
+            <li>릴리스에서 <code>nail.apk</code>(arm64)를 받는다.</li>
+            <li>"출처를 알 수 없는 앱" 설치를 한 번 허락한다.</li>
+            <li>새 버전은 지우지 않고 덮어 설치하면 기록이 남는다.</li>
+          </ul>
+          <p><a class="btn small alt" data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">최신 APK 받기</a></p>
+        </div>
+        <div class="keytable">
+          <h3>조작(기본)</h3>
+          <table>
+            <thead><tr><th>동작</th><th>키보드</th><th>게임패드</th></tr></thead>
+            <tbody>
+              <tr><td>이동</td><td><kbd>WASD</kbd> <kbd>←↑↓→</kbd></td><td>왼쪽 스틱</td></tr>
+              <tr><td>공격(3연타)</td><td><kbd>J</kbd></td><td><kbd>X</kbd></td></tr>
+              <tr><td>굴파기 → 솟구침</td><td><kbd>K</kbd></td><td><kbd>A</kbd></td></tr>
+              <tr><td>필살기</td><td><kbd>L</kbd></td><td><kbd>B</kbd></td></tr>
+              <tr><td>먹기 / 넘기기</td><td><kbd>I</kbd> / <kbd>Q</kbd> <kbd>E</kbd></td><td><kbd>Y</kbd> / <kbd>LB</kbd> <kbd>RB</kbd></td></tr>
+              <tr><td>지도 / 메뉴</td><td><kbd>M</kbd> / <kbd>Esc</kbd></td><td><kbd>Select</kbd> / <kbd>Start</kbd></td></tr>
+            </tbody>
+          </table>
+          <p>조준은 오른쪽 스틱. 설정 → 조작 설정에서 바꿀 수 있다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-core section" id="next" data-depth="play">
+    <div class="wrap split">
+      <div class="copy">
+        <p class="tag">다음</p>
+        <h2>v0.4 "깊은 곳"을 만드는 중</h2>
+        <p>더 깊은 새 길과 그 끝의 이웃, 그리고 가장 깊은 곳의 마지막 싸움. 해 보고 느낀 점은 언제든 <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">의견·버그 알리기</a>로.</p>
+      </div>
+      <dl class="facts">
+        <div><dt>장르</dt><dd>탑다운 액션 로그라이트</dd></div>
+        <div><dt>플랫폼</dt><dd>웹 브라우저 · Android (iOS 준비 중)</dd></div>
+        <div><dt>가격</dt><dd>무료</dd></div>
+        <div><dt>언어</dt><dd>11개</dd></div>
+        <div><dt>만든 곳</dt><dd>Beardworks</dd></div>
+        <div><dt>엔진</dt><dd>Rust + macroquad (소스 공개)</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="layer-core section" id="faq" data-depth="play">
+    <div class="wrap">
+      <header class="head"><p class="tag">자주 묻는 것</p><h2>궁금한 것</h2></header>
+      <div class="faq">
+        <details><summary>기록은 어디에 남나요?</summary><p>웹은 그 브라우저에, Android는 기기에 남는다. 저장 슬롯은 셋이다. 브라우저 데이터를 지우면 웹 기록도 지워진다.</p></details>
+        <details><summary>게임패드가 되나요?</summary><p>된다. PC·폰 브라우저와 Android에서 패드를 쓸 수 있다. 패드가 붙은 Android 핸드헬드를 염두에 두고 만들었다. iOS는 아직 패드가 안 된다.</p></details>
+        <details><summary>폰에서도 되나요?</summary><p>된다. 화면에 이동 스틱과 버튼이 나온다. 다만 키보드·패드가 가장 편하다.</p></details>
+        <details><summary>어렵나요?</summary><p>쓰러지며 배우는 게임이지만, 쓰러질수록 피해가 줄어드는 "포포의 응원"을 켤 수 있다. 익숙해지면 실뜨기로 어려움을 올린다.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-core section" id="news" data-depth="play">
+    <div class="wrap">
+      <header class="head"><p class="tag">소식</p><h2>업데이트</h2></header>
+      <ul class="news" data-news>
+        <li><span class="v">v0.3.2</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.2">쉼터마다 다른 지도, 피아노·바이올린 음악, 안내 키캡</a></li>
+        <li><span class="v">v0.3.1</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.1">드릴 속도, 그림자, '안 됨' 알림, 색약에게도 보이는 위험 표시</a></li>
+        <li><span class="v">v0.3.0</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.0">새 잡몹 다섯, 지대 장애물, 실타래 칸</a></li>
+        <li><span class="v">v0.2.4</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.2.4">쉼터 보리 그림자, 공식 페이지 새 스크린숏</a></li>
+      </ul>
+      <p><a href="https://github.com/AimenJoe/nail-under-the-roots/releases">모든 릴리스</a></p>
+    </div>
   </section>
 </main>
 
-<footer>
+<footer class="layer-core">
   <div class="wrap">
     <p>© 2026 Beardworks · <a href="https://github.com/AimenJoe/nail-under-the-roots">소스 코드(GitHub)</a> · <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">의견·버그 알리기</a></p>
-    <p>환경 그림: <a href="https://danieldiggle.itch.io/sunnyside">Sunnyside World</a> by danieldiggle. 글꼴: <a href="https://github.com/quiple/galmuri">Galmuri</a>(SIL OFL 1.1). 일러스트 바탕: Friedrich·Korb·Blum·Robert 등 퍼블릭 도메인·CC0 그림(<a href="https://github.com/AimenJoe/nail-under-the-roots/blob/main/assets/LICENSES.md">출처</a>). 나머지 그림은 임시로 코드로 그렸다.</p>
+    <p>대화 초상화·컷씬 일러스트·타이틀 바탕은 Google Gemini 이미지 모델(나노바나나)로 그린 원본을 도트로 옮긴 것이다(SynthID 워터마크 포함). 움직이는 캐릭터는 코드로 그린 임시 그림이다. 환경 그림: <a href="https://danieldiggle.itch.io/sunnyside">Sunnyside World</a> by danieldiggle. 음악: Cleyton Kauffman · fluffclipse · Kistol · Aureolus_Omicron, 효과음: Kenney(모두 CC0). 글꼴: <a href="https://github.com/quiple/galmuri">Galmuri</a> · Ark Pixel · 俐方體11號(SIL OFL 1.1). <a href="https://github.com/AimenJoe/nail-under-the-roots/blob/main/assets/LICENSES.md">출처 전체</a></p>
   </div>
 </footer>
 <script src="site.js" defer></script>

@@ -1,4 +1,5 @@
-// 공식 페이지(0069): GitHub Releases에서 최신 버전·APK 주소·소식을 읽어 채운다.
+// 공식 페이지(0069, 0155): GitHub Releases에서 최신 버전·APK 주소·소식을 읽어 채운다.
+// 반딧불(.flies[data-flies])을 뿌리고, 깊이 눈금(.depth)에서 지금 층을 밝히고 나일을 스크롤만큼 내린다.
 // 읽지 못하면(오프라인·요청 제한) 페이지에 적어 둔 값과 릴리스 목록 링크가 그대로 남는다.
 (() => {
   const REPO = "AimenJoe/nail-under-the-roots";
@@ -41,4 +42,46 @@
       }
     })
     .catch(() => {});
+})();
+
+(() => {
+  // 반딧불: 자리·흔들림·깜빡임을 하나씩 다르게. 움직임 줄이기면 CSS가 멈춘다.
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  document.querySelectorAll("[data-flies]").forEach((box) => {
+    const n = Number(box.dataset.flies) || 8;
+    for (let i = 0; i < n; i++) {
+      const f = document.createElement("span");
+      f.className = "fly";
+      const st = f.style;
+      st.left = `${rnd(4, 96)}%`;
+      st.top = `${rnd(8, 88)}%`;
+      st.setProperty("--x1", `${rnd(-40, 40)}px`); st.setProperty("--y1", `${rnd(-30, 30)}px`);
+      st.setProperty("--x2", `${rnd(-40, 40)}px`); st.setProperty("--y2", `${rnd(-30, 30)}px`);
+      st.setProperty("--d", `${rnd(7, 13)}s`); st.setProperty("--b", `${rnd(2.2, 4.5)}s`);
+      st.setProperty("--delay", `${rnd(-8, 0)}s`);
+      box.append(f);
+    }
+  });
+
+  // 깊이 눈금: 페이지를 내려간 만큼 나일이 내려가고, 화면 가운데 있는 층의 이름이 밝아진다.
+  const depth = document.querySelector(".depth");
+  if (!depth) return;
+  const mole = depth.querySelector(".depth-mole");
+  const marks = [...depth.querySelectorAll("li")];
+  const sections = [...document.querySelectorAll("[data-depth]")];
+  let ticking = false;
+  const update = () => {
+    ticking = false;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    const p = max > 0 ? Math.min(1, scrollY / max) : 0;
+    mole.style.setProperty("--p", `${(p * 100).toFixed(1)}%`);
+    const mid = innerHeight / 2;
+    let cur = sections[0];
+    for (const s of sections) if (s.getBoundingClientRect().top < mid) cur = s;
+    const key = cur ? cur.dataset.depth : "top";
+    marks.forEach((m) => m.classList.toggle("on", m.dataset.for === key));
+  };
+  addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+  addEventListener("resize", update);
+  update();
 })();

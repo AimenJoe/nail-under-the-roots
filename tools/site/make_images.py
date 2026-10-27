@@ -31,8 +31,22 @@ PORTRAITS = {
     "susu": 33,
     "kongi": 36,
 }
-# 스포일러가 없는 일러스트만(오프닝·첫 굴).
-ILLUSTS = ["great_tree", "molehill"]
+# 스포일러가 없는 일러스트만(타이틀 바탕·오프닝의 엄마 굴).
+ILLUSTS = ["title", "mother_burrow"]
+# 페이지에서 걷는 스프라이트(0155): (시트, 줄, 첫 칸, 칸 수). 16×16 칸을 가로 띠로 잘라 CSS steps()로 돌린다.
+# nail.png 줄 0 = 서 있기 2 + 걷기 4, critters.png는 tools/art/critters.py 머리말의 줄 번호.
+SPRITES = {
+    "nail": ("nail.png", 0, 2, 4),
+    "momo": ("critters.png", 8, 2, 2),
+    "rat": ("critters.png", 0, 2, 2),
+    "squirrel": ("critters.png", 3, 2, 2),
+    "shrew": ("critters.png", 14, 2, 2),
+    "hedgehog": ("critters.png", 15, 2, 2),
+    "toad": ("critters.png", 16, 0, 2),
+    "bat": ("critters.png", 17, 0, 4),
+    "sporecap": ("critters.png", 18, 0, 2),
+    "popo": ("critters.png", 6, 2, 2),
+}
 
 
 def main() -> None:
@@ -43,6 +57,9 @@ def main() -> None:
         sheet.crop((x, y, x + CELL, y + CELL)).save(OUT / f"p_{name}.png", optimize=True)
     for name in ILLUSTS:
         shutil.copyfile(ART / "illust" / f"{name}.png", OUT / f"i_{name}.png")
+    for name, (sheet_name, row, first, n) in SPRITES.items():
+        sh = Image.open(ART / sheet_name).convert("RGBA")
+        sh.crop((first * 16, row * 16, (first + n) * 16, row * 16 + 16)).save(OUT / f"sp_{name}.png", optimize=True)
     # 파비콘: 나일 스프라이트 첫 칸(16×16).
     Image.open(ART / "nail.png").convert("RGBA").crop((0, 0, 16, 16)).save(OUT / "favicon.png")
     subset_font()

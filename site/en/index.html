@@ -4,22 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Naïl: Under the Roots</title>
-<meta name="description" content="A cute top-down action roguelite about a baby mole following the roots underground. Play in your browser or on Android.">
+<meta name="description" content="A cute top-down action roguelite about a baby mole following the roots underground. Free. Play in your browser or on Android.">
 <link rel="icon" href="../img/favicon.png" type="image/png">
 <link rel="alternate" hreflang="ko" href="https://aimenjoe.github.io/nail-under-the-roots/">
 <link rel="alternate" hreflang="en" href="https://aimenjoe.github.io/nail-under-the-roots/en/">
 <meta property="og:title" content="Naïl: Under the Roots">
 <meta property="og:description" content="The great tree is withering. A baby mole leaves the burrow alone for the first time.">
-<meta property="og:image" content="https://aimenjoe.github.io/nail-under-the-roots/img/s_village.png">
+<meta property="og:image" content="https://aimenjoe.github.io/nail-under-the-roots/img/i_title.png">
 <meta property="og:type" content="website">
+<meta name="theme-color" content="#17130f">
 <link rel="stylesheet" href="../style.css">
 </head>
 <body>
+<a class="skip" href="#story">Skip to content</a>
 <header class="top">
   <div class="wrap">
     <a class="brand" href="./"><img class="px" src="../img/favicon.png" alt="" width="24" height="24">Naïl</a>
     <nav aria-label="On this page">
-      <a href="#about">About</a>
+      <a href="#fight">Fight</a>
+      <a href="#zones">Zones</a>
       <a href="#cast">Neighbors</a>
       <a href="#play">Play</a>
       <a href="#news">News</a>
@@ -28,143 +31,314 @@
   </div>
 </header>
 
+<aside class="depth" aria-hidden="true">
+  <ol>
+    <li data-for="top">Surface</li>
+    <li data-for="story">Burrow</li>
+    <li data-for="zones">Roots</li>
+    <li data-for="deep">Depths</li>
+    <li data-for="play">Deepest</li>
+  </ol>
+  <span class="depth-mole sprite" style="--sp: url(../img/sp_nail.png); --n: 4"></span>
+</aside>
+
 <main>
-  <section class="wrap hero">
-    <figure><img class="px" src="../img/i_great_tree.png" alt="A great tree with almost no leaves, purple threads spreading between its roots" width="640" height="560"></figure>
+  <section class="hero" id="top" data-depth="top">
+    <img class="hero-bg px" src="../img/i_title.png" alt="A sunset meadow above a burrow where a baby mole sleeps beside a jar of glowbugs; on the right, a great tree with purple threads tangled in its roots" width="640" height="360">
+    <div class="flies" data-flies="14"></div>
     <div class="hero-text">
       <p class="eyebrow">A cute top-down action roguelite</p>
       <h1 class="logo">Naïl<small>Under the Roots</small></h1>
-      <p class="lede">The great tree above barely put out any leaves this spring. Below it, strange purple threads spread between the roots. That day, <b>Naïl</b> the baby mole left the burrow alone for the first time.</p>
+      <p class="lede">The great tree is withering. Purple threads have spread between its roots. <b>Naïl</b> the baby mole leaves the burrow alone for the first time.</p>
       <div class="cta">
         <a class="btn" href="https://nail-under-the-roots.netlify.app" target="_blank" rel="noopener">Play in browser</a>
         <a class="btn alt" data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">Android APK</a>
       </div>
       <p class="meta">Free · No install · Keyboard · Gamepad · Touch · Latest <b data-latest-version>v0.3.2</b> (<span data-latest-date>2026-10-27</span>)</p>
     </div>
+    <a class="scroll-hint" href="#story">Dig down ▼</a>
   </section>
 
-  <section class="wrap features" id="about" aria-label="About">
-    <article class="feature">
-      <img class="shot px" src="../img/s_fight.png" alt="Naïl fighting tainted field mice and squirrels on a meadow, a charge warning line on the ground" width="960" height="540" loading="lazy">
+  <div class="parade" aria-hidden="true">
+    <span class="sprite walker" style="--sp: url(../img/sp_nail.png); --n: 4"></span>
+    <span class="sprite walker w2" style="--sp: url(../img/sp_popo.png); --n: 2"></span>
+  </div>
+
+  <section class="layer-burrow section" id="story" data-depth="story">
+    <div class="wrap split">
+      <figure class="frame"><img class="px" src="../img/i_mother_burrow.png" alt="Inside a round burrow, a mother mole touches noses with baby Naïl as light falls through the entrance" width="640" height="360" loading="lazy"></figure>
       <div class="copy">
+        <p class="tag">Story</p>
+        <h2>One by one, the neighbors are taken</h2>
+        <p>This spring the great tree barely put out any leaves. Purple threads crept along its roots and wrapped the underground folk one by one, turning them against anyone who passes.</p>
+        <p>Naïl leaves home and follows the roots down with <b>Popo</b>, a raccoon guide. Beat a tangled neighbor and the threads come loose, and they wake up.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-burrow section" id="fight" data-depth="story">
+    <div class="wrap">
+      <header class="head">
         <p class="tag">Fight</p>
         <h2>Dig in, burst out, claw</h2>
-        <p>Dig underground to slip past attacks, burst up into a ram, then follow with a three-hit claw combo whose last hit lands the hardest. Swing right as an enemy attacks to parry it. Fill the gauge for a drill dash across the screen.</p>
-      </div>
-    </article>
-    <article class="feature">
-      <img class="shot px" src="../img/s_deep.png" alt="A dark burrow lit by blue mushrooms, facing Doto, the tainted red squirrel" width="960" height="540" loading="lazy">
-      <div class="copy">
-        <p class="tag">Paths</p>
-        <h2>A different branching path every run</h2>
-        <p>Open the path map at camp and choose your next burrow. Burrows are dug fresh each time, and at the end of each of the three paths a neighbor tangled in the roots blocks the way. Glowbugs you have banked stay yours when you fall.</p>
-      </div>
-    </article>
-    <article class="feature">
-      <img class="shot px" src="../img/s_village.png" alt="The village under a flowering great tree, with neighbors and decorations" width="960" height="540" loading="lazy">
-      <div class="copy">
-        <p class="tag">Village</p>
-        <h2>Neighbors come home, the great tree blooms again</h2>
-        <p>Free a tangled neighbor and they move into the village under the great tree. Spend glowbugs to awaken the tree's talents and seeds to decorate. Every clear brings new leaves, and in the end, flowers.</p>
-      </div>
-    </article>
-  </section>
-
-  <section class="wrap section" id="cast">
-    <header>
-      <h2>Neighbors</h2>
-      <p>The folk who live underground. Some of them are caught in the purple threads.</p>
-    </header>
-    <ul class="cast">
-      <li><img class="px" src="../img/p_nail.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Baby mole</p><h3>Naïl</h3><p>Leaving the burrow alone for the first time. Good with claws and digging.</p></div></li>
-      <li><img class="px" src="../img/p_popo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Raccoon</p><h3>Popo</h3><p>Your guide, and the shopkeeper at camp. Trades goods for seeds.</p></div></li>
-      <li><img class="px" src="../img/p_bori.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Field mouse chief</p><h3>Bori</h3><p>The old chief of the field mice, guarding the southern glade.</p></div></li>
-      <li><img class="px" src="../img/p_momo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Rabbit</p><h3>Momo</h3><p>Met three times at the end of the first path. Later, you can take her down yourself.</p></div></li>
-      <li><img class="px" src="../img/p_doto.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Squirrel</p><h3>Doto</h3><p>At the tangled roots where the second path ends. Gives up nothing it buried.</p></div></li>
-      <li><img class="px" src="../img/p_kongi.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Armadillo</p><h3>Kongi</h3><p>Keeper of the deep door. Curls up so no one can go further down.</p></div></li>
-      <li><img class="px" src="../img/p_halmae.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mushroom elder</p><h3>Granny Nuruk</h3><p>Spins threads. Her cat's cradle sets how hard your next run is.</p></div></li>
-      <li><img class="px" src="../img/p_susu.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mole cricket smith</p><h3>Susu</h3><p>By the stump at the first camp. Makes you Sprout Claws.</p></div></li>
-    </ul>
-  </section>
-
-  <section class="wrap section" id="more">
-    <header>
-      <h2>Also inside</h2>
-    </header>
-    <ul class="more">
-      <li><b>Each zone fights differently</b><span>Root Tangle: shrews, toads and thorn patches. Dark Depths: bats, spore caps and a falling ceiling. Free the strong neighbor in a Tangle for a charm.</span></li>
-      <li><b>A second hero, Momo</b><span>Hind-leg kicks, a hop to dodge, three chained stomps.</span></li>
-      <li><b>Great Tree talents</b><span>Permanent skills woken with banked glowbugs. Pick one of two paths per slot, different for each hero.</span></li>
-      <li><b>Cat's Cradle 1–10</b><span>Difficulty steps that open one by one as you clear. Tracked per character.</span></li>
-      <li><b>Today's Burrow</b><span>The same burrow for everyone on a given date, with your best distance kept.</span></li>
-      <li><b>Thread Dream</b><span>Fight the bosses you beat again, inside a dream.</span></li>
-      <li><b>Journal · Bestiary · Album</b><span>Goals across runs, the creatures you met, the pictures you saw.</span></li>
-      <li><b>Popo's Cheer · Comfort</b><span>An assist mode: the more you fall, the less damage you take. Turn down screen shake and particles, remap buttons.</span></li>
-      <li><b>Eleven languages</b><span>한국어 · English · 日本語 · 简体中文 · 繁體中文 · Português · Français · Español · Deutsch · Русский · Polski.</span></li>
-    </ul>
-    <div class="gallery">
-      <figure><img class="px" src="../img/s_camp.png" alt="The camp under the roots, neighbors around a campfire" width="960" height="540" loading="lazy"><figcaption>Camp: the clearing under the roots at the end of each path</figcaption></figure>
-      <figure><img class="px" src="../img/s_story.png" alt="A dialogue box in a dark burrow, a tangled rabbit speaking" width="960" height="540" loading="lazy"><figcaption>Dialogue (Korean shown)</figcaption></figure>
-      <figure><img class="px" src="../img/i_molehill.png" alt="Molehills on a meadow and a small tree" width="640" height="360" loading="lazy"><figcaption>Cutscene illustration</figcaption></figure>
-    </div>
-  </section>
-
-  <section class="wrap section" id="play">
-    <header>
-      <h2>Play</h2>
-      <p>Still in development (v0.2). The moving characters are placeholder art, backgrounds and props come from the Sunnyside World pack, and the dialogue portraits and story illustrations were drawn with an image-generation model and redrawn as pixel art. Music and sound effects are CC0. Your progress is saved in the browser (web) or on the device (Android).</p>
-    </header>
-    <div class="play">
-      <div>
-        <h3>Browser</h3>
-        <p>Runs in desktop and phone browsers. A keyboard or gamepad works best; on phones, use the on-screen buttons.</p>
-        <p><a href="https://nail-under-the-roots.netlify.app" target="_blank" rel="noopener">nail-under-the-roots.netlify.app</a></p>
-      </div>
-      <div>
-        <h3>Android</h3>
-        <ul>
-          <li>Download <code>nail.apk</code> (arm64) from the releases page.</li>
-          <li>Allow installing apps from unknown sources once.</li>
-          <li>Install new versions over the old one to keep your progress.</li>
+        <p>A fighting style only a mole could have. It gets faster as it gets familiar.</p>
+      </header>
+      <div class="fight">
+        <figure class="frame"><img class="px" src="../img/s_fight.png" alt="Naïl fighting tainted field mice and squirrels on a meadow, a charge warning line on the ground" width="960" height="540" loading="lazy"></figure>
+        <ul class="moves">
+          <li><span class="keys"><kbd>J</kbd></span><b>Three-hit claws</b><span>The third hit lands hardest. Four claws to find: Sprout, Mole, Stone and Venom.</span></li>
+          <li><span class="keys"><kbd>K</kbd></span><b>Burrow → burst up</b><span>Duck underground to let attacks pass, then burst out into a ram. Hold to stay under longer.</span></li>
+          <li><span class="keys"><kbd>J</kbd></span><b>Parry</b><span>Swing right as an enemy strikes to knock it back.</span></li>
+          <li><span class="keys"><kbd>L</kbd></span><b>Drill</b><span>When the gauge is full, dash a whole screen across.</span></li>
         </ul>
-        <p><a data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">Get the latest APK</a></p>
-      </div>
-      <div class="keys">
-        <h3>Controls (default)</h3>
-        <table>
-          <thead><tr><th>Action</th><th>Keyboard</th><th>Gamepad</th></tr></thead>
-          <tbody>
-            <tr><td>Move</td><td><kbd>WASD</kbd> / arrows</td><td>Left stick</td></tr>
-            <tr><td>Attack (3 hits)</td><td><kbd>J</kbd></td><td>X</td></tr>
-            <tr><td>Burrow → burst up</td><td><kbd>K</kbd></td><td>A</td></tr>
-            <tr><td>Special</td><td><kbd>L</kbd></td><td>B</td></tr>
-            <tr><td>Eat / switch item</td><td><kbd>I</kbd> / <kbd>Q</kbd>·<kbd>E</kbd></td><td>Y / LB·RB</td></tr>
-            <tr><td>Menu</td><td><kbd>Esc</kbd></td><td>Start</td></tr>
-          </tbody>
-        </table>
-        <p>Rebind them in Settings → Controls.</p>
       </div>
     </div>
   </section>
 
-  <section class="wrap section" id="news">
-    <header>
-      <h2>News</h2>
-    </header>
-    <ul class="news" data-news>
-      <li><span class="v">v0.3.2</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.2">Camp maps, piano & violin music, key caps in hints</a></li>
-      <li><span class="v">v0.3.1</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.1">Drill speed, shadows, 'can't do that' feedback, color-blind friendly hazards</a></li>
-      <li><span class="v">v0.3.0</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.0">Five new creatures, zone hazards, Tangle rooms</a></li>
-      <li><span class="v">v0.2.4</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.2.4">Bori's shadow at camp, new page screenshots</a></li>
-    </ul>
-    <p><a href="https://github.com/AimenJoe/nail-under-the-roots/releases">All releases</a></p>
+  <section class="layer-roots section" id="zones" data-depth="zones">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">Zones</p>
+        <h2>Three zones, darker the deeper you go</h2>
+        <p>Each zone has its own creatures and its own dangerous ground. Their tricks come from how the real animals live.</p>
+      </header>
+      <ol class="zones">
+        <li class="zone">
+          <img class="px shot" src="../img/s_meadow.png" alt="" width="960" height="540" loading="lazy">
+          <div>
+            <h3><span class="z-n">1</span>Flowering Entrance</h3>
+            <p>A bright meadow. Swarms of tainted field mice, chipmunks throwing acorns, red squirrels that pounce.</p>
+            <p class="crit"><span class="sprite" style="--sp: url(../img/sp_rat.png); --n: 2" title="Field Mouse"></span><span class="sprite" style="--sp: url(../img/sp_squirrel.png); --n: 2" title="Chipmunk"></span></p>
+          </div>
+        </li>
+        <li class="zone">
+          <img class="px shot" src="../img/s_roots.png" alt="" width="960" height="540" loading="lazy">
+          <div>
+            <h3><span class="z-n">2</span>Root Tangle</h3>
+            <p><b>Toads</b> that shoot out their tongues, <b>shrews</b> that bite twice in a row, <b>hedgehogs</b> that curl up and roll. <b>Thorny roots</b> on the floor.</p>
+            <p class="crit"><span class="sprite" style="--sp: url(../img/sp_toad.png); --n: 2" title="Toad"></span><span class="sprite" style="--sp: url(../img/sp_shrew.png); --n: 2" title="Shrew"></span><span class="sprite" style="--sp: url(../img/sp_hedgehog.png); --n: 2" title="Hedgehog"></span></p>
+          </div>
+        </li>
+        <li class="zone" id="deep" data-depth="deep">
+          <img class="px shot" src="../img/s_mobs.png" alt="" width="960" height="540" loading="lazy">
+          <div>
+            <h3><span class="z-n">3</span>Dark Depths</h3>
+            <p>The only light is around Naïl. <b>Bats</b> your burst can't reach, <b>spore caps</b> that puff out clouds, and a <b>ceiling that falls</b> while you fight.</p>
+            <p class="crit"><span class="sprite" style="--sp: url(../img/sp_bat.png); --n: 4" title="Bat"></span><span class="sprite" style="--sp: url(../img/sp_sporecap.png); --n: 2" title="Spore Cap"></span></p>
+          </div>
+        </li>
+      </ol>
+      <p class="note">On the path map, a <b>Tangle</b> stop holds a strong foe bound tight in thread. Free it for a charm.</p>
+    </div>
+  </section>
+
+  <section class="layer-roots section" id="route" data-depth="zones">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">Paths · Camps</p>
+        <h2>A new branching path each run, a different camp on each path</h2>
+        <p>Open the path map at camp and pick your next burrow. Burrows are dug fresh every time. There are three camps, each with a hidden nook. Banked glowbugs stay when you fall, and from your second run you start right by the burrow entrance.</p>
+      </header>
+      <div class="gallery">
+        <figure class="frame"><img class="px" src="../img/s_camp.png" alt="The first camp, neighbors around a campfire" width="960" height="540" loading="lazy"><figcaption>First camp</figcaption></figure>
+        <figure class="frame"><img class="px" src="../img/s_camp2.png" alt="A camp in a cave of tangled roots" width="960" height="540" loading="lazy"><figcaption>Root cave</figcaption></figure>
+        <figure class="frame"><img class="px" src="../img/s_camp3.png" alt="A dark mushroom-forest camp lit by blue mushrooms" width="960" height="540" loading="lazy"><figcaption>Mushroom forest</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="cast" data-depth="deep">
+    <div class="flies" data-flies="8"></div>
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">Neighbors</p>
+        <h2>Wake them, and they come home</h2>
+        <p>At the end of each path a tangled neighbor blocks the way. Once awake, they settle in the village under the great tree.</p>
+      </header>
+      <ul class="cast">
+        <li><img class="px" src="../img/p_nail.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Baby mole</p><h3>Naïl</h3><p>Leaving the burrow alone for the first time. Good with claws and digging.</p></div></li>
+        <li><img class="px" src="../img/p_popo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Raccoon</p><h3>Popo</h3><p>Your guide, and the shopkeeper at camp. Trades goods for seeds.</p></div></li>
+        <li><img class="px" src="../img/p_bori.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Field mouse chief</p><h3>Bori</h3><p>The old chief of the field mice, guarding the southern glade.</p></div></li>
+        <li><img class="px" src="../img/p_momo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Rabbit</p><h3>Momo</h3><p>Met three times at the end of the first path. Later, you can take her down yourself.</p></div></li>
+        <li><img class="px" src="../img/p_doto.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Squirrel</p><h3>Doto</h3><p>At the tangled roots where the second path ends. Gives up nothing it buried.</p></div></li>
+        <li><img class="px" src="../img/p_kongi.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Armadillo</p><h3>Kongi</h3><p>Keeper of the deep door. Curls up so no one can go further down.</p></div></li>
+        <li><img class="px" src="../img/p_halmae.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mushroom elder</p><h3>Granny Nuruk</h3><p>Spins threads. Her cat's cradle sets how hard your next run is.</p></div></li>
+        <li><img class="px" src="../img/p_susu.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mole cricket smith</p><h3>Susu</h3><p>By the stump at the first camp. Makes you Sprout Claws.</p></div></li>
+      </ul>
+      <div class="split">
+        <figure class="frame"><img class="px" src="../img/s_village.png" alt="The village under a flowering great tree, with neighbors and decorations" width="960" height="540" loading="lazy"></figure>
+        <div class="copy">
+          <p class="tag">Village</p>
+          <h3>The great tree blooms again</h3>
+          <p>Spend glowbugs to awaken the tree's talents and seeds to decorate the village. Every neighbor you wake brings new leaves, and in the end, flowers.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="two" data-depth="deep">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">Two heroes</p>
+        <h2>Naïl's claws, Momo's hind legs</h2>
+      </header>
+      <div class="duo">
+        <article>
+          <span class="sprite big" style="--sp: url(../img/sp_nail.png); --n: 4"></span>
+          <h3>Naïl</h3>
+          <p>Three-hit claws, burrowing underground, bursting up, the drill.</p>
+        </article>
+        <article>
+          <span class="sprite big" style="--sp: url(../img/sp_momo.png); --n: 2"></span>
+          <h3>Momo</h3>
+          <p>Hind-leg kicks, a hop to dodge, three chained stomps. Her own talents and charms.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="more" data-depth="deep">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">Also inside</p>
+        <h2>Reasons to keep digging</h2>
+      </header>
+      <ul class="more">
+        <li><b>Great Tree talents</b><span>Permanent skills woken with banked glowbugs. Pick one of two per slot, different for each hero.</span></li>
+        <li><b>Cat's Cradle 1–10</b><span>Difficulty steps that open one by one as you clear. Tracked per hero.</span></li>
+        <li><b>Today's Burrow</b><span>The same burrow for everyone on a given date, with your best distance kept.</span></li>
+        <li><b>Thread Dream</b><span>Fight the bosses you beat again, inside a dream.</span></li>
+        <li><b>Journal · Bestiary · Album</b><span>Goals across runs, fourteen creatures to meet, the pictures you saw.</span></li>
+        <li><b>Three save slots · resume at camp</b><span>A run that reached camp carries on after you quit.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="sound" data-depth="deep">
+    <div class="wrap split">
+      <div class="copy">
+        <p class="tag">Sound</p>
+        <h2>Piano and violin where you rest, chiptune where you fight</h2>
+        <p>Violin and harp on the title, piano and violin in the village, a piano waltz at camp. Meadows, burrows and bosses keep the tension up with retro chiptune. Music steps back during dialogue and menus.</p>
+      </div>
+      <ul class="credits">
+        <li><b>Prologue Theme</b><span>Cleyton Kauffman · title</span></li>
+        <li><b>Lovely town</b><span>fluffclipse · village</span></li>
+        <li><b>Snowfall</b><span>Kistol · camp</span></li>
+        <li><b>15 Melodic RPG Chiptunes</b><span>Aureolus_Omicron · meadow, burrows, bosses</span></li>
+        <li><b>Sound effects</b><span>Kenney</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="layer-deep section" id="access" data-depth="deep">
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">For everyone</p>
+        <h2>Play your way</h2>
+      </header>
+      <ul class="more">
+        <li><b>Keyboard · gamepad · touch</b><span>Button names in hints follow the device you're using. Remap buttons in Settings.</span></li>
+        <li><b>Popo's Cheer</b><span>An assist mode: the more you fall, the less damage you take.</span></li>
+        <li><b>Readable without color</b><span>Hazards, attack warnings and "can't do that" marks also show by brightness and shape, checked with color-vision simulation.</span></li>
+        <li><b>Less shake · fewer particles</b><span>Turn down screen shake and particle effects in Settings.</span></li>
+      </ul>
+      <ul class="langs" aria-label="Eleven languages">
+        <li lang="ko">한국어</li><li lang="en">English</li><li lang="ja">日本語</li><li lang="zh-Hans">简体中文</li><li lang="zh-Hant">繁體中文</li><li lang="pt-BR">Português</li><li lang="fr">Français</li><li lang="es">Español</li><li lang="de">Deutsch</li><li lang="ru">Русский</li><li lang="pl">Polski</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="layer-core section" id="play" data-depth="play">
+    <div class="flies" data-flies="6"></div>
+    <div class="wrap">
+      <header class="head">
+        <p class="tag">Play</p>
+        <h2>Right now, for free</h2>
+        <p>Still in development. Progress is saved in the browser (web) or on the device (Android).</p>
+      </header>
+      <div class="play">
+        <div>
+          <h3>Browser</h3>
+          <p>Runs in desktop and phone browsers. A keyboard or gamepad works best; on phones, use the on-screen buttons.</p>
+          <p><a class="btn small" href="https://nail-under-the-roots.netlify.app" target="_blank" rel="noopener">Play in browser</a></p>
+        </div>
+        <div>
+          <h3>Android</h3>
+          <ul>
+            <li>Download <code>nail.apk</code> (arm64) from the releases page.</li>
+            <li>Allow installing apps from unknown sources once.</li>
+            <li>Install new versions over the old one to keep your progress.</li>
+          </ul>
+          <p><a class="btn small alt" data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">Get the latest APK</a></p>
+        </div>
+        <div class="keytable">
+          <h3>Controls (default)</h3>
+          <table>
+            <thead><tr><th>Action</th><th>Keyboard</th><th>Gamepad</th></tr></thead>
+            <tbody>
+              <tr><td>Move</td><td><kbd>WASD</kbd> <kbd>←↑↓→</kbd></td><td>Left stick</td></tr>
+              <tr><td>Attack (3 hits)</td><td><kbd>J</kbd></td><td><kbd>X</kbd></td></tr>
+              <tr><td>Burrow → burst up</td><td><kbd>K</kbd></td><td><kbd>A</kbd></td></tr>
+              <tr><td>Special</td><td><kbd>L</kbd></td><td><kbd>B</kbd></td></tr>
+              <tr><td>Eat / switch item</td><td><kbd>I</kbd> / <kbd>Q</kbd> <kbd>E</kbd></td><td><kbd>Y</kbd> / <kbd>LB</kbd> <kbd>RB</kbd></td></tr>
+              <tr><td>Map / menu</td><td><kbd>M</kbd> / <kbd>Esc</kbd></td><td><kbd>Select</kbd> / <kbd>Start</kbd></td></tr>
+            </tbody>
+          </table>
+          <p>Aim with the right stick. Rebind in Settings → Controls.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-core section" id="next" data-depth="play">
+    <div class="wrap split">
+      <div class="copy">
+        <p class="tag">Next</p>
+        <h2>Working on v0.4, "The Deep"</h2>
+        <p>A new, deeper path with a neighbor at its end, and a last fight at the very bottom. Tell us what you think any time via <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">feedback &amp; bug reports</a>.</p>
+      </div>
+      <dl class="facts">
+        <div><dt>Genre</dt><dd>Top-down action roguelite</dd></div>
+        <div><dt>Platforms</dt><dd>Web browser · Android (iOS in progress)</dd></div>
+        <div><dt>Price</dt><dd>Free</dd></div>
+        <div><dt>Languages</dt><dd>11</dd></div>
+        <div><dt>Made by</dt><dd>Beardworks</dd></div>
+        <div><dt>Engine</dt><dd>Rust + macroquad (open source)</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="layer-core section" id="faq" data-depth="play">
+    <div class="wrap">
+      <header class="head"><p class="tag">FAQ</p><h2>Questions</h2></header>
+      <div class="faq">
+        <details><summary>Where is my progress saved?</summary><p>On the web, in that browser; on Android, on the device. There are three save slots. Clearing browser data also clears web progress.</p></details>
+        <details><summary>Does it support gamepads?</summary><p>Yes, in desktop and phone browsers and on Android. It was built with Android handhelds with built-in controls in mind. Gamepads don't work on iOS yet.</p></details>
+        <details><summary>Can I play on my phone?</summary><p>Yes. A move stick and buttons appear on screen, though a keyboard or gamepad is the most comfortable.</p></details>
+        <details><summary>Is it hard?</summary><p>You learn by falling, but you can turn on "Popo's Cheer" so you take less damage the more you fall. Once it feels easy, raise the challenge with the cat's cradle.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="layer-core section" id="news" data-depth="play">
+    <div class="wrap">
+      <header class="head"><p class="tag">News</p><h2>Updates</h2></header>
+      <ul class="news" data-news>
+        <li><span class="v">v0.3.2</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.2">Camp maps, piano &amp; violin music, key caps in hints</a></li>
+        <li><span class="v">v0.3.1</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.1">Drill speed, shadows, 'can't do that' feedback, color-blind friendly hazards</a></li>
+        <li><span class="v">v0.3.0</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.3.0">Five new creatures, zone hazards, Tangle rooms</a></li>
+        <li><span class="v">v0.2.4</span><span class="d">2026-10-27</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.2.4">Bori's shadow at camp, new page screenshots</a></li>
+      </ul>
+      <p><a href="https://github.com/AimenJoe/nail-under-the-roots/releases">All releases</a></p>
+    </div>
   </section>
 </main>
 
-<footer>
+<footer class="layer-core">
   <div class="wrap">
     <p>© 2026 Beardworks · <a href="https://github.com/AimenJoe/nail-under-the-roots">Source code (GitHub)</a> · <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">Feedback &amp; bug reports</a></p>
-    <p>Environment art: <a href="https://danieldiggle.itch.io/sunnyside">Sunnyside World</a> by danieldiggle. Font: <a href="https://github.com/quiple/galmuri">Galmuri</a> (SIL OFL 1.1). Illustration backgrounds: public-domain and CC0 paintings by Friedrich, Korb, Blum, Robert and others (<a href="https://github.com/AimenJoe/nail-under-the-roots/blob/main/assets/LICENSES.md">sources</a>). Everything else is placeholder art drawn in code.</p>
+    <p>Dialogue portraits, story illustrations and the title background were drawn with Google's Gemini image model (Nano Banana) and redrawn as pixel art (they carry a SynthID watermark). The moving characters are placeholder art drawn in code. Environment art: <a href="https://danieldiggle.itch.io/sunnyside">Sunnyside World</a> by danieldiggle. Music: Cleyton Kauffman · fluffclipse · Kistol · Aureolus_Omicron; sound effects: Kenney (all CC0). Fonts: <a href="https://github.com/quiple/galmuri">Galmuri</a> · Ark Pixel · Cubic 11 (SIL OFL 1.1). <a href="https://github.com/AimenJoe/nail-under-the-roots/blob/main/assets/LICENSES.md">All sources</a></p>
   </div>
 </footer>
 <script src="../site.js" defer></script>
