@@ -17,6 +17,11 @@ use crate::moveset::{self, Moveset};
 use crate::room::Room;
 use crate::tuning as t;
 
+// 0170 R9: 상태 함수를 셋으로 나눴다 — 발톱(attack), 굴파기·드릴(burrow), 모모의 뛰기(momo). 본문은 그대로.
+mod attack;
+mod burrow;
+mod momo;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum State {
     Free,
@@ -178,6 +183,13 @@ pub struct Player {
     swing_age: f32,
 }
 
+/// 한 틱의 바깥 상황(0170 R9): 상태 함수들이 같은 것을 본다.
+pub(super) struct Ctx<'a> {
+    pub a: &'a Actions,
+    pub dt: f32,
+    pub move_dir: Vec2,
+}
+
 impl Player {
     pub fn new(pos: Vec2) -> Self {
         Self {
@@ -312,72 +324,6 @@ impl Player {
             self.start_chain(move_dir);
         } else {
             self.start_drill(move_dir);
-        }
-    }
-
-    fn start_hop(&mut self, move_dir: Vec2) {
-        let dir = move_dir.normalize_or(self.facing);
-        self.dodge_buf = 0.0;
-        self.attack_buf = 0.0;
-        self.combo_timer = 0.0;
-        self.vel = Vec2::ZERO;
-        self.facing = dir;
-        self.state = State::Hop { time: 0.0, dir };
-        self.events.push(Event::Hop);
-    }
-
-    fn start_chain(&mut self, move_dir: Vec2) {
-        let dir = move_dir.normalize_or(self.facing);
-        self.sp = 0.0;
-        self.attack_buf = 0.0;
-        self.dodge_buf = 0.0;
-        self.combo_timer = 0.0;
-        self.vel = Vec2::ZERO;
-        self.facing = dir;
-        self.state = State::Chain {
-            left: self.talents.chain_hops(),
-            time: 0.0,
-            dir,
-        };
-        self.events.push(Event::Hop);
-    }
-
-    /// 이어 뛰기 밟기 반지름(재주 높이 뛰기 + 들꽃 화관, 0142). 월드의 고리도 이 값.
-    pub fn chain_radius(&self) -> f32 {
-        self.talents.chain_radius() + self.stats.chain_radius
-    }
-
-    fn stomp_strike(&mut self) -> Strike {
-        self.swing_id += 1;
-        Strike {
-            id: self.swing_id,
-            kind: StrikeKind::Stomp,
-            shape: Shape::Circle {
-                center: self.pos,
-                r: self.chain_radius(),
-            },
-            damage: t::CHAIN_DAMAGE + self.stats.damage,
-            knockback: t::CHAIN_KNOCKBACK,
-            stun: self.talents.chain_stun(),
-            hitstop: t::CHAIN_HITSTOP,
-            shake: t::CHAIN_SHAKE,
-            finisher: false,
-            poison: 0.0,
-        }
-    }
-
-    /// 발 구르기(0142): 깡충 착지의 작은 밟기. 이어 뛰기 밟기보다 작고 약하다.
-    fn stamp_strike(&mut self) -> Strike {
-        Strike {
-            damage: t::TAL_STAMP_DAMAGE + self.stats.damage,
-            shape: Shape::Circle {
-                center: self.pos,
-                r: t::TAL_STAMP_RADIUS,
-            },
-            knockback: t::CHAIN_KNOCKBACK * 0.5,
-            stun: t::CHAIN_STUN * 0.6,
-            shake: t::CHAIN_SHAKE * 0.4,
-            ..self.stomp_strike()
         }
     }
 
@@ -542,6 +488,47 @@ impl Player {
     }
 
     /// 한 로직 틱. 이번 틱에 활성인 공격 히트박스를 돌려준다.
+    /// 자유: 특기·회피·평타·먹기 시작, 이동.
+    pub(super) fn tick_free(&mut self, c: &Ctx<'_>) -> Option<Strike> {
+        let a = c.a;
+        let dt = c.dt;
+        let move_dir = c.move_dir;
+        if a.special && self.armed && self.sp_full() {
+            self.start_special(move_dir);
+        } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
+            self.start_dodge(move_dir);
+        } else if self.armed && self.attack_buf > 0.0 && self.no_attack <= 0.0 {
+            // 누르는 순간 평타(0167). 누르고 있으면 활성 구간 뒤에 모으기로 간다.
+            let idx = if self.combo_timer > 0.0 {
+                self.combo_next
+            } else {
+                0
+            };
+            self.start_swing(idx, a.aim, false);
+        } else {
+            self.pos += move_dir * self.speed() * dt;
+        }
+        None
+    }
+
+    /// 먹기: 시간이 차면 효과, 맞으면 끊긴다.
+    pub(super) fn tick_eat(&mut self, c: &Ctx<'_>, item: Consumable, time: f32) -> Option<Strike> {
+        let dt = c.dt;
+        let move_dir = c.move_dir;
+        let time = time + dt;
+        self.pos += move_dir * self.speed() * t::EAT_MOVE_FACTOR * dt;
+        if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
+            // 굴파기(깡충)로 끊는다: 먹지 않은 것으로. 대기는 이미 흐르고 있다.
+            self.start_dodge(move_dir);
+        } else if time >= item.eat_time() * self.talents.eat_time_mul() {
+            self.events.push(Event::Ate(item));
+            self.state = State::Free;
+        } else {
+            self.state = State::Eat { item, time };
+        }
+        None
+    }
+
     pub fn update(&mut self, a: &Actions, room: &Room, dt: f32) -> Option<Strike> {
         self.events.clear();
         self.prev_pos = self.pos;
@@ -567,323 +554,32 @@ impl Player {
         }
 
         let mut strike = None;
+        let c = Ctx { a, dt, move_dir };
         match self.state {
             State::Dead => {}
-            State::Free => {
-                if a.special && self.armed && self.sp_full() {
-                    self.start_special(move_dir);
-                } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
-                    self.start_dodge(move_dir);
-                } else if self.armed && self.attack_buf > 0.0 && self.no_attack <= 0.0 {
-                    // 누르는 순간 평타(0167). 누르고 있으면 활성 구간 뒤에 모으기로 간다.
-                    let idx = if self.combo_timer > 0.0 {
-                        self.combo_next
-                    } else {
-                        0
-                    };
-                    self.start_swing(idx, a.aim, false);
-                } else {
-                    self.pos += move_dir * self.speed() * dt;
-                }
-            }
-            State::Attack { idx, time, dir } => {
-                let ms = self.moveset;
-                let hit = ms.hits[idx];
-                let last = ms.last();
-                // 공격 속도: 스윙 시계를 빨리(느리게) 돌린다. 활성·캔슬·후딜레이가 함께 줄어든다.
-                let sdt = dt * self.stats.attack_speed;
-                let time = time + sdt;
-                let (a0, a1) = hit.active;
-                if time >= a0 && time - sdt < a1 {
-                    strike = Some(self.claw_strike(idx, dir));
-                }
-                self.pos += move_dir * self.speed() * ms.move_factor * dt;
-                self.state = State::Attack { idx, time, dir };
-
-                if a.special && self.sp_full() && time >= a1 {
-                    // 필살기도 휘두른 뒤(활성 구간 뒤)라면 캔슬로 낼 수 있다.
-                    self.start_special(move_dir);
-                } else if self.dodge_buf > 0.0
-                    && self.burrow_cd <= 0.0
-                    && time >= hit.dodge_cancel_after
-                {
-                    // 굴파기(깡충) 캔슬: 후딜레이를 끊고 다음 콤보로 섞는다.
-                    self.start_dodge(move_dir);
-                } else if time >= a1 && self.queued == Some(true) && idx < last {
-                    // 박자에 맞춰 눌렀다(0167): 활성 구간이 끝나는 순간 다음 타 — 가장 빠르다.
-                    self.start_swing(idx + 1, a.aim, true);
-                } else if time >= a1 && a.attack_held {
-                    // 활성 구간이 지났는데 아직 누르고 있다: 바로 강공격 모으기(0161). 어느 타 뒤든.
-                    // 강공격(또는 덜 모으고 뗀 것) 뒤 콤보는 다음 타로 이어진다.
-                    self.combo_timer = 0.0;
-                    self.events.push(Event::ChargeStart);
-                    self.state = State::Charging {
-                        time: 0.0,
-                        dir,
-                        after: idx + 1,
-                    };
-                } else if self.queued.is_some()
-                    && time >= hit.swing + hit.recovery + t::MASH_PENALTY
-                {
-                    // 박자 전에 눌렀다(연타, 0167): 스윙을 다 마치고 `MASH_PENALTY`만큼 늦게. 마지막 타 뒤면 1타부터.
-                    let next = if idx < last { idx + 1 } else { 0 };
-                    self.start_swing(next, a.aim, false);
-                } else if self.queued.is_none() && time >= hit.swing + hit.recovery {
-                    self.state = State::Free;
-                    if idx < last {
-                        self.combo_next = idx + 1;
-                        self.combo_timer = ms.combo_window;
-                    } else {
-                        self.combo_timer = 0.0;
-                    }
-                }
-            }
+            State::Free => strike = self.tick_free(&c),
+            State::Attack { idx, time, dir } => strike = self.tick_attack(&c, idx, time, dir),
             State::Charging { time, dir, after } => {
-                let was = time;
-                let time = time + dt;
-                // 모으는 동안은 느리게 걷고, 조준·이동 쪽으로 겨눈다.
-                let want = if a.aim != Vec2::ZERO { a.aim } else { move_dir };
-                let dir = want.normalize_or(dir);
-                self.facing = dir;
-                self.pos += move_dir * self.speed() * t::HEAVY_MOVE_FACTOR * dt;
-                if was < t::HEAVY_CHARGE && time >= t::HEAVY_CHARGE {
-                    self.events.push(Event::HeavyReady);
-                }
-                self.state = State::Charging { time, dir, after };
-                if a.special && self.armed && self.sp_full() {
-                    self.start_special(move_dir);
-                } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
-                    self.start_dodge(move_dir);
-                } else if !a.attack_held {
-                    if time >= t::HEAVY_CHARGE {
-                        self.start_heavy(dir, after, time - t::HEAVY_CHARGE <= t::HEAVY_PERFECT);
-                    } else {
-                        // 덜 모으고 뗐다: 아무것도 안 나가고(평타는 이미 나갔다), 콤보는 거기서 이어진다.
-                        self.state = State::Free;
-                        if after <= self.moveset.last() {
-                            self.combo_next = after;
-                            self.combo_timer = self.moveset.combo_window;
-                        }
-                    }
-                }
+                strike = self.tick_charging(&c, time, dir, after)
             }
             State::Heavy {
                 time,
                 dir,
                 after,
                 perfect,
-            } => {
-                let ms = self.moveset;
-                let hit = ms.heavy();
-                let sdt = dt * self.stats.attack_speed;
-                let time = time + sdt;
-                let (a0, a1) = hit.active;
-                if time >= a0 && time - sdt < a1 {
-                    strike = Some(self.heavy_strike(dir, perfect));
-                }
-                self.pos += move_dir * self.speed() * ms.move_factor * dt;
-                self.state = State::Heavy {
-                    time,
-                    dir,
-                    after,
-                    perfect,
-                };
-                if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
-                    self.start_dodge(move_dir);
-                } else if time >= a1 && a.attack_held {
-                    // 강공격 뒤에도 누르고 있으면 다시 모은다.
-                    self.combo_timer = 0.0;
-                    self.events.push(Event::ChargeStart);
-                    self.state = State::Charging {
-                        time: 0.0,
-                        dir,
-                        after,
-                    };
-                } else if time >= hit.swing + hit.recovery {
-                    // 강공격의 후딜레이는 끊지 못한다(0167: 0161 덧붙임의 0.3초 잠금은 뺐다). 박자 창 안에서 눌렀으면
-                    // 후딜레이가 끝나는 순간 다음 타, 그 전에 눌렀으면(연타) `MASH_PENALTY`만큼 늦게.
-                    let next = if after <= ms.last() { after } else { 0 };
-                    match self.queued {
-                        Some(true) => self.start_swing(next, a.aim, true),
-                        Some(false) if time >= hit.swing + hit.recovery + t::MASH_PENALTY => {
-                            self.start_swing(next, a.aim, false)
-                        }
-                        Some(false) => {}
-                        None => {
-                            self.state = State::Free;
-                            if after <= ms.last() {
-                                self.combo_next = after;
-                                self.combo_timer = ms.combo_window;
-                            } else {
-                                self.combo_timer = 0.0;
-                            }
-                        }
-                    }
-                }
-            }
-            State::Burrow { time: was } => {
-                let time = was + dt;
-                // 정한 시간까지는 빠르게 파고 가고(대시), 힘을 모으는 동안은 느리다(0160).
-                let base = self.talents.burrow_time();
-                let factor = if was < base {
-                    t::BURROW_DASH_FACTOR
-                } else {
-                    t::BURROW_CHARGE_FACTOR
-                };
-                self.pos += move_dir * self.speed() * factor * dt;
-                self.state = State::Burrow { time };
-                let early = (self.dodge_buf > 0.0 && time > 0.05) || self.attack_buf > 0.0;
-                // 톡 누르면 정한 시간, 누르고 있으면 BURROW_HOLD_EXTRA까지 더 머문다(떼면 솟구침, 0101).
-                // 더 머무는 동안은 힘을 모은다(0158): 정한 시간을 넘기는 틱에 땅이 울기 시작.
-                if a.dodge_held && was < base && time >= base {
-                    self.events.push(Event::Rumble);
-                }
-                let limit = if a.dodge_held {
-                    base + t::BURROW_HOLD_EXTRA
-                } else {
-                    base
-                };
-                if time >= limit || early {
-                    strike = Some(self.start_emerge((time - base).max(0.0)));
-                }
-            }
-            State::Hop { time, dir } => {
-                let time = time + dt;
-                self.pos += dir * (self.talents.hop_dist() / t::HOP_TIME) * dt;
-                if time >= t::HOP_TIME {
-                    self.burrow_cd = self.burrow_cd_full();
-                    self.events.push(Event::Land(false));
-                    if self.talents.hop_stamp() {
-                        strike = Some(self.stamp_strike());
-                        self.events.push(Event::Stamp);
-                    }
-                    self.state = State::Free;
-                } else {
-                    self.state = State::Hop { time, dir };
-                }
-            }
-            State::Chain { left, time, dir } => {
-                let time = time + dt;
-                self.pos += dir * (t::CHAIN_HOP_DIST / t::CHAIN_HOP_TIME) * dt;
-                if time >= t::CHAIN_HOP_TIME {
-                    strike = Some(self.stomp_strike());
-                    self.events.push(Event::Land(true));
-                    if left > 1 {
-                        // 다음 뛰기: 입력 쪽으로 다시 겨눈다(없으면 그대로).
-                        let dir = move_dir.normalize_or(dir);
-                        self.facing = dir;
-                        self.events.push(Event::Hop);
-                        self.state = State::Chain {
-                            left: left - 1,
-                            time: 0.0,
-                            dir,
-                        };
-                    } else {
-                        self.state = State::Recover {
-                            time: t::CHAIN_RECOVER,
-                        };
-                    }
-                } else {
-                    self.state = State::Chain { left, time, dir };
-                }
-            }
-            State::Emerge { time, charge } => {
-                let time = time + dt;
-                self.state = if time >= t::EMERGE_TIME {
-                    State::Free
-                } else {
-                    State::Emerge { time, charge }
-                };
-            }
+            } => strike = self.tick_heavy(&c, time, dir, after, perfect),
+            State::Burrow { time: was } => strike = self.tick_burrow(&c, was),
+            State::Hop { time, dir } => strike = self.tick_hop(&c, time, dir),
+            State::Chain { left, time, dir } => strike = self.tick_chain(&c, left, time, dir),
+            State::Emerge { time, charge } => strike = self.tick_emerge(&c, time, charge),
             State::Drill {
                 time,
                 dir,
                 aim,
                 next_hit,
-            } => {
-                let time = time + dt;
-                let mut dir = dir;
-                let mut aim = aim;
-                let mut next_hit = next_hit;
-                if time < t::DRILL_REV {
-                    // 시동: 제자리. 방향은 입력대로 바로, 그 둘레(콘) 안의 적이 있으면 그 적 쪽으로(0139).
-                    let want = if a.aim != Vec2::ZERO { a.aim } else { move_dir };
-                    if want != Vec2::ZERO {
-                        aim = want.normalize();
-                    }
-                    self.drill_lock = drill_assist(self.pos, aim, &self.targets);
-                    dir = self
-                        .drill_lock
-                        .map_or(aim, |q| (q - self.pos).try_normalize().unwrap_or(aim));
-                } else {
-                    self.drill_lock = None;
-                    if time - dt < t::DRILL_REV {
-                        self.events.push(Event::Drill);
-                    }
-                    // 직진성: 입력 쪽으로 초당 DRILL_TURN 라디안만 튼다.
-                    if move_dir != Vec2::ZERO {
-                        let want = move_dir.normalize();
-                        let ang = dir.angle_between(want);
-                        let step = ang.clamp(-t::DRILL_TURN * dt, t::DRILL_TURN * dt);
-                        dir = Vec2::from_angle(step).rotate(dir).normalize();
-                    }
-                    self.pos += dir * drill_speed(time - t::DRILL_REV) * dt;
-                    next_hit -= dt;
-                }
-                self.facing = dir;
-                if time >= t::DRILL_REV && next_hit <= 0.0 {
-                    next_hit += t::DRILL_HIT_EVERY;
-                    self.swing_id += 1;
-                    strike = Some(Strike {
-                        id: self.swing_id,
-                        kind: StrikeKind::Drill,
-                        shape: Shape::Circle {
-                            center: self.pos + dir * 6.0,
-                            r: t::DRILL_RADIUS,
-                        },
-                        damage: t::DRILL_DAMAGE + self.stats.damage,
-                        knockback: t::DRILL_KNOCKBACK,
-                        stun: t::DRILL_STUN,
-                        hitstop: t::DRILL_HITSTOP,
-                        shake: t::DRILL_HIT_SHAKE,
-                        finisher: false,
-                        poison: 0.0,
-                    });
-                }
-                self.state = if time >= t::DRILL_REV + t::DRILL_TIME * self.talents.drill_mul() {
-                    State::Recover {
-                        time: t::DRILL_RECOVER,
-                    }
-                } else {
-                    State::Drill {
-                        time,
-                        dir,
-                        aim,
-                        next_hit,
-                    }
-                };
-            }
-            State::Recover { time } => {
-                let time = time - dt;
-                self.state = if time <= 0.0 {
-                    State::Free
-                } else {
-                    State::Recover { time }
-                };
-            }
-            State::Eat { item, time } => {
-                let time = time + dt;
-                self.pos += move_dir * self.speed() * t::EAT_MOVE_FACTOR * dt;
-                if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
-                    // 굴파기(깡충)로 끊는다: 먹지 않은 것으로. 대기는 이미 흐르고 있다.
-                    self.start_dodge(move_dir);
-                } else if time >= item.eat_time() * self.talents.eat_time_mul() {
-                    self.events.push(Event::Ate(item));
-                    self.state = State::Free;
-                } else {
-                    self.state = State::Eat { item, time };
-                }
-            }
+            } => strike = self.tick_drill(&c, time, dir, aim, next_hit),
+            State::Recover { time } => strike = self.tick_recover(&c, time),
+            State::Eat { item, time } => strike = self.tick_eat(&c, item, time),
         }
 
         self.attack_buf = (self.attack_buf - dt).max(0.0);
@@ -924,190 +620,6 @@ impl Player {
             self.face_left = self.facing.x < 0.0;
         }
         strike
-    }
-
-    fn start_swing(&mut self, idx: usize, aim: Vec2, beat: bool) {
-        let dir = if aim != Vec2::ZERO {
-            aim.normalize()
-        } else {
-            self.facing
-        };
-        self.facing = dir;
-        self.swing_id += 1;
-        self.swing_age = 0.0;
-        // 패링 창은 대기가 끝났을 때만 열린다. 연타하면 몇 번에 한 번만(docs/decisions/0038).
-        self.parry_open = self.parry_cd <= 0.0;
-        if self.parry_open {
-            self.parry_cd = t::PARRY_COOLDOWN;
-        }
-        self.vel += dir * self.moveset.hits[idx].lunge;
-        self.attack_buf = 0.0;
-        self.queued = None;
-        self.on_beat = beat;
-        self.combo_beats = if idx == 0 {
-            0
-        } else {
-            self.combo_beats + usize::from(beat)
-        };
-        self.combo_timer = 0.0;
-        self.state = State::Attack {
-            idx,
-            time: 0.0,
-            dir,
-        };
-        self.events.push(Event::Swing(idx));
-        if beat {
-            self.events.push(Event::Beat);
-        }
-    }
-
-    fn start_drill(&mut self, move_dir: Vec2) {
-        let dir = if move_dir != Vec2::ZERO {
-            move_dir.normalize()
-        } else {
-            self.facing
-        };
-        self.sp = 0.0;
-        self.attack_buf = 0.0;
-        self.dodge_buf = 0.0;
-        self.combo_timer = 0.0;
-        self.vel = Vec2::ZERO;
-        self.drill_lock = drill_assist(self.pos, dir, &self.targets);
-        self.state = State::Drill {
-            time: 0.0,
-            dir: self
-                .drill_lock
-                .map_or(dir, |q| (q - self.pos).try_normalize().unwrap_or(dir)),
-            aim: dir,
-            next_hit: 0.0,
-        };
-        self.events.push(Event::DrillRev);
-    }
-
-    /// 필살기 시동 중(제자리에서 힘 모으기). 월드는 이 동안 적을 멈춘다.
-    pub fn drill_revving(&self) -> bool {
-        matches!(self.state, State::Drill { time, .. } if time < t::DRILL_REV)
-    }
-
-    fn start_burrow(&mut self) {
-        self.dodge_buf = 0.0;
-        self.attack_buf = 0.0;
-        self.vel = Vec2::ZERO;
-        self.state = State::Burrow { time: 0.0 };
-        self.events.push(Event::Burrow);
-    }
-
-    /// `held`: 정한 시간보다 더 머문 초. 그만큼 대기가 늘어 땅속에 숨어 지내지는 못한다(0101).
-    /// 그 시간에 모은 힘(0~1)만큼 솟구침이 커진다(0158): 톡은 작게 톡, 끝까지 누르면 크게 쾅.
-    fn start_emerge(&mut self, held: f32) -> Strike {
-        let charge = Self::charge_of(held);
-        self.dodge_buf = 0.0;
-        self.attack_buf = 0.0;
-        self.burrow_cd = self.burrow_cd_full() + held * t::BURROW_HOLD_CD;
-        self.no_attack = t::EMERGE_NO_ATTACK;
-        self.swing_id += 1;
-        self.state = State::Emerge { time: 0.0, charge };
-        self.events.push(Event::Emerge);
-        Strike {
-            id: self.swing_id,
-            kind: StrikeKind::Emerge,
-            shape: Shape::Circle {
-                center: self.pos,
-                r: self.emerge_radius_for(charge),
-            },
-            damage: t::EMERGE_DAMAGE + (t::EMERGE_CHARGE_DAMAGE as f32 * charge).round() as i32,
-            knockback: t::EMERGE_KNOCKBACK * (1.0 + (t::EMERGE_CHARGE_KNOCKBACK - 1.0) * charge),
-            stun: t::EMERGE_STUN + t::EMERGE_CHARGE_STUN * charge,
-            hitstop: t::EMERGE_HITSTOP + t::EMERGE_CHARGE_HITSTOP * charge,
-            shake: t::EMERGE_SHAKE + t::EMERGE_CHARGE_SHAKE * charge,
-            finisher: false,
-            poison: 0.0,
-        }
-    }
-
-    fn claw_strike(&self, idx: usize, dir: Vec2) -> Strike {
-        let h = self.moveset.hits[idx];
-        Strike {
-            id: self.swing_id,
-            kind: StrikeKind::Claw(idx),
-            shape: Shape::Sector {
-                origin: self.pos + dir * 2.0,
-                dir,
-                r: h.range,
-            },
-            damage: h.damage + self.stats.damage,
-            knockback: if idx == self.moveset.last() {
-                // 콤보의 이음을 모두 박자에 맞췄으면 마무리 타가 더 멀리 민다(0168).
-                let full = if self.combo_beats >= self.moveset.last() {
-                    t::FULL_BEAT_KNOCK
-                } else {
-                    1.0
-                };
-                h.knockback * self.stats.finisher_knockback * full
-            } else {
-                h.knockback
-            },
-            stun: h.stun,
-            // 박자에 맞춘 타는 멈춤·흔들림이 조금 더(0168).
-            hitstop: h.hitstop
-                + if self.on_beat {
-                    t::BEAT_HITSTOP_BONUS
-                } else {
-                    0.0
-                },
-            shake: h.shake
-                + if self.on_beat {
-                    t::BEAT_SHAKE_BONUS
-                } else {
-                    0.0
-                },
-            finisher: idx == self.moveset.last(),
-            poison: h.poison,
-        }
-    }
-
-    /// 강공격(0161): 다 모으고 뗐다. 받아치기 창은 늘 열린다(모으는 데 0.45초가 들어 연타가 안 된다).
-    fn start_heavy(&mut self, dir: Vec2, after: usize, perfect: bool) {
-        self.facing = dir;
-        self.swing_id += 1;
-        self.swing_age = 0.0;
-        self.parry_open = true;
-        self.parry_cd = t::PARRY_COOLDOWN;
-        self.vel += dir * self.moveset.heavy().lunge;
-        self.attack_buf = 0.0;
-        self.combo_timer = 0.0;
-        self.on_beat = false;
-        self.state = State::Heavy {
-            time: 0.0,
-            dir,
-            after,
-            perfect,
-        };
-        self.events.push(Event::Heavy);
-        if perfect {
-            self.events.push(Event::HeavyPerfect);
-        }
-    }
-
-    fn heavy_strike(&self, dir: Vec2, perfect: bool) -> Strike {
-        let h = self.moveset.heavy();
-        let bonus = if perfect { 1 } else { 0 };
-        Strike {
-            id: self.swing_id,
-            kind: StrikeKind::Heavy,
-            shape: Shape::Sector {
-                origin: self.pos + dir * 2.0,
-                dir,
-                r: h.range,
-            },
-            damage: h.damage + self.stats.damage + bonus * t::HEAVY_PERFECT_DAMAGE,
-            knockback: h.knockback * self.stats.finisher_knockback,
-            stun: h.stun,
-            hitstop: h.hitstop + bonus as f32 * t::HEAVY_PERFECT_HITSTOP,
-            shake: h.shake,
-            finisher: true,
-            poison: h.poison,
-        }
     }
 
     /// 피해를 입힌다. 무적이면 false.
