@@ -248,6 +248,12 @@ impl Enemy {
         }
     }
 
+    /// 받아칠 수 있는 공격인가(0160): 곧게 오는 돌진(물기·구르기·내리꽂기도 `Charge`)만. 내려앉기·튀어나오기는
+    /// 둘레 공격이라 안 된다. 예고도 띠·점선(황금) ↔ 고리(진홍, ✕)로 갈린다.
+    pub fn parryable(&self) -> bool {
+        matches!(self.state, State::Charge { .. })
+    }
+
     /// 피해 판정 반지름(내려앉는·튀어나오는 순간은 둘레까지).
     pub fn contact_radius(&self) -> f32 {
         match self.state {
@@ -918,6 +924,25 @@ fn idle_of(b: Behavior) -> State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 받아치기 규칙(0160): 곧게 오는 돌진만, 내려앉기는 안 된다.
+    #[test]
+    fn only_straight_charges_are_parryable() {
+        let mut e = Enemy::new(Kind::FieldMouse, vec2(100.0, 100.0));
+        e.state = State::Charge {
+            time: 0.0,
+            dir: vec2(1.0, 0.0),
+        };
+        assert!(e.parryable());
+        let mut l = Enemy::new(Kind::RedSquirrel, vec2(100.0, 100.0));
+        l.state = State::Leap {
+            time: l.sp().dash_time,
+            from: vec2(80.0, 100.0),
+            to: vec2(120.0, 100.0),
+        };
+        assert!(l.contact_damage().is_some(), "내려앉는 순간은 아프다");
+        assert!(!l.parryable(), "하지만 받아칠 수는 없다");
+    }
 
     const FIELD_HP: i32 = species::FIELD_MOUSE.hp;
 

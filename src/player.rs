@@ -534,12 +534,18 @@ impl Player {
             }
             State::Burrow { time: was } => {
                 let time = was + dt;
-                self.pos += move_dir * t::PLAYER_SPEED * t::BURROW_SPEED_FACTOR * dt;
+                // 정한 시간까지는 빠르게 파고 가고(대시), 힘을 모으는 동안은 느리다(0160).
+                let base = self.talents.burrow_time();
+                let factor = if was < base {
+                    t::BURROW_DASH_FACTOR
+                } else {
+                    t::BURROW_CHARGE_FACTOR
+                };
+                self.pos += move_dir * t::PLAYER_SPEED * factor * dt;
                 self.state = State::Burrow { time };
                 let early = (self.dodge_buf > 0.0 && time > 0.05) || self.attack_buf > 0.0;
                 // 톡 누르면 정한 시간, 누르고 있으면 BURROW_HOLD_EXTRA까지 더 머문다(떼면 솟구침, 0101).
                 // 더 머무는 동안은 힘을 모은다(0158): 정한 시간을 넘기는 틱에 땅이 울기 시작.
-                let base = self.talents.burrow_time();
                 if a.dodge_held && was < base && time >= base {
                     self.events.push(Event::Rumble);
                 }
@@ -1371,6 +1377,43 @@ mod tests {
         let mut p = Player::new(room.center());
         let half = secs(&mut p, 36); // 0.6초에 뗀다
         assert!((half - 0.6).abs() < 0.04, "떼면 바로 솟구친다 {half}");
+    }
+
+    /// 땅속 대시(0160): 정한 시간까지는 빠르게, 힘을 모으는 동안은 느리게 간다.
+    #[test]
+    fn burrow_dashes_fast_then_slows_while_charging() {
+        let room = Room::new();
+        let mut p = Player::new(room.center());
+        let dig = Actions {
+            dodge: true,
+            dodge_held: true,
+            move_dir: vec2(1.0, 0.0),
+            ..Default::default()
+        };
+        tick(&mut p, &room, &dig);
+        let go = Actions {
+            dodge_held: true,
+            move_dir: vec2(1.0, 0.0),
+            ..Default::default()
+        };
+        let x0 = p.pos.x;
+        let base_ticks = (t::BURROW_MAX_TIME / t::TICK_DT) as usize;
+        for _ in 0..base_ticks {
+            tick(&mut p, &room, &go);
+        }
+        let dash = p.pos.x - x0;
+        let x1 = p.pos.x;
+        for _ in 0..base_ticks {
+            tick(&mut p, &room, &go);
+        }
+        let crawl = p.pos.x - x1;
+        assert!(matches!(p.state, State::Burrow { .. }));
+        assert!(
+            dash > crawl * 3.0,
+            "대시 {dash} 는 모으는 동안 {crawl} 보다 훨씬 멀리"
+        );
+        let plain = t::PLAYER_SPEED * t::BURROW_MAX_TIME;
+        assert!(dash > plain * 1.8, "걷기보다 훨씬 빠르다 {dash} vs {plain}");
     }
 
     /// 힘 모으기(0158): 톡은 보통 솟구침, 정한 시간을 넘겨 누르고 있으면 힘이 차고(땅이 운다) 끝까지 모으면

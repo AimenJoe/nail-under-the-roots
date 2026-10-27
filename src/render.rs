@@ -4136,6 +4136,50 @@ fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     }
     let pos = lerp(p.prev_pos, p.pos, alpha);
     let moving = (p.pos - p.prev_pos).length() > 0.05;
+    // 파고들기(0160): 첫 BURROW_DIVE_TIME 동안 서 있는 그림이 땅속으로 가라앉고 흙더미가 솟는다.
+    if let player::State::Burrow { time: bt } = p.state {
+        if bt < t::BURROW_DIVE_TIME {
+            let k = (bt / t::BURROW_DIVE_TIME).clamp(0.0, 1.0);
+            let sink = (16.0 * k).round();
+            if sink < 16.0 {
+                draw_texture_ex(
+                    art.nail_fur(fur),
+                    pos.x - 8.0,
+                    pos.y - 8.0 + sink,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(0.0, 0.0, art::CELL, art::CELL - sink)),
+                        dest_size: Some(vec2(16.0, 16.0 - sink)),
+                        flip_x: p.face_left,
+                        ..Default::default()
+                    },
+                );
+            }
+            // 흙더미는 아래서부터 올라온다.
+            let rise = (16.0 * (1.0 - k)).round();
+            draw_texture_ex(
+                art.nail_fur(fur),
+                pos.x - 8.0,
+                pos.y - 8.0 + rise,
+                WHITE,
+                DrawTextureParams {
+                    source: Some(Rect::new(0.0, art::CELL * 2.0, art::CELL, art::CELL - rise)),
+                    dest_size: Some(vec2(16.0, 16.0 - rise)),
+                    flip_x: p.face_left,
+                    ..Default::default()
+                },
+            );
+            return;
+        }
+    }
+    // 솟구치기(0160): 폴짝 튀어 올랐다 내려앉는다.
+    let pop = match p.state {
+        player::State::Emerge { time: et, .. } => {
+            let k = (et / t::EMERGE_TIME).clamp(0.0, 1.0);
+            (t::EMERGE_POP_HEIGHT * (k * std::f32::consts::PI).sin()).round()
+        }
+        _ => 0.0,
+    };
     let (col, row) = match p.state {
         player::State::Dead => (4, 1),
         // 힘을 모으면(0158) 흙더미가 더 빨리 들썩인다.
@@ -4173,10 +4217,13 @@ fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     } else {
         WHITE
     };
+    if pop > 0.0 {
+        draw_ellipse(pos.x, pos.y + 6.0, 7.0 - pop * 0.25, 2.5, 0.0, SHADOW_SOFT);
+    }
     draw_texture_ex(
         art.nail_fur(fur),
         pos.x - 8.0,
-        pos.y - 8.0,
+        pos.y - 8.0 - pop,
         tint,
         DrawTextureParams {
             source: Some(art::cell(col, row)),
@@ -4607,9 +4654,42 @@ fn draw_player_halo(p: Vec2, time: f32) {
 /// 색이 아니라 밝기로 읽히게 올리고, 채움은 그대로 옅게 둔다("너무 샛빨갛다", 2026-10-25).
 const TELEGRAPH_FILL: (f32, f32) = (0.03, 0.16);
 const TELEGRAPH_EDGE: (f32, f32) = (0.3, 0.65);
-const TELEGRAPH_EDGE_RGB: (f32, f32, f32) = (1.0, 0.55, 0.50);
+/// 못 튕겨내는 공격(둘레: 내려앉기·포자·돌): 진홍. 가운데 ✕도 함께(0160).
+const TELEGRAPH_EDGE_RGB: (f32, f32, f32) = (1.0, 0.32, 0.36);
+const TELEGRAPH_FILL_RGB: (f32, f32, f32) = (0.95, 0.25, 0.30);
+/// 튕겨낼 수 있는 공격(곧게 오는 것: 돌진 띠·던지기·혀 점선): 황금. 진홍보다 밝아 색약·흑백에서도 갈린다(0160).
+const PARRY_EDGE_RGB: (f32, f32, f32) = (1.0, 0.88, 0.45);
+const PARRY_FILL_RGB: (f32, f32, f32) = (1.0, 0.80, 0.35);
 /// 마지막 깜빡임은 거의 흰빛.
-const TELEGRAPH_BLINK: Color = Color::new(1.0, 0.85, 0.80, 0.85);
+const TELEGRAPH_BLINK: Color = Color::new(1.0, 0.95, 0.85, 0.9);
+
+/// 못 튕겨내는 둘레 공격의 ✕(0160): 고리 가운데, 어두운 밑띠 위에 테두리 색 2px.
+fn draw_no_parry_mark(at: Vec2, edge: Color) {
+    let (x, y) = (at.x.round(), at.y.round());
+    let rim = Color::new(0.1, 0.02, 0.04, edge.a * 0.5);
+    for d in -4..=4 {
+        let d = d as f32;
+        draw_rectangle(x + d - 1.0, y + d - 1.0, 4.0, 4.0, rim);
+        draw_rectangle(x + d - 1.0, y - d - 1.0, 4.0, 4.0, rim);
+    }
+    for d in -4..=4 {
+        let d = d as f32;
+        draw_rectangle(x + d, y + d, 2.0, 2.0, edge);
+        draw_rectangle(x + d, y - d, 2.0, 2.0, edge);
+    }
+}
+
+/// 못 튕겨내는 고리(0160): 어두운 밑띠 위에 진홍 1px — 풀밭에서 갈색으로 묻히지 않게.
+fn draw_no_parry_ring(at: Vec2, r: f32, edge: Color) {
+    draw_circle_lines(
+        at.x,
+        at.y,
+        r,
+        3.0,
+        Color::new(0.1, 0.02, 0.04, edge.a * 0.45),
+    );
+    draw_circle_lines(at.x, at.y, r, 1.0, edge);
+}
 
 /// 공격 예고(바닥, 적·플레이어보다 먼저 그린다): 맞을 자리를 붉게, 공격 순간이 가까울수록 진하게.
 /// - 돌격형(떨기): 돌진할 길(몸 폭 × 돌진 거리, 벽에서 끊김)을 띠로. 방향은 지금 보는 쪽(떨기 끝에 굳는다).
@@ -4642,7 +4722,8 @@ fn draw_telegraphs(w: &World, alpha: f32) {
                 TELEGRAPH_EDGE.0 + (TELEGRAPH_EDGE.1 - TELEGRAPH_EDGE.0) * k,
             )
         };
-        draw_circle_lines(r.pos.x, r.pos.y, rad * (1.5 - 0.5 * k), 1.0, edge);
+        draw_no_parry_ring(r.pos, rad * (1.5 - 0.5 * k), edge);
+        draw_no_parry_mark(r.pos, edge);
     }
     for e in w.enemies.iter().filter(|e| e.alive && !e.asleep) {
         let sp = e.sp();
@@ -4677,20 +4758,22 @@ fn draw_telegraphs(w: &World, alpha: f32) {
         // 채움은 아주 옅게(최대 16%), 테두리가 주로 읽힌다. 깜빡임도 흰 번쩍이 아니라 조금 더 진한 붉은빛.
         let blink = k > 0.85 && ((w.time * 16.0) as i32) % 2 == 0;
         let edge_a = TELEGRAPH_EDGE.0 + (TELEGRAPH_EDGE.1 - TELEGRAPH_EDGE.0) * k;
+        // 띠·점선(곧게 오는 것)은 튕겨낼 수 있어 황금, 고리(둘레)는 못 튕겨 진홍(0160).
+        let parry = kind == 0 || kind == 1;
+        let (er, ef) = if parry {
+            (PARRY_EDGE_RGB, PARRY_FILL_RGB)
+        } else {
+            (TELEGRAPH_EDGE_RGB, TELEGRAPH_FILL_RGB)
+        };
         let edge = if blink {
             TELEGRAPH_BLINK
         } else {
-            Color::new(
-                TELEGRAPH_EDGE_RGB.0,
-                TELEGRAPH_EDGE_RGB.1,
-                TELEGRAPH_EDGE_RGB.2,
-                edge_a,
-            )
+            Color::new(er.0, er.1, er.2, edge_a)
         };
         let fill = Color::new(
-            0.95,
-            0.35,
-            0.35,
+            ef.0,
+            ef.1,
+            ef.2,
             TELEGRAPH_FILL.0 + (TELEGRAPH_FILL.1 - TELEGRAPH_FILL.0) * k,
         );
         match kind {
@@ -4702,19 +4785,24 @@ fn draw_telegraphs(w: &World, alpha: f32) {
                 let (a, b) = (pos + dir * r, pos + dir * (len + r));
                 draw_triangle(a + side, a - side, b + side, fill);
                 draw_triangle(a - side, b - side, b + side, fill);
+                // 황금 테두리 밑에 어두운 띠(0160): 밝은 풀밭·색약·흑백에서도 선이 남는다.
+                let tip = b + dir * 3.0;
+                let rim = Color::new(0.1, 0.05, 0.02, edge.a * 0.45);
+                for s in [side, -side] {
+                    draw_line(a.x + s.x, a.y + s.y, b.x + s.x, b.y + s.y, 3.0, rim);
+                    draw_line(b.x + s.x, b.y + s.y, tip.x, tip.y, 3.0, rim);
+                }
                 for s in [side, -side] {
                     draw_line(a.x + s.x, a.y + s.y, b.x + s.x, b.y + s.y, 1.0, edge);
+                    draw_line(b.x + s.x, b.y + s.y, tip.x, tip.y, 1.0, edge);
                 }
-                // 끝 화살촉
-                let tip = b + dir * 3.0;
-                draw_line(b.x + side.x, b.y + side.y, tip.x, tip.y, 1.0, edge);
-                draw_line(b.x - side.x, b.y - side.y, tip.x, tip.y, 1.0, edge);
             }
             3 => {
                 // 포자버섯: 구름이 덮을 자리. 고리가 안에서 밖으로 부푼다.
                 let r = t::SPORE_CLOUD_R;
                 draw_circle(pos.x, pos.y, r, fill);
-                draw_circle_lines(pos.x, pos.y, r * (0.5 + 0.5 * k), 1.0, edge);
+                draw_no_parry_ring(pos, r * (0.5 + 0.5 * k), edge);
+                draw_no_parry_mark(pos + vec2(0.0, -r - 6.0), edge);
             }
             1 => {
                 let dir = e.facing.normalize_or(vec2(1.0, 0.0));
@@ -4734,6 +4822,15 @@ fn draw_telegraphs(w: &World, alpha: f32) {
                     // 줄은 1px라 띠보다 잘 안 보인다: 처음부터 조금 진하게.
                     let fade = 1.0 - d / 150.0 * 0.5;
                     let c = Color::new(edge.r, edge.g, edge.b, edge.a.max(0.3) * fade);
+                    // 점선도 어두운 밑띠 위에(0160).
+                    draw_line(
+                        p0.x,
+                        p0.y,
+                        p1.x,
+                        p1.y,
+                        3.0,
+                        Color::new(0.1, 0.05, 0.02, c.a * 0.45),
+                    );
                     draw_line(p0.x, p0.y, p1.x, p1.y, 1.0, c);
                     d += 5.0;
                 }
@@ -4749,9 +4846,10 @@ fn draw_telegraphs(w: &World, alpha: f32) {
                 let r = sp.land_radius;
                 draw_circle(at.x, at.y, r, fill);
                 // 고리가 바깥에서 조여 들어 내려앉을 때 딱 맞는다.
-                draw_circle_lines(at.x, at.y, r * (1.5 - 0.5 * k), 1.0, edge);
+                draw_no_parry_ring(at, r * (1.5 - 0.5 * k), edge);
                 let inner = Color::new(edge.r, edge.g, edge.b, edge.a * 0.5);
                 draw_circle_lines(at.x, at.y, r, 1.0, inner);
+                draw_no_parry_mark(at, edge);
             }
         }
     }

@@ -487,16 +487,18 @@ impl World {
             match ev {
                 player::Event::Swing(i) => sfx.play(sfx::Id::Claw(*i)),
                 player::Event::Burrow => {
+                    // 파고들기(0160): 흙이 확 튀고 화면이 살짝 — 톡 한 번이 "동작"으로 읽히게.
                     self.burrows += 1;
                     sfx.play(sfx::Id::Burrow);
-                    self.fx.push(ring(self.player.pos, 4.0, 12.0, 0.2, DIRT));
-                    clods(&mut self.fx, self.player.pos, 5, DIRT, 40.0);
+                    self.feel.add_trauma(0.12);
+                    self.fx.push(ring(self.player.pos, 4.0, 18.0, 0.22, DIRT));
+                    clods(&mut self.fx, self.player.pos, 10, DIRT, 85.0);
                     puff(
                         &mut self.fx,
                         self.player.pos,
-                        2,
+                        3,
                         self.biome.dust(),
-                        5.0,
+                        6.0,
                         0.4,
                     );
                 }
@@ -1261,7 +1263,9 @@ impl World {
                     let rr = pr + e.contact_radius();
                     if (e.pos - ppos).length_squared() <= rr * rr {
                         let from = (e.pos - ppos).normalize_or_zero();
-                        if parry.is_some_and(|d| d.dot(from) > t::PARRY_FRONT) {
+                        // 곧게 오는 것(돌진·물기·구르기·내리꽂기)만 받아친다(0160). 내려앉기·튀어나오기 같은 둘레 공격은
+                        // 고리로 예고하고 비켜야 한다 — "띠·점선은 튕겨내고 고리는 피한다".
+                        if e.parryable() && parry.is_some_and(|d| d.dot(from) > t::PARRY_FRONT) {
                             // 패링: 돌진을 받아쳐 크게 멈칫하게 한다. 피해 없음.
                             // 되받아치기(재주, 0047)면 피해도 준다.
                             let counter = self.player.talents.parry_counter();
