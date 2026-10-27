@@ -154,6 +154,7 @@ impl Renderer {
                 if bright { 0.0 } else { 1.0 },
             ),
         );
+        m.set_uniform("Fade", vec2(t::FIRE_SHADOW_FADE.0, t::FIRE_SHADOW_FADE.1));
         gl_use_material(m);
         let a = if bright {
             t::SUN_SHADOW_ALPHA
@@ -3110,10 +3111,16 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
             list.push((n.pos.y + 9.0, Drawable::Neighbor(i)));
             continue;
         }
-        list.push((n.pos.y + 6.0, Drawable::Neighbor(i)));
-        let rx = if big { 12.0 } else { 6.0 };
+        // 보리(32px 그림)는 발이 그림 맨 아래 줄(pos.y + 7)이고 몸이 발보다 넓다: 발밑 그림자를 발 줄에 크게 두어야
+        // 몸 밖으로 보인다(y + 6, 가로 12였을 때는 몸에 거의 다 가려 그림자가 없는 것처럼 보였다).
+        let (foot, shadow_y, rx, ry): (f32, f32, f32, f32) = if big {
+            (7.0, 7.5, 14.0, 3.0)
+        } else {
+            (6.0, 6.0, 6.0, 2.5)
+        };
+        list.push((n.pos.y + foot, Drawable::Neighbor(i)));
         if ground {
-            draw_ellipse(n.pos.x, n.pos.y + 6.0, rx, 2.5, 0.0, SHADOW_SOFT);
+            draw_ellipse(n.pos.x, n.pos.y + shadow_y, rx, ry, 0.0, SHADOW_SOFT);
         }
     }
     if let Some(v) = &w.adv.village {
@@ -4615,6 +4622,7 @@ fn silhouette_material() -> Option<Material> {
         world = position.xy;
     }"#;
     // Fire = (불 x, 불 y, 닿는 거리, 어두운 곳이면 1): 어두운 곳은 불에서 멀수록 옅게(0103).
+    // Fade = 옅어지기 시작·다 사라지는 거리(닿는 거리의 비율, t::FIRE_SHADOW_FADE).
     const FRAGMENT: &str = r#"#version 100
     precision mediump float;
     varying lowp vec4 color;
@@ -4622,11 +4630,12 @@ fn silhouette_material() -> Option<Material> {
     varying highp vec2 world;
     uniform sampler2D Texture;
     uniform vec4 Fire;
+    uniform vec2 Fade;
     void main() {
         // 반투명(빛 원·잔상·옅은 고리)은 그림자를 드리우지 않는다: 반쯤 넘게 채운 점만 모양으로 친다(0106).
         float a = step(0.5, texture2D(Texture, uv).a);
         float d = distance(world, Fire.xy);
-        float fade = mix(1.0, 1.0 - smoothstep(0.55 * Fire.z, Fire.z, d), Fire.w);
+        float fade = mix(1.0, 1.0 - smoothstep(Fade.x * Fire.z, Fade.y * Fire.z, d), Fire.w);
         gl_FragColor = vec4(0.10, 0.06, 0.14, a * color.a * fade);
     }"#;
     load_material(
@@ -4647,7 +4656,10 @@ fn silhouette_material() -> Option<Material> {
                 )),
                 ..Default::default()
             },
-            uniforms: vec![UniformDesc::new("Fire", UniformType::Float4)],
+            uniforms: vec![
+                UniformDesc::new("Fire", UniformType::Float4),
+                UniformDesc::new("Fade", UniformType::Float2),
+            ],
             ..Default::default()
         },
     )
