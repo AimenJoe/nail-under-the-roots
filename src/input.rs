@@ -360,17 +360,17 @@ pub fn verb(v: Verb) -> &'static str {
         Device::Touch => match v {
             Verb::Confirm | Verb::Pick | Verb::Tabs => s.v_touch,
             Verb::Back => s.v_touch_out,
-            Verb::Menu => "MENU",
+            Verb::Menu => s.tab_menu,
             Verb::Walk => s.v_drag,
             Verb::Change => "◀▶",
             Verb::Skip => s.v_touch_here,
-            Verb::Restart => "ATK",
+            Verb::Restart => s.act_attack,
         },
     }
 }
 
 /// 동사 이름이 누르는 것(키·패드 버튼·터치 화면 버튼)인가 — 그렇다면 안내 글에서 키캡으로 그린다(0153).
-/// 터치의 "탭"·"바깥 탭"·"끌기"는 손짓이라 글 그대로, 화면 버튼(MENU·ATK)은 키캡.
+/// 터치의 "탭"·"바깥 탭"·"끌기"는 손짓이라 글 그대로, 화면 버튼(메뉴·공격)은 키캡.
 pub fn verb_is_button(v: Verb) -> bool {
     device() != Device::Touch || matches!(v, Verb::Menu | Verb::Restart)
 }
@@ -391,15 +391,19 @@ pub fn prompt(a: Act) -> &'static str {
     match device() {
         Device::Pad => b.pad(a).label(),
         Device::Keys => b.key_label(a),
-        Device::Touch => match a {
-            Act::Attack => "ATK",
-            Act::Dodge => "DIG",
-            Act::Special => "SP",
-            Act::UseItem => "ITEM",
-            Act::ItemPrev | Act::ItemNext => "<>",
-            // 터치에는 지도 버튼이 없다: 메뉴 → 지도 탭.
-            Act::Map => "MENU",
-        },
+        // 터치 버튼은 그림(0172)이라 글에는 동작 이름을 쓴다(설정 화면의 이름과 같다).
+        Device::Touch => {
+            let s = crate::i18n::s();
+            match a {
+                Act::Attack => s.act_attack,
+                Act::Dodge => s.act_dodge,
+                Act::Special => s.act_special,
+                Act::UseItem => s.act_use_item,
+                Act::ItemPrev | Act::ItemNext => "◀▶",
+                // 터치에는 지도 버튼이 없다: 메뉴 → 지도 탭.
+                Act::Map => s.tab_menu,
+            }
+        }
     }
 }
 
@@ -512,8 +516,6 @@ struct NavRepeat {
 /// 화면 좌표(논리 px) 기준. 렌더가 `overlay()`로 읽어 그린다.
 #[derive(Default)]
 struct TouchState {
-    /// 한 번이라도 터치가 들어오면 오버레이를 보인다.
-    seen: bool,
     stick: Option<TouchStick>,
     /// 지난 프레임까지 본 터치 id. 처음 보는 id가 "눌림"이다.
     /// (`TouchPhase::Started`에 기대면 안 된다: 실제 손가락은 touchstart 직후 touchmove가 같은 프레임에 들어와
@@ -523,6 +525,8 @@ struct TouchState {
     dig: Option<u64>,
     /// 공격 버튼 위에서 시작해 아직 떼지 않은 손가락(강공격 모으기, 0161).
     atk: Option<u64>,
+    /// 이번 프레임에 화면에 손가락이 있었다(버튼·스틱이 아니어도). 장치 = 터치로 본다(0036·0172).
+    active: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -540,11 +544,22 @@ pub struct TouchOverlay {
     pub buttons: [TouchButton; 6],
 }
 
+/// 터치 버튼이 하는 일. 그림(픽토그램)은 렌더가 캐릭터 표(`characters::Icon`)에서 고른다(0172).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TouchKind {
+    Attack,
+    Dodge,
+    Menu,
+    Special,
+    Item,
+    ItemSwitch,
+}
+
 #[derive(Clone, Copy)]
 pub struct TouchButton {
     pub center: Vec2,
     pub radius: f32,
-    pub label: &'static str,
+    pub kind: TouchKind,
     /// 다시 쓸 수 있기까지의 진행(1 = 지금 쓸 수 있음). 앱이 월드의 대기를 넣는다(docs/decisions/0038).
     pub ready: f32,
 }
@@ -580,38 +595,38 @@ fn layout_for(w: f32, h: f32) -> TouchOverlay {
             TouchButton {
                 center: atk,
                 radius: atk_r,
-                label: "ATK",
+                kind: TouchKind::Attack,
                 ready: 1.0,
             },
             TouchButton {
                 center: dig,
                 radius: dig_r,
-                label: "DIG",
+                kind: TouchKind::Dodge,
                 ready: 1.0,
             },
             TouchButton {
                 center: vec2(r * 1.2, r * 1.2),
                 radius: r * 0.75,
-                label: "MENU",
+                kind: TouchKind::Menu,
                 ready: 1.0,
             },
             TouchButton {
                 center: sp,
                 radius: sp_r,
-                label: "SP",
+                kind: TouchKind::Special,
                 ready: 1.0,
             },
             TouchButton {
                 // 아이템: 굴파기와 필살기 사이, 왼쪽 위 대각선.
                 center: vec2(dig.x + r * 0.2, sp.y + r * 0.4),
                 radius: r * 0.8,
-                label: "ITEM",
+                kind: TouchKind::Item,
                 ready: 1.0,
             },
             TouchButton {
                 center: vec2(dig.x - r * 2.0, sp.y - r * 0.2),
                 radius: r * 0.55,
-                label: "<>",
+                kind: TouchKind::ItemSwitch,
                 ready: 1.0,
             },
         ],
@@ -642,9 +657,10 @@ impl Input {
         }
     }
 
-    /// 터치가 한 번이라도 있었고 게임 모드면 오버레이 정보를 돌려준다.
+    /// 지금 쓰는 장치가 터치이고(마지막으로 만진 것이 화면, 0036) 게임 모드면 오버레이 정보를 돌려준다.
+    /// 패드·키보드를 만지면 바로 사라진다(0172).
     pub fn overlay(&self) -> Option<TouchOverlay> {
-        if !self.touch.seen || self.menu_mode {
+        if device() != Device::Touch || self.menu_mode {
             return None;
         }
         let mut o = touch_layout();
@@ -664,7 +680,11 @@ impl Input {
             set_device(Device::Keys);
         }
         let touch = self.read_touch();
-        if touch.tap.is_some() || touch.move_dir != Vec2::ZERO || any_edge(&touch) {
+        if self.touch.active
+            || touch.tap.is_some()
+            || touch.move_dir != Vec2::ZERO
+            || any_edge(&touch)
+        {
             set_device(Device::Touch);
         }
         let mouse = read_mouse();
@@ -731,10 +751,10 @@ impl Input {
     fn read_touch(&mut self) -> Actions {
         let mut a = Actions::default();
         let touches = touches();
+        self.touch.active = !touches.is_empty();
         if touches.is_empty() && self.touch.stick.is_none() && self.touch.known.is_empty() {
             return a;
         }
-        self.touch.seen = true;
         let layout = touch_layout();
         let half = screen_width() * 0.5;
         // macroquad 0.4.16: screen_width()·mouse_position()은 DPI로 나눈 논리 픽셀인데 touches()만 물리 픽셀이다.
@@ -762,24 +782,24 @@ impl Input {
                     .iter()
                     .find(|b| (t.position - b.center).length() <= b.radius * 1.3)
                 {
-                    match b.label {
-                        "ATK" => {
+                    match b.kind {
+                        TouchKind::Attack => {
                             a.attack = true;
                             a.confirm = true;
                             if !ended {
                                 self.touch.atk = Some(t.id);
                             }
                         }
-                        "DIG" => {
+                        TouchKind::Dodge => {
                             a.dodge = true;
                             if !ended {
                                 self.touch.dig = Some(t.id);
                             }
                         }
-                        "SP" => a.special = true,
-                        "ITEM" => a.use_item = true,
-                        "<>" => a.item_next = true,
-                        _ => a.menu = true,
+                        TouchKind::Special => a.special = true,
+                        TouchKind::Item => a.use_item = true,
+                        TouchKind::ItemSwitch => a.item_next = true,
+                        TouchKind::Menu => a.menu = true,
                     }
                 } else if t.position.x < half && self.touch.stick.is_none() && !ended {
                     self.touch.stick = Some(TouchStick {
@@ -1001,6 +1021,7 @@ fn read_keyboard() -> Actions {
 }
 
 /// 이동을 뺀 눌림이 하나라도 있나(안내 글 장치 판정).
+/// 장치를 바꾸는 누름: 게임 동작·메뉴 동사·메뉴 탐색 한 칸(D패드·화살표 톡). 스틱·이동 축은 따로 본다.
 fn any_edge(a: &Actions) -> bool {
     a.attack
         || a.dodge
@@ -1012,6 +1033,12 @@ fn any_edge(a: &Actions) -> bool {
         || a.confirm
         || a.cancel
         || a.menu
+        || a.up
+        || a.down
+        || a.left
+        || a.right
+        || a.tab_prev
+        || a.tab_next
 }
 
 /// 마우스는 보조: 왼쪽 클릭을 탭으로.
@@ -1215,7 +1242,11 @@ mod tests {
             (667.0, 375.0),
         ] {
             let l = layout_for(w, h);
-            let atk = l.buttons.iter().find(|b| b.label == "ATK").unwrap();
+            let atk = l
+                .buttons
+                .iter()
+                .find(|b| b.kind == TouchKind::Attack)
+                .unwrap();
             assert!(l.buttons.iter().all(|b| b.radius <= atk.radius), "{w}x{h}");
             assert!(
                 atk.radius * 2.0 >= 0.25 * w.min(h),
@@ -1224,21 +1255,21 @@ mod tests {
             for (i, a) in l.buttons.iter().enumerate() {
                 assert!(
                     a.center.x - a.radius >= 0.0 && a.center.x + a.radius <= w,
-                    "{w}x{h} {}",
-                    a.label
+                    "{w}x{h} {:?}",
+                    a.kind
                 );
                 assert!(
                     a.center.y - a.radius >= 0.0 && a.center.y + a.radius <= h,
-                    "{w}x{h} {}",
-                    a.label
+                    "{w}x{h} {:?}",
+                    a.kind
                 );
                 for b in &l.buttons[i + 1..] {
                     let d = (a.center - b.center).length();
                     assert!(
                         d >= a.radius + b.radius,
-                        "{w}x{h}: {} {} 겹침",
-                        a.label,
-                        b.label
+                        "{w}x{h}: {:?} {:?} 겹침",
+                        a.kind,
+                        b.kind
                     );
                 }
             }
@@ -1266,13 +1297,13 @@ mod tests {
         assert_eq!(verb(Verb::Confirm), Pad::South.label());
         assert_eq!(verb(Verb::Tabs), "LB/RB");
         set_device(Device::Touch);
-        assert_eq!(prompt(Act::Attack), "ATK");
-        assert_eq!(prompt(Act::Dodge), "DIG");
+        assert_eq!(prompt(Act::Attack), crate::i18n::s().act_attack);
+        assert_eq!(prompt(Act::Dodge), crate::i18n::s().act_dodge);
         assert_eq!(verb(Verb::Confirm), crate::i18n::s().v_touch);
         for d in [Device::Keys, Device::Pad, Device::Touch] {
             set_device(d);
             assert!(all.iter().all(|v| !verb(*v).is_empty()), "{d:?}");
-            // 키·패드는 다 누르는 것, 터치는 화면 버튼(MENU·ATK)만(손짓 "탭"은 글 그대로).
+            // 키·패드는 다 누르는 것, 터치는 화면 버튼(메뉴·공격)만(손짓 "탭"은 글 그대로).
             let caps: Vec<_> = all.iter().filter(|v| verb_is_button(**v)).collect();
             match d {
                 Device::Touch => assert_eq!(caps, [&Verb::Menu, &Verb::Restart]),

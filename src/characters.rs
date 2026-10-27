@@ -22,6 +22,29 @@ pub enum Special {
     Chain,
 }
 
+/// 터치 버튼의 픽토그램(0172). 렌더(`render/hud.rs`)가 선으로 그린다.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Icon {
+    /// 발톱 세 줄(공격).
+    Claw,
+    /// 발자국(모모의 발차기).
+    Paw,
+    /// 흙더미로 들어가는 화살표(굴파기).
+    Mound,
+    /// 포물선 화살표(깡충).
+    Hop,
+    /// 드릴(필살기).
+    Drill,
+    /// 세 번 뛰기(이어 뛰기).
+    Chain,
+    /// 산딸기(아이템).
+    Berry,
+    /// ◀▶(아이템 넘기기).
+    Switch,
+    /// ≡(메뉴).
+    Menu,
+}
+
 pub struct CharacterDef {
     pub id: Character,
     /// 이어하기·고르기 기록의 번호(바꾸지 않는다, 0056·0080).
@@ -48,6 +71,8 @@ pub struct CharacterDef {
     pub toast_web: Tr,
     /// 파 내려가는 전환(`draw_descent`)의 그림 줄. None = Naïl의 털빛 줄.
     pub dig_row: Option<u32>,
+    /// 터치 버튼 그림: 공격·회피·특기(0172).
+    pub touch: [Icon; 3],
 }
 
 pub static ALL: [CharacterDef; 2] = [
@@ -70,6 +95,7 @@ pub static ALL: [CharacterDef; 2] = [
         toast_thorn: |s| s.toast_thorn,
         toast_web: |s| s.toast_web,
         dig_row: None,
+        touch: [Icon::Claw, Icon::Mound, Icon::Drill],
     },
     // 돌아온 모모(0046) → 플레이어블(0056): 발차기 3연타, 깡충, 이어 뛰기(기 게이지). 자리 1·3의 재주는 제 것(0142).
     CharacterDef {
@@ -91,6 +117,7 @@ pub static ALL: [CharacterDef; 2] = [
         toast_thorn: |s| s.toast_thorn_momo,
         toast_web: |s| s.toast_web_momo,
         dig_row: Some(4),
+        touch: [Icon::Paw, Icon::Hop, Icon::Chain],
     },
 ];
 

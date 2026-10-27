@@ -2,6 +2,9 @@
 
 use super::*;
 
+use crate::characters::{CharacterDef, Icon};
+use crate::input::TouchKind;
+
 /// 보스 체력 막대(화면 위 가운데): 이름 + 막대. 깨어 있는 보스가 있을 때만.
 /// 위에 둔다: 던전 방(192px)이 화면(180px)보다 커서 방 아래쪽에 서면 아래 막대가 Naïl과 보스를 가렸다(0046).
 pub(super) fn draw_boss_bar(ui: &Ui, w: &World) {
@@ -303,8 +306,8 @@ pub(super) fn draw_title_background() {
     draw_rectangle(0.0, t::VIEW_H - 8.0, t::VIEW_W, 8.0, WALL_COLOR);
 }
 
-/// 터치 조작 오버레이(실제 해상도). 터치가 한 번이라도 있었을 때만.
-pub fn draw_touch_overlay(t: &TouchOverlay) {
+/// 터치 조작 오버레이(실제 해상도). 지금 장치가 터치일 때만(0172). 버튼 그림은 캐릭터 표에서.
+pub fn draw_touch_overlay(t: &TouchOverlay, ch: &CharacterDef) {
     let line = Color::new(1.0, 1.0, 1.0, 0.35);
     let fill = Color::new(1.0, 1.0, 1.0, 0.12);
     if let Some((origin, pos)) = t.stick {
@@ -335,15 +338,102 @@ pub fn draw_touch_overlay(t: &TouchOverlay) {
             draw_circle_lines(b.center.x, b.center.y, b.radius, 2.0, line);
         }
         let line = if ready < 1.0 { faint } else { line };
-        let fs = b.radius * 0.6;
-        let dim = measure_text(b.label, None, fs as u16, 1.0);
-        draw_text(
-            b.label,
-            b.center.x - dim.width / 2.0,
-            b.center.y + dim.height / 2.0,
-            fs,
-            line,
-        );
+        let icon = match b.kind {
+            TouchKind::Attack => ch.touch[0],
+            TouchKind::Dodge => ch.touch[1],
+            TouchKind::Special => ch.touch[2],
+            TouchKind::Item => Icon::Berry,
+            TouchKind::ItemSwitch => Icon::Switch,
+            TouchKind::Menu => Icon::Menu,
+        };
+        draw_touch_icon(icon, b.center, b.radius, line);
+    }
+}
+
+/// 터치 버튼의 픽토그램(0172): 선 몇 개로, 버튼 반지름에 비례. 글자 대신 — 글자는 읽어야 하고 언어를 탄다.
+fn draw_touch_icon(icon: Icon, c: Vec2, r: f32, col: Color) {
+    let s = r * 0.5;
+    let w = (r * 0.09).max(2.0);
+    let line = |a: Vec2, b: Vec2| draw_line(a.x, a.y, b.x, b.y, w, col);
+    // draw_arc: `rot`도에서 시계 방향으로 `arc`도(0° = 오른쪽, 270° = 위).
+    let arc = |cx: f32, cy: f32, rad: f32, rot: f32, deg: f32| {
+        draw_arc(cx, cy, 24, rad, rot, w, deg, col);
+    };
+    match icon {
+        Icon::Claw => {
+            for i in -1..=1 {
+                let o = i as f32 * s * 0.55;
+                let top = c + vec2(o - s * 0.35, -s * 0.9);
+                let mid = c + vec2(o - s * 0.05, s * 0.1);
+                let end = c + vec2(o + s * 0.35, s * 0.9);
+                line(top, mid);
+                line(mid, end);
+            }
+        }
+        Icon::Paw => {
+            draw_circle_lines(c.x, c.y + s * 0.35, s * 0.55, w, col);
+            for (dx, dy) in [(-0.75, -0.25), (0.0, -0.6), (0.75, -0.25)] {
+                draw_circle_lines(c.x + dx * s, c.y + dy * s, s * 0.25, w, col);
+            }
+        }
+        Icon::Mound => {
+            arc(c.x, c.y + s * 0.75, s * 0.9, 180.0, 180.0);
+            let top = c + vec2(0.0, -s * 1.0);
+            let tip = c + vec2(0.0, s * 0.3);
+            line(top, tip);
+            line(tip, tip + vec2(-s * 0.4, -s * 0.45));
+            line(tip, tip + vec2(s * 0.4, -s * 0.45));
+        }
+        Icon::Hop => {
+            let base = c + vec2(0.0, s * 0.45);
+            arc(base.x, base.y, s * 0.9, 180.0, 180.0);
+            let tip = base + vec2(s * 0.9, s * 0.15);
+            line(tip, tip + vec2(-s * 0.4, -s * 0.35));
+            line(tip, tip + vec2(s * 0.35, -s * 0.4));
+            line(c + vec2(-s * 1.0, s * 0.95), c + vec2(s * 1.0, s * 0.95));
+        }
+        Icon::Drill => {
+            let (a, b, tip) = (
+                c + vec2(-s * 0.9, -s * 0.6),
+                c + vec2(-s * 0.9, s * 0.6),
+                c + vec2(s * 1.0, 0.0),
+            );
+            draw_triangle_lines(a, b, tip, w, col);
+            line(
+                c + vec2(-s * 0.55, -s * 0.45),
+                c + vec2(-s * 0.25, s * 0.35),
+            );
+            line(c + vec2(-s * 0.1, -s * 0.3), c + vec2(s * 0.2, s * 0.2));
+        }
+        Icon::Chain => {
+            for (x, y, rad) in [(-0.65, 0.75, 0.3), (0.0, 0.45, 0.42), (0.7, 0.1, 0.55)] {
+                arc(c.x + x * s, c.y + y * s, rad * s, 180.0, 180.0);
+            }
+        }
+        Icon::Berry => {
+            let o = c + vec2(0.0, s * 0.25);
+            draw_circle_lines(o.x, o.y, s * 0.6, w, col);
+            let top = o + vec2(0.0, -s * 0.6);
+            line(top, top + vec2(s * 0.15, -s * 0.5));
+            draw_triangle_lines(
+                top,
+                top + vec2(s * 0.7, -s * 0.45),
+                top + vec2(s * 0.15, -s * 0.75),
+                w,
+                col,
+            );
+        }
+        Icon::Switch => {
+            line(c + vec2(-s * 0.2, -s * 0.6), c + vec2(-s * 0.8, 0.0));
+            line(c + vec2(-s * 0.8, 0.0), c + vec2(-s * 0.2, s * 0.6));
+            line(c + vec2(s * 0.2, -s * 0.6), c + vec2(s * 0.8, 0.0));
+            line(c + vec2(s * 0.8, 0.0), c + vec2(s * 0.2, s * 0.6));
+        }
+        Icon::Menu => {
+            for dy in [-0.55, 0.0, 0.55] {
+                line(c + vec2(-s * 0.8, s * dy), c + vec2(s * 0.8, s * dy));
+            }
+        }
     }
 }
 

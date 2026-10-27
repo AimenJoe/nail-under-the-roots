@@ -1380,7 +1380,7 @@ impl App {
             o.buttons[crate::input::TOUCH_SP].ready = p.sp / crate::tuning::SP_MAX;
             o.buttons[crate::input::TOUCH_ITEM].ready =
                 1.0 - p.item_cd / (crate::tuning::ITEM_COOLDOWN * p.eat_cd_mul);
-            render::draw_touch_overlay(&o);
+            render::draw_touch_overlay(&o, self.world.character.def());
         }
     }
 
