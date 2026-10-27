@@ -861,7 +861,9 @@ impl App {
     /// 시나리오가 만든 월드 위에 얹는다 — `scenario::build`는 기록을 모른다.
     fn seed_run_from_profile(&mut self, s: Scenario, ch: Character) {
         // 도감은 런을 넘어 남는다. 시든 꽃잎(0164)도.
-        self.world.story.petal_found = self.profile.flag(crate::profile::key::PETAL);
+        self.world
+            .story
+            .set_petal_found(self.profile.flag(crate::profile::key::PETAL));
         for k in crate::species::BESTIARY {
             if self.profile.flag(&crate::profile::key::mob(k)) && !self.world.seen.contains(&k) {
                 self.world.seen.push(k);
@@ -890,30 +892,24 @@ impl App {
         // 개발 시나리오 "모모"는 시나리오가 정한 값을 그대로 쓴다.
         if matches!(s, Scenario::Normal | Scenario::Village) {
             use crate::profile::key;
-            self.world.story.momo_wins =
-                self.profile.count(key::MOMO_WINS).min(t::MOMO_FIGHTS) as u8;
-            // 모모로 내려가면 모모 보스는 없다(0056).
-            self.world.story.momo_fight = s == Scenario::Normal
-                && !self.profile.flag(key::MOMO_BACK)
-                && ch != Character::Momo;
-            // 도토(0052)도 첫 시작에서만, 기억해 내기 전까지.
-            self.world.story.doto_fight =
-                s == Scenario::Normal && !self.profile.flag(key::DOTO_MEMORY);
-            // 콩이(0054)도 첫 시작에서만, 이기기 전까지.
-            self.world.story.kongi_fight =
-                s == Scenario::Normal && !self.profile.flag(key::KONGI_BACK);
-            // 토끼풀(0165)도 첫 시작에서만, 돌아오기 전까지.
-            self.world.story.clover_fight =
-                s == Scenario::Normal && !self.profile.flag(key::CLOVER_BACK);
-            self.world.story.clover_back = self.profile.flag(key::CLOVER_BACK);
-            // 굴토끼 옛 굴(0165): 첫 시작은 모모가 돌아온 뒤, 오늘의 굴엔 없고, 개발 시나리오는 늘.
-            self.world.story.warren_open = match s {
-                Scenario::Normal => self.profile.flag(key::MOMO_BACK),
-                Scenario::Daily => false,
-                _ => true,
-            };
+            // 기록이 이야기에 주는 것을 한 번에(0170 R11). 모모로 내려가면 모모 보스는 없다(0056); 도토(0052)·콩이(0054)·토끼풀(0165)은
+            // 첫 시작에서만, 돌아오기(기억해 내기) 전까지; 굴토끼 옛 굴(0165)은 첫 시작은 모모가 돌아온 뒤, 오늘의 굴엔 없고, 개발 시나리오는 늘.
+            let normal = s == Scenario::Normal;
+            self.world.story.seed(crate::world::StorySeed {
+                momo_wins: self.profile.count(key::MOMO_WINS).min(t::MOMO_FIGHTS) as u8,
+                momo_fight: normal && !self.profile.flag(key::MOMO_BACK) && ch != Character::Momo,
+                doto_fight: normal && !self.profile.flag(key::DOTO_MEMORY),
+                kongi_fight: normal && !self.profile.flag(key::KONGI_BACK),
+                clover_fight: normal && !self.profile.flag(key::CLOVER_BACK),
+                clover_back: self.profile.flag(key::CLOVER_BACK),
+                warren_open: match s {
+                    Scenario::Normal => self.profile.flag(key::MOMO_BACK),
+                    Scenario::Daily => false,
+                    _ => true,
+                },
+            });
             // 개발 시나리오는 길을 이미 짰으니(쉼터에서 시작) 갈래를 넣어 다시 짠다.
-            if self.world.story.warren_open
+            if self.world.story.warren_open()
                 && self
                     .world
                     .adv

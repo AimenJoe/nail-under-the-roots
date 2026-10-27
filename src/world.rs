@@ -316,29 +316,124 @@ pub struct Inventory {
 /// 런의 이야기 깃발(0169 R2): 어떤 보스와 싸우는 중인지·이겼는지, 길이 열렸는지, 한 번만 알리는 토스트를 알렸는지.
 #[derive(Default)]
 pub struct Story {
+    // 0170 R11: 필드는 모두 비공개. 바깥은 아래 메서드로만 읽고 바꾼다 — 이야기 깃발의 진실은 기록(profile)이고, 여기는 이번 런의 상태.
     /// 모모(0046): 첫 길 끝에서 싸우나(앱이 기록에서 정하고, 모모에게 쓰러지면 이번 런엔 끈다), 지금까지 이긴 수(빈 자리의 꽃잎).
-    pub momo_fight: bool,
+    momo_fight: bool,
     /// 굴토끼 옛 굴(0165)이 길 지도에 열렸나(모모가 돌아온 뒤). 길을 짤 때 본다.
-    pub warren_open: bool,
-    pub momo_wins: u8,
+    warren_open: bool,
+    momo_wins: u8,
     /// 도토(0052): 둘째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다). 묻힌 도토리.
-    pub doto_fight: bool,
+    doto_fight: bool,
     /// 이번 런에 덤불에 찔린 적이 있나(처음 한 번만 알려 준다, 0149).
     thorn_told: bool,
     /// 흰 실 그물(0165)에 처음 걸렸을 때 한 번 알려 줬나.
     web_told: bool,
     /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
-    pub kongi_fight: bool,
+    kongi_fight: bool,
     /// 토끼풀(0165): 굴토끼 옛 굴 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
-    pub clover_fight: bool,
+    clover_fight: bool,
     /// 토끼풀 가족이 마을에 돌아왔다(기록 `CLOVER_BACK`): 참 엔딩 에필로그에 한 줄 더.
-    pub clover_back: bool,
+    clover_back: bool,
     /// 고치를 쳤을 때 한 번 알려 줬나 / 마지막으로 튕긴 공격 번호.
     cocoon_told: bool,
     /// 모모가 떠난 자리의 시든 꽃잎(0164). 밟으면 줍는다(`petal_tick`).
-    pub petal_at: Option<Vec2>,
+    petal_at: Option<Vec2>,
     /// 시든 꽃잎을 주웠다(기록 `key::PETAL`): 모모를 만나기 전에도 도감에 '???' 칸이 선다.
-    pub petal_found: bool,
+    petal_found: bool,
+}
+
+/// 기록(profile)이 새 런의 이야기에 주는 것(0170 R11). 앱이 기록에서 만들어 `Story::seed`에 넣는다. 월드는 기록을 모른다.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct StorySeed {
+    pub momo_wins: u8,
+    pub momo_fight: bool,
+    pub doto_fight: bool,
+    pub kongi_fight: bool,
+    pub clover_fight: bool,
+    pub clover_back: bool,
+    pub warren_open: bool,
+}
+
+/// 보스를 이긴 결과: 이긴 수와 돌아왔나(모모만 세 번).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BossBeaten {
+    pub wins: u8,
+    pub back: bool,
+}
+
+impl Story {
+    pub fn seed(&mut self, s: StorySeed) {
+        self.momo_wins = s.momo_wins;
+        self.momo_fight = s.momo_fight;
+        self.doto_fight = s.doto_fight;
+        self.kongi_fight = s.kongi_fight;
+        self.clover_fight = s.clover_fight;
+        self.clover_back = s.clover_back;
+        self.warren_open = s.warren_open;
+    }
+
+    /// 이번 런에 그 보스와 길 끝에서 싸우나.
+    pub fn fight(&self, k: Kind) -> bool {
+        match k {
+            Kind::Momo => self.momo_fight,
+            Kind::Doto => self.doto_fight,
+            Kind::Kongi => self.kongi_fight,
+            Kind::Clover => self.clover_fight,
+            _ => false,
+        }
+    }
+
+    /// 싸움을 켜고 끈다(쓰러지면 이번 런엔 끈다, 이어하기 복원).
+    pub fn set_fight(&mut self, k: Kind, on: bool) {
+        match k {
+            Kind::Momo => self.momo_fight = on,
+            Kind::Doto => self.doto_fight = on,
+            Kind::Kongi => self.kongi_fight = on,
+            Kind::Clover => self.clover_fight = on,
+            _ => {}
+        }
+    }
+
+    /// 보스를 이겼다: 이번 런엔 다시 안 싸운다. 모모(0046)는 이긴 수를 세고 세 번째에야 돌아온다.
+    pub fn beat(&mut self, k: Kind) -> BossBeaten {
+        if k == Kind::Momo {
+            let wins = self.momo_wins.saturating_add(1);
+            self.momo_wins = wins;
+            let back = wins as u32 >= t::MOMO_FIGHTS;
+            if back {
+                self.momo_fight = false;
+            }
+            BossBeaten { wins, back }
+        } else {
+            self.set_fight(k, false);
+            BossBeaten {
+                wins: 1,
+                back: true,
+            }
+        }
+    }
+
+    pub fn momo_wins(&self) -> u8 {
+        self.momo_wins
+    }
+    pub fn warren_open(&self) -> bool {
+        self.warren_open
+    }
+    pub fn clover_back(&self) -> bool {
+        self.clover_back
+    }
+    pub fn petal_found(&self) -> bool {
+        self.petal_found
+    }
+    pub fn set_petal_found(&mut self, on: bool) {
+        self.petal_found = on;
+    }
+    pub fn petal_at(&self) -> Option<Vec2> {
+        self.petal_at
+    }
+    pub fn set_petal(&mut self, at: Option<Vec2>) {
+        self.petal_at = at;
+    }
 }
 
 /// 런 통계(0169 R2): 저널 `stat.*`·튜토리얼 단계가 읽는 수. `app/run.rs`가 저장한다.

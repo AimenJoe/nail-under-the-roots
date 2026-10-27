@@ -62,9 +62,9 @@ impl App {
             root_hearts: w.inv.root_hearts.max(0) as u32,
             heart_sold: w.adv.heart_sold,
             sp_milli: (w.player.sp.max(0.0) * 1000.0) as u32,
-            momo_fight: w.story.momo_fight,
-            doto_fight: w.story.doto_fight,
-            kongi_fight: w.story.kongi_fight,
+            momo_fight: w.story.fight(crate::enemy::Kind::Momo),
+            doto_fight: w.story.fight(crate::enemy::Kind::Doto),
+            kongi_fight: w.story.fight(crate::enemy::Kind::Kongi),
             no_damage: w.no_damage,
             stats: stat_fields(w)
                 .iter()
@@ -152,9 +152,9 @@ impl App {
                 w.inv.charms_found.push(*c);
             }
         }
-        w.story.momo_fight = r.momo_fight;
-        w.story.doto_fight = r.doto_fight;
-        w.story.kongi_fight = r.kongi_fight;
+        w.story.set_fight(crate::enemy::Kind::Momo, r.momo_fight);
+        w.story.set_fight(crate::enemy::Kind::Doto, r.doto_fight);
+        w.story.set_fight(crate::enemy::Kind::Kongi, r.kongi_fight);
         w.no_damage = r.no_damage;
         for (k, n) in &r.stats {
             set_stat(w, k, *n);

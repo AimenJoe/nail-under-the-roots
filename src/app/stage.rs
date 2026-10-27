@@ -319,7 +319,7 @@ impl App {
                     self.play(cutscene::deep_sleep(&self.world));
                 }
                 AdvEvent::MomoIntro => {
-                    let level = self.world.story.momo_wins.saturating_add(1);
+                    let level = self.world.story.momo_wins().saturating_add(1);
                     let at = self.world.adv.boss_last;
                     self.play(cutscene::momo_meet(&self.world, level, at));
                 }
@@ -338,12 +338,8 @@ impl App {
     /// 개발 시나리오는 기록 없이 이번 월드에서만 센다.
     fn momo_beaten(&mut self) {
         use crate::profile::key;
-        let wins = self.world.story.momo_wins.saturating_add(1);
-        self.world.story.momo_wins = wins;
-        let back = wins as u32 >= t::MOMO_FIGHTS;
-        if back {
-            self.world.story.momo_fight = false;
-        }
+        let crate::world::BossBeaten { wins, back } =
+            self.world.story.beat(crate::enemy::Kind::Momo);
         if self.recording() {
             self.profile.set_count(key::MOMO_WINS, wins as u32);
             if back {
@@ -363,7 +359,7 @@ impl App {
     /// 도토를 이겼다(0052): 씨앗 자리를 기억해 낸다(참 엔딩 조건 하나). 이번 런엔 다시 안 싸운다.
     /// 개발 시나리오는 기록 없이 장면만.
     fn doto_beaten(&mut self) {
-        self.world.story.doto_fight = false;
+        self.world.story.beat(crate::enemy::Kind::Doto);
         if self.recording() {
             self.profile.set(crate::profile::key::DOTO_MEMORY);
             self.save_profile();
@@ -375,7 +371,7 @@ impl App {
     /// 콩이를 이겼다(0054): 문을 열고 바위 발톱을 준다(장면 속 획득 창). 그 뒤 마을에 온다.
     fn kongi_beaten(&mut self) {
         use crate::profile::key;
-        self.world.story.kongi_fight = false;
+        self.world.story.beat(crate::enemy::Kind::Kongi);
         if self.recording() {
             self.profile.set(key::KONGI_BACK);
             self.profile.set(key::STONE);
@@ -388,7 +384,7 @@ impl App {
     /// 토끼풀을 이겼다(0165): 가족이 돌아온다(장면). 이번 런엔 다시 안 싸운다.
     fn clover_beaten(&mut self) {
         use crate::profile::key;
-        self.world.story.clover_fight = false;
+        self.world.story.beat(crate::enemy::Kind::Clover);
         if self.recording() {
             self.profile.set(key::CLOVER_BACK);
             self.save_profile();
@@ -505,7 +501,7 @@ impl App {
             // 빈 자리: 모모를 이긴 만큼 꽃잎이 물들어 있다(0046). 모모로 왔으면 제 자리라 1인칭으로, 나일이 있는 곳도 말한다(0067).
             Interact::Seat => {
                 let momo = self.world.character == crate::equipment::Character::Momo;
-                let (line, face): (Tr, Face) = match self.world.story.momo_wins {
+                let (line, face): (Tr, Face) = match self.world.story.momo_wins() {
                     _ if momo => (|s| s.seat_momo, Face::Happy),
                     0 => (|s| s.seat_1, Face::Worried),
                     1 => (|s| s.seat_p1, Face::Worried),

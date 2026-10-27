@@ -501,7 +501,7 @@ impl App {
         for (i, k) in BESTIARY.iter().enumerate().skip(first).take(fits) {
             let r = Rect::new(c.x, c.y + (i - first) as f32 * row_h, list_w, row_h - 1.0);
             let known = seen.contains(k);
-            let hinted = *k == crate::enemy::Kind::Momo && self.world.story.petal_found;
+            let hinted = *k == crate::enemy::Kind::Momo && self.world.story.petal_found();
             let name = if known {
                 tr(k.species().name)
             } else {
@@ -540,7 +540,7 @@ impl App {
         let w = c.right() - x;
         if !seen.contains(&k) {
             // 시든 꽃잎(0164)을 주웠으면 모모 칸엔 물음만 선다.
-            let text = if k == crate::enemy::Kind::Momo && self.world.story.petal_found {
+            let text = if k == crate::enemy::Kind::Momo && self.world.story.petal_found() {
                 s.best_petal
             } else {
                 s.best_unseen

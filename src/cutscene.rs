@@ -293,11 +293,11 @@ mod device_tests {
             }
         }
         assert!(c.is_done());
-        let at = w.story.petal_at.expect("시든 꽃잎이 남는다");
+        let at = w.story.petal_at().expect("시든 꽃잎이 남는다");
         assert!(!w.petal_tick(), "멀리서는 안 줍는다");
         w.player.pos = at;
         assert!(w.petal_tick(), "밟으면 줍는다");
-        assert!(w.story.petal_found && w.story.petal_at.is_none());
+        assert!(w.story.petal_found() && w.story.petal_at().is_none());
         assert!(w
             .adv
             .events
@@ -782,7 +782,7 @@ impl Cutscene {
                 Step::Cue {
                     cue: Cue::Leave,
                     at,
-                } => w.story.petal_at = Some(at),
+                } => w.story.set_petal(Some(at)),
                 _ => {}
             }
         }
@@ -1986,7 +1986,7 @@ pub fn ending_half(w: &World) -> Cutscene {
 
 /// 참 엔딩 + 에필로그: 참 엔딩 조건(모모·도토)이 다 섰을 때.
 pub fn ending_true(w: &World) -> Cutscene {
-    Cutscene::new(story_actors(w), true_ending_steps(w.story.clover_back))
+    Cutscene::new(story_actors(w), true_ending_steps(w.story.clover_back()))
 }
 
 /// 모모로 가장 깊은 곳에 닿았다(0056): 흰 실 속의 굴토끼 털과 시든 꽃잎. 모모는 꽃잎을 마을로 가져간다.

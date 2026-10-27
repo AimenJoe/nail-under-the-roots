@@ -314,15 +314,20 @@ pub fn build(s: Scenario) -> World {
             let mut w = World::camp_start(stage);
             w.inv.seeds = 40;
             w.adv.events.clear();
-            if let Scenario::Momo(wins) = s {
-                w.story.momo_fight = true;
-                w.story.momo_wins = wins;
-            }
-            w.story.doto_fight = doto;
-            w.story.kongi_fight = s == Scenario::Kongi;
+            w.story.seed(crate::world::StorySeed {
+                momo_fight: matches!(s, Scenario::Momo(_)),
+                momo_wins: if let Scenario::Momo(wins) = s {
+                    wins
+                } else {
+                    0
+                },
+                doto_fight: doto,
+                kongi_fight: s == Scenario::Kongi,
+                clover_fight: s == Scenario::Clover,
+                warren_open: s == Scenario::Clover,
+                ..Default::default()
+            });
             if s == Scenario::Clover {
-                w.story.clover_fight = true;
-                w.story.warren_open = true;
                 w.reroll_route();
                 w.enter_route_warren_now();
             } else {

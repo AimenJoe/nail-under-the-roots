@@ -527,7 +527,7 @@ impl World {
     fn swap_place(&mut self, f: &mut Fade) {
         f.swapped = true;
         self.spring = None;
-        self.story.petal_at = None;
+        self.story.set_petal(None);
         self.hazards.cocoons.clear();
         self.hazards.waves.clear();
         self.hazards.thread_lash = None;
@@ -809,21 +809,27 @@ impl World {
             return;
         };
         // 첫 길의 끝은 모모가 지킨다(아직 안 돌아왔고, 이번 런에 모모에게 쓰러지지 않았으면, 0046).
-        if self.story.momo_fight && stage == 1 && kind == NodeKind::Boss {
+        if self.story.fight(crate::enemy::Kind::Momo) && stage == 1 && kind == NodeKind::Boss {
             prm.boss = Some(Kind::Momo);
             // 복선(0159): 모모가 지키는 굴에는 방마다 시든 꽃잎이 떠돈다.
             self.juice.petals = true;
         }
         // 둘째 길의 끝은 도토가 지킨다(아직 기억해 내지 않았고, 이번 런에 도토에게 쓰러지지 않았으면, 0052).
-        if self.story.doto_fight && stage == 2 && kind == NodeKind::Boss {
+        if self.story.fight(crate::enemy::Kind::Doto) && stage == 2 && kind == NodeKind::Boss {
             prm.boss = Some(Kind::Doto);
         }
         // 셋째 길(마지막 길)의 끝은 콩이가 지킨다. 이기면 출구가 가장 깊은 곳으로(0054).
-        if self.story.kongi_fight && stage == t::FINAL_STAGE && kind == NodeKind::Boss {
+        if self.story.fight(crate::enemy::Kind::Kongi)
+            && stage == t::FINAL_STAGE
+            && kind == NodeKind::Boss
+        {
             prm.boss = Some(Kind::Kongi);
         }
         // 굴토끼 옛 굴의 끝은 토끼풀이 지킨다(0165). 이기면 출구가 가장 깊은 곳으로.
-        if self.story.clover_fight && stage == t::FINAL_STAGE && kind == NodeKind::Warren {
+        if self.story.fight(crate::enemy::Kind::Clover)
+            && stage == t::FINAL_STAGE
+            && kind == NodeKind::Warren
+        {
             prm.boss = Some(Kind::Clover);
         }
         self.adv.node = Some(at);
@@ -914,7 +920,7 @@ impl World {
             self.adv.route = Some(Route::generate(
                 self.adv.seed,
                 stage,
-                self.story.warren_open,
+                self.story.warren_open(),
             ));
         }
     }
@@ -982,7 +988,7 @@ impl World {
         self.adv.route = Some(Route::generate(
             self.adv.seed,
             stage,
-            self.story.warren_open,
+            self.story.warren_open(),
         ));
         self.adv.last_cell = None;
         self.adv.events.push(AdvEvent::CampArrive(stage));
@@ -1004,16 +1010,16 @@ impl World {
     fn respawn_at_save(&mut self) {
         // 모모에게 쓰러지면 이번 런의 첫 길 끝은 보통 무리로(이기지 않고도 지나갈 수 있게, 0046).
         if self.enemies.iter().any(|e| e.kind == Kind::Momo) {
-            self.story.momo_fight = false;
+            self.story.set_fight(crate::enemy::Kind::Momo, false);
         }
         if self.enemies.iter().any(|e| e.kind == Kind::Doto) {
-            self.story.doto_fight = false;
+            self.story.set_fight(crate::enemy::Kind::Doto, false);
         }
         if self.enemies.iter().any(|e| e.kind == Kind::Kongi) {
-            self.story.kongi_fight = false;
+            self.story.set_fight(crate::enemy::Kind::Kongi, false);
         }
         if self.enemies.iter().any(|e| e.kind == Kind::Clover) {
-            self.story.clover_fight = false;
+            self.story.set_fight(crate::enemy::Kind::Clover, false);
         }
         self.hazards.mines.clear();
         self.hazards.clouds.clear();
@@ -1040,7 +1046,7 @@ impl World {
             self.adv.route = Some(Route::generate(
                 self.adv.seed,
                 stage,
-                self.story.warren_open,
+                self.story.warren_open(),
             ));
         }
         self.player.revive();
@@ -1112,7 +1118,7 @@ impl World {
                         e.make_elite();
                     }
                     if kind == Kind::Momo {
-                        e.level = self.story.momo_wins.saturating_add(1);
+                        e.level = self.story.momo_wins().saturating_add(1);
                         self.adv.boss_last = e.pos;
                         self.adv.events.push(AdvEvent::MomoIntro);
                     }
@@ -1687,7 +1693,7 @@ mod tests {
     fn doto_guards_the_second_path_and_then_lives_in_the_village() {
         for (stage, fight, want) in [(2, true, true), (2, false, false), (1, true, false)] {
             let mut w = World::camp_start(stage);
-            w.story.doto_fight = fight;
+            w.story.set_fight(crate::enemy::Kind::Doto, fight);
             w.enter_route_boss_now();
             let boss = w.adv.dungeon.as_ref().and_then(|d| d.boss);
             assert_eq!(boss == Some(Kind::Doto), want, "길 {stage}, 싸움 {fight}");
@@ -1710,7 +1716,7 @@ mod tests {
             (2, true, false),
         ] {
             let mut w = World::camp_start(stage);
-            w.story.kongi_fight = fight;
+            w.story.set_fight(crate::enemy::Kind::Kongi, fight);
             w.enter_route_boss_now();
             let boss = w.adv.dungeon.as_ref().and_then(|d| d.boss);
             assert_eq!(boss == Some(Kind::Kongi), want, "길 {stage}, 싸움 {fight}");

@@ -257,8 +257,8 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                         None => draw_stall(r),
                     },
                     PropKind::Seat => match &art.sunny {
-                        Some(sunny) => draw_seat_sunny(sunny, r, w.story.momo_wins),
-                        None => draw_seat(r, w.story.momo_wins),
+                        Some(sunny) => draw_seat_sunny(sunny, r, w.story.momo_wins()),
+                        None => draw_seat(r, w.story.momo_wins()),
                     },
                 }
             }
