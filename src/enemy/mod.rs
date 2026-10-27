@@ -8,6 +8,11 @@ use crate::room::Room;
 use crate::species::{self, Behavior, Species};
 use crate::tuning as t;
 
+// 0169 R5: 상태 함수를 셋으로 나눴다 — 잡몹의 돌격(melee), 거리 두는 적(ranged), 보스의 수(boss). 본문은 그대로.
+mod boss;
+mod melee;
+mod ranged;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Kind {
     /// 들쥐: 기본 돌격.
@@ -175,6 +180,20 @@ impl Projectile {
             self.alive = false;
         }
     }
+}
+
+/// 한 틱의 바깥 상황(0169 R5): 상태 함수들이 같은 것을 본다. `events`·`projectiles`는 월드의 것(빌림).
+pub(super) struct Ctx<'a> {
+    pub player_pos: Vec2,
+    /// 플레이어를 노릴 수 있나(살아 있고 땅속이 아니다).
+    pub targetable: bool,
+    pub room: &'a Room,
+    pub dt: f32,
+    pub to_player: Vec2,
+    pub dist: f32,
+    pub dir_to_player: Vec2,
+    pub projectiles: &'a mut Vec<Projectile>,
+    pub events: &'a mut Vec<Event>,
 }
 
 impl Enemy {
@@ -356,15 +375,19 @@ impl Enemy {
             return;
         }
 
+        let mut c = Ctx {
+            player_pos,
+            targetable: player_targetable,
+            room,
+            dt,
+            to_player,
+            dist,
+            dir_to_player,
+            projectiles,
+            events,
+        };
         match self.state {
-            State::Stunned { time } => {
-                let time = time - dt;
-                if time <= 0.0 {
-                    self.state = self.idle_state();
-                } else {
-                    self.state = State::Stunned { time };
-                }
-            }
+            State::Stunned { time } => self.tick_stunned(&mut c, time),
             State::Approach
                 if matches!(
                     sp.behavior,
@@ -375,344 +398,24 @@ impl Enemy {
                         | Behavior::Clover
                 ) =>
             {
-                if player_targetable {
-                    self.facing = dir_to_player;
-                    self.state = match sp.behavior {
-                        Behavior::Chief => self.chief_next(dist, player_pos),
-                        Behavior::Momo => self.momo_next(dist, player_pos, events),
-                        Behavior::Kongi => self.kongi_next(dist),
-                        Behavior::Clover => self.clover_next(dist, player_pos),
-                        _ => self.doto_next(dist, player_pos),
-                    };
-                    if matches!(self.state, State::Approach) {
-                        if sp.behavior == Behavior::Clover {
-                            // 토끼풀(0165): 플레이어가 아니라 "고치 앞 자리"로 간다.
-                            let to = self.clover_post(player_pos) - self.pos;
-                            if to.length() > 3.0 {
-                                self.pos += to.normalize() * self.speed() * dt;
-                            }
-                        } else {
-                            // 도토는 너무 가까우면 물러난다(던지는 보스).
-                            let away = sp.behavior == Behavior::Doto && dist < sp.keep.0;
-                            let dir = if away { -dir_to_player } else { dir_to_player };
-                            self.pos += dir * self.speed() * dt;
-                        }
-                    }
-                }
+                self.tick_boss_approach(&mut c)
             }
-            State::Thump { time } => {
-                let time = time + dt;
-                if player_targetable {
-                    self.facing = dir_to_player;
-                }
-                if time >= self.thump_windup() {
-                    events.push(Event::Thump(self.pos));
-                    self.state = State::Rest { time: sp.rest };
-                } else {
-                    self.state = State::Thump { time };
-                }
-            }
-            State::Gather { time } => {
-                let was = time;
-                let time = time + dt;
-                // 고치 쪽으로 가서 실을 감는다. 그동안 플레이어를 본다(실을 뻗을 쪽).
-                if let Some(g) = self.guard {
-                    let to = g + vec2(0.0, 14.0) - self.pos;
-                    if to.length() > 3.0 {
-                        self.pos += to.normalize() * self.speed() * 1.5 * dt;
-                    }
-                }
-                if player_targetable {
-                    self.facing = dir_to_player;
-                }
-                if was < t::CLOVER_THREAD_AT && time >= t::CLOVER_THREAD_AT {
-                    events.push(Event::Thread(self.pos, self.facing));
-                }
-                self.state = if time >= t::CLOVER_GATHER_TIME {
-                    State::Rest {
-                        time: sp.rest * 0.5,
-                    }
-                } else {
-                    State::Gather { time }
-                };
-            }
-            State::Howl { time } => {
-                let time = time + dt;
-                let doto = sp.behavior == Behavior::Doto;
-                let dur = self.windup()
-                    * if doto {
-                        t::DOTO_BURY_MUL
-                    } else {
-                        t::CHIEF_HOWL_MUL
-                    };
-                if time >= dur {
-                    if doto {
-                        events.push(Event::Bury(if self.hurt_half() {
-                            t::DOTO_MINES_HURT
-                        } else {
-                            t::DOTO_MINES
-                        }));
-                    } else {
-                        self.summons += 1;
-                        events.push(Event::Summon);
-                    }
-                    self.state = State::Rest { time: sp.rest };
-                } else {
-                    self.state = State::Howl { time };
-                }
-            }
-            State::Approach => {
-                if player_targetable {
-                    self.facing = dir_to_player;
-                    if dist < sp.trigger {
-                        if sp.behavior == Behavior::Darter {
-                            self.chain = t::SHREW_BITES - 1;
-                        }
-                        self.state = State::Windup { time: 0.0 };
-                    } else {
-                        self.pos += dir_to_player * self.speed() * dt;
-                    }
-                }
-            }
-            State::Windup { time } => {
-                let time = time + dt;
-                if player_targetable {
-                    self.facing = dir_to_player;
-                }
-                if time >= self.windup() {
-                    self.state = State::Charge {
-                        time: 0.0,
-                        dir: self.facing,
-                    };
-                    events.push(Event::Charge);
-                } else {
-                    self.state = State::Windup { time };
-                }
-            }
-            State::Charge { time, dir } => {
-                let time = time + dt;
-                self.pos += dir * sp.dash_speed * dt;
-                let r = self.radius();
-                let dur = if sp.behavior == Behavior::Momo {
-                    t::MOMO_KICK_TIME
-                } else {
-                    sp.dash_time
-                };
-                let before = self.pos;
-                let hit_wall = room.resolve_circle(&mut self.pos, r);
-                if hit_wall && sp.behavior == Behavior::Kongi && self.chain > 0 {
-                    // 콩이: 벽에 튕긴다(반사 + 플레이어 쪽으로 조금 꺾기). 다 튕기면 아래처럼 어질어질.
-                    self.chain -= 1;
-                    let n = (self.pos - before).normalize_or(-dir);
-                    let bounced = dir - 2.0 * dir.dot(n) * n;
-                    let aim = (player_pos - self.pos).normalize_or(bounced);
-                    let new_dir = (bounced * (1.0 - t::KONGI_BOUNCE_AIM)
-                        + aim * t::KONGI_BOUNCE_AIM)
-                        .normalize_or(bounced);
-                    self.facing = new_dir;
-                    events.push(Event::WallHit);
-                    self.state = State::Charge { time, dir: new_dir };
-                } else if hit_wall {
-                    self.state = State::Rest { time: sp.wall_rest };
-                    self.flash = t::HIT_FLASH;
-                    events.push(Event::WallHit);
-                } else if time >= dur
-                    && matches!(sp.behavior, Behavior::Darter | Behavior::Clover)
-                    && self.chain > 0
-                {
-                    // 뒤쥐: 곧바로 다시 겨눠 한 번 더 문다(예고는 짧게). 토끼풀도 둘째 차기(0165).
-                    self.chain -= 1;
-                    let skip = if sp.behavior == Behavior::Clover {
-                        t::CLOVER_KICK_REAIM
-                    } else {
-                        t::SHREW_REAIM
-                    };
-                    self.state = State::Windup {
-                        time: self.windup() * (1.0 - skip),
-                    };
-                } else if time >= dur {
-                    self.chain = 0;
-                    self.state = State::Rest { time: sp.rest };
-                } else {
-                    self.state = State::Charge { time, dir };
-                }
-            }
-            State::Rest { time } => {
-                let time = time - dt;
-                self.state = if time <= 0.0 {
-                    idle_of(sp.behavior)
-                } else {
-                    State::Rest { time }
-                };
-            }
-            State::Keep => {
-                if player_targetable {
-                    self.facing = dir_to_player;
-                    let (near, far) = sp.keep;
-                    if dist < near {
-                        self.pos -= dir_to_player * self.speed() * dt;
-                    } else if dist > far {
-                        self.pos += dir_to_player * self.speed() * dt;
-                    } else if matches!(sp.behavior, Behavior::Leaper | Behavior::Swooper) {
-                        // 청설모·박쥐: 거리 안에서는 옆으로 돈다(가만히 있지 않는다).
-                        let side = vec2(-dir_to_player.y, dir_to_player.x);
-                        self.pos += side * self.speed() * 0.6 * dt;
-                    }
-                    // 실버섯은 가까이 와야 부푼다. 다른 것은 늘 센다.
-                    if sp.behavior != Behavior::Spore || dist < sp.trigger {
-                        self.fire_cd -= dt;
-                    }
-                    if self.fire_cd <= 0.0 {
-                        self.state = match sp.behavior {
-                            Behavior::Leaper => State::Crouch {
-                                time: 0.0,
-                                target: player_pos,
-                            },
-                            Behavior::Swooper => State::Windup { time: 0.0 },
-                            _ => State::Aim { time: 0.0 },
-                        };
-                    }
-                }
-            }
-            State::Crouch { time, target } => {
-                let time = time + dt;
-                self.facing = (target - self.pos).normalize_or(self.facing);
-                if time >= self.windup() {
-                    // 너무 멀면 갈 수 있는 데까지만.
-                    let reach = (target - self.pos).clamp_length_max(sp.trigger * 1.2);
-                    self.state = State::Leap {
-                        time: 0.0,
-                        from: self.pos,
-                        to: self.pos + reach,
-                    };
-                    events.push(Event::Leap);
-                } else {
-                    self.state = State::Crouch { time, target };
-                }
-            }
-            State::Leap { time, from, to } => {
-                let time = time + dt;
-                let k = (time / sp.dash_time).min(1.0);
-                self.pos = from + (to - from) * k;
-                if time >= sp.dash_time {
-                    events.push(Event::Land);
-                    self.fire_cd = sp.fire_every;
-                    self.state = if self.chain > 0 && player_targetable {
-                        // 모모 세 번째: 내려앉자마자 다시 웅크린다(예고는 짧게).
-                        self.chain -= 1;
-                        State::Crouch {
-                            time: self.windup() * t::MOMO_CHAIN_SKIP,
-                            target: player_pos,
-                        }
-                    } else {
-                        self.chain = 0;
-                        State::Rest { time: sp.rest }
-                    };
-                } else {
-                    self.state = State::Leap { time, from, to };
-                }
-            }
-            State::Under { time } => {
-                let time = time + dt;
-                if time < t::MOMO_DIG_TRACK {
-                    // 둔덕이 플레이어를 따라온다(걸음보다 느리게).
-                    if player_targetable {
-                        let step = t::MOMO_DIG_SPEED * dt;
-                        self.pos += to_player.clamp_length_max(step);
-                    }
-                    self.state = State::Under { time };
-                } else if time >= t::MOMO_DIG_TRACK + self.windup() {
-                    events.push(Event::Pop);
-                    self.state = State::Pop { time: 0.0 };
-                } else {
-                    self.state = State::Under { time };
-                }
-            }
-            State::Guard { time } => {
-                let time = time + dt;
-                if player_targetable {
-                    self.facing = dir_to_player;
-                }
-                self.state = if time >= t::KONGI_GUARD_TIME {
-                    State::Rest {
-                        time: sp.rest * 0.5,
-                    }
-                } else {
-                    State::Guard { time }
-                };
-            }
-            State::Pop { time } => {
-                let time = time + dt;
-                self.state = if time >= t::MOMO_POP_TIME {
-                    State::Rest { time: sp.rest }
-                } else {
-                    State::Pop { time }
-                };
-            }
-            State::Lash { time, dir } => {
-                let time = time + dt;
-                self.state = if time >= t::TOAD_LASH_TIME {
-                    State::Rest { time: sp.rest }
-                } else {
-                    State::Lash { time, dir }
-                };
-            }
-            State::Puff { time } => {
-                let time = time + dt;
-                self.state = if time >= t::SPORE_PUFF_TIME {
-                    State::Rest { time: sp.rest }
-                } else {
-                    State::Puff { time }
-                };
-            }
-            State::Aim { time } => {
-                let time = time + dt;
-                if player_targetable {
-                    self.facing = dir_to_player;
-                }
-                if time >= self.windup() && sp.behavior == Behavior::Tongue {
-                    // 두꺼비: 겨눈 쪽으로 혀를 내민다(맞았는지는 월드가 이 틱에 본다).
-                    events.push(Event::Tongue);
-                    self.fire_cd = sp.fire_every;
-                    self.state = State::Lash {
-                        time: 0.0,
-                        dir: self.facing,
-                    };
-                } else if time >= self.windup() && sp.behavior == Behavior::Spore {
-                    // 포자버섯: 제자리에 포자 구름(월드가 놓는다).
-                    events.push(Event::Spore);
-                    self.fire_cd = sp.fire_every;
-                    self.state = State::Puff { time: 0.0 };
-                } else if time >= self.windup() {
-                    // 도토: 부채꼴로 여럿(가운데가 플레이어 쪽), 던진 뒤 잠깐 쉰다.
-                    let n = match sp.behavior {
-                        Behavior::Doto if self.hurt_half() => t::DOTO_FAN_HURT,
-                        Behavior::Doto => t::DOTO_FAN,
-                        _ => 1,
-                    };
-                    for i in 0..n {
-                        let a = (i as f32 - (n - 1) as f32 * 0.5) * t::DOTO_FAN_SPREAD;
-                        let dir = Vec2::from_angle(a).rotate(self.facing);
-                        let start = self.pos + dir * (self.radius() + t::PROJECTILE_RADIUS + 1.0);
-                        projectiles.push(Projectile {
-                            pos: start,
-                            prev_pos: start,
-                            vel: dir * sp.shot_speed,
-                            alive: true,
-                            friendly: false,
-                        });
-                    }
-                    events.push(Event::Shoot);
-                    self.fire_cd = sp.fire_every;
-                    self.state = if sp.behavior == Behavior::Doto {
-                        State::Rest { time: sp.rest }
-                    } else {
-                        State::Keep
-                    };
-                } else {
-                    self.state = State::Aim { time };
-                }
-            }
+            State::Thump { time } => self.tick_thump(&mut c, time),
+            State::Gather { time } => self.tick_gather(&mut c, time),
+            State::Howl { time } => self.tick_howl(&mut c, time),
+            State::Approach => self.tick_approach(&mut c),
+            State::Windup { time } => self.tick_windup(&mut c, time),
+            State::Charge { time, dir } => self.tick_charge(&mut c, time, dir),
+            State::Rest { time } => self.tick_rest(&mut c, time),
+            State::Keep => self.tick_keep(&mut c),
+            State::Crouch { time, target } => self.tick_crouch(&mut c, time, target),
+            State::Leap { time, from, to } => self.tick_leap(&mut c, time, from, to),
+            State::Under { time } => self.tick_under(&mut c, time),
+            State::Guard { time } => self.tick_guard(&mut c, time),
+            State::Pop { time } => self.tick_pop(&mut c, time),
+            State::Lash { time, dir } => self.tick_lash(&mut c, time, dir),
+            State::Puff { time } => self.tick_puff(&mut c, time),
+            State::Aim { time } => self.tick_aim(&mut c, time),
         }
 
         let before = self.vel;
@@ -740,152 +443,6 @@ impl Enemy {
 
     fn idle_state(&self) -> State {
         idle_of(self.sp().behavior)
-    }
-
-    /// 대장의 다음 수: 체력이 반 아래면 세 번에 한 번 부하를 부르고(두 번까지), 아니면 돌진과 뛰어 찍기를 번갈아.
-    /// 멀면 걸어서 다가간다(Approach 그대로).
-    fn chief_next(&mut self, dist: f32, player_pos: Vec2) -> State {
-        let sp = self.sp();
-        let hurt = self.hp * 2 <= self.max_hp;
-        if hurt && self.summons < t::CHIEF_SUMMONS && self.pattern % 3 == 2 {
-            self.pattern += 1;
-            return State::Howl { time: 0.0 };
-        }
-        if self.pattern.is_multiple_of(2) {
-            if dist < sp.trigger {
-                self.pattern += 1;
-                return State::Windup { time: 0.0 };
-            }
-        } else if dist < sp.trigger * 1.3 {
-            self.pattern += 1;
-            return State::Crouch {
-                time: 0.0,
-                target: player_pos,
-            };
-        }
-        State::Approach
-    }
-
-    /// 모모의 다음 수(0046). 만날수록 한 수씩 는다:
-    /// 1번째 높이 뛰기 ↔ 뒷발 차기, 2번째 + 굴로 숨기, 3번째 + 뛰기를 세 번 이어서.
-    /// 차기는 가까워야, 뛰기는 조금 멀어도 된다. 안 닿으면 걸어서 다가간다.
-    fn momo_next(&mut self, dist: f32, player_pos: Vec2, events: &mut Vec<Event>) -> State {
-        let sp = self.sp();
-        let moves = if self.level >= 2 { 3 } else { 2 };
-        match self.pattern % moves {
-            0 if dist < sp.trigger * 1.5 => {
-                self.pattern += 1;
-                self.chain = if self.level >= 3 {
-                    t::MOMO_HOP_CHAIN - 1
-                } else {
-                    0
-                };
-                State::Crouch {
-                    time: 0.0,
-                    target: player_pos,
-                }
-            }
-            1 if dist < sp.trigger => {
-                self.pattern += 1;
-                State::Windup { time: 0.0 }
-            }
-            2 => {
-                self.pattern += 1;
-                events.push(Event::Dig);
-                State::Under { time: 0.0 }
-            }
-            _ => State::Approach,
-        }
-    }
-
-    /// 도토의 다음 수(0052): 부채꼴 던지기 → 높이 뛰기 → 도토리 묻기를 돈다.
-    /// 던지기는 멀어도(유지 거리 끝까지), 뛰기는 조금 멀어도 된다. 묻기는 거리와 상관없이. 안 되면 거리를 맞춘다.
-    fn doto_next(&mut self, dist: f32, player_pos: Vec2) -> State {
-        let sp = self.sp();
-        match self.pattern % 3 {
-            0 if dist < sp.keep.1 * 1.3 => {
-                self.pattern += 1;
-                State::Aim { time: 0.0 }
-            }
-            1 if dist < sp.trigger * 1.5 => {
-                self.pattern += 1;
-                State::Crouch {
-                    time: 0.0,
-                    target: player_pos,
-                }
-            }
-            2 => {
-                self.pattern += 1;
-                State::Howl { time: 0.0 }
-            }
-            _ => State::Approach,
-        }
-    }
-
-    /// 콩이의 다음 수(0054): 구르기 ↔ 웅크려 버티기. 구르기는 거리 안에서, 버티기는 가까이 걸어온 뒤. 아니면 걸어온다.
-    fn kongi_next(&mut self, dist: f32) -> State {
-        let sp = self.sp();
-        match self.pattern % 2 {
-            0 if dist < sp.trigger => {
-                self.pattern += 1;
-                self.chain = self.kongi_bounces();
-                State::Windup { time: 0.0 }
-            }
-            1 if dist < t::KONGI_GUARD_NEAR => {
-                self.pattern += 1;
-                State::Guard { time: 0.0 }
-            }
-            _ => State::Approach,
-        }
-    }
-
-    fn kongi_bounces(&self) -> u32 {
-        if self.hurt_half() {
-            t::KONGI_BOUNCES_HURT
-        } else {
-            t::KONGI_BOUNCES
-        }
-    }
-
-    /// 토끼풀의 다음 수(0165): 반 아래면 한 번 품기. 아니면 발 구르기 → 높이 뛰기(조금 멀어도) → 가까우면 두 번 차기를 돈다.
-    /// 수가 안 되면 고치 앞 자리로 간다.
-    fn clover_next(&mut self, dist: f32, player_pos: Vec2) -> State {
-        let sp = self.sp();
-        if self.hurt_half() && self.summons == 0 {
-            self.summons = 1;
-            return State::Gather { time: 0.0 };
-        }
-        match self.pattern % 3 {
-            0 => {
-                self.pattern += 1;
-                State::Thump { time: 0.0 }
-            }
-            1 if dist < sp.trigger * 1.5 => {
-                self.pattern += 1;
-                State::Crouch {
-                    time: 0.0,
-                    target: player_pos,
-                }
-            }
-            2 => {
-                self.pattern += 1;
-                if dist < t::CLOVER_KICK_NEAR * 1.5 {
-                    self.chain = t::CLOVER_KICKS - 1;
-                    State::Windup { time: 0.0 }
-                } else {
-                    State::Approach
-                }
-            }
-            _ => State::Approach,
-        }
-    }
-
-    /// 토끼풀이 서려는 자리: 고치 가운데에서 플레이어 쪽으로 `CLOVER_GUARD_DIST`. 고치가 없으면 플레이어 쪽.
-    fn clover_post(&self, player_pos: Vec2) -> Vec2 {
-        match self.guard {
-            Some(g) => g + (player_pos - g).normalize_or(vec2(0.0, 1.0)) * t::CLOVER_GUARD_DIST,
-            None => player_pos,
-        }
     }
 
     /// 발 구르기 예고(0165): 반 아래면 짧다. 실뜨기 배율은 그대로.
