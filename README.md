@@ -7,7 +7,7 @@
 - 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md) (끝의 "구현 상태"·"사람이 할 일"이 현재 위치. 지금 마일스톤은 `docs/decisions/0081`(v0.3.0), 버전 규칙은 0079)
 - 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 스프라이트·대체 타일은 직접 그림(원본 `tools/art/*.py`, `python3 tools/art/<이름>.py`로 PNG 재생성 — nail·critters·chief·tiles). 초상화·일러스트·타이틀은 나노바나나 원본(`tools/art/sources/ai/`)을 `ai_portraits.py`·`ai_illust.py`가 옮긴다(`portraits.py`·`illust.py`가 부름, 새 원본은 먼저 `strip_logo.py`). 앱 아이콘은 `tools/icons/make_icons.py`. 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
 - 결정 기록: [`docs/decisions/`](docs/decisions/)
-- 기여 규칙: [`CONTRIBUTING.md`](CONTRIBUTING.md) · 배포·릴리스 절차: [`docs/release.md`](docs/release.md) · 코드 건강 점검과 리팩터링 계획: [`docs/decisions/0169`](docs/decisions/0169-code-health-review-and-refactoring-plan.md)
+- 기여 규칙: [`CONTRIBUTING.md`](CONTRIBUTING.md) · 배포·릴리스 절차: [`docs/release.md`](docs/release.md) · 코드 건강 점검과 리팩터링 계획: [`docs/decisions/0169`](docs/decisions/0169-code-health-review-and-refactoring-plan.md) · 추상화 수준 판정과 다음 목표(R9~R13): [`docs/decisions/0170`](docs/decisions/0170-abstraction-level-review-and-next-refactoring-targets.md)
 - 지식 베이스: [AimenJoe/KB](https://github.com/AimenJoe/KB) (`maps/gamedev.md`)
 - 저작권: © 2026 Beardworks. 코드·직접 그린 그림·글은 Beardworks 소유(레포는 공개지만 오픈소스 라이선스를 붙이지 않았다 = 모든 권리 보유). 폰트·의존성은 각자의 라이선스(`assets/LICENSES.md`, `assets/THIRD_PARTY_LICENSES.txt`)
 
