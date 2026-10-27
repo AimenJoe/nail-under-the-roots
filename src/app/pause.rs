@@ -310,11 +310,7 @@ impl App {
             (s.stat_power, (base_dmg + st.damage).to_string()),
             (s.stat_aspd, pct(st.attack_speed)),
             (
-                if w.character == Character::Momo {
-                    s.stat_hop_cd
-                } else {
-                    s.stat_dig_cd
-                },
+                (w.character.def().stat_dodge_cd)(s),
                 fill(s.fmt_secs, &[&format!("{:.1}", p.burrow_cd_full())]),
             ),
             (&fill(s.stat_gauge, &[&tr(gauge.name())]), pct(st.sp_gain)),

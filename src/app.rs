@@ -1408,11 +1408,11 @@ impl App {
     /// 뿌리 길에서 고른 캐릭터(0056). 모모는 돌아온 뒤에만.
     fn picked(&self) -> Character {
         use crate::profile::key;
-        if self.profile.count(key::CHAR_PICK) == 1 && self.profile.flag(key::MOMO_BACK) {
-            Character::Momo
-        } else {
-            Character::Mole
-        }
+        let code = self.profile.count(key::CHAR_PICK);
+        crate::characters::ALL
+            .iter()
+            .find(|d| d.code as u32 == code && d.available(&self.profile))
+            .map_or(Character::Mole, |d| d.id)
     }
 
     /// 실뜨기에서 고를 수 있는 가장 높은 단계(고른 캐릭터의 것, 0040).
@@ -1449,8 +1449,10 @@ impl App {
             decor,
             // 토끼풀 가족이 돌아오면(0165) 큰 나무의 잎이 한 단계 더.
             growth: crate::village::growth(
-                self.profile.count(&key::clears(Character::Mole))
-                    + self.profile.count(&key::clears(Character::Momo))
+                crate::characters::ALL
+                    .iter()
+                    .map(|d| self.profile.count(&key::clears(d.id)))
+                    .sum::<u32>()
                     + u32::from(self.profile.flag(key::CLOVER_BACK)),
             ),
             tree_ready: self.tree_affordable(),

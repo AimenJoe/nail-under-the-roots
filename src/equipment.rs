@@ -25,33 +25,21 @@ pub enum WeaponKind {
 
 impl Character {
     pub fn name(self) -> &'static str {
-        match self {
-            Character::Mole => crate::i18n::s().name_nail,
-            Character::Momo => crate::i18n::s().name_momo,
-        }
+        (self.def().name)(crate::i18n::s())
     }
 
     pub fn weapon_kind(self) -> WeaponKind {
-        match self {
-            Character::Mole => WeaponKind::Claw,
-            Character::Momo => WeaponKind::Kick,
-        }
+        self.def().weapon_kind
     }
 
-    /// 필살기 게이지의 종류. 두더지는 분노(맞히면 찬다), 다음 캐릭터는 기(氣) 등.
+    /// 필살기 게이지의 종류. 두더지는 분노(맞히면 찬다), 모모는 기(氣).
     pub fn gauge(self) -> Gauge {
-        match self {
-            Character::Mole => Gauge::Rage,
-            Character::Momo => Gauge::Ki,
-        }
+        self.def().gauge
     }
 
     /// 처음 들고 시작하는 무기(WEAPONS 번호).
     pub fn starting_weapon(self) -> usize {
-        match self {
-            Character::Mole => 1,
-            Character::Momo => 4,
-        }
+        self.def().starting_weapon
     }
 }
 

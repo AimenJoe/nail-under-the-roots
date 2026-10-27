@@ -1287,7 +1287,14 @@ impl App {
 
     /// 큰 나무에 탭이 있나: 모모가 돌아오면 Naïl/모모(0142).
     fn tree_tabs(&self) -> bool {
-        self.profile.flag(crate::profile::key::MOMO_BACK)
+        crate::characters::available(&self.profile).count() > 1
+    }
+
+    /// 큰 나무 탭의 캐릭터들(고를 수 있는 것, 표 순서).
+    fn tree_chars(&self) -> Vec<Character> {
+        crate::characters::available(&self.profile)
+            .map(|d| d.id)
+            .collect()
     }
 
     /// 맡긴 반딧불로 지금 깨울 수 있는 것이 있나(재주 갈래 또는 도토 뒤 독 발톱). 나무 밑동 빛·HUD가 본다(0061).
@@ -1295,11 +1302,7 @@ impl App {
         use crate::profile::key;
         use crate::talents::{key_awake, table, KEY_LIGHT, SLOTS};
         let have = self.profile.count(KEY_LIGHT);
-        let chars: &[Character] = if self.tree_tabs() {
-            &[Character::Mole, Character::Momo]
-        } else {
-            &[Character::Mole]
-        };
+        let chars = self.tree_chars();
         let talent = chars.iter().any(|ch| {
             SLOTS
                 .iter()
@@ -1330,11 +1333,14 @@ impl App {
             let tab = match tap_hit {
                 Some(Hit::TreeTab(i)) => Some(i),
                 _ if a.tab_prev || a.tab_next => {
-                    Some(usize::from(self.tree_char == Character::Mole))
+                    let chars = self.tree_chars();
+                    let at = chars.iter().position(|c| *c == self.tree_char).unwrap_or(0);
+                    Some((at + 1) % chars.len().max(1))
                 }
                 _ => None,
             };
-            let ch = [Character::Mole, Character::Momo][tab.unwrap_or(0).min(1)];
+            let chars = self.tree_chars();
+            let ch = chars[tab.unwrap_or(0).min(chars.len() - 1)];
             if tab.is_some() && ch != self.tree_char {
                 self.tree_char = ch;
                 // 모모 탭에는 독 발톱 줄이 없다: 커서가 그 줄이면 마지막 자리로.
@@ -1346,8 +1352,8 @@ impl App {
         let ch = self.tree_char;
         let (mut row, mut side) = self.tree_cursor;
         // 도토 뒤엔 다섯째 줄: Naïl 자신의 독 발톱(한 칸, 0052). 모모 탭에는 없다.
-        let venom_row =
-            ch == Character::Mole && self.profile.flag(crate::profile::key::DOTO_MEMORY);
+        let venom_row = ch.def().weapon_kind == crate::equipment::WeaponKind::Claw
+            && self.profile.flag(crate::profile::key::DOTO_MEMORY);
         let n = SLOTS.len() + usize::from(venom_row);
         if a.up {
             row = (row + n - 1) % n;
@@ -1441,8 +1447,9 @@ impl App {
             // 제목과 반딧불 수 사이 제목 줄에 Naïl/모모 탭(0142).
             let x = panel.x + 6.0 + ui.text_w(s.tree_title, FONT_PX) + 6.0;
             let right = panel.right() - 20.0 - ui.text_w(&light, FONT_PX) - 6.0;
-            let names = [Character::Mole.name(), Character::Momo.name()];
-            let active = usize::from(ch == Character::Momo);
+            let chars = self.tree_chars();
+            let names: Vec<&str> = chars.iter().map(|c| c.name()).collect();
+            let active = chars.iter().position(|c| *c == ch).unwrap_or(0);
             for (i, r) in ui
                 .tabs(&names, active, x, panel.y + 1.0, right - x)
                 .into_iter()
@@ -1452,8 +1459,8 @@ impl App {
             }
         }
         let tal_table = table(ch);
-        let venom_row =
-            ch == Character::Mole && self.profile.flag(crate::profile::key::DOTO_MEMORY);
+        let venom_row = ch.def().weapon_kind == crate::equipment::WeaponKind::Claw
+            && self.profile.flag(crate::profile::key::DOTO_MEMORY);
         let venom = self.profile.flag(crate::profile::key::VENOM);
         let rows = SLOTS.len() + usize::from(venom_row);
         let row_h = if venom_row { 18.0 } else { 21.0 };

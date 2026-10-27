@@ -1684,10 +1684,8 @@ impl World {
                 self.juice.toast = Some((
                     if kind == Kind::Hedgehog {
                         |s| s.toast_spines
-                    } else if self.character == crate::equipment::Character::Momo {
-                        |s| s.toast_shell_momo
                     } else {
-                        |s| s.toast_shell
+                        self.character.def().toast_shell
                     },
                     2.0,
                 ));
@@ -1893,14 +1891,7 @@ impl World {
                     }
                     if thorned && !self.story.thorn_told {
                         self.story.thorn_told = true;
-                        self.juice.toast = Some((
-                            if self.character == crate::equipment::Character::Momo {
-                                |s| s.toast_thorn_momo
-                            } else {
-                                |s| s.toast_thorn
-                            },
-                            2.5,
-                        ));
+                        self.juice.toast = Some((self.character.def().toast_thorn, 2.5));
                     }
                     self.juice.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
                     self.juice.feel.add_trauma(t::PLAYER_HURT_SHAKE);
@@ -2314,14 +2305,7 @@ impl World {
         self.player.slow = true;
         if !self.story.web_told {
             self.story.web_told = true;
-            self.juice.toast = Some((
-                if self.character == crate::equipment::Character::Momo {
-                    |s| s.toast_web_momo
-                } else {
-                    |s| s.toast_web
-                },
-                2.5,
-            ));
+            self.juice.toast = Some((self.character.def().toast_web, 2.5));
         }
     }
 

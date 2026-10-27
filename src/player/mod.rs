@@ -294,10 +294,6 @@ impl Player {
             || !self.is_alive()
     }
 
-    fn momo(&self) -> bool {
-        self.kit == crate::equipment::Character::Momo
-    }
-
     /// 뛰는 높이(그리기용 px, 바닥 = 0).
     pub fn height(&self) -> f32 {
         let (time, dur, h) = match self.state {
@@ -311,19 +307,17 @@ impl Player {
 
     /// 회피 시작(캐릭터마다): 굴파기 / 깡충.
     fn start_dodge(&mut self, move_dir: Vec2) {
-        if self.momo() {
-            self.start_hop(move_dir);
-        } else {
-            self.start_burrow();
+        match self.kit.def().dodge {
+            crate::characters::Dodge::Hop => self.start_hop(move_dir),
+            crate::characters::Dodge::Burrow => self.start_burrow(),
         }
     }
 
     /// 특기 시작(캐릭터마다): 드릴 / 이어 뛰기.
     fn start_special(&mut self, move_dir: Vec2) {
-        if self.momo() {
-            self.start_chain(move_dir);
-        } else {
-            self.start_drill(move_dir);
+        match self.kit.def().special {
+            crate::characters::Special::Chain => self.start_chain(move_dir),
+            crate::characters::Special::Drill => self.start_drill(move_dir),
         }
     }
 

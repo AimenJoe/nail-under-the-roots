@@ -86,12 +86,9 @@ pub const MOMO_TABLE: [(Tr, [Talent; 2]); 4] = [
     EAT,
 ];
 
-/// 캐릭터의 재주 표.
+/// 캐릭터의 재주 표(캐릭터 표에서, 0170 R14).
 pub fn table(ch: Character) -> &'static [(Tr, [Talent; 2]); 4] {
-    match ch {
-        Character::Mole => &TABLE,
-        Character::Momo => &MOMO_TABLE,
-    }
+    ch.def().talents
 }
 
 impl Slot {
@@ -101,14 +98,7 @@ impl Slot {
 
     /// 기록 키의 자리 이름. 모모의 자리 1·3은 따로(0142), 2·4는 Naïl과 같은 키.
     fn key(self, ch: Character) -> &'static str {
-        match (self, ch) {
-            (Slot::Burrow, Character::Momo) => "hop",
-            (Slot::Drill, Character::Momo) => "chain",
-            (Slot::Burrow, _) => "burrow",
-            (Slot::Parry, _) => "parry",
-            (Slot::Drill, _) => "drill",
-            (Slot::Eat, _) => "eat",
-        }
+        ch.def().talent_keys[self.index()]
     }
 }
 
@@ -127,10 +117,10 @@ pub fn key_pick(ch: Character, slot: Slot) -> String {
 /// 두 캐릭터의 모든 갈래 깨움 키(겹치는 자리 2·4는 한 번). 저널 "깨운 재주 수"가 센다.
 pub fn all_awake_keys() -> Vec<String> {
     let mut keys: Vec<String> = Vec::new();
-    for ch in &[Character::Mole, Character::Momo] {
+    for ch in crate::characters::ALL.iter().map(|d| d.id) {
         for slot in SLOTS {
             for side in 0..2 {
-                let k = key_awake(*ch, slot, side);
+                let k = key_awake(ch, slot, side);
                 if !keys.contains(&k) {
                     keys.push(k);
                 }

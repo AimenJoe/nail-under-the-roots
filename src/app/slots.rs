@@ -304,13 +304,15 @@ impl App {
 
 /// 슬롯 요약 한 줄: 가장 멀리 간 쉼터 · 끝까지 간 수(두 캐릭터 합) · 내려간 수.
 fn slot_summary(p: &Profile) -> String {
-    use crate::equipment::Character;
     use crate::profile::key;
     let s = i18n::s();
     let deepest = p.count(key::DEEPEST);
     if deepest == 0 {
         return fill(s.slot_summary_start, &[&p.count(key::RUNS)]);
     }
-    let clears = p.count(&key::clears(Character::Mole)) + p.count(&key::clears(Character::Momo));
+    let clears: u32 = crate::characters::ALL
+        .iter()
+        .map(|d| p.count(&key::clears(d.id)))
+        .sum();
     fill(s.slot_summary, &[&deepest, &clears, &p.count(key::RUNS)])
 }

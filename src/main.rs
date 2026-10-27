@@ -12,6 +12,7 @@ mod art;
 mod biome;
 mod bosses;
 mod camp;
+mod characters;
 mod combat;
 mod cutscene;
 mod daily;

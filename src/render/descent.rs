@@ -313,11 +313,12 @@ pub(super) fn draw_descent(
     // 순서(사장 제안): 파다가 → 고개를 들어 우리를 보고 윙크 → 드릴처럼 뱅글뱅글 돌며 내려간다. 굽기가 길면 되풀이.
     if let Some(tex) = art.and_then(|a| a.dig.as_ref()) {
         let (col, spinning) = dig_col(clock);
-        let row = if w.player.kit == crate::equipment::Character::Momo {
-            4
-        } else {
-            u32::from(w.inv.fur.min(3))
-        };
+        let row = w
+            .player
+            .kit
+            .def()
+            .dig_row
+            .unwrap_or(u32::from(w.inv.fur.min(3)));
         if spinning {
             // 돌며 흙을 나선으로 흩뿌린다(몸 둘레를 돌다 바깥으로).
             let soil = strata_color(d.depth_m + 1.0);
