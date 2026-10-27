@@ -28,6 +28,8 @@ pub enum Id {
     Die,
     Shoot,
     Charge,
+    /// 박자에 맞춘 타(0167).
+    Beat,
     WallHit,
     /// 반딧불 줍기. 연달아 주우면 음이 조금씩 올라간다.
     Glowbug,
@@ -100,6 +102,7 @@ pub struct Sfx {
     die: Sound,
     shoot: Sound,
     charge: Sound,
+    beat: Sound,
     wall_hit: Sound,
     impact: Sound,
     unbind: Sound,
@@ -215,6 +218,8 @@ impl Sfx {
             .await,
             shoot: make(&[Layer::tone(0.09, 760.0, 420.0, Wave::Sine, 0.4, 1.0)]).await,
             charge: make(&[Layer::tone(0.12, 90.0, 260.0, Wave::Triangle, 0.45, 0.8)]).await,
+            // 박자 콤보(0167): 짧고 높은 '틱'.
+            beat: make(&[Layer::tone(0.04, 1800.0, 1400.0, Wave::Triangle, 0.22, 0.9)]).await,
             wall_hit: make(&[
                 Layer::noise(0.1, 0.6, 2.0),
                 Layer::tone(0.12, 90.0, 50.0, Wave::Sine, 0.6, 1.5),
@@ -373,6 +378,7 @@ impl Sfx {
             Id::Die => &self.die,
             Id::Shoot => &self.shoot,
             Id::Charge => &self.charge,
+            Id::Beat => &self.beat,
             Id::WallHit => &self.wall_hit,
             Id::Impact => &self.impact,
             Id::Unbind => &self.unbind,

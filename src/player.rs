@@ -25,15 +25,13 @@ pub enum State {
         time: f32,
         dir: Vec2,
     },
-    /// 강공격 모으기(0161): 어느 타든 활성 구간이 지났는데 공격을 계속 누르고 있으면. `HEAVY_CHARGE` 뒤 떼면 `Heavy`,
+    /// 강공격 모으기(0161·0167): 어느 타든 활성 구간이 지났는데 공격을 계속 누르고 있으면. `HEAVY_CHARGE` 뒤 떼면 `Heavy`,
     /// 그 전에 떼면 그냥 선다. `after`는 강공격 뒤 이어질 콤보 번호(1타 뒤면 2타) — 콤보 사이 어디에든 끼운다.
-    /// `pending`이면 아직 평타가 안 나간 채 누르고 있는 것(누른 순간부터): `HEAVY_CHARGE` 전에 떼면 `after`번 평타,
-    /// 넘겨 떼면 평타 없이 강공격(1타부터 강공격). `HEAVY_TAP` 전까지는 겉으로 보통 상태다.
+    /// 평타는 누르는 순간 나가므로(0167) 모으기는 늘 평타 뒤다.
     Charging {
         time: f32,
         dir: Vec2,
         after: usize,
-        pending: bool,
     },
     /// 강공격 스윙(0161): `Moveset::heavy`. 첫머리 창은 둘레 공격(진홍)도 받아친다. 끝나면 `after`번 타로 콤보가 이어진다.
     Heavy {
@@ -84,6 +82,8 @@ pub enum State {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Event {
     Swing(usize),
+    /// 박자에 맞춰 이어진 타(0167): 작은 반짝임·소리.
+    Beat,
     /// 강공격이 나갔다 / 다 모여 발톱이 빛난다(0161).
     Heavy,
     HeavyReady,
@@ -161,8 +161,11 @@ pub struct Player {
     combo_next: usize,
     combo_timer: f32,
     no_attack: f32,
-    /// 강공격 뒤 평타 잠금(0161 덧붙임): 남은 동안 누르면 모으기만 된다.
-    heavy_lock: f32,
+    /// 박자 콤보(0167): 스윙·강공격 중에 눌러 둔 다음 타. `Some(true)` = 박자 창 안에서 눌렀다(가장 빠르게 이어진다),
+    /// `Some(false)` = 창이 열리기 전에 눌렀다(연타) — 스윙이 다 끝나고 `MASH_PENALTY`만큼 늦게 나간다. 먼저 누른 것이 남는다.
+    queued: Option<bool>,
+    /// 지금 스윙이 박자에 맞아 나갔나(그림·소리).
+    pub on_beat: bool,
     swing_id: u32,
     /// 지금 스윙을 시작하고 흐른 실제 시간(패링 창).
     swing_age: f32,
@@ -205,7 +208,8 @@ impl Player {
             combo_next: 0,
             combo_timer: 0.0,
             no_attack: 0.0,
-            heavy_lock: 0.0,
+            queued: None,
+            on_beat: false,
             swing_id: 0,
             swing_age: f32::MAX,
         }
@@ -461,7 +465,24 @@ impl Player {
     /// 히트스톱 중에도 호출된다: 눌림을 버퍼에 넣기만 한다.
     pub fn buffer(&mut self, a: &Actions) {
         if a.attack {
-            self.attack_buf = t::INPUT_BUFFER;
+            // 박자 콤보(0167): 스윙 중의 눌림은 버퍼가 아니라 `queued`에. 활성 구간 끝(조금 앞 `BEAT_GRACE`까지) 전이면 "이르다".
+            let beat = match self.state {
+                State::Attack { idx, time, .. } => {
+                    Some(time >= self.moveset.hits[idx].active.1 - t::BEAT_GRACE)
+                }
+                State::Heavy { time, .. } => {
+                    Some(time >= self.moveset.heavy().active.1 - t::BEAT_GRACE)
+                }
+                _ => None,
+            };
+            match beat {
+                Some(on_beat) => {
+                    if self.queued.is_none() {
+                        self.queued = Some(on_beat);
+                    }
+                }
+                None => self.attack_buf = t::INPUT_BUFFER,
+            }
         }
         if a.dodge {
             self.dodge_buf = t::INPUT_BUFFER;
@@ -525,8 +546,10 @@ impl Player {
         self.item_cd = (self.item_cd - dt).max(0.0);
         self.parry_cd = (self.parry_cd - dt).max(0.0);
         self.no_attack = (self.no_attack - dt).max(0.0);
-        self.heavy_lock = (self.heavy_lock - dt).max(0.0);
         self.swing_age += dt;
+        if !matches!(self.state, State::Attack { .. } | State::Heavy { .. }) {
+            self.queued = None;
+        }
 
         let move_dir = a.move_dir;
         if move_dir != Vec2::ZERO
@@ -544,32 +567,13 @@ impl Player {
                 } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
                     self.start_dodge(move_dir);
                 } else if self.armed && self.attack_buf > 0.0 && self.no_attack <= 0.0 {
+                    // 누르는 순간 평타(0167). 누르고 있으면 활성 구간 뒤에 모으기로 간다.
                     let idx = if self.combo_timer > 0.0 {
                         self.combo_next
                     } else {
                         0
                     };
-                    if a.attack_held {
-                        // 떼는 순간 평타(0161): 누르고 있는 동안은 기다린다. 길게 누르면 평타 없이 바로 모은다.
-                        // 강공격 직후(`heavy_lock`)에는 모으기만: 덜 모으고 떼면 평타가 아니라 아무것도 안 나간다.
-                        self.attack_buf = 0.0;
-                        let dir = if a.aim != Vec2::ZERO {
-                            a.aim.normalize()
-                        } else {
-                            self.facing
-                        };
-                        self.state = State::Charging {
-                            time: 0.0,
-                            dir,
-                            after: idx,
-                            pending: self.heavy_lock <= 0.0,
-                        };
-                    } else if self.heavy_lock > 0.0 {
-                        // 강공격 직후의 톡은 버린다.
-                        self.attack_buf = 0.0;
-                    } else {
-                        self.start_swing(idx, a.aim);
-                    }
+                    self.start_swing(idx, a.aim, false);
                 } else {
                     self.pos += move_dir * self.speed() * dt;
                 }
@@ -597,20 +601,25 @@ impl Player {
                 {
                     // 굴파기(깡충) 캔슬: 후딜레이를 끊고 다음 콤보로 섞는다.
                     self.start_dodge(move_dir);
-                } else if time >= a1 && self.attack_buf > 0.0 && idx < last {
-                    // 활성 구간이 끝났으면 다음 타로 바로 이어진다.
-                    self.start_swing(idx + 1, a.aim);
+                } else if time >= a1 && self.queued == Some(true) && idx < last {
+                    // 박자에 맞춰 눌렀다(0167): 활성 구간이 끝나는 순간 다음 타 — 가장 빠르다.
+                    self.start_swing(idx + 1, a.aim, true);
                 } else if time >= a1 && a.attack_held {
-                    // 활성 구간이 지났는데 아직 누르고 있다: 바로 강공격 모으기(0161). 1·2·3타 어디서든,
-                    // 처음부터 누르고 있으면 1타가 톡 나간 뒤 곧장 모은다. 강공격 뒤 콤보는 다음 타로 이어진다.
+                    // 활성 구간이 지났는데 아직 누르고 있다: 바로 강공격 모으기(0161). 어느 타 뒤든.
+                    // 강공격(또는 덜 모으고 뗀 것) 뒤 콤보는 다음 타로 이어진다.
                     self.combo_timer = 0.0;
                     self.state = State::Charging {
                         time: 0.0,
                         dir,
                         after: idx + 1,
-                        pending: false,
                     };
-                } else if time >= hit.swing + hit.recovery {
+                } else if self.queued.is_some()
+                    && time >= hit.swing + hit.recovery + t::MASH_PENALTY
+                {
+                    // 박자 전에 눌렀다(연타, 0167): 스윙을 다 마치고 `MASH_PENALTY`만큼 늦게. 마지막 타 뒤면 1타부터.
+                    let next = if idx < last { idx + 1 } else { 0 };
+                    self.start_swing(next, a.aim, false);
+                } else if self.queued.is_none() && time >= hit.swing + hit.recovery {
                     self.state = State::Free;
                     if idx < last {
                         self.combo_next = idx + 1;
@@ -620,48 +629,31 @@ impl Player {
                     }
                 }
             }
-            State::Charging {
-                time,
-                dir,
-                after,
-                pending,
-            } => {
+            State::Charging { time, dir, after } => {
                 let was = time;
                 let time = time + dt;
-                // 모으는 동안은 느리게 걷고, 조준·이동 쪽으로 겨눈다. 톡 판정 전(pending·HEAVY_TAP)엔 보통 걸음.
+                // 모으는 동안은 느리게 걷고, 조준·이동 쪽으로 겨눈다.
                 let want = if a.aim != Vec2::ZERO { a.aim } else { move_dir };
                 let dir = want.normalize_or(dir);
                 self.facing = dir;
-                let slow = !(pending && time < t::HEAVY_TAP);
-                let factor = if slow { t::HEAVY_MOVE_FACTOR } else { 1.0 };
-                self.pos += move_dir * self.speed() * factor * dt;
+                self.pos += move_dir * self.speed() * t::HEAVY_MOVE_FACTOR * dt;
                 if was < t::HEAVY_CHARGE && time >= t::HEAVY_CHARGE {
                     self.events.push(Event::HeavyReady);
                 }
-                self.state = State::Charging {
-                    time,
-                    dir,
-                    after,
-                    pending,
-                };
+                self.state = State::Charging { time, dir, after };
                 if a.special && self.armed && self.sp_full() {
                     self.start_special(move_dir);
                 } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
                     self.start_dodge(move_dir);
                 } else if !a.attack_held {
                     if time >= t::HEAVY_CHARGE {
-                        // 강공격이 그 타를 대신한다: 다음은 그다음 타.
-                        let next = if pending { after + 1 } else { after };
-                        self.start_heavy(dir, next);
-                    } else if pending {
-                        // 짧게 눌렀다 뗐다: 평타.
-                        self.start_swing(after, a.aim);
+                        self.start_heavy(dir, after);
                     } else {
-                        // 덜 모으고 뗐다: 아무것도 안 나가고, 콤보는 거기서 이어진다(강공격 뒤 잠금이 남았으면 그만큼 더).
+                        // 덜 모으고 뗐다: 아무것도 안 나가고(평타는 이미 나갔다), 콤보는 거기서 이어진다.
                         self.state = State::Free;
                         if after <= self.moveset.last() {
                             self.combo_next = after;
-                            self.combo_timer = self.moveset.combo_window + self.heavy_lock;
+                            self.combo_timer = self.moveset.combo_window;
                         }
                     }
                 }
@@ -680,28 +672,32 @@ impl Player {
                 if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
                     self.start_dodge(move_dir);
                 } else if time >= a1 && a.attack_held {
-                    // 강공격 뒤에도 누르고 있으면 다시 모은다(평타는 안 된다). 덜 모으고 떼도 평타 잠금은
-                    // 남은 후딜레이 + `HEAVY_AFTER_LOCK` 동안 그대로다.
+                    // 강공격 뒤에도 누르고 있으면 다시 모은다.
                     self.combo_timer = 0.0;
-                    self.heavy_lock =
-                        (hit.swing + hit.recovery - time).max(0.0) + t::HEAVY_AFTER_LOCK;
                     self.state = State::Charging {
                         time: 0.0,
                         dir,
                         after,
-                        pending: false,
                     };
                 } else if time >= hit.swing + hit.recovery {
-                    // 강공격 뒤 평타는 후딜레이에 더해 `HEAVY_AFTER_LOCK` 동안 막힌다: 그 안의 톡은 버리고,
-                    // 누르고 있으면 모으기만. 콤보 자리(`after`)는 잠금이 풀린 뒤에도 남는다.
-                    self.state = State::Free;
-                    self.attack_buf = 0.0;
-                    self.heavy_lock = t::HEAVY_AFTER_LOCK;
-                    if after <= ms.last() {
-                        self.combo_next = after;
-                        self.combo_timer = ms.combo_window + t::HEAVY_AFTER_LOCK;
-                    } else {
-                        self.combo_timer = 0.0;
+                    // 강공격의 후딜레이는 끊지 못한다(0167: 0161 덧붙임의 0.3초 잠금은 뺐다). 박자 창 안에서 눌렀으면
+                    // 후딜레이가 끝나는 순간 다음 타, 그 전에 눌렀으면(연타) `MASH_PENALTY`만큼 늦게.
+                    let next = if after <= ms.last() { after } else { 0 };
+                    match self.queued {
+                        Some(true) => self.start_swing(next, a.aim, true),
+                        Some(false) if time >= hit.swing + hit.recovery + t::MASH_PENALTY => {
+                            self.start_swing(next, a.aim, false)
+                        }
+                        Some(false) => {}
+                        None => {
+                            self.state = State::Free;
+                            if after <= ms.last() {
+                                self.combo_next = after;
+                                self.combo_timer = ms.combo_window;
+                            } else {
+                                self.combo_timer = 0.0;
+                            }
+                        }
                     }
                 }
             }
@@ -910,7 +906,7 @@ impl Player {
         strike
     }
 
-    fn start_swing(&mut self, idx: usize, aim: Vec2) {
+    fn start_swing(&mut self, idx: usize, aim: Vec2, beat: bool) {
         let dir = if aim != Vec2::ZERO {
             aim.normalize()
         } else {
@@ -926,6 +922,8 @@ impl Player {
         }
         self.vel += dir * self.moveset.hits[idx].lunge;
         self.attack_buf = 0.0;
+        self.queued = None;
+        self.on_beat = beat;
         self.combo_timer = 0.0;
         self.state = State::Attack {
             idx,
@@ -933,6 +931,9 @@ impl Player {
             dir,
         };
         self.events.push(Event::Swing(idx));
+        if beat {
+            self.events.push(Event::Beat);
+        }
     }
 
     fn start_drill(&mut self, move_dir: Vec2) {
@@ -1594,10 +1595,10 @@ mod tests {
         assert!((half - 0.6).abs() < 0.04, "떼면 바로 솟구친다 {half}");
     }
 
-    /// 강공격(0161): 짧게 눌렀다 떼면 평타(떼는 순간), 누르고 있으면 모으기 → 0.45초 뒤 떼면 피해 2 이상·넓은 한 방.
-    /// 1타부터 강공격이 되고, 강공격 뒤 콤보는 다음 타로 이어진다. 평타 뒤에도 누르고 있으면 모은다.
+    /// 강공격(0161·0167): 누르면 평타가 바로, 누르고 있으면 활성 구간 뒤 모으기 → 0.45초 뒤 떼면 피해 2 이상·넓은 한 방.
+    /// 강공격 뒤 콤보는 다음 타로 이어지고, 후딜레이는 끊지 못하지만 잠금은 없다(0161 덧붙임 철회).
     #[test]
-    fn hold_attack_charges_a_heavy_strike_tap_is_a_light_one() {
+    fn press_swings_at_once_and_holding_charges_a_heavy_strike() {
         let room = Room::new();
         let press = Actions {
             attack: true,
@@ -1609,44 +1610,35 @@ mod tests {
             ..Default::default()
         };
         let release = Actions::default();
-        // 톡: 누른 틱엔 기다리고(겉으론 보통), 떼면 평타.
+        // 누르는 순간 평타.
         let mut p = Player::new(room.center());
-        tick(&mut p, &room, &press);
+        let (_, ev) = tick(&mut p, &room, &press);
         assert!(
-            matches!(p.state, State::Charging { pending: true, .. }),
-            "누르고 있는 동안은 기다린다"
+            matches!(p.state, State::Attack { idx: 0, .. }),
+            "누르면 바로 평타"
         );
-        tick(&mut p, &room, &release);
-        assert!(matches!(p.state, State::Attack { idx: 0, .. }), "떼면 평타");
-        // 평타 뒤에도 누르고 있으면 모은다(활성 구간 뒤 바로).
+        assert!(ev.contains(&Event::Swing(0)));
+        // 평타 뒤에도 누르고 있으면 모은다(활성 구간 뒤 바로), 다음 자리는 2타.
         let mut n = 0;
         while matches!(p.state, State::Attack { .. }) && n < 100 {
             tick(&mut p, &room, &hold);
             n += 1;
         }
         assert!(
-            matches!(p.state, State::Charging { pending: false, .. }),
-            "스윙 뒤에도 누르고 있으면 모은다"
+            matches!(p.state, State::Charging { after: 1, .. }),
+            "스윙 뒤에도 누르고 있으면 모은다 {:?}",
+            p.state
         );
-        tick(&mut p, &room, &release);
-        assert!(
-            matches!(p.state, State::Free),
-            "덜 모으고 떼면 아무것도 안 나간다"
-        );
-
-        // 1타부터 강공격: 처음부터 누르고 있으면 평타 없이 모은다.
-        let mut p = Player::new(room.center());
-        tick(&mut p, &room, &press);
         let mut ready = false;
         for _ in 0..((t::HEAVY_CHARGE / t::TICK_DT) as usize + 2) {
             let (s, ev) = tick(&mut p, &room, &hold);
-            assert!(s.is_none(), "평타가 나가지 않는다");
+            assert!(s.is_none(), "모으는 동안 판정은 없다");
             ready |= ev.contains(&Event::HeavyReady);
         }
         assert!(ready, "다 모이면 발톱이 빛난다");
         let (_, ev) = tick(&mut p, &room, &release);
         assert!(ev.contains(&Event::Heavy));
-        assert!(matches!(p.state, State::Heavy { .. }));
+        assert!(matches!(p.state, State::Heavy { after: 1, .. }));
         assert!(p.parry_heavy(), "강공격 첫머리는 둘레 공격도 받아친다");
         let mut strike = None;
         for _ in 0..60 {
@@ -1664,14 +1656,10 @@ mod tests {
         };
         let last = p.moveset.hits[p.moveset.last()].range;
         assert!((r - last * 1.3).abs() < 1e-3, "반지름 1.3배 {r}");
-        // 강공격 뒤 바로 평타는 안 된다(사장 2026-10-27): 스윙 중 톡은 버려지고, 후딜레이 뒤 잠금 동안도 그렇다.
-        let tap = Actions {
-            attack: true,
-            ..Default::default()
-        };
+        // 강공격 뒤 잠금은 없다: 후딜레이가 끝나면 선다, 콤보는 2타로.
         let mut n = 0;
         while matches!(p.state, State::Heavy { .. }) && n < 100 {
-            tick(&mut p, &room, &tap);
+            tick(&mut p, &room, &release);
             n += 1;
         }
         assert!(
@@ -1680,60 +1668,119 @@ mod tests {
             p.state
         );
         tick(&mut p, &room, &press);
-        tick(&mut p, &room, &release);
-        assert!(
-            matches!(p.state, State::Free),
-            "강공격 직후의 톡은 평타가 되지 않는다 {:?}",
-            p.state
-        );
-        // 그 동안 누르고 있으면 모으기는 된다.
-        tick(&mut p, &room, &press);
-        tick(&mut p, &room, &hold);
-        assert!(
-            matches!(p.state, State::Charging { pending: false, .. }),
-            "잠금 중에는 모으기만 {:?}",
-            p.state
-        );
-        tick(&mut p, &room, &release);
-        assert!(matches!(p.state, State::Free));
-        // 강공격 스윙 중에 누르고 있다가 덜 모으고 떼도 잠금은 그대로다.
-        let mut q = Player::new(room.center());
-        tick(&mut q, &room, &press);
-        for _ in 0..((t::HEAVY_CHARGE / t::TICK_DT) as usize + 2) {
-            tick(&mut q, &room, &hold);
-        }
-        tick(&mut q, &room, &release);
-        assert!(matches!(q.state, State::Heavy { .. }));
-        let mut n = 0;
-        while matches!(q.state, State::Heavy { .. }) && n < 100 {
-            tick(&mut q, &room, &hold);
-            n += 1;
-        }
-        assert!(
-            matches!(q.state, State::Charging { pending: false, .. }),
-            "강공격 스윙 중 누르고 있으면 모은다 {:?}",
-            q.state
-        );
-        tick(&mut q, &room, &release);
-        tick(&mut q, &room, &press);
-        tick(&mut q, &room, &release);
-        assert!(
-            matches!(q.state, State::Free),
-            "덜 모으고 뗀 뒤의 톡도 평타가 되지 않는다 {:?}",
-            q.state
-        );
-        // 잠금이 풀리면 콤보처럼: 1타 자리의 강공격이었으니 다음 공격은 2타.
-        let mut n = 0;
-        while p.heavy_lock > 0.0 && n < 100 {
-            tick(&mut p, &room, &Actions::default());
-            n += 1;
-        }
-        tick(&mut p, &room, &press);
-        tick(&mut p, &room, &release);
         assert!(
             matches!(p.state, State::Attack { idx: 1, .. }),
             "강공격 뒤 콤보가 2타로 이어진다 {:?}",
             p.state
+        );
+        // 덜 모으고 떼면 아무것도 안 나간다(평타는 이미 나갔다).
+        let mut q = Player::new(room.center());
+        tick(&mut q, &room, &press);
+        let mut n = 0;
+        while matches!(q.state, State::Attack { .. }) && n < 100 {
+            tick(&mut q, &room, &hold);
+            n += 1;
+        }
+        assert!(matches!(q.state, State::Charging { .. }));
+        tick(&mut q, &room, &release);
+        assert!(
+            matches!(q.state, State::Free),
+            "덜 모으고 떼면 아무것도 {:?}",
+            q.state
+        );
+    }
+
+    /// 박자 콤보(0167): 활성 구간 끝(조금 앞까지)에 맞춰 누르면 그 순간 다음 타(가장 빠름, `Beat`), 그 전에 누르면(연타)
+    /// 스윙을 다 마치고 `MASH_PENALTY`만큼 늦게 — 그래도 버려지지는 않는다. 강공격 뒤도 같다.
+    #[test]
+    fn combo_on_the_beat_is_fastest_and_mashing_is_slower() {
+        let room = Room::new();
+        let tap = Actions {
+            attack: true,
+            ..Default::default()
+        };
+        let none = Actions::default();
+        let hit0 = crate::moveset::CLAWS.hits[0];
+        let a1 = hit0.active.1;
+        // 박자: 활성 구간이 끝나기 직전에 한 번 누른다 → 활성 끝에 2타.
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &tap);
+        let mut ticks = 0;
+        let mut beat_at = None;
+        for n in 1..60 {
+            // 눌림은 틱 머리에서 보니, 그때의 스윙 시간은 (n-1)틱.
+            let time = (n - 1) as f32 * t::TICK_DT;
+            let a = if time >= a1 - t::BEAT_GRACE && beat_at.is_none() {
+                beat_at = Some(n);
+                &tap
+            } else {
+                &none
+            };
+            let (_, ev) = tick(&mut p, &room, a);
+            if ev.contains(&Event::Swing(1)) {
+                assert!(ev.contains(&Event::Beat), "박자에 맞췄다");
+                ticks = n;
+                break;
+            }
+        }
+        assert!(ticks > 0, "2타가 나간다");
+        assert!(
+            (ticks as f32 * t::TICK_DT - a1).abs() <= t::TICK_DT + 1e-4,
+            "활성 구간 끝에 바로 이어진다: {ticks}틱"
+        );
+        let beat_ticks = ticks;
+        // 연타: 매 틱 누른다 → 첫 눌림이 박자 전이라 스윙 + 벌칙 뒤에야 2타, Beat 없음.
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &tap);
+        let mut mash_ticks = 0;
+        for n in 1..60 {
+            let (_, ev) = tick(&mut p, &room, &tap);
+            if ev.contains(&Event::Swing(1)) {
+                assert!(!ev.contains(&Event::Beat), "연타는 박자가 아니다");
+                mash_ticks = n;
+                break;
+            }
+        }
+        assert!(
+            mash_ticks > beat_ticks,
+            "연타 {mash_ticks} > 박자 {beat_ticks}"
+        );
+        let want = hit0.swing + hit0.recovery + t::MASH_PENALTY;
+        assert!(
+            (mash_ticks as f32 * t::TICK_DT - want).abs() <= t::TICK_DT + 1e-4,
+            "스윙 + 벌칙 뒤: {mash_ticks}틱"
+        );
+        // 이른 눌림 한 번도 버려지지 않는다: 그 뒤 아무것도 안 눌러도 벌칙 뒤에 나간다.
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &tap);
+        tick(&mut p, &room, &tap);
+        let mut out = false;
+        for _ in 0..60 {
+            let (_, ev) = tick(&mut p, &room, &none);
+            if ev.contains(&Event::Swing(1)) {
+                out = true;
+                break;
+            }
+        }
+        assert!(out, "이른 눌림도 나간다");
+        // 마지막 타 뒤의 연타는 1타부터, 역시 벌칙 뒤.
+        let mut p = Player::new(room.center());
+        let mut swings = vec![];
+        for n in 0..200 {
+            let (_, ev) = tick(&mut p, &room, &tap);
+            for e in ev {
+                if let Event::Swing(i) = e {
+                    swings.push((n, i));
+                }
+            }
+            if swings.len() >= 4 {
+                break;
+            }
+        }
+        assert_eq!(
+            swings.iter().map(|s| s.1).collect::<Vec<_>>(),
+            vec![0, 1, 2, 0],
+            "{swings:?}"
         );
     }
 

@@ -645,6 +645,12 @@ impl World {
         for ev in &self.player.events {
             match ev {
                 player::Event::Swing(i) => sfx.play(sfx::Id::Claw(*i)),
+                player::Event::Beat => {
+                    // 박자에 맞췄다(0167): 발톱 끝 작은 반짝임 + 높은 '틱'.
+                    sfx.play(sfx::Id::Beat);
+                    let p = self.player.pos + self.player.facing * 7.0;
+                    self.fx.push(glint(p, WHITE, 0.18));
+                }
                 player::Event::Heavy => {
                     // 강공격(0161): 마무리 타 소리 + 앞으로 튀는 불똥.
                     sfx.play(sfx::Id::Claw(2));
