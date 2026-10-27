@@ -10,6 +10,9 @@ use crate::input::{Actions, Verb};
 use crate::profile::{self, Profile, SLOTS};
 use crate::ui::{self, Ui, FONT_PX};
 
+/// 단추가 내려앉아 있는 시간(초, 단추감 0157). 이 동안은 입력을 받지 않고, 끝나면 그 일을 한다.
+const SLOT_PRESS: f64 = 0.12;
+
 impl App {
     /// 슬롯마다 비었나(타이틀 줄 고르기). 지금 슬롯은 메모리의 기록, 나머지는 읽어 둔 것.
     pub(super) fn slot_filled(&self, i: usize) -> bool {
@@ -155,8 +158,29 @@ impl App {
             self.slots_col = col;
             go = true;
         }
+        // 단추감(0157): 누르면 먼저 단추가 내려앉고(SLOT_PRESS초), 그 뒤에 한다.
+        if let Some((i, col, t0)) = self.slots_press {
+            if get_time() - t0 < SLOT_PRESS {
+                return;
+            }
+            self.slots_press = None;
+            self.slots_cursor = i;
+            self.slots_col = col;
+            self.slot_action(i);
+            return;
+        }
         if go {
-            let i = self.slots_cursor;
+            self.slots_press = Some((self.slots_cursor, self.slots_col, get_time()));
+            return;
+        }
+        if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
+            self.scene = Scene::Title;
+        }
+    }
+
+    /// 고른 슬롯의 단추가 하는 일(이어하기·새로 시작·지우기·덮어쓰기. 지우기·덮어쓰기는 두 번).
+    fn slot_action(&mut self, i: usize) {
+        {
             let filled = self.slot_filled(i);
             match (self.slots_load, filled, self.slots_col) {
                 (true, true, 0) => self.continue_slot(i),
@@ -181,10 +205,6 @@ impl App {
                 }
                 _ => {}
             }
-            return;
-        }
-        if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
-            self.scene = Scene::Title;
         }
     }
 
@@ -247,7 +267,6 @@ impl App {
                 let b = Rect::new(r.right() - (n - k as f32) * (bw + 4.0), r.y + 2.0, bw, 15.0);
                 let sel = on && self.slots_col == col;
                 let warn = self.slots_armed == Some(i) && (col == 1 || filled && !self.slots_load);
-                ui.rect(b, if sel { ui::PANEL_LIGHT } else { ui::PANEL });
                 let edge = if warn {
                     Color::new(0.95, 0.45, 0.40, 1.0)
                 } else if sel {
@@ -255,10 +274,10 @@ impl App {
                 } else {
                     ui::BORDER
                 };
-                ui.rect_lines(b, edge);
-                let label = ui.fit(label, b.w - 4.0, FONT_PX);
-                let c = if sel { ui::TEXT } else { ui::TEXT_DIM };
-                ui.text_center(&label, b.center().x, b.y + 2.0, FONT_PX, c);
+                let pressed = self
+                    .slots_press
+                    .is_some_and(|(pi, pc, _)| pi == i && pc == col);
+                ui.button(b, label, sel, edge, pressed);
                 self.hits
                     .push((Rect::new(b.x, b.y - 2.0, b.w, b.h + 4.0), hit));
             }

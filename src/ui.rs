@@ -302,6 +302,29 @@ impl Ui {
         rects
     }
 
+    /// 눌리는 단추(0157): 오른쪽 아래 그림자 2px 위에 얹힌 면, 위·왼쪽 1px 밝은 모서리. `pressed`면 그림자 자리로
+    /// 내려앉는다(1px 아래·오른쪽, 그림자 없음). `edge`는 테두리 색(고름·경고), `sel`이면 면이 밝다.
+    pub fn button(&self, r: Rect, label: &str, sel: bool, edge: Color, pressed: bool) {
+        let shadow = Color::new(0.02, 0.01, 0.03, 0.9);
+        let face = if sel { PANEL_LIGHT } else { PANEL };
+        let (fx, fy) = if pressed {
+            (r.x + 1.0, r.y + 1.0)
+        } else {
+            self.rect(Rect::new(r.x + 2.0, r.y + 2.0, r.w, r.h), shadow);
+            (r.x, r.y)
+        };
+        let f = Rect::new(fx, fy, r.w, r.h);
+        self.rect(f, face);
+        // 밝은 모서리(위·왼쪽): 빛이 왼쪽 위에서 온다.
+        let hi = Color::new(edge.r, edge.g, edge.b, if pressed { 0.25 } else { 0.45 });
+        self.rect(Rect::new(f.x + 1.0, f.y + 1.0, f.w - 2.0, 1.0), hi);
+        self.rect(Rect::new(f.x + 1.0, f.y + 1.0, 1.0, f.h - 2.0), hi);
+        self.rect_lines(f, edge);
+        let c = if sel { TEXT } else { TEXT_DIM };
+        let label = self.fit(label, f.w - 4.0, FONT_PX);
+        self.text_center(&label, f.center().x, f.y + 2.0, FONT_PX, c);
+    }
+
     /// 가로 탭 줄(폭 `max_w` 안). 각 탭의 논리 rect를 돌려준다.
     /// 이름이 긴 언어면 여백을 줄이고, 그래도 넘치면 탭마다 같은 몫으로 자른다.
     pub fn tabs(&self, labels: &[&str], active: usize, x: f32, y: f32, max_w: f32) -> Vec<Rect> {

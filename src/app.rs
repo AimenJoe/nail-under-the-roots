@@ -407,6 +407,8 @@ pub struct App {
     slots_cursor: usize,
     slots_col: usize,
     slots_armed: Option<usize>,
+    /// 눌린 단추(슬롯, 단추, 누른 시각): 단추감(0157). 잠깐 내려앉았다가 그 일을 한다.
+    slots_press: Option<(usize, usize, f64)>,
     /// 슬롯 창이 이어하기로 열렸나(false = 시작하기).
     slots_load: bool,
     /// 쉼터부터 이어하는 중(0080): `start`가 새 런 셈·이야기 한마디·이어하기 지우기를 건너뛴다.
@@ -535,6 +537,7 @@ impl App {
             slots_cursor: 0,
             slots_col: 0,
             slots_armed: None,
+            slots_press: None,
             slots_load: false,
             resuming: false,
             pause_tab: 0,
