@@ -109,22 +109,13 @@ pub enum AdvEvent {
     CampArrive(u32),
     /// 마지막 길의 주인을 이기고 출구를 밟았다: 가장 깊은 곳(엔딩은 앱, 0042).
     Deepest,
-    /// 첫 길 끝 방에 모모가 있다 / 모모를 이겼다(0046). 몇 번째인지는 앱이 안다.
-    MomoIntro,
-    MomoBeaten,
-    /// 둘째 길 끝 방에 도토가 있다 / 도토를 이겼다(0052).
-    DotoIntro,
-    DotoBeaten,
-    /// 셋째 길 끝 방에 콩이가 있다 / 콩이를 이겼다(0054).
-    KongiIntro,
-    KongiBeaten,
+    /// 길의 주인(`bosses.rs`: 모모 0046·도토 0052·콩이 0054·토끼풀 0165)이 끝 방에 있다 / 이겼다. 장면·기록은 앱.
+    KeeperIntro(Kind),
+    KeeperBeaten(Kind),
     /// 가장 깊은 곳(0162): 들어섰다(할매의 말) / 매듭 셋을 끊었다(엔딩) / 세 번 감겨 실에 잠겼다(쉼터로).
     DeepIntro,
     DeepDone,
     DeepSleep,
-    /// 굴토끼 옛 굴 끝 방에 토끼풀이 있다 / 토끼풀을 이겼다(0165).
-    CloverIntro,
-    CloverBeaten,
     /// 모모가 남긴 시든 꽃잎을 주웠다(0164): 기록에 남기고 도감 '???' 칸.
     PetalFound,
 }
@@ -808,29 +799,15 @@ impl World {
         }) else {
             return;
         };
-        // 첫 길의 끝은 모모가 지킨다(아직 안 돌아왔고, 이번 런에 모모에게 쓰러지지 않았으면, 0046).
-        if self.story.fight(crate::enemy::Kind::Momo) && stage == 1 && kind == NodeKind::Boss {
-            prm.boss = Some(Kind::Momo);
-            // 복선(0159): 모모가 지키는 굴에는 방마다 시든 꽃잎이 떠돈다.
-            self.juice.petals = true;
-        }
-        // 둘째 길의 끝은 도토가 지킨다(아직 기억해 내지 않았고, 이번 런에 도토에게 쓰러지지 않았으면, 0052).
-        if self.story.fight(crate::enemy::Kind::Doto) && stage == 2 && kind == NodeKind::Boss {
-            prm.boss = Some(Kind::Doto);
-        }
-        // 셋째 길(마지막 길)의 끝은 콩이가 지킨다. 이기면 출구가 가장 깊은 곳으로(0054).
-        if self.story.fight(crate::enemy::Kind::Kongi)
-            && stage == t::FINAL_STAGE
-            && kind == NodeKind::Boss
-        {
-            prm.boss = Some(Kind::Kongi);
-        }
-        // 굴토끼 옛 굴의 끝은 토끼풀이 지킨다(0165). 이기면 출구가 가장 깊은 곳으로.
-        if self.story.fight(crate::enemy::Kind::Clover)
-            && stage == t::FINAL_STAGE
-            && kind == NodeKind::Warren
-        {
-            prm.boss = Some(Kind::Clover);
+        // 길의 주인(bosses.rs): 그 길 끝 칸을 지킨다 — 아직 안 돌아왔고, 이번 런에 그에게 쓰러지지 않았으면(`Story::fight`).
+        // 모모가 지키는 굴에는 복선으로 방마다 시든 꽃잎이 떠돈다(0159).
+        for b in &crate::bosses::ALL {
+            if self.story.fight(b.kind) && stage == b.stage && kind == b.node {
+                prm.boss = Some(b.kind);
+                if b.petals {
+                    self.juice.petals = true;
+                }
+            }
         }
         self.adv.node = Some(at);
         self.build_dungeon(&prm, biome);
@@ -1117,26 +1094,19 @@ impl World {
                     if elite && n == 0 {
                         e.make_elite();
                     }
-                    if kind == Kind::Momo {
-                        e.level = self.story.momo_wins().saturating_add(1);
+                    // 길의 주인(bosses.rs)이면 자리를 적고 앱에 알린다(만남 장면). 자리 차림은 주인마다.
+                    if crate::bosses::of(kind).is_some() {
+                        if kind == Kind::Momo {
+                            e.level = self.story.momo_wins().saturating_add(1);
+                        }
+                        if kind == Kind::Clover {
+                            // 아기들의 고치 둘은 방 위쪽 가운데(0165). 토끼풀은 그 앞을 지킨다.
+                            let c = vec2(interior.center().x, interior.y + 22.0);
+                            self.hazards.cocoons = vec![c + vec2(-13.0, 0.0), c + vec2(13.0, 2.0)];
+                            e.guard = Some(c);
+                        }
                         self.adv.boss_last = e.pos;
-                        self.adv.events.push(AdvEvent::MomoIntro);
-                    }
-                    if kind == Kind::Doto {
-                        self.adv.boss_last = e.pos;
-                        self.adv.events.push(AdvEvent::DotoIntro);
-                    }
-                    if kind == Kind::Kongi {
-                        self.adv.boss_last = e.pos;
-                        self.adv.events.push(AdvEvent::KongiIntro);
-                    }
-                    if kind == Kind::Clover {
-                        // 아기들의 고치 둘은 방 위쪽 가운데(0165). 토끼풀은 그 앞을 지킨다.
-                        let c = vec2(interior.center().x, interior.y + 22.0);
-                        self.hazards.cocoons = vec![c + vec2(-13.0, 0.0), c + vec2(13.0, 2.0)];
-                        e.guard = Some(c);
-                        self.adv.boss_last = e.pos;
-                        self.adv.events.push(AdvEvent::CloverIntro);
+                        self.adv.events.push(AdvEvent::KeeperIntro(kind));
                     }
                     self.enemies.push(e);
                 }
@@ -1187,18 +1157,9 @@ impl World {
                         self.loot.push(Loot::spawn(LootKind::Seed, at));
                     }
                     self.adv.boss_cleared = true;
-                    if named == Some(Kind::Momo) {
-                        // 모모는 달아난다(장면은 앱). 끝방 보상은 그대로.
-                        self.adv.events.push(AdvEvent::MomoBeaten);
-                    } else if named == Some(Kind::Doto) {
-                        // 도토는 제정신이 돌아와 씨앗 자리를 기억해 낸다(장면은 앱).
-                        self.adv.events.push(AdvEvent::DotoBeaten);
-                    } else if named == Some(Kind::Kongi) {
-                        // 콩이는 문을 열고 바위 발톱을 준다(장면은 앱).
-                        self.adv.events.push(AdvEvent::KongiBeaten);
-                    } else if named == Some(Kind::Clover) {
-                        // 토끼풀은 맑은 눈으로 돌아오고 고치가 풀린다(장면은 앱, 0165).
-                        self.adv.events.push(AdvEvent::CloverBeaten);
+                    // 길의 주인을 이겼다: 장면·기록은 앱(모모는 달아나거나 돌아오고, 도토는 기억해 내고, 콩이는 문을 열고, 토끼풀은 고치가 풀린다).
+                    if let Some(k) = named.filter(|k| crate::bosses::of(*k).is_some()) {
+                        self.adv.events.push(AdvEvent::KeeperBeaten(k));
                     } else {
                         self.juice.toast = Some((|s| s.toast_boss, 3.0));
                     }

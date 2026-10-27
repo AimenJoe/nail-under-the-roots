@@ -318,79 +318,24 @@ impl App {
                     self.after_cutscene = super::AfterCut::Respawn;
                     self.play(cutscene::deep_sleep(&self.world));
                 }
-                AdvEvent::MomoIntro => {
-                    let level = self.world.story.momo_wins().saturating_add(1);
-                    let at = self.world.adv.boss_last;
-                    self.play(cutscene::momo_meet(&self.world, level, at));
-                }
-                AdvEvent::MomoBeaten => self.momo_beaten(),
-                AdvEvent::DotoIntro => self.play(cutscene::doto_meet(&self.world)),
-                AdvEvent::DotoBeaten => self.doto_beaten(),
-                AdvEvent::KongiIntro => self.play(cutscene::kongi_meet(&self.world)),
-                AdvEvent::KongiBeaten => self.kongi_beaten(),
-                AdvEvent::CloverIntro => self.play(cutscene::clover_meet(&self.world)),
-                AdvEvent::CloverBeaten => self.clover_beaten(),
+                AdvEvent::KeeperIntro(k) => self.play(cutscene::keeper_meet(k, &self.world)),
+                AdvEvent::KeeperBeaten(k) => self.keeper_beaten(k),
             }
         }
     }
 
-    /// 모모를 이겼다(0046): 이긴 수를 남기고, 세 번째면 돌아오는 장면 + 참 엔딩 조건 하나, 아니면 달아나는 장면.
-    /// 개발 시나리오는 기록 없이 이번 월드에서만 센다.
-    fn momo_beaten(&mut self) {
-        use crate::profile::key;
-        let crate::world::BossBeaten { wins, back } =
-            self.world.story.beat(crate::enemy::Kind::Momo);
+    /// 길의 주인을 이겼다(bosses.rs): 이번 런의 이야기에 적고(`Story::beat`), 첫 시작이면 기록에 남기고, 장면을 튼다
+    /// (모모는 세 번째에야 돌아오고 그 전엔 달아난다, 0046; 도토는 기억해 내고 0052, 콩이는 문을 열고 바위 발톱을 주고 0054,
+    /// 토끼풀은 가족과 돌아온다 0165). 개발 시나리오는 기록 없이 장면만.
+    fn keeper_beaten(&mut self, kind: crate::enemy::Kind) {
+        let r = self.world.story.beat(kind);
         if self.recording() {
-            self.profile.set_count(key::MOMO_WINS, wins as u32);
-            if back {
-                self.profile.set(key::MOMO_BACK);
+            if let Some(b) = crate::bosses::of(kind) {
+                b.record(&mut self.profile, r);
             }
             self.save_profile();
         }
-        if back {
-            let at = self.world.adv.boss_last;
-            self.play(cutscene::momo_returns(&self.world, at));
-        } else {
-            let at = self.world.adv.boss_last;
-            self.play(cutscene::momo_flee(&self.world, at, wins as u32));
-        }
-    }
-
-    /// 도토를 이겼다(0052): 씨앗 자리를 기억해 낸다(참 엔딩 조건 하나). 이번 런엔 다시 안 싸운다.
-    /// 개발 시나리오는 기록 없이 장면만.
-    fn doto_beaten(&mut self) {
-        self.world.story.beat(crate::enemy::Kind::Doto);
-        if self.recording() {
-            self.profile.set(crate::profile::key::DOTO_MEMORY);
-            self.save_profile();
-        }
-        let at = self.world.adv.boss_last;
-        self.play(cutscene::doto_returns(&self.world, at));
-    }
-
-    /// 콩이를 이겼다(0054): 문을 열고 바위 발톱을 준다(장면 속 획득 창). 그 뒤 마을에 온다.
-    fn kongi_beaten(&mut self) {
-        use crate::profile::key;
-        self.world.story.beat(crate::enemy::Kind::Kongi);
-        if self.recording() {
-            self.profile.set(key::KONGI_BACK);
-            self.profile.set(key::STONE);
-            self.save_profile();
-        }
-        let at = self.world.adv.boss_last;
-        self.play(cutscene::kongi_returns(&self.world, at));
-    }
-
-    /// 토끼풀을 이겼다(0165): 가족이 돌아온다(장면). 이번 런엔 다시 안 싸운다.
-    fn clover_beaten(&mut self) {
-        use crate::profile::key;
-        self.world.story.beat(crate::enemy::Kind::Clover);
-        if self.recording() {
-            self.profile.set(key::CLOVER_BACK);
-            self.save_profile();
-        }
-        let at = self.world.adv.boss_last;
-        self.play(cutscene::clover_returns(&self.world, at));
+        self.play(cutscene::keeper_beaten(kind, &self.world, r));
     }
 
     /// 가장 깊은 곳(0042): 클리어를 남기고 엔딩을 튼다. 끝나면 타이틀로(런이 끝났다).

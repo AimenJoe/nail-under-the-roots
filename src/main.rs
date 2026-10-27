@@ -10,6 +10,7 @@ mod adventure;
 mod app;
 mod art;
 mod biome;
+mod bosses;
 mod camp;
 mod combat;
 mod cutscene;

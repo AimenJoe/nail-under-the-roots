@@ -1414,6 +1414,50 @@ pub fn boss_beaten(w: &World, at: Vec2, entrance: Vec2) -> Cutscene {
     Cutscene::new(actors, steps)
 }
 
+/// 길의 주인을 만나는 장면(0170 R12, 표는 `bosses.rs`): 주인마다 하나. 새 보스는 여기 가지 하나.
+pub fn keeper_meet(kind: crate::enemy::Kind, w: &World) -> Cutscene {
+    use crate::enemy::Kind;
+    match kind {
+        Kind::Momo => momo_meet(w, w.story.momo_wins().saturating_add(1), w.adv.boss_last),
+        Kind::Doto => doto_meet(w),
+        Kind::Kongi => kongi_meet(w),
+        Kind::Clover => clover_meet(w),
+        other => unreachable!("길의 주인이 아니다: {other:?}"),
+    }
+}
+
+/// 길의 주인을 이긴 뒤의 장면: 모모는 돌아오거나(세 번째) 달아나고, 나머지는 돌아온다.
+pub fn keeper_beaten(kind: crate::enemy::Kind, w: &World, r: crate::world::BossBeaten) -> Cutscene {
+    use crate::enemy::Kind;
+    let at = w.adv.boss_last;
+    match kind {
+        Kind::Momo if r.back => momo_returns(w, at),
+        Kind::Momo => momo_flee(w, at, r.wins as u32),
+        Kind::Doto => doto_returns(w, at),
+        Kind::Kongi => kongi_returns(w, at),
+        Kind::Clover => clover_returns(w, at),
+        other => unreachable!("길의 주인이 아니다: {other:?}"),
+    }
+}
+
+#[cfg(test)]
+mod keeper_tests {
+    use super::*;
+
+    /// 보스 표(bosses.rs)의 주인마다 만남·이긴 뒤 장면이 있다(표에 줄을 더하고 가지를 빼먹으면 여기서 터진다).
+    #[test]
+    fn every_keeper_has_its_scenes() {
+        let mut w = World::camp_start(1);
+        w.adv.boss_last = w.player.pos;
+        for b in &crate::bosses::ALL {
+            let _ = keeper_meet(b.kind, &w);
+            for back in [false, true] {
+                let _ = keeper_beaten(b.kind, &w, crate::world::BossBeaten { wins: 1, back });
+            }
+        }
+    }
+}
+
 /// 첫 길 끝 방에 모모가 있다(0046). 만날 때마다 말이 조금씩 무너진다: 막기 → 사라진 가족 → 걱정.
 /// 등장(0159): 음악이 끊기고 어둠이 Naïl 둘레만 남긴 채 내려앉는다 → 빛이 천천히 모모 쪽으로 옮겨 가며
 /// 시든 꽃잎이 흩날리고 모모가 일어선다(땅 울림) → '???' 카드 → 말 → 빛과 카메라가 돌아오고 보스 곡.
