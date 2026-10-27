@@ -1246,25 +1246,67 @@ pub fn opening(w: &World) -> Cutscene {
         },
         Step::Wait(0.3),
         say(0, Face::Worried, |s| s.op_1),
+        // 모모의 첫 등장(0159, 사장 "튜토리얼의 등장 씬 임팩트"): 보리가 돌아와 "그 아이도…"라 하기 전에
+        // 모모가 기억에 남아야 한다. 음악이 끊기고 시든 꽃잎이 날아들며 대낮에 어둠이 Naïl 둘레만 남기고 덮인다.
+        // 모모는 어둠 밖에서 걸어 나와 빛 가장자리에 선다 → '???' 카드 → 말 → 보라 울림과 함께 사라진다.
+        Step::Hush(true),
+        Step::Cue {
+            cue: Cue::Petals(false),
+            at: vec2(230.0, 80.0),
+        },
+        Step::Wait(0.5),
+        Step::Shake(0.15),
+        Step::Gloom {
+            to: 0.8,
+            actor: 0,
+            radius: 84.0,
+            secs: 1.0,
+        },
+        Step::Wait(0.3),
         Step::Show {
             actor: 1,
             at: vec2(290.0, 90.0),
-        },
-        Step::Move {
-            actor: 1,
-            to: vec2(200.0, 90.0),
-            speed: 45.0,
         },
         Step::Face {
             actor: 0,
             dir: vec2(1.0, 0.0),
         },
+        Step::Move {
+            actor: 1,
+            to: vec2(188.0, 90.0),
+            speed: 40.0,
+        },
+        Step::Cue {
+            cue: Cue::Rise,
+            at: vec2(188.0, 90.0),
+        },
+        Step::Wait(0.5),
+        Step::Card {
+            name: "???",
+            sub: |s| s.mob_momo,
+            secs: 3.0,
+        },
         say(1, Face::Normal, |s| s.op_2),
         say(1, Face::Worried, |s| s.op_3),
         say(0, Face::Normal, |s| s.op_4),
+        Step::Cue {
+            cue: Cue::Rise,
+            at: vec2(188.0, 90.0),
+        },
+        Step::Cue {
+            cue: Cue::Petals(false),
+            at: vec2(188.0, 90.0),
+        },
         Step::Shake(0.4),
         Step::Hide { actor: 1 },
-        Step::Wait(0.4),
+        Step::Gloom {
+            to: 0.0,
+            actor: 0,
+            radius: 84.0,
+            secs: 0.9,
+        },
+        Step::Hush(false),
+        Step::Wait(0.3),
         say(0, Face::Determined, |s| s.op_5),
         // 라쿤 포포가 뛰어와 돕겠다고 한다(튜토리얼 안내).
         Step::Show {
