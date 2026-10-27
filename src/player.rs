@@ -25,15 +25,18 @@ pub enum State {
         time: f32,
         dir: Vec2,
     },
-    /// 강공격 모으기(0161): 평타 뒤 공격을 계속 누르고 있으면. `HEAVY_CHARGE` 뒤 떼면 `Heavy`, 그 전에 떼면 그냥 선다.
+    /// 강공격 모으기(0161): 어느 타든 활성 구간이 지났는데 공격을 계속 누르고 있으면. `HEAVY_CHARGE` 뒤 떼면 `Heavy`,
+    /// 그 전에 떼면 그냥 선다. `after`는 강공격 뒤 이어질 콤보 번호(1타 뒤면 2타) — 콤보 사이 어디에든 끼운다.
     Charging {
         time: f32,
         dir: Vec2,
+        after: usize,
     },
-    /// 강공격 스윙(0161): `Moveset::heavy`. 첫머리 창은 둘레 공격(진홍)도 받아친다.
+    /// 강공격 스윙(0161): `Moveset::heavy`. 첫머리 창은 둘레 공격(진홍)도 받아친다. 끝나면 `after`번 타로 콤보가 이어진다.
     Heavy {
         time: f32,
         dir: Vec2,
+        after: usize,
     },
     Burrow {
         time: f32,
@@ -545,23 +548,26 @@ impl Player {
                 } else if time >= a1 && self.attack_buf > 0.0 && idx < last {
                     // 활성 구간이 끝났으면 다음 타로 바로 이어진다.
                     self.start_swing(idx + 1, a.aim);
+                } else if time >= a1 && a.attack_held {
+                    // 활성 구간이 지났는데 아직 누르고 있다: 바로 강공격 모으기(0161). 1·2·3타 어디서든,
+                    // 처음부터 누르고 있으면 1타가 톡 나간 뒤 곧장 모은다. 강공격 뒤 콤보는 다음 타로 이어진다.
+                    self.combo_timer = 0.0;
+                    self.state = State::Charging {
+                        time: 0.0,
+                        dir,
+                        after: idx + 1,
+                    };
                 } else if time >= hit.swing + hit.recovery {
-                    if a.attack_held {
-                        // 아직 누르고 있다: 강공격 모으기(0161). 콤보는 끊긴다.
-                        self.combo_timer = 0.0;
-                        self.state = State::Charging { time: 0.0, dir };
+                    self.state = State::Free;
+                    if idx < last {
+                        self.combo_next = idx + 1;
+                        self.combo_timer = ms.combo_window;
                     } else {
-                        self.state = State::Free;
-                        if idx < last {
-                            self.combo_next = idx + 1;
-                            self.combo_timer = ms.combo_window;
-                        } else {
-                            self.combo_timer = 0.0;
-                        }
+                        self.combo_timer = 0.0;
                     }
                 }
             }
-            State::Charging { time, dir } => {
+            State::Charging { time, dir, after } => {
                 let was = time;
                 let time = time + dt;
                 // 모으는 동안은 느리게 걷고, 조준·이동 쪽으로 겨눈다.
@@ -572,21 +578,25 @@ impl Player {
                 if was < t::HEAVY_CHARGE && time >= t::HEAVY_CHARGE {
                     self.events.push(Event::HeavyReady);
                 }
-                self.state = State::Charging { time, dir };
+                self.state = State::Charging { time, dir, after };
                 if a.special && self.armed && self.sp_full() {
                     self.start_special(move_dir);
                 } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
                     self.start_dodge(move_dir);
                 } else if !a.attack_held {
                     if time >= t::HEAVY_CHARGE {
-                        self.start_heavy(dir);
+                        self.start_heavy(dir, after);
                     } else {
-                        // 덜 모으고 뗐다: 아무것도 안 나간다.
+                        // 덜 모으고 뗐다: 아무것도 안 나가고, 콤보는 거기서 이어진다.
                         self.state = State::Free;
+                        if after <= self.moveset.last() {
+                            self.combo_next = after;
+                            self.combo_timer = self.moveset.combo_window;
+                        }
                     }
                 }
             }
-            State::Heavy { time, dir } => {
+            State::Heavy { time, dir, after } => {
                 let ms = self.moveset;
                 let hit = ms.heavy();
                 let sdt = dt * self.stats.attack_speed;
@@ -596,12 +606,20 @@ impl Player {
                     strike = Some(self.heavy_strike(dir));
                 }
                 self.pos += move_dir * t::PLAYER_SPEED * ms.move_factor * dt;
-                self.state = State::Heavy { time, dir };
+                self.state = State::Heavy { time, dir, after };
                 if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
                     self.start_dodge(move_dir);
+                } else if time >= a1 && self.attack_buf > 0.0 && after <= ms.last() {
+                    // 강공격 뒤 바로 다음 타(콤보처럼).
+                    self.start_swing(after, a.aim);
                 } else if time >= hit.swing + hit.recovery {
                     self.state = State::Free;
-                    self.combo_timer = 0.0;
+                    if after <= ms.last() {
+                        self.combo_next = after;
+                        self.combo_timer = ms.combo_window;
+                    } else {
+                        self.combo_timer = 0.0;
+                    }
                 }
             }
             State::Burrow { time: was } => {
@@ -923,7 +941,7 @@ impl Player {
     }
 
     /// 강공격(0161): 다 모으고 뗐다. 받아치기 창은 늘 열린다(모으는 데 0.45초가 들어 연타가 안 된다).
-    fn start_heavy(&mut self, dir: Vec2) {
+    fn start_heavy(&mut self, dir: Vec2, after: usize) {
         self.facing = dir;
         self.swing_id += 1;
         self.swing_age = 0.0;
@@ -932,7 +950,11 @@ impl Player {
         self.vel += dir * self.moveset.heavy().lunge;
         self.attack_buf = 0.0;
         self.combo_timer = 0.0;
-        self.state = State::Heavy { time: 0.0, dir };
+        self.state = State::Heavy {
+            time: 0.0,
+            dir,
+            after,
+        };
         self.events.push(Event::Heavy);
     }
 
@@ -1560,6 +1582,18 @@ mod tests {
         };
         let last = p.moveset.hits[p.moveset.last()].range;
         assert!((r - last * 1.3).abs() < 1e-3, "반지름 1.3배 {r}");
+        // 콤보처럼: 1타 뒤 강공격이었으니 다음 공격은 2타.
+        let mut n = 0;
+        while matches!(p.state, State::Heavy { .. }) && n < 100 {
+            tick(&mut p, &room, &Actions::default());
+            n += 1;
+        }
+        tick(&mut p, &room, &press);
+        assert!(
+            matches!(p.state, State::Attack { idx: 1, .. }),
+            "강공격 뒤 콤보가 2타로 이어진다 {:?}",
+            p.state
+        );
     }
 
     /// 땅속 대시(0160): 정한 시간까지는 빠르게, 힘을 모으는 동안은 느리게 간다.

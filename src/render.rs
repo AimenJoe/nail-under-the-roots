@@ -1324,7 +1324,7 @@ fn draw_player_fx(p: &Player, alpha: f32) {
             }
         }
         // 강공격 모으기(0161): 발톱 끝에 빛이 모이고, 다 모이면 밝게 맥박친다.
-        player::State::Charging { time: ct, dir } => {
+        player::State::Charging { time: ct, dir, .. } => {
             let k = (ct / t::HEAVY_CHARGE).clamp(0.0, 1.0);
             let claw = pos + dir * 7.0;
             let pulse = if k >= 1.0 {
@@ -1354,7 +1354,7 @@ fn draw_player_fx(p: &Player, alpha: f32) {
                 );
             }
         }
-        player::State::Heavy { time: at, dir } => {
+        player::State::Heavy { time: at, dir, .. } => {
             let hit = p.moveset.heavy();
             let (a0, a1) = hit.active;
             let origin = pos + dir * 2.0;
