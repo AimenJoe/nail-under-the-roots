@@ -63,6 +63,30 @@ def main() -> None:
     # 파비콘: 나일 스프라이트 첫 칸(16×16).
     Image.open(ART / "nail.png").convert("RGBA").crop((0, 0, 16, 16)).save(OUT / "favicon.png")
     subset_font()
+    bust_cache()
+
+
+def bust_cache() -> None:
+    """style.css·site.js 주소에 내용 해시를 붙인다(0155). Pages는 파일을 몇 분 캐시해서, 새 HTML이 옛 CSS와
+    만나면 깊이 눈금이 맨 위 번호 목록으로, 숨긴 "본문으로" 링크가 보였다(사장 피드백 2026-10-27)."""
+    import hashlib
+
+    site = ROOT / "site"
+    # 글꼴(페이지 글자 서브셋)도 글을 바꾸면 바뀐다: CSS 안의 주소에 먼저 붙이고, 그 CSS로 해시를 잰다.
+    css = site / "style.css"
+    font = hashlib.sha1((site / "fonts" / "galmuri11-sub.woff2").read_bytes()).hexdigest()[:8]
+    css.write_text(
+        re.sub(r'(fonts/galmuri11-sub\.woff2)(\?v=[0-9a-f]+)?"', rf'\1?v={font}"', css.read_text(encoding="utf-8")),
+        encoding="utf-8",
+    )
+    tags = {}
+    for name in ("style.css", "site.js"):
+        tags[name] = hashlib.sha1((site / name).read_bytes()).hexdigest()[:8]
+    for page in site.rglob("*.html"):
+        text = page.read_text(encoding="utf-8")
+        for name, h in tags.items():
+            text = re.sub(rf'((?:\.\./)?{re.escape(name)})(\?v=[0-9a-f]+)?"', rf'\1?v={h}"', text)
+        page.write_text(text, encoding="utf-8")
 
 
 def subset_font() -> None:
