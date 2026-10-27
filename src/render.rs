@@ -2450,9 +2450,10 @@ fn draw_deep(d: &world::Deep, w: &World, alpha: f32) {
             );
         }
     }
-    // 할매: 숨 쉬는 큰 더미.
-    let br = 1.0 + 0.02 * (t * 1.3).sin();
-    let glow = 0.35 + 0.15 * (t * 0.9).sin();
+    // 할매: 숨 쉬는 큰 더미. 놓아줄 때(0163)는 빛이 커지고 눈을 뜬다.
+    let rel = d.done_t.map(|x| (x / 1.6).clamp(0.0, 1.0)).unwrap_or(0.0);
+    let br = 1.0 + 0.02 * (t * 1.3).sin() + 0.03 * rel;
+    let glow = 0.35 + 0.15 * (t * 0.9).sin() + 1.2 * rel;
     draw_circle(
         c.x,
         c.y + 4.0,
@@ -2519,9 +2520,15 @@ fn draw_deep(d: &world::Deep, w: &World, alpha: f32) {
     let eye = Color::new(0.40, 0.30, 0.50, 1.0);
     for sx in [-11.0, 11.0] {
         let (x, y) = ((c.x + sx).round(), (c.y - 2.0).round());
-        draw_rectangle(x - 3.0, y, 7.0, 1.0, eye);
-        draw_rectangle(x - 4.0, y - 1.0, 1.0, 1.0, eye);
-        draw_rectangle(x + 4.0, y - 1.0, 1.0, 1.0, eye);
+        if rel > 0.6 {
+            // 뜬 눈: 둥근 동공 + 빛.
+            draw_rectangle(x - 2.0, y - 2.0, 4.0, 4.0, eye);
+            draw_rectangle(x - 1.0, y - 2.0, 1.0, 1.0, Color::new(1.0, 1.0, 1.0, 0.9));
+        } else {
+            draw_rectangle(x - 3.0, y, 7.0, 1.0, eye);
+            draw_rectangle(x - 4.0, y - 1.0, 1.0, 1.0, eye);
+            draw_rectangle(x + 4.0, y - 1.0, 1.0, 1.0, eye);
+        }
         // 볼 홍조.
         draw_rectangle(
             x - 2.0,
@@ -5787,10 +5794,11 @@ pub fn light_sources(w: &World, alpha: f32, cam: Vec2, player_radius: f32) -> Ve
     let mut v = Vec::new();
     // 가장 깊은 곳(0162): 할매의 흰 빛과 매듭의 보라 빛.
     if let Some(d) = &w.deep {
+        let rel = d.done_t.map(|x| (x / 1.6).clamp(0.0, 1.0)).unwrap_or(0.0);
         v.push(LightSrc {
             pos: d.center,
-            radius: 96.0,
-            strength: 0.9,
+            radius: 96.0 + 90.0 * rel,
+            strength: 0.9 + 0.6 * rel,
         });
         for k in d.knots.iter().filter(|k| !k.cut) {
             v.push(LightSrc {

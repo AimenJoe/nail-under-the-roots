@@ -970,6 +970,10 @@ impl World {
         if self.adv.place == Place::Deep {
             // 실에 잠겼다(0162): 맡겨 둔 쉼터로 돌아간다. 매듭은 다음에 다시.
             self.deep = None;
+            // 잠드는 장면(0163)이 남긴 어둠·침묵을 걷는다.
+            self.gloom.amount = 0.0;
+            self.hush = false;
+            self.boss_card = None;
             self.restore_field();
         }
         if self.adv.place == Place::Dungeon {

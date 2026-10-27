@@ -152,6 +152,70 @@ mod device_tests {
         assert!(w.adv.cam_hold.is_none(), "카메라는 플레이어에게");
     }
 
+    /// 물든 것의 등장 셋(0163): 대장·도토·콩이도 모모처럼 음악이 내려가고 어둠·카드가 뜨며, 끝나면 제자리.
+    #[test]
+    fn tainted_intros_are_staged_like_momo() {
+        let w = World::new();
+        for (name, c) in [
+            ("boss", boss_intro(&w)),
+            ("doto", doto_meet(&w)),
+            ("kongi", kongi_meet(&w)),
+        ] {
+            let steps = &c.steps;
+            assert!(
+                matches!(steps.first(), Some(Step::Hush(true))),
+                "{name}: 음악부터"
+            );
+            assert!(
+                steps
+                    .iter()
+                    .any(|s| matches!(s, Step::Card { name: "???", .. })),
+                "{name}: ??? 카드"
+            );
+            assert!(
+                steps
+                    .iter()
+                    .any(|s| matches!(s, Step::Cue { cue: Cue::Rise, .. })),
+                "{name}: 일어선다"
+            );
+            assert!(
+                matches!(steps.last(), Some(Step::Hush(false))),
+                "{name}: 끝나면 음악"
+            );
+            assert!(
+                steps
+                    .iter()
+                    .filter(|s| matches!(s, Step::Say { .. }))
+                    .count()
+                    == 2,
+                "{name}: 말 두 줄은 그대로"
+            );
+        }
+        // 잠드는 장면: 어둠이 1.0까지 닫히고 검게 끝난다. 되살아날 때 걷는 것은 adventure가 한다.
+        let mut w = World::new();
+        let mut c = deep_sleep(&w);
+        let quiet = Actions::default();
+        for _ in 0..200 {
+            c.update(&quiet, 1.0 / 60.0, &mut w);
+        }
+        assert!(w.hush);
+        assert!(w.gloom.amount > 0.95, "{}", w.gloom.amount);
+        assert!(
+            w.sounds.contains(&crate::sfx::Id::Rumble),
+            "실이 휘감는 울림"
+        );
+        // 도망(0163): 사라지는 자리에 흙·실.
+        let at = w.player.pos + vec2(60.0, 0.0);
+        let c = momo_flee(&w, at, 1);
+        assert!(c.steps.iter().any(|s| matches!(
+            s,
+            Step::Cue {
+                cue: Cue::Vanish,
+                ..
+            }
+        )));
+    }
+
     /// 돌아오는 장면(0159): 실이 풀리는 이펙트가 먼저 나고, 그 뒤에야 배우가 보인다.
     #[test]
     fn returning_neighbor_appears_after_threads_unbind() {
@@ -764,13 +828,13 @@ fn kongi_actor(pos: Vec2) -> Actor {
 
 /// 셋째 길 끝 방에 콩이가 있다(0054): 깊은 곳의 문을 막는다. "아무도 떠나지 마"(0037)의 문지기판.
 pub fn kongi_meet(w: &World) -> Cutscene {
-    talk(
-        w,
-        &[
-            (Speaker::KongiTainted, |s| s.kongi_meet_1, Face::Normal),
-            (Speaker::Nail, |s| s.kongi_meet_1b, Face::Determined),
-        ],
-    )
+    let at = w.adv.boss_last;
+    let actors = vec![nail_actor(w), tainted_actor(w, Speaker::KongiTainted, at)];
+    let lines = vec![
+        say(1, Face::Normal, |s| s.kongi_meet_1),
+        say(0, Face::Determined, |s| s.kongi_meet_1b),
+    ];
+    Cutscene::new(actors, tainted_meet_steps(w, at, |s| s.mob_kongi, lines))
 }
 
 /// 콩이를 이겼다(0054): 맑은 눈으로 돌아와 이름을 말하고, 붙잡는 것만이 지키는 게 아니었다며 바위 발톱을 준다. 먼저 마을로 간다.
@@ -921,15 +985,82 @@ pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
     Cutscene::new(actors, steps)
 }
 
-/// 공터에 들어섰다: 대장이 깨어나 길을 막는다.
+/// 물든 것의 등장(0163): 음악이 끊기고 어둠이 Naïl 둘레만 남긴 채 내려앉는다 → 빛·카메라가 `at`으로 →
+/// 보라 울림으로 일어선다 → '???' 카드(도감 이름) → 말 → 빛·카메라가 돌아오고 보스 곡.
+/// 모모의 두 번째 만남과 같은 길이(짧은 판). 배우 0 = Naïl, 1 = 물든 것(월드의 적을 그대로 그린다).
+fn tainted_meet_steps(w: &World, at: Vec2, sub: Tr, lines: Vec<Step>) -> Vec<Step> {
+    let mut steps = vec![
+        Step::Hush(true),
+        Step::Gloom {
+            to: 0.88,
+            actor: 0,
+            radius: 64.0,
+            secs: 0.5,
+        },
+        Step::Wait(0.2),
+        Step::Face {
+            actor: 0,
+            dir: at - w.player.pos,
+        },
+        Step::Pan {
+            to: Some(at),
+            secs: 0.9,
+        },
+        Step::Gloom {
+            to: 0.88,
+            actor: 1,
+            radius: 58.0,
+            secs: 0.6,
+        },
+        Step::Cue { cue: Cue::Rise, at },
+        Step::Shake(0.2),
+        Step::Wait(0.6),
+        Step::Card {
+            name: "???",
+            sub,
+            secs: 3.0,
+        },
+    ];
+    steps.extend(lines);
+    steps.extend([
+        Step::Pan {
+            to: None,
+            secs: 0.7,
+        },
+        Step::Gloom {
+            to: 0.0,
+            actor: 1,
+            radius: 58.0,
+            secs: 0.6,
+        },
+        Step::Hush(false),
+    ]);
+    steps
+}
+
+/// 물든 것의 배우: 말풍선·초상화만, 자리는 `at`(어둠의 빛이 거기 선다). 그림은 월드의 적.
+fn tainted_actor(w: &World, who: Speaker, at: Vec2) -> Actor {
+    let mut a = speaker_actor(w, who);
+    a.pos = at;
+    a.visible = false;
+    a.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
+    a
+}
+
+/// 공터에 들어섰다: 대장이 깨어나 길을 막는다(등장 연출 0163).
 pub fn boss_intro(w: &World) -> Cutscene {
-    talk(
-        w,
-        &[
-            (Speaker::Chief, |s| s.chief_intro_1, Face::Normal),
-            (Speaker::Nail, |s| s.chief_intro_2, Face::Determined),
-        ],
-    )
+    let at = w
+        .enemies
+        .iter()
+        .find(|e| e.kind == crate::enemy::Kind::Chief)
+        .map(|e| e.pos)
+        .unwrap_or(w.player.pos + vec2(0.0, -40.0));
+    let actors = vec![nail_actor(w), tainted_actor(w, Speaker::Chief, at)];
+    let lines = vec![
+        say(1, Face::Normal, |s| s.chief_intro_1),
+        say(0, Face::Determined, |s| s.chief_intro_2),
+    ];
+    Cutscene::new(actors, tainted_meet_steps(w, at, |s| s.mob_chief, lines))
 }
 
 /// 대장을 이겼다: 보리로 돌아와 고맙다 하고, 굴 입구로 먼저 내려간다.
@@ -1106,15 +1237,27 @@ pub fn momo_flee(w: &World, at: Vec2, wins: u32) -> Cutscene {
     };
     // 플레이어 반대쪽으로 뛰어 사라진다.
     let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
+    // 달아나기(0163): 시든 꽃잎이 흩날리며 뛰어가고, 굴 속으로 파고들어 사라진다.
+    let hole = at + away * 140.0;
     let steps = vec![
         Step::Wait(0.5),
         say(1, Face::Worried, line),
+        Step::Cue {
+            cue: Cue::Petals(false),
+            at,
+        },
+        Step::Shake(0.15),
         Step::Move {
             actor: 1,
-            to: at + away * 140.0,
+            to: hole,
             speed: 170.0,
         },
+        Step::Cue {
+            cue: Cue::Vanish,
+            at: hole,
+        },
         Step::Hide { actor: 1 },
+        Step::Wait(0.4),
         say(0, Face::Worried, |s| s.momo_flee_wait),
         Step::Narrate(|s| s.momo_petal),
     ];
@@ -1123,13 +1266,13 @@ pub fn momo_flee(w: &World, at: Vec2, wins: u32) -> Cutscene {
 
 /// 둘째 길 끝 방에 도토가 있다(0052): 묻은 것을 지키려 길을 막는다.
 pub fn doto_meet(w: &World) -> Cutscene {
-    talk(
-        w,
-        &[
-            (Speaker::DotoTainted, |s| s.doto_meet_1, Face::Normal),
-            (Speaker::Nail, |s| s.doto_meet_1b, Face::Determined),
-        ],
-    )
+    let at = w.adv.boss_last;
+    let actors = vec![nail_actor(w), tainted_actor(w, Speaker::DotoTainted, at)];
+    let lines = vec![
+        say(1, Face::Normal, |s| s.doto_meet_1),
+        say(0, Face::Determined, |s| s.doto_meet_1b),
+    ];
+    Cutscene::new(actors, tainted_meet_steps(w, at, |s| s.mob_doto, lines))
 }
 
 /// 도토를 이겼다(0052): 맑은 눈으로 돌아와 이름을 말하고, 오래전 가장 깊은 곳에 묻은 씨앗을 기억해 낸다(참 엔딩 조건).
@@ -1396,6 +1539,37 @@ pub fn halmae_meet(w: &World) -> Cutscene {
         say(0, Face::Determined, |s| s.deep_1),
     ];
     Cutscene::new(story_actors(w), steps)
+}
+
+/// 실에 잠긴다(0163): 세 번 감긴 뒤. 음악이 끊기고 보라 어둠이 조여 오며 실이 휘감는다 → 한 줄 → 검게.
+/// 끝나면 앱이 맡겨 둔 쉼터로 되살린다(`AfterCut::Respawn`), 되살아날 때 어둠·침묵을 걷는다.
+pub fn deep_sleep(w: &World) -> Cutscene {
+    let at = w.player.pos;
+    let steps = vec![
+        Step::Hush(true),
+        Step::Gloom {
+            to: 0.9,
+            actor: 0,
+            radius: 46.0,
+            secs: 0.9,
+        },
+        Step::Cue { cue: Cue::Wrap, at },
+        Step::Shake(0.2),
+        Step::Wait(0.5),
+        Step::Gloom {
+            to: 1.0,
+            actor: 0,
+            radius: 14.0,
+            secs: 1.1,
+        },
+        Step::Wait(0.3),
+        Step::Narrate(|s| s.deep_sleep),
+        Step::Fade {
+            to_clear: false,
+            secs: 0.8,
+        },
+    ];
+    Cutscene::new(vec![nail_actor(w)], steps)
 }
 
 fn half_ending_steps() -> Vec<Step> {

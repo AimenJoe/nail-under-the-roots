@@ -287,8 +287,9 @@ impl App {
                 AdvEvent::DeepIntro => self.play(cutscene::halmae_meet(&self.world)),
                 AdvEvent::DeepDone => self.reach_deepest(),
                 AdvEvent::DeepSleep => {
-                    self.world.toast = Some((|s| s.deep_sleep, 4.0));
-                    self.world.start_fade(crate::adventure::Transition::Respawn);
+                    // 잠드는 장면(0163) 뒤 맡겨 둔 쉼터로.
+                    self.after_cutscene = super::AfterCut::Respawn;
+                    self.play(cutscene::deep_sleep(&self.world));
                 }
                 AdvEvent::MomoIntro => {
                     let level = self.world.momo_wins.saturating_add(1);

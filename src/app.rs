@@ -186,6 +186,8 @@ enum AfterCut {
     Game,
     Title,
     Village,
+    /// 실에 잠겼다(0163): 장면이 끝나면 맡겨 둔 쉼터로 되살아난다.
+    Respawn,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -743,6 +745,10 @@ impl App {
                                 self.scene = Scene::Title;
                             }
                             AfterCut::Village => self.start(Scenario::Village),
+                            AfterCut::Respawn => {
+                                self.scene = Scene::Game;
+                                self.world.start_fade(crate::adventure::Transition::Respawn);
+                            }
                         }
                     }
                 } else {

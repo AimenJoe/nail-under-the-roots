@@ -103,6 +103,10 @@ pub enum Cue {
     Rise,
     /// 반짝임 한 줌(돌아온 이웃이 나타날 때).
     Sparkle,
+    /// 굴 속으로 사라진다(0163, 모모 도망): 흙 튐 + 어두운 먼지 + 실 몇 올, 파고드는 소리.
+    Vanish,
+    /// 실에 감겨 잠긴다(0163): 보라 고리가 조여 오고 실이 휘감는다, 땅 울림.
+    Wrap,
 }
 
 /// 이웃이 누구인가(그림·말).
@@ -1800,6 +1804,40 @@ impl World {
                 );
                 clods(&mut self.fx, at, 8, DIRT, 70.0);
             }
+            Cue::Vanish => {
+                self.sounds.push(sfx::Id::Burrow);
+                self.feel.add_trauma(0.15);
+                self.fx.push(ring(at, 16.0, 2.0, 0.35, THREAD));
+                puff(
+                    &mut self.fx,
+                    at,
+                    5,
+                    Color::new(0.30, 0.22, 0.34, 1.0),
+                    8.0,
+                    0.6,
+                );
+                clods(&mut self.fx, at, 6, DIRT, 60.0);
+                unravel(&mut self.fx, at, 10.0);
+            }
+            Cue::Wrap => {
+                self.sounds.push(sfx::Id::Rumble);
+                self.feel.add_trauma(0.35);
+                for (k, r) in [48.0, 36.0, 24.0].into_iter().enumerate() {
+                    let mut f = ring(at, r, 3.0, 0.7, THREAD);
+                    f.time = -0.18 * k as f32;
+                    self.fx.push(f);
+                }
+                puff(
+                    &mut self.fx,
+                    at,
+                    8,
+                    Color::new(0.24, 0.14, 0.34, 1.0),
+                    12.0,
+                    0.9,
+                );
+                unravel(&mut self.fx, at, 18.0);
+                unravel(&mut self.fx, at, 28.0);
+            }
             Cue::Sparkle => {
                 self.sounds.push(sfx::Id::Glowbug);
                 for k in 0..6 {
@@ -1857,10 +1895,14 @@ impl World {
         for k in &mut d.knots {
             k.shake = (k.shake - dt).max(0.0);
         }
-        if let Some(t_done) = d.done_t.as_mut() {
-            *t_done += dt;
-            if *t_done >= t::DEEP_DONE_DELAY {
-                d.done_t = Some(f32::MAX);
+        if let Some(was) = d.done_t {
+            // 놓아주기(0163): 셋 다 끊긴 뒤 할매의 남은 실이 풀리고 흰 꽃잎이 날린다, 빛이 커진다. 그 뒤 엔딩.
+            let now = was + dt;
+            let fire = was < t::DEEP_DONE_DELAY && now >= t::DEEP_DONE_DELAY;
+            d.done_t = Some(if fire { f32::MAX } else { now });
+            let c = d.center;
+            self.deep_release_fx(c, was, now);
+            if fire {
                 self.adv.events.push(crate::adventure::AdvEvent::DeepDone);
             }
             return;
@@ -1953,6 +1995,42 @@ impl World {
                     d.next_pull = d.pull_every();
                 }
             }
+        }
+    }
+
+    /// 놓아주기 이펙트(0163): `was`→`now` 사이에 지난 박자마다 한 번. 0.4초 실이 풀림, 1.0초 흰 꽃잎, 1.6초 더 큰 풀림,
+    /// 2.3초 반짝임과 꽃잎. 그림은 `render::draw_deep`가 `done_t`로 빛·눈을 바꾼다.
+    fn deep_release_fx(&mut self, c: Vec2, was: f32, now: f32) {
+        let crossed = |at: f32| was < at && now >= at;
+        let white = Color::new(0.98, 0.96, 1.0, 1.0);
+        if crossed(0.4) {
+            self.sounds.push(sfx::Id::Unbind);
+            self.feel.add_trauma(0.25);
+            self.fx.push(ring(c, 10.0, 60.0, 0.7, WHITE));
+            self.fx.push(ring(c, 6.0, 40.0, 0.5, THREAD));
+            for dx in [-30.0, 0.0, 30.0] {
+                unravel(&mut self.fx, c + vec2(dx, 4.0), 22.0);
+            }
+        }
+        if crossed(1.0) {
+            petals(&mut self.fx, c + vec2(0.0, -10.0), 24, white, 60.0);
+        }
+        if crossed(1.6) {
+            self.sounds.push(sfx::Id::Unbind);
+            self.feel.add_trauma(0.2);
+            self.fx.push(ring(c, 20.0, 90.0, 0.9, WHITE));
+            unravel(&mut self.fx, c, 46.0);
+            unravel(&mut self.fx, c + vec2(0.0, 12.0), 34.0);
+        }
+        if crossed(2.3) {
+            self.sounds.push(sfx::Id::Glowbug);
+            for k in 0..10 {
+                let ang = k as f32 / 10.0 * std::f32::consts::TAU;
+                let mut g = glint(c + vec2(ang.cos() * 40.0, ang.sin() * 26.0), white, 0.7);
+                g.time = -0.05 * k as f32;
+                self.fx.push(g);
+            }
+            petals(&mut self.fx, c + vec2(0.0, -20.0), 16, white, 50.0);
         }
     }
 
@@ -2381,6 +2459,15 @@ mod tests {
             w.deep_tick(t::TICK_DT);
         }
         assert!(w.adv.events.contains(&AdvEvent::DeepDone));
+        assert!(
+            w.sounds.iter().filter(|s| **s == sfx::Id::Unbind).count() >= 3,
+            "놓아주기: 매듭 셋 + 할매의 실이 풀리는 소리가 더 난다(0163) {:?}",
+            w.sounds
+        );
+        assert!(
+            w.fx.iter().any(|f| matches!(f.kind, FxKind::Petal { .. })),
+            "흰 꽃잎"
+        );
     }
 
     /// 길의 샘(0159): 들어서는 게 아니라 발을 담가야 가득 회복, 한 번만.

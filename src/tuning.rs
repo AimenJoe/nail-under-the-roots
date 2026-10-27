@@ -78,8 +78,8 @@ pub const DEEP_THREAD_W: f32 = 5.0;
 pub const DEEP_PULL_SPEED: f32 = 240.0;
 pub const DEEP_WRAP_TIME: f32 = 1.3;
 pub const DEEP_WRAPS: u32 = 3;
-/// 셋 다 끊은 뒤 엔딩까지(마지막 실이 풀리는 걸 본다).
-pub const DEEP_DONE_DELAY: f32 = 1.4;
+/// 셋 다 끊은 뒤 엔딩까지: 놓아주기 이펙트(0163, 실이 풀리고 흰 꽃잎, 빛이 커진다)를 본다.
+pub const DEEP_DONE_DELAY: f32 = 3.4;
 
 // ---- 강공격(0161) --------------------------------------------------------
 /// 공격은 떼는 순간 평타(사장 선택 2026-10-27: 1타부터 강공격이 되게). 누른 지 이만큼(초) 안에 떼면 평타,
