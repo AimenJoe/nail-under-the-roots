@@ -300,6 +300,27 @@ impl Enemy {
         }
     }
 
+    /// 공격 예고의 진행(0175): 0 = 예고 시작, 1 = 공격이 나가는 순간. 예고 중이 아니면 None.
+    /// 그림은 몸으로 닫히는 고리(플레이어의 박자 고리와 같은 말: 고리가 닿는 순간 일어난다). 돌진 예고(받아칠 수 있다)는
+    /// 황금, 나머지(내려앉기·쏘기·울부짖기·발 구르기)는 진홍 — 0160의 색 약속.
+    pub fn telegraph(&self) -> Option<(f32, bool)> {
+        let (time, dur, parryable) = match self.state {
+            State::Windup { time } => (time, self.windup(), true),
+            State::Aim { time } | State::Crouch { time, .. } => (time, self.windup(), false),
+            State::Howl { time } => {
+                let m = if self.sp().behavior == Behavior::Doto {
+                    t::DOTO_BURY_MUL
+                } else {
+                    t::CHIEF_HOWL_MUL
+                };
+                (time, self.windup() * m, false)
+            }
+            State::Thump { time } => (time, self.thump_windup(), false),
+            _ => return None,
+        };
+        Some(((time / dur.max(1e-3)).clamp(0.0, 1.0), parryable))
+    }
+
     /// 받아칠 수 있는 공격인가(0160): 곧게 오는 돌진(물기·구르기·내리꽂기도 `Charge`)만. 내려앉기·튀어나오기는
     /// 둘레 공격이라 안 된다. 예고도 띠·점선(황금) ↔ 고리(진홍, ✕)로 갈린다.
     pub fn parryable(&self) -> bool {
@@ -691,6 +712,30 @@ fn idle_of(b: Behavior) -> State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 공격 예고 고리(0175): 돌진 예고는 황금(받아칠 수 있다), 웅크림·조준은 진홍, 예고가 아니면 없음. 예고 끝에 1.
+    #[test]
+    fn telegraph_progress_and_color_follow_the_windup() {
+        let mut e = Enemy::new(Kind::FieldMouse, vec2(50.0, 50.0));
+        assert_eq!(e.telegraph(), None);
+        e.state = State::Windup { time: 0.0 };
+        assert_eq!(e.telegraph(), Some((0.0, true)));
+        e.state = State::Windup { time: e.windup() };
+        assert_eq!(e.telegraph(), Some((1.0, true)));
+        e.state = State::Crouch {
+            time: e.windup() * 0.5,
+            target: Vec2::ZERO,
+        };
+        let (k, parry) = e.telegraph().unwrap();
+        assert!((k - 0.5).abs() < 1e-5 && !parry);
+        e.state = State::Aim { time: 0.0 };
+        assert_eq!(e.telegraph(), Some((0.0, false)));
+        e.state = State::Charge {
+            time: 0.0,
+            dir: vec2(1.0, 0.0),
+        };
+        assert_eq!(e.telegraph(), None, "공격 중엔 고리 없음");
+    }
 
     fn strike(kind: StrikeKind, at: Vec2, damage: i32) -> Strike {
         Strike {

@@ -248,6 +248,7 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                         draw_tile(&art.tiles, src, r.x, r.bottom() - 32.0, w.biome.wall_tint());
                     }
                     PropKind::Chest { opened } => draw_chest(r, opened, w.time),
+                    PropKind::Breakable(b) => draw_breakable(b, r, w.time),
                     PropKind::Campfire => match &art.sunny {
                         Some(sunny) => draw_campfire_sunny(sunny, r, w.time),
                         None => draw_campfire(r, w.time),

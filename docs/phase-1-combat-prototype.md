@@ -94,6 +94,9 @@
 | 소리 파일(0081) | `tools/audio/make_audio.py`, `assets/sfx`·`assets/music`, `sfx.rs`(FILES·변형), `music.rs`(TRACKS·들을 때 읽기·KEEP), `app.rs`(menu_sound) | CC0 효과음(Kenney: 메뉴·사기·안 됨·맞음·쓰러짐·다침·상자)·음악 7곡(칩튠 Aureolus_Omicron 넷 + 쉬는 곳 피아노·바이올린 셋, 0154). 웹 헤드리스로 받기·재생·고리 확인, 네이티브 실제 소리는 미확인 |
 | 강공격(0161) | `input.rs`(attack_held), `player.rs`(Charging·Heavy·heavy_strike·parry_heavy), `moveset.rs`(heavy_of), `combat.rs`(StrikeKind::Heavy), `world.rs`, `render.rs`, `tutorial.rs`(Stage::Heavy) | 누르는 순간 평타, 누르고 있으면 활성 구간 뒤 모으기 → 0.45초 뒤 떼면 피해 2 이상·반지름 1.3배 한 방(마지막 타에서 만든다), 콤보는 다음 타로(후딜레이는 못 끊지만 잠금은 없다, 0167). 첫머리 창은 진홍 고리 공격도 받아친다. 튜토리얼 열 단계 중 4번째 |
 | 박자 콤보(0167 → 0174) | `player/`(Queued·beat_clock·beat_at·combo_pending·queue_due·beat_cue·beat_pips), `tuning.rs`(BEAT_PERIOD·BEAT_WINDOW·BEAT_RING_*·BEAT_PIP_SHOW), `world.rs`·`sfx.rs`(Beat(n) 도미솔도), `render/actors.rs`(draw_beat_cue) | 평타는 누르는 순간. 다음 타의 박자는 스윙 시작 0.25초 뒤(스윙·후딜레이가 길면 그 끝). 창 ±0.06초 안이면 그 자리에서 + 덤·퍼지는 고리·오르는 종소리·머리 위 음표, 창 전이면 박자까지 기다렸다(스냅, 덤 없음), 창 뒤면 그 자리에서(덤 없음). 닫히는 고리가 박자를 보여 준다. 강공격 뒤 잠금 없음 |
+| 설정 파일(0175) | `prefs.rs`(store::read_from·write_to·load_all·save_all), `profile.rs`(data_dir) | 데스크톱·Android·iOS도 기록 폴더의 `prefs.txt`에 설정을 남긴다(전엔 켤 때마다 기본값) |
+| 적 공격 예고 고리(0176) | `enemy/mod.rs`(telegraph), `render/actors.rs` | 돌진·조준·웅크림·울부짖기·발 구르기 예고 동안 발밑으로 닫히는 고리(돌진 황금·나머지 진홍, 끝 15% 흰색). 닿는 순간 공격 |
+| 부술 수 있는 것(0177) | `room.rs`(PropKind::Breakable·remove_prop), `dungeon.rs`(breakables), `world.rs`(prop_break·stats.broken), `render/props.rs`(draw_breakable), `sfx.rs`(Break), `tuning.rs`(BREAK_*) | 굴 방마다 1~3개(지대마다 흙더미·뿌리혹·돌무더기·실뭉치), 공격이 닿으면 깨져 씨앗 30%·산딸기 12%·반딧불 10%·지렁이 4% |
 | 타격 피드백·강타 보상(0168) | `tuning.rs`(KICK_*·BEAT_*·HEAVY_PERFECT·WALL_SLAM_*·CHARGE_PULL_*), `combat.rs`(Feel::kick), `moveset.rs`(heavy_of), `player.rs`(on_beat·combo_beats·perfect), `enemy.rs`(slam), `world.rs`, `render.rs`(draw_enemy 진동·눌림, 킥), `sfx.rs`(ChargeUp·HitTick) | 히트스톱 5/9/13f, 맞은 적 진동·눌림, 맞히면 전진 멈춤 + 카메라 킥 2/3/4px, '틱'. 강타 피해 3·경직 +0.5·넉백 ×1.7 → 벽 쿵 +1, 콩이 등딱지 깨기, 모으는 동안 소리·웅크림·먼지. 박자 타 덤, 이음 다 맞춘 마무리 ×1.25, 다 모인 직후 뗀 강타 +1 |
 | 코드 건강(0169 R1~R4) | `sfx.rs`(Queue·flush), `world.rs`(step 단계 메서드·enemy_down·Inventory·Story·RunStats·Hazards·Juice), `render/`(아홉 모듈), `app/`(pause·settings·album·title, start 넷으로), `scenario.rs`(통째 시험) | 로직은 오디오 장치를 모른다 → 시나리오 37개를 600틱씩 돌리는 시험. 동작 변화는 적 쓰러짐 손맛 통일뿐 |
 | 코드 건강(0169 R5~R8) | `enemy/`(mod·melee·ranged·boss, `Ctx`), `i18n/`(mod + 언어 열하나), `tools/test/smoke.js`·`smoke-web.yml`, `equipment.rs`(발톱 상수), `profile.rs`·`prefs.rs`·`suspend.rs`(고정 샘플 시험), `tools/art/legacy/`, `build-android.yml`·`build-ios.yml`(main만), `render/actors.rs`(모모 웅크림) | 브라우저 연기 시험이 main push마다 돈다. 동작 변화는 모모 모으기 웅크림 1px뿐 |
@@ -167,6 +170,9 @@
 - [x] D. 스테이지 다양화(0147): 뿌리 지대 가시뿌리 덤불(걸으면 찔림, 돌진하던 적은 박혀 멈칫), 심층 무너지는 천장(예고 뒤 돌), 길 지도 "실타래" 칸(엘리트 + 졸개 둘, 이기면 장신구). 세기·빈도는 사장(개발 → "실타래 굴: 뿌리/심층")
 - [x] E. 열한 언어·도감·저널(0146·0147·0162·0165의 글은 모두 열한 언어. 앨범은 토끼풀 일러스트 원본이 오면)
 - [ ] F. 사장 판정
+- [ ] **설정 파일(0175)**: Android에서 언어·음량·버튼을 바꾸고 껐다 켜면 남는지, APK를 덮어 설치해도 남는지
+- [ ] **적 예고 고리(0176)**: 어두운 지대에서도 보이는지, 닿는 순간 = 공격 순간으로 느껴지는지, 여러 마리일 때 어지럽지 않은지, 보스에도 둘지
+- [ ] **부술 수 있는 것(0177)**: 방마다 1~3개가 알맞은지, 빈손 44%가 "운"으로 느껴지는지, 들판·쉼터·마을에도 둘지
 - [ ] **박자 콤보(0174)**: 0.25초 템포가 "타·타·탕"으로 읽히는지, 창 ±0.06초, 연타가 박자에 스냅되는 게 둔하지 않은지, 닫히는 고리·종소리·음표가 싸움을 가리거나 유치하지 않은지, 모모 발차기의 쉼
 
 ### v0.3.0 마일스톤(0081·0140) — 닫음(2026-10-27, 사장 결정으로 v0.3.0 배포, 0148). 7·10~12는 아래 "먼저"로 넘김

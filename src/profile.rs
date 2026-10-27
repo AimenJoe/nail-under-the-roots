@@ -230,6 +230,11 @@ mod store {
 
     /// 저장 파일 자리. `NAIL_SAVE_DIR`이 있으면 그곳(테스트·휴대용).
     fn path(cell: u32) -> Option<PathBuf> {
+        Some(data_dir()?.join(file_name(cell)))
+    }
+
+    /// 기록·설정 파일을 두는 앱 전용 폴더(설정 파일 `prefs.txt`도 여기, 0175).
+    pub fn data_dir() -> Option<PathBuf> {
         let dir = if let Some(d) = std::env::var_os("NAIL_SAVE_DIR") {
             PathBuf::from(d)
         } else if cfg!(target_os = "android") {
@@ -246,7 +251,7 @@ mod store {
                 None => PathBuf::from(std::env::var_os("HOME")?).join(".local/share/nail"),
             }
         };
-        Some(dir.join(file_name(cell)))
+        Some(dir)
     }
 
     pub fn read(cell: u32) -> Option<String> {
@@ -264,6 +269,12 @@ mod store {
             let _ = std::fs::rename(&tmp, &p);
         }
     }
+}
+
+/// 기록·설정 파일 폴더(데스크톱·Android·iOS). 웹은 localStorage라 없다.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn data_dir() -> Option<std::path::PathBuf> {
+    store::data_dir()
 }
 
 /// miniquad가 플러그인 버전을 맞춰 보는 함수(mq_js_bundle.js의 init_plugins).

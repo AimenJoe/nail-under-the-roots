@@ -642,6 +642,68 @@ pub(super) fn draw_chest(r: Rect, opened: bool, time: f32) {
 
 /// 쉼터 모닥불: 돌 둘레 + 장작 + 흔들리는 불꽃 + 바닥 빛.
 /// 모닥불의 돌만(불꽃·빛 없이): 그림자 패스용(0105). 그림 자리는 `draw_campfire_sunny`·`draw_campfire`와 같다.
+/// 부술 수 있는 것(0175): 칸 하나(발 사각형 `r`) 위에 지대마다 다른 모양. 바닥 그림자 + 둥근 몸통 + 무늬.
+pub(super) fn draw_breakable(b: crate::room::Breakable, r: Rect, time: f32) {
+    use crate::room::Breakable;
+    let c = r.center();
+    let (cx, foot) = (c.x.round(), (r.bottom() - 2.0).round());
+    draw_ellipse(cx, foot + 1.0, 7.0, 2.5, 0.0, SHADOW_SOFT);
+    let px = |x: f32, y: f32, col: Color| draw_rectangle(x, y, 1.0, 1.0, col);
+    match b {
+        Breakable::Mound => {
+            // 흙더미: 갈색 둔덕, 위는 밝고 아래는 어둡다. 조약돌 둘.
+            let (lo, hi) = (
+                Color::new(0.42, 0.30, 0.20, 1.0),
+                Color::new(0.62, 0.47, 0.32, 1.0),
+            );
+            draw_ellipse(cx, foot - 3.0, 6.5, 4.5, 0.0, lo);
+            draw_ellipse(cx - 0.5, foot - 4.5, 5.0, 3.0, 0.0, hi);
+            px(cx - 3.0, foot - 2.0, Color::new(0.5, 0.48, 0.5, 1.0));
+            px(cx + 2.0, foot - 5.0, Color::new(0.5, 0.48, 0.5, 1.0));
+            px(cx + 1.0, foot - 1.0, lo);
+        }
+        Breakable::Gall => {
+            // 뿌리혹: 불그죽죽한 혹, 어두운 뿌리 줄이 감겨 있다. 살짝 숨 쉰다.
+            let k = 1.0 + 0.04 * (time * 2.0 + c.x * 0.1).sin();
+            let (lo, hi) = (
+                Color::new(0.40, 0.22, 0.18, 1.0),
+                Color::new(0.58, 0.33, 0.26, 1.0),
+            );
+            draw_ellipse(cx, foot - 4.0, 5.5 * k, 5.5, 0.0, lo);
+            draw_ellipse(cx - 1.0, foot - 5.0, 4.0 * k, 3.5, 0.0, hi);
+            let root = Color::new(0.28, 0.16, 0.12, 1.0);
+            draw_line(cx - 5.0, foot - 2.0, cx + 4.0, foot - 6.0, 1.0, root);
+            draw_line(cx - 3.0, foot - 8.0, cx + 5.0, foot - 3.0, 1.0, root);
+        }
+        Breakable::RockPile => {
+            // 돌무더기: 회색 돌 셋을 쌓았다.
+            let (lo, hi) = (
+                Color::new(0.36, 0.33, 0.36, 1.0),
+                Color::new(0.58, 0.55, 0.58, 1.0),
+            );
+            draw_ellipse(cx - 3.0, foot - 2.0, 3.5, 2.5, 0.0, lo);
+            draw_ellipse(cx + 3.0, foot - 2.0, 3.5, 2.5, 0.0, lo);
+            draw_ellipse(cx, foot - 5.5, 3.5, 3.0, 0.0, hi);
+            px(cx - 4.0, foot - 3.0, hi);
+            px(cx + 2.0, foot - 3.0, hi);
+            px(cx - 1.0, foot - 7.0, WHITE);
+        }
+        Breakable::SilkBall => {
+            // 실뭉치: 희끄무레한 공, 실 줄 몇 가닥. 보랏빛이 돈다.
+            let (lo, hi) = (
+                Color::new(0.72, 0.68, 0.80, 1.0),
+                Color::new(0.92, 0.90, 0.98, 1.0),
+            );
+            draw_ellipse(cx, foot - 4.5, 5.5, 5.0, 0.0, lo);
+            draw_ellipse(cx - 1.0, foot - 5.5, 4.0, 3.5, 0.0, hi);
+            let thread = Color::new(0.60, 0.50, 0.75, 0.9);
+            draw_line(cx - 5.0, foot - 5.0, cx + 5.0, foot - 4.0, 1.0, thread);
+            draw_line(cx - 3.0, foot - 8.0, cx + 2.0, foot - 1.0, 1.0, thread);
+            px(cx + 5.0, foot - 2.0, thread);
+        }
+    }
+}
+
 pub(super) fn draw_campfire_stones(sunny: Option<&art::Sunny>, r: Rect) {
     if let Some(sunny) = sunny {
         let c = vec2(r.center().x, r.bottom() - 4.0);

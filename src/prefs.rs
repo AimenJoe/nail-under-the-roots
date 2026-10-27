@@ -1,5 +1,6 @@
 //! 설정 저장(소리·흔들림·언어·조작). 웹은 브라우저 localStorage(web/index.html의 nail_prefs 플러그인)에
-//! 정수 칸 몇 개로 둔다. 데스크톱·Android는 아직 저장하지 않는다(켤 때마다 기본값).
+//! 정수 칸 몇 개로 둔다. 데스크톱·Android·iOS는 기록 폴더(`profile::data_dir`)의 `prefs.txt`에 같은 칸을
+//! 줄 하나로 적는다(0175. 전엔 저장하지 않아 켤 때마다 기본값이었다 — 사장: "업데이트하면 언어가 사라진다").
 //!
 //! 칸: 0 표식(MAGIC), 1 소리+1, 2 흔들림+1, 3 언어(0 = 기기 언어), 4..11 키 번호+1, 11..18 패드 번호+1,
 //! 18 음악+1(0081), 19 입자 효과+1(0141). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
@@ -119,14 +120,68 @@ mod store {
         // SAFETY: 위와 같다.
         unsafe { nail_pref_set(i, v) }
     }
+
+    pub fn load_all() -> [u32; super::CELLS] {
+        let mut v = [0u32; super::CELLS];
+        for (i, x) in v.iter_mut().enumerate() {
+            *x = get(i as u32);
+        }
+        v
+    }
+
+    pub fn save_all(v: &[u32; super::CELLS]) {
+        for (i, x) in v.iter().enumerate() {
+            set(i as u32, *x);
+        }
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 mod store {
-    pub fn get(_i: u32) -> u32 {
-        0
+    use super::CELLS;
+    use std::path::{Path, PathBuf};
+
+    fn path() -> Option<PathBuf> {
+        crate::profile::data_dir().map(|d| d.join("prefs.txt"))
     }
-    pub fn set(_i: u32, _v: u32) {}
+
+    /// 파일 한 줄: 칸 값을 빈칸으로 띄어 쓴다. 없거나 깨졌으면 0(= 저장 전).
+    pub fn read_from(p: &Path) -> [u32; CELLS] {
+        let mut v = [0u32; CELLS];
+        if let Ok(s) = std::fs::read_to_string(p) {
+            for (x, w) in v.iter_mut().zip(s.split_whitespace()) {
+                *x = w.parse().unwrap_or(0);
+            }
+        }
+        v
+    }
+
+    /// 임시 파일에 쓰고 이름을 바꾼다(기록 파일과 같은 방식).
+    pub fn write_to(p: &Path, v: &[u32; CELLS]) {
+        if let Some(d) = p.parent() {
+            let _ = std::fs::create_dir_all(d);
+        }
+        let line = v
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(" ")
+            + "\n";
+        let tmp = p.with_extension("tmp");
+        if std::fs::write(&tmp, line).is_ok() {
+            let _ = std::fs::rename(&tmp, p);
+        }
+    }
+
+    pub fn load_all() -> [u32; CELLS] {
+        path().map(|p| read_from(&p)).unwrap_or([0; CELLS])
+    }
+
+    pub fn save_all(v: &[u32; CELLS]) {
+        if let Some(p) = path() {
+            write_to(&p, v);
+        }
+    }
 }
 
 /// miniquad가 플러그인 버전을 맞춰 보는 함수(mq_js_bundle.js의 init_plugins).
@@ -137,22 +192,41 @@ pub extern "C" fn nail_prefs_crate_version() -> u32 {
 }
 
 pub fn load() -> Option<Prefs> {
-    let mut v = [0u32; CELLS];
-    for (i, x) in v.iter_mut().enumerate() {
-        *x = store::get(i as u32);
-    }
-    decode(&v)
+    decode(&store::load_all())
 }
 
 pub fn save(p: &Prefs) {
-    for (i, x) in encode(p).iter().enumerate() {
-        store::set(i as u32, *x);
-    }
+    store::save_all(&encode(p));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 데스크톱·Android 설정 파일(0175): 쓴 칸을 그대로 읽고, 없는 파일은 0(저장 전), 깨진 글자는 0.
+    #[test]
+    fn native_prefs_file_round_trips() {
+        let dir = std::env::temp_dir().join(format!("nail-prefs-test-{}", std::process::id()));
+        let p = dir.join("prefs.txt");
+        assert_eq!(store::read_from(&p), [0u32; CELLS], "없으면 0");
+        let prefs = Prefs {
+            volume: 3,
+            music: 2,
+            shake: 0,
+            effects: 5,
+            lang: Some(Lang::Pl),
+            bindings: Bindings::DEFAULT,
+        };
+        store::write_to(&p, &encode(&prefs));
+        assert_eq!(decode(&store::read_from(&p)), Some(prefs));
+        std::fs::write(&p, "garbage 1 2\n").unwrap();
+        assert_eq!(
+            decode(&store::read_from(&p)),
+            None,
+            "표식이 깨지면 통째로 무시"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// v0.3.8이 쓴 칸 배열의 고정 샘플(0169 R8): 칸 번호 ↔ 값 약속이 바뀌면 여기서 깨진다(바꾸면 MAGIC을 올린다).
     #[test]

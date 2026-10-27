@@ -12,7 +12,7 @@ use crate::input::Actions;
 use crate::items::{Bag, Consumable};
 use crate::loot::{self, Loot, LootKind};
 use crate::player::{self, Player};
-use crate::room::Room;
+use crate::room::{PropKind, Room};
 use crate::sfx;
 use crate::tuning as t;
 
@@ -459,6 +459,8 @@ pub struct RunStats {
     pub heavy_hits: u32,
     /// 굴파기 횟수(튜토리얼용).
     pub burrows: u32,
+    /// 부순 것 수(0175).
+    pub broken: u32,
 }
 
 /// 싸움 중 바닥의 위험물(0169 R2): 도토리 지뢰·포자 구름·떨어지는 돌·고치·충격파·실 가닥.
@@ -768,6 +770,7 @@ impl World {
             self.deep_hit(s);
             self.web_cut(s);
             self.cocoon_hit(s);
+            self.prop_break(s);
         }
         // 땅속에서 힘을 모으는 동안(0158) 땅이 운다: 힘에 비례해 흔들리고 흙알이 튄다.
         if self.player.is_burrowed() {
@@ -2465,6 +2468,60 @@ impl World {
         }
     }
 
+    /// 부술 수 있는 것(0175): 플레이어의 공격이 닿으면 깨진다 — 흙덩이·먼지·퍽 소리, 운에 따라 소모품(`BREAK_*`). 꿈에서는 빈손.
+    fn prop_break(&mut self, s: &Strike) {
+        let mut broken = Vec::new();
+        let mut i = 0;
+        while i < self.room.props.len() {
+            let p = self.room.props[i];
+            if let PropKind::Breakable(b) = p.kind {
+                if s.shape.overlaps_circle(p.rect.center(), t::BREAK_R) {
+                    broken.push((p.rect.center(), b));
+                    self.room.remove_prop(i);
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        for (at, b) in broken {
+            self.stats.broken += 1;
+            self.juice.audio.play(sfx::Id::Break);
+            let (chunk, dust) = match b {
+                crate::room::Breakable::Mound => (DIRT, Color::new(0.6, 0.48, 0.34, 1.0)),
+                crate::room::Breakable::Gall => (
+                    Color::new(0.45, 0.28, 0.2, 1.0),
+                    Color::new(0.5, 0.36, 0.26, 1.0),
+                ),
+                crate::room::Breakable::RockPile => (ROCK, Color::new(0.55, 0.52, 0.52, 1.0)),
+                crate::room::Breakable::SilkBall => (
+                    Color::new(0.92, 0.90, 0.98, 1.0),
+                    Color::new(0.85, 0.82, 0.92, 1.0),
+                ),
+            };
+            clods(&mut self.juice.fx, at, 5, chunk, 70.0);
+            puff(&mut self.juice.fx, at, 4, dust, 5.0, 0.45);
+            self.juice.feel.add_trauma(0.08);
+            if self.dream {
+                continue;
+            }
+            let roll = rand::gen_range(0.0, 1.0);
+            let kind = if roll < t::BREAK_SEED {
+                Some(LootKind::Seed)
+            } else if roll < t::BREAK_SEED + t::BREAK_BERRY {
+                Some(LootKind::Berry)
+            } else if roll < t::BREAK_SEED + t::BREAK_BERRY + t::BREAK_GLOWBUG {
+                Some(LootKind::Glowbug)
+            } else if roll < t::BREAK_SEED + t::BREAK_BERRY + t::BREAK_GLOWBUG + t::BREAK_WORM {
+                Some(LootKind::Worm)
+            } else {
+                None
+            };
+            if let Some(k) = kind {
+                self.push_loot(Loot::spawn(k, at));
+            }
+        }
+    }
+
     /// 시든 꽃잎(0164): 밟으면 줍는다 — 토스트, 분홍 반짝임, 도감 '???'. 앱이 기록에 남긴다(`AdvEvent::PetalFound`).
     pub fn petal_tick(&mut self) -> bool {
         let Some(at) = self.story.petal_at else {
@@ -3373,5 +3430,69 @@ mod tests {
             assert_eq!(e.hp, h, "밀쳐내기는 피해가 없다");
         }
         assert!(matches!(es[0].state, crate::enemy::State::Stunned { .. }));
+    }
+
+    /// 부술 수 있는 것(0175): 공격이 닿으면 빠지고 막던 자리가 풀리며 소리·흙덩이, 닿지 않으면 그대로. 꿈에서는 빈손.
+    #[test]
+    fn breakables_break_on_a_strike_and_stop_blocking() {
+        use crate::combat::{Shape, StrikeKind};
+        use crate::room::{Breakable, Prop};
+        let mut w = World::new();
+        let c = w.player.pos + vec2(24.0, 0.0);
+        let rect = Rect::new(c.x - 8.0, c.y - 8.0, 16.0, 16.0);
+        w.room.add_prop(Prop {
+            rect,
+            kind: PropKind::Breakable(Breakable::RockPile),
+        });
+        assert!(w.room.solids.contains(&rect), "소품은 막는다");
+        let strike = |at: Vec2| Strike {
+            id: 9,
+            kind: StrikeKind::Claw(0),
+            shape: Shape::Circle { center: at, r: 4.0 },
+            damage: 1,
+            knockback: 0.0,
+            stun: 0.0,
+            hitstop: 0.0,
+            shake: 0.0,
+            finisher: false,
+            poison: 0.0,
+        };
+        let brk = |w: &World| {
+            w.room
+                .props
+                .iter()
+                .filter(|p| matches!(p.kind, PropKind::Breakable(_)))
+                .count()
+        };
+        w.prop_break(&strike(c + vec2(40.0, 0.0)));
+        assert_eq!(brk(&w), 1, "안 닿으면 그대로");
+        let fx_before = w.juice.fx.len();
+        w.prop_break(&strike(c + vec2(6.0, 0.0)));
+        assert_eq!(brk(&w), 0, "깨졌다");
+        assert!(!w.room.solids.contains(&rect), "막던 자리가 풀린다");
+        assert!(w.juice.audio.played(sfx::Id::Break));
+        assert!(w.juice.fx.len() > fx_before, "흙덩이·먼지");
+        assert_eq!(w.stats.broken, 1);
+        // 꿈: 빈손. 여러 번 깨도 떨어지는 게 없다(첫 번째 것이 운으로 떨어뜨린 건 치운다).
+        w.loot.clear();
+        w.dream = true;
+        for _ in 0..30 {
+            w.room.add_prop(Prop {
+                rect,
+                kind: PropKind::Breakable(Breakable::Mound),
+            });
+            w.prop_break(&strike(c));
+        }
+        assert!(w.loot.is_empty(), "꿈에서는 아무것도 안 나온다");
+        // 깨어서는 운에 따라 나온다(서른 번이면 거의 확실히 하나는).
+        w.dream = false;
+        for _ in 0..30 {
+            w.room.add_prop(Prop {
+                rect,
+                kind: PropKind::Breakable(Breakable::Mound),
+            });
+            w.prop_break(&strike(c));
+        }
+        assert!(!w.loot.is_empty(), "운에 따라 소모품");
     }
 }

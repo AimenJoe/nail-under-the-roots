@@ -19,6 +19,8 @@ pub enum Scenario {
     /// 아레나 웨이브(예전 첫 시작). 손맛 시험장.
     Arena,
     Empty,
+    /// 부술 수 있는 것 넷(0177): 흙더미·뿌리혹·돌무더기·실뭉치가 플레이어 둘레에.
+    Breakables,
     Chargers(u32),
     Shooters(u32),
     /// 지정 웨이브부터 자동 웨이브.
@@ -81,7 +83,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 37] = [
+pub const LIST: [Entry; 38] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -267,6 +269,11 @@ pub const LIST: [Entry; 37] = [
         desc: "굴토끼 옛 굴(흰 실 굴). 끝방의 토끼풀: 발 구르기(충격파·실 그물)·두 번 차기·내려앉기, 반 아래면 품기(실 한 가닥). 고치는 못 때린다.",
         scenario: Scenario::Clover,
     },
+    Entry {
+        name: "부술 수 있는 것 넷",
+        desc: "흙더미·뿌리혹·돌무더기·실뭉치. 쳐서 깨면 운에 따라 씨앗·산딸기·반딧불·지렁이(0177).",
+        scenario: Scenario::Breakables,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -419,6 +426,27 @@ pub fn build(s: Scenario) -> World {
         | Scenario::Village
         | Scenario::Tutorial => World::empty(),
         Scenario::AllClaws => World::new(),
+        Scenario::Breakables => {
+            use crate::room::{Breakable, Prop, PropKind};
+            let mut w = World::empty();
+            let c = w.player.pos;
+            for (i, b) in [
+                Breakable::Mound,
+                Breakable::Gall,
+                Breakable::RockPile,
+                Breakable::SilkBall,
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let at = c + vec2(-48.0 + 32.0 * i as f32, -40.0);
+                w.room.add_prop(Prop {
+                    rect: Rect::new(at.x - 8.0, at.y - 8.0, 16.0, 16.0),
+                    kind: PropKind::Breakable(b),
+                });
+            }
+            w
+        }
         Scenario::Gear => {
             let mut w = build(Scenario::Chargers(2));
             w.inv.bag.berries = 3;

@@ -61,6 +61,8 @@ pub enum Id {
     Impact,
     /// 실이 풀린다(0159): 돌아오는 이웃 — 맑게 올라가는 두 음 + 반짝임.
     Unbind,
+    /// 부술 수 있는 것이 깨졌다(0175): 퍽 + 흙 소음.
+    Break,
 }
 
 /// 파일 소리 표: (이름, 변형 수, 크기). 크기는 MASTER_VOLUME·설정에 곱한다 — 귀로 맞춘다.
@@ -151,6 +153,7 @@ pub struct Sfx {
     wall_hit: Sound,
     impact: Sound,
     unbind: Sound,
+    brk: Sound,
     glowbug: [Sound; 4],
     heal: Sound,
     drill: [Sound; 3],
@@ -291,6 +294,11 @@ impl Sfx {
                 Layer::tone(0.5, 520.0, 1040.0, Wave::Sine, 0.45, 1.2),
                 Layer::tone(0.6, 780.0, 1560.0, Wave::Triangle, 0.25, 1.6),
                 Layer::noise(0.3, 0.12, 3.0),
+            ])
+            .await,
+            brk: make(&[
+                Layer::noise(0.09, 0.5, 2.2),
+                Layer::tone(0.1, 220.0, 70.0, Wave::Square, 0.3, 1.6),
             ])
             .await,
             glowbug: [
@@ -450,6 +458,7 @@ impl Sfx {
             Id::WallHit => &self.wall_hit,
             Id::Impact => &self.impact,
             Id::Unbind => &self.unbind,
+            Id::Break => &self.brk,
             Id::Glowbug => {
                 let i = self.glow_step.get();
                 self.glow_step.set((i + 1) % self.glowbug.len());

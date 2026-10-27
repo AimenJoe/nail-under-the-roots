@@ -414,6 +414,24 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             }
             RoomKind::Rest => {}
         }
+        // 부술 수 있는 것(0175): 싸움방·끝방 1~3개, 쉼방 2~3개, 시작방 1개. 굴 모양·적·덤불과 다른 난수.
+        let n_break = match room.kind {
+            RoomKind::Combat | RoomKind::Boss => 1 + rng_at(seed, room.at, 0xB4EA_4B1E).below(3),
+            RoomKind::Rest => 2 + rng_at(seed, room.at, 0xB4EA_4B1E).below(2),
+            RoomKind::Start => 1,
+            RoomKind::Treasure => 0,
+        } as usize;
+        breakables(
+            &grid,
+            &mut props,
+            &thorns,
+            &webs,
+            ox,
+            oy,
+            seed ^ hash_at(room.at) ^ 0xB4EA_4B1E,
+            prm.biome,
+            n_break,
+        );
     }
     let dungeon = Dungeon {
         rooms,
@@ -470,6 +488,60 @@ fn thorn_patches(
             if ok(nx, ny, out) {
                 out.push(cell_center(ox + nx, oy + ny));
                 (x, y) = (nx, ny);
+            }
+        }
+    }
+}
+
+fn rng_at(seed: u64, at: (i32, i32), salt: u64) -> Rng {
+    Rng::new((seed ^ hash_at(at) ^ salt) | 1)
+}
+
+/// 부술 수 있는 것(0175) `n`개: 문 앞 십자 길·`KEEP` 자리·소품·덤불·그물 칸을 피해 바닥 칸에. 생김새는 지대 것이
+/// 대부분, 가끔 흙더미. 소품이라 막고, 깨지면 빠진다(`World::prop_break`).
+#[allow(clippy::too_many_arguments)]
+fn breakables(
+    grid: &Grid,
+    props: &mut Vec<Prop>,
+    thorns: &[Vec2],
+    webs: &[Vec2],
+    ox: usize,
+    oy: usize,
+    seed: u64,
+    biome: Biome,
+    n: usize,
+) {
+    use crate::room::Breakable;
+    let mut rng = Rng::new(seed | 1);
+    let lane = |x: usize, y: usize| (8..=11).contains(&x) || (5..=8).contains(&y);
+    let local = match biome {
+        Biome::Meadow => Breakable::Mound,
+        Biome::Roots => Breakable::Gall,
+        Biome::Deep => Breakable::RockPile,
+        Biome::Silk => Breakable::SilkBall,
+    };
+    for _ in 0..n {
+        for _ in 0..12 {
+            let x = 2 + rng.below(16) as usize;
+            let y = 3 + rng.below(8) as usize;
+            let c = cell_center(ox + x, oy + y);
+            let free = !lane(x, y)
+                && !KEEP.contains(&(x, y))
+                && grid.get(ox + x, oy + y) == Cell::Floor
+                && !props.iter().any(|p| p.rect.contains(c))
+                && !thorns.contains(&c)
+                && !webs.contains(&c);
+            if free {
+                let kind = if rng.chance(0.25) {
+                    Breakable::Mound
+                } else {
+                    local
+                };
+                props.push(Prop {
+                    rect: cell_rect(ox + x, oy + y),
+                    kind: PropKind::Breakable(kind),
+                });
+                break;
             }
         }
     }
@@ -828,6 +900,74 @@ mod tests {
             shaped * 10 >= total * 8,
             "대부분 방이 네모가 아니다: {shaped}/{total}"
         );
+    }
+
+    #[test]
+    /// 부술 수 있는 것(0175): 모든 지대의 굴에 있고, 바닥 칸·길 밖·적 자리 밖에, 다른 소품과 겹치지 않으며,
+    /// 같은 시드면 같은 자리. 생김새는 지대 것 아니면 흙더미.
+    #[test]
+    fn breakables_sit_on_floor_off_the_lanes_in_every_biome() {
+        use crate::room::Breakable;
+        for (biome, local) in [
+            (Biome::Meadow, Breakable::Mound),
+            (Biome::Roots, Breakable::Gall),
+            (Biome::Deep, Breakable::RockPile),
+            (Biome::Silk, Breakable::SilkBall),
+        ] {
+            let prm = Params {
+                biome,
+                ..Params::new(1)
+            };
+            for seed in 1..12 {
+                let (d, room) = generate(seed, &prm);
+                let (_, again) = generate(seed, &prm);
+                let brk = |r: &Room| {
+                    r.props
+                        .iter()
+                        .filter_map(|p| match p.kind {
+                            PropKind::Breakable(b) => Some((p.rect, b)),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                };
+                let list = brk(&room);
+                assert_eq!(list, brk(&again), "seed {seed}");
+                assert!(
+                    list.len() >= d.rooms.len() / 2,
+                    "seed {seed}: 곳곳에 — {}",
+                    list.len()
+                );
+                for (rect, b) in &list {
+                    assert!(*b == local || *b == Breakable::Mound);
+                    let c = rect.center();
+                    let g = room.grid.as_ref().unwrap();
+                    assert_eq!(
+                        g.get((c.x / 16.0) as usize, (c.y / 16.0) as usize),
+                        Cell::Floor
+                    );
+                    let r = d
+                        .rooms
+                        .iter()
+                        .find(|r| r.rect().contains(c))
+                        .expect("방 안");
+                    let (x, y) = (
+                        ((c.x / 16.0) as i32 - r.at.0 * ROOM_W as i32) as usize,
+                        ((c.y / 16.0) as i32 - r.at.1 * ROOM_H as i32) as usize,
+                    );
+                    assert!(
+                        !(8..=11).contains(&x) && !(5..=8).contains(&y),
+                        "seed {seed}: 길 위"
+                    );
+                    assert!(!KEEP.contains(&(x, y)), "seed {seed}: 적 자리");
+                    assert_eq!(
+                        room.props.iter().filter(|p| p.rect.contains(c)).count(),
+                        1,
+                        "seed {seed}: 겹침"
+                    );
+                    assert!(!room.thorns.contains(&c) && !room.webs.contains(&c));
+                }
+            }
+        }
     }
 
     #[test]

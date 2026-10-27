@@ -26,6 +26,17 @@ pub enum PropKind {
     Stall,
     /// 쉼터의 빈 자리(통나무). 돌아올 이웃의 자리.
     Seat,
+    /// 부술 수 있는 것(0175): 발톱·솟구침·드릴이 닿으면 깨지고 운에 따라 소모품이 나온다. 깨지면 소품에서 빠진다.
+    Breakable(Breakable),
+}
+
+/// 부술 수 있는 것의 생김새(0175): 지대마다 다르다. 흙더미(들판)·뿌리혹(뿌리)·돌무더기(심층)·실뭉치(흰 실 굴).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Breakable {
+    Mound,
+    Gall,
+    RockPile,
+    SilkBall,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -190,6 +201,20 @@ impl Room {
 
     pub fn doors_locked(&self) -> bool {
         self.doors_locked
+    }
+
+    /// 소품을 더한다(개발 방·테스트). 막는 자리도 바로.
+    pub fn add_prop(&mut self, p: Prop) {
+        self.props.push(p);
+        self.rebuild_solids();
+    }
+
+    /// 소품을 치운다(부서진 것, 0175). 막던 자리도 풀린다.
+    pub fn remove_prop(&mut self, i: usize) {
+        if i < self.props.len() {
+            self.props.remove(i);
+            self.rebuild_solids();
+        }
     }
 
     /// 상자를 연다(그림만 바뀌고 계속 막는다).

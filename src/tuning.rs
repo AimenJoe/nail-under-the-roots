@@ -261,6 +261,12 @@ pub const BERRY_PITY_KILLS: u32 = 6;
 pub const BERRY_HEAL: i32 = 1;
 /// 쥬시 지렁이: 처치마다 이 확률로 떨어진다(체력과 무관, 드묾).
 pub const WORM_CHANCE: f32 = 0.035;
+/// 부술 수 있는 것(0175): 타격 판정 반지름, 깨졌을 때 나오는 것의 확률(순서대로 씨앗·산딸기·반딧불·지렁이, 나머지는 빈손).
+pub const BREAK_R: f32 = 8.0;
+pub const BREAK_SEED: f32 = 0.30;
+pub const BREAK_BERRY: f32 = 0.12;
+pub const BREAK_GLOWBUG: f32 = 0.10;
+pub const BREAK_WORM: f32 = 0.04;
 
 // ---- 가방(퀵 아이템, src/items.rs, docs/decisions/0017) ----------------------------------
 /// 들고 다닐 수 있는 수. 가득이면 바닥에 남는다.
