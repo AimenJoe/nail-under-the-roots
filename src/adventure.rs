@@ -27,7 +27,7 @@ use crate::room::{PropKind, Room};
 use crate::route::{NodeKind, Route};
 use crate::sfx::{self, Sfx};
 use crate::tuning as t;
-use crate::world::{Gift, Npc, Who, World};
+use crate::world::{clods, puff, ring, Gift, Npc, Spring, Who, World, DIRT};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Place {
@@ -165,6 +165,8 @@ pub struct Adventure {
     /// 카메라 왼쪽 위(월드 좌표)와 직전 틱 값(보간).
     pub cam: Vec2,
     pub prev_cam: Vec2,
+    /// 컷씬이 카메라를 잡아 둔 자리(0159): 있으면 플레이어 대신 이 점을 가운데에 둔다.
+    pub cam_hold: Option<Vec2>,
     boss_cleared: bool,
     seed: u64,
     /// 몇 번째 쉼터까지 왔나(0 = 아직 필드).
@@ -344,6 +346,20 @@ impl World {
         self.enter_node();
     }
 
+    /// 개발: 길의 샘 칸(0159)으로 바로. 샘 칸이 없는 길이면 끝방 앞 층 첫 칸.
+    pub fn enter_route_spring_now(&mut self) {
+        if let Some(r) = self.adv.route.as_mut() {
+            let found = r.layers.iter().enumerate().find_map(|(l, layer)| {
+                layer
+                    .iter()
+                    .position(|n| n.kind == NodeKind::Spring)
+                    .map(|i| (l, i))
+            });
+            r.at = Some(found.unwrap_or((r.layers.len().saturating_sub(2), 0)));
+        }
+        self.enter_node();
+    }
+
     /// 앱이 부른다: 길 지도에서 칸을 골랐다. 고를 수 있는 칸이면 어두워졌다가 그 굴로.
     pub fn choose_node(&mut self, at: (usize, usize)) -> bool {
         let ok = self.adv.route.as_mut().is_some_and(|r| r.pick(at));
@@ -480,6 +496,10 @@ impl World {
     /// 어두운 한가운데: 장소를 바꾸고, 닿은 깊이를 적고, 새 지대로 내려왔으면 이름 카드(0156).
     fn swap_place(&mut self, f: &mut Fade) {
         f.swapped = true;
+        self.spring = None;
+        self.exit_at = None;
+        self.exit_age = 0.0;
+        self.petals = false;
         match f.kind {
             Transition::ExitDungeon => self.exit_dungeon(),
             Transition::Respawn => self.respawn_at_save(),
@@ -499,6 +519,9 @@ impl World {
             return;
         }
         if self.cell_triggers() {
+            sfx.play(sfx::Id::Heal);
+        }
+        if self.spring_tick() {
             sfx.play(sfx::Id::Heal);
         }
         if self.adv.place == Place::Field {
@@ -746,6 +769,8 @@ impl World {
         // 첫 길의 끝은 모모가 지킨다(아직 안 돌아왔고, 이번 런에 모모에게 쓰러지지 않았으면, 0046).
         if self.momo_fight && stage == 1 && kind == NodeKind::Boss {
             prm.boss = Some(Kind::Momo);
+            // 복선(0159): 모모가 지키는 굴에는 방마다 시든 꽃잎이 떠돈다.
+            self.petals = true;
         }
         // 둘째 길의 끝은 도토가 지킨다(아직 기억해 내지 않았고, 이번 런에 도토에게 쓰러지지 않았으면, 0052).
         if self.doto_fight && stage == 2 && kind == NodeKind::Boss {
@@ -939,20 +964,22 @@ impl World {
         };
         if !room.visited {
             room.visited = true;
-            if room.kind == RoomKind::Rest && goal == Goal::Spring {
-                // 길의 샘: 체력을 가득 채운다.
-                self.player.heal(self.player.stats.max_hp);
-                sfx.play(sfx::Id::Heal);
-                self.springs += 1;
-                self.toast = Some((|s| s.toast_spring, 2.5));
+            let c = room.rect().center();
+            let spring = room.kind == RoomKind::Rest && goal == Goal::Spring;
+            if spring {
+                // 길의 샘(0159): 방 가운데에 샘이 있고, 발을 담가야 회복한다(`spring_tick`). 전엔 들어서면 바로였다.
+                self.spring = Some(Spring {
+                    pos: c,
+                    drunk: false,
+                });
             }
             if room.kind == RoomKind::Rest {
-                let c = room.rect().center();
-                // 방 가운데에 놓는다(굴러가지 않으니 묶을 필요 없음).
+                // 산딸기는 방 가운데(샘이 있으면 샘 아래)에 놓는다(굴러가지 않으니 묶을 필요 없음).
+                let dy = if spring { 24.0 } else { 8.0 };
                 for k in 0..3 {
                     self.loot.push(Loot::place(
                         LootKind::Berry,
-                        c + vec2(-20.0 + k as f32 * 20.0, 8.0),
+                        c + vec2(-20.0 + k as f32 * 20.0, dy),
                     ));
                 }
             }
@@ -1019,6 +1046,14 @@ impl World {
                 if let Some(g) = self.room.grid.as_mut() {
                     g.set(ex, ey, Cell::Exit);
                 }
+                // 출구가 열린다(0159): 흙이 꺼지며 흙덩이가 튀고 빛 고리. 화면 밖이면 HUD 표시가 가리킨다.
+                let ep = vec2(ex as f32 * 16.0 + 8.0, ey as f32 * 16.0 + 8.0);
+                self.exit_at = Some(ep);
+                self.exit_age = 0.0;
+                self.fx
+                    .push(ring(ep, 4.0, 24.0, 0.5, Color::new(1.0, 0.92, 0.6, 1.0)));
+                clods(&mut self.fx, ep, 10, DIRT, 70.0);
+                puff(&mut self.fx, ep, 3, self.biome.dust(), 7.0, 0.5);
                 if goal == Goal::Boss {
                     self.loot.push(Loot::place(LootKind::RootHeart, at));
                     for _ in 0..t::BOSS_SEEDS {
@@ -1138,7 +1173,7 @@ impl World {
     fn cam_target(&self) -> Vec2 {
         let b = self.cam_bounds();
         let view = vec2(t::VIEW_W, t::VIEW_H);
-        let want = self.player.pos - view / 2.0;
+        let want = self.adv.cam_hold.unwrap_or(self.player.pos) - view / 2.0;
         let axis = |w: f32, lo: f32, size: f32, v: f32| {
             if size <= w {
                 lo + (size - w) / 2.0
@@ -1165,6 +1200,14 @@ impl World {
     pub fn snap_cam(&mut self) {
         self.adv.cam = self.cam_target();
         self.adv.prev_cam = self.adv.cam;
+    }
+
+    /// `focus`를 가운데에 둔 카메라 왼쪽 위(장소 경계 안으로, 0159 컷씬 팬).
+    pub fn cam_at(&mut self, focus: Vec2) -> Vec2 {
+        let hold = self.adv.cam_hold.replace(focus);
+        let c = self.cam_target();
+        self.adv.cam_hold = hold;
+        c
     }
 }
 

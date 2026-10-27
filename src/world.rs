@@ -53,6 +53,11 @@ pub enum FxKind {
         angle: f32,
         len: f32,
     },
+    /// 꽃잎(0159): 팔랑이며 천천히 내려앉는다. `phase`는 흔들림의 위상.
+    Petal {
+        color: Color,
+        phase: f32,
+    },
 }
 
 pub struct Fx {
@@ -61,6 +66,43 @@ pub struct Fx {
     pub time: f32,
     pub dur: f32,
     pub kind: FxKind,
+}
+
+/// 길의 샘(0159). 들어서는 순간이 아니라 발을 담가야 회복한다(말로만 샘이었다).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Spring {
+    pub pos: Vec2,
+    /// 이미 마셨다(한 번만).
+    pub drunk: bool,
+}
+
+/// 컷씬이 덮는 어둠(0159): 환경 어둠과 별개로 `at` 둘레 `radius`만 밝고 바깥은 `amount`만큼 검다.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Gloom {
+    pub amount: f32,
+    pub at: Vec2,
+    pub radius: f32,
+}
+
+impl Gloom {
+    pub const NONE: Gloom = Gloom {
+        amount: 0.0,
+        at: Vec2::ZERO,
+        radius: 70.0,
+    };
+}
+
+/// 컷씬에서 부르는 이펙트 묶음(0159). 스크립트는 자리와 이름만 적고, 어떻게 보이는지는 월드가 안다.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Cue {
+    /// 실이 풀린다: 쓰러진 자리에서 보라 실이 한 올씩 빠져나가고 흰 고리·반짝임. 돌아오는 이웃.
+    Unbind,
+    /// 꽃잎이 흩날린다(모모). `true`면 핀 꽃의 분홍, 아니면 시든 꽃잎.
+    Petals(bool),
+    /// 물든 것이 일어선다: 보라 고리 + 어두운 먼지 + 땅 울림.
+    Rise,
+    /// 반짝임 한 줌(돌아온 이웃이 나타날 때).
+    Sparkle,
 }
 
 /// 이웃이 누구인가(그림·말).
@@ -222,6 +264,20 @@ pub struct World {
     pub chests: u32,
     pub springs: u32,
     pub slams: u32,
+    /// 길의 샘(0159): 쉼방 가운데의 맑은 샘. 발을 담그면 한 번 가득 회복.
+    pub spring: Option<Spring>,
+    /// 끝방의 출구 자리(0159)와 생긴 뒤 흐른 초: 화면 밖이면 HUD 가장자리 표시가 가리킨다(`EXIT_MARK_DELAY` 뒤).
+    /// 장소를 옮기면 없어진다.
+    pub exit_at: Option<Vec2>,
+    pub exit_age: f32,
+    /// 컷씬 장치(0159). `hush`면 음악을 내린다(보스 곡도 아직). `gloom`은 환경 어둠 위에 덮는 어둠(0~1)과 빛의 자리·반지름.
+    /// `boss_card`는 화면 가운데 큰 이름 카드(이름, 설명, 남은 시간). `petals`면 시든 꽃잎이 방을 떠돈다(모모 복선).
+    pub hush: bool,
+    pub gloom: Gloom,
+    /// 컷씬 이펙트가 낸 소리(0159): 앱이 프레임마다 꺼내 튼다(컷씬은 Sfx를 모른다 — 테스트에서 돌릴 수 있게).
+    pub sounds: Vec<sfx::Id>,
+    pub boss_card: Option<(&'static str, Tr, f32)>,
+    pub petals: bool,
     /// 지금 환경. `biome_by_wave`면 웨이브가 깊이를 대신해 바뀐다.
     pub biome: Biome,
     pub biome_by_wave: bool,
@@ -301,6 +357,14 @@ impl World {
             fur: 0,
             chests: 0,
             springs: 0,
+            spring: None,
+            exit_at: None,
+            exit_age: 0.0,
+            hush: false,
+            gloom: Gloom::NONE,
+            sounds: Vec::new(),
+            boss_card: None,
+            petals: false,
             slams: 0,
             biome: Biome::Meadow,
             biome_by_wave: true,
@@ -1350,41 +1414,16 @@ impl World {
         // 6. 정리
         self.enemies.retain(|e| e.alive);
         self.projectiles.retain(|p| p.alive);
-        for f in &mut self.fx {
-            f.time += dt;
-            f.pos += f.vel * dt;
-            match &mut f.kind {
-                // 흙덩이는 공기 저항이 작고 중력으로 떨어진다. 바닥에 닿으면 한 번 작게 튀고 미끄러진다.
-                FxKind::Clod { z, vz, .. } => {
-                    f.vel *= 0.97;
-                    *vz -= CLOD_GRAVITY * dt;
-                    *z += *vz * dt;
-                    if *z < 0.0 {
-                        *z = 0.0;
-                        *vz = -*vz * 0.35;
-                        f.vel *= 0.5;
-                    }
-                }
-                // 실은 천천히 떠오른다.
-                FxKind::Thread { angle, .. } => {
-                    f.vel *= 0.95;
-                    *angle += dt * 1.5;
-                }
-                _ => f.vel *= 0.9,
+        self.tick_fx(dt);
+        if self.exit_at.is_some() {
+            self.exit_age += dt;
+        }
+        if let Some((_, _, left)) = &mut self.boss_card {
+            *left -= dt;
+            if *left <= 0.0 {
+                self.boss_card = None;
             }
         }
-        // 끝난 효과를 지운다. 이미 거른 것(앞쪽)이 몇 개 남는지 세어 둔다(thin_fx가 새것만 보게).
-        let checked = self.fx_checked;
-        let (mut idx, mut kept) = (0, 0);
-        self.fx.retain(|f| {
-            let keep = f.time < f.dur;
-            if idx < checked && keep {
-                kept += 1;
-            }
-            idx += 1;
-            keep
-        });
-        self.fx_checked = kept;
         // 발걸음 먼지(0081): 걷는 동안 12px마다 발 뒤에 작은 먼지. 효과가 넘치면 건너뛴다.
         let moved = (self.player.pos - self.player.prev_pos).length();
         if self.player.is_alive() && self.player.on_foot() && moved > 0.2 {
@@ -1536,6 +1575,145 @@ impl World {
     }
 
     /// 보간이 멈춘 화면(일시정지·히트스톱) 위에서 미끄러지지 않게 prev를 현재로 맞춘다.
+    /// 입자 효과만 한 틱(컷씬에서도 돈다, 0159). 월드 틱의 6단계.
+    pub fn tick_fx(&mut self, dt: f32) {
+        for f in &mut self.fx {
+            f.time += dt;
+            f.pos += f.vel * dt;
+            match &mut f.kind {
+                // 흙덩이는 공기 저항이 작고 중력으로 떨어진다. 바닥에 닿으면 한 번 작게 튀고 미끄러진다.
+                FxKind::Clod { z, vz, .. } => {
+                    f.vel *= 0.97;
+                    *vz -= CLOD_GRAVITY * dt;
+                    *z += *vz * dt;
+                    if *z < 0.0 {
+                        *z = 0.0;
+                        *vz = -*vz * 0.35;
+                        f.vel *= 0.5;
+                    }
+                }
+                // 실은 천천히 떠오른다.
+                FxKind::Thread { angle, .. } => {
+                    f.vel *= 0.95;
+                    *angle += dt * 1.5;
+                }
+                // 꽃잎은 팔랑이며 가라앉는다: 옆으로 흔들리고 아래로 천천히.
+                FxKind::Petal { phase, .. } => {
+                    *phase += dt * 5.0;
+                    f.vel.x = f.vel.x * 0.96 + phase.sin() * 14.0 * dt;
+                    f.vel.y = (f.vel.y + 40.0 * dt).min(16.0);
+                }
+                _ => f.vel *= 0.9,
+            }
+        }
+        // 끝난 효과를 지운다. 이미 거른 것(앞쪽)이 몇 개 남는지 세어 둔다(thin_fx가 새것만 보게).
+        let checked = self.fx_checked;
+        let (mut idx, mut kept) = (0, 0);
+        self.fx.retain(|f| {
+            let keep = f.time < f.dur;
+            if idx < checked && keep {
+                kept += 1;
+            }
+            idx += 1;
+            keep
+        });
+        self.fx_checked = kept;
+    }
+
+    /// 컷씬 이펙트 묶음(0159)을 `at`에 낸다.
+    pub fn cue(&mut self, cue: Cue, at: Vec2) {
+        match cue {
+            Cue::Unbind => {
+                self.sounds.push(sfx::Id::Unbind);
+                self.feel.add_trauma(0.3);
+                self.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
+                self.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
+                unravel(&mut self.fx, at, 14.0);
+                unravel(&mut self.fx, at, 22.0);
+                for k in 0..10 {
+                    let ang = k as f32 / 10.0 * std::f32::consts::TAU;
+                    let r = 6.0 + (k % 3) as f32 * 6.0;
+                    let mut g = glint(
+                        at + vec2(ang.cos() * r, ang.sin() * r - 4.0),
+                        Color::new(1.0, 0.95, 0.85, 1.0),
+                        0.6,
+                    );
+                    g.time = -0.05 * k as f32;
+                    self.fx.push(g);
+                }
+            }
+            Cue::Petals(bloom) => {
+                let color = if bloom {
+                    Color::new(1.0, 0.70, 0.80, 1.0)
+                } else {
+                    Color::new(0.74, 0.56, 0.60, 1.0)
+                };
+                petals(&mut self.fx, at, 18, color, 70.0);
+            }
+            Cue::Rise => {
+                self.sounds.push(sfx::Id::Rumble);
+                self.feel.add_trauma(0.4);
+                self.fx.push(ring(at, 26.0, 4.0, 0.5, THREAD));
+                self.fx
+                    .push(ring(at, 6.0, 40.0, 0.6, Color::new(0.5, 0.3, 0.6, 1.0)));
+                puff(
+                    &mut self.fx,
+                    at,
+                    6,
+                    Color::new(0.30, 0.22, 0.34, 1.0),
+                    10.0,
+                    0.7,
+                );
+                clods(&mut self.fx, at, 8, DIRT, 70.0);
+            }
+            Cue::Sparkle => {
+                self.sounds.push(sfx::Id::Glowbug);
+                for k in 0..6 {
+                    let ang = k as f32 / 6.0 * std::f32::consts::TAU + 0.4;
+                    let mut g = glint(
+                        at + vec2(ang.cos() * 9.0, ang.sin() * 6.0 - 3.0),
+                        WHITE,
+                        0.5,
+                    );
+                    g.time = -0.06 * k as f32;
+                    self.fx.push(g);
+                }
+            }
+        }
+    }
+
+    /// 길의 샘(0159): 발을 담그면 가득 회복. 한 번만. 회복했으면 true(소리는 부르는 쪽).
+    pub fn spring_tick(&mut self) -> bool {
+        let Some(sp) = &mut self.spring else {
+            return false;
+        };
+        if sp.drunk || !self.player.is_alive() || !self.player.on_foot() {
+            return false;
+        }
+        if (self.player.pos - sp.pos).length() > t::SPRING_RADIUS {
+            return false;
+        }
+        sp.drunk = true;
+        let at = sp.pos;
+        self.player.heal(self.player.stats.max_hp);
+        self.springs += 1;
+        self.toast = Some((|s| s.toast_spring, 2.5));
+        self.fx
+            .push(ring(at, 6.0, 26.0, 0.5, Color::new(0.75, 0.92, 1.0, 1.0)));
+        for k in 0..8 {
+            let ang = k as f32 / 8.0 * std::f32::consts::TAU;
+            let mut g = glint(
+                at + vec2(ang.cos() * 12.0, ang.sin() * 6.0),
+                Color::new(0.85, 0.97, 1.0, 1.0),
+                0.7,
+            );
+            g.vel = vec2(0.0, -14.0);
+            g.time = -0.07 * k as f32;
+            self.fx.push(g);
+        }
+        true
+    }
+
     pub fn freeze(&mut self) {
         self.freeze_interp();
     }
@@ -1669,7 +1847,7 @@ fn emerge_push(
     }
 }
 
-fn ring(pos: Vec2, r0: f32, r1: f32, dur: f32, color: Color) -> Fx {
+pub(crate) fn ring(pos: Vec2, r0: f32, r1: f32, dur: f32, color: Color) -> Fx {
     Fx {
         pos,
         vel: Vec2::ZERO,
@@ -1687,7 +1865,7 @@ const CLOD_GRAVITY: f32 = 360.0;
 pub const THREAD: Color = Color::new(0.68, 0.45, 0.92, 1.0);
 
 /// 먼지·연기 `n`개: `spread` 반경 안 아무 데서, 천천히 퍼진다.
-fn puff(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, size: f32, dur: f32) {
+pub(crate) fn puff(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, size: f32, dur: f32) {
     for _ in 0..n {
         let ang = rand::gen_range(0.0, std::f32::consts::TAU);
         let off = vec2(ang.cos(), ang.sin()) * rand::gen_range(0.0, size);
@@ -1706,7 +1884,7 @@ fn puff(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, size: f32, dur: f32
 }
 
 /// 흙덩이 `n`개: 사방으로 튀어 올랐다 떨어진다.
-fn clods(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
+pub(crate) fn clods(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
     for _ in 0..n {
         let ang = rand::gen_range(0.0, std::f32::consts::TAU);
         let sp = rand::gen_range(0.4, 1.0) * speed;
@@ -1775,6 +1953,24 @@ fn unravel(fx: &mut Vec<Fx>, pos: Vec2, radius: f32) {
     }
 }
 
+/// 꽃잎 흩날림(0159): 위로 튀었다가 팔랑이며 내려앉는다.
+fn petals(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
+    for k in 0..n {
+        let ang = rand::gen_range(0.0, std::f32::consts::TAU);
+        let sp = rand::gen_range(speed * 0.4, speed);
+        fx.push(Fx {
+            pos: pos + vec2(ang.cos() * 4.0, ang.sin() * 3.0),
+            vel: vec2(ang.cos() * sp * 0.6, -sp - rand::gen_range(0.0, 20.0)),
+            time: -0.02 * k as f32,
+            dur: rand::gen_range(1.6, 2.6),
+            kind: FxKind::Petal {
+                color,
+                phase: rand::gen_range(0.0, 6.0),
+            },
+        });
+    }
+}
+
 fn burst(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
     for _ in 0..n {
         let ang = rand::gen_range(0.0, std::f32::consts::TAU);
@@ -1793,6 +1989,28 @@ fn burst(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
 mod tests {
     use super::*;
     use crate::enemy::{Enemy, Kind};
+
+    /// 길의 샘(0159): 들어서는 게 아니라 발을 담가야 가득 회복, 한 번만.
+    #[test]
+    fn spring_heals_once_when_stepped_in() {
+        let mut w = World::new();
+        let c = w.player.pos;
+        w.spring = Some(Spring {
+            pos: c + vec2(60.0, 0.0),
+            drunk: false,
+        });
+        w.player.hp = 1;
+        assert!(!w.spring_tick(), "멀리서는 아무 일 없다");
+        assert_eq!(w.player.hp, 1);
+        w.player.pos = c + vec2(60.0 + t::SPRING_RADIUS - 1.0, 0.0);
+        assert!(w.spring_tick(), "발을 담그면 회복");
+        assert_eq!(w.player.hp, w.player.stats.max_hp);
+        assert_eq!(w.springs, 1);
+        assert!(w.spring.unwrap().drunk);
+        w.player.hp = 1;
+        assert!(!w.spring_tick(), "한 번만");
+        assert_eq!(w.player.hp, 1);
+    }
 
     /// 입자 효과 설정(0141): 새 장식 효과는 비율만큼 고르게 남고, 공격 범위 고리는 늘 남는다. 한 번 거른 것은 다시 거르지 않는다.
     #[test]

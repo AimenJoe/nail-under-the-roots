@@ -9,7 +9,7 @@ use macroquad::prelude::*;
 use crate::i18n::{self, Tr};
 use crate::illust::Illust;
 use crate::input::{Act, Actions};
-use crate::world::World;
+use crate::world::{Cue, World};
 
 /// 글자가 찍히는 속도(초당 글자 수).
 const CHARS_PER_SEC: f32 = 40.0;
@@ -118,6 +118,68 @@ impl Portrait {
 }
 
 #[cfg(test)]
+mod device_tests {
+    use super::*;
+
+    /// 모모 등장 장치(0159): 음악을 내리고 어둠을 덮고 카메라를 모모에게 옮긴 뒤, 끝나면(건너뛰어도) 모두 제자리.
+    #[test]
+    fn momo_intro_restores_music_light_and_camera_when_skipped() {
+        let mut w = World::new();
+        let at = w.player.pos + vec2(120.0, 0.0);
+        let mut c = momo_meet(&w, 1, at);
+        let quiet = Actions::default();
+        // 어둠 → 팬 → 꽃잎·일어섬 → 카드 → 말(확인을 기다린다): 5초면 말 차례.
+        for _ in 0..300 {
+            c.update(&quiet, 1.0 / 60.0, &mut w);
+        }
+        assert!(w.hush, "말하기 전엔 음악이 내려가 있다");
+        assert!(w.gloom.amount > 0.5, "어둠이 덮인다 {}", w.gloom.amount);
+        assert!(
+            w.sounds.contains(&crate::sfx::Id::Rumble)
+                || w.fx
+                    .iter()
+                    .any(|f| matches!(f.kind, crate::world::FxKind::Petal { .. })),
+            "꽃잎·울림"
+        );
+        let skip = Actions {
+            cancel: true,
+            ..Default::default()
+        };
+        c.update(&skip, 1.0 / 60.0, &mut w);
+        assert!(c.is_done());
+        assert!(!w.hush, "끝나면 음악(보스 곡)");
+        assert_eq!(w.gloom.amount, 0.0, "어둠은 걷힌다");
+        assert!(w.adv.cam_hold.is_none(), "카메라는 플레이어에게");
+    }
+
+    /// 돌아오는 장면(0159): 실이 풀리는 이펙트가 먼저 나고, 그 뒤에야 배우가 보인다.
+    #[test]
+    fn returning_neighbor_appears_after_threads_unbind() {
+        let mut w = World::new();
+        let at = w.player.pos + vec2(60.0, 0.0);
+        let mut c = doto_returns(&w, at);
+        assert!(!c.actors[1].visible, "처음엔 안 보인다");
+        let quiet = Actions::default();
+        let mut unbound_at = None;
+        for i in 0..200 {
+            c.update(&quiet, 1.0 / 60.0, &mut w);
+            if unbound_at.is_none()
+                && w.fx
+                    .iter()
+                    .any(|f| matches!(f.kind, crate::world::FxKind::Thread { .. }))
+            {
+                unbound_at = Some(i);
+            }
+            if c.actors[1].visible {
+                assert!(unbound_at.is_some_and(|u| u < i), "실이 풀린 뒤에 나타난다");
+                return;
+            }
+        }
+        panic!("배우가 나타나지 않는다");
+    }
+}
+
+#[cfg(test)]
 mod portrait_tests {
     use super::*;
 
@@ -197,6 +259,31 @@ pub enum Step {
         secs: f32,
     },
     Shake(f32),
+    /// 카메라를 `to`가 가운데 오도록 `secs` 동안 옮긴다(0159). `None`이면 플레이어에게 돌아가고 잡아 둔 것을 푼다.
+    Pan {
+        to: Option<Vec2>,
+        secs: f32,
+    },
+    /// 어둠(0159): `secs` 동안 `to`(0~1)까지. 빛의 자리는 `actor`(0 = 플레이어), 반지름 `radius`.
+    Gloom {
+        to: f32,
+        actor: usize,
+        radius: f32,
+        secs: f32,
+    },
+    /// 음악을 내린다/올린다(0159). 내린 동안은 보스 곡도 아직.
+    Hush(bool),
+    /// 월드 이펙트 묶음(0159)을 `at`에.
+    Cue {
+        cue: Cue,
+        at: Vec2,
+    },
+    /// 화면 가운데 큰 이름 카드(0159): 이름, 한 줄 설명, 초.
+    Card {
+        name: &'static str,
+        sub: Tr,
+        secs: f32,
+    },
     /// 화면 전체 일러스트를 띄운다(`None`이면 내린다). 대화·내레이션은 그 위에 뜬다(docs/decisions/0039).
     /// 바꾸는 순간은 보통 `Fade`로 가린다.
     Illust(Option<Illust>),
@@ -220,6 +307,11 @@ pub struct Cutscene {
     /// 지금 떠 있는 일러스트와 뜬 뒤 흐른 시간(패닝·입자).
     pub illust: Option<Illust>,
     pub illust_t: f32,
+    /// 지금 스텝이 이번 프레임에 시작했나(팬·어둠의 출발값을 잡는다).
+    fresh: bool,
+    /// 팬·어둠의 출발값.
+    pan_from: Vec2,
+    gloom_from: f32,
 }
 
 /// 렌더용: 지금 열린 대화창.
@@ -253,6 +345,9 @@ impl Cutscene {
             age: 0.0,
             illust: None,
             illust_t: 0.0,
+            fresh: true,
+            pan_from: Vec2::ZERO,
+            gloom_from: 0.0,
         }
     }
 
@@ -282,10 +377,20 @@ impl Cutscene {
             self.finish_fast(w);
             return;
         }
+        // 입자 효과(실·꽃잎·반짝임)와 이름 카드는 컷씬 동안에도 흐른다(0159). 로직은 멈춘다.
+        w.tick_fx(dt);
+        w.time += dt;
+        if let Some((_, _, left)) = &mut w.boss_card {
+            *left -= dt;
+            if *left <= 0.0 {
+                w.boss_card = None;
+            }
+        }
         let Some(step) = self.steps.get(self.idx).cloned() else {
             self.done = true;
             return;
         };
+        let fresh = std::mem::replace(&mut self.fresh, false);
         self.t += dt;
         self.age += dt;
         self.illust_t += dt;
@@ -338,11 +443,63 @@ impl Cutscene {
                 w.feel.add_trauma(amount);
                 true
             }
+            Step::Pan { to, secs } => {
+                if fresh {
+                    self.pan_from = w.adv.cam;
+                }
+                let focus = to.unwrap_or(w.player.pos);
+                let target = w.cam_at(focus);
+                let p = (self.t / secs.max(0.01)).min(1.0);
+                let k = p * p * (3.0 - 2.0 * p);
+                w.adv.cam = self.pan_from + (target - self.pan_from) * k;
+                w.adv.prev_cam = w.adv.cam;
+                if p >= 1.0 {
+                    w.adv.cam_hold = to;
+                    true
+                } else {
+                    false
+                }
+            }
+            Step::Gloom {
+                to,
+                actor,
+                radius,
+                secs,
+            } => {
+                if fresh {
+                    self.gloom_from = w.gloom.amount;
+                }
+                let p = (self.t / secs.max(0.01)).min(1.0);
+                let at = if actor == 0 {
+                    w.player.pos
+                } else {
+                    self.actors[actor].pos
+                };
+                w.gloom = crate::world::Gloom {
+                    amount: self.gloom_from + (to - self.gloom_from) * p,
+                    at,
+                    radius,
+                };
+                p >= 1.0
+            }
+            Step::Hush(on) => {
+                w.hush = on;
+                true
+            }
+            Step::Cue { cue, at } => {
+                w.cue(cue, at);
+                true
+            }
+            Step::Card { name, sub, secs } => {
+                w.boss_card = Some((name, sub, secs));
+                true
+            }
         };
         if advance {
             self.idx += 1;
             self.t = 0.0;
             self.shown = 0.0;
+            self.fresh = true;
             if self.idx >= self.steps.len() {
                 self.done = true;
             }
@@ -394,6 +551,25 @@ impl Cutscene {
                 Step::Give(i) => w.gifts.push(crate::world::Gift::Weapon(i)),
                 Step::Fade { to_clear, .. } => self.fade = if to_clear { 0.0 } else { 1.0 },
                 Step::Illust(il) => self.illust = il,
+                // 장치(0159)는 끝값만: 카메라는 잡아 둔 자리(또는 플레이어)로, 어둠은 그 값으로, 음악은 그대로.
+                Step::Pan { to, .. } => {
+                    w.adv.cam_hold = to;
+                    w.snap_cam();
+                }
+                Step::Gloom {
+                    to, actor, radius, ..
+                } => {
+                    w.gloom = crate::world::Gloom {
+                        amount: to,
+                        at: if actor == 0 {
+                            w.player.pos
+                        } else {
+                            self.actors[actor].pos
+                        },
+                        radius,
+                    };
+                }
+                Step::Hush(on) => w.hush = on,
                 _ => {}
             }
         }
@@ -600,14 +776,14 @@ pub fn kongi_meet(w: &World) -> Cutscene {
 /// 콩이를 이겼다(0054): 맑은 눈으로 돌아와 이름을 말하고, 붙잡는 것만이 지키는 게 아니었다며 바위 발톱을 준다. 먼저 마을로 간다.
 pub fn kongi_returns(w: &World, at: Vec2) -> Cutscene {
     let mut kongi = kongi_actor(at);
-    kongi.visible = true;
+    kongi.visible = false;
     kongi.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
     let actors = vec![nail_actor(w), kongi];
     let side = if at.x >= w.player.pos.x { 22.0 } else { -22.0 };
     let near = w.player.pos + vec2(side, 0.0);
     let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
-    let mut steps = vec![
-        Step::Wait(0.6),
+    let mut steps = unbind_steps(at, 1, false);
+    steps.extend([
         say(1, Face::Normal, |s| s.kongi_b1),
         Step::Move {
             actor: 1,
@@ -623,7 +799,7 @@ pub fn kongi_returns(w: &World, at: Vec2) -> Cutscene {
             dir: vec2(side, 0.0),
         },
         say(0, Face::Worried, |s| s.kongi_b2),
-    ];
+    ]);
     // 깊은 곳의 문(0085): 콩이가 지키던 문, 틈으로 빛이 샌다. 그림 위에서 내레이션 + 콩이의 말, 그리고 돌아온다.
     steps.extend(cut_to(Some(Illust::KongiDoor)));
     steps.extend([
@@ -764,13 +940,13 @@ pub fn boss_beaten(w: &World, at: Vec2, entrance: Vec2) -> Cutscene {
         .collect();
     actors[1].sprite = Some(Sprite::Bori);
     actors[1].pos = at;
-    actors[1].visible = true;
+    actors[1].visible = false;
     actors[1].facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
     // 보리가 Naïl 곁으로 걸어온다(카메라는 Naïl을 따르니, 멀리 쓰러지면 대화창 뒤에 가려진다).
     let side = if at.x >= w.player.pos.x { 26.0 } else { -26.0 };
     let near = w.player.pos + vec2(side, 0.0);
-    // 쓰러진 자리에서 실이 풀리는 일러스트(0039) → 월드로 돌아와 보리가 걸어온다.
-    let mut steps = vec![Step::Wait(0.6)];
+    // 쓰러진 자리에서 실이 풀린다(월드 이펙트, 0159) → 일러스트(0039) → 월드로 돌아와 보리가 걸어온다.
+    let mut steps = unbind_steps(at, 1, false);
     steps.extend(cut_to(Some(Illust::BoriFreed)));
     steps.extend([Step::Narrate(|s| s.bori_free)]);
     steps.extend(cut_to(None));
@@ -804,7 +980,10 @@ pub fn boss_beaten(w: &World, at: Vec2, entrance: Vec2) -> Cutscene {
 }
 
 /// 첫 길 끝 방에 모모가 있다(0046). 만날 때마다 말이 조금씩 무너진다: 막기 → 사라진 가족 → 걱정.
-pub fn momo_meet(w: &World, level: u8) -> Cutscene {
+/// 등장(0159): 음악이 끊기고 어둠이 Naïl 둘레만 남긴 채 내려앉는다 → 빛이 천천히 모모 쪽으로 옮겨 가며
+/// 시든 꽃잎이 흩날리고 모모가 일어선다(땅 울림) → '???' 카드 → 말 → 빛과 카메라가 돌아오고 보스 곡.
+/// `at`은 모모가 선 자리(월드의 적을 그대로 그린다, 배우는 안 보인다).
+pub fn momo_meet(w: &World, level: u8, at: Vec2) -> Cutscene {
     let lines: [(Tr, Tr); 3] = [
         (|s| s.momo_meet_1, |s| s.momo_meet_1b),
         (|s| s.momo_meet_2, |s| s.momo_meet_2b),
@@ -816,13 +995,102 @@ pub fn momo_meet(w: &World, level: u8) -> Cutscene {
     } else {
         Face::Normal
     };
-    talk(
-        w,
-        &[
-            (Speaker::MomoTainted, momo, face),
-            (Speaker::Nail, nail, Face::Determined),
-        ],
-    )
+    let mut m = momo_tainted_actor(at);
+    m.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
+    let actors = vec![nail_actor(w), m];
+    let first = level <= 1;
+    let mut steps = vec![
+        Step::Hush(true),
+        Step::Gloom {
+            to: 0.88,
+            actor: 0,
+            radius: 64.0,
+            secs: if first { 0.9 } else { 0.5 },
+        },
+        Step::Wait(if first { 0.5 } else { 0.2 }),
+        Step::Face {
+            actor: 0,
+            dir: at - w.player.pos,
+        },
+        Step::Pan {
+            to: Some(at),
+            secs: if first { 1.6 } else { 0.9 },
+        },
+        Step::Gloom {
+            to: 0.88,
+            actor: 1,
+            radius: 58.0,
+            secs: if first { 1.2 } else { 0.6 },
+        },
+        Step::Cue {
+            cue: Cue::Petals(false),
+            at,
+        },
+        Step::Wait(0.5),
+        Step::Cue { cue: Cue::Rise, at },
+        Step::Shake(0.2),
+        Step::Wait(0.6),
+        Step::Card {
+            name: "???",
+            sub: |s| s.mob_momo,
+            secs: 3.0,
+        },
+        say(1, face, momo),
+        say(0, Face::Determined, nail),
+        Step::Pan {
+            to: None,
+            secs: 0.7,
+        },
+        Step::Gloom {
+            to: 0.0,
+            actor: 1,
+            radius: 58.0,
+            secs: 0.6,
+        },
+        Step::Hush(false),
+    ];
+    if !first {
+        // 다시 만날 때는 짧게: 꽃잎 없이 일어서고, 카드도 짧게.
+        steps.retain(|s| {
+            !matches!(
+                s,
+                Step::Cue {
+                    cue: Cue::Petals(_),
+                    ..
+                }
+            )
+        });
+    }
+    Cutscene::new(actors, steps)
+}
+
+/// 돌아오는 이웃의 첫 스텝(0159): 쓰러진 자리에서 실이 풀리고(흰 고리·반짝임), 잠시 뒤 제 모습으로 나타난다.
+/// `actor`가 0이면 배우를 내보이지 않는다(일러스트로 이어지는 모모). `bloom`이면 분홍 꽃잎도.
+fn unbind_steps(at: Vec2, actor: usize, bloom: bool) -> Vec<Step> {
+    let mut v = vec![
+        Step::Wait(0.5),
+        Step::Cue {
+            cue: Cue::Unbind,
+            at,
+        },
+        Step::Shake(0.15),
+        Step::Wait(0.7),
+    ];
+    if bloom {
+        v.push(Step::Cue {
+            cue: Cue::Petals(true),
+            at,
+        });
+    }
+    if actor > 0 {
+        v.push(Step::Show { actor, at });
+        v.push(Step::Cue {
+            cue: Cue::Sparkle,
+            at,
+        });
+    }
+    v.push(Step::Wait(if bloom { 0.9 } else { 0.5 }));
+    v
 }
 
 /// 모모를 이겼다(첫 번째·두 번째): 한마디 하고 굴 속으로 달아난다. 마을 빈 자리의 꽃잎이 하나 물든다.
@@ -868,14 +1136,14 @@ pub fn doto_meet(w: &World) -> Cutscene {
 /// 그리고 먼저 마을로 간다.
 pub fn doto_returns(w: &World, at: Vec2) -> Cutscene {
     let mut doto = doto_actor(at);
-    doto.visible = true;
+    doto.visible = false;
     doto.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
     let actors = vec![nail_actor(w), doto];
     let side = if at.x >= w.player.pos.x { 22.0 } else { -22.0 };
     let near = w.player.pos + vec2(side, 0.0);
     let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
-    let mut steps = vec![
-        Step::Wait(0.6),
+    let mut steps = unbind_steps(at, 1, false);
+    steps.extend([
         say(1, Face::Normal, |s| s.doto_b1),
         Step::Move {
             actor: 1,
@@ -892,7 +1160,7 @@ pub fn doto_returns(w: &World, at: Vec2) -> Cutscene {
         },
         say(0, Face::Worried, |s| s.doto_b2),
         say(1, Face::Happy, |s| s.doto_b3),
-    ];
+    ]);
     // 기억 속 장면(0053): 오래전 흰 실 곁에 씨앗을 묻던 날. 그림 위에서 말하고, 내레이션으로 맺는다.
     steps.extend(cut_to(Some(Illust::DotoMemory)));
     steps.extend([
@@ -1121,8 +1389,15 @@ fn true_ending_steps() -> Vec<Step> {
 }
 
 /// 모모가 돌아오는 장면: 세 번째 승리 뒤(0046).
-pub fn momo_returns(w: &World) -> Cutscene {
-    Cutscene::new(story_actors(w), momo_steps())
+pub fn momo_returns(w: &World, at: Vec2) -> Cutscene {
+    // 쓰러진 자리에서 실이 풀리고 분홍 꽃잎이 흩날린 뒤(0159) 꽃이 피는 일러스트로.
+    let mut steps = unbind_steps(at, 0, true);
+    steps.push(Step::Fade {
+        to_clear: false,
+        secs: 0.5,
+    });
+    steps.extend(momo_steps());
+    Cutscene::new(story_actors(w), steps)
 }
 
 /// 반쪽 엔딩: 마지막 길의 주인을 이기고 처음(또는 참 엔딩 조건 없이) 가장 깊은 곳에 닿았을 때(0042).

@@ -617,6 +617,10 @@ impl App {
             return (Some(Track::Title), false);
         }
         let w = &self.world;
+        // 컷씬이 음악을 내렸다(0159): 보스 곡도 아직. 장면이 풀면(Hush(false)) 바로 보스 곡.
+        if w.hush && self.scene == Scene::Cutscene {
+            return (None, false);
+        }
         let boss = self.dream.is_some() || w.enemies.iter().any(|e| e.is_boss() && !e.asleep);
         let track = if boss {
             Track::Boss
@@ -713,6 +717,9 @@ impl App {
                 }
                 if let Some(c) = self.cutscene.as_mut() {
                     c.update(&a, dt, &mut self.world);
+                    for id in self.world.sounds.drain(..) {
+                        self.sfx.play(id);
+                    }
                     // 본 일러스트는 앨범에 남는다(개발 시나리오에서 봐도).
                     if let Some(il) = c.illust {
                         if self
@@ -2258,6 +2265,8 @@ impl App {
         if let Some(il) = c.illust {
             self.renderer.draw_illust(ui, il, c.illust_t);
         }
+        // 보스 이름 카드(0159)는 HUD가 없는 컷씬에서도.
+        self.renderer.draw_boss_card(ui, &self.world);
         if let Some(d) = c.dialogue().filter(|d| d.narration) {
             // 내레이션: 이름·초상화 없이 아래쪽에 가운데 맞춤. 상자 대신 화면 아래에서 위로 옅어지는 어둠(0152):
             // 네모 띠는 양옆·위 모서리가 그림 위에 뜬 UI 상자처럼 보였다(사장 "미묘하게 거슬린다"). 글은 테두리로 읽힌다.

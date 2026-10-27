@@ -67,6 +67,10 @@ pub enum Scenario {
     Doto,
     /// 셋째 길 끝 굴(콩이가 지킨다)에 바로(docs/decisions/0054).
     Kongi,
+    /// 길의 샘 칸(0159): 쉼방의 샘 곁에서 시작(체력은 깎인 채).
+    Spring,
+    /// 출구 확인(0159): 적 없는 한 방짜리 굴 — 들어서면 바로 출구가 열린다.
+    Exit,
 }
 
 pub struct Entry {
@@ -75,7 +79,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 32] = [
+pub const LIST: [Entry; 34] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -232,6 +236,16 @@ pub const LIST: [Entry; 32] = [
         scenario: Scenario::Doto,
     },
     Entry {
+        name: "길의 샘",
+        desc: "길의 샘 칸. 쉼방 가운데 샘에 발을 담그면 가득 회복(0159).",
+        scenario: Scenario::Spring,
+    },
+    Entry {
+        name: "출구",
+        desc: "적 없는 한 방 굴. 들어서면 내려가는 출구가 열린다(0159, 화면 밖이면 가장자리 표시).",
+        scenario: Scenario::Exit,
+    },
+    Entry {
         name: "콩이",
         desc: "셋째 길 끝 굴. 끝방의 콩이: 굴러 튕기기·웅크려 버티기(발톱은 튕김, 솟구치기·드릴은 뚫음). 이기면 바위 발톱.",
         scenario: Scenario::Kongi,
@@ -308,6 +322,48 @@ pub fn build(s: Scenario) -> World {
             let mut w = World::camp_start(2);
             w.seeds = 40;
             w.adv.events.clear();
+            w
+        }
+        Scenario::Spring => {
+            let mut w = World::camp_start(1);
+            w.adv.events.clear();
+            w.enter_route_spring_now();
+            // 샘 방(쉼방) 문 안쪽에, 체력은 반으로.
+            let rest = w.adv.dungeon.as_ref().and_then(|d| {
+                d.rooms
+                    .iter()
+                    .find(|r| r.kind == crate::dungeon::RoomKind::Rest)
+                    .map(|r| r.interior().center())
+            });
+            if let Some(c) = rest {
+                w.player.pos = c + vec2(0.0, 48.0);
+                w.player.prev_pos = w.player.pos;
+                w.snap_cam();
+            }
+            w.player.hp = (w.player.stats.max_hp / 2).max(1);
+            w
+        }
+        Scenario::Exit => {
+            let mut w = World::camp_start(1);
+            w.adv.events.clear();
+            w.enter_route_boss_now();
+            // 끝방의 적을 비운다: 들어서면 바로 클리어 → 출구.
+            if let Some(d) = w.adv.dungeon.as_mut() {
+                for r in &mut d.rooms {
+                    r.enemies.clear();
+                }
+            }
+            let boss = w.adv.dungeon.as_ref().and_then(|d| {
+                d.rooms
+                    .iter()
+                    .find(|r| r.kind == crate::dungeon::RoomKind::Boss)
+                    .map(|r| r.interior().center())
+            });
+            if let Some(c) = boss {
+                w.player.pos = c + vec2(0.0, 40.0);
+                w.player.prev_pos = w.player.pos;
+                w.snap_cam();
+            }
             w
         }
         Scenario::Camp => {

@@ -13,7 +13,7 @@ use crate::tuning;
 
 const SR: u32 = 44_100;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Id {
     Claw(usize),
     Burrow,
@@ -54,6 +54,8 @@ pub enum Id {
     Chest,
     /// 마무리 타·솟구치기가 맞았다: 낮고 무거운 쿵(0090).
     Impact,
+    /// 실이 풀린다(0159): 돌아오는 이웃 — 맑게 올라가는 두 음 + 반짝임.
+    Unbind,
 }
 
 /// 파일 소리 표: (이름, 변형 수, 크기). 크기는 MASTER_VOLUME·설정에 곱한다 — 귀로 맞춘다.
@@ -100,6 +102,7 @@ pub struct Sfx {
     charge: Sound,
     wall_hit: Sound,
     impact: Sound,
+    unbind: Sound,
     glowbug: [Sound; 4],
     heal: Sound,
     drill: [Sound; 3],
@@ -221,6 +224,12 @@ impl Sfx {
                 Layer::tone(0.3, 130.0, 38.0, Wave::Sine, 1.0, 1.1),
                 Layer::noise(0.12, 0.7, 2.5),
                 Layer::tone(0.16, 260.0, 80.0, Wave::Square, 0.25, 1.6),
+            ])
+            .await,
+            unbind: make(&[
+                Layer::tone(0.5, 520.0, 1040.0, Wave::Sine, 0.45, 1.2),
+                Layer::tone(0.6, 780.0, 1560.0, Wave::Triangle, 0.25, 1.6),
+                Layer::noise(0.3, 0.12, 3.0),
             ])
             .await,
             glowbug: [
@@ -366,6 +375,7 @@ impl Sfx {
             Id::Charge => &self.charge,
             Id::WallHit => &self.wall_hit,
             Id::Impact => &self.impact,
+            Id::Unbind => &self.unbind,
             Id::Glowbug => {
                 let i = self.glow_step.get();
                 self.glow_step.set((i + 1) % self.glowbug.len());

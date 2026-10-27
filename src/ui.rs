@@ -90,6 +90,11 @@ impl Ui {
         draw_rectangle(p.x, p.y, r.w * self.scale, r.h * self.scale, c);
     }
 
+    /// 논리 좌표 세 점의 삼각형(화살표 같은 작은 표시).
+    pub fn tri(&self, a: Vec2, b: Vec2, c: Vec2, col: Color) {
+        draw_triangle(self.px(a), self.px(b), self.px(c), col);
+    }
+
     /// 텍스처 한 칸을 논리 좌표 (x, y)에 원래 크기 × 배율로 찍는다.
     pub fn sprite(&self, tex: &Texture2D, src: Rect, x: f32, y: f32, tint: Color) {
         let p = self.px(vec2(x, y));

@@ -278,7 +278,8 @@ impl App {
                 AdvEvent::Deepest => self.reach_deepest(),
                 AdvEvent::MomoIntro => {
                     let level = self.world.momo_wins.saturating_add(1);
-                    self.play(cutscene::momo_meet(&self.world, level));
+                    let at = self.world.adv.boss_last;
+                    self.play(cutscene::momo_meet(&self.world, level, at));
                 }
                 AdvEvent::MomoBeaten => self.momo_beaten(),
                 AdvEvent::DotoIntro => self.play(cutscene::doto_meet(&self.world)),
@@ -307,7 +308,8 @@ impl App {
             self.save_profile();
         }
         if back {
-            self.play(cutscene::momo_returns(&self.world));
+            let at = self.world.adv.boss_last;
+            self.play(cutscene::momo_returns(&self.world, at));
         } else {
             let at = self.world.adv.boss_last;
             self.play(cutscene::momo_flee(&self.world, at, wins as u32));

@@ -313,6 +313,9 @@ impl Renderer {
             } else {
                 draw_room_art(art, w);
             }
+            if let Some(sp) = &w.spring {
+                draw_spring(sp, w.time);
+            }
             self.draw_sun_shadows(art, w, alpha);
             draw_drill_trail(Some(art), &w.player, alpha);
             draw_telegraphs(w, alpha);
@@ -334,6 +337,7 @@ impl Renderer {
             } else {
                 draw_darkness(art, w, alpha, cam);
             }
+            draw_gloom(art, w, cam);
             draw_save_lights(w, cam, self.light.as_ref());
             draw_world_lights(
                 w,
@@ -803,6 +807,8 @@ impl Renderer {
         );
         draw_quick_slots(ui, w);
         self.draw_biome_card(ui, w);
+        self.draw_boss_card(ui, w);
+        draw_exit_mark(ui, w);
         if let Some((text, time)) = w.toast {
             let s = crate::i18n::tr(text);
             let a = (time / 0.4).min(1.0);
@@ -944,6 +950,63 @@ fn draw_boss_bar(ui: &Ui, w: &World) {
 
 /// 퀵 슬롯(왼쪽 아래): 산딸기·지렁이 두 칸, 고른 칸은 테두리 강조, 개수, 먹기 키 안내.
 /// HUD 바탕판(0091): 풀밭·흙 위에서도 HUD가 묻히지 않게 반투명 어두운 판 + 어두운 테두리.
+/// 끝방 출구가 화면 밖일 때(0159) 가장자리에 구멍 표시와 그쪽을 가리키는 화살을 띄운다. 보상을 줍는 동안
+/// (`EXIT_MARK_DELAY`)은 조용히. 화면 안이면 출구 자체가 보이니 아무것도 안 그린다.
+fn draw_exit_mark(ui: &Ui, w: &World) {
+    let Some(e) = w.exit_at else {
+        return;
+    };
+    if w.adv.fade.is_some() || w.exit_age < t::EXIT_MARK_DELAY {
+        return;
+    }
+    let v = e - w.adv.cam;
+    let inside = Rect::new(-8.0, -8.0, t::VIEW_W + 16.0, t::VIEW_H + 16.0);
+    if inside.contains(v) {
+        return;
+    }
+    // 화면 가운데에서 출구 쪽으로 나가는 선이 안쪽 테두리와 만나는 점.
+    let c = vec2(t::VIEW_W / 2.0, t::VIEW_H / 2.0 + 4.0);
+    let d = v - c;
+    let bounds = Rect::new(14.0, 18.0, t::VIEW_W - 28.0, t::VIEW_H - 40.0);
+    let k = {
+        let kx = if d.x.abs() < 1e-3 {
+            f32::MAX
+        } else if d.x > 0.0 {
+            (bounds.right() - c.x) / d.x
+        } else {
+            (bounds.x - c.x) / d.x
+        };
+        let ky = if d.y.abs() < 1e-3 {
+            f32::MAX
+        } else if d.y > 0.0 {
+            (bounds.bottom() - c.y) / d.y
+        } else {
+            (bounds.y - c.y) / d.y
+        };
+        kx.min(ky).min(1.0)
+    };
+    let p = (c + d * k).round();
+    let pulse = 0.55 + 0.45 * (w.time * 4.0).sin();
+    let dir = d.normalize_or(vec2(1.0, 0.0));
+    // 작은 구멍 아이콘 + 화살.
+    ui.rect(
+        Rect::new(p.x - 6.0, p.y - 4.0, 12.0, 8.0),
+        Color::new(0.07, 0.05, 0.09, 0.6),
+    );
+    ui.rect(
+        Rect::new(p.x - 4.0, p.y - 2.0, 8.0, 4.0),
+        Color::new(0.16, 0.11, 0.14, 1.0),
+    );
+    ui.rect(
+        Rect::new(p.x - 2.0, p.y - 1.0, 4.0, 2.0),
+        Color::new(0.0, 0.0, 0.0, 1.0),
+    );
+    let tip = p + dir * 11.0;
+    let n = vec2(-dir.y, dir.x);
+    let col = Color::new(1.0, 0.92, 0.62, pulse);
+    ui.tri(tip, p + dir * 5.0 + n * 4.0, p + dir * 5.0 - n * 4.0, col);
+}
+
 fn hud_plate(ui: &Ui, r: Rect) {
     ui.rect(r, Color::new(0.06, 0.04, 0.08, 0.62));
     ui.rect_lines(r, Color::new(0.02, 0.01, 0.03, 0.75));
@@ -1748,24 +1811,8 @@ fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D, sheet: Option<&Texture
                         Color::new(0.0, 0.0, 0.0, 1.0),
                     );
                 }
-                Cell::Exit => {
-                    let pulse = 0.5 + 0.3 * (w.time * 3.0).sin();
-                    draw_ellipse(p.x, p.y + 2.0, 10.0, 6.0, 0.0, world::DIRT);
-                    draw_ellipse(
-                        p.x,
-                        p.y + 2.0,
-                        8.0,
-                        4.5,
-                        0.0,
-                        Color::new(0.95, 0.9, 0.6, pulse),
-                    );
-                    draw_triangle(
-                        vec2(p.x, p.y - 10.0),
-                        vec2(p.x - 4.0, p.y - 5.0),
-                        vec2(p.x + 4.0, p.y - 5.0),
-                        Color::new(1.0, 1.0, 0.8, pulse),
-                    );
-                }
+                // 출구(0159): 길의 굴에서는 더 깊이 파 내려가는 구멍, 필드의 옛 굴에서는 올라가는 구멍.
+                Cell::Exit => draw_exit(p, w.time, w.adv.node.is_some()),
                 Cell::Gate => {
                     // 뿌리 길: 뿌리가 감싼 큰 구멍 + 팻말.
                     let root = Color::new(0.42, 0.30, 0.24, 1.0);
@@ -1991,10 +2038,193 @@ fn hash01(i: u32, k: u32) -> f32 {
 /// 환경 입자(0081): 들판·마을은 떠다니는 꽃가루, 뿌리 지대는 천천히 내리는 포자, 심층은 빛 알갱이(더하기 빛 패스).
 /// 상태가 없다. 번호마다 월드에 붙은 자리(카메라 둘레 타일에서 되풀이)와 흐름이 정해져 있다.
 /// 분위기 입자는 작고 대비가 낮게(타격 효과보다 눈에 덜 띄게).
+/// 끝방 출구(0159). `down`이면 파 내려가는 구멍: 흙 테두리 안이 아래로 갈수록 검고, 빛나는 테두리와 안으로
+/// 떨어지는 ⌄ 셋이 "내려간다"를 말한다. 예전엔 위를 가리키는 ▲라 올라가는 것으로 읽혔다(사장 피드백 2026-10-27).
+/// `down`이 아니면(필드에서 들어온 옛 굴) 위로 나가는 구멍: 밝은 안쪽 + 떠오르는 ⌃.
+fn draw_exit(p: Vec2, time: f32, down: bool) {
+    let pulse = 0.5 + 0.5 * (time * 3.0).sin();
+    let rim = Color::new(0.36, 0.25, 0.18, 1.0);
+    draw_ellipse(p.x, p.y + 3.0, 13.0, 7.5, 0.0, rim);
+    draw_ellipse(p.x, p.y + 2.0, 12.0, 6.5, 0.0, world::DIRT);
+    if down {
+        for (k, (rx, ry)) in [(10.0, 5.2), (8.0, 4.0), (6.0, 2.8)]
+            .into_iter()
+            .enumerate()
+        {
+            let d = 0.16 - 0.05 * k as f32;
+            draw_ellipse(
+                p.x,
+                p.y + 2.5,
+                rx,
+                ry,
+                0.0,
+                Color::new(d, d * 0.7, d * 0.9, 1.0),
+            );
+        }
+        draw_ellipse(
+            p.x,
+            p.y + 2.5,
+            4.0,
+            1.8,
+            0.0,
+            Color::new(0.0, 0.0, 0.0, 1.0),
+        );
+        // 테두리 빛: 숨 쉬듯.
+        draw_ellipse_lines(
+            p.x,
+            p.y + 2.0,
+            11.0,
+            5.8,
+            0.0,
+            1.0,
+            Color::new(1.0, 0.92, 0.62, 0.45 + 0.4 * pulse),
+        );
+        // 떨어지는 ⌄ 셋: 위에서 구멍 속으로, 들어갈수록 옅다.
+        for k in 0..3 {
+            let ph = (time * 0.9 + k as f32 / 3.0).fract();
+            let y = p.y - 14.0 + ph * 16.0;
+            let a = (1.0 - ph) * 0.9;
+            let c = Color::new(1.0, 0.95, 0.75, a);
+            let (x, y) = (p.x.round(), y.round());
+            draw_rectangle(x - 3.0, y - 2.0, 2.0, 1.0, c);
+            draw_rectangle(x + 2.0, y - 2.0, 2.0, 1.0, c);
+            draw_rectangle(x - 2.0, y - 1.0, 2.0, 1.0, c);
+            draw_rectangle(x + 1.0, y - 1.0, 2.0, 1.0, c);
+            draw_rectangle(x - 1.0, y, 3.0, 1.0, c);
+        }
+    } else {
+        draw_ellipse(
+            p.x,
+            p.y + 2.0,
+            9.0,
+            4.8,
+            0.0,
+            Color::new(0.95, 0.90, 0.62, 0.55 + 0.3 * pulse),
+        );
+        for k in 0..2 {
+            let ph = (time * 0.8 + k as f32 * 0.5).fract();
+            let y = p.y + 4.0 - ph * 16.0;
+            let a = (1.0 - ph) * 0.9;
+            let c = Color::new(1.0, 1.0, 0.85, a);
+            let (x, y) = (p.x.round(), y.round());
+            draw_rectangle(x - 1.0, y, 3.0, 1.0, c);
+            draw_rectangle(x - 2.0, y + 1.0, 2.0, 1.0, c);
+            draw_rectangle(x + 1.0, y + 1.0, 2.0, 1.0, c);
+            draw_rectangle(x - 3.0, y + 2.0, 2.0, 1.0, c);
+            draw_rectangle(x + 2.0, y + 2.0, 2.0, 1.0, c);
+        }
+    }
+}
+
+/// 길의 샘(0159): 돌 테두리의 맑은 웅덩이. 물결 고리가 퍼지고 반짝임이 떠다닌다. 마신 뒤엔 조용해진다.
+fn draw_spring(sp: &world::Spring, time: f32) {
+    let (x, y) = (sp.pos.x.round(), sp.pos.y.round() + 2.0);
+    let live = if sp.drunk { 0.35 } else { 1.0 };
+    // 젖은 흙 + 돌 테두리.
+    draw_ellipse(
+        x,
+        y + 1.0,
+        22.0,
+        12.0,
+        0.0,
+        Color::new(0.30, 0.24, 0.18, 1.0),
+    );
+    draw_ellipse(x, y, 20.0, 10.5, 0.0, Color::new(0.52, 0.50, 0.46, 1.0));
+    for k in 0..9 {
+        let ang = k as f32 / 9.0 * std::f32::consts::TAU + 0.3;
+        let (sx, sy) = (x + ang.cos() * 19.0, y + ang.sin() * 9.5);
+        let c = if k % 2 == 0 {
+            Color::new(0.62, 0.60, 0.56, 1.0)
+        } else {
+            Color::new(0.42, 0.40, 0.38, 1.0)
+        };
+        draw_ellipse(sx.round(), sy.round(), 3.0, 2.0, 0.0, c);
+    }
+    // 물: 깊은 가운데 → 얕은 가장자리.
+    draw_ellipse(x, y, 16.0, 8.0, 0.0, Color::new(0.22, 0.42, 0.52, 1.0));
+    draw_ellipse(x, y, 12.0, 5.5, 0.0, Color::new(0.30, 0.58, 0.72, 1.0));
+    draw_ellipse(
+        x - 2.0,
+        y - 1.0,
+        6.0,
+        2.2,
+        0.0,
+        Color::new(0.55, 0.80, 0.90, 1.0),
+    );
+    // 물결 고리: 가운데에서 퍼져 옅어진다.
+    for k in 0..2 {
+        let ph = (time * 0.45 + k as f32 * 0.5).fract();
+        let a = (1.0 - ph) * 0.55 * live;
+        draw_ellipse_lines(
+            x,
+            y,
+            2.0 + ph * 13.0,
+            1.0 + ph * 6.5,
+            0.0,
+            1.0,
+            Color::new(0.80, 0.95, 1.0, a),
+        );
+    }
+    // 떠다니는 반짝임.
+    for k in 0..4 {
+        let ph = (time * 0.6 + k as f32 * 0.25).fract();
+        let ang = k as f32 * 1.7 + time * 0.3;
+        let (sx, sy) = (x + ang.cos() * 8.0, y - 2.0 + ang.sin() * 3.0 - ph * 6.0);
+        let a = (1.0 - ph) * 0.9 * live;
+        draw_rectangle(
+            sx.round(),
+            sy.round(),
+            1.0,
+            1.0,
+            Color::new(1.0, 1.0, 1.0, a),
+        );
+    }
+}
+
+/// 컷씬의 어둠(0159): `gloom.at` 둘레 `radius`만 밝고 바깥은 `amount`만큼 보랏빛 검정. 환경 어둠 위에 한 번 더.
+fn draw_gloom(art: &Art, w: &World, cam: Vec2) {
+    let g = w.gloom;
+    if g.amount <= 0.0 {
+        return;
+    }
+    let c = g.at;
+    let s = g.radius * 2.0;
+    let (x0, y0) = (c.x - g.radius, c.y - g.radius);
+    let (l, tp) = (cam.x - 8.0, cam.y - 8.0);
+    let (r, b) = (cam.x + t::VIEW_W + 8.0, cam.y + t::VIEW_H + 8.0);
+    // 보랏빛 장막을 먼저 옅게 깔고(빛 안도 조금 물든다), 그 위에 검은 어둠 마스크. 마스크 그림이 검정이라
+    // 바깥 네모도 검정이어야 네모 경계가 안 보인다.
+    draw_rectangle(
+        l,
+        tp,
+        r - l,
+        b - tp,
+        Color::new(0.30, 0.12, 0.45, 0.22 * g.amount),
+    );
+    let col = Color::new(0.0, 0.0, 0.0, g.amount);
+    draw_texture_ex(
+        &art.dark,
+        x0,
+        y0,
+        col,
+        DrawTextureParams {
+            dest_size: Some(vec2(s, s)),
+            ..Default::default()
+        },
+    );
+    draw_rectangle(l, tp, r - l, (y0 - tp).max(0.0), col);
+    draw_rectangle(l, y0 + s, r - l, (b - (y0 + s)).max(0.0), col);
+    draw_rectangle(l, y0, (x0 - l).max(0.0), s, col);
+    draw_rectangle(x0 + s, y0, (r - (x0 + s)).max(0.0), s, col);
+}
+
 fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
     let deep = w.biome == Biome::Deep;
     if glow != deep || w.room.grid.is_none() {
         return;
+    }
+    if w.petals && !glow {
+        draw_wilted_petals(w, cam);
     }
     let (tw, th) = (RW + 48.0, RH + 48.0);
     let n = if deep { 18 } else { 22 };
@@ -2047,6 +2277,31 @@ fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
             );
         }
         draw_rectangle(x.round(), y.round(), size, size, color);
+    }
+}
+
+/// 시든 꽃잎(0159): 모모가 지키는 굴에서 방마다 떠도는 복선. 마을 빈 자리의 시든 꽃잎과 같은 색.
+/// 옆으로 흘러가며 위아래로 팔랑이고, 흔들림에 따라 가로·세로로 바뀐다.
+fn draw_wilted_petals(w: &World, cam: Vec2) {
+    let (tw, th) = (RW + 48.0, RH + 48.0);
+    let t = w.time;
+    let c = Color::new(0.74, 0.56, 0.60, 0.9);
+    for i in 0..9u32 {
+        if !keep_share(i as usize, w.effects) {
+            continue;
+        }
+        let (hx, hy, hs) = (hash01(i, 11), hash01(i, 12), hash01(i, 13));
+        let ph = t * (1.6 + hs) + hs * 7.0;
+        let flow = vec2(t * (7.0 + hs * 5.0), ph.sin() * 4.0 + t * 2.0);
+        let x = (cam.x - 24.0 + (hx * tw + flow.x - cam.x).rem_euclid(tw)).round();
+        let y = (cam.y - 24.0 + (hy * th + flow.y - cam.y).rem_euclid(th)).round();
+        if ph.cos() > 0.0 {
+            draw_rectangle(x - 1.0, y, 3.0, 1.0, c);
+            draw_rectangle(x, y - 1.0, 1.0, 1.0, c);
+        } else {
+            draw_rectangle(x, y - 1.0, 1.0, 3.0, c);
+            draw_rectangle(x - 1.0, y, 1.0, 1.0, c);
+        }
     }
 }
 
@@ -4709,6 +4964,21 @@ fn draw_fx(w: &World) {
                 }
                 draw_rectangle(pos.x, pos.y, 1.0, 1.0, WHITE);
             }
+            // 꽃잎(0159): 2×2 점 둘이 흔들림에 따라 가로·세로로 바뀌며 팔랑인다.
+            FxKind::Petal { color, phase } => {
+                if f.time < 0.0 {
+                    continue;
+                }
+                let a = (1.0 - p).min(1.0) * (0.5 + 0.5 * (p * 6.0).min(1.0));
+                let c = Color::new(color.r, color.g, color.b, a);
+                if phase.sin() > 0.0 {
+                    draw_rectangle(pos.x - 1.0, pos.y, 3.0, 1.0, c);
+                    draw_rectangle(pos.x, pos.y - 1.0, 1.0, 1.0, c);
+                } else {
+                    draw_rectangle(pos.x, pos.y - 1.0, 1.0, 3.0, c);
+                    draw_rectangle(pos.x - 1.0, pos.y, 1.0, 1.0, c);
+                }
+            }
             // 풀려 흩어지는 실: 짧은 물결 선(점 몇 개), 끝으로 갈수록 옅다.
             FxKind::Thread { angle, len } => {
                 let c = crate::world::THREAD;
@@ -5009,6 +5279,14 @@ pub struct LightSrc {
 pub fn light_sources(w: &World, alpha: f32, cam: Vec2, player_radius: f32) -> Vec<LightSrc> {
     let t = w.time;
     let mut v = Vec::new();
+    // 길의 샘(0159): 어두운 굴에서도 샘이 먼저 보인다.
+    if let Some(sp) = &w.spring {
+        v.push(LightSrc {
+            pos: sp.pos,
+            radius: 46.0,
+            strength: if sp.drunk { 0.4 } else { 0.65 },
+        });
+    }
     // 플레이어(예전 어둠 막의 구멍과 같은 크기, 가운데는 거의 다 걷힌다).
     v.push(LightSrc {
         pos: lerp(w.player.prev_pos, w.player.pos, alpha),
@@ -5664,17 +5942,29 @@ impl Renderer {
         if w.adv.fade.is_some() {
             return;
         }
-        let shown = t::BIOME_CARD_TIME - time;
+        let name = crate::i18n::tr(biome.name());
+        let depth = crate::i18n::fill(crate::i18n::s().depth_m, &[&m]);
+        self.draw_card(ui, name, &depth, t::BIOME_CARD_TIME - time, time, 48.0);
+    }
+
+    /// 보스 이름 카드(0159): 컷씬이 띄운다(모모의 '???'). HUD와 컷씬 그리기 둘 다 부른다.
+    pub fn draw_boss_card(&self, ui: &Ui, w: &World) {
+        let Some((name, sub, left)) = w.boss_card else {
+            return;
+        };
+        // 카메라가 보스를 가운데에 두니 더 위에(건너뛰기 안내 아래).
+        self.draw_card(ui, name, crate::i18n::tr(sub), 3.0 - left, left, 30.0);
+    }
+
+    /// 화면 위쪽 가운데의 이름 카드: 이름 + 한 줄. `shown`초 동안 보였고 `time`초 남았다. `y`는 이름 줄.
+    fn draw_card(&self, ui: &Ui, name: &str, depth: &str, shown: f32, time: f32, y: f32) {
         let a = (shown / 0.6).min(time / 0.8).clamp(0.0, 1.0);
         if a <= 0.0 {
             return;
         }
-        let name = crate::i18n::tr(biome.name());
-        let depth = crate::i18n::fill(crate::i18n::s().depth_m, &[&m]);
         let out = ui.with_outline();
-        let y = 48.0;
         let nw = ui.text_w(name, crate::ui::FONT_PX);
-        let dw = ui.text_w(&depth, crate::ui::FONT_PX);
+        let dw = ui.text_w(depth, crate::ui::FONT_PX);
         // 밝은 바닥에서도 읽히게 둥근 그늘(0152).
         let bw = nw.max(dw) + 16.0;
         self.draw_soft_shade(ui, Rect::new(160.0 - bw / 2.0, y - 2.0, bw, 28.0), 0.55 * a);
@@ -5698,7 +5988,7 @@ impl Renderer {
             Color::new(1.0, 0.92, 0.72, a),
         );
         out.text_center(
-            &depth,
+            depth,
             160.0,
             y + 13.0,
             crate::ui::FONT_PX,
