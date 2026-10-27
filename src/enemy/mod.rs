@@ -3,7 +3,7 @@
 
 use macroquad::prelude::*;
 
-use crate::combat;
+use crate::combat::{self, Strike, StrikeKind};
 use crate::room::Room;
 use crate::species::{self, Behavior, Species};
 use crate::tuning as t;
@@ -87,6 +87,17 @@ pub enum State {
     Thump { time: f32 },
     /// 토끼풀(0165): 고치로 가 실을 더 감는다(반 아래, 한 번). `CLOVER_THREAD_AT`에 `Event::Thread`(실 한 가닥).
     Gather { time: f32 },
+}
+
+/// 플레이어의 타격을 받은 결과(0170 R10). 월드는 이것만 보고 연출·통계·소리를 낸다 — 종 규칙은 전부 `Enemy::receive` 안.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Struck {
+    /// 닿지 않았다: 이미 이 스윙에 맞았다, 땅속, 모양 밖, 나는 박쥐에 솟구치기(0146).
+    Miss,
+    /// 등딱지·가시에 튕겼다(콩이·고슴도치, 0054): 발톱만. 플레이어가 밀려난다.
+    Deflected,
+    /// 맞았다. `dir`은 민 방향. `broke_guard`면 등딱지를 열었다(솟구치기·드릴·강공격, 0168).
+    Hit { dir: Vec2, broke_guard: bool },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -532,6 +543,49 @@ impl Enemy {
         )
     }
 
+    /// 플레이어의 타격 `s`를 받는다(0170 R10): 닿나, 튕기나, 맞으면 어느 쪽으로 밀리고 멈추나, 독·벽 쿵까지 — 종 규칙은 여기 한 곳.
+    /// `origin`·`facing`은 플레이어 자리·방향(밀 방향을 정한다).
+    pub fn receive(&mut self, s: &Strike, origin: Vec2, facing: Vec2) -> Struck {
+        if self.last_hit_by == s.id
+            || !self.hittable()
+            || !s.shape.overlaps_circle(self.pos, self.radius())
+            // 나는 박쥐에는 솟구치기가 닿지 않는다(0146).
+            || (self.flying() && s.kind == StrikeKind::Emerge)
+        {
+            return Struck::Miss;
+        }
+        self.last_hit_by = s.id;
+        // 콩이의 등딱지(0054): 발톱은 튕긴다(패링 거울). 솟구치기(아래 배)·드릴은 뚫고 연다.
+        // 강공격은 튕기지 않고 자세를 깬다(0168: 모으기 = 자세 깨기).
+        let guarded = self.guarding();
+        if guarded && matches!(s.kind, StrikeKind::Claw(_)) {
+            self.shell_hit();
+            return Struck::Deflected;
+        }
+        let dir = (self.pos - origin).normalize_or_zero();
+        let dir = if dir == Vec2::ZERO {
+            facing
+        } else if s.kind == StrikeKind::Drill {
+            // 드릴은 앞으로 밀어 데려간다(옆으로 흩지 않는다).
+            (facing * 1.6 + dir * 0.4).normalize()
+        } else {
+            dir
+        };
+        self.hurt(s.damage, dir, s.knockback, s.stun);
+        let broke_guard = guarded && self.alive;
+        if broke_guard {
+            self.break_guard();
+        }
+        if s.poison > 0.0 && self.alive {
+            self.apply_poison(s.poison);
+        }
+        // 벽 쿵(0168): 강공격 넉백으로 벽에 박히면 한 번 더.
+        if s.kind == StrikeKind::Heavy && self.alive {
+            self.slam = t::WALL_SLAM_DAMAGE;
+        }
+        Struck::Hit { dir, broke_guard }
+    }
+
     /// 독을 건다. 이미 걸려 있으면 더 긴 쪽.
     pub fn apply_poison(&mut self, secs: f32) {
         if self.poison <= 0.0 {
@@ -637,6 +691,95 @@ fn idle_of(b: Behavior) -> State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn strike(kind: StrikeKind, at: Vec2, damage: i32) -> Strike {
+        Strike {
+            id: 7,
+            kind,
+            shape: combat::Shape::Circle {
+                center: at,
+                r: 12.0,
+            },
+            damage,
+            knockback: 60.0,
+            stun: 0.3,
+            hitstop: 0.0,
+            shake: 0.0,
+            finisher: false,
+            poison: 0.0,
+        }
+    }
+
+    /// 등딱지(0054·0168): 버티는 콩이에게 발톱은 튕기고(피해 없음), 강공격은 자세를 깨고 들어간다(피해 + 긴 경직).
+    #[test]
+    fn guard_deflects_claws_and_breaks_under_a_heavy() {
+        let at = vec2(100.0, 100.0);
+        let mut e = Enemy::new(Kind::Kongi, at);
+        e.state = State::Guard { time: 1.0 };
+        let hp = e.hp;
+        let r = e.receive(
+            &strike(StrikeKind::Claw(0), at, 2),
+            at - vec2(10.0, 0.0),
+            vec2(1.0, 0.0),
+        );
+        assert_eq!(r, Struck::Deflected);
+        assert_eq!(e.hp, hp, "튕기면 피해 없음");
+        let mut e = Enemy::new(Kind::Kongi, at);
+        e.state = State::Guard { time: 1.0 };
+        let r = e.receive(
+            &strike(StrikeKind::Heavy, at, 3),
+            at - vec2(10.0, 0.0),
+            vec2(1.0, 0.0),
+        );
+        assert!(
+            matches!(
+                r,
+                Struck::Hit {
+                    broke_guard: true,
+                    ..
+                }
+            ),
+            "{r:?}"
+        );
+        assert_eq!(e.hp, hp - 3);
+        assert!(
+            matches!(e.state, State::Stunned { .. }),
+            "등딱지가 열리면 어질어질"
+        );
+        assert_eq!(e.slam, t::WALL_SLAM_DAMAGE, "강공격은 벽 쿵을 건다");
+    }
+
+    /// 같은 스윙은 같은 적을 두 번 때리지 않고, 민 방향은 플레이어에서 적 쪽이다.
+    #[test]
+    fn one_swing_hits_once_and_pushes_away_from_the_player() {
+        let at = vec2(100.0, 100.0);
+        let mut e = Enemy::new(Kind::Kongi, at);
+        let s = strike(StrikeKind::Claw(1), at, 1);
+        match e.receive(&s, at - vec2(10.0, 0.0), vec2(0.0, 1.0)) {
+            Struck::Hit { dir, broke_guard } => {
+                assert!(!broke_guard);
+                assert!(dir.x > 0.99, "{dir}");
+            }
+            r => panic!("{r:?}"),
+        }
+        assert_eq!(e.receive(&s, at, vec2(1.0, 0.0)), Struck::Miss);
+    }
+
+    /// 나는 박쥐(0146)에는 솟구치기가 닿지 않고 발톱은 닿는다.
+    #[test]
+    fn bats_dodge_the_emerge_but_not_claws() {
+        let at = vec2(100.0, 100.0);
+        let mut e = Enemy::new(Kind::Bat, at);
+        assert!(e.flying());
+        assert_eq!(
+            e.receive(&strike(StrikeKind::Emerge, at, 2), at, vec2(1.0, 0.0)),
+            Struck::Miss
+        );
+        assert!(matches!(
+            e.receive(&strike(StrikeKind::Claw(0), at, 1), at, vec2(1.0, 0.0)),
+            Struck::Hit { .. }
+        ));
+    }
 
     /// 벽 쿵(0168): 강공격 넉백(`slam`)으로 빠르게 날아가다 벽에 박히면 피해 +1·튕김·`slammed`. 느리거나 `slam`이 없으면 그냥 멈춘다.
     #[test]

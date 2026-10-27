@@ -4,7 +4,7 @@ use macroquad::prelude::*;
 
 use crate::adventure::{Adventure, Place};
 use crate::biome::Biome;
-use crate::combat::{Feel, Strike};
+use crate::combat::{dist_to_segment, Feel, Strike};
 use crate::enemy::{self, Enemy, Kind, Projectile};
 use crate::equipment::Stats;
 use crate::i18n::Tr;
@@ -1593,37 +1593,20 @@ impl World {
             // 마무리 타·솟구치기가 맞힌 첫 자리(0090): 한 번만 쿵 소리와 충격 고리.
             let mut impact_at = None;
             for e in &mut self.enemies {
-                if e.last_hit_by == s.id
-                    || !e.hittable()
-                    || !s.shape.overlaps_circle(e.pos, e.radius())
-                    // 나는 박쥐에는 솟구치기가 닿지 않는다(0146).
-                    || (e.flying() && s.kind == crate::combat::StrikeKind::Emerge)
-                {
-                    continue;
-                }
-                e.last_hit_by = s.id;
-                // 콩이의 등딱지(0054): 발톱은 튕긴다(패링 거울). 솟구치기(아래 배)·드릴은 뚫고 연다.
-                // 강공격은 튕기지 않고 자세를 깬다(0168: 모으기 = 자세 깨기).
-                let guarded = e.guarding();
-                if guarded && matches!(s.kind, crate::combat::StrikeKind::Claw(_)) {
-                    e.shell_hit();
-                    shell_from = Some((e.pos, e.kind));
-                    continue;
-                }
-                let dir = (e.pos - origin).normalize_or_zero();
-                let dir = if dir == Vec2::ZERO {
-                    self.player.facing
-                } else if s.kind == crate::combat::StrikeKind::Drill {
-                    // 드릴은 앞으로 밀어 데려간다(옆으로 흩지 않는다).
-                    (self.player.facing * 1.6 + dir * 0.4).normalize()
-                } else {
-                    dir
+                // 닿나·튕기나·얼마나 밀리나는 적이 정한다(0170 R10). 월드는 결과로 연출·통계만.
+                let dir = match e.receive(&s, origin, self.player.facing) {
+                    enemy::Struck::Miss => continue,
+                    enemy::Struck::Deflected => {
+                        shell_from = Some((e.pos, e.kind));
+                        continue;
+                    }
+                    enemy::Struck::Hit { dir, broke_guard } => {
+                        if broke_guard {
+                            broke_at = Some(e.pos);
+                        }
+                        dir
+                    }
                 };
-                e.hurt(s.damage, dir, s.knockback, s.stun);
-                if guarded && e.alive {
-                    e.break_guard();
-                    broke_at = Some(e.pos);
-                }
                 if matches!(
                     s.kind,
                     crate::combat::StrikeKind::Claw(_) | crate::combat::StrikeKind::Heavy
@@ -1633,60 +1616,14 @@ impl World {
                 if s.kind == crate::combat::StrikeKind::Heavy {
                     self.stats.heavy_hits += 1;
                 }
-                if s.poison > 0.0 && e.alive {
-                    e.apply_poison(s.poison);
-                }
                 if s.finisher {
                     self.stats.finisher_hits += 1;
                 }
                 if s.kind == crate::combat::StrikeKind::Emerge {
                     self.stats.emerge_hits += 1;
                 }
-                self.juice.feel.add_hitstop(s.hitstop);
-                self.juice.feel.add_trauma(s.shake);
-                // 맞혔다는 확인(0168): 카메라를 맞힌 쪽으로 찬다. 박자·딱 맞춤이면 조금 더.
-                let kick = match s.kind {
-                    crate::combat::StrikeKind::Heavy => {
-                        t::KICK_HEAVY
-                            + if matches!(
-                                self.player.state,
-                                player::State::Heavy { perfect: true, .. }
-                            ) {
-                                t::KICK_BONUS
-                            } else {
-                                0.0
-                            }
-                    }
-                    crate::combat::StrikeKind::Claw(_) if s.finisher => {
-                        t::KICK_FINISHER
-                            + if self.player.on_beat {
-                                t::KICK_BONUS
-                            } else {
-                                0.0
-                            }
-                    }
-                    crate::combat::StrikeKind::Claw(_) => {
-                        t::KICK_LIGHT
-                            + if self.player.on_beat {
-                                t::KICK_BONUS
-                            } else {
-                                0.0
-                            }
-                    }
-                    crate::combat::StrikeKind::Emerge => t::KICK_FINISHER,
-                    _ => 0.0,
-                };
-                if kick > 0.0 {
-                    self.juice.feel.add_kick(dir, kick);
-                }
+                strike_feel(&mut self.juice.feel, &self.player, &s, dir);
                 hit_any = true;
-                if s.kind == crate::combat::StrikeKind::Heavy {
-                    self.juice.feel.flash = self.juice.feel.flash.max(t::HEAVY_HIT_FLASH);
-                    // 벽 쿵(0168): 강공격 넉백으로 벽에 박히면 한 번 더.
-                    if e.alive {
-                        e.slam = t::WALL_SLAM_DAMAGE;
-                    }
-                }
                 let hit_point = e.pos - dir * e.radius() * 0.5;
                 if (s.finisher || s.kind == crate::combat::StrikeKind::Emerge)
                     && impact_at.is_none()
@@ -1762,45 +1699,54 @@ impl World {
                 burst(&mut self.juice.fx, at, 14, SHELL, 130.0);
                 self.juice.toast = Some((|s| s.toast_guard_break, 2.0));
             }
-            let parry = self.player.parry_dir();
-            let mut parried = false;
-            for p in &mut self.projectiles {
-                if !p.alive || p.friendly || !s.shape.overlaps_circle(p.pos, p.radius()) {
-                    continue;
+            self.strike_projectiles(&s);
+            self.dig_mines(&s);
+        }
+    }
+
+    /// 타격이 투사체에 닿으면: 스윙 첫머리에 맞받으면 되돌리고(패링), 아니면 베어 없앤다.
+    fn strike_projectiles(&mut self, s: &Strike) {
+        let parry = self.player.parry_dir();
+        let mut parried = false;
+        for p in &mut self.projectiles {
+            if !p.alive || p.friendly || !s.shape.overlaps_circle(p.pos, p.radius()) {
+                continue;
+            }
+            // 스윙 첫머리에 맞받으면 되돌린다(패링), 아니면 베어 없앤다.
+            match parry {
+                Some(dir) if (-p.vel.normalize_or_zero()).dot(dir) > t::PARRY_FRONT => {
+                    p.vel = dir * p.vel.length() * t::PARRY_REFLECT_SPEED;
+                    p.friendly = true;
+                    parried = true;
                 }
-                // 스윙 첫머리에 맞받으면 되돌린다(패링), 아니면 베어 없앤다.
-                match parry {
-                    Some(dir) if (-p.vel.normalize_or_zero()).dot(dir) > t::PARRY_FRONT => {
-                        p.vel = dir * p.vel.length() * t::PARRY_REFLECT_SPEED;
-                        p.friendly = true;
-                        parried = true;
-                    }
-                    _ => {
-                        p.alive = false;
-                        self.juice.fx.push(ring(p.pos, 2.0, 8.0, 0.12, PROJECTILE));
-                    }
+                _ => {
+                    p.alive = false;
+                    self.juice.fx.push(ring(p.pos, 2.0, 8.0, 0.12, PROJECTILE));
                 }
             }
-            if parried {
-                self.parry_feedback();
+        }
+        if parried {
+            self.parry_feedback();
+        }
+    }
+
+    /// 발톱이 닿은 묻힌 도토리는 파낸다(터지지 않는다).
+    fn dig_mines(&mut self, s: &Strike) {
+        let before = self.hazards.mines.len();
+        let mut dug = Vec::new();
+        self.hazards.mines.retain(|m| {
+            let hit = s.shape.overlaps_circle(m.pos, 5.0);
+            if hit {
+                dug.push(m.pos);
             }
-            // 발톱이 닿은 묻힌 도토리는 파낸다(터지지 않는다).
-            let before = self.hazards.mines.len();
-            let mut dug = Vec::new();
-            self.hazards.mines.retain(|m| {
-                let hit = s.shape.overlaps_circle(m.pos, 5.0);
-                if hit {
-                    dug.push(m.pos);
-                }
-                !hit
-            });
-            if self.hazards.mines.len() < before {
-                self.juice.audio.play(sfx::Id::Claw(0));
-            }
-            for p in dug {
-                self.juice.fx.push(ring(p, 2.0, 8.0, 0.15, DIRT));
-                burst(&mut self.juice.fx, p, 6, DIRT, 70.0);
-            }
+            !hit
+        });
+        if self.hazards.mines.len() < before {
+            self.juice.audio.play(sfx::Id::Claw(0));
+        }
+        for p in dug {
+            self.juice.fx.push(ring(p, 2.0, 8.0, 0.15, DIRT));
+            burst(&mut self.juice.fx, p, 6, DIRT, 70.0);
         }
     }
 
@@ -1853,16 +1799,7 @@ impl World {
             let mut pull = None;
             if hurt_from.is_none() && !parried {
                 for e in &mut self.enemies {
-                    let enemy::State::Lash { time, dir } = e.state else {
-                        continue;
-                    };
-                    if time > 0.0 {
-                        continue;
-                    }
-                    let start = e.pos + dir * e.radius();
-                    let reach = self.room.ray_len(start, dir, 1.0, t::TOAD_TONGUE_REACH);
-                    if dist_to_segment(ppos, start, start + dir * reach) > pr + t::TOAD_TONGUE_WIDTH
-                    {
+                    if !e.tongue_reaches(&self.room, ppos, pr) {
                         continue;
                     }
                     let from = (e.pos - ppos).normalize_or_zero();
@@ -2904,17 +2841,6 @@ pub fn enemy_color(kind: Kind) -> Color {
     kind.species().color
 }
 
-/// 점에서 선분까지 거리.
-fn dist_to_segment(p: Vec2, a: Vec2, b: Vec2) -> f32 {
-    let ab = b - a;
-    let k = if ab.length_squared() > 1e-6 {
-        ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    (a + ab * k - p).length()
-}
-
 /// 밀쳐내기(0090): 솟구치기에 안 맞은 둘레의 잡몹을 피해 없이 바깥으로 민다. 가까울수록 세게. 보스는 버틴다.
 /// 같은 공격 번호(`id`)로 맞은 적은 이미 맞았으니 건너뛴다.
 /// `radius`: 미는 반지름(모은 힘만큼 넓다, 0158).
@@ -2943,6 +2869,33 @@ fn emerge_push(
             t::EMERGE_PUSH_KNOCKBACK * k,
             t::EMERGE_PUSH_STUN,
         );
+    }
+}
+
+/// 맞혔을 때의 손맛(0168): 멈춤·흔들림, 맞힌 쪽으로 카메라 킥(박자·딱 맞춤이면 조금 더), 강공격은 번쩍.
+fn strike_feel(feel: &mut Feel, player: &Player, s: &Strike, dir: Vec2) {
+    feel.add_hitstop(s.hitstop);
+    feel.add_trauma(s.shake);
+    let beat = if player.on_beat { t::KICK_BONUS } else { 0.0 };
+    let kick = match s.kind {
+        crate::combat::StrikeKind::Heavy => {
+            t::KICK_HEAVY
+                + if matches!(player.state, player::State::Heavy { perfect: true, .. }) {
+                    t::KICK_BONUS
+                } else {
+                    0.0
+                }
+        }
+        crate::combat::StrikeKind::Claw(_) if s.finisher => t::KICK_FINISHER + beat,
+        crate::combat::StrikeKind::Claw(_) => t::KICK_LIGHT + beat,
+        crate::combat::StrikeKind::Emerge => t::KICK_FINISHER,
+        _ => 0.0,
+    };
+    if kick > 0.0 {
+        feel.add_kick(dir, kick);
+    }
+    if s.kind == crate::combat::StrikeKind::Heavy {
+        feel.flash = feel.flash.max(t::HEAVY_HIT_FLASH);
     }
 }
 

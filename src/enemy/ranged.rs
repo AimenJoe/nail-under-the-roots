@@ -3,6 +3,19 @@
 use super::*;
 
 impl Enemy {
+    /// 두꺼비 혀(0146): 내민 틱에 혀 줄이 `ppos`(반지름 `pr`)에 닿나. 벽에 막히면 거기까지.
+    pub fn tongue_reaches(&self, room: &Room, ppos: Vec2, pr: f32) -> bool {
+        let State::Lash { time, dir } = self.state else {
+            return false;
+        };
+        if time > 0.0 {
+            return false;
+        }
+        let start = self.pos + dir * self.radius();
+        let reach = room.ray_len(start, dir, 1.0, t::TOAD_TONGUE_REACH);
+        combat::dist_to_segment(ppos, start, start + dir * reach) <= pr + t::TOAD_TONGUE_WIDTH
+    }
+
     /// 거리 두기(던지기·뛰기·혀·포자): 멀면 다가가고 가까우면 물러나며, 때가 되면 겨눈다.
     pub(super) fn tick_keep(&mut self, c: &mut Ctx<'_>) {
         let dt = c.dt;

@@ -145,3 +145,14 @@ pub fn apply_friction(vel: &mut Vec2, dt: f32) {
         *vel = Vec2::ZERO;
     }
 }
+
+/// 점에서 선분까지 거리.
+pub fn dist_to_segment(p: Vec2, a: Vec2, b: Vec2) -> f32 {
+    let ab = b - a;
+    let k = if ab.length_squared() > 1e-6 {
+        ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (a + ab * k - p).length()
+}
