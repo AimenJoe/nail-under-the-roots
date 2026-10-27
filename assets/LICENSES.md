@@ -2,9 +2,10 @@
 
 | 파일 | 출처 | 라이선스 | 비고 |
 |---|---|---|---|
-| `fonts/Galmuri11-Condensed.ttf` | [quiple/galmuri](https://github.com/quiple/galmuri) `dist/Galmuri11-Condensed.ttf` (2026-10-25) | SIL Open Font License 1.1 (폰트 파일 name 테이블과 레포 README에 명시) | 용량을 줄이려고 pyftsubset으로 글리프를 추려 담았다(ASCII, Latin-1, œ Œ Ÿ(프랑스어, 0084), 키릴·„ “ ‚ ‘ – —(러시아어·독일어, 0085), KS X 1001 한글 음절 2,350자·호환 자모, 화살표·도형 기호 일부). README의 "Legal Stuff"에 따르면 Galmuri11 Bold·Condensed는 모든 글리프가 제작자의 순수 창작이다(Regular 계열은 일부 글리프가 닌텐도 DS 폰트에서 유래). 그래서 Condensed를 골랐다. |
+| `fonts/Galmuri11-Condensed.ttf` | [quiple/galmuri](https://github.com/quiple/galmuri) `dist/Galmuri11-Condensed.ttf` (2026-10-25) | SIL Open Font License 1.1 (폰트 파일 name 테이블과 레포 README에 명시) | 용량을 줄이려고 pyftsubset으로 글리프를 추려 담았다(ASCII, Latin-1, œ Œ Ÿ(프랑스어, 0084), 키릴·„ “ ‚ ‘ – —(러시아어·독일어, 0085), 라틴 확장 A U+0100–017F(폴란드어 ą ć ę ł ń ś ź ż 등, 0144), KS X 1001 한글 음절 2,350자·호환 자모, 화살표·도형 기호 일부). README의 "Legal Stuff"에 따르면 Galmuri11 Bold·Condensed는 모든 글리프가 제작자의 순수 창작이다(Regular 계열은 일부 글리프가 닌텐도 DS 폰트에서 유래). 그래서 Condensed를 골랐다. |
 
-| `fonts/NailCJK-ja.ttf`, `fonts/NailCJK-zh-Hans.ttf` | [TakWolf/ark-pixel-font](https://github.com/TakWolf/ark-pixel-font) develop `816fb3cc6df3`(2026-10-25)의 12px 글자 원본 PNG | SIL Open Font License 1.1 (원문 `fonts/OFL-ArkPixel.txt`, 예약 폰트 이름 없음) | `tools/fonts/build_cjk.py`가 그 언어 표에 쓰인 글자만 뽑아 TTF로 다시 지은 수정본. OFL에 맞춰 이름을 바꿨다(Nail CJK 12 JA/SC). Ark는 제작자 창작(README). 표의 기호가 Ark에 없으면 Galmuri11 Condensed(OFL)에서 빌린다(지금은 없음) |
+| `fonts/NailCJK-ja.ttf`, `fonts/NailCJK-zh-Hans.ttf`, `fonts/NailCJK-zh-Hant.ttf`(번체, 대만 모양 zh_tw → zh_hant → 기본, 0144) | [TakWolf/ark-pixel-font](https://github.com/TakWolf/ark-pixel-font) develop `816fb3cc6df3`(2026-10-25)의 12px 글자 원본 PNG | SIL Open Font License 1.1 (원문 `fonts/OFL-ArkPixel.txt`, 예약 폰트 이름 없음) | `tools/fonts/build_cjk.py`가 그 언어 표에 쓰인 글자만 뽑아 TTF로 다시 지은 수정본. OFL에 맞춰 이름을 바꿨다(Nail CJK 12 JA/SC/TC). Ark는 제작자 창작(README). 표의 기호가 Ark에 없으면 Galmuri11 Condensed(OFL)에서 빌린다(지금은 없음) |
+| `fonts/NailCJK-zh-Hant.ttf`의 한자 일부(Ark에 없는 번체 한자, 0144) | [ACh-K/Cubic-11](https://github.com/ACh-K/Cubic-11) 俐方體11號 `fonts/web/Cubic_11.woff2`(레포 `4c566f7`, 2026-06-27, 폰트 버전 1.451) | SIL Open Font License 1.1 (원문과 원 고지 `fonts/OFL-Cubic11.txt`, 예약 폰트 이름 없음. Cubic 11은 JF Dot M+H 12·M+ BITMAP FONTS(자유 라이선스)에서 이어진 폰트) | `build_cjk.py`가 Ark에 없는 한자만 12px로 찍어(fusion-pixel-font와 같은 방법) Nail CJK 12 TC에 넣는다. 수정본이라 원래 이름을 쓰지 않는다 |
 | `fonts/OFL-ArkPixel.txt` | Ark Pixel 레포 `LICENSE-OFL` | — | Ark Pixel의 OFL 원문. 일본어·간체 폰트와 함께 배포 |
 | `art/nail.png` | 직접 그림. 원본 `tools/art/nail.py` | © 2026 Beardworks | Naïl 스프라이트 v2(idle·walk·attack·hurt·dead·흙더미·그림자 + 흰 실루엣) |
 | `art/nail_fur1~3.png` | 직접 그림. 원본 `tools/art/nail.py`(털 색만 바꿈) | © 2026 Beardworks | 털빛 잿빛·밤빛·모래빛(저널 보상, docs/decisions/0048) |
@@ -36,6 +37,7 @@
 | Kenney 효과음·Aureolus_Omicron 음악(`sfx/`·`music/`) | CC0 1.0 | 가능 | 지킬 것 없음. 크레딧은 고마움으로 남긴다(게임 크레딧 화면이 생기면 넣는다) |
 | Galmuri11 Condensed | SIL OFL 1.1 | 가능(게임에 넣어 판매 가능) | 폰트 파일만 따로 팔지 않는다. OFL 원문과 저작권 고지를 함께 배포 |
 | Ark Pixel 서브셋(NailCJK) | SIL OFL 1.1 | 가능 | 위와 같음. 수정본이라 원래 이름(Ark Pixel)을 폰트 이름으로 쓰지 않는다 |
+| 俐方體11號(Cubic 11, NailCJK TC 안) | SIL OFL 1.1 | 가능 | OFL 원문·원 고지(`fonts/OFL-Cubic11.txt`)를 함께 배포 |
 | Rust 크레이트 192개 | MIT·Apache-2.0·BSD·ISC·Zlib·Unlicense·Unicode-3.0(전부 허용형, GPL 등 카피레프트 없음) | 가능 | 저작권 고지와 라이선스 원문을 배포물에 포함(`THIRD_PARTY_LICENSES.txt`). 게임 안 크레딧 화면은 나중에 |
 | `web/mq_js_bundle.js`, `web/macroquad-gamepads-0.1.js` | MIT OR Apache-2.0 | 가능 | 위와 같음(고지 파일에 포함) |
 | Sunnyside World(레포 밖) | 작가 라이선스 V1(2026-10-25 페이지에서 원문 확인) | 가능 | 재포장·재판매 금지(수정해도), 튜토리얼·교육 외 재배포 금지, AI 학습 금지. 공개 레포에 넣지 않는다. 크레딧은 필수 아님(넣기로 함) |
