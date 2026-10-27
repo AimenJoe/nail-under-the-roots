@@ -5,11 +5,11 @@
 ## 0. 쓰는 법
 1. **모델**: Nano Banana 2.1(`gemini-nano-banana-2.1`)이 기본, 인물이 많은 장면은 Nano Banana Pro(`gemini-3-pro-image`). **Nano Banana 2 Lite는 쓰지 않는다**(참고 그림 여러 장·여러 번 고치기에 맞추지 않은 모델). 옛 Nano Banana(2.5 Flash Image)는 참고 그림 3장까지가 좋다. [1차]
 2. **참고 그림 한도**: 2.1은 캐릭터 4명까지 닮게, 물건 10개까지. Pro는 캐릭터 5명, 물건 6개, **그림체 참고 3장**. 한 장면에 넣는 캐릭터 그림은 이 안에서. [1차]
-3. **첨부 순서**: 캐릭터 그림(시트·초상화)만 넣는다. 비율이 다른 그림을 여러 장 넣으면 **마지막 그림의 비율**을 따르므로, 비율은 프롬프트 끝의 `Aspect ratio …`로 박는다(시트·장면 모두 글로 적은 비율로 나왔다). 구도 그림(`layout_*.png`)은 넣지 않는다(아래 3의 참고 그림, 0128). AI Studio·API처럼 비율을 고를 수 있으면 직접 고른다. [1차 + 직접 본 것]
-4. **해상도는 가장 크게**(2K·4K). 도트처럼 그려도 진짜 픽셀 격자가 아니다(한 점이 3~5px로 들쭉날쭉, 주기가 없다). 격자를 찾지 않고 게임 칸마다 가장 흔한 색을 고르는데(0125), 원본이 클수록 칸마다 점이 많아 고르기가 안정된다. [직접 본 것. "격자를 맞추라"는 도구 회사 글(2차)은 우리 그림에 맞지 않았다]
+3. **첨부 순서**: 캐릭터 그림(시트·초상화)만 넣는다. 비율이 다른 그림을 여러 장 넣으면 **마지막 그림의 비율**을 따르므로, 비율은 프롬프트 끝의 `Aspect ratio …`로 박는다(시트·장면 모두 글로 적은 비율로 나왔다). 구도 그림(`layout_*.png`)은 넣지 않는다(위 0-2 끝의 참고 그림, 0128). AI Studio·API처럼 비율을 고를 수 있으면 직접 고른다. [1차 + 직접 본 것]
+4. **해상도는 고를 수 있으면 가장 크게**(2K·4K, 지금 원본은 모두 1024px 폭). 도트처럼 그려도 진짜 픽셀 격자가 아니다(한 점이 3~5px로 들쭉날쭉, 주기가 없다). 격자를 찾지 않고 게임 칸마다 가장 흔한 색을 고르는데(0125), 원본이 클수록 칸마다 점이 많아 고르기가 안정된다. [직접 본 것. "격자를 맞추라"는 도구 회사 글(2차)은 우리 그림에 맞지 않았다]
 5. 프롬프트 = **[공통 스타일] + [세계 규칙] + [캐릭터] + [장면]**. 이어 붙여 영어로 넣는다(한국어도 지원 언어지만 이 문서의 글은 영어로 맞췄다). 낱말 나열보다 **장면을 문장으로 그리는 것**이 기본 원칙이다. [1차]
 6. **장면마다 새 대화.** 고치다 생김새가 흐트러지면 새 대화에서 자세한 설명과 함께 다시 시작한다. 한 번에 다 맞추려 하지 말고 짧게 고쳐 달라고 한다. 예: "Keep everything the same, but make Naïl smaller and move him to the left third." [1차]
-7. 나온 그림은 **원본 그대로** 넘겨 준다. 크기·격자·팔레트·안전 영역은 Claude가 맞춘다(아래 7).
+7. 나온 그림은 **원본 그대로** 넘겨 준다. 크기·팔레트는 `ai_illust.py`가 맞추고, 안전 영역은 프롬프트로 잡고 Claude가 확인한다(아래 7).
 
 ### 0-1. 먼저 캐릭터 시트(권장)
 > **용어**: 이 문서에서 "캐릭터 시트(character sheet)"는 늘 이 0-1 단계의 결과, 곧 그 캐릭터의 앞모습·3/4 모습 그림이다. "초상화(portrait)"는 0-2의 가슴 위 그림이다.
@@ -67,7 +67,7 @@ Edit the last attached image, the portrait of [이름]. Add only [고칠 것], c
 - **패닝하는 그림은 마지막 화면의 대화창 자리를 원본 높이 비율로 적는다**: `last_bloom`(640×440, 아래로 80 패닝)은 마지막 화면에서 대화창이 원본 높이 75% 아래를 덮는다. "위쪽 3분의 2"만 쓰면 이웃들이 61~93%에 서서 가려졌다(0130).
 - **반짝이는 "small round dots of light"로 적는다**: "sparkles"만 쓰면 ✦ 로고와 똑같은 네 꼭짓점 별이 그려져 로고처럼 보였다(`momo_bloom`, 0128).
 - 그림체를 더 맞추고 싶으면 Pro에서 초상화 하나를 그림체 참고로 더 넣는다(0-1 끝의 문장).
-- **구도 그림(`layout_*.png`)은 넣지 않는다**(0128). 지금 임시 일러스트라, 넣으면 모델이 그 어색한 모양까지 따라 그렸다(`great_tree` 셋째 판: 좌우 대칭·사다리꼴 줄기·번개 같은 실, `momo_bloom` 첫 판: 달걀 같은 몸·곧은 두 귀). 자리는 장면 글에("얼굴은 위쪽 3분의 2"), 비율은 `Aspect ratio …`로 적는다. 나노바나나가 고를 수 있는 비율로 받고 `ai_illust.py`가 게임 비율로 자른다(2:1 장면 → 21:9, 640×440 → 3:2).
+- **구도 그림(`layout_*.png`)은 넣지 않는다**(0128). 예전 코드 임시 일러스트라, 넣으면 모델이 그 어색한 모양까지 따라 그렸다(`great_tree` 셋째 판: 좌우 대칭·사다리꼴 줄기·번개 같은 실, `momo_bloom` 첫 판: 달걀 같은 몸·곧은 두 귀). 자리는 장면 글에("얼굴은 위쪽 3분의 2"), 비율은 `Aspect ratio …`로 적는다. 나노바나나가 고를 수 있는 비율로 받고 `ai_illust.py`가 게임 비율로 자른다(2:1 장면 → 21:9, 640×440 → 3:2).
 - 예전 `ref_*.png`(직접 그린 초상화를 4배로 키운 것)는 시트를 그릴 때만 썼다.
 
 ## 1. 공통 스타일 (모든 장면 앞에)
@@ -83,21 +83,21 @@ Layout: a landscape game screen. Faces and important things sit in the upper two
 World rules: The violet threads belong to Halmae, an ancient and lonely fungus grandmother who is afraid of being left alone. They are thin, softly glowing violet strands that wrap around tree roots. Tree roots are always brown wood, never purple; the violet threads only coil around them. Animals bound by the threads have small glowing eyes: red for the field mice, green for Momo the rabbit, amber for Doto the squirrel, and pale sky blue for Kongi the armadillo. When an animal is freed, its eyes return to their own gentle dark color and the threads loosen, fall away, and fade to white or sparkle.
 ```
 
-**실이 없는 장면**에서는 세계 규칙 바로 뒤에 이 문장을 붙인다: `There are no violet threads anywhere in this scene; all roots are clean, bare brown wood.` 세계 규칙의 "실은 뿌리를 감는다" 때문에 `mother_burrow` 첫 그림에서 집 굴 방의 뿌리마다 실이 거미줄처럼 감겼다(0126). 해당: `mother_burrow`, `molehill`, `sprout`, `last_bloom`(`cutscene-illustrations.md`에서 실이 나오지 않는 장면).
+**실이 없는 장면**에서는 세계 규칙 바로 뒤에 이 문장을 붙인다: `There are no violet threads anywhere in this scene; all roots are clean, bare brown wood.` 세계 규칙의 "실은 뿌리를 감는다" 때문에 `mother_burrow` 첫 그림에서 집 굴 방의 뿌리마다 실이 거미줄처럼 감겼다(0126). 해당: `mother_burrow`, `molehill`, `sprout`, `last_bloom`, `doto_memory`(흰 실만, `cutscene-illustrations.md`에서 실이 나오지 않는 장면).
 
 ## 3. 캐릭터 (장면에 나오는 사람만 이어 붙인다)
 | 이름 | 첨부 | 붙여 넣을 글 |
 |---|---|---|
-| Naïl | `ref_nail.png` | `Naïl: a tiny baby mole with no visible ears (a mole's ears are hidden in its fur), a round, fluffy brown body, a big pink snout, large pink front paws with cream claws, small shiny dark eyes with a white highlight, and a knitted red-orange scarf tied at the front. Match the attached reference of Naïl.` |
+| Naïl | `sheet_nail.png` | `Naïl: a tiny baby mole with no visible ears (a mole's ears are hidden in its fur), a round, fluffy brown body, a big pink snout, large pink front paws with cream claws, small shiny lavender eyes with a white highlight, and a knitted red-orange scarf tied at the front. Match the attached character sheet of Naïl.` |
 | 엄마 | `ref_mom.png` | `Naïl's mother: the same kind of mole but larger, with slightly darker brown fur, no scarf, and gentle closed eyes. Match the attached reference of the mother mole.` |
-| 보리 | `ref_bori.png` | `Bori: a plump, round old field-mouse elder with a big wide head and reddish-brown fur, big round ears with pink insides, a small scar on his forehead, a pink snout and a long pink tail; sturdy, tired and kind. Match the attached reference of Bori.` |
-| 모모(돌아옴) | `ref_momo_freed.png` | `Momo: a young European wild rabbit (a burrow rabbit with medium-length ears; one ear tip folds over), warm grey-brown fur, a cream chest and muzzle, big glossy dark eyes with small lashes, and a pink flower at the base of one ear. Match the attached reference of Momo.` |
+| 보리 | `sheet_bori.png` | `Bori: a plump, round old field-mouse elder with a big wide head and reddish-brown fur, big round ears with pink insides, a small scar on his forehead, a pink snout and a long pink tail; sturdy, tired and kind. Match the attached character sheet of Bori.` |
+| 모모(돌아옴) | `sheet_momo.png` | `Momo: a young European wild rabbit (a burrow rabbit with medium-length ears; one ear tip folds over), warm grey-brown fur, a cream chest and muzzle, big glossy lavender eyes with dark pupils with small lashes, and a pink flower at the base of one ear. Match the attached character sheet of Momo.` |
 | 모모(물듦) | `ref_momo_tainted.png` | `Momo while bound: the same rabbit with dusky plum-grey fur and glowing green eyes, violet threads coiled around her body. Match the attached reference.` |
-| 누룩 할매 | `ref_halmae.png` | `Halmae: an enormous, ancient fungus grandmother, a soft white cotton-like mycelium mound crowned with a cluster of tan mushroom caps, with a kind old face: closed eyes, rosy cheeks and a small smile. Her threads spread out in every direction, white with violet mixed in. Match the attached reference of Halmae.` |
-| 도토 | `ref_doto.png` | `Doto: a red squirrel with a huge fluffy tail and an acorn-cap hat, cheerful closed eyes. Match the attached reference of Doto.` |
-| 수수 | `ref_susu.png` | `Susu: a cute mole-cricket craftsman, a small digging insect drawn as a round, friendly animal: a big rounded, velvety brown thorax like a soft helmet, a small round head with two long thin antennae and big gentle eyes, a pair of large dark shovel-like front legs for digging, a short segmented abdomen, and brass goggles with round sky-blue lenses pushed up on his forehead. Match the attached reference of Susu.` |
+| 누룩 할매 | `sheet_halmae.png` | `Halmae: an enormous, ancient fungus grandmother, a soft white cotton-like mycelium mound crowned with a cluster of tan mushroom caps, with a kind old face: closed eyes, rosy cheeks and a small smile. Her threads spread out in every direction, white with violet mixed in. Match the attached character sheet of Halmae.` |
+| 도토 | `sheet_doto.png` | `Doto: a red squirrel with a huge fluffy tail and an acorn-cap hat, cheerful closed eyes. Match the attached character sheet of Doto.` |
+| 수수 | `sheet_susu.png` | `Susu: a cute mole-cricket craftsman, a small digging insect drawn as a round, friendly animal: a big rounded, velvety brown thorax like a soft helmet, a small round head with two long thin antennae and big gentle eyes, a pair of large dark shovel-like front legs for digging, a short segmented abdomen, and brass goggles with round sky-blue lenses pushed up on his forehead. Match the attached character sheet of Susu.` |
 | 콩이 | `sheet_kongi.png` | `Kongi: a small, chubby, cute armadillo with a soft pink face, belly and limbs, a domed banded grey shell on his back and a grey head plate, a long rounded pink snout, two tall pink ears, small gentle dark eyes and rosy cheeks. Match the attached character sheet of Kongi.` (확정한 시트가 귀가 길고 분홍이라 시트에 맞췄다. 예전 글 "짧고 뾰족한 귀"는 시트 전 것) |
-| 포포 | `ref_popo.png` | `Popo: a raccoon with grey fur, a black eye mask, a white muzzle and round ears, with a small trinket tucked behind one ear. Match the attached reference of Popo.` |
+| 포포 | `sheet_popo.png` | `Popo: a raccoon with grey fur, a black eye mask, a white muzzle and round ears, with a small trinket tucked behind one ear. Match the attached character sheet of Popo.` |
 
 ## 4. 장면
 비율은 나노바나나에서 고를 비율, 괄호는 게임 그림 크기(Claude가 잘라 맞춘다).
@@ -169,7 +169,7 @@ Scene: The entrance to the deepest place: a huge stone door in the darkness. The
 ```
 
 ### `title` (타이틀 바탕) — 16:9 (640×360)
-첨부: `sheet_nail.png`
+첨부: `sheet_nail.png`. 공통 스타일의 Layout 줄은 타이틀용으로 바꾼다(위에 제목, 가운데 메뉴, 0137).
 ```
 Scene (a game title screen background; the game draws the title text and menu on top): A cross-section of the earth, built in steps. First, the top third is a meadow at sunset with a distant lonely hill and two small village mounds; on the right, the trunk of a great tree rises out of frame. Then, below the ground line, dark layered soil: the great tree's brown roots spread down and to the left, and violet threads coil around the tips of the thickest roots. Finally, in the lower left, a tunnel leads down to a small burrow chamber where baby Naïl sleeps curled beside a jar of fireflies. Keep the top band of sky calm and simple for the title text, and keep the central area of the soil dark and even for the menu; put the interesting details (the tree, the burrow chamber) at the sides. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
 ```
@@ -188,9 +188,9 @@ Scene (a game title screen background; the game draws the title text and menu on
 - 다른 작가의 그림·화풍 이름("○○ 스타일")을 넣지 않는다.
 
 ## 7. 넣고 나서(Claude)
-1. 원본을 `tools/art/sources/ai/`에 넣고 `strip_logo.py`로 ✦를 원본에서 지운다(0133). `ai_illust.py`가 장면의 비율로 자르고, 게임 칸(그림 크기의 절반)마다 가장 흔한 색을 골라 2배로 키운다(격자는 찾지 않는다, 0125). 작은 캐릭터는 `FOCUS`에 자리를 적는다(0135·0137). 프롬프트로 격자를 맞추려 하지 않는다.
-2. 팔레트를 줄이고(디더 없이), 1px 체크 무늬가 생기면 단으로 정리한다(사양 2).
-3. 안전 영역(아래 112px)·색 약속(갈색 뿌리·보라 실·눈 색)을 다시 본다.
+1. 원본을 `tools/art/sources/ai/illust/<장면>.png`(초상화는 `sources/ai/`)에 넣고 `python3 tools/art/strip_logo.py <파일>`로 ✦를 원본에서 지운 뒤(0133) `python3 tools/art/illust.py assets/art/illust <장면>`으로 만든다. `ai_illust.py`가 장면의 비율로 자르고, 게임 칸(그림 크기의 절반)마다 가장 흔한 색을 골라 2배로 키운다(격자는 찾지 않는다, 0125). 작은 캐릭터는 `FOCUS`에 자리를 적는다(0135·0137). 프롬프트로 격자를 맞추려 하지 않는다.
+2. 팔레트는 `ai_illust.py`가 줄인다(채도 높은 색·나머지·FOCUS, 디더 없음). 2×2 점이라 1px 체크 무늬는 생기지 않는다.
+3. 안전 영역(대화창 y 248 아래, 내레이션 y 264 아래)·색 약속(갈색 뿌리·보라 실·눈 색)을 다시 본다.
 4. `assets/LICENSES.md`에 출처(모델·날짜·만든 사람)를 적고, 개발 → "이야기 일러스트"로 배율 2·3에서 본다.
 5. 초상화(`tools/art/ai_portraits.py`): 선이 검게 나오면 프롬프트로 다시 그리지 말고 자두빛으로 옮긴다(모모, 0110). 배경을 지운 미리보기는 **실제 바탕(어두운 대화창)**에서 본다. 밝은 바탕에서는 배경색과 비슷한 크림색 가슴이 지워진 것이 안 보였다(0110).
 

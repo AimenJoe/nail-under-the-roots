@@ -4,8 +4,8 @@
 
 - 공식 페이지: https://aimenjoe.github.io/nail-under-the-roots/ (원본 `site/`, `pages.yml`이 GitHub Pages에 올린다, docs/decisions/0069). 게임은 https://nail-under-the-roots.netlify.app
 - 컨셉: [`docs/concept.md`](docs/concept.md)
-- 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md) (끝의 "구현 상태"·"사람이 할 일"이 현재 위치. 다음 마일스톤은 `docs/decisions/0079`)
-- 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 캐릭터·대체 타일은 직접 그림(원본 `tools/art/*.py`, `python3 tools/art/<이름>.py`로 PNG 재생성 — nail·critters·chief·portraits·tiles·illust, 앱 아이콘은 `tools/icons/make_icons.py`). 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
+- 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md) (끝의 "구현 상태"·"사람이 할 일"이 현재 위치. 지금 마일스톤은 `docs/decisions/0081`(v0.3.0), 버전 규칙은 0079)
+- 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 스프라이트·대체 타일은 직접 그림(원본 `tools/art/*.py`, `python3 tools/art/<이름>.py`로 PNG 재생성 — nail·critters·chief·tiles). 초상화·일러스트·타이틀은 나노바나나 원본(`tools/art/sources/ai/`)을 `ai_portraits.py`·`ai_illust.py`가 옮긴다(`portraits.py`·`illust.py`가 부름, 새 원본은 먼저 `strip_logo.py`). 앱 아이콘은 `tools/icons/make_icons.py`. 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
 - 결정 기록: [`docs/decisions/`](docs/decisions/)
 - 지식 베이스: [AimenJoe/KB](https://github.com/AimenJoe/KB) (`maps/gamedev.md`)
 - 저작권: © 2026 Beardworks. 코드·직접 그린 그림·글은 Beardworks 소유(레포는 공개지만 오픈소스 라이선스를 붙이지 않았다 = 모든 권리 보유). 폰트·의존성은 각자의 라이선스(`assets/LICENSES.md`, `assets/THIRD_PARTY_LICENSES.txt`)
@@ -37,15 +37,15 @@ python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 | 재시작 | 메뉴 → 다시 시작 | 메뉴 → 다시 시작 |
 | 메뉴(일시정지) | Esc | Start |
 | 메뉴 탐색 | 방향키·WASD, Enter/Space 확인, Esc 뒤로, Q/E 탭 | D-pad·스틱, A 확인, B 뒤로, LB/RB 탭 |
+| 디버그 | F1 오버레이, F2 히트박스, F3 글자 넘침 검사(개발 빌드) | — |
 
 게임 동작(공격~지도)은 설정 → 조작 설정에서 바꿀 수 있다. 웹에서는 브라우저에 저장된다(docs/decisions/0022).
-| 디버그 | F1 오버레이, F2 히트박스 | — |
 
 흐름: 인트로 → 타이틀(시작하기·이어하기·오늘의 굴·앨범·설정·개발) → 슬롯 고르기(0078) → (오프닝 컷씬) → 게임. 게임 중 메뉴를 열면 탭 여섯 개(메뉴·상태·가방·저널·도감·지도).
 
 - **장비**: 캐릭터마다 무기 종류가 다르다. Naïl은 발톱 — 새싹(가벼움, 4연타)·두더지(기본)·바위(무거움, 2연타)·독. 메뉴 → 가방에서 확인으로 장착(docs/decisions/0011).
 - **무기 획득**: 처음엔 맨손. 튜토리얼에서 두더지 발톱을 줍고, 이후는 스토리(컷씬 `Give`·바닥 획득물)를 따라 하나씩(docs/decisions/0012). 개발 시나리오 "발톱 4종 비교"는 넷 다 들고 시작.
-- **초상화**: 대화창에 2배 밀도 도트 초상화(Naïl 표정 4, 정체 모를 이웃). 원본 `tools/art/portraits.py`(docs/decisions/0015).
+- **초상화**: 대화창에 88×88 2배 밀도 초상화. 아홉 캐릭터 열세 묶음(물든 모습 포함), 나노바나나 원본(`tools/art/sources/ai/`)을 `ai_portraits.py`가 칸에 끼운다(0108~0122). 틀·남은 칸은 `portraits.py`(0015).
 - **장신구·퀵 아이템**: 능력치 = 무기 + 장신구 2칸(체력·공격 속도·굴파기 대기·공격력·분노 충전) + 뿌리 심장(최대 체력 영구 +1). 산딸기(체력 1)·쥬시 지렁이(체력 가득, 들고 있다가 쓰러지면 저절로 일어남 = 목숨, 최대 3)는 가방에 모아 I/Y로 먹고 Q·E/LB·RB로 넘긴다(docs/decisions/0017). 상태 탭에 능력치가 숫자로.
 - **적 = 물든 이웃**: 들쥐·생쥐 떼·시궁쥐(돌격), 다람쥐(도토리), 청설모(뛰어 덮치기). 종류 표는 `src/species.rs`, 그림은 `tools/art/critters.py`. 메뉴 → 도감에 만난 이웃이 말로 된 능력(체력·힘·빠르기)과 이야기·요령으로 적힌다(docs/decisions/0021). 개발 시나리오 "적 다섯 종".
 - **공격 예고**: 적이 공격을 준비하면 맞을 자리(돌진 길·도토리 줄·착지 고리)가 바닥에 붉게, 공격 순간이 가까울수록 진하게 깜빡인다(docs/decisions/0025).
@@ -68,7 +68,7 @@ python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 ```sh
 cargo fmt --all -- --check
 cargo clippy --target wasm32-unknown-unknown -- -D warnings
-cargo test                                        # 규칙 테스트(무브셋·독)
+cargo test                                        # 단위·규칙 테스트(무브셋·번역·폰트 글자·지도·굽기·패드 키 등)
 cargo build --release --target wasm32-unknown-unknown
 cargo check --target aarch64-linux-android
 python3 tools/licenses.py                         # 의존성을 바꿨을 때만: 고지 파일 다시 만들기
@@ -82,8 +82,8 @@ python3 tools/licenses.py                         # 의존성을 바꿨을 때�
 - `main`에 push하면 `deploy-web.yml`이 wasm을 빌드하고, 레포 Secrets에 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`가 있으면 배포한다. 시크릿이 없으면 빌드 검증만. Netlify 사이트는 **Git 연동 없이**(Deploy manually) 만든다. 이유와 절차: KB `guides/macroquad-wasm-netlify-github-actions.md`.
 
 ### Android (APK)
-- `build-android.yml`이 `src/`·`Cargo.*`가 바뀐 push마다 `cargo quad-apk build --release`로 **디버그 키 서명 APK**를 만들어 Actions 아티팩트(`nail-apk-<sha>`)로 올린다. Actions 탭 → 해당 실행 → Artifacts에서 받는다.
-- `v*` 태그를 push하면 같은 APK가 GitHub Release에 첨부된다: `git tag v0.1.0 && git push origin v0.1.0`.
+- `build-android.yml`이 `src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`가 바뀐 push마다 `cargo quad-apk build --release`로 **디버그 키 서명 APK**를 만들어 Actions 아티팩트(`nail-apk-<sha>`)로 올린다. Actions 탭 → 해당 실행 → Artifacts에서 받는다.
+- 보통은 아래 "릴리스 = 버전 올리기"(`release.yml`)로 낸다. 손으로 `v*` 태그를 push해도 같은 APK가 Release에 붙는다(세션 프록시는 태그 push를 받지 않는다).
 - 실기 설치: 아티팩트 **zip을 풀어** 안의 `nail.apk`만 설치한다(`nail.apk.idsig`는 무시). `adb install -r nail.apk` 또는 사이드로드(알 수 없는 출처 허용). arm64 전용, Android 8.0+.
 - **제3자 에셋(Sunnyside)**: 원본은 `assets/vendor/`(gitignore). CI는 비공개 레포 `AimenJoe/nail-assets`를 Secrets `ASSETS_REPO`(=`AimenJoe/nail-assets`)·`ASSETS_TOKEN`(그 레포만 Contents 읽기, fine-grained 토큰, 만료 최대 1년)으로 받는다. 팩에서 새 파일을 쓰면 `src/art.rs` 경로와 같은 자리로 `nail-assets`에도 올린다. 토큰이 만료되면 빌드는 직접 그린 그림으로 돌아간다(실패하지 않는다).
 - **릴리스 = 버전 올리기**: `Cargo.toml`의 `version`(과 `[package.metadata.android]`의 `version_code`)을 올리고 `docs/releases/v<버전>.md`(릴리스 본문)를 함께 main에 push하면 `release.yml`이 태그 `v<버전>`을 만들고 `build-android`를 불러 APK를 GitHub Release에 붙인다. 태그가 이미 있거나 본문이 없으면 아무것도 안 한다. Actions 탭에서 `release`를 손으로 돌려도 된다. 손으로 `v*` 태그를 push해도 예전처럼 Release가 생긴다(본문 파일은 있어야 한다).

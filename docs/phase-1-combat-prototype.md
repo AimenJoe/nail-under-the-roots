@@ -43,15 +43,15 @@
 - 웹 빌드가 Netlify에 배포되어 링크로 열린다(CI는 이미 준비됨, Netlify 시크릿만 등록).
 - 손맛 수치가 `tuning.rs`에 정리되고, 결정 사항이 `docs/decisions/`에 기록.
 
-## 구현 상태 (2026-10-24, 표는 2026-10-26 v0.1.17까지)
-코드는 전부 들어갔다. **판정: 통과**(2026-10-25 사장 "판정 및 손맛은 좋은 편이야, 지금 이대로도"). 수치는 지금 값을 기준으로 둔다. 본인 외 한 명 더는 아직이다.
+## 구현 상태 (2026-10-24, 표는 2026-10-27 v0.2.0 + 0139까지)
+코드는 전부 들어갔다. **판정: 통과**(2026-10-25 사장 "판정 및 손맛은 좋은 편이야, 지금 이대로도"). 수치는 지금 값을 기준으로 둔다. 본인 외 한 사람도 판정했다(2026-10-26, 1·4 동의, 2·3 약함 → 0090). 2·3 다시 묻기가 남았다.
 
 | 항목 | 위치 | 비고 |
 |---|---|---|
 | 고정 타임스텝 60Hz + 가변 렌더(보간) | `src/main.rs`, `world.rs` | 눌림은 `input.rs` 래치에 모아 틱이 소비. 히트스톱·일시정지 중엔 보간 prev를 현재로 맞춰 미끄러짐 방지 |
 | 모듈 분리 | `input` `player` `enemy` `combat` `room` `render` `world` `tuning` `sfx` | `world`는 틱 순서를 엮는 곳, `sfx`는 임시 합성음(명세 밖 추가) |
 | 발톱 3연타 | `player.rs` | 활성 구간이 끝나면 버퍼된 입력으로 다음 타가 바로 이어짐. 3타 뒤 추가 경직 0.14초. 스윙 시작 시 전방 전진(lunge) |
-| 굴파기 | `player.rs`, `input.rs`(dodge_held) | 명세대로(누르고 있기 0101). 솟구침은 투사체도 지운다(추가). 쿨다운 바를 HUD 오른쪽 위에 표시 |
+| 굴파기 | `player.rs`, `input.rs`(dodge_held) | 명세에서 바꿈: 솟구침 반지름 22·직후 공격 불가 0.06초·밀쳐내기 44(0090), 누르고 있기(0101). 솟구침은 투사체도 지운다(추가). 쿨다운 바를 HUD 오른쪽 위에 표시 |
 | 적(물든 이웃) | `enemy.rs`, `species.rs`, `tools/art/critters.py` | 그림 v2: 종마다 기본 자세를 손으로 찍고 동작은 옮기기·몇 점 바꾸기(v1 타원 쌓기는 얼룩져 안 읽혔다). 다섯 종: 들쥐·생쥐 떼·시궁쥐(돌격 셋), 다람쥐(도토리), 청설모(웅크렸다 뛰기, 착지 고리). 종류 표 = 수치·도감 글. 쥐가 절반 넘게 뽑힘. 개발 시나리오 "적 다섯 종"(docs/decisions/0021) |
 | 내 캐릭터 구별 | `tools/art/critters.py`(taint), `render.rs`(draw_player_halo) | 물든 적은 털색을 보라 쪽 + 어둡게, 외곽선 차갑게. Naïl은 따뜻한 색 그대로 + 발밑 빛 고리(천천히 숨 쉼). 흑백으로 봐도 Naïl이 더 밝다 |
 | 떨어진 것 | `loot.rs`(bounds), `adventure.rs`(loot_bounds, push_loot) | 던전에서는 떨어진 방 안쪽에서만 구른다(문 칸으로 굴러가 주우려다 옆 방으로 넘어가던 문제) |
@@ -69,15 +69,15 @@
 | 장비 | `equipment.rs`, `moveset.rs` | 캐릭터별 무기 종류. Naïl은 발톱 4종(새싹·두더지·바위·독), 가방에서 장착, 독 지속 피해. 규칙은 `cargo test`(docs/decisions/0011) |
 | 무브셋 | `moveset.rs` | 콤보를 데이터로(발톱 3타, 실험용 무거운 2타). 타별 회피 캔슬 창 `dodge_cancel_after`. 개발 시나리오 "무거운 무기"로 비교(docs/decisions/0009) |
 | 튜토리얼 | `tutorial.rs`, `cutscene.rs`(popo_talk), `world.rs`(npc) | 라쿤 포포의 9단계: 이동·발톱·3연타·굴파기·솟구치기·패링(30초면 넘김)·필살기·아이템·메뉴 안내. 단계마다 대화 + "[n/9]" 힌트(지금 버튼 이름), 연습 중 체력 그대로(docs/decisions/0023). 헤드리스 Chromium으로 오프닝 → 포포 → 1~3단계 확인 |
-| 개발 시나리오 | `scenario.rs` | 타이틀 "개발"(dev feature). 빈 방, 돌격형 1/3, 원거리형 1, 1+1, 웨이브 3부터, 오프닝 컷씬. 판정 2(적 3마리)는 "돌격형 3마리"로 바로 들어간다 |
+| 개발 시나리오 | `scenario.rs` | 타이틀 "개발"(dev feature). 빈 방, 들쥐 1/3마리, 다람쥐 1마리, 1+1, 웨이브 3부터, 오프닝 컷씬 외 보스·장소·이야기 일러스트들. 판정 2(적 3마리)는 "들쥐 3마리"로 바로 들어간다 |
 | 컷씬 | `cutscene.rs` | JRPG식 대화창·배우 이동·페이드·건너뛰기. 오프닝: 물든 모모(이름표 "???", 초상화 차가움·괴로움, 스프라이트)가 길을 막는다(docs/decisions/0008, 0029) |
-| 게임 틀 | `app.rs`, `ui.rs` | 인트로 → 타이틀(시작·설정) → 게임 ⇄ 일시정지(메뉴·상태·가방·저널·지도). 커서 없는 탐색 + 탭/클릭 보조. 한글 픽셀 폰트. 탭 여섯(메뉴·상태·가방·저널·도감·지도). 처음엔 가방·지도가 틀만, 저널이 튜토리얼 퀘스트 4개였다(0007) — 지금 내용은 아래 저널·장비·지도 줄 |
+| 게임 틀 | `app.rs`, `ui.rs` | 인트로 → 타이틀(시작·이어하기·오늘의 굴·앨범·설정·개발) → 게임 ⇄ 일시정지(메뉴·상태·가방·저널·지도). 커서 없는 탐색 + 탭/클릭 보조. 한글 픽셀 폰트. 탭 여섯(메뉴·상태·가방·저널·도감·지도). 처음엔 가방·지도가 틀만, 저널이 튜토리얼 퀘스트 4개였다(0007) — 지금 내용은 아래 저널·장비·지도 줄 |
 | 글자 성능 | `ui.rs`(glyph_plan, warm), `render.rs`(present) | 픽셀 폰트를 원래 12 물리 px(정수배)로 굽고 정수배로 키움 + 언어를 정할 때 그 언어 글자를 한 번에 미리 굽기. 대화 중 텍스처 올리기 160MB → 0(헤드리스 측정). 화면은 수정 전과 픽셀 단위로 같음. Safari 버벅임 대응(실기 확인은 사람) |
 | 다국어 | `i18n.rs`, `ui.rs`, `tools/fonts/`, `web/index.html` | 처음 다섯(한국어·영어·일본어·간체·브라질 포르투갈어, 0033) → 지금 아홉(+프랑스어·스페인어 0084, 독일어·러시아어 0085) 표, 언어별 폰트(일·중은 Ark Pixel 서브셋), 기기 선호 목록으로 시작, 설정에서 전환, 가짜 언어 Pseudo. CJK 줄바꿈(금칙)·넘침 대비(fit·탭 여백). 폰트 글자·자리표시자 테스트(docs/decisions/0013, 0014). 번역은 직접 쓴 초안(원어민 검수 전) |
-| 초상화 | `tools/art/portraits.py`, `art.rs`, `render.rs`(draw_portrait), `cutscene.rs`(Face) | 88×88, 게임 픽셀의 2배 밀도. Naïl 보통·기쁨·걱정·결의, 이웃은 그림자(docs/decisions/0015). 홀수 배율에서도 칸을 꽉 채운다(0111) |
+| 초상화 | `tools/art/portraits.py`, `art.rs`, `render.rs`(draw_portrait), `cutscene.rs`(Face) | 88×88, 게임 픽셀의 2배 밀도. 아홉 캐릭터 열세 묶음(나노바나나, 0107~0122), 그림자는 칸 4만 남김(docs/decisions/0015). 홀수 배율에서도 칸을 꽉 채운다(0111) |
 | 반딧불·산딸기 | `loot.rs`, `world.rs`(drop_loot), `render.rs`(draw_loot, HUD) | 화폐(자석·HUD·상태 탭), 회복(불운 보정), 최대 체력 5, 줍는 소리(음 올라감). 개발 시나리오 "떨어지는 것 확인"(docs/decisions/0016) |
-| 능력치·장신구 | `equipment.rs`(Stats, CHARMS), `app.rs`(가방 끼기/빼기, 상태 탭) | 장신구 5종 2칸, 생명의 씨앗, 공격 속도 = 스윙 시계 배율(docs/decisions/0017) |
-| 퀵 아이템 | `items.rs`, `player.rs`(State::Eat), `world.rs`(start_eating, finish_eating, revive), `render.rs`(퀵 슬롯·draw_eating) | 산딸기 1칸 회복, 쥬시 지렁이 가득 회복 + 목숨(최대 3), I·Y 먹기, Q·L1 넘기기. 먹는 시간 0.35초(맞으면 끊김, 굴파기로 끊기) + 먹기 대기 1.5초, 슬롯 덮개·터치 테두리(0038) |
+| 능력치·장신구 | `equipment.rs`(Stats, CHARMS), `app.rs`(가방 끼기/빼기, 상태 탭) | 장신구 8종(기본 5 + 저널 3) 2칸, 생명의 씨앗, 공격 속도 = 스윙 시계 배율(docs/decisions/0017) |
+| 퀵 아이템 | `items.rs`, `player.rs`(State::Eat), `world.rs`(start_eating, finish_eating, revive), `render.rs`(퀵 슬롯·draw_eating) | 산딸기 1칸 회복, 쥬시 지렁이 가득 회복 + 목숨(최대 3), I·Y 먹기, Q·E / LB·RB 넘기기. 먹는 시간 0.35초(맞으면 끊김, 굴파기로 끊기) + 먹기 대기 1.5초, 슬롯 덮개·터치 테두리(0038) |
 | 필살기 | `player.rs`(State::Drill/Recover), `world.rs`, `render.rs`(trail·super dim), `sfx.rs`(engine) | 분노 게이지. 시동 0.3초(적 정지·화면 어둡게) → 화면 한 폭 돌진(≈320px), 연타로 벽까지 끌고 가 쾅(번쩍임). 엔진음 하나. 단위 테스트(docs/decisions/0018, 0024) |
 | 모험(필드·던전) | `adventure.rs`, `map.rs`, `field.rs`, `dungeon.rs`, `room.rs`(격자), `render.rs`(draw_grid_art) | 연속 스크롤 필드, 자는 적, 저장 지점, 굴 입구 → 생성 던전(문 잠금·보물·휴식·보스·출구), 밀기 전환, 지도 탭, 저장 지점 부활. 단위 테스트(docs/decisions/0019) |
 | Android 패드 버튼 | `third_party/miniquad`(패치, `[patch.crates-io]`), `input.rs`(Pad::key·read_gamepads) | 패드 버튼 키코드 → F13~F25, 동작은 Bindings, 메뉴 A/B(뒤로)/Start/LB·RB, 다시 붙이기. 스틱은 Android가 바꿔 준 D패드 키(디지털). 패치 표 = Pad::key 테스트(0075) |
@@ -88,9 +88,9 @@
 | 특수효과(0081) | `world.rs`(FxKind Puff·Clod·Glint·Thread, puff·clods·spray·unravel, 발걸음), `render.rs`(draw_fx, draw_ambient, draw_world_lights) | 먼지·흙덩이·맞은 쪽 불똥·쓰러진 이웃의 보라 실·반짝임, 환경 입자, 더하기 빛(반딧불·모닥불·빛 버섯) |
 | 음악 바탕(0081) | `music.rs`, `app.rs`(music_track, 설정 음악 줄), `prefs.rs`(칸 18), `sfx.rs`(같은 소리 30ms) | 장소마다 곡·1초 교차·대사/창에서 낮춤 |
 | 공격 동작(0082) | `tools/art/nail.py`(bob·windup·settle, 줄 1 칸 9개), `render.rs`(draw_nail 단계, draw_claw_marks sweep) | 들기 → 치기 → 거두기, 1·2타 가까운 발·먼 발 번갈아, 마지막 타 두 발 + 윗몸 내리찍기, 발톱 자국도 번갈아(마지막은 X) |
-| 타이틀 바탕(0083) | `tools/art/illust.py`(title), `art.rs`(Art::title), `render.rs`(draw_title_art), `app.rs`(타이틀·슬롯·설정 창) | v2: 어둠 속 땅의 단면(빛 셋 — 굴 방 병·해 진 하늘·깊은 보라 — 앞의 실루엣), 굴 방 비네트, 잡음으로 흔든 굴·입구, 흐르는 안개 두 겹·반딧불·보라 알갱이 |
+| 타이틀 바탕(0083) | `tools/art/illust.py`(title), `art.rs`(Art::title), `render.rs`(draw_title_art), `app.rs`(타이틀·슬롯·설정 창) | 지금은 나노바나나 해 질 녘 땅의 단면(0137) + 흐르는 안개 두 겹·반딧불·보라 알갱이. v2 코드 그림(어둠 속 단면·굴 방 비네트)은 원본이 없을 때만 |
 | 프랑스어·스페인어(0084) | `i18n.rs`(FR·ES 표, `Lang::Fr`·`Es`, `fr-*`·`es-*`), `prefs.rs`(언어 값 6·7), `assets/fonts/Galmuri11-Condensed.ttf`(+œŒŸ) | 일곱 언어. 헤드리스로 여섯 화면 넘침 확인·수정 |
-| 콩이의 문·독일어·러시아어(0085) | `illust.py`(kongi_door), `illust.rs`(KongiDoor), `cutscene.rs`(kongi_returns), `app.rs`(앨범 5칸·두 줄 굴리기), `i18n.rs`(DE·RU, kongi_door), `prefs.rs`(8·9) | 콩이가 지키던 문의 컷씬 그림(실루엣 방식)·내레이션, 앨범 스크롤, 아홉 언어 |
+| 콩이의 문·독일어·러시아어(0085) | `illust.py`(kongi_door), `illust.rs`(KongiDoor), `cutscene.rs`(kongi_returns), `app.rs`(앨범 5칸·두 줄 굴리기), `i18n.rs`(DE·RU, kongi_door), `prefs.rs`(8·9) | 콩이가 지키던 문의 컷씬 그림(지금은 나노바나나, 0136)·내레이션, 앨범 스크롤, 아홉 언어 |
 | 소리 파일(0081) | `tools/audio/make_audio.py`, `assets/sfx`·`assets/music`, `sfx.rs`(FILES·변형), `music.rs`(TRACKS·들을 때 읽기·KEEP), `app.rs`(menu_sound) | CC0 효과음(Kenney: 메뉴·사기·안 됨·맞음·쓰러짐·다침·상자)·음악 7곡(Aureolus_Omicron). 웹 헤드리스로 받기·재생·고리 확인, 네이티브 실제 소리는 미확인 |
 | 패링 | `player.rs`(parry_dir), `world.rs`(parry_feedback) | 스윙 첫 0.12초 앞쪽: 돌진 경직, 투사체 반사, SP +4(docs/decisions/0020). 창이 열린 뒤 0.45초는 새 창 없음(연타 방지), 성공하면 바로(0038) |
 | 스테이지 고리 | `adventure.rs`, `camp.rs`, `route.rs`, `dungeon.rs`(Params), `app/stage.rs` | 필드 → 공터 보스 → 쉼터 → 길 지도(층 3 + 보스, 엇갈리지 않는 갈래, 다음 층만 보임) → 굴(굴·둥지·저장고·샘·보스) → 다음 쉼터. 쉼터: 체력 가득·저장 고리·포포 가게(씨앗)·보리·빈 자리, 공격 버튼 = 말 걸기. 쓰러지면 쉼터, 길은 새로. 단위 테스트(길 규칙 3, 고리 2)(docs/decisions/0030, 0031) |
@@ -100,22 +100,22 @@
 | 실의 꿈(0055) | `dream.rs`(보스 넷·열림·기록 키), `app/dream.rs`(고르기 창·꿈 싸움·깨어나기·HUD), `village.rs`(X), `adventure.rs`(Interact::Dream), `render.rs`(실 고리), `world.rs`(dream: 떨어뜨리지 않음) | 마을 할매 곁 실 고리에서 이긴 길의 주인과 빈 방에서 다시 싸움(모모는 세 번째 모습), 가장 빠른 기록·★(안 맞고 이김), 넷 다 이기면 이어서 꾸기, 얻는 것 없음, 저널 둘 |
 | 콩이 보스(한 번) | `enemy.rs`(Kongi·Guard·kongi_next·shell_hit·break_guard·on_parried), `species.rs`(KONGI), `world.rs`(등딱지 튕김·열기), `player.rs`(recoil), `adventure.rs`(KongiIntro·KongiBeaten), `app/stage.rs`(kongi_beaten), `cutscene.rs`(kongi_meet·kongi_returns), `tools/art/critters.py`(KONGI)·`portraits.py`(칸 35~37) | 셋째 길 끝방. 구르기(벽에 튕기고 어질어질) ↔ 웅크려 버티기(발톱은 튕기고 바로 굴러 옴 — 패링 거울), 솟구치기·드릴로 등딱지 열기, 패링하면 구르기 멈춤. 이기면 바위 발톱(런마다 가방에), 마을 바위 곁, 저널 "깊은 곳의 문", 도감 목록 넘기기(0054) |
 | 지도 그림(0062·0063) | `terrain.rs`(굽기·장식 자리·흙길), `render.rs`(구운 지도 + 바뀌는 칸), `dungeon.rs`(shape_room·KEEP) | 장소가 바뀔 때 지도를 한 장으로 굽는다: 잡음으로 물결치는 둥근 벽 윤곽, 3/4 벼랑(지층·뿌리·늘어진 잎)과 윗면(덤불·뿌리·돌), 바닥 큰 띠·반대 재질 얼룩·던전 흙길·그늘, 무리 지은 장식. 던전 방은 모서리·가장자리 혹·바위 무리로 굴처럼(문 앞 길·적 자리 보호, 이어짐 검사). 마을 큰 나무는 깨울 재주가 있으면 빛난다(0061). 굽기는 `terrain::Baker`로 프레임마다 12ms씩 나눠 하고 그동안 화면 검정·월드 틱 멈춤, 최근 장소 세 장은 남긴다(0068, 브라우저 가장 긴 프레임 133~150ms → 33ms) |
-| 모모 플레이어블(0056) | `equipment.rs`(Character::Momo·WeaponKind::Kick·뒷발), `moveset.rs`(KICKS), `player.rs`(kit·Hop·Chain·stomp), `tuning.rs`(HOP_*·CHAIN_*), `app/pick.rs`(누구와 내려갈까), `app/stage.rs`(뿌리 길·reach_deepest), `cutscene.rs`(ending_momo·플레이어 배우), `illust.py`(momo_deep), `render.rs`(draw_momo_player) | 모모가 돌아온 뒤 마을 뿌리 길에서 Naïl/모모를 고름. 같은 버튼에 뒷발 3타·깡충(무적)·이어 뛰기(세 번 밟기), 발톱은 줍지 않음. 깬 수·실뜨기는 캐릭터마다, 모모 런은 모모 보스 없음, 가장 깊은 곳 → 모모 장면(`momo_deep`, 엔딩 깃발과 따로), 포포·할매 한마디, 저널 "꽃잎을 따라", 앨범 10장 |
-| 작은 것들(0053) | `camp.rs`(z), `cutscene.rs`(susu_meet·Portrait::SUSU), `app/stage.rs`(수수 말 걸기), `illust.rs`·`tools/art/illust.py`(doto_memory), `knots.rs`(6~10), `story.rs`(TalkDoto·진행 줄), `tools/art/critters.py`(SUSU)·`portraits.py`(칸 33~34) | 첫 쉼터의 땅강아지 수수가 새싹 발톱을 만들어 줌(런마다 가방에, 저널 "파는 손"), 도토 기억 일러스트(앨범 9장 5×2), 실뜨기 10단계(걸음·보스 체력·패링 창·굴파기 대기·지렁이), 진행을 따르는 이웃 말 7줄 |
+| 모모 플레이어블(0056) | `equipment.rs`(Character::Momo·WeaponKind::Kick·뒷발), `moveset.rs`(KICKS), `player.rs`(kit·Hop·Chain·stomp), `tuning.rs`(HOP_*·CHAIN_*), `app/pick.rs`(누구와 내려갈까), `app/stage.rs`(뿌리 길·reach_deepest), `cutscene.rs`(ending_momo·플레이어 배우), `illust.py`(momo_deep), `render.rs`(draw_momo_player) | 모모가 돌아온 뒤 마을 뿌리 길에서 Naïl/모모를 고름. 같은 버튼에 뒷발 3타·깡충(무적)·이어 뛰기(세 번 밟기), 발톱은 줍지 않음. 깬 수·실뜨기는 캐릭터마다, 모모 런은 모모 보스 없음, 가장 깊은 곳 → 모모 장면(`momo_deep`, 엔딩 깃발과 따로), 포포·할매 한마디, 저널 "꽃잎을 따라", 앨범 그때 10장(지금 11장) |
+| 작은 것들(0053) | `camp.rs`(z), `cutscene.rs`(susu_meet·Portrait::SUSU), `app/stage.rs`(수수 말 걸기), `illust.rs`·`tools/art/illust.py`(doto_memory), `knots.rs`(6~10), `story.rs`(TalkDoto·진행 줄), `tools/art/critters.py`(SUSU)·`portraits.py`(칸 33~34) | 첫 쉼터의 땅강아지 수수가 새싹 발톱을 만들어 줌(런마다 가방에, 저널 "파는 손"), 도토 기억 일러스트(앨범 그때 9장, 지금 11장 5×2 굴리기), 실뜨기 10단계(걸음·보스 체력·패링 창·굴파기 대기·지렁이), 진행을 따르는 이웃 말 7줄 |
 | 반딧불·큰 나무 재주 | `talents.rs`, `app/stage.rs`(bank_glowbugs·update_tree·draw_tree), `player.rs`·`world.rs`(재주 배율), `adventure.rs`(Interact::Tree), `sfx.rs`(드릴 소리 셋) | 쉼터·런 끝에 반딧불을 마을로. 마을 큰 나무에서 자리 넷 × 갈래 둘(굴파기·패링·드릴·먹기), 깨우기는 반딧불, 바꿔 끼기는 공짜(0047) |
-| 임시 그림 다듬기 | `tools/art/portraits.py`(칸 12~17), `tools/art/illust.py`(bands, momo_bloom), `cutscene.rs`(Portrait::MOMO·HALMAE·MOM) | 돌아온 모모·누룩 할매·엄마 초상화, 일러스트 띠 경계 2×2 섞기, 모모 일러스트 몸·눈(0049) |
-| 작은 정리(0051) | `app.rs`(상태 탭·도감 쪽), `story.rs`(TalkBori·TalkMomo), `portraits.py`(털빛 초상화, 12칸 줄), `illust.py`(큰 나무 가지) | 상태 탭에 재주, 대화창 Naïl 털빛, 도감 이야기·공격·요령 쪽(확인으로 넘김), 진행을 따르는 보리·모모 말, 큰 나무 가지 |
-| 초상화 v4(0070·0071) | `tools/pixel`(점 도구·편집기), `tools/art/portraits.py`(fur_clumps·silhouette_tufts, 기본 v4) | 털 인물(Naïl·엄마·보리·모모·도토·포포)에 털 뭉치 경계·크기 섞인 실루엣 삐침·작은 하이라이트·빛 쪽 외곽선 한 단, Naïl 원통 목도리·평평한 발톱·정수리 한 가닥. 대화창에서 헤드리스 확인 |
-| 일러스트 바탕(0072·0073) | `tools/art/illust.py`(set_style·SCENE_STYLE·pastel_bg·ambient_tint), `tools/art/sources/`, `tools/pixel/pxl.py`(pixelate --cel) | 그때 열 장 모두 v4(콩이의 문은 0085 실루엣 방식): 여섯 장(흙더미·큰 나무·마지막 꽃·엄마 굴·보리·모모)은 파스텔·수채·유화(CC0·퍼블릭 도메인) 바탕을 도트화, 땅속·꿈 네 장은 v4 규칙만 |
-| 저널 | `journal.rs`, `app.rs`(Tally·draw_journal), `app/stage.rs`(sync_journal·claim_journal·물웅덩이), `village.rs`(자리 7~9·W), `equipment.rs`(장신구 8), `tools/art/nail.py`(털빛 3) | 런을 넘어 남는 목표 31개(이야기·싸움·탐험·이웃·마을), 앞 목표 뒤에 보임, 받기로 반딧불·씨앗·저널 전용 꾸미기 3·털빛 3·새 장신구 3(0048). 장신구는 받으면 가방에·런마다 들고 시작, 받은 뒤 보상이 어디 있는지 표시(0050) |
+| 임시 그림 다듬기 | `tools/art/portraits.py`(칸 12~17), `tools/art/illust.py`(bands, momo_bloom), `cutscene.rs`(Portrait::MOMO·HALMAE·MOM) | 돌아온 모모·누룩 할매·엄마 초상화, 일러스트 띠 경계 2×2 섞기, 모모 일러스트 몸·눈(0049). 지금은 나노바나나가 대신함(원본 없을 때만) |
+| 작은 정리(0051) | `app.rs`(상태 탭·도감 쪽), `story.rs`(TalkBori·TalkMomo), `portraits.py`(털빛 초상화, 12칸 줄), `illust.py`(큰 나무 가지) | 상태 탭에 재주, 대화창 Naïl 털빛, 도감 이야기·공격·요령 쪽(확인으로 넘김), 진행을 따르는 보리·모모 말, 큰 나무 가지. 초상화·일러스트는 지금 나노바나나가 대신함 |
+| 초상화 v4(0070·0071) | `tools/pixel`(점 도구·편집기), `tools/art/portraits.py`(fur_clumps·silhouette_tufts, 기본 v4) | 털 인물(Naïl·엄마·보리·모모·도토·포포)에 털 뭉치 경계·크기 섞인 실루엣 삐침·작은 하이라이트·빛 쪽 외곽선 한 단, Naïl 원통 목도리·평평한 발톱·정수리 한 가닥. 대화창에서 헤드리스 확인. 지금은 나노바나나가 대신함(칸 4 그림자 말고, 원본 없을 때만) |
+| 일러스트 바탕(0072·0073) | `tools/art/illust.py`(set_style·SCENE_STYLE·pastel_bg·ambient_tint), `tools/art/sources/`, `tools/pixel/pxl.py`(pixelate --cel) | 그때 열 장 모두 v4(콩이의 문은 0085 실루엣 방식): 여섯 장(흙더미·큰 나무·마지막 꽃·엄마 굴·보리·모모)은 파스텔·수채·유화(CC0·퍼블릭 도메인) 바탕을 도트화, 땅속·꿈 네 장은 v4 규칙만. 지금은 나노바나나가 대신함(원본 없을 때만) |
+| 저널 | `journal.rs`, `app.rs`(Tally·draw_journal), `app/stage.rs`(sync_journal·claim_journal·물웅덩이), `village.rs`(자리 7~9·W), `equipment.rs`(장신구 8), `tools/art/nail.py`(털빛 3) | 런을 넘어 남는 목표 38개(0048 때 31개, 보스·꿈·모모 등으로 늘어남)(이야기·싸움·탐험·이웃·마을), 앞 목표 뒤에 보임, 받기로 반딧불·씨앗·저널 전용 꾸미기 3·털빛 3·새 장신구 3(0048). 장신구는 받으면 가방에·런마다 들고 시작, 받은 뒤 보상이 어디 있는지 표시(0050) |
 | 오늘의 굴 | `daily.rs`, `adventure.rs`(camp_start_seeded), `app.rs`(TitleItem) | 날짜(UTC) 시드, 첫 쉼터에서, 가장 먼 쉼터·완주 기록, 타이틀 줄에 날짜·기록, 한 달 넘은 기록 지움(0044) |
 | 실뜨기 | `knots.rs`, `enemy.rs`(max_hp·windup·apply_knots), `world.rs`(knots), `app.rs`(begin_run·KnotPick) | 첫 클리어로 1단계, 가장 높은 단계로 닿으면 다음 단계. 시작할 때 고르기. 매듭: 적 체력 ×1.25 · 예고 ×0.8 · 산딸기 ×0.6 · 가게 ×1.5 · 먹기 대기 ×1.6(0043) |
 | 런의 끝 | `tuning.rs`(FINAL_STAGE), `route.rs`(is_final), `adventure.rs`(AdvEvent::Deepest), `app/stage.rs`(reach_deepest) | 필드 + 길 3개, 셋째 길 보스 칸 = 가장 깊은 곳 → 반쪽/참 엔딩(조건 깃발) → 타이틀, 클리어 수 기록, 반쪽 엔딩 뒤 포포 한마디(0042) |
 | 기록·다회차 | `profile.rs`, `story.rs`, `app.rs`(start·on_death·album·설정), `web/index.html`(nail_save), `player.rs`(resist) | 깃발 + 수 기록(웹 localStorage·데스크톱 파일·Android 앱 폴더), 튜토리얼 뒤 새 런은 바로 필드·보리 뒤엔 대장 없음, 런 사이 한마디(가장 구체적인 줄·한 번), 도감 유지, 앨범(타이틀), 포포의 응원(20%+2%/쓰러짐, 최대 80%), 기록 지우기(0041) |
-| 컷씬 일러스트 | `illust.rs`, `cutscene.rs`(Step::Illust·Narrate, cut_to, 이야기 장면), `render.rs`(draw_illust), `tools/art/illust.py` | 640×360 2배 밀도 한 장 그림 + 느린 패닝 + 입자, 내레이션 띠. 처음 8장(0039) → 지금 11장(+도토 기억 0053·모모 깊은 곳 0056·콩이의 문 0085), 모두 이야기 컷씬에서 나오고 앨범에 모인다. 개발 "이야기 일러스트"는 바로 보기용. 임시 그림, 내레이션 아홉 언어(0037, 0039) |
+| 컷씬 일러스트 | `illust.rs`, `cutscene.rs`(Step::Illust·Narrate, cut_to, 이야기 장면), `render.rs`(draw_illust), `tools/art/illust.py` | 2배 밀도 한 장 그림(기본 640×360, 패닝 장면은 더 큼) + 느린 패닝 + 입자, 내레이션 띠. 처음 8장(0039) → 지금 11장(+도토 기억 0053·모모 깊은 곳 0056·콩이의 문 0085), 모두 이야기 컷씬에서 나오고 앨범에 모인다. 개발 "이야기 일러스트"는 바로 보기용. 그림은 11장 모두 나노바나나(0125~0136), 내레이션 아홉 언어(0037, 0039) |
 | 튜토리얼 보스 | `enemy.rs`(Chief), `species.rs`(CHIEF), `field.rs`(공터), `tools/art/chief.py`, `render.rs`(보스 막대) | 들쥐 대장 보리: 돌진 ↔ 뛰어 찍기, 반 아래면 생쥐 떼, 공격 중 슈퍼아머, 벽에 박으면 2.2초 틈. 32×32 그림, 초상화 3, 처치 컷씬 → 쉼터의 이웃. 헤드리스로 공터 잠금·막대·처치 컷씬·쉼터·가게·길 지도 확인(docs/decisions/0032) |
 | iOS 빌드 1단계(0086) | `.github/workflows/build-ios.yml`, `ios/Info.plist`, `ios/icons/`, `profile.rs`(iOS 저장 자리) | macOS 러너에서 `aarch64-apple-ios` 빌드 → 손으로 짠 `.app` → 서명 안 한 `.ipa` 아티팩트. 실기 실행은 미확인(서명: Sideloadly·AltStore·TestFlight는 나중에). 패드는 iOS에서 아직 안 됨(gilrs) |
-| 앱 아이콘(0087) | `tools/icons/make_icons.py`, `android/res/mipmap-*`, `Cargo.toml`(res·icon), `build-android.yml`(application-icon 검사) | Naïl 초상화 얼굴에서 iOS·Android 아이콘. Android는 옛 mipmap + 적응형(8+). CI가 APK에 아이콘이 없으면 실패 |
+| 앱 아이콘(0087) | `tools/icons/make_icons.py`, `android/res/mipmap-*`, `Cargo.toml`(res·icon), `build-android.yml`(application-icon 검사) | iOS·Android 아이콘(그림은 0123에서 큰 나무·뿌리 실루엣으로 바꿈). Android는 옛 mipmap + 적응형(8+). CI가 APK에 아이콘이 없으면 실패 |
 | 솟구치기·마무리 타(0090) | `tuning.rs`(EMERGE_*·CLAW_*), `moveset.rs`, `world.rs`(emerge_push·충격), `sfx.rs`(Impact) | 첫 바깥 판정 2·3("숨는 용도", "그저 그렇다") 뒤: 솟구침 반지름 22·피해 2·넉백 340 + 반지름 44 밀쳐내기(잡몹만), 두 겹 고리·쿵. 마무리 타 넉백 ×1.35~1.45, 멈춤·흔들림↑, 충격 고리·쿵. 단위 테스트(밀쳐내기) |
 | HUD·퀵 슬롯(0091) | `render.rs`(hud_plate·draw_quick_slots·draw_hud_bars), `items.rs`(Bag::take·flash) | 바탕판 셋·테두리 글자, 게이지 34px, 퀵 슬롯 22px·아이콘 2배·고른 칸 금빛 2px, 다 쓰면 가진 다른 것으로 저절로 + 1.2초 깜빡임(쓰러져 지렁이가 쓰여도). 가게 창 밑 HUD 숨김. 단위 테스트 |
 | 화면 × 아홉 언어 점검(0089) | `ui.rs`(check, F3), 헤드리스 순회 | 넘침·겹침·잘림 검사기, 가게·꾸미기·실뜨기·조작·도감·저널·가방·상태·큰 나무·튜토리얼 힌트·말풍선 고침, 스페인어·러시아어 몇 줄 줄임 |
@@ -124,12 +124,12 @@
 | 잠긴 문(0094·0096~0099) | `render.rs`(draw_root_gate·빛 패스), `sunny.rs`(FENCE_H·FENCE_V), `room.rs`(door_anim·tick_doors), `world.rs`(열릴 때 실 풀림) | 팩 나무 울타리 두 겹(가운데 칸만: 남북 39,2 · 동서 40,3, 가로대가 벽에서 벽까지, 팩이 없으면 물든 뿌리) + 가로대를 감는 보라 실, 0.35초에 솟아 닫히고 0.5초에 가라앉으며 실이 풀린다, 어둠 속에서도 실이 빛남 |
 | 어둠 지도·야광버섯·그림자(0095·0100) | `render.rs`(dark_rt·cut_material·light_sources·draw_cast_shadows·draw_mushrooms), `art.rs`(light), `biome.rs` | 빛 자리마다 어둠을 빼는 렌더 타깃, 버섯 빛 64px·세기 0.28(은은하게 넓게), 심층 버섯 14%·뿌리 지대 4%, 빛 반대쪽으로 눕는 그림자 |
 | 해·모닥불 그림자(0102~0106, 시험) | `render.rs`(draw_sun_shadows·shadow_dir·sun_shear·silhouette_material, draw_sorted의 sun), `sunny.rs`(stamp_sun_shadow), `terrain.rs`(Baker::fires), `tuning.rs`(SUN_SHADOW_*·FIRE_SHADOW_*·DECOR_LIFT_*) | 서 있는 것의 모양을 발 줄 축으로 눕혀 렌더 타깃에 모아 한 번에 얹는다. 밝은 곳은 해(오른쪽 아래), 모닥불 곁은 불 바깥쪽(150px, 멀수록 길게, 불이 아래면 더 길게 0104, 어두운 곳은 바깥으로 옅게). 모닥불 돌은 돌만 키운 모양(뒤쪽은 짧게, 0105). 그림자 패스는 몸만(빛·표시·반투명·바닥 것 제외, 밝은 곳은 타원 그림자 끔, 0106). 구운 꽃·조약돌·풀포기는 높이 비율만큼 짧게 |
-| Naïl·포포·모모(돌아옴·물듦)·보리(돌아옴·물듦)·누룩 할매·엄마·도토(돌아옴·물듦)·수수·콩이(돌아옴·물듦) 초상화 나노바나나(0107~0122, 이웃 그림자 칸 4 말고 모두) | `tools/art/sources/ai/*.png`, `tools/art/ai_portraits.py`, `tools/art/portraits.py`(sheet), `docs/art/nano-banana-prompts.md` | 표정 원본(✦는 `strip_logo.py`가 원본에서 지움, 0133) → 배경 투명·88×88·한 팔레트(눈 8색 따로)·털빛 셋(주둥이·발톱은 자리로 지킴). 포포: 틀 맞추기(높이 92%)·채도 높은 색 따로. 모모: 검은 선 → 자두빛, 틀 1.22(귀 끝을 칸 맨 위에, 가슴을 칸 아래로), 가슴이 지워지지 않게 아래 끝 번지기 끔. 물든 모모: 같은 틀, 실은 굵게·위로, 눈은 선명한 초록으로 고쳐 그림, 흰빛은 보랏빛으로 물들임. 보리: 시트를 통통하게 고쳐 그림, 틀 그대로. 들쥐 대장: 보리를 고쳐 그림, 눈 팔레트 안 뗌(보라 기운 털), 빨간 눈 밝게. 할매: 시트의 둥근 얼굴 판으로 표정 짝, 둘러싸인 배경 틈 지움. 엄마: Naïl 초상화를 함께 넣고 털을 짙고 매끈하게, 앞발은 따로 고쳐 그림. Naïl 결의: 덜 표독스럽게 다시 그림, 팔레트를 얼려 다른 칸은 그대로. 도토: 시트에서 조끼·보라 꽃·리본 빼고, 몸이 잘린 줄까지만 써 배 구멍 막음. 물든 도토: 도토를 고쳐 그림, 호박색 눈 밝게. 수수: 생김새 글을 새로 쓰고 삽발을 칸 아래에. 콩이: 3/4 모습 기준, 토끼 귀가 아닌 뾰족한 귀. 물든 콩이: 하늘빛 눈 밝히기, 배경색 잡기를 튀는 점에 강하게. 다른 캐릭터는 다음 차례 |
+| Naïl·포포·모모(돌아옴·물듦)·보리(돌아옴·물듦)·누룩 할매·엄마·도토(돌아옴·물듦)·수수·콩이(돌아옴·물듦) 초상화 나노바나나(0107~0122, 이웃 그림자 칸 4 말고 모두) | `tools/art/sources/ai/*.png`, `tools/art/ai_portraits.py`, `tools/art/portraits.py`(sheet), `docs/art/nano-banana-prompts.md` | 표정 원본(✦는 `strip_logo.py`가 원본에서 지움, 0133) → 배경 투명·88×88·한 팔레트(눈 8색 따로)·털빛 셋(주둥이·발톱은 자리로 지킴). 포포: 틀 맞추기(높이 92%)·채도 높은 색 따로. 모모: 검은 선 → 자두빛, 틀 1.22(귀 끝을 칸 맨 위에, 가슴을 칸 아래로), 가슴이 지워지지 않게 아래 끝 번지기 끔. 물든 모모: 같은 틀, 실은 굵게·위로, 눈은 선명한 초록으로 고쳐 그림, 흰빛은 보랏빛으로 물들임. 보리: 시트를 통통하게 고쳐 그림, 틀 그대로. 들쥐 대장: 보리를 고쳐 그림, 눈 팔레트 안 뗌(보라 기운 털), 빨간 눈 밝게. 할매: 시트의 둥근 얼굴 판으로 표정 짝, 둘러싸인 배경 틈 지움. 엄마: Naïl 초상화를 함께 넣고 털을 짙고 매끈하게, 앞발은 따로 고쳐 그림. Naïl 결의: 덜 표독스럽게 다시 그림, 팔레트를 얼려 다른 칸은 그대로. 도토: 시트에서 조끼·보라 꽃·리본 빼고, 몸이 잘린 줄까지만 써 배 구멍 막음. 물든 도토: 도토를 고쳐 그림, 호박색 눈 밝게. 수수: 생김새 글을 새로 쓰고 삽발을 칸 아래에. 콩이: 3/4 모습 기준, 토끼 귀가 아닌 뾰족한 귀. 물든 콩이: 하늘빛 눈 밝히기, 배경색 잡기를 튀는 점에 강하게. |
 | 앱 아이콘: 큰 나무·실에 얽힌 뿌리 실루엣(0123) | `tools/icons/make_icons.py`(`art`), `ios/icons`, `android/res/mipmap-*` | 64칸 코드 그림, 금빛 원 앞 나무 + 보랏빛 앞 뿌리 + 뿌리 다발을 묶는 실 고리 둘. 일러스트에서 자른 것과 견주어 이것을 유지(48px에서 읽힘) |
-| 나노바나나 일러스트(0125~) | `tools/art/sources/ai/illust/*.png`, `tools/art/ai_illust.py`, `tools/art/illust.py`(main) | `great_tree`·`mother_burrow`(실을 지운 자리에 맨 나무껍질을 그리게 해 집 장면에서 실 제거)·`bori_freed`(물든 모습 그림을 빼고 시트대로 다시 그림)·`momo_bloom`(구도 그림을 빼고 비율을 글로)·`halmae_deep`(Naïl을 대화창 위로)·`last_bloom`(이웃 넷을 패닝 끝 대화창 위로)·`sprout`·`molehill`·`doto_memory`·`momo_deep`(작은 모모의 색은 `FOCUS` 팔레트, 0135)·`kongi_door`(0136)·타이틀 바탕 `title`(0137, 작은 캐릭터는 `FOCUS` 자리에서 어두운 선도 지킨다). 컷씬 일러스트 열하나 + 타이틀 모두 나노바나나. ✦ 로고는 원본에서 한 번 지운다(`tools/art/strip_logo.py`, 흰색 얹기 되돌리기, 0133). 남은 장면도 구도 그림 없이. 게임 칸마다 가장 흔한 색 + 채도 높은 색은 색상별 팔레트·칸 문턱 15%(작은 빨간 눈을 지킨다). 남은 장면은 같은 길 |
+| 나노바나나 일러스트(0125~) | `tools/art/sources/ai/illust/*.png`, `tools/art/ai_illust.py`, `tools/art/illust.py`(main) | `great_tree`·`mother_burrow`(실을 지운 자리에 맨 나무껍질을 그리게 해 집 장면에서 실 제거)·`bori_freed`(물든 모습 그림을 빼고 시트대로 다시 그림)·`momo_bloom`(구도 그림을 빼고 비율을 글로)·`halmae_deep`(Naïl을 대화창 위로)·`last_bloom`(이웃 넷을 패닝 끝 대화창 위로)·`sprout`·`molehill`·`doto_memory`·`momo_deep`(작은 모모의 색은 `FOCUS` 팔레트, 0135)·`kongi_door`(0136)·타이틀 바탕 `title`(0137, 작은 캐릭터는 `FOCUS` 자리에서 어두운 선도 지킨다). 컷씬 일러스트 열하나 + 타이틀 모두 나노바나나. ✦ 로고는 원본에서 한 번 지운다(`tools/art/strip_logo.py`, 흰색 얹기 되돌리기, 0133). 게임 칸마다 가장 흔한 색 + 채도 높은 색은 색상별 팔레트·칸 문턱 15%(작은 빨간 눈을 지킨다). |
 | 웨이브 | `world.rs`, `scenario.rs` | 지금은 개발 시나리오(아레나·웨이브 3부터)에서만. 적을 다 잡으면 1.2초 뒤 다음 웨이브(1C+1S → 2C+1S → 2C+2S → 3C+2S). 명세엔 없지만 5분 플레이 판정을 위해 넣음 |
 
-확인한 것: 데스크톱(Xvfb) 실행 캡처로 렌더 방향·공격 반원·굴파기·히트박스 표시, 헤드리스 Chromium으로 웹 빌드 로드·입력·콘솔(mismatch 없음). 확인 못 한 것: 실제 손맛(판정 1~4), 실기 게임패드, 소리의 실제 느낌(컨테이너에 오디오 장치 없음).
+확인한 것: 데스크톱(Xvfb) 실행 캡처로 렌더 방향·공격 반원·굴파기·히트박스 표시, 헤드리스 Chromium으로 웹 빌드 로드·입력·콘솔(mismatch 없음). 확인 못 한 것: 판정 2·3 다시(0090 뒤), 데스크톱 실기 패드, 소리의 실제 느낌(컨테이너에 오디오 장치 없음).
 
 ## 사람이 할 일 (다음 세션 전)
 2026-10-25에 정리했다. 끝난 것(Netlify 시크릿, 플레이 판정, Sunnyside 받기·라이선스·비공개 에셋 레포, 화면 이동·스토리·다회차 결정, 저장 파일, 기술 해금·가게 화면)은 지웠다. 기록은 각 결정(docs/decisions)에 있다.
@@ -138,10 +138,9 @@
 - [x] 세션 네트워크 허용 도메인에 `kenney.nl`·`opengameart.org` 추가
 - [ ] **v0.1.11 귀로 판정**(0081 진행 2): 곡이 장소에 맞는지(타이틀·마을·들판·쉼터·뿌리·심층·보스), 고리 이음매가 들리는지, 음악과 효과음 크기 균형, 메뉴 소리가 거슬리지 않는지, 맞음·쓰러짐·다침 변형이 반복으로 들리지 않는지, 폰 스피커·이어폰. 바꾸고 싶은 곡·소리는 "어디 → 무엇"으로 알려 주면 표만 고친다
 - [ ] **v0.1.12 공격 동작**(0082): 1·2타가 발을 번갈아 치는 것으로 보이는지, 상체 들썩임이 너무 잔잔한지·과한지, 마지막 타(두 발 + 내리찍기 + X 자국)가 확실히 큰지
-- [ ] **v0.1.14 타이틀 바탕 v2**(0083): 신비하고 덜 또렷한 느낌이 맞는지, 안개가 너무 짙거나 옅지 않은지, 굴 방 비네트·입구가 자연스러운지
 - [ ] **v0.1.14 프랑스어·스페인어**(0084): 원어민이 있으면 말투·용어 검수(특히 쥐 이름, 프랑스어 ! ? 앞 띄어쓰기, 스페인어 Mando/Control)
-- [ ] **v0.1.15**(0083·0085): 타이틀 v2.1 어둡기, 콩이 컷씬 그림(셋째 길 보스를 이기면), 앨범 스크롤, 독일어·러시아어(원어민 검수가 있으면 좋다). 다른 일러스트 열 장도 이 방식으로 다시 그릴지
-- [ ] **v0.1.16**: Android 홈 화면 아이콘이 둥근·네모 런처에서 잘리지 않는지(0087). iOS는 원하면 `nail-ios-unsigned` 아티팩트를 Sideloadly(Windows·Mac)로 내 Apple ID 서명해 설치 → 화면·터치·소리·저장(0086)
+- [ ] **v0.1.15**(0085): 앨범 스크롤, 독일어·러시아어(원어민 검수가 있으면 좋다)
+- [ ] **iOS**(0086): 원하면 `nail-ios-unsigned` 아티팩트를 Sideloadly(Windows·Mac)로 내 Apple ID 서명해 설치 → 화면·터치·소리·저장(0086)
 - [ ] Android에서 장소를 바꿀 때 곡을 읽느라 멈칫하는지(검은 화면이 길어지는지), 보스가 깨어날 때 멈칫하지 않는지
 - [ ] 새 특수효과(먼지·흙덩이·보라 실·꽃가루·모닥불 빛)가 지나치거나 모자라지 않은지
 
@@ -163,7 +162,7 @@
   - 해·모닥불 그림자(0102~0106, 시험): 방향·길이·진하기가 맞는지, 팩에 구운 아래 그림자와 둘이 어색하지 않은지, 모닥불 곁 그림자가 퍼지는 모양, 빼자고 하면 끈다
 - [ ] **드릴 겨누기**(0139): 시동 동안 누른 쪽 둘레(±34°)의 적에게 모서리 표시가 뜨고 그쪽으로 나가는지, 원하지 않는 적에게 끌리지 않는지, 점선이 거슬리지 않는지
 - [ ] **v0.2.0 확인**(나노바나나 그림, 0107~0138):
-  - 대화 초상화 열두 캐릭터: 배율 3·5(홀수)에서도 칸을 꽉 채우는지(0111), 표정이 갈리는지, 물든 눈(빨강·초록·호박·하늘빛)이 보이는지
+  - 대화 초상화 아홉 캐릭터(열세 묶음): 배율 3·5(홀수)에서도 칸을 꽉 채우는지(0111), 표정이 갈리는지, 물든 눈(빨강·초록·호박·하늘빛)이 보이는지
   - 컷씬 일러스트 열하나: 대화창·내레이션에 얼굴이 가리지 않는지(특히 패닝 끝: `last_bloom`·`momo_deep`), 작은 캐릭터(모모·콩이·잠든 Naïl)가 알아보이는지
   - 타이틀 바탕(0137): 해 질 녘 그림 위 메뉴 글이 읽히는지, 안개·반딧불이 어색하지 않은지, 저작권 줄이 굴 방에 겹치는 것이 거슬리는지
   - 앱 아이콘(0123): 폰 런처(원·둥근 네모)에서 뿌리 끝이 잘리는 게 거슬리는지
@@ -175,9 +174,8 @@
   - **쉼터부터 이어하기**(0080): 쉼터에서 앱을 껐다 켜고 이어하기 → 같은 쉼터·같은 씨앗·가방인지, 굴 안에서 끄면 마지막 쉼터부터인지
   - **저장 슬롯**(0078): 덮어 설치한 뒤 예전 기록이 슬롯 1로 이어지는지, 타이틀 시작하기·이어하기 → 슬롯 고르기, 덮어쓰기·지우기(두 번)
   - Sunnyside 그림(큰 나무·들판 나무·꽃·모닥불·버섯)이 나오는지, 장소를 바꿀 때 멈칫 없이 밝아지는지(검정이 0.2초쯤 길어진 게 거슬리지 않는지)
-  - APK를 지우지 않고 덮어 설치했을 때 기록이 남는지, Android Chrome 글자 색, 타이틀 "v0.1.10 · <커밋>"
+  - Android Chrome 글자 색, 타이틀 "v<버전> · <커밋>"
   - 모모 런: 포포 배웅과 쉼터 빈 자리 말(나일은 마을에서 기다린다)
-  - 새 그림(0071~0073): 대화 초상화의 털·목도리, 컷씬 일러스트 열 장(특히 패닝하는 큰 나무·마지막 꽃이 끝까지 자연스러운지, 대화창에 얼굴이 가리지 않는지)
 - [ ] GitHub에서 Secret `SECRETS_TOKEN`과 그 fine-grained 토큰을 지운다(0067, 이미 했으면 체크)
 - [x] 공식 페이지 켜기(0069, 2026-10-25 사장이 Source = GitHub Actions, `pages` 4번째 실행 성공)
 - [ ] **공식 페이지 보기**: https://aimenjoe.github.io/nail-under-the-roots/ 를 폰·PC로 보고 글·그림이 어색한 곳을 알려 준다
@@ -187,7 +185,7 @@
 - [ ] **보스**: 튜토리얼 보스 체력 36·슈퍼아머, 모모(0046) 셋째 이어 뛰기 세기, 도토(0052) 부채꼴·묻은 도토리, 콩이(0054) 튕김·버티기, 실의 꿈(0055) 보랏빛·체력 2 회복
 - [ ] **모모 플레이어블**(0056): 깡충 56px·대기, 이어 뛰기 세 번 × 2, 뒷발 사거리, 작아 보이는지, 고르기 창, 모모 장면·`momo_deep` 그림
 - [ ] **런 구조**: 필드 + 길 3개가 10~15분인지(0042), 필드 크기·적 밀도·던전 방 수·카메라 속도·부활 규칙, 반딧불·씨앗·산딸기 개수와 자석 반경, 포포의 응원 비율, 길 지도 갈래(다음 층만 보임), 쉼터 가게 값, 마을(0045) 꾸미기 값·잎 자람, 큰 나무 재주 값(0047)·빛남(0061), 저널 목표 숫자(0048), 실뜨기 1~10 어려움(0043), 오늘의 굴(0044)
-- [ ] **그림**: 지도(0062·0063: 둥근 벽·바닥 띠가 어지럽지 않은지, 던전 바위가 싸움을 막는지), 적 다섯 종 구별, Naïl 스프라이트·초상화(표정 4, 털빛), 모모 물든 모습, 할매·엄마 초상화(0049), 컷씬 일러스트 길이·패닝(0039)
+- [ ] **그림**: 지도(0062·0063: 둥근 벽·바닥 띠가 어지럽지 않은지, 던전 바위가 싸움을 막는지), 적 다섯 종 구별, Naïl 스프라이트(털빛), 모모 물든 모습(스프라이트), 컷씬 일러스트 길이·패닝(0039). 초상화·일러스트 그림은 위 "v0.2.0 확인"
 - [ ] **이야기·글**: 0037 뼈대에서 어색한 곳, 튜토리얼 9단계 길이·포포 말투(0023), 수수·이웃 말투
 - [ ] **기기**: iPhone Safari(안티에일리어싱 끔, 0026·대화창 버벅임, 저전력 모드 끄고), 폰 터치 공격 버튼 크기·가게/길 지도 닫기(✕·바깥 탭), 패드 실기(다시 붙이기, 장치별 안내 0036, 닌텐도 배치), 화면 떨림(0034), 타이틀 글자 테두리(0035), 가게 사기 전 확인 창, 세로↔가로 초상화 크기, 껐다 켜도 기록이 남는지(0041)
 - [ ] **번역**: 브라질 포르투갈어 검수(가능하면 원어민, 0033)

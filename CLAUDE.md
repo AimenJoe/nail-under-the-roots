@@ -1,10 +1,10 @@
 # CLAUDE.md — nail-under-the-roots
 
-Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macroquad. 웹(Netlify) 먼저, 나중에 Android 핸드헬드(컨트롤러 필수).
+Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macroquad. 웹(Netlify)·Android 핸드헬드(APK, 컨트롤러 필수), iOS는 빌드만.
 
 ## 먼저 읽을 것
 1. `docs/concept.md` — 무엇을 만드는가
-2. `docs/phase-1-combat-prototype.md` — 1단계 범위와 판정 기준. 끝의 **"구현 상태"와 "사람이 할 일"**이 현재 위치다. 다음 마일스톤(v0.2.0 조건표)은 `docs/decisions/0079`
+2. `docs/phase-1-combat-prototype.md` — 1단계 범위와 판정 기준. 끝의 **"구현 상태"와 "사람이 할 일"**이 현재 위치다. 버전 규칙은 `docs/decisions/0079`(v0.2.0은 닫음), 지금 마일스톤(v0.3.0 조건표)은 `docs/decisions/0081`
 3. `docs/decisions/` — 왜 그렇게 정했나. 바꾸려면 새 번호로 기록
 
 세션 시작 프롬프트는 따로 없다. 이 파일과 위 세 문서가 그 역할을 한다. 세션이 끝나면 "구현 상태"·"사람이 할 일"을 갱신하고 커밋한다.
@@ -43,19 +43,19 @@ cargo fmt --all -- --check
 cargo clippy --target wasm32-unknown-unknown -- -D warnings
 cargo build --release --target wasm32-unknown-unknown
 cargo check --target aarch64-linux-android   # NDK 없이 됨. Android에서만 깨지는 의존성(gamepads 등)을 잡는다
-cargo test                                   # 규칙 테스트(무브셋·독). 리눅스면 libx11-dev 등 필요(README)
+cargo test                                   # 단위·규칙 테스트(무브셋·번역·폰트 글자·지도·굽기·패드 키 등). 리눅스면 libx11-dev 등 필요(README)
 python3 tools/licenses.py                    # 의존성을 바꿨을 때만. assets/THIRD_PARTY_LICENSES.txt 갱신
 ```
 **배포는 사장에게 먼저 묻는다**(2026-10-26 사장 지시): 고친 것은 작업 브랜치에만 커밋·push하고, main push·버전 올리기·릴리스는 하지 않는다(main에 push하면 웹이 바로 배포된다). 고친 것을 모아 "이것들을 고쳤는데 v<버전>으로 배포할까요?"라고 묻고, 사장이 다음 수정 사항을 말하면 그것까지 넣어 배포 시점을 함께 정한다.
 
-CI: `deploy-web.yml`이 위 세 줄을 돌리고 Netlify 시크릿이 있으면 배포한다. `build-android.yml`이 APK를 만들어 아티팩트(태그면 Release)로 올린다. `build-ios.yml`(macOS 러너)이 서명하지 않은 `.ipa`를 아티팩트로 올린다(내 기기 시험은 Sideloadly·AltStore로 직접 서명, 0086). iOS에서는 패드가 아직 안 된다(gilrs에 iOS 백엔드 없음). `cargo check --release --target aarch64-apple-ios`는 리눅스에서도 된다. 앱 아이콘(iOS·Android)은 `tools/icons/make_icons.py`가 코드로 찍은 큰 나무·실에 얽힌 뿌리 실루엣에서 만든다(0087·0123). 릴리스는 `Cargo.toml` 버전을 올리고 `docs/releases/v<버전>.md`를 함께 main에 push하면 `release.yml`이 태그·APK·Release를 만든다(세션 프록시는 태그 push를 받지 않는다). 로컬에 Android SDK/NDK는 두지 않는다(docs/decisions/0005).
+CI: `deploy-web.yml`이 fmt·clippy·`cargo test`·wasm 빌드를 돌리고 Netlify 시크릿이 있으면 배포한다. `build-android.yml`이 APK를 만들어 아티팩트(태그면 Release)로 올린다. `build-ios.yml`(macOS 러너)이 서명하지 않은 `.ipa`를 아티팩트로 올린다(내 기기 시험은 Sideloadly·AltStore로 직접 서명, 0086). iOS에서는 패드가 아직 안 된다(gilrs에 iOS 백엔드 없음). `cargo check --release --target aarch64-apple-ios`는 리눅스에서도 된다. 앱 아이콘(iOS·Android)은 `tools/icons/make_icons.py`가 코드로 찍은 큰 나무·실에 얽힌 뿌리 실루엣에서 만든다(0087·0123). 릴리스는 `Cargo.toml` 버전을 올리고 `docs/releases/v<버전>.md`를 함께 main에 push하면 `release.yml`이 태그·APK·Release를 만든다(세션 프록시는 태그 push를 받지 않는다). 로컬에 Android SDK/NDK는 두지 않는다(docs/decisions/0005).
 
 공식 페이지(0069): `site/`(한국어 `index.html`, 영어 `en/`)를 `pages.yml`이 GitHub Pages에 올린다. 그림·글꼴은 `python3 tools/site/make_images.py`(초상화 자르기·일러스트 복사·페이지 글자만 남긴 Galmuri), 스크린숏은 `tools/site/shots.js`. 페이지 글을 바꾸면 두 언어를 다 고치고 `make_images.py`를 다시 돌린다(글꼴 글자). 최신 버전·APK·소식은 `site.js`가 GitHub Releases에서 읽는다(못 읽으면 적어 둔 값).
 
 ## 하지 않는 것
 - `mq_js_bundle.js`나 게임패드 JS 플러그인을 외부 URL로 핫링크하지 않는다. `web/`에 복사본.
 - 에셋 팩을 라이선스 확인 없이 커밋하지 않는다. `assets/LICENSES.md`에 기록. **이 레포는 공개다. 유료·제3자 팩 원본은 `assets/vendor/`(gitignore)에만 두고 커밋하지 않는다**(docs/decisions/0010). 팩 그림은 Claude가 보고 고르고 확인해도 되지만 AI 학습·생성 참조에는 쓰지 않는다(0064).
-- 직접 그린 그림은 PNG를 손으로 고치지 않는다. 점으로 다듬을 때는 `tools/pixel`(`.pxl` 텍스트 원본, `pxl.py check`의 계단·외톨이 검사, 브라우저 편집기 `editor.html`, 0070). 그 밖에는 `tools/art/*.py`를 고치고 다시 생성한다(Naïl `nail.py`, 적·이웃 `critters.py`, 보스 `chief.py`, 초상화 `portraits.py`(나노바나나 원본이 있는 캐릭터는 `tools/art/sources/ai/` + `ai_portraits.py`가 칸을 바꿔 끼운다, 0108. 일러스트 첨부용 시트 묶음은 `ref_pack.py`, 0124), 타일 `tiles.py`, 컷씬 일러스트·타이틀 바탕 `illust.py`(타이틀은 `title` 장면, 앨범 목록 밖, 0083. 나노바나나 원본이 있는 장면은 `tools/art/sources/ai/illust/` + `ai_illust.py`가 바꿔 끼운다, 0125. 나노바나나 원본을 새로 넣으면 `strip_logo.py`로 ✦ 로고를 원본에서 한 번 지운다, 0133) — 임시 그림. 일러스트 바탕은 파스텔·수채 그림(`tools/art/sources/`, CC0·퍼블릭 도메인, 출처는 `assets/LICENSES.md`)을 `pastel_bg`로 도트화하고 그 위에 그린다(0073). 사람이 그린 그림으로 바꿀 때는 `docs/art/cutscene-illustrations.md`).
-- 마일스톤(docs/decisions/0079) 밖의 큰 기능을 사장 지시 없이 먼저 만들지 않는다. 마이너 버전은 마일스톤을 마쳤을 때만 올린다(패치는 자유).
+- 직접 그린 그림은 PNG를 손으로 고치지 않는다. 점으로 다듬을 때는 `tools/pixel`(`.pxl` 텍스트 원본, `pxl.py check`의 계단·외톨이 검사, 브라우저 편집기 `editor.html`, 0070). 그 밖에는 `tools/art/*.py`를 고치고 다시 생성한다(Naïl `nail.py`, 적·이웃 `critters.py`, 보스 `chief.py`, 초상화 `portraits.py`(나노바나나 원본이 있는 캐릭터는 `tools/art/sources/ai/` + `ai_portraits.py`가 칸을 바꿔 끼운다, 0108. 일러스트 첨부용 시트 묶음은 `ref_pack.py`, 0124), 타일 `tiles.py`, 컷씬 일러스트·타이틀 바탕 `illust.py`(타이틀은 `title` 장면, 앨범 목록 밖, 0083. 나노바나나 원본이 있는 장면은 `tools/art/sources/ai/illust/` + `ai_illust.py`가 바꿔 끼운다, 0125. 나노바나나 원본을 새로 넣으면 `strip_logo.py`로 ✦ 로고를 원본에서 한 번 지운다, 0133) — 스프라이트·타일은 임시 그림. 지금 게임 초상화(칸 4 그림자 빼고)·일러스트·타이틀은 모두 나노바나나 원본에서 만들고, 코드 그림과 파스텔·수채 바탕(`tools/art/sources/`, `pastel_bg`, 0073)은 원본이 없을 때만 쓴다. 사람이 그린 그림으로 바꿀 때는 `docs/art/cutscene-illustrations.md`).
+- 마일스톤(버전 규칙 0079, 지금은 0081) 밖의 큰 기능을 사장 지시 없이 먼저 만들지 않는다. 마이너 버전은 마일스톤을 마쳤을 때만 올린다(패치는 자유).
 - `cargo-quad-apk` 커밋(`build-android.yml`의 `CARGO_QUAD_APK_REV`)과 `web/*.js` 복사본은 의도적으로만 올린다. 올리면 CI 콘솔/로그를 확인한다.
 - 언어: 문서·커밋 메시지 한국어, 코드 식별자 영어.

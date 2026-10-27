@@ -1,7 +1,8 @@
 """컷씬 일러스트 생성기 — 임시 그림(docs/decisions/0039). 이 파일이 원본이고 PNG는 산출물이다(직접 그린 그림, 프로젝트 소유).
 
 실행: python3 tools/art/illust.py [출력 폴더]  (기본 assets/art/illust)
-사람이 그린 그림으로 바꿀 때는 같은 이름의 PNG를 넣는다(사양: docs/art/cutscene-illustrations.md).
+나노바나나 원본(tools/art/sources/ai/illust/)이 있는 장면은 ai_illust.scene()으로 바꿔 끼운다(0125, 지금 열둘 모두). 코드로 그리는 것은 title_fog뿐이다.
+사람이 그린 그림으로 바꿀 때는 같은 이름의 PNG를 넣고, 그 장면의 AI 원본을 빼야 다시 돌려도 덮이지 않는다(사양: docs/art/cutscene-illustrations.md).
 
 크기: 화면에 보이는 창 640×360(게임 320×180의 2배 밀도). 패닝하는 그림은 더 크다(src/illust.rs의 pan과 맞출 것).
   great_tree   640×560  위(나무) → 아래(땅속)로 패닝

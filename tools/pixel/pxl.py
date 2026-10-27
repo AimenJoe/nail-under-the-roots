@@ -16,7 +16,7 @@
     python3 tools/pixel/pxl.py import 그림.png 새.pxl [--colors 48]   PNG → .pxl (색이 많으면 줄인다)
     python3 tools/pixel/pxl.py render 그림.pxl 출력.png [--zoom 8 --grid]   PNG로(zoom이면 확대 미리보기 + 격자·좌표)
     python3 tools/pixel/pxl.py show 그림.pxl x0 y0 x1 y1               한 구역을 좌표 눈금과 함께 출력(고칠 곳 찾기)
-    python3 tools/pixel/pxl.py check 그림.pxl                          줄 길이·모르는 글자·외톨이 픽셀·색 수
+    python3 tools/pixel/pxl.py check 그림.pxl                          줄 길이·모르는 글자·외톨이 픽셀·윤곽 계단·색 수
     python3 tools/pixel/pxl.py sheet 출력.png 열 a.pxl b.pxl ...       칸을 이어 시트로
     python3 tools/pixel/pxl.py put 그림.pxl x y 글자열                 (x, y)부터 오른쪽으로 덮어쓴다('_'는 건너뜀)
     python3 tools/pixel/pxl.py rekey 그림.pxl d=O:외곽선 u=4:털4 ...      글자를 한꺼번에 바꾸고 이름을 붙인다(가져온 뒤 읽기 쉽게)

@@ -580,7 +580,7 @@ impl Renderer {
     }
 
     /// 컷씬 일러스트를 게임 화면 전체에(docs/decisions/0039). 원본 1px = 화면 배율/2 px(초상화와 같은 2배 밀도).
-    /// 홀수 배율에서는 원본 픽셀이 1.5배처럼 고르지 않게 늘어난다 — 그래서 임시 그림은 1px 디더를 쓰지 않는다.
+    /// 홀수 배율에서는 원본 픽셀이 1.5배처럼 고르지 않게 늘어난다 — 그래서 그림은 2×2 점으로 만들고 1px 디더를 쓰지 않는다.
     /// `t`는 그림이 뜬 뒤 흐른 시간(패닝·입자).
     pub fn draw_illust(&self, ui: &Ui, il: crate::illust::Illust, t: f32) {
         use crate::illust::{self, VIEW_H, VIEW_W};

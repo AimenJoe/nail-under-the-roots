@@ -1,4 +1,4 @@
-"""나노바나나 일러스트용 참고 그림 묶음 만들기(docs/art/nano-banana-prompts.md 3, docs/decisions/0124).
+"""나노바나나 일러스트용 참고 그림 묶음 만들기(docs/art/nano-banana-prompts.md 0-2 끝, docs/decisions/0124).
 
 실행: python3 tools/art/ref_pack.py <출력 폴더>
 - 캐릭터 시트(tools/art/sources/ai/sheets/<이름>.png, 사장이 0-1 단계로 그린 것)를 장면 첨부용으로 다듬는다:
