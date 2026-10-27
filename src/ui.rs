@@ -16,6 +16,55 @@ pub const ACCENT: Color = Color::new(0.90, 0.71, 0.47, 1.0);
 pub const OUTLINE_TEXT: Color = Color::new(0.05, 0.03, 0.06, 1.0);
 pub const DIM_OVERLAY: Color = Color::new(0.0, 0.0, 0.0, 0.55);
 
+/// 키캡(0153): 글 속 키·버튼 이름을 이 두 표식 사이에 두면(`key`) 테두리 있는 작은 칸 + 밝은 글로 그린다.
+/// 표식은 사용 영역 글자라 폰트에 없고 그리지 않는다. `text`·`text_w`가 알아보니 가운데·오른쪽 맞춤·`fit`·`wrap`이 그대로 된다.
+pub const KEY_OPEN: char = '\u{E000}';
+pub const KEY_CLOSE: char = '\u{E001}';
+/// 키캡 안쪽 여백(좌우, 논리 px)과 칸 사이 틈.
+const KEY_PAD: f32 = 2.0;
+const KEY_GAP: f32 = 1.0;
+pub const KEY_TEXT: Color = Color::new(1.0, 0.93, 0.78, 1.0);
+const KEY_FILL: Color = Color::new(0.10, 0.08, 0.12, 0.88);
+const KEY_EDGE: Color = Color::new(0.62, 0.50, 0.38, 1.0);
+
+/// 키·버튼 이름을 키캡 표식으로 감싼다.
+pub fn key(name: &str) -> String {
+    format!("{KEY_OPEN}{name}{KEY_CLOSE}")
+}
+
+/// 표식을 뺀 글(소리·검사·저장용).
+pub fn plain(s: &str) -> String {
+    s.chars()
+        .filter(|c| *c != KEY_OPEN && *c != KEY_CLOSE)
+        .collect()
+}
+
+/// (조각, 키캡인가). 닫는 표식이 없으면(잘린 글) 끝까지 키캡.
+fn key_segments(s: &str) -> Vec<(String, bool)> {
+    let mut out: Vec<(String, bool)> = Vec::new();
+    let mut cur = String::new();
+    let mut in_key = false;
+    for c in s.chars() {
+        match c {
+            KEY_OPEN if !in_key => {
+                if !cur.is_empty() {
+                    out.push((std::mem::take(&mut cur), false));
+                }
+                in_key = true;
+            }
+            KEY_CLOSE if in_key => {
+                out.push((std::mem::take(&mut cur), true));
+                in_key = false;
+            }
+            _ => cur.push(c),
+        }
+    }
+    if !cur.is_empty() {
+        out.push((cur, in_key));
+    }
+    out
+}
+
 /// 한 프레임의 화면 배치. 렌더러의 `present()`가 만든다.
 #[derive(Clone)]
 pub struct Ui {
@@ -84,8 +133,44 @@ impl Ui {
     pub fn text(&self, s: &str, x: f32, y: f32, size: f32, c: Color) {
         #[cfg(feature = "dev")]
         if check::on() && c.a > 0.05 {
-            check::text(s, Rect::new(x, y, self.text_w(s, size), size));
+            check::text(&plain(s), Rect::new(x, y, self.text_w(s, size), size));
         }
+        if s.contains(KEY_OPEN) {
+            // 키캡(0153): 보통 글은 받은 색, 키 이름은 테두리 칸 + 밝은 글.
+            let mut cx = x;
+            for (seg, is_key) in key_segments(s) {
+                if is_key {
+                    let w = self.plain_w(&seg, size) + 2.0 * KEY_PAD;
+                    let r = Rect::new(cx, y - 1.0, w, size + 1.0);
+                    self.rect(
+                        r,
+                        Color::new(KEY_FILL.r, KEY_FILL.g, KEY_FILL.b, KEY_FILL.a * c.a),
+                    );
+                    // 테두리는 넘침 검사의 틀로 세지 않는다(글 한 줄 속 작은 칸이라, 줄 전체가 "틀 밖"으로 잡혔다).
+                    let p = self.px(vec2(r.x, r.y));
+                    draw_rectangle_lines(
+                        p.x,
+                        p.y,
+                        r.w * self.scale,
+                        r.h * self.scale,
+                        self.scale,
+                        Color::new(KEY_EDGE.r, KEY_EDGE.g, KEY_EDGE.b, c.a),
+                    );
+                    let kc = Color::new(KEY_TEXT.r, KEY_TEXT.g, KEY_TEXT.b, c.a);
+                    self.plain_text(&seg, cx + KEY_PAD, y, size, kc);
+                    cx += w + KEY_GAP;
+                } else {
+                    self.plain_text(&seg, cx, y, size, c);
+                    cx += self.plain_w(&seg, size);
+                }
+            }
+            return;
+        }
+        self.plain_text(s, x, y, size, c);
+    }
+
+    /// 표식 없는 글 한 줄(테두리 켜졌으면 테두리).
+    fn plain_text(&self, s: &str, x: f32, y: f32, size: f32, c: Color) {
         let p = self.px(vec2(x, y + size * 0.8));
         if self.outline {
             // 상하좌우 1게임 px에 어두운 글자를 먼저: 가는 획(Galmuri Condensed)이 뒤의 선과 겹쳐 끊겨 보이지 않게.
@@ -128,6 +213,23 @@ impl Ui {
 
     /// 글자 폭(논리 px).
     pub fn text_w(&self, s: &str, size: f32) -> f32 {
+        if !s.contains(KEY_OPEN) {
+            return self.plain_w(s, size);
+        }
+        key_segments(s)
+            .iter()
+            .map(|(seg, is_key)| {
+                let w = self.plain_w(seg, size);
+                if *is_key {
+                    w + 2.0 * KEY_PAD + KEY_GAP
+                } else {
+                    w
+                }
+            })
+            .sum()
+    }
+
+    fn plain_w(&self, s: &str, size: f32) -> f32 {
         let (font_size, font_scale) = glyph_plan(size, self.scale, miniquad::window::dpi_scale());
         measure_text(s, self.font.as_ref(), font_size, font_scale).width / self.scale
     }
@@ -399,6 +501,22 @@ pub fn glyph_plan(size: f32, scale: f32, dpi: f32) -> (u16, f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 키캡 조각(0153): 표식 사이가 키, 잘려 닫는 표식이 없으면 끝까지 키.
+    #[test]
+    fn key_segments_split_keys() {
+        let t = format!("{} 고르기 · {} 확인", key("↑↓"), key("Enter"));
+        let segs = key_segments(&t);
+        assert_eq!(segs[0], ("↑↓".to_string(), true));
+        assert_eq!(segs[1], (" 고르기 · ".to_string(), false));
+        assert_eq!(segs[2], ("Enter".to_string(), true));
+        assert_eq!(segs.len(), 4);
+        assert_eq!(
+            key_segments(&format!("A {KEY_OPEN}En")),
+            vec![("A ".into(), false), ("En".into(), true)]
+        );
+        assert_eq!(plain(&t), "↑↓ 고르기 · Enter 확인");
+    }
 
     /// 굽는 크기는 원래 12 물리 px(가능하면), 키우는 배는 정수. 레티나(dpi 2)·배율 4: 12px로 구워 8배 = 96px.
     #[test]

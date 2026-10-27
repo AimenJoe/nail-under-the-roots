@@ -919,7 +919,9 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
     let (x0, y0, size, gap) = (5.0 + deny_shake(w.deny[1]), 153.0, 22.0, 3.0);
     let hint = crate::i18n::fill(
         crate::i18n::s().quick_hint,
-        &[&crate::input::prompt(crate::input::Act::UseItem)],
+        &[&crate::ui::key(crate::input::prompt(
+            crate::input::Act::UseItem,
+        ))],
     );
     let hx = x0 + 2.0 * (size + gap) + 2.0;
     let hw = ui.text_w(&hint, crate::ui::FONT_PX);

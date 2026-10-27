@@ -447,7 +447,7 @@ impl Cutscene {
 fn say_text(text: Tr, arg: Option<Act>) -> String {
     let t = i18n::tr(text);
     match arg {
-        Some(a) => i18n::fill(t, &[&crate::input::prompt(a)]),
+        Some(a) => i18n::fill(t, &[&crate::ui::key(crate::input::prompt(a))]),
         None => t.to_string(),
     }
 }

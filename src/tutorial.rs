@@ -104,11 +104,12 @@ impl Tutorial {
             Stage::Done => return None,
         };
         let body = match arg {
-            Some(a) => fill(crate::i18n::tr(text), &[&input::prompt(a)]),
+            Some(a) => fill(crate::i18n::tr(text), &[&crate::ui::key(input::prompt(a))]),
             // 걷기: 키보드 WASD, 패드 스틱, 터치 왼쪽 끌기.
-            None if self.stage == Stage::Move => {
-                fill(crate::i18n::tr(text), &[&input::verb(input::Verb::Walk)])
-            }
+            None if self.stage == Stage::Move => fill(
+                crate::i18n::tr(text),
+                &[&crate::ui::key(input::verb(input::Verb::Walk))],
+            ),
             None => crate::i18n::tr(text).to_string(),
         };
         let n = STEPS.iter().position(|s| *s == self.stage).unwrap_or(0) + 1;

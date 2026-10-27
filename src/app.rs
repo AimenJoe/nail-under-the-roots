@@ -112,7 +112,19 @@ const REBIND_TIMEOUT: f32 = 5.0;
 
 /// 안내 글의 동사 자리(`{0}`, `{1}` …)를 지금 장치(키보드·패드·터치)의 이름으로 채운다.
 fn vfill(t: &str, verbs: &[Verb]) -> String {
-    let names: Vec<&str> = verbs.iter().map(|v| input::verb(*v)).collect();
+    // 키·버튼 이름은 키캡으로(0153). 터치의 "탭"·"바깥 탭" 같은 말은 키가 아니라 그대로.
+    let touch = input::device() == Device::Touch;
+    let names: Vec<String> = verbs
+        .iter()
+        .map(|v| {
+            let n = input::verb(*v);
+            if touch {
+                n.to_string()
+            } else {
+                ui::key(n)
+            }
+        })
+        .collect();
     let args: Vec<&dyn std::fmt::Display> =
         names.iter().map(|n| n as &dyn std::fmt::Display).collect();
     fill(t, &args)
@@ -2156,10 +2168,11 @@ impl App {
         for (i, r) in rects.into_iter().enumerate() {
             self.hits.push((r, Hit::TitleItem(i)));
         }
+        // 타이틀에서 뒤로(Esc)는 아무 일도 하지 않아 안내에서 뺐다(0153).
         let hint = device_hint(
-            s.title_controls,
+            s.title_pick,
             s.title_controls_touch,
-            &[Verb::Pick, Verb::Confirm, Verb::Back],
+            &[Verb::Pick, Verb::Confirm],
         );
         // 알림(오늘의 굴 완주)이 있으면 조작 안내 자리에.
         match note {
@@ -2647,7 +2660,7 @@ impl App {
         // 넓으면 왼쪽 아래 퀵 슬롯 판(칸 둘 + "I 먹기")을 덮었다(일본어, 0089): 그때는 그 판 위로 올린다.
         let quick = fill(
             i18n::s().quick_hint,
-            &[&crate::input::prompt(crate::input::Act::UseItem)],
+            &[&ui::key(crate::input::prompt(crate::input::Act::UseItem))],
         );
         let quick_right = 57.0 + ui.text_w(&quick, FONT_PX) + 6.0;
         let bottom = if 160.0 - w / 2.0 < quick_right {
@@ -2862,7 +2875,7 @@ impl App {
             s.special_desc,
             &[
                 &tr(gauge.name()),
-                &crate::input::prompt(crate::input::Act::Special),
+                &ui::key(crate::input::prompt(crate::input::Act::Special)),
             ],
         );
         labeled(&mut y, s.special_name, gauge.color(), &desc);

@@ -1011,7 +1011,7 @@ impl App {
             Interact::Gate if village => s.ia_descend,
             Interact::Gate => s.ia_route,
         };
-        let text = fill(verb, &[&input::prompt(Act::Attack)]);
+        let text = fill(verb, &[&crate::ui::key(input::prompt(Act::Attack))]);
         let p = (anchor - w.adv.cam).round();
         let tw = ui.text_w(&text, FONT_PX) + 8.0;
         let mut r = Rect::new(
