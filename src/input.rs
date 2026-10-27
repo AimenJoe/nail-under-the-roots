@@ -369,6 +369,12 @@ pub fn verb(v: Verb) -> &'static str {
     }
 }
 
+/// 동사 이름이 누르는 것(키·패드 버튼·터치 화면 버튼)인가 — 그렇다면 안내 글에서 키캡으로 그린다(0153).
+/// 터치의 "탭"·"바깥 탭"·"끌기"는 손짓이라 글 그대로, 화면 버튼(MENU·ATK)은 키캡.
+pub fn verb_is_button(v: Verb) -> bool {
+    device() != Device::Touch || matches!(v, Verb::Menu | Verb::Restart)
+}
+
 pub fn bindings() -> Bindings {
     BINDINGS.read().map(|b| *b).unwrap_or(Bindings::DEFAULT)
 }
@@ -1239,6 +1245,12 @@ mod tests {
         for d in [Device::Keys, Device::Pad, Device::Touch] {
             set_device(d);
             assert!(all.iter().all(|v| !verb(*v).is_empty()), "{d:?}");
+            // 키·패드는 다 누르는 것, 터치는 화면 버튼(MENU·ATK)만(손짓 "탭"은 글 그대로).
+            let caps: Vec<_> = all.iter().filter(|v| verb_is_button(**v)).collect();
+            match d {
+                Device::Touch => assert_eq!(caps, [&Verb::Menu, &Verb::Restart]),
+                _ => assert_eq!(caps.len(), all.len()),
+            }
         }
         set_device(Device::Keys);
     }

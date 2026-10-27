@@ -112,16 +112,15 @@ const REBIND_TIMEOUT: f32 = 5.0;
 
 /// 안내 글의 동사 자리(`{0}`, `{1}` …)를 지금 장치(키보드·패드·터치)의 이름으로 채운다.
 fn vfill(t: &str, verbs: &[Verb]) -> String {
-    // 키·버튼 이름은 키캡으로(0153). 터치의 "탭"·"바깥 탭" 같은 말은 키가 아니라 그대로.
-    let touch = input::device() == Device::Touch;
+    // 키·버튼 이름은 키캡으로(0153). 터치의 "탭"·"바깥 탭" 같은 손짓은 그대로.
     let names: Vec<String> = verbs
         .iter()
         .map(|v| {
             let n = input::verb(*v);
-            if touch {
-                n.to_string()
-            } else {
+            if input::verb_is_button(*v) {
                 ui::key(n)
+            } else {
+                n.to_string()
             }
         })
         .collect();
