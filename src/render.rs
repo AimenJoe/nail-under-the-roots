@@ -833,6 +833,18 @@ fn portrait_px(scale: f32) -> f32 {
 mod portrait_tests {
     use super::*;
 
+    /// 눌린 그림자 타원(0150): 동서로 눕으면 가로로 길고, 남북으로 눕으면 폭이 줄지 않고 길이가 반이 된다.
+    #[test]
+    fn ground_shadow_keeps_width_north_south() {
+        let (rx, ry, _) = ground_ellipse(vec2(1.0, 0.0), 8.0, 4.0);
+        assert!((rx - 8.0).abs() < 1e-3 && (ry - 2.0).abs() < 1e-3);
+        let (rx, ry, _) = ground_ellipse(vec2(0.0, 1.0), 8.0, 4.0);
+        assert!(
+            (rx - 4.0).abs() < 1e-3 && (ry - 4.0).abs() < 1e-3,
+            "{rx} {ry}"
+        );
+    }
+
     #[test]
     fn portrait_fills_its_box() {
         for s in 1..=8 {
@@ -912,7 +924,7 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
             },
         );
         let border = if selected && w.deny[1] > 0.0 {
-            DENY_RED
+            deny_color(w.deny[1])
         } else if selected && flash_on {
             WHITE
         } else if selected {
@@ -998,6 +1010,18 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
         );
     }
     out.text(&hint, hx, y0 + 5.0, crate::ui::FONT_PX, crate::ui::TEXT);
+    // 못 먹었다(0149·0150): 고른 칸 위에 ✕.
+    if w.deny[1] > 0.0 {
+        let k = Consumable::ALL
+            .iter()
+            .position(|c| *c == w.bag.selected)
+            .unwrap_or(0) as f32;
+        deny_cross(
+            ui,
+            vec2(x0 + k * (size + gap) + size / 2.0, y0 + size / 2.0),
+            4.0,
+        );
+    }
 }
 
 /// 컷씬 배우(월드 패스 안에서, begin_world 뒤 present 전에).
@@ -4235,8 +4259,13 @@ fn draw_player_halo(p: Vec2, time: f32) {
 }
 
 /// 공격 예고의 불투명도(시작, 공격 직전). 채움은 바닥이 비치게 옅게, 테두리가 주로 읽힌다.
+/// 테두리는 밝은 산호색 + 하한 0.3(0150): 1·2형 색약·흑백 시뮬레이션에서 붉은 테두리(0.15~0.5)가 어두운 바닥에 묻혔다.
+/// 색이 아니라 밝기로 읽히게 올리고, 채움은 그대로 옅게 둔다("너무 샛빨갛다", 2026-10-25).
 const TELEGRAPH_FILL: (f32, f32) = (0.03, 0.16);
-const TELEGRAPH_EDGE: (f32, f32) = (0.15, 0.5);
+const TELEGRAPH_EDGE: (f32, f32) = (0.3, 0.65);
+const TELEGRAPH_EDGE_RGB: (f32, f32, f32) = (1.0, 0.55, 0.50);
+/// 마지막 깜빡임은 거의 흰빛.
+const TELEGRAPH_BLINK: Color = Color::new(1.0, 0.85, 0.80, 0.85);
 
 /// 공격 예고(바닥, 적·플레이어보다 먼저 그린다): 맞을 자리를 붉게, 공격 순간이 가까울수록 진하게.
 /// - 돌격형(떨기): 돌진할 길(몸 폭 × 돌진 거리, 벽에서 끊김)을 띠로. 방향은 지금 보는 쪽(떨기 끝에 굳는다).
@@ -4260,12 +4289,12 @@ fn draw_telegraphs(w: &World, alpha: f32) {
         );
         let blink = k > 0.85 && ((w.time * 16.0) as i32) % 2 == 0;
         let edge = if blink {
-            Color::new(1.0, 0.62, 0.6, TELEGRAPH_EDGE.1 + 0.12)
+            TELEGRAPH_BLINK
         } else {
             Color::new(
-                0.95,
-                0.38,
-                0.38,
+                TELEGRAPH_EDGE_RGB.0,
+                TELEGRAPH_EDGE_RGB.1,
+                TELEGRAPH_EDGE_RGB.2,
                 TELEGRAPH_EDGE.0 + (TELEGRAPH_EDGE.1 - TELEGRAPH_EDGE.0) * k,
             )
         };
@@ -4305,9 +4334,14 @@ fn draw_telegraphs(w: &World, alpha: f32) {
         let blink = k > 0.85 && ((w.time * 16.0) as i32) % 2 == 0;
         let edge_a = TELEGRAPH_EDGE.0 + (TELEGRAPH_EDGE.1 - TELEGRAPH_EDGE.0) * k;
         let edge = if blink {
-            Color::new(1.0, 0.62, 0.6, TELEGRAPH_EDGE.1 + 0.12)
+            TELEGRAPH_BLINK
         } else {
-            Color::new(0.95, 0.38, 0.38, edge_a)
+            Color::new(
+                TELEGRAPH_EDGE_RGB.0,
+                TELEGRAPH_EDGE_RGB.1,
+                TELEGRAPH_EDGE_RGB.2,
+                edge_a,
+            )
         };
         let fill = Color::new(
             0.95,
@@ -4395,7 +4429,8 @@ fn draw_thorn(c: Vec2, time: f32, near: f32) {
     );
     let dark = Color::new(0.16, 0.05, 0.10, 1.0);
     let body = Color::new(0.34, 0.12, 0.20, 1.0);
-    let spike = Color::new(0.96, 0.38, 0.50, 1.0);
+    // 가시는 밝게(0150): 색약 시뮬레이션(1·2형)에서 붉은 가시가 몸과 같은 어둠으로 묻혔다. 밝기 차로 "뾰족한 것"이 읽히게.
+    let spike = Color::new(1.0, 0.80, 0.84, 1.0);
     for (i, (dx, dy)) in [
         (-3.0, 1.0),
         (3.0, 1.5),
@@ -4694,7 +4729,11 @@ fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
     };
     ui.rect(Rect::new(x, 8.0, (bw * sp).round(), 5.0), gold);
     if w.deny[0] > 0.0 {
-        ui.rect_lines(Rect::new(x - 2.0, 6.0, bw + 4.0, 9.0), DENY_RED);
+        ui.rect_lines(
+            Rect::new(x - 2.0, 6.0, bw + 4.0, 9.0),
+            deny_color(w.deny[0]),
+        );
+        deny_cross(ui, vec2(x + bw / 2.0, 10.0), 3.0);
     }
     if full {
         let a = 0.5 + 0.5 * (w.time * 5.0).sin();
@@ -4706,8 +4745,56 @@ fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
     }
 }
 
+/// 바닥 위 타원(축 `g` 방향 반지름 `along`, 옆 `across`)을 3/4 시점으로(세로 ×0.5) 눌렀을 때 화면의 (가로 반지름, 세로 반지름, 각도°).
+/// 눌린 타원의 공분산 M·Mᵀ(M = 누름 × 돌림 × 반지름)의 고유값·고유벡터(0150).
+fn ground_ellipse(g: Vec2, along: f32, across: f32) -> (f32, f32, f32) {
+    let n = vec2(-g.y, g.x);
+    let (u, v) = (vec2(g.x, g.y * 0.5) * along, vec2(n.x, n.y * 0.5) * across);
+    let (xx, yy, xy) = (
+        u.x * u.x + v.x * v.x,
+        u.y * u.y + v.y * v.y,
+        u.x * u.y + v.x * v.y,
+    );
+    let mid = (xx + yy) * 0.5;
+    let d = (((xx - yy) * 0.5).powi(2) + xy * xy).sqrt();
+    let ang = 0.5 * (2.0 * xy).atan2(xx - yy);
+    (
+        (mid + d).sqrt(),
+        (mid - d).max(0.0).sqrt(),
+        ang.to_degrees(),
+    )
+}
+
 /// 할 수 없는 행동(0149)의 붉은 테두리.
 const DENY_RED: Color = Color::new(1.0, 0.30, 0.32, 1.0);
+
+/// 테두리는 흰색·붉은색을 번갈아 깜빡인다(0150): 1·2형 색약 시뮬레이션에서 붉은 테두리가 고른 칸의 금빛과 같아졌다.
+/// 밝기가 바뀌는 깜빡임과 ✕ 모양(`deny_cross`)은 색을 몰라도 읽힌다.
+fn deny_color(left: f32) -> Color {
+    if ((left * 16.0) as i32) % 2 == 0 {
+        WHITE
+    } else {
+        DENY_RED
+    }
+}
+
+/// 픽셀 ✕(반지름 `h`): 어두운 테두리 위에 흰 대각선 둘.
+fn deny_cross(ui: &Ui, c: Vec2, h: f32) {
+    let c = c.round();
+    let n = h as i32;
+    for (col, grow) in [(OUTLINE, 1), (WHITE, 0)] {
+        for i in -n..=n {
+            let f = i as f32;
+            for (dx, dy) in [(f, f), (f, -f)] {
+                let g = grow as f32;
+                ui.rect(
+                    Rect::new(c.x + dx - g, c.y + dy - g, 1.0 + 2.0 * g, 1.0 + 2.0 * g),
+                    col,
+                );
+            }
+        }
+    }
+}
 
 /// 떨림(px): 남은 시간 동안 1px씩 좌우로.
 fn deny_shake(left: f32) -> f32 {
@@ -5070,12 +5157,13 @@ fn draw_cast_shadows(w: &World, alpha: f32, cam: Vec2, fire_silhouettes: bool) {
             .collect();
         shades.sort_by(|a, b| b.0.total_cmp(&a.0));
         for (k, dir) in shades.into_iter().take(2) {
-            // 짧고 통통하게(0149): 예전 길이 size·0.8 + 16k, 폭 size·0.35(2px)라 바늘처럼 보였다(사장 "너무 뾰족").
-            let len = size * 0.9 + 8.0 * k;
-            // 3/4 시점: 바닥에 눕힌 그림자는 세로가 줄어든다.
-            let c = foot + vec2(dir.x, dir.y * 0.5) * (len * 0.4);
-            let ang = (dir.y * 0.5).atan2(dir.x).to_degrees();
-            let (rx, ry) = (len * 0.5 + 2.0, (size * 0.55).max(3.0));
+            // 바닥 위 타원을 세로 절반으로 눌러 그린다(0150): 3/4 시점에서 바닥은 세로가 반이다.
+            // 예전엔 화면에서 돌리기만 해서, 남북으로 눕는 그림자는 폭 3px 그대로 길게 서 막대처럼 얇았다.
+            let g = vec2(dir.x, dir.y * 2.0).normalize_or(vec2(1.0, 0.0));
+            let along = size * 0.45 + 4.0 * k + 2.0;
+            let across = size * 0.6 + 1.0;
+            let (rx, ry, ang) = ground_ellipse(g, along, across);
+            let c = foot + vec2(g.x, g.y * 0.5) * (along * 0.8);
             let a = (0.5 * k).min(0.4);
             // 가장자리를 한 겹 옅게 둘러 끝이 뾰족하지 않게.
             draw_ellipse(
