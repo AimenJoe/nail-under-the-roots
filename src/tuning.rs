@@ -112,7 +112,8 @@ pub const EMERGE_TIME: f32 = 0.12;
 /// 솟구친 직후 공격 불가 시간(리스크). 솟구친 뒤 바로 발톱으로 잇게 0.10 → 0.06(0090).
 pub const EMERGE_NO_ATTACK: f32 = 0.06;
 /// 기습 보상: 평타 한 대(1)보다 세게(0090).
-pub const EMERGE_DAMAGE: i32 = 2;
+/// 사장 2026-10-27: 톡은 1, 힘을 다 모으면 2(0090의 "세면 1로"를 힘 모으기와 함께 적용, 0158).
+pub const EMERGE_DAMAGE: i32 = 1;
 pub const EMERGE_KNOCKBACK: f32 = 340.0;
 pub const EMERGE_STUN: f32 = 0.6;
 pub const EMERGE_HITSTOP: f32 = 0.11;
