@@ -316,6 +316,9 @@ impl Renderer {
             if let Some(sp) = &w.spring {
                 draw_spring(sp, w.time);
             }
+            if let Some(at) = w.petal_at {
+                draw_left_petal(at, w.time);
+            }
             if let Some(d) = &w.deep {
                 draw_deep(d, w, alpha);
             }
@@ -2241,6 +2244,31 @@ fn draw_exit(p: Vec2, time: f32, down: bool) {
 }
 
 /// 길의 샘(0159): 돌 테두리의 맑은 웅덩이. 물결 고리가 퍼지고 반짝임이 떠다닌다. 마신 뒤엔 조용해진다.
+/// 모모가 남긴 시든 꽃잎(0164): 바닥에 놓인 작은 꽃잎, 분홍빛이 조금 남아 가끔 반짝인다.
+fn draw_left_petal(at: Vec2, time: f32) {
+    let (x, y) = (at.x.round(), at.y.round());
+    let bob = ((time * 1.4).sin() * 0.5).round();
+    draw_ellipse(x, y + 2.0, 4.0, 1.5, 0.0, SHADOW_SOFT);
+    let c = Color::new(0.74, 0.56, 0.60, 1.0);
+    let pink = Color::new(0.98, 0.70, 0.78, 1.0);
+    draw_rectangle(x - 2.0, y - 1.0 + bob, 5.0, 2.0, c);
+    draw_rectangle(x - 1.0, y - 2.0 + bob, 3.0, 1.0, c);
+    draw_rectangle(x - 1.0, y + 1.0 + bob, 2.0, 1.0, c);
+    draw_rectangle(x, y - 1.0 + bob, 1.0, 1.0, pink);
+    let tw = (time * 2.3).sin();
+    if tw > 0.6 {
+        let a = (tw - 0.6) / 0.4;
+        draw_rectangle(x + 2.0, y - 4.0, 1.0, 1.0, Color::new(1.0, 0.85, 0.9, a));
+        draw_rectangle(
+            x - 4.0,
+            y - 2.0,
+            1.0,
+            1.0,
+            Color::new(1.0, 0.85, 0.9, a * 0.7),
+        );
+    }
+}
+
 fn draw_spring(sp: &world::Spring, time: f32) {
     let (x, y) = (sp.pos.x.round(), sp.pos.y.round() + 2.0);
     let live = if sp.drunk { 0.35 } else { 1.0 };

@@ -216,6 +216,64 @@ mod device_tests {
         )));
     }
 
+    /// 오프닝의 모모(0164): 눈빛 → 등장 → 카드 → 덮침(Naïl이 밀려남) → 멈춤·착각 → 사라지며 시든 꽃잎을 남긴다
+    /// → 포포가 굳는다. 끝까지 돌리면 꽃잎이 바닥에 있고, 밟으면 줍는다.
+    #[test]
+    fn opening_momo_lunges_and_leaves_a_petal() {
+        let mut w = World::new();
+        let c = opening(&w);
+        let steps = &c.steps;
+        let pos = |f: &dyn Fn(&Step) -> bool| steps.iter().position(f);
+        let eyes = pos(&|s| matches!(s, Step::Cue { cue: Cue::Eyes, .. })).expect("눈빛");
+        let card = pos(&|s| matches!(s, Step::Card { name: "???", .. })).expect("카드");
+        let lunge = pos(&|s| matches!(s, Step::Move { actor: 1, speed, .. } if *speed > 200.0))
+            .expect("덮침");
+        let recoil = pos(&|s| matches!(s, Step::Move { actor: 0, speed, .. } if *speed > 150.0))
+            .expect("밀려남");
+        let leave = pos(&|s| {
+            matches!(
+                s,
+                Step::Cue {
+                    cue: Cue::Leave,
+                    ..
+                }
+            )
+        })
+        .expect("꽃잎");
+        let popo = pos(&|s| matches!(s, Step::Say { actor: 2, .. })).expect("포포");
+        assert!(eyes < card && card < lunge && lunge < recoil && recoil < leave && leave < popo);
+        // 포포의 첫마디는 굳은 말(Worried)이고, 그다음이 인사.
+        assert!(matches!(
+            steps[popo],
+            Step::Say {
+                face: Face::Worried,
+                ..
+            }
+        ));
+        // 끝까지 돌리면 자리에 꽃잎이 남는다.
+        let mut c = c;
+        let skip = Actions {
+            cancel: true,
+            ..Default::default()
+        };
+        for _ in 0..400 {
+            c.update(&skip, 1.0 / 60.0, &mut w);
+            if c.is_done() {
+                break;
+            }
+        }
+        assert!(c.is_done());
+        let at = w.petal_at.expect("시든 꽃잎이 남는다");
+        assert!(!w.petal_tick(), "멀리서는 안 줍는다");
+        w.player.pos = at;
+        assert!(w.petal_tick(), "밟으면 줍는다");
+        assert!(w.petal_found && w.petal_at.is_none());
+        assert!(w
+            .adv
+            .events
+            .contains(&crate::adventure::AdvEvent::PetalFound));
+    }
+
     /// 돌아오는 장면(0159): 실이 풀리는 이펙트가 먼저 나고, 그 뒤에야 배우가 보인다.
     #[test]
     fn returning_neighbor_appears_after_threads_unbind() {
@@ -634,6 +692,11 @@ impl Cutscene {
                     };
                 }
                 Step::Hush(on) => w.hush = on,
+                // 남는 것(0164): 건너뛰어도 시든 꽃잎은 자리에 둔다(이펙트는 없이).
+                Step::Cue {
+                    cue: Cue::Leave,
+                    at,
+                } => w.petal_at = Some(at),
                 _ => {}
             }
         }
@@ -1389,9 +1452,11 @@ pub fn opening(w: &World) -> Cutscene {
         },
         Step::Wait(0.3),
         say(0, Face::Worried, |s| s.op_1),
-        // 모모의 첫 등장(0159, 사장 "튜토리얼의 등장 씬 임팩트"): 보리가 돌아와 "그 아이도…"라 하기 전에
-        // 모모가 기억에 남아야 한다. 음악이 끊기고 시든 꽃잎이 날아들며 대낮에 어둠이 Naïl 둘레만 남기고 덮인다.
-        // 모모는 어둠 밖에서 걸어 나와 빛 가장자리에 선다 → '???' 카드 → 말 → 보라 울림과 함께 사라진다.
+        // 모모의 첫 등장(0159 → 0164, 사장 "아직도 임팩트 없지? 궁금해하는 게 없나"): 음악이 끊기고 시든 꽃잎이
+        // 날아들며 대낮에 어둠이 Naïl 둘레만 남긴다. 어둠 속에 보라 눈빛 두 점 → 모모가 걸어 나와 빛 가장자리에 선다
+        // → '???' 카드 → 순간에 덮쳐 한 방(피해 없음, Naïl이 밀려난다) → 스스로 멈춘다("…아니야.") → Naïl을
+        // 다른 누군가로 착각하고 이상한 한마디만 남긴다 → 보라 울림·꽃잎과 함께 사라지고 자리에 시든 꽃잎 하나 →
+        // 1초의 침묵 → 어둠이 걷힌다 → Naïl "지금… 뭐라고 한 거지?" → 포포가 뛰어오다 굳는다.
         Step::Hush(true),
         Step::Cue {
             cue: Cue::Petals(false),
@@ -1406,13 +1471,18 @@ pub fn opening(w: &World) -> Cutscene {
             secs: 1.0,
         },
         Step::Wait(0.3),
-        Step::Show {
-            actor: 1,
-            at: vec2(290.0, 90.0),
+        Step::Cue {
+            cue: Cue::Eyes,
+            at: vec2(262.0, 90.0),
         },
         Step::Face {
             actor: 0,
             dir: vec2(1.0, 0.0),
+        },
+        Step::Wait(1.2),
+        Step::Show {
+            actor: 1,
+            at: vec2(290.0, 90.0),
         },
         Step::Move {
             actor: 1,
@@ -1429,37 +1499,71 @@ pub fn opening(w: &World) -> Cutscene {
             sub: |s| s.mob_momo,
             secs: 3.0,
         },
-        say(1, Face::Normal, |s| s.op_2),
-        say(1, Face::Worried, |s| s.op_3),
-        say(0, Face::Normal, |s| s.op_4),
+        Step::Wait(1.0),
+        // 덮친다: 한 번에 Naïl 앞까지, Naïl은 밀려난다.
+        Step::Move {
+            actor: 1,
+            to: vec2(128.0, 90.0),
+            speed: 320.0,
+        },
         Step::Cue {
             cue: Cue::Rise,
-            at: vec2(188.0, 90.0),
+            at: vec2(118.0, 90.0),
+        },
+        Step::Shake(0.35),
+        Step::Move {
+            actor: 0,
+            to: vec2(92.0, 90.0),
+            speed: 220.0,
+        },
+        Step::Wait(0.6),
+        say(1, Face::Worried, |s| s.op_stop),
+        say(1, Face::Normal, |s| s.op_2),
+        say(1, Face::Worried, |s| s.op_3),
+        Step::Cue {
+            cue: Cue::Rise,
+            at: vec2(128.0, 90.0),
         },
         Step::Cue {
             cue: Cue::Petals(false),
-            at: vec2(188.0, 90.0),
+            at: vec2(128.0, 90.0),
         },
         Step::Shake(0.4),
         Step::Hide { actor: 1 },
+        Step::Cue {
+            cue: Cue::Leave,
+            at: vec2(136.0, 96.0),
+        },
+        // 침묵: 꽃잎만 떨어진다.
+        Step::Wait(1.0),
         Step::Gloom {
             to: 0.0,
             actor: 0,
             radius: 84.0,
             secs: 0.9,
         },
+        say(0, Face::Worried, |s| s.op_4),
+        Step::Wait(0.4),
         Step::Hush(false),
-        Step::Wait(0.3),
-        say(0, Face::Determined, |s| s.op_5),
-        // 라쿤 포포가 뛰어와 돕겠다고 한다(튜토리얼 안내).
+        // 라쿤 포포가 뛰어오다 모모가 선 자리를 보고 굳는다 → 그다음에야 안내.
         Step::Show {
             actor: 2,
             at: vec2(150.0, 150.0),
         },
         Step::Move {
             actor: 2,
-            to: vec2(140.0, 100.0),
+            to: vec2(120.0, 104.0),
             speed: 70.0,
+        },
+        Step::Face {
+            actor: 2,
+            dir: vec2(1.0, 0.0),
+        },
+        Step::Wait(0.5),
+        say(2, Face::Worried, |s| s.popo_hi0),
+        Step::Face {
+            actor: 2,
+            dir: vec2(-1.0, 0.0),
         },
         Step::Face {
             actor: 0,

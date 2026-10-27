@@ -286,6 +286,12 @@ impl App {
                 }
                 AdvEvent::DeepIntro => self.play(cutscene::halmae_meet(&self.world)),
                 AdvEvent::DeepDone => self.reach_deepest(),
+                AdvEvent::PetalFound => {
+                    if self.recording() {
+                        self.profile.set(crate::profile::key::PETAL);
+                        self.save_profile();
+                    }
+                }
                 AdvEvent::DeepSleep => {
                     // 잠드는 장면(0163) 뒤 맡겨 둔 쉼터로.
                     self.after_cutscene = super::AfterCut::Respawn;

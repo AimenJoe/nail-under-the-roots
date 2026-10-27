@@ -975,7 +975,8 @@ impl App {
             self.profile.raise(&crate::daily::key_best(today), 1);
             crate::profile::save(&self.profile);
         }
-        // 도감은 런을 넘어 남는다.
+        // 도감은 런을 넘어 남는다. 시든 꽃잎(0164)도.
+        self.world.petal_found = self.profile.flag(crate::profile::key::PETAL);
         for k in crate::species::BESTIARY {
             if self.profile.flag(&crate::profile::key::mob(k)) && !self.world.seen.contains(&k) {
                 self.world.seen.push(k);
@@ -2998,6 +2999,7 @@ impl App {
         for (i, k) in BESTIARY.iter().enumerate().skip(first).take(fits) {
             let r = Rect::new(c.x, c.y + (i - first) as f32 * row_h, list_w, row_h - 1.0);
             let known = seen.contains(k);
+            let hinted = *k == crate::enemy::Kind::Momo && self.world.petal_found;
             let name = if known {
                 tr(k.species().name)
             } else {
@@ -3015,7 +3017,7 @@ impl App {
                 FONT_PX,
                 if on {
                     ui::ACCENT
-                } else if known {
+                } else if known || hinted {
                     ui::TEXT
                 } else {
                     ui::TEXT_DIM
@@ -3035,7 +3037,15 @@ impl App {
         let x = c.x + list_w + 8.0;
         let w = c.right() - x;
         if !seen.contains(&k) {
-            ui.text(s.best_unseen, x, c.y + 20.0, FONT_PX, ui::TEXT_DIM);
+            // 시든 꽃잎(0164)을 주웠으면 모모 칸엔 물음만 선다.
+            let text = if k == crate::enemy::Kind::Momo && self.world.petal_found {
+                s.best_petal
+            } else {
+                s.best_unseen
+            };
+            for (i, l) in ui::wrap(ui, text, w - 6.0, FONT_PX).iter().enumerate() {
+                ui.text(l, x, c.y + 20.0 + i as f32 * 12.0, FONT_PX, ui::TEXT_DIM);
+            }
             return;
         }
         let sp = k.species();

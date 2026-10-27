@@ -122,6 +122,8 @@ pub enum AdvEvent {
     DeepIntro,
     DeepDone,
     DeepSleep,
+    /// 모모가 남긴 시든 꽃잎을 주웠다(0164): 기록에 남기고 도감 '???' 칸.
+    PetalFound,
 }
 
 /// 확인 버튼으로 하는 일(쉼터).
@@ -508,6 +510,7 @@ impl World {
     fn swap_place(&mut self, f: &mut Fade) {
         f.swapped = true;
         self.spring = None;
+        self.petal_at = None;
         self.exit_at = None;
         self.exit_age = 0.0;
         self.petals = false;
@@ -535,6 +538,9 @@ impl World {
         }
         if self.spring_tick() {
             sfx.play(sfx::Id::Heal);
+        }
+        if self.petal_tick() {
+            sfx.play(sfx::Id::Glowbug);
         }
         if self.adv.place == Place::Field {
             if let Some(id) = self.field_boss() {

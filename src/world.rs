@@ -107,6 +107,10 @@ pub enum Cue {
     Vanish,
     /// 실에 감겨 잠긴다(0163): 보라 고리가 조여 오고 실이 휘감는다, 땅 울림.
     Wrap,
+    /// 어둠 속 눈빛(0164): 보라 빛 두 점이 천천히 깜빡인다(나타나기 전).
+    Eyes,
+    /// 떠난 자리에 시든 꽃잎 하나를 남긴다(0164): `World::petal_at`. 밟으면 토스트 + 도감 '???'.
+    Leave,
 }
 
 /// 이웃이 누구인가(그림·말).
@@ -357,6 +361,10 @@ pub struct World {
     pub slams: u32,
     /// 길의 샘(0159): 쉼방 가운데의 맑은 샘. 발을 담그면 한 번 가득 회복.
     pub spring: Option<Spring>,
+    /// 모모가 떠난 자리의 시든 꽃잎(0164). 밟으면 줍는다(`petal_tick`).
+    pub petal_at: Option<Vec2>,
+    /// 시든 꽃잎을 주웠다(기록 `key::PETAL`): 모모를 만나기 전에도 도감에 '???' 칸이 선다.
+    pub petal_found: bool,
     /// 가장 깊은 곳의 실매듭 끊기(0162). 있으면 할매·매듭·당기기가 돈다.
     pub deep: Option<Deep>,
     /// 끝방의 출구 자리(0159)와 생긴 뒤 흐른 초: 화면 밖이면 HUD 가장자리 표시가 가리킨다(`EXIT_MARK_DELAY` 뒤).
@@ -453,6 +461,8 @@ impl World {
             chests: 0,
             springs: 0,
             spring: None,
+            petal_at: None,
+            petal_found: false,
             deep: None,
             exit_at: None,
             exit_age: 0.0,
@@ -1838,6 +1848,18 @@ impl World {
                 unravel(&mut self.fx, at, 18.0);
                 unravel(&mut self.fx, at, 28.0);
             }
+            Cue::Eyes => {
+                let violet = Color::new(0.80, 0.45, 1.0, 1.0);
+                for (k, dx) in [-4.0, 4.0].into_iter().enumerate() {
+                    let mut g = glint(at + vec2(dx, -6.0), violet, 1.6);
+                    g.time = -0.1 * k as f32;
+                    self.fx.push(g);
+                }
+            }
+            Cue::Leave => {
+                self.petal_at = Some(at);
+                petals(&mut self.fx, at, 6, Color::new(0.74, 0.56, 0.60, 1.0), 30.0);
+            }
             Cue::Sparkle => {
                 self.sounds.push(sfx::Id::Glowbug);
                 for k in 0..6 {
@@ -1855,6 +1877,30 @@ impl World {
     }
 
     /// 길의 샘(0159): 발을 담그면 가득 회복. 한 번만. 회복했으면 true(소리는 부르는 쪽).
+    /// 시든 꽃잎(0164): 밟으면 줍는다 — 토스트, 분홍 반짝임, 도감 '???'. 앱이 기록에 남긴다(`AdvEvent::PetalFound`).
+    pub fn petal_tick(&mut self) -> bool {
+        let Some(at) = self.petal_at else {
+            return false;
+        };
+        if !self.player.is_alive()
+            || !self.player.on_foot()
+            || (self.player.pos - at).length() > 10.0
+        {
+            return false;
+        }
+        self.petal_at = None;
+        self.petal_found = true;
+        self.toast = Some((|s| s.toast_petal, 3.0));
+        self.fx.push(glint(
+            at + vec2(0.0, -4.0),
+            Color::new(1.0, 0.72, 0.80, 1.0),
+            0.6,
+        ));
+        petals(&mut self.fx, at, 4, Color::new(0.74, 0.56, 0.60, 1.0), 24.0);
+        self.adv.events.push(crate::adventure::AdvEvent::PetalFound);
+        true
+    }
+
     pub fn spring_tick(&mut self) -> bool {
         let Some(sp) = &mut self.spring else {
             return false;
