@@ -137,6 +137,12 @@ pub struct World {
     pub enemies: Vec<Enemy>,
     pub projectiles: Vec<Projectile>,
     pub fx: Vec<Fx>,
+    /// 입자 효과 설정(0..=1, 0141). 1보다 작으면 새로 생긴 장식 효과(먼지·흙덩이·불똥·반짝임·실)를 그 비율만 남긴다.
+    /// 공격 범위를 보여 주는 고리(Ring)는 놀이 정보라 늘 남긴다.
+    pub effects: f32,
+    /// `fx` 앞에서부터 이미 남길지 정한 개수(새 효과는 늘 뒤에 붙는다). 줄이는 몫의 누적값.
+    fx_checked: usize,
+    fx_acc: f32,
     pub pickups: Vec<Pickup>,
     /// 바닥의 반딧불·산딸기.
     pub loot: Vec<Loot>,
@@ -227,6 +233,9 @@ impl World {
             enemies: Vec::new(),
             projectiles: Vec::new(),
             fx: Vec::new(),
+            effects: 1.0,
+            fx_checked: 0,
+            fx_acc: 0.0,
             pickups: Vec::new(),
             loot: Vec::new(),
             glowbugs: 0,
@@ -298,6 +307,34 @@ impl World {
     }
 
     pub fn tick(&mut self, a: &Actions, sfx: &Sfx) {
+        self.step(a, sfx);
+        self.thin_fx();
+    }
+
+    /// 입자 효과 설정(0141): 지난번 뒤로 새로 생긴 장식 효과를 `effects` 비율만 남긴다. 난수를 쓰지 않고 몫을 쌓아
+    /// 고르게 솎는다(0.5면 둘에 하나). 어디서 효과를 만들든(월드·모험·컷씬) 여기 한 곳에서 거른다.
+    fn thin_fx(&mut self) {
+        let start = self.fx_checked.min(self.fx.len());
+        if self.effects < 1.0 {
+            let mut i = start;
+            while i < self.fx.len() {
+                if matches!(self.fx[i].kind, FxKind::Ring { .. }) {
+                    i += 1;
+                    continue;
+                }
+                self.fx_acc += self.effects.max(0.0);
+                if self.fx_acc >= 1.0 {
+                    self.fx_acc -= 1.0;
+                    i += 1;
+                } else {
+                    self.fx.remove(i);
+                }
+            }
+        }
+        self.fx_checked = self.fx.len();
+    }
+
+    fn step(&mut self, a: &Actions, sfx: &Sfx) {
         let dt = t::TICK_DT;
         self.time += dt;
         if self.adventure_pre(sfx) {
@@ -1052,7 +1089,18 @@ impl World {
                 _ => f.vel *= 0.9,
             }
         }
-        self.fx.retain(|f| f.time < f.dur);
+        // 끝난 효과를 지운다. 이미 거른 것(앞쪽)이 몇 개 남는지 세어 둔다(thin_fx가 새것만 보게).
+        let checked = self.fx_checked;
+        let (mut idx, mut kept) = (0, 0);
+        self.fx.retain(|f| {
+            let keep = f.time < f.dur;
+            if idx < checked && keep {
+                kept += 1;
+            }
+            idx += 1;
+            keep
+        });
+        self.fx_checked = kept;
         // 발걸음 먼지(0081): 걷는 동안 12px마다 발 뒤에 작은 먼지. 효과가 넘치면 건너뛴다.
         let moved = (self.player.pos - self.player.prev_pos).length();
         if self.player.is_alive() && self.player.on_foot() && moved > 0.2 {
@@ -1431,6 +1479,49 @@ fn burst(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
 mod tests {
     use super::*;
     use crate::enemy::{Enemy, Kind};
+
+    /// 입자 효과 설정(0141): 새 장식 효과는 비율만큼 고르게 남고, 공격 범위 고리는 늘 남는다. 한 번 거른 것은 다시 거르지 않는다.
+    #[test]
+    fn effects_setting_thins_decorative_fx_but_keeps_rings() {
+        let dust = |x: f32| Fx {
+            pos: vec2(x, 0.0),
+            vel: Vec2::ZERO,
+            time: 0.0,
+            dur: 1.0,
+            kind: FxKind::Puff {
+                r0: 1.0,
+                r1: 2.0,
+                color: WHITE,
+            },
+        };
+        let ring = Fx {
+            pos: Vec2::ZERO,
+            vel: Vec2::ZERO,
+            time: 0.0,
+            dur: 1.0,
+            kind: FxKind::Ring {
+                r0: 1.0,
+                r1: 20.0,
+                color: WHITE,
+            },
+        };
+        let mut w = World::new();
+        w.effects = 0.5;
+        w.fx.extend((0..10).map(|i| dust(i as f32)));
+        w.fx.push(ring);
+        w.thin_fx();
+        assert_eq!(w.fx.len(), 6, "먼지 열 중 다섯 + 고리");
+        assert!(w.fx.iter().any(|f| matches!(f.kind, FxKind::Ring { .. })));
+        // 이미 거른 것은 그대로, 새로 붙은 것만 거른다.
+        w.fx.extend((0..4).map(|i| dust(i as f32)));
+        w.thin_fx();
+        assert_eq!(w.fx.len(), 8);
+        // 0이면 장식은 하나도 남지 않는다.
+        w.effects = 0.0;
+        w.fx.extend((0..5).map(|i| dust(i as f32)));
+        w.thin_fx();
+        assert_eq!(w.fx.len(), 8);
+    }
 
     /// 밀쳐내기(0090): 둘레의 잡몹은 피해 없이 바깥으로 밀리고 멈춘다. 가까울수록 세다. 이미 맞은 적·보스·멀리 있는 적은 그대로.
     #[test]

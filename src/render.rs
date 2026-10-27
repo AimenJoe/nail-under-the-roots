@@ -53,6 +53,8 @@ pub struct Renderer {
     cam: Camera2D,
     fonts: Fonts,
     art: Option<Art>,
+    /// 입자 효과 설정(0..=1, 0141): 일러스트·타이틀의 입자를 이 비율만 그린다. 앱이 프레임마다 넣는다.
+    pub effects: f32,
     /// 글자를 미리 구운 (언어, 배율, dpi). 바뀌면(언어 전환·창 크기) 다시 굽는다.
     warmed: std::cell::Cell<Option<(crate::i18n::Lang, u32, u32)>>,
     /// 이번 프레임 월드 화면의 왼쪽 위(월드 좌표, 흔들림 포함). 월드 패스 뒤에는 카메라가 화면 고정이라
@@ -93,6 +95,7 @@ impl Renderer {
             cam,
             fonts,
             art,
+            effects: 1.0,
             warmed: std::cell::Cell::new(None),
             view_origin: Vec2::ZERO,
             subpixel: Vec2::ZERO,
@@ -548,6 +551,9 @@ impl Renderer {
             (270.0, 292.0, 0.9),
         ];
         for (i, &(x, y, ph)) in FLIES.iter().enumerate() {
+            if !keep_share(i, self.effects) {
+                continue;
+            }
             let s = 0.35 + 0.07 * i as f32;
             let px = x + (t * s + ph).sin() * 10.0;
             let py = y + (t * s * 2.0 + ph).sin() * 5.0;
@@ -562,6 +568,9 @@ impl Renderer {
         }
         // 물든 뿌리 끝(오른쪽 아래)에서 보라 알갱이가 천천히 떠올라 사라진다.
         for i in 0..9 {
+            if !keep_share(i, self.effects) {
+                continue;
+            }
             let f = i as f32;
             let period = 7.0 + (f * 1.37) % 3.0;
             let p = ((t + f * 2.9) / period).fract();
@@ -610,7 +619,10 @@ impl Renderer {
             }
             None => draw_rectangle(o.x, o.y, w, h, Color::new(0.08, 0.06, 0.10, 1.0)),
         }
-        for p in illust::particles(spec.fx, t) {
+        for (i, p) in illust::particles(spec.fx, t).into_iter().enumerate() {
+            if !keep_share(i, self.effects) {
+                continue;
+            }
             draw_rectangle(
                 (o.x + p.pos.x * k).round(),
                 (o.y + p.pos.y * k).round(),
@@ -1849,6 +1861,11 @@ fn draw_save_lights(w: &World, cam: Vec2, light: Option<&Material>) {
 }
 
 /// 0..1 해시(환경 입자 자리, 0081). 같은 번호면 같은 값이라 상태 없이 그린다.
+/// 입자 효과 설정(0141): 번호 `i`의 입자를 그릴까. `share`(0..=1) 비율만큼 고르게 고른다(0.5면 둘에 하나, 1이면 모두).
+fn keep_share(i: usize, share: f32) -> bool {
+    ((i + 1) as f32 * share).floor() > (i as f32 * share).floor()
+}
+
 fn hash01(i: u32, k: u32) -> f32 {
     let mut x = i.wrapping_mul(0x9E37_79B9) ^ k.wrapping_mul(0x85EB_CA6B);
     x ^= x >> 15;
@@ -1868,6 +1885,10 @@ fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
     let (tw, th) = (RW + 48.0, RH + 48.0);
     let n = if deep { 18 } else { 22 };
     for i in 0..n {
+        // 입자 효과 설정(0141): 그 비율만.
+        if !keep_share(i as usize, w.effects) {
+            continue;
+        }
         let (hx, hy, hs) = (hash01(i, 1), hash01(i, 2), hash01(i, 3));
         let t = w.time;
         let (drift, color, size) = match w.biome {

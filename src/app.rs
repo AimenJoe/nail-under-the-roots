@@ -72,10 +72,11 @@ const PAUSE_MENU: [Tr; 4] = [
     |s| s.pm_settings,
     |s| s.pm_title,
 ];
-const SETTING_ROWS: [Tr; 9] = [
+const SETTING_ROWS: [Tr; 10] = [
     |s| s.set_sound,
     |s| s.set_music,
     |s| s.set_shake,
+    |s| s.set_effects,
     |s| s.set_debug,
     |s| s.set_language,
     |s| s.set_assist,
@@ -84,10 +85,12 @@ const SETTING_ROWS: [Tr; 9] = [
     |s| s.set_back,
 ];
 /// 설정의 "포포의 응원"·"조작 설정"·"기록 지우기"·"돌아가기" 줄.
-const SETTING_ASSIST: usize = 5;
-const SETTING_CONTROLS: usize = 6;
-const SETTING_ERASE: usize = 7;
-const SETTING_BACK: usize = 8;
+const SETTING_ASSIST: usize = 6;
+const SETTING_CONTROLS: usize = 7;
+const SETTING_ERASE: usize = 8;
+const SETTING_BACK: usize = 9;
+/// 설정 창에 한 번에 보이는 줄. 줄이 더 많으면 고른 줄이 보이게 굴린다(입자 줄을 더해 열 줄이 됐다, 0141).
+const SETTING_VISIBLE: usize = 9;
 /// 값이 아니라 누르는 줄(좌우로 바뀌지 않는다).
 fn setting_is_button(i: usize) -> bool {
     matches!(i, SETTING_CONTROLS | SETTING_ERASE | SETTING_BACK)
@@ -186,6 +189,8 @@ pub struct Settings {
     /// 음악 크기(0..=10, 효과음과 따로, 0081).
     pub music: u8,
     pub shake: u8,
+    /// 입자 효과(0..=10, 0141). 0이면 먼지·불똥·환경 입자를 그리지 않는다(공격 범위 고리는 남긴다).
+    pub effects: u8,
     pub debug_overlay: bool,
     /// 사람이 고른 언어(None = 기기 언어).
     pub lang: Option<i18n::Lang>,
@@ -197,6 +202,9 @@ impl Settings {
     }
     fn shake_f(&self) -> f32 {
         self.shake as f32 / 10.0
+    }
+    fn effects_f(&self) -> f32 {
+        self.effects as f32 / 10.0
     }
 }
 
@@ -488,6 +496,7 @@ impl App {
             volume: saved.map(|p| p.volume).unwrap_or(7),
             music: saved.map(|p| p.music).unwrap_or(7),
             shake: saved.map(|p| p.shake).unwrap_or(10),
+            effects: saved.map(|p| p.effects).unwrap_or(10),
             debug_overlay: false,
             lang: saved.and_then(|p| p.lang),
         };
@@ -789,6 +798,7 @@ impl App {
             if a.restart || (unlocked && (a.confirm || a.attack)) {
                 restart = true;
             }
+            self.world.effects = self.settings.effects_f();
             self.world.tick(&a, &self.sfx);
             self.acc -= t::TICK_DT;
         }
@@ -1250,11 +1260,12 @@ impl App {
                 self.music.set_volume(self.settings.music as f32 / 10.0);
             }
             2 => self.settings.shake = (self.settings.shake as i8 + d).clamp(0, 10) as u8,
-            3 => {
+            3 => self.settings.effects = (self.settings.effects as i8 + d).clamp(0, 10) as u8,
+            4 => {
                 self.settings.debug_overlay = !self.settings.debug_overlay;
                 self.world.debug.overlay = self.settings.debug_overlay;
             }
-            4 => {
+            5 => {
                 let l = i18n::lang().cycle(d);
                 i18n::set_lang(l);
                 self.settings.lang = Some(l);
@@ -1276,6 +1287,7 @@ impl App {
             volume: self.settings.volume,
             music: self.settings.music,
             shake: self.settings.shake,
+            effects: self.settings.effects,
             lang: self.settings.lang,
             bindings: crate::input::bindings(),
         });
@@ -1543,6 +1555,7 @@ impl App {
         } else {
             1.0
         };
+        self.renderer.effects = self.settings.effects_f();
         self.renderer.begin_world(
             if in_world { Some(&self.world) } else { None },
             alpha,
@@ -2275,7 +2288,7 @@ impl App {
     }
 
     fn draw_settings(&mut self, ui: &Ui) {
-        // 줄이 아홉(음악 크기를 따로 둔 뒤, 0081): 창을 위로 붙이고 줄 간격을 1px 줄여 아래 안내 두 줄 자리를 남긴다.
+        // 창을 위로 붙이고 줄 간격을 1px 줄여 아래 안내 두 줄 자리를 남긴다(0081). 열 줄이 되어 아홉 줄만 보이고 굴린다(0141).
         let panel = Rect::new(56.0, 0.0, 208.0, 155.0);
         let s = i18n::s();
         ui.panel(panel, Some(s.settings));
@@ -2284,6 +2297,7 @@ impl App {
             format!("{}%", self.settings.volume * 10),
             format!("{}%", self.settings.music * 10),
             format!("{}%", self.settings.shake * 10),
+            format!("{}%", self.settings.effects * 10),
             if self.settings.debug_overlay {
                 s.on
             } else {
@@ -2302,8 +2316,19 @@ impl App {
             String::new(),
         ];
         let row_h = FONT_PX + 3.0;
-        for (i, label) in trs(&SETTING_ROWS).into_iter().enumerate() {
-            let y = panel.y + 18.0 + i as f32 * row_h;
+        // 줄이 창보다 많다: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
+        let n = SETTING_ROWS.len();
+        let first = self
+            .settings_cursor
+            .saturating_sub(SETTING_VISIBLE - 1)
+            .min(n.saturating_sub(SETTING_VISIBLE));
+        for (i, label) in trs(&SETTING_ROWS)
+            .into_iter()
+            .enumerate()
+            .skip(first)
+            .take(SETTING_VISIBLE)
+        {
+            let y = panel.y + 18.0 + (i - first) as f32 * row_h;
             let selected = self.settings_cursor == i;
             if setting_is_button(i) {
                 let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, FONT_PX + 3.0);
@@ -2339,6 +2364,25 @@ impl App {
                 self.hits.push((r, Hit::SettingRight(i)));
                 self.hits.push((row, Hit::SettingRow(i)));
             }
+        }
+        // 가려진 줄이 있으면 위·아래 끝에 표시.
+        if first > 0 {
+            ui.text(
+                "▲",
+                panel.right() - 14.0,
+                panel.y + 4.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
+        if first + SETTING_VISIBLE < n {
+            ui.text(
+                "▼",
+                panel.right() - 14.0,
+                panel.bottom() - 13.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
         }
         let settings_hint = vfill(s.settings_hint, &[Verb::Change]);
         for (i, l) in ui::wrap(ui, &settings_hint, 300.0, FONT_PX)
