@@ -93,7 +93,7 @@
 | 콩이의 문·독일어·러시아어(0085) | `illust.py`(kongi_door), `illust.rs`(KongiDoor), `cutscene.rs`(kongi_returns), `app.rs`(앨범 5칸·두 줄 굴리기), `i18n.rs`(DE·RU, kongi_door), `prefs.rs`(8·9) | 콩이가 지키던 문의 컷씬 그림(지금은 나노바나나, 0136)·내레이션, 앨범 스크롤, 아홉 언어 |
 | 소리 파일(0081) | `tools/audio/make_audio.py`, `assets/sfx`·`assets/music`, `sfx.rs`(FILES·변형), `music.rs`(TRACKS·들을 때 읽기·KEEP), `app.rs`(menu_sound) | CC0 효과음(Kenney: 메뉴·사기·안 됨·맞음·쓰러짐·다침·상자)·음악 7곡(칩튠 Aureolus_Omicron 넷 + 쉬는 곳 피아노·바이올린 셋, 0154). 웹 헤드리스로 받기·재생·고리 확인, 네이티브 실제 소리는 미확인 |
 | 강공격(0161) | `input.rs`(attack_held), `player.rs`(Charging·Heavy·heavy_strike·parry_heavy), `moveset.rs`(heavy_of), `combat.rs`(StrikeKind::Heavy), `world.rs`, `render.rs`, `tutorial.rs`(Stage::Heavy) | 누르는 순간 평타, 누르고 있으면 활성 구간 뒤 모으기 → 0.45초 뒤 떼면 피해 2 이상·반지름 1.3배 한 방(마지막 타에서 만든다), 콤보는 다음 타로(후딜레이는 못 끊지만 잠금은 없다, 0167). 첫머리 창은 진홍 고리 공격도 받아친다. 튜토리얼 열 단계 중 4번째 |
-| 박자 콤보(0167) | `player.rs`(queued·on_beat·buffer), `tuning.rs`(BEAT_GRACE·MASH_PENALTY), `world.rs`·`sfx.rs`(Beat) | 평타는 누르는 순간. 스윙 중 눌림은 박자 창(활성 끝 0.03초 앞~) 안이면 활성 끝에 바로(최속, 반짝임 + '틱'), 창 전이면(연타) 스윙·후딜레이 + 0.08초 뒤(버려지진 않음). 강공격 뒤 잠금 없음 |
+| 박자 콤보(0167 → 0174) | `player/`(Queued·beat_clock·beat_at·combo_pending·queue_due·beat_cue·beat_pips), `tuning.rs`(BEAT_PERIOD·BEAT_WINDOW·BEAT_RING_*·BEAT_PIP_SHOW), `world.rs`·`sfx.rs`(Beat(n) 도미솔도), `render/actors.rs`(draw_beat_cue) | 평타는 누르는 순간. 다음 타의 박자는 스윙 시작 0.25초 뒤(스윙·후딜레이가 길면 그 끝). 창 ±0.06초 안이면 그 자리에서 + 덤·퍼지는 고리·오르는 종소리·머리 위 음표, 창 전이면 박자까지 기다렸다(스냅, 덤 없음), 창 뒤면 그 자리에서(덤 없음). 닫히는 고리가 박자를 보여 준다. 강공격 뒤 잠금 없음 |
 | 타격 피드백·강타 보상(0168) | `tuning.rs`(KICK_*·BEAT_*·HEAVY_PERFECT·WALL_SLAM_*·CHARGE_PULL_*), `combat.rs`(Feel::kick), `moveset.rs`(heavy_of), `player.rs`(on_beat·combo_beats·perfect), `enemy.rs`(slam), `world.rs`, `render.rs`(draw_enemy 진동·눌림, 킥), `sfx.rs`(ChargeUp·HitTick) | 히트스톱 5/9/13f, 맞은 적 진동·눌림, 맞히면 전진 멈춤 + 카메라 킥 2/3/4px, '틱'. 강타 피해 3·경직 +0.5·넉백 ×1.7 → 벽 쿵 +1, 콩이 등딱지 깨기, 모으는 동안 소리·웅크림·먼지. 박자 타 덤, 이음 다 맞춘 마무리 ×1.25, 다 모인 직후 뗀 강타 +1 |
 | 코드 건강(0169 R1~R4) | `sfx.rs`(Queue·flush), `world.rs`(step 단계 메서드·enemy_down·Inventory·Story·RunStats·Hazards·Juice), `render/`(아홉 모듈), `app/`(pause·settings·album·title, start 넷으로), `scenario.rs`(통째 시험) | 로직은 오디오 장치를 모른다 → 시나리오 37개를 600틱씩 돌리는 시험. 동작 변화는 적 쓰러짐 손맛 통일뿐 |
 | 코드 건강(0169 R5~R8) | `enemy/`(mod·melee·ranged·boss, `Ctx`), `i18n/`(mod + 언어 열하나), `tools/test/smoke.js`·`smoke-web.yml`, `equipment.rs`(발톱 상수), `profile.rs`·`prefs.rs`·`suspend.rs`(고정 샘플 시험), `tools/art/legacy/`, `build-android.yml`·`build-ios.yml`(main만), `render/actors.rs`(모모 웅크림) | 브라우저 연기 시험이 main push마다 돈다. 동작 변화는 모모 모으기 웅크림 1px뿐 |
@@ -167,6 +167,7 @@
 - [x] D. 스테이지 다양화(0147): 뿌리 지대 가시뿌리 덤불(걸으면 찔림, 돌진하던 적은 박혀 멈칫), 심층 무너지는 천장(예고 뒤 돌), 길 지도 "실타래" 칸(엘리트 + 졸개 둘, 이기면 장신구). 세기·빈도는 사장(개발 → "실타래 굴: 뿌리/심층")
 - [x] E. 열한 언어·도감·저널(0146·0147·0162·0165의 글은 모두 열한 언어. 앨범은 토끼풀 일러스트 원본이 오면)
 - [ ] F. 사장 판정
+- [ ] **박자 콤보(0174)**: 0.25초 템포가 "타·타·탕"으로 읽히는지, 창 ±0.06초, 연타가 박자에 스냅되는 게 둔하지 않은지, 닫히는 고리·종소리·음표가 싸움을 가리거나 유치하지 않은지, 모모 발차기의 쉼
 
 ### v0.3.0 마일스톤(0081·0140) — 닫음(2026-10-27, 사장 결정으로 v0.3.0 배포, 0148). 7·10~12는 아래 "먼저"로 넘김
 - [x] 1~6. 특수효과·소리 바탕·메뉴 소리·효과음·음악(0081)
