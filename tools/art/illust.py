@@ -9,7 +9,7 @@
   halmae_deep  704×360  오른쪽으로 64px 패닝
   momo_deep    704×360  왼쪽 → 오른쪽으로 64px 패닝
   last_bloom   640×440  위(꽃) → 아래(밑동)로 패닝
-  나머지       640×360(doto_memory 포함 — 도토가 기억해 내는 장면, 0053)
+  나머지       640×360(doto_memory 포함 — 도토가 기억해 내는 장면, 0053. clover_cocoon — 실 속에서 아기들의 고치를 품은 토끼풀, 0165: 코드 그림이 없고 나노바나나 원본만)
   title        640×360 타이틀 바탕(0083, 컷씬 그림이 아니다: 앨범에 없다, assets/art/illust/title.png)
 대화창·내레이션 띠가 보이는 창의 y 248 아래를 덮는다 → 얼굴·중요한 것은 그 위에.
 
@@ -1645,6 +1645,10 @@ def title_fog():
     return _Rgba(Image.fromarray(rgba, 'RGBA'))
 
 
+def clover_cocoon():
+    raise SystemExit('clover_cocoon은 코드 그림이 없다: 나노바나나 원본 tools/art/sources/ai/illust/clover_cocoon.png이 필요하다(0165)')
+
+
 SCENES = {
     'great_tree': great_tree,
     'mother_burrow': mother_burrow,
@@ -1657,6 +1661,7 @@ SCENES = {
     'molehill': molehill,
     'doto_memory': doto_memory,
     'kongi_door': kongi_door,
+    'clover_cocoon': clover_cocoon,
     'title': title,
     'title_fog': title_fog,
 }

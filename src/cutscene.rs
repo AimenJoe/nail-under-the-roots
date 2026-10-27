@@ -989,6 +989,10 @@ pub fn clover_returns(w: &World, at: Vec2) -> Cutscene {
     let near = w.player.pos + vec2(side, 0.0);
     let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
     let mut steps = unbind_steps(at, 1, false);
+    // 실이 풀린 뒤, 그동안의 모습 한 장(0165): 실에 감긴 채 아기들의 고치를 품고 잠들어 있던 어미. 내레이션 한 줄.
+    steps.extend(cut_to(Some(Illust::CloverCocoon)));
+    steps.push(Step::Narrate(|s| s.clover_cocoon));
+    steps.extend(cut_to(None));
     steps.extend([
         say(1, Face::Normal, |s| s.clover_b1),
         Step::Move {
