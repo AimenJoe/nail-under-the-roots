@@ -274,6 +274,41 @@ mod device_tests {
             .contains(&crate::adventure::AdvEvent::PetalFound));
     }
 
+    /// 토끼풀 가족(0165): 실이 풀린 뒤 고치가 풀려(월드의 고치가 없어지고 꽃잎) 아기 둘이 나타나고, 셋이 떠난다.
+    #[test]
+    fn clover_family_hatches_after_unbind_and_leaves() {
+        let mut w = World::new();
+        let at = w.player.pos + vec2(0.0, -40.0);
+        w.cocoons = vec![at + vec2(-13.0, -10.0), at + vec2(13.0, -8.0)];
+        let mut c = clover_returns(&w, at);
+        assert!(!c.actors[2].visible && !c.actors[3].visible);
+        let go = Actions {
+            confirm: true,
+            ..Default::default()
+        };
+        let mut seen_babies = false;
+        let mut saw_petals = false;
+        for _ in 0..1200 {
+            c.update(&go, 1.0 / 60.0, &mut w);
+            saw_petals |=
+                w.fx.iter()
+                    .any(|f| matches!(f.kind, crate::world::FxKind::Petal { .. }));
+            if c.actors[2].visible && c.actors[3].visible {
+                seen_babies = true;
+                assert!(w.cocoons.is_empty(), "아기들이 보이면 고치는 풀렸다");
+            }
+            if c.is_done() {
+                break;
+            }
+        }
+        assert!(c.is_done() && seen_babies);
+        assert!(
+            !c.actors[1].visible && !c.actors[2].visible,
+            "가족이 먼저 떠난다"
+        );
+        assert!(saw_petals, "고치가 풀릴 때 분홍 꽃잎");
+    }
+
     /// 돌아오는 장면(0159): 실이 풀리는 이펙트가 먼저 나고, 그 뒤에야 배우가 보인다.
     #[test]
     fn returning_neighbor_appears_after_threads_unbind() {
@@ -838,7 +873,6 @@ pub enum Speaker {
     Kongi,
     /// 물든 토끼풀(굴토끼 옛 굴의 보스, 이름표 "???") / 돌아온 토끼풀(0165). 초상화는 아직 없다(색 네모).
     CloverTainted,
-    #[allow(dead_code)] // 0165 ④(가족 귀환·마을)에서 쓴다.
     Clover,
 }
 
@@ -917,14 +951,104 @@ pub fn clover_meet(w: &World) -> Cutscene {
     Cutscene::new(actors, tainted_meet_steps(w, at, |s| s.mob_clover, lines))
 }
 
-/// 토끼풀을 이겼다(0165): 실이 풀리고 맑은 눈으로 돌아온다. (가족 귀환 장면은 다음 단계에서 채운다.)
+/// 토끼풀을 이겼다(0165): 실이 풀리고 맑은 눈으로 돌아온다 → "…막내는?" → 고치가 풀려 아기 둘이 나타난다 →
+/// 모모가 마을에서 기다린다고(모모 런이면 "엄마… 나 여기 있어") → 가족이 먼저 마을로.
+/// 배우: 0 Naïl, 1 토끼풀, 2·3 아기(박하·민들레, 고치 자리에서 나타난다).
 pub fn clover_returns(w: &World, at: Vec2) -> Cutscene {
     let mut clover = clover_actor(at);
     clover.visible = false;
     clover.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
-    let actors = vec![nail_actor(w), clover];
+    let baby = |pos: Vec2| Actor {
+        sprite: Some(Sprite::Critter(crate::art::BABY_ROW)),
+        pos,
+        ..story_actor("", CLOVER_FUR)
+    };
+    let c0 = w
+        .cocoons
+        .first()
+        .copied()
+        .unwrap_or(at + vec2(-14.0, -10.0));
+    let c1 = w.cocoons.get(1).copied().unwrap_or(at + vec2(14.0, -8.0));
+    let actors = vec![nail_actor(w), clover, baby(c0), baby(c1)];
+    let momo = w.character == crate::equipment::Character::Momo;
+    let side = if at.x >= w.player.pos.x { 22.0 } else { -22.0 };
+    let near = w.player.pos + vec2(side, 0.0);
+    let away = (at - w.player.pos).normalize_or(vec2(0.0, -1.0));
     let mut steps = unbind_steps(at, 1, false);
-    steps.push(say(1, Face::Normal, |s| s.clover_b1));
+    steps.extend([
+        say(1, Face::Normal, |s| s.clover_b1),
+        Step::Move {
+            actor: 1,
+            to: near,
+            speed: 35.0,
+        },
+        Step::Face {
+            actor: 1,
+            dir: vec2(-side, 0.0),
+        },
+        Step::Face {
+            actor: 0,
+            dir: vec2(side, 0.0),
+        },
+        if momo {
+            say(0, Face::Happy, |s| s.clover_b2_momo)
+        } else {
+            say(0, Face::Happy, |s| s.clover_b2)
+        },
+        // 고치가 풀린다: 실·반짝임·분홍 꽃잎, 아기 둘이 나타난다.
+        Step::Cue {
+            cue: Cue::Hatch,
+            at: c0,
+        },
+        Step::Shake(0.15),
+        Step::Wait(0.6),
+        Step::Show { actor: 2, at: c0 },
+        Step::Show { actor: 3, at: c1 },
+        Step::Cue {
+            cue: Cue::Sparkle,
+            at: c0,
+        },
+        Step::Cue {
+            cue: Cue::Sparkle,
+            at: c1,
+        },
+        Step::Wait(0.6),
+        if momo {
+            say(1, Face::Happy, |s| s.clover_b3_momo)
+        } else {
+            say(1, Face::Happy, |s| s.clover_b3)
+        },
+        // 아기들이 어미 곁으로 깡충, 그리고 셋이 먼저 떠난다.
+        Step::Move {
+            actor: 2,
+            to: near + vec2(-10.0, 6.0),
+            speed: 70.0,
+        },
+        Step::Move {
+            actor: 3,
+            to: near + vec2(10.0, 7.0),
+            speed: 70.0,
+        },
+        Step::Wait(0.4),
+        Step::Move {
+            actor: 1,
+            to: near + away * 150.0,
+            speed: 80.0,
+        },
+        Step::Move {
+            actor: 2,
+            to: near + away * 150.0 + vec2(-10.0, 6.0),
+            speed: 80.0,
+        },
+        Step::Move {
+            actor: 3,
+            to: near + away * 150.0 + vec2(10.0, 7.0),
+            speed: 80.0,
+        },
+        Step::Hide { actor: 1 },
+        Step::Hide { actor: 2 },
+        Step::Hide { actor: 3 },
+    ]);
     Cutscene::new(actors, steps)
 }
 
@@ -1747,7 +1871,7 @@ fn half_ending_steps() -> Vec<Step> {
 }
 
 /// 참 엔딩 + 에필로그: 씨앗을 심고, 큰 나무의 마지막 꽃, 흰 실과 새싹, 새 두더지 둔덕.
-fn true_ending_steps() -> Vec<Step> {
+fn true_ending_steps(family: bool) -> Vec<Step> {
     let mut v = vec![
         Step::Illust(Some(Illust::HalmaeDeep)),
         Step::Fade {
@@ -1764,14 +1888,15 @@ fn true_ending_steps() -> Vec<Step> {
     v.extend(cut_to(Some(Illust::Sprout)));
     v.push(Step::Narrate(|s| s.true_4));
     v.extend(cut_to(Some(Illust::Molehill)));
-    v.extend([
-        Step::Narrate(|s| s.epi_1),
-        Step::Narrate(|s| s.epi_2),
-        Step::Fade {
-            to_clear: false,
-            secs: 1.5,
-        },
-    ]);
+    v.extend([Step::Narrate(|s| s.epi_1), Step::Narrate(|s| s.epi_2)]);
+    if family {
+        // 토끼풀 가족이 돌아왔으면(0165) 한 줄 더.
+        v.push(Step::Narrate(|s| s.epi_clover));
+    }
+    v.push(Step::Fade {
+        to_clear: false,
+        secs: 1.5,
+    });
     v
 }
 
@@ -1794,7 +1919,7 @@ pub fn ending_half(w: &World) -> Cutscene {
 
 /// 참 엔딩 + 에필로그: 참 엔딩 조건(모모·도토)이 다 섰을 때.
 pub fn ending_true(w: &World) -> Cutscene {
-    Cutscene::new(story_actors(w), true_ending_steps())
+    Cutscene::new(story_actors(w), true_ending_steps(w.clover_back))
 }
 
 /// 모모로 가장 깊은 곳에 닿았다(0056): 흰 실 속의 굴토끼 털과 시든 꽃잎. 모모는 꽃잎을 마을로 가져간다.
@@ -1821,6 +1946,6 @@ pub fn ending_momo(w: &World) -> Cutscene {
 pub fn story_preview(w: &World) -> Cutscene {
     let mut steps = momo_steps();
     steps.extend(half_ending_steps());
-    steps.extend(true_ending_steps());
+    steps.extend(true_ending_steps(true));
     Cutscene::new(story_actors(w), steps)
 }

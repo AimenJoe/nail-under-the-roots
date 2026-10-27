@@ -1019,6 +1019,7 @@ impl App {
             self.world.kongi_fight = s == Scenario::Normal && !self.profile.flag(key::KONGI_BACK);
             // 토끼풀(0165)도 첫 시작에서만, 돌아오기 전까지.
             self.world.clover_fight = s == Scenario::Normal && !self.profile.flag(key::CLOVER_BACK);
+            self.world.clover_back = self.profile.flag(key::CLOVER_BACK);
             // 굴토끼 옛 굴(0165): 첫 시작은 모모가 돌아온 뒤, 오늘의 굴엔 없고, 개발 시나리오는 늘.
             self.world.warren_open = match s {
                 Scenario::Normal => self.profile.flag(key::MOMO_BACK),
@@ -1909,10 +1910,13 @@ impl App {
             momo: self.profile.flag(key::MOMO_BACK),
             doto: self.profile.flag(key::DOTO_MEMORY),
             kongi: self.profile.flag(key::KONGI_BACK),
+            clover: self.profile.flag(key::CLOVER_BACK),
             decor,
+            // 토끼풀 가족이 돌아오면(0165) 큰 나무의 잎이 한 단계 더.
             growth: crate::village::growth(
                 self.profile.count(&key::clears(Character::Mole))
-                    + self.profile.count(&key::clears(Character::Momo)),
+                    + self.profile.count(&key::clears(Character::Momo))
+                    + u32::from(self.profile.flag(key::CLOVER_BACK)),
             ),
             tree_ready: self.tree_affordable(),
         }

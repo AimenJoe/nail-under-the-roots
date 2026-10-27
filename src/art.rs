@@ -135,7 +135,6 @@ pub const SPORE_ROW: u32 = 18;
 /// 토끼풀(물든 어미 굴토끼, 0165)과 돌아온 토끼풀, 아기 굴토끼(박하·민들레, 깨어난 모습).
 pub const CLOVER_ROW: u32 = 19;
 pub const CLOVER_BACK_ROW: u32 = 20;
-#[allow(dead_code)] // 0165 ④(가족 귀환·마을)에서 쓴다.
 pub const BABY_ROW: u32 = 21;
 
 impl Art {

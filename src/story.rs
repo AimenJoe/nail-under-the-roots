@@ -122,6 +122,36 @@ pub const LINES: &[Line] = &[
         ],
         once: true,
     },
+    // 토끼풀 가족(0165): 돌아온 뒤 할매가 마을에서, 보리·모모가 말을 걸면 한 번.
+    Line {
+        id: "halmae_clover",
+        when: When::Village,
+        who: Speaker::Halmae,
+        text: |s| s.halmae_clover,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::HALF_ENDING),
+            Flag(key::CLOVER_BACK),
+            Seen("halmae_arrive"),
+        ],
+        once: true,
+    },
+    Line {
+        id: "bori_clover",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_clover,
+        needs: &[Flag(key::CLOVER_BACK)],
+        once: true,
+    },
+    Line {
+        id: "momo_clover",
+        when: When::TalkMomo,
+        who: Speaker::Momo,
+        text: |s| s.momo_v4,
+        needs: &[Flag(key::CLOVER_BACK)],
+        once: true,
+    },
     // 모모(0046): 처음 이긴 뒤 보리가 "그 아이"를 알아본다, 돌아온 뒤 포포가 빈 자리를 본다.
     Line {
         id: "bori_momo",

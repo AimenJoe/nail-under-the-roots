@@ -4320,6 +4320,27 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
                             draw_critter_at(tex, art::KONGI_BACK_ROW, n.pos, left, false, w.time);
                         }
                     }
+                    world::Who::Clover => {
+                        // 토끼풀 + 아기 둘(0165): 어미 곁에서 아기들이 번갈아 깡충.
+                        if let Some(tex) = art.critters.as_ref() {
+                            draw_critter_at(tex, art::CLOVER_BACK_ROW, n.pos, left, false, w.time);
+                            for (k, off) in
+                                [vec2(-13.0, 5.0), vec2(12.0, 7.0)].into_iter().enumerate()
+                            {
+                                let hop = ((w.time * 2.0 + k as f32 * 1.7).sin() * 2.0)
+                                    .max(0.0)
+                                    .round();
+                                draw_critter_at(
+                                    tex,
+                                    art::BABY_ROW,
+                                    n.pos + off - vec2(0.0, hop),
+                                    k == 0,
+                                    false,
+                                    w.time,
+                                );
+                            }
+                        }
+                    }
                 }
             }
             Drawable::Tree(at, growth) => {

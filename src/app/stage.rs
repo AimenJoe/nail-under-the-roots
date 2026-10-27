@@ -544,6 +544,15 @@ impl App {
                     &[(Speaker::Kongi, text, Face::Happy)],
                 ));
             }
+            Interact::Talk(Who::Clover) => {
+                let lines: [Tr; 3] = [|s| s.clover_v1, |s| s.clover_v2, |s| s.clover_v3];
+                let text = lines[self.talk_n as usize % lines.len()];
+                self.talk_n += 1;
+                self.play(cutscene::talk(
+                    &self.world,
+                    &[(Speaker::Clover, text, Face::Happy)],
+                ));
+            }
             Interact::Talk(Who::Doto) => {
                 let lines: [Tr; 3] = [|s| s.doto_v1, |s| s.doto_v2, |s| s.doto_v3];
                 let text = lines[self.talk_n as usize % lines.len()];
@@ -1144,7 +1153,9 @@ impl App {
         let verb = match i {
             Interact::Talk(Who::Popo) if village => s.ia_decor,
             Interact::Talk(Who::Popo) => s.ia_shop,
-            Interact::Talk(Who::Bori | Who::Momo | Who::Doto | Who::Susu | Who::Kongi) => s.ia_talk,
+            Interact::Talk(
+                Who::Bori | Who::Momo | Who::Doto | Who::Susu | Who::Kongi | Who::Clover,
+            ) => s.ia_talk,
             Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,
             Interact::Tree => s.ia_tree,

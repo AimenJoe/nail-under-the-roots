@@ -305,6 +305,7 @@ impl World {
                 'M' if v.momo => w.neighbors.push(Npc::standing(Who::Momo, *at)),
                 'd' if v.doto => w.neighbors.push(Npc::standing(Who::Doto, *at)),
                 'g' if v.kongi => w.neighbors.push(Npc::standing(Who::Kongi, *at)),
+                'j' if v.clover => w.neighbors.push(Npc::standing(Who::Clover, *at)),
                 _ => {}
             }
         }

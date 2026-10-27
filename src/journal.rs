@@ -194,6 +194,17 @@ pub const GOALS: &[Goal] = &[
         Some("deeper"),
         Light(40)
     ),
+    // 토끼풀 가족(0165): 굴토끼 옛 굴 끝에서 깨운다. 보상은 흰 실 매듭.
+    goal!(
+        "clover",
+        Story,
+        jg_clover,
+        jg_clover_d,
+        Flag(key::CLOVER_BACK),
+        1,
+        Some("momo3"),
+        Charm(crate::equipment::SILK_KNOT)
+    ),
     // 모모와 가장 깊은 곳(0056): 모모를 골라 끝까지. 보상은 들꽃 화관(0142, 그 전에는 반딧불 40).
     goal!(
         "momo_deep",

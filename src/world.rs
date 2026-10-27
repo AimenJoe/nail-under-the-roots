@@ -119,6 +119,8 @@ pub enum Cue {
     Eyes,
     /// 떠난 자리에 시든 꽃잎 하나를 남긴다(0164): `World::petal_at`. 밟으면 토스트 + 도감 '???'.
     Leave,
+    /// 아기들의 고치가 풀린다(0165): 고치마다 실이 풀리고 반짝임·분홍 꽃잎, 고치가 없어진다.
+    Hatch,
 }
 
 /// 이웃이 누구인가(그림·말).
@@ -138,6 +140,8 @@ pub enum Who {
     Susu,
     /// 돌아온 콩이: 마을 위쪽 바위 곁(docs/decisions/0054).
     Kongi,
+    /// 돌아온 토끼풀 + 아기 둘(박하·민들레): 마을 모모 자리 곁(0165).
+    Clover,
 }
 
 /// 이웃 NPC: 서 있거나(쉼터) 플레이어 곁으로 걸어온다(튜토리얼의 포포). 막지 않는다.
@@ -364,6 +368,8 @@ pub struct World {
     pub kongi_fight: bool,
     /// 토끼풀(0165): 굴토끼 옛 굴 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
     pub clover_fight: bool,
+    /// 토끼풀 가족이 마을에 돌아왔다(기록 `CLOVER_BACK`): 참 엔딩 에필로그에 한 줄 더.
+    pub clover_back: bool,
     /// 아기들의 고치(0165): 토끼풀의 끝방에 둘. 때릴 수 없다(발톱이 튕긴다). 장소를 옮기면 없어진다.
     pub cocoons: Vec<Vec2>,
     /// 토끼풀의 충격파(0165).
@@ -478,6 +484,7 @@ impl World {
             rock_cd: t::ROCK_EVERY.1,
             kongi_fight: false,
             clover_fight: false,
+            clover_back: false,
             cocoons: Vec::new(),
             waves: Vec::new(),
             thread_lash: None,
@@ -1945,6 +1952,22 @@ impl World {
                 self.petal_at = Some(at);
                 petals(&mut self.fx, at, 6, Color::new(0.74, 0.56, 0.60, 1.0), 30.0);
             }
+            Cue::Hatch => {
+                self.sounds.push(sfx::Id::Unbind);
+                let cocoons = std::mem::take(&mut self.cocoons);
+                for (k, c) in cocoons.into_iter().enumerate() {
+                    self.fx.push(ring(c, 3.0, 22.0, 0.4, WHITE));
+                    unravel(&mut self.fx, c, 12.0);
+                    petals(&mut self.fx, c, 8, Color::new(1.0, 0.70, 0.80, 1.0), 40.0);
+                    for i in 0..5 {
+                        let ang = i as f32 / 5.0 * std::f32::consts::TAU + k as f32;
+                        let mut g =
+                            glint(c + vec2(ang.cos() * 8.0, ang.sin() * 5.0 - 3.0), WHITE, 0.5);
+                        g.time = -0.06 * i as f32;
+                        self.fx.push(g);
+                    }
+                }
+            }
             Cue::Sparkle => {
                 self.sounds.push(sfx::Id::Glowbug);
                 for k in 0..6 {
@@ -2075,7 +2098,11 @@ impl World {
             return;
         }
         // 감긴다: 토끼풀 쪽으로 끌려가고 잠깐 손을 못 쓴다.
-        self.player.recoil(ppos - from, 0.0, t::CLOVER_PULL_LOCK);
+        self.player.recoil(
+            ppos - from,
+            0.0,
+            t::CLOVER_PULL_LOCK * self.player.stats.wrap_mul,
+        );
         self.player.vel = from * t::CLOVER_PULL;
         self.sounds.push(sfx::Id::Rumble);
         self.feel.add_trauma(0.25);
@@ -2276,8 +2303,9 @@ impl World {
                             unravel(&mut self.fx, pp + from * 8.0, 10.0);
                         } else {
                             d.wraps += 1;
-                            d.wrapped = t::DEEP_WRAP_TIME;
-                            self.player.recoil(pp - from, 0.0, t::DEEP_WRAP_TIME);
+                            let wrap = t::DEEP_WRAP_TIME * self.player.stats.wrap_mul;
+                            d.wrapped = wrap;
+                            self.player.recoil(pp - from, 0.0, wrap);
                             self.sounds.push(sfx::Id::Rumble);
                             self.feel.add_trauma(0.3);
                             self.fx.push(ring(pp, 6.0, 20.0, 0.3, THREAD));

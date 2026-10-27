@@ -141,6 +141,8 @@ pub struct Stats {
     pub finisher_knockback: f32,
     /// 모모 이어 뛰기 밟기 반지름에 더한다(px).
     pub chain_radius: f32,
+    /// 실에 감기는 시간 배율(0165, 흰 실 매듭): 가장 깊은 곳의 당기기·토끼풀의 실.
+    pub wrap_mul: f32,
 }
 
 impl Stats {
@@ -152,6 +154,7 @@ impl Stats {
         sp_gain: 1.0,
         finisher_knockback: 1.0,
         chain_radius: 0.0,
+        wrap_mul: 1.0,
     };
 
     /// 기본값에 장신구와 뿌리 심장을 더한다. 배율은 곱, 더하기는 합. 너무 극단으로 가지 않게 묶는다.
@@ -166,6 +169,7 @@ impl Stats {
             s.sp_gain *= m.sp_gain;
             s.finisher_knockback *= m.finisher_knockback;
             s.chain_radius += m.chain_radius;
+            s.wrap_mul *= m.wrap_mul;
         }
         s.max_hp = (s.max_hp + root_hearts.min(crate::tuning::ROOT_HEART_MAX)).max(1);
         s.attack_speed = s.attack_speed.clamp(0.6, 1.8);
@@ -184,6 +188,7 @@ pub struct Mods {
     pub sp_gain: f32,
     pub finisher_knockback: f32,
     pub chain_radius: f32,
+    pub wrap_mul: f32,
 }
 
 const NO_MODS: Mods = Mods {
@@ -194,6 +199,7 @@ const NO_MODS: Mods = Mods {
     sp_gain: 1.0,
     finisher_knockback: 1.0,
     chain_radius: 0.0,
+    wrap_mul: 1.0,
 };
 
 /// 장신구: 2칸. 얻는 곳은 상자·상점(맵 단계)·저널. 대부분 누구나 끼고, 모모 것(0142)은 모모 런에서만 나온다.
@@ -218,8 +224,10 @@ impl Charm {
 pub const CHARM_SLOTS: usize = 2;
 /// 들꽃 화관(저널 momo_deep의 보상).
 pub const CROWN: usize = 10;
+/// 흰 실 매듭(저널 "가족"의 보상, 0165).
+pub const SILK_KNOT: usize = 11;
 
-pub static CHARMS: [Charm; 11] = [
+pub static CHARMS: [Charm; 12] = [
     Charm {
         name: |s| s.c_shell,
         desc: |s| s.c_shell_desc,
@@ -353,6 +361,17 @@ pub static CHARMS: [Charm; 11] = [
         },
         color: Color::new(0.98, 0.84, 0.48, 1.0),
         only: Some(Character::Momo),
+        journal: true,
+    },
+    Charm {
+        name: |s| s.c_knot,
+        desc: |s| s.c_knot_desc,
+        mods: Mods {
+            wrap_mul: 0.5,
+            ..NO_MODS
+        },
+        color: Color::new(0.94, 0.92, 0.99, 1.0),
+        only: None,
         journal: true,
     },
 ];
