@@ -8,6 +8,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 3. `docs/decisions/` — 왜 그렇게 정했나. 바꾸려면 새 번호로 기록
 
 세션 시작 프롬프트는 따로 없다. 이 파일과 위 세 문서가 그 역할을 한다. 세션이 끝나면 "구현 상태"·"사람이 할 일"을 갱신하고 커밋한다.
+기여 규칙은 `CONTRIBUTING.md`, 배포·릴리스 절차는 `docs/release.md`, 리팩터링 계획은 `docs/decisions/0169`.
 
 ## 지식 베이스 (KB)
 일반 지식은 이 레포가 아니라 **github.com/AimenJoe/KB** 에 있다. 세션에 KB 레포를 함께 붙이고, 질문 전에 `maps/gamedev.md` → 해당 노트를 먼저 읽는다.
