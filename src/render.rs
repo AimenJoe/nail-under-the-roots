@@ -582,13 +582,31 @@ impl Renderer {
             let a = (p * 4.0).min(1.0) * (1.0 - p) * 0.8;
             dot(x, y, 2.0, Color::new(0.78, 0.6, 1.0, a));
         }
-        // 메뉴 뒤(게임 좌표 90~256 × 53~151, 오늘의 굴 날짜까지) 옅은 어둠. 바탕이 어두워 아주 옅게.
-        let menu = Rect::new(90.0, 53.0, 166.0, 98.0);
-        ui.rect(
-            Rect::new(menu.x - 2.0, menu.y - 2.0, menu.w + 4.0, menu.h + 4.0),
-            Color::new(0.03, 0.02, 0.04, 0.12),
+        // 메뉴 뒤 어둠은 타이틀 화면이 메뉴 줄 수에 맞춰 둥글게 깐다(`draw_soft_shade`, 0152).
+        // 예전엔 여기서 크기가 정해진 네모 두 겹(166×98)을 늘 깔아, 줄이 넷뿐이면 아래가 비고 하늘 위에 모서리가 보였다.
+    }
+
+    /// 가장자리 없는 둥근 그늘(0152): 빛 얼룩 텍스처(가운데 진하고 바깥으로 부드럽게 0)를 어둡게 `r` 둘레에 깐다.
+    /// 그림 위 글 뒤에 네모를 두면 UI 상자가 그림 위에 뜬 것처럼 보인다(사장 "메뉴 뒤쪽 음영 배경 때문에 거슬린다").
+    pub fn draw_soft_shade(&self, ui: &Ui, r: Rect, alpha: f32) {
+        let Some(art) = self.art.as_ref() else {
+            ui.rect(r, Color::new(0.03, 0.02, 0.04, alpha * 0.6));
+            return;
+        };
+        // 얼룩은 가장자리로 갈수록 옅어지니, 글 자리가 진한 안쪽에 들어오게 넉넉히 키운다.
+        let (w, h) = (r.w * 1.6 + 24.0, r.h * 1.9 + 24.0);
+        let c = r.center();
+        let o = ui.px(vec2(c.x - w / 2.0, c.y - h / 2.0));
+        draw_texture_ex(
+            &art.light,
+            o.x,
+            o.y,
+            Color::new(0.03, 0.02, 0.04, alpha),
+            DrawTextureParams {
+                dest_size: Some(vec2(w * ui.scale, h * ui.scale)),
+                ..Default::default()
+            },
         );
-        ui.rect(menu, Color::new(0.03, 0.02, 0.04, 0.2));
     }
 
     /// 컷씬 일러스트를 게임 화면 전체에(docs/decisions/0039). 원본 1px = 화면 배율/2 px(초상화와 같은 2배 밀도).

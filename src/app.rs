@@ -2104,7 +2104,38 @@ impl App {
             .map(|it| self.title_label(it))
             .collect();
         let labels: Vec<&str> = labels.iter().map(|l| l.as_str()).collect();
-        let rects = ui.menu_list(&labels, self.title_cursor, 96.0, 56.0, 128.0);
+        // 메뉴 뒤 그늘(0152): 줄 수만큼, 가장자리 없이 둥글게(오늘의 굴 날짜 자리까지).
+        let rows = labels.len() as f32 * (FONT_PX + 4.0);
+        self.renderer
+            .draw_soft_shade(ui, Rect::new(96.0, 56.0, 150.0, rows), 0.55);
+        // 고른 줄도 네모 막대 대신(0152): 그 줄 뒤에 부드러운 그늘 + ▶ + 밝은 글. 다른 줄은 흐린 글.
+        let row_h = FONT_PX + 4.0;
+        let rects: Vec<Rect> = labels
+            .iter()
+            .enumerate()
+            .map(|(i, l)| {
+                let r = Rect::new(96.0, 56.0 + i as f32 * row_h, 128.0, row_h);
+                let label = ui.fit(l, r.w - 16.0, FONT_PX);
+                let on = i == self.title_cursor;
+                if on {
+                    let w = ui.text_w(&label, FONT_PX) + 18.0;
+                    self.renderer.draw_soft_shade(
+                        ui,
+                        Rect::new(r.x, r.y + 2.0, w, row_h - 4.0),
+                        0.75,
+                    );
+                    ui.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ui::ACCENT);
+                }
+                ui.text(
+                    &label,
+                    r.x + 14.0,
+                    r.y + 2.0,
+                    FONT_PX,
+                    if on { ui::ACCENT } else { ui::TEXT_DIM },
+                );
+                r
+            })
+            .collect();
         // 오늘의 굴 줄 오른쪽에 오늘 날짜(UTC): 날마다 다른 굴이라는 표시.
         if let Some(i) = self
             .title_items()
@@ -2213,9 +2244,21 @@ impl App {
             self.renderer.draw_illust(ui, il, c.illust_t);
         }
         if let Some(d) = c.dialogue().filter(|d| d.narration) {
-            // 내레이션: 이름·초상화 없이 아래쪽 어두운 띠에 가운데 맞춤.
+            // 내레이션: 이름·초상화 없이 아래쪽에 가운데 맞춤. 상자 대신 화면 아래에서 위로 옅어지는 어둠(0152):
+            // 네모 띠는 양옆·위 모서리가 그림 위에 뜬 UI 상자처럼 보였다(사장 "미묘하게 거슬린다"). 글은 테두리로 읽힌다.
             let b = Rect::new(8.0, 132.0, 304.0, 42.0);
-            ui.rect(b, Color::new(0.04, 0.03, 0.06, 0.72));
+            let (top_y, bottom_y) = (112.0, t::VIEW_H);
+            let mut y = top_y;
+            while y < bottom_y {
+                let k = ((y - top_y) / (b.y - top_y)).clamp(0.0, 1.0);
+                let a = 0.72 * k * k * (3.0 - 2.0 * k);
+                ui.rect(
+                    Rect::new(0.0, y, t::VIEW_W, 2.0),
+                    Color::new(0.03, 0.02, 0.05, a),
+                );
+                y += 2.0;
+            }
+            let ui = &ui.with_outline();
             // 줄은 다 찍힌 글로 나누고(찍히는 동안 줄이 바뀌지 않게) 앞에서부터 찍힌 만큼만 보인다.
             let full = ui::wrap(ui, &d.text, b.w - 24.0, FONT_PX);
             let top = b.y + (b.h - full.len().min(3) as f32 * 13.0) / 2.0;
