@@ -7,3 +7,5 @@
 /assets/vendor/
 
 __pycache__/
+smoke-out/
+tools/test/node_modules/

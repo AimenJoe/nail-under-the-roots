@@ -1,0 +1,56 @@
+name: smoke-web
+# 웹 빌드 연기 시험(docs/decisions/0169 R7). 헤드리스 Chromium으로 타이틀 → 개발 시나리오 몇 개를 띄워 입력을 넣고
+# 콘솔 에러·패닉·멈춘 화면을 잡는다(tools/test/smoke.js). 단위 테스트가 못 보는 wasm·JS 번들·로딩 화면·그리기 경로.
+# main push(관련 파일)와 수동 실행. 스크린숏은 아티팩트로.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'web/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'tools/test/**'
+      - '.github/workflows/smoke-web.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --target wasm32-unknown-unknown
+
+      # deploy-web.yml의 "Assemble publish dir"과 같게(유료 팩 없이 직접 그린 대체 타일).
+      - name: Assemble dist
+        run: |
+          mkdir -p dist
+          cp web/index.html web/*.js dist/
+          cp assets/THIRD_PARTY_LICENSES.txt dist/
+          cp target/wasm32-unknown-unknown/release/nail.wasm dist/
+          cp -r assets dist/assets
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright
+        working-directory: tools/test
+        run: |
+          npm install --no-save --no-package-lock playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - run: node tools/test/smoke.js dist smoke-out
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-shots
+          path: smoke-out

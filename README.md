@@ -75,6 +75,8 @@ cargo check --target aarch64-linux-android
 python3 tools/licenses.py                         # 의존성을 바꿨을 때만: 고지 파일 다시 만들기
 ```
 
+웹 빌드 연기 시험(0169): `dist/`를 조립한 뒤 `node tools/test/smoke.js dist` — 헤드리스 Chromium으로 타이틀·개발 시나리오 몇 개에 들어가 입력을 넣고 콘솔 에러·패닉·멈춘 화면을 잡는다(Playwright 필요). CI는 `smoke-web.yml`이 main push마다 돌리고 스크린숏을 아티팩트로 남긴다.
+
 ## 배포
 
 ### 웹 (Netlify)
