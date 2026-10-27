@@ -159,6 +159,8 @@ pub struct Player {
     combo_next: usize,
     combo_timer: f32,
     no_attack: f32,
+    /// 강공격 뒤 평타 잠금(0161 덧붙임): 남은 동안 누르면 모으기만 된다.
+    heavy_lock: f32,
     swing_id: u32,
     /// 지금 스윙을 시작하고 흐른 실제 시간(패링 창).
     swing_age: f32,
@@ -200,6 +202,7 @@ impl Player {
             combo_next: 0,
             combo_timer: 0.0,
             no_attack: 0.0,
+            heavy_lock: 0.0,
             swing_id: 0,
             swing_age: f32::MAX,
         }
@@ -497,6 +500,7 @@ impl Player {
         self.item_cd = (self.item_cd - dt).max(0.0);
         self.parry_cd = (self.parry_cd - dt).max(0.0);
         self.no_attack = (self.no_attack - dt).max(0.0);
+        self.heavy_lock = (self.heavy_lock - dt).max(0.0);
         self.swing_age += dt;
 
         let move_dir = a.move_dir;
@@ -522,6 +526,7 @@ impl Player {
                     };
                     if a.attack_held {
                         // 떼는 순간 평타(0161): 누르고 있는 동안은 기다린다. 길게 누르면 평타 없이 바로 모은다.
+                        // 강공격 직후(`heavy_lock`)에는 모으기만: 덜 모으고 떼면 평타가 아니라 아무것도 안 나간다.
                         self.attack_buf = 0.0;
                         let dir = if a.aim != Vec2::ZERO {
                             a.aim.normalize()
@@ -532,8 +537,11 @@ impl Player {
                             time: 0.0,
                             dir,
                             after: idx,
-                            pending: true,
+                            pending: self.heavy_lock <= 0.0,
                         };
+                    } else if self.heavy_lock > 0.0 {
+                        // 강공격 직후의 톡은 버린다.
+                        self.attack_buf = 0.0;
                     } else {
                         self.start_swing(idx, a.aim);
                     }
@@ -624,11 +632,11 @@ impl Player {
                         // 짧게 눌렀다 뗐다: 평타.
                         self.start_swing(after, a.aim);
                     } else {
-                        // 덜 모으고 뗐다: 아무것도 안 나가고, 콤보는 거기서 이어진다.
+                        // 덜 모으고 뗐다: 아무것도 안 나가고, 콤보는 거기서 이어진다(강공격 뒤 잠금이 남았으면 그만큼 더).
                         self.state = State::Free;
                         if after <= self.moveset.last() {
                             self.combo_next = after;
-                            self.combo_timer = self.moveset.combo_window;
+                            self.combo_timer = self.moveset.combo_window + self.heavy_lock;
                         }
                     }
                 }
@@ -646,14 +654,27 @@ impl Player {
                 self.state = State::Heavy { time, dir, after };
                 if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
                     self.start_dodge(move_dir);
-                } else if time >= a1 && self.attack_buf > 0.0 && after <= ms.last() {
-                    // 강공격 뒤 바로 다음 타(콤보처럼).
-                    self.start_swing(after, a.aim);
+                } else if time >= a1 && a.attack_held {
+                    // 강공격 뒤에도 누르고 있으면 다시 모은다(평타는 안 된다). 덜 모으고 떼도 평타 잠금은
+                    // 남은 후딜레이 + `HEAVY_AFTER_LOCK` 동안 그대로다.
+                    self.combo_timer = 0.0;
+                    self.heavy_lock =
+                        (hit.swing + hit.recovery - time).max(0.0) + t::HEAVY_AFTER_LOCK;
+                    self.state = State::Charging {
+                        time: 0.0,
+                        dir,
+                        after,
+                        pending: false,
+                    };
                 } else if time >= hit.swing + hit.recovery {
+                    // 강공격 뒤 평타는 후딜레이에 더해 `HEAVY_AFTER_LOCK` 동안 막힌다: 그 안의 톡은 버리고,
+                    // 누르고 있으면 모으기만. 콤보 자리(`after`)는 잠금이 풀린 뒤에도 남는다.
                     self.state = State::Free;
+                    self.attack_buf = 0.0;
+                    self.heavy_lock = t::HEAVY_AFTER_LOCK;
                     if after <= ms.last() {
                         self.combo_next = after;
-                        self.combo_timer = ms.combo_window;
+                        self.combo_timer = ms.combo_window + t::HEAVY_AFTER_LOCK;
                     } else {
                         self.combo_timer = 0.0;
                     }
@@ -1618,20 +1639,72 @@ mod tests {
         };
         let last = p.moveset.hits[p.moveset.last()].range;
         assert!((r - last * 1.3).abs() < 1e-3, "반지름 1.3배 {r}");
-        // 콤보처럼: 1타 자리의 강공격이었으니 다음 공격은 2타.
+        // 강공격 뒤 바로 평타는 안 된다(사장 2026-10-27): 스윙 중 톡은 버려지고, 후딜레이 뒤 잠금 동안도 그렇다.
+        let tap = Actions {
+            attack: true,
+            ..Default::default()
+        };
         let mut n = 0;
         while matches!(p.state, State::Heavy { .. }) && n < 100 {
-            tick(&mut p, &room, &release);
+            tick(&mut p, &room, &tap);
             n += 1;
         }
-        tick(
-            &mut p,
-            &room,
-            &Actions {
-                attack: true,
-                ..Default::default()
-            },
+        assert!(
+            matches!(p.state, State::Free),
+            "강공격이 끝나면 선다 {:?}",
+            p.state
         );
+        tick(&mut p, &room, &press);
+        tick(&mut p, &room, &release);
+        assert!(
+            matches!(p.state, State::Free),
+            "강공격 직후의 톡은 평타가 되지 않는다 {:?}",
+            p.state
+        );
+        // 그 동안 누르고 있으면 모으기는 된다.
+        tick(&mut p, &room, &press);
+        tick(&mut p, &room, &hold);
+        assert!(
+            matches!(p.state, State::Charging { pending: false, .. }),
+            "잠금 중에는 모으기만 {:?}",
+            p.state
+        );
+        tick(&mut p, &room, &release);
+        assert!(matches!(p.state, State::Free));
+        // 강공격 스윙 중에 누르고 있다가 덜 모으고 떼도 잠금은 그대로다.
+        let mut q = Player::new(room.center());
+        tick(&mut q, &room, &press);
+        for _ in 0..((t::HEAVY_CHARGE / t::TICK_DT) as usize + 2) {
+            tick(&mut q, &room, &hold);
+        }
+        tick(&mut q, &room, &release);
+        assert!(matches!(q.state, State::Heavy { .. }));
+        let mut n = 0;
+        while matches!(q.state, State::Heavy { .. }) && n < 100 {
+            tick(&mut q, &room, &hold);
+            n += 1;
+        }
+        assert!(
+            matches!(q.state, State::Charging { pending: false, .. }),
+            "강공격 스윙 중 누르고 있으면 모은다 {:?}",
+            q.state
+        );
+        tick(&mut q, &room, &release);
+        tick(&mut q, &room, &press);
+        tick(&mut q, &room, &release);
+        assert!(
+            matches!(q.state, State::Free),
+            "덜 모으고 뗀 뒤의 톡도 평타가 되지 않는다 {:?}",
+            q.state
+        );
+        // 잠금이 풀리면 콤보처럼: 1타 자리의 강공격이었으니 다음 공격은 2타.
+        let mut n = 0;
+        while p.heavy_lock > 0.0 && n < 100 {
+            tick(&mut p, &room, &Actions::default());
+            n += 1;
+        }
+        tick(&mut p, &room, &press);
+        tick(&mut p, &room, &release);
         assert!(
             matches!(p.state, State::Attack { idx: 1, .. }),
             "강공격 뒤 콤보가 2타로 이어진다 {:?}",
