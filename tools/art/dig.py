@@ -2,7 +2,9 @@
 이 파일이 원본이고 assets/art/dig.png는 산출물이다(직접 그린 그림, 프로젝트 소유).
 
 실행: python3 tools/art/dig.py [출력 경로]   (기본 assets/art/dig.png)
-줄 0 Naïl 기본 털, 줄 1~3 털빛 1~3(nail.py FURS), 줄 4 돌아온 모모. 칸 0~5 = 한 번 긁는 동작(초당 12칸으로 돈다).
+줄 0 Naïl 기본 털, 줄 1~3 털빛 1~3(nail.py FURS), 줄 4 돌아온 모모.
+칸 0~5 긁기 한 번(초당 12칸), 6 고개 들어 카메라 보기, 7 윙크, 8~15 몸통 축으로 한 바퀴(코르크 마개처럼 돌며 내려감).
+장면 순서(render.rs `dig_col`): 파다가 → 우리를 보고 윙크 → 뱅글뱅글 돌며 내려간다(사장 제안 2026-10-27).
 
 카메라(사장 지시 2026-10-27): 머리가 아래(땅 쪽), 등이 위(우리 쪽). 위에서 내려다보는 뒷모습이라 얼굴은 안 보이고
 등·엉덩이·꼬리·뒷발바닥이 보인다. 앞발은 어깨 양옆에서 땅을 긁어 뒤(위)로 흙을 넘긴다.
@@ -13,6 +15,7 @@
   - 앞발(삽: 분홍 손바닥 + 크림 발톱)·뒷발·꼬리·귀·꽃은 글자 격자를 손으로 찍어 얹는다. 도형으로 그리면 작은 부위가 뭉개진다(0070).
   - 외곽선(o)은 nail.py처럼 자동.
 """
+import math
 import sys
 
 from PIL import Image
@@ -51,9 +54,11 @@ def inside_of(ellipses):
              for x in range(S)] for y in range(S)]
 
 
-def back(ellipses, grain=(), hump=None):
+def back(ellipses, grain=(), hump=None, phase=0.0, belly=1.0):
     """등을 위에서 본 몸통: 줄마다 몸통 폭의 왼쪽 22%는 밝음(h), 오른쪽 26%는 그늘(d), 가운데 털(b).
-    맨 아래 두 줄(머리 끝)과 맨 위 줄(엉덩이 끝)은 그늘로 돌려 둥글게. grain = 털 결 점 (x, y)."""
+    맨 아래 두 줄(머리 끝)과 맨 위 줄(엉덩이 끝)은 그늘로 돌려 둥글게. grain = 털 결 점 (x, y).
+    phase(라디안)는 몸통 축으로 돈 각: 0 = 등이 우리 쪽. 원통이라 가로 자리 t → 표면 각 θ = asin(2t−1)이고,
+    재질 각 θ+phase가 뒤(π) 근처면 배의 밝은 털(l, 폭 belly 라디안)이 보인다. 털 결 점도 같이 돈다."""
     ins = inside_of(ellipses)
     g = blank()
     ys = [y for y in range(S) if any(ins[y])]
@@ -63,8 +68,12 @@ def back(ellipses, grain=(), hump=None):
         w = x1 - x0 + 1
         for x in xs:
             t = (x - x0 + 0.5) / w
+            theta = math.asin(max(-1.0, min(1.0, 2 * t - 1)))
+            a = (theta + phase) % (2 * math.pi) - math.pi   # 배(재질 각 π) 가운데가 0
             if y >= ys[-1] - 1 or y == ys[0]:
                 ch = 'd' if t > 0.3 else 'b'
+            elif abs(a) < belly / 2 and ys[0] + 3 < y < ys[-1] - 2:
+                ch = 'l'
             elif t < 0.22:
                 ch = 'h'
             elif t > 0.74:
@@ -72,6 +81,22 @@ def back(ellipses, grain=(), hump=None):
             else:
                 ch = 'b'
             g[y][x] = ch
+    if phase:
+        # 돌고 있으면 털 결 점을 재질 각에 따라 옮긴다(앞쪽에 있을 때만).
+        moved = []
+        for x, y in grain:
+            if y < ys[0] or y > ys[-1]:
+                continue
+            xs = [xx for xx in range(S) if ins[y][xx]]
+            if not xs:
+                continue
+            x0, x1 = xs[0], xs[-1]
+            w = x1 - x0 + 1
+            am = math.asin(max(-1.0, min(1.0, 2 * ((x - x0 + 0.5) / w) - 1)))
+            sa = am - phase
+            if math.cos(sa) > 0.1:
+                moved.append((x0 + int((math.sin(sa) + 1) / 2 * w), y))
+        grain = moved
     if hump:
         # 어깨의 둥근 하이라이트(왼쪽 위 빛): 등이 부풀어 보인다.
         hx, hy, hr = hump
@@ -97,6 +122,20 @@ def head_shade(g, crease_y):
         for x in range(S):
             if g[y][x] == 'h':
                 g[y][x] = 'b'
+
+
+def spin_x(ells, y, am, phase, width):
+    """돌고 있는 몸통의 재질 각 am(±π/2 = 양옆)에 붙은 부위의 화면 x(너비 width 가운데 맞춤). 뒤로 돌아가 있으면 None."""
+    ins = inside_of(ells)
+    xs = [x for x in range(S) if ins[min(max(y, 0), S - 1)][x]]
+    if not xs:
+        return None
+    sa = am - phase
+    if math.cos(sa) < -0.15:
+        return None
+    x0, x1 = xs[0], xs[-1]
+    cx = x0 + (math.sin(sa) + 1) / 2 * (x1 - x0 + 1)
+    return int(round(cx - width / 2))
 
 
 def attach_x(ells, y, width, side, overlap=1):
@@ -183,6 +222,49 @@ def nail_frame(i):
     return outline(g)
 
 
+# 고개를 들어 우리를 보는 머리(아래쪽 몸 위에 얹는다): 큰 눈 둘 + 반사, 볼 홍조, 둥근 분홍 코.
+LOOK_HEAD = [
+    "...dbbbbbbd...",
+    "..bbbbbbbbbb..",
+    ".bbbbbbbbbbbb.",
+    ".bbwebbbbbweb.",
+    ".bbeebbbbbeeb.",
+    ".brbbbbbbbbrb.",
+    "..bbbbpppbbb..",
+    "..dbbbpqpbbd..",
+    "...dbbbqbbd...",
+    "....dddddd....",
+]
+WINK = ["bb", "ee"]   # 오른눈 감기(가로선)
+
+
+def nail_look(wink):
+    g = nail_frame(0)
+    # outline()을 거친 뒤라 외곽선 포함. 머리를 다시 얹고 외곽선을 다시 두른다.
+    g = [[ch if ch != 'o' else '.' for ch in row] for row in g]
+    put(g, 9, 19, LOOK_HEAD)
+    if wink:
+        put(g, 19, 22, WINK)
+    return outline(g)
+
+
+def nail_spin(k):
+    """8칸 중 k번째: 몸통 축으로 k/8 바퀴. 앞발은 양옆(±π/2)에 붙어 돌고, 뒷발·꼬리도 함께."""
+    phase = k / 8 * 2 * math.pi
+    g = back(NAIL_BODY, NAIL_GRAIN, hump=(12.5, 13.5, 4.2), phase=phase, belly=1.4)
+    head_shade(g, 23)
+    put(g, 15, 1, TAIL)
+    for am, rows in ((-math.pi / 2, PAW_DOWN), (math.pi / 2, flip(PAW_DOWN))):
+        x = spin_x(NAIL_BODY, 20, am, phase, len(rows[0]))
+        if x is not None:
+            put(g, x, 18, rows)
+    for am, rows in ((-math.pi / 2, HIND_REST), (math.pi / 2, flip(HIND_REST))):
+        x = spin_x(NAIL_BODY, 6, am, phase, len(rows[0]))
+        if x is not None:
+            put(g, x, 5, rows)
+    return outline(g)
+
+
 # ---- 돌아온 모모(굴토끼) ----
 # 위에서 본 토끼: 둥근 엉덩이에 솜뭉치 꼬리, 긴 귀 둘이 등 위에 나란히 눕는다(머리에서 엉덩이 쪽으로).
 # 귀 밑동(머리 옆)에 꽃. 작은 앞발은 어깨 옆에서 긁고, 큰 뒷발은 엉덩이 양옆에서 찬다.
@@ -235,6 +317,52 @@ def momo_frame(i):
     return outline(g)
 
 
+M_LOOK_HEAD = [
+    "...dbbbbbbd...",
+    "..bbbbbbbbbb..",
+    ".bbbbbbbbbbbb.",
+    ".bbWnbbbbbWnb.",
+    ".bbnnbbbbbnnb.",
+    ".brbbbbbbbbrb.",
+    "..bbbbbppbbb..",
+    "..dbbbbqqbbd..",
+    "...dbbbbbbd...",
+    "....dddddd....",
+]
+M_WINK = ["bb", "nn"]
+
+
+def momo_look(wink):
+    g = momo_frame(0)
+    g = [[ch if ch != 'o' else '.' for ch in row] for row in g]
+    put(g, 9, 19, M_LOOK_HEAD)
+    if wink:
+        put(g, 19, 22, M_WINK)
+    return outline(g)
+
+
+def momo_spin(k):
+    phase = k / 8 * 2 * math.pi
+    g = back(MOMO_BODY, MOMO_GRAIN, hump=(12.5, 13.0, 3.5), phase=phase, belly=1.4)
+    head_shade(g, 23)
+    put(g, 14, 1, COTTON)
+    # 귀 둘은 등 위(재질 각 ±0.55)에 누워 함께 돈다. 뒤로 가면 안 보인다.
+    for am, rows in ((-0.55, EAR), (0.55, flip(EAR))):
+        x = spin_x(MOMO_BODY, 15, am, phase, len(rows[0]))
+        if x is not None:
+            put(g, x, 10, rows)
+            put(g, x + 1, 19, FLOWER)
+    for am, rows in ((-math.pi / 2, M_FRONT), (math.pi / 2, flip(M_FRONT))):
+        x = spin_x(MOMO_BODY, 23, am, phase, 3)
+        if x is not None:
+            put(g, x, 22, rows)
+    for am, rows in ((-math.pi / 2, M_HIND_REST), (math.pi / 2, flip(M_HIND_REST))):
+        x = spin_x(MOMO_BODY, 6, am, phase, 2)
+        if x is not None:
+            put(g, x, 5, rows)
+    return outline(g)
+
+
 def paint(img, ox, oy, g, pal):
     for y in range(S):
         for x in range(S):
@@ -247,13 +375,14 @@ def sheet():
     sys.path.insert(0, __file__.rsplit('/', 1)[0])
     from nail import FURS
     rows = [NAIL] + [dict(NAIL, **FURS[k]) for k in (1, 2, 3)]
-    img = Image.new('RGBA', (S * 6, S * 5), (0, 0, 0, 0))
-    frames = [nail_frame(i) for i in range(6)]
+    img = Image.new('RGBA', (S * 16, S * 5), (0, 0, 0, 0))
+    frames = [nail_frame(i) for i in range(6)] + [nail_look(False), nail_look(True)] + [nail_spin(k) for k in range(8)]
     for r, pal in enumerate(rows):
         for i, g in enumerate(frames):
             paint(img, i * S, r * S, g, pal)
-    for i in range(6):
-        paint(img, i * S, 4 * S, momo_frame(i), MOMO)
+    mframes = [momo_frame(i) for i in range(6)] + [momo_look(False), momo_look(True)] + [momo_spin(k) for k in range(8)]
+    for i, g in enumerate(mframes):
+        paint(img, i * S, 4 * S, g, MOMO)
     return img
 
 

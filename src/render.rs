@@ -5251,6 +5251,22 @@ const DESCENT_PX_PER_M: f32 = 12.0;
 /// 파 내려가는 Naïl의 화면 높이(머리 끝).
 const DESCENT_DIG_Y: f32 = 104.0;
 
+/// 파 내려가기 장면의 칸(dig.png 열)과 "돌고 있나". 주기 `DIG_CYCLE`초: 긁기 → 우리 보기(윙크 한 번) → 회전.
+fn dig_col(clock: f32) -> (u32, bool) {
+    const DIG_CYCLE: f32 = 1.6;
+    let t = clock % DIG_CYCLE;
+    if t < DIG_T_LOOK {
+        (((t * 12.0) as u32) % 6, false)
+    } else if t < DIG_T_SPIN {
+        let wink = (DIG_T_LOOK + 0.16..DIG_T_LOOK + 0.28).contains(&t);
+        (if wink { 7 } else { 6 }, false)
+    } else {
+        (8 + (((t - DIG_T_SPIN) * 30.0) as u32) % 8, true)
+    }
+}
+const DIG_T_LOOK: f32 = 0.35;
+const DIG_T_SPIN: f32 = 0.75;
+
 /// 깊이(m)에 맞는 흙 색: 땅 위 겉흙 → 흙 → 뿌리 흙 → 검은 바위 → 가장 깊은 곳.
 fn strata_color(m: f32) -> Color {
     const KEYS: [(f32, [f32; 3]); 6] = [
@@ -5537,26 +5553,41 @@ fn draw_descent(
             shade(soil, 1.35, a * (1.0 - ph)),
         );
     }
-    // Naïl(또는 모모): 이 장면 전용 32×32 파 내려가기 6칸(dig.png, `tools/art/dig.py`). 털빛마다 줄이 있다.
+    // Naïl(또는 모모): 이 장면 전용 32×32(dig.png, `tools/art/dig.py`). 털빛마다 줄이 있다.
+    // 순서(사장 제안): 파다가 → 고개를 들어 우리를 보고 윙크 → 드릴처럼 뱅글뱅글 돌며 내려간다. 굽기가 길면 되풀이.
     if let Some(tex) = art.and_then(|a| a.dig.as_ref()) {
-        let frame = ((clock * 12.0) as u32) % 6;
+        let (col, spinning) = dig_col(clock);
         let row = if w.player.kit == crate::equipment::Character::Momo {
             4
         } else {
             u32::from(w.fur.min(3))
         };
+        if spinning {
+            // 돌며 흙을 나선으로 흩뿌린다(몸 둘레를 돌다 바깥으로).
+            let soil = strata_color(d.depth_m + 1.0);
+            for i in 0..10u32 {
+                let ph = (clock * 2.2 + hash01(i, 71)).fract();
+                let ang = -clock * 22.0 + i as f32 * 0.63;
+                let r = 10.0 + ph * 14.0;
+                let px = 160.0 + ang.cos() * r;
+                let py = DESCENT_DIG_Y + 6.0 + ang.sin() * r * 0.55;
+                let wide = 1.0 + f32::from(u8::from(i % 3 == 0));
+                draw_rectangle(
+                    px.round(),
+                    py.round(),
+                    wide,
+                    1.0,
+                    shade(soil, 1.3, a * (1.0 - ph)),
+                );
+            }
+        }
         draw_texture_ex(
             tex,
             144.0,
             DESCENT_DIG_Y - 12.0,
             Color::new(1.0, 1.0, 1.0, a),
             DrawTextureParams {
-                source: Some(Rect::new(
-                    frame as f32 * 32.0,
-                    row as f32 * 32.0,
-                    32.0,
-                    32.0,
-                )),
+                source: Some(Rect::new(col as f32 * 32.0, row as f32 * 32.0, 32.0, 32.0)),
                 dest_size: Some(vec2(32.0, 32.0)),
                 ..Default::default()
             },
