@@ -5446,7 +5446,7 @@ fn draw_descent(
         for c in 0..cols {
             let x0 = c as f32 * cell;
             // 가운데 굴(파 온 길)에는 장식을 두지 않는다.
-            if (x0 + 4.0 - 160.0).abs() < 12.0 && y0 < DESCENT_DIG_Y {
+            if (x0 + 4.0 - 160.0).abs() < 16.0 && y0 < DESCENT_DIG_Y {
                 continue;
             }
             let id = (cy as u32).wrapping_mul(97) ^ c as u32;
@@ -5505,7 +5505,7 @@ fn draw_descent(
         }
     }
     // 파 온 굴: Naïl 위로 어두운 기둥, 가장자리 한 줄은 더 어둡다.
-    let tw = 12.0;
+    let tw = 18.0;
     let tx = 160.0 - tw / 2.0;
     let ty = (-top).max(0.0);
     if ty < DESCENT_DIG_Y {
@@ -5528,7 +5528,7 @@ fn draw_descent(
         let ph = (clock * 2.6 + i as f32 / 8.0).fract();
         let side = if i % 2 == 0 { -1.0 } else { 1.0 };
         let sx = 160.0 + side * (3.0 + ph * (6.0 + 6.0 * hash01(i, 23)));
-        let sy = DESCENT_DIG_Y + 14.0 - ph * 10.0 + ph * ph * 12.0;
+        let sy = DESCENT_DIG_Y + 18.0 - ph * 10.0 + ph * ph * 12.0;
         draw_rectangle(
             sx.round(),
             sy.round(),
@@ -5537,41 +5537,27 @@ fn draw_descent(
             shade(soil, 1.35, a * (1.0 - ph)),
         );
     }
-    // Naïl(또는 모모): 머리를 아래로 한 파 내려가기 4칸(nail.png 줄 2의 3~6열, critters.png 줄 19). 앞발을 번갈아
-    // 내리긋는 동안 몸이 좌우로 1px 흔들린다.
-    if let Some(art) = art {
-        let frame = ((clock * 10.0) as u32) % 4;
-        let sway = [0.0, 1.0, 0.0, -1.0][frame as usize];
-        let (tex, src) = if w.player.kit == crate::equipment::Character::Momo {
-            match art.critters.as_ref() {
-                Some(t) => (
-                    t,
-                    Rect::new(
-                        frame as f32 * 16.0,
-                        art::MOMO_DIG_ROW as f32 * 16.0,
-                        16.0,
-                        16.0,
-                    ),
-                ),
-                None => (
-                    &art.nail,
-                    Rect::new((3 + frame) as f32 * 16.0, 32.0, 16.0, 16.0),
-                ),
-            }
+    // Naïl(또는 모모): 이 장면 전용 32×32 파 내려가기 6칸(dig.png, `tools/art/dig.py`). 털빛마다 줄이 있다.
+    if let Some(tex) = art.and_then(|a| a.dig.as_ref()) {
+        let frame = ((clock * 12.0) as u32) % 6;
+        let row = if w.player.kit == crate::equipment::Character::Momo {
+            4
         } else {
-            (
-                art.nail_fur(w.fur),
-                Rect::new((3 + frame) as f32 * 16.0, 32.0, 16.0, 16.0),
-            )
+            u32::from(w.fur.min(3))
         };
         draw_texture_ex(
             tex,
-            152.0 + sway,
-            DESCENT_DIG_Y - 2.0,
+            144.0,
+            DESCENT_DIG_Y - 12.0,
             Color::new(1.0, 1.0, 1.0, a),
             DrawTextureParams {
-                source: Some(src),
-                dest_size: Some(vec2(16.0, 16.0)),
+                source: Some(Rect::new(
+                    frame as f32 * 32.0,
+                    row as f32 * 32.0,
+                    32.0,
+                    32.0,
+                )),
+                dest_size: Some(vec2(32.0, 32.0)),
                 ..Default::default()
             },
         );

@@ -4,7 +4,7 @@
 use macroquad::prelude::*;
 
 pub struct Art {
-    /// Naïl 시트: 16×16 칸, 줄 0 idle·walk, 줄 1 attack·hurt·dead, 줄 2 흙더미·그림자·파 내려가기 4칸(3~6열, 0156), 줄 3~5 흰 실루엣.
+    /// Naïl 시트: 16×16 칸, 줄 0 idle·walk, 줄 1 attack·hurt·dead, 줄 2 흙더미·그림자, 줄 3~5 흰 실루엣.
     pub nail: Texture2D,
     /// 털빛 1~3(tools/art/nail.py, 저널 보상 docs/decisions/0048). 없으면 기본 털.
     pub nail_furs: Vec<Option<Texture2D>>,
@@ -18,12 +18,14 @@ pub struct Art {
     pub dark: Texture2D,
     /// 빛 구멍(0095): 가운데 불투명 → 가장자리 투명. 어둠 지도에서 이만큼 어둠을 뺀다.
     pub light: Texture2D,
-    /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이, 줄 14~18 땃쥐·고슴도치·두꺼비·박쥐·포자버섯(0146), 줄 19 모모 파 내려가기(0156). 아래 CRITTER_ROWS줄은 흰 실루엣.
+    /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이, 줄 14~18 땃쥐·고슴도치·두꺼비·박쥐·포자버섯(0146). 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
     /// 들쥐 대장·보리(tools/art/chief.py): 32×32, 줄 0 물든 대장, 줄 1 보리, 줄 2·3 흰 실루엣.
     pub chief: Option<Texture2D>,
+    /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 털빛 1~3, 줄 4 돌아온 모모. 땅 단면 전환에서만.
+    pub dig: Option<Texture2D>,
     /// 컷씬 일러스트(illust::Illust::ALL 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
     pub illust: Vec<Option<Texture2D>>,
     /// 타이틀 바탕 640×360(2배 밀도, `tools/art/illust.py` title, 0083). 없으면 예전 선 바탕.
@@ -109,15 +111,13 @@ pub const PORTRAIT_COLS: u32 = 12;
 pub const CELL: f32 = 16.0;
 
 /// critters.png에서 실루엣 줄까지의 거리(그림 줄 수).
-pub const CRITTER_ROWS: u32 = 20;
+pub const CRITTER_ROWS: u32 = 19;
 /// critters.png의 라쿤 줄.
 pub const RACCOON_ROW: u32 = 6;
 /// critters.png의 모모(물든 굴토끼) 줄(docs/decisions/0029).
 pub const MOMO_ROW: u32 = 7;
 /// 돌아온 모모(꽃이 핀 모습, docs/decisions/0046).
 pub const MOMO_BLOOM_ROW: u32 = 8;
-/// 돌아온 모모의 파 내려가기 4칸(땅 단면 전환, 0156).
-pub const MOMO_DIG_ROW: u32 = 19;
 /// 도토(물든 청설모, 둘째 길 보스)와 돌아온 도토(docs/decisions/0052).
 pub const DOTO_ROW: u32 = 9;
 pub const DOTO_BACK_ROW: u32 = 10;
@@ -152,9 +152,14 @@ impl Art {
             .collect();
         v.extend((1..crate::journal::FURS).map(|n| format!("art/nail_fur{n}.png")));
         v.extend(
-            ["art/portraits.png", "art/critters.png", "art/chief.png"]
-                .iter()
-                .map(|s| s.to_string()),
+            [
+                "art/portraits.png",
+                "art/critters.png",
+                "art/chief.png",
+                "art/dig.png",
+            ]
+            .iter()
+            .map(|s| s.to_string()),
         );
         v.extend(
             crate::illust::Illust::ALL
@@ -195,6 +200,10 @@ impl Art {
         if let Some(c) = &chief {
             c.set_filter(FilterMode::Nearest);
         }
+        let dig = crate::loading::texture("art/dig.png").await.ok();
+        if let Some(d) = &dig {
+            d.set_filter(FilterMode::Nearest);
+        }
         let mut illust = Vec::new();
         for il in crate::illust::Illust::ALL {
             let t = crate::loading::texture(&format!("art/illust/{}.png", il.spec().file))
@@ -229,6 +238,7 @@ impl Art {
             critters,
             portraits,
             chief,
+            dig,
             illust,
         })
     }
