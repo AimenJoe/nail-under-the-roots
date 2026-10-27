@@ -73,17 +73,49 @@ fn node_text(kind: Option<NodeKind>, last: bool) -> (Tr, Tr) {
 }
 
 /// 길 지도 칸의 화면 위치(논리 px). 0열 = 쉼터, 1열부터 층.
+/// 왼쪽 위(쉼터)에서 오른쪽 아래(보스)로 비스듬히 내려간다(0156): 층의 가운데 높이가 층마다 낮아지고,
+/// 같은 층의 칸은 그 둘레에 위아래로 늘어선다.
 fn node_pos(r: &Route, area: Rect, layer: usize, i: usize) -> Vec2 {
     let cols = r.layers.len() as f32;
-    let x = area.x + 18.0 + (layer as f32 + 1.0) * (area.w - 36.0) / cols;
+    let f = (layer as f32 + 1.0) / cols;
+    let x = area.x + 18.0 + f * (area.w - 36.0);
     let n = r.layers[layer].len() as f32;
     let node = &r.layers[layer][i];
-    let y = area.y + (i as f32 + 0.5) / n * area.h;
-    vec2((x + node.jx * 6.0).round(), (y + node.jy * 5.0).round())
+    let mid = area.y + ROUTE_TOP + f * (area.h - ROUTE_TOP - ROUTE_BOTTOM);
+    let y = (mid + (i as f32 - (n - 1.0) / 2.0) * ROUTE_GAP + node.jy * 4.0)
+        .clamp(area.y + 7.0, area.bottom() - 7.0);
+    vec2((x + node.jx * 6.0).round(), y.round())
 }
 
+/// 비스듬한 길 지도: 쉼터 높이(위에서)·보스 높이(아래에서)·같은 층 칸 사이.
+const ROUTE_TOP: f32 = 12.0;
+const ROUTE_BOTTOM: f32 = 14.0;
+const ROUTE_GAP: f32 = 22.0;
+
 fn camp_pos(area: Rect) -> Vec2 {
-    vec2(area.x + 18.0, area.y + area.h / 2.0)
+    vec2(area.x + 18.0, area.y + ROUTE_TOP)
+}
+
+/// 길 지도 바탕(0156): 아래로 갈수록 짙어지는 흙 띠와 물결치는 경계. 위가 쉼터, 아래가 다음 깊이.
+fn draw_route_strata(ui: &Ui, area: Rect) {
+    const BANDS: usize = 6;
+    let bh = area.h / BANDS as f32;
+    for b in 0..BANDS {
+        let k = b as f32 / (BANDS - 1) as f32;
+        let c = Color::new(0.30 - 0.19 * k, 0.21 - 0.13 * k, 0.15 - 0.03 * k, 0.55);
+        let y0 = area.y + b as f32 * bh;
+        ui.rect(Rect::new(area.x, y0.round(), area.w, bh.ceil() + 1.0), c);
+        if b > 0 {
+            // 경계: 4px마다 1px 위아래로 물결.
+            let line = Color::new(0.08, 0.05, 0.06, 0.45);
+            let mut x = area.x;
+            while x < area.right() {
+                let wob = ((x * 0.21 + b as f32 * 1.7).sin() * 1.5).round();
+                ui.rect(Rect::new(x, (y0 + wob).round(), 4.0, 1.0), line);
+                x += 4.0;
+            }
+        }
+    }
 }
 
 fn circle(ui: &Ui, p: Vec2, r: f32, c: Color) {
@@ -564,6 +596,7 @@ impl App {
         let lit = Color::new(0.90, 0.71, 0.47, 1.0);
         let walked =
             |l: usize, i: usize| r.at.is_some_and(|(al, ai)| l < al || (l == al && i == ai));
+        draw_route_strata(ui, area);
         // 길(뒤에서 앞으로): 쉼터 → 첫 층, 층 → 다음 층.
         for i in 0..r.layers[0].len() {
             let on = r.at.is_none() || walked(0, i);
@@ -596,6 +629,44 @@ impl App {
             cp + vec2(0.0, -1.0),
             1.5,
             Color::new(1.0, 0.9, 0.5, 1.0),
+        );
+        // 깊이(0156): 오른쪽 위(비어 있는 쪽)에 지금 쉼터의 깊이, 보스 위에 길이 끝나는 깊이.
+        let label = |m: u32| fill(s.depth_m, &[&m]);
+        ui.text_right(
+            &label(crate::depth::camp(r.stage)),
+            area.right() - 2.0,
+            area.y + 2.0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+        let last = r.layers.len() - 1;
+        let bp = node_pos(r, area, last, 0);
+        // 두 깊이 사이 오른쪽 끝에 점선 자(아래로 내려간다).
+        let (y0, y1) = (area.y + 14.0, bp.y - 25.0);
+        let mut y = y0;
+        while y < y1 - 3.0 {
+            ui.rect(Rect::new(area.right() - 6.0, y, 1.0, 2.0), ui::TEXT_DIM);
+            y += 4.0;
+        }
+        ui.rect(
+            Rect::new(area.right() - 8.0, y1 - 3.0, 5.0, 1.0),
+            ui::TEXT_DIM,
+        );
+        ui.rect(
+            Rect::new(area.right() - 7.0, y1 - 2.0, 3.0, 1.0),
+            ui::TEXT_DIM,
+        );
+        ui.rect(
+            Rect::new(area.right() - 6.0, y1 - 1.0, 1.0, 1.0),
+            ui::TEXT_DIM,
+        );
+        // 아래쪽은 마지막 층 칸과 가까워 짧은 꼴("48m", 긴 언어에서 칸과 겹쳤다).
+        ui.text_right(
+            &fill(s.depth_short, &[&crate::depth::stage_end(r.stage)]),
+            area.right() - 2.0,
+            bp.y - 22.0,
+            FONT_PX,
+            ui::TEXT_DIM,
         );
         // 칸
         let pulse = 0.5 + 0.5 * (get_time() as f32 * 5.0).sin();

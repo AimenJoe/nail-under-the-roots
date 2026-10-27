@@ -246,6 +246,10 @@ pub const VILLAGE_SEEDS_DAILY: u32 = 5;
 pub const FINAL_STAGE: u32 = 3;
 /// 장소를 바꿀 때 어두워지는(그리고 밝아지는) 시간.
 pub const FADE_HALF: f32 = 0.3;
+/// 내려가는 전환(굴로·다음 쉼터로)의 반: 이 동안 지층 단면이 흐른다(0156). 굽기가 길면 가운데가 더 길어진다.
+pub const DESCENT_HALF: f32 = 0.6;
+/// 지대 이름 카드가 떠 있는 시간(0156).
+pub const BIOME_CARD_TIME: f32 = 3.2;
 /// 카메라가 목표를 따라가는 빠르기(초당, 지수 감쇠). 던전 방을 넘을 때 이 속도로 미끄러진다.
 pub const CAM_FOLLOW: f32 = 9.0;
 /// 필드의 자는 적이 깨는 거리.

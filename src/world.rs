@@ -596,6 +596,12 @@ impl World {
                 self.toast = None;
             }
         }
+        if let Some((_, _, time)) = self.adv.biome_card.as_mut() {
+            *time -= dt;
+            if *time <= 0.0 {
+                self.adv.biome_card = None;
+            }
+        }
 
         // 1b. 획득물
         let ppos = self.player.pos;

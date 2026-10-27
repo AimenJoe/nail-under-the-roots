@@ -14,6 +14,7 @@ mod camp;
 mod combat;
 mod cutscene;
 mod daily;
+mod depth;
 mod dream;
 mod dungeon;
 mod enemy;

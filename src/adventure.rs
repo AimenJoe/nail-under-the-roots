@@ -17,6 +17,7 @@
 use macroquad::prelude::*;
 
 use crate::biome::Biome;
+use crate::depth;
 use crate::dungeon::{self, Dungeon, Goal, Params, RoomKind};
 use crate::enemy::{Enemy, Kind};
 use crate::field;
@@ -48,6 +49,31 @@ pub enum Transition {
     EnterCamp,
     /// 길 지도에서 고른 굴로.
     EnterNode,
+}
+
+impl Transition {
+    /// 더 깊이 내려가는 전환: 검정 대신 지층 단면이 흐르고(0156) 조금 더 길다.
+    pub fn descends(self) -> bool {
+        matches!(self, Transition::EnterCamp | Transition::EnterNode)
+    }
+
+    /// 어두워지는(=밝아지는) 반의 길이.
+    pub fn half(self) -> f32 {
+        if self.descends() {
+            t::DESCENT_HALF
+        } else {
+            t::FADE_HALF
+        }
+    }
+}
+
+/// 내려가는 전환의 지금 모습(렌더가 지층 단면을 그린다, 0156).
+#[derive(Clone, Copy, Debug)]
+pub struct Descent {
+    /// 화면에 보일 깊이(m): 떠난 곳 → 닿을 곳.
+    pub depth_m: f32,
+    /// 단면이 월드를 덮는 정도(0..1). 처음·끝에서 월드와 섞인다.
+    pub cover: f32,
 }
 
 /// 필드 공터의 보스(들쥐 대장).
@@ -108,6 +134,9 @@ pub struct Fade {
     pub kind: Transition,
     pub t: f32,
     swapped: bool,
+    /// 떠난 곳·닿을 곳의 깊이(m, `depth.rs`). 닿을 곳은 장소를 바꾼 뒤 실제 값으로 고친다.
+    pub from_m: u32,
+    pub to_m: u32,
 }
 
 /// 던전에 있는 동안 맡겨 둔 필드·쉼터.
@@ -161,6 +190,10 @@ pub struct Adventure {
     /// 마을이면 그 모습(이웃·꾸미기·나무)과 자리 표시(0045).
     pub village: Option<crate::village::State>,
     pub marks: Vec<(char, Vec2)>,
+    /// 이번 런에서 마지막으로 이름 카드를 보인 지대(같은 지대로 내려가면 다시 띄우지 않는다, 0156).
+    pub shown_biome: Option<Biome>,
+    /// 지대 이름 카드: (지대, 깊이 m, 남은 시간).
+    pub biome_card: Option<(Biome, u32, f32)>,
 }
 
 impl World {
@@ -181,6 +214,7 @@ impl World {
         }
         w.adv.place = Place::Field;
         w.adv.home = Place::Field;
+        w.adv.shown_biome = Some(Biome::Meadow);
         w.adv.save_pos = p.start;
         w.adv.entrance_pos = entrance.unwrap_or(p.start);
         w.adv.seed = (macroquad::miniquad::date::now() * 1000.0) as u64;
@@ -433,23 +467,30 @@ impl World {
             return false;
         };
         f.t += t::TICK_DT;
-        if !f.swapped && f.t >= t::FADE_HALF {
-            f.swapped = true;
-            match f.kind {
-                Transition::ExitDungeon => self.exit_dungeon(),
-                Transition::Respawn => self.respawn_at_save(),
-                Transition::EnterCamp => self.enter_camp(),
-                Transition::EnterNode => self.enter_node(),
-            }
+        let half = f.kind.half();
+        if !f.swapped && f.t >= half {
+            self.swap_place(&mut f);
             sfx.play(sfx::Id::Emerge);
         }
-        self.adv.fade = if f.t >= t::FADE_HALF * 2.0 {
-            None
-        } else {
-            Some(f)
-        };
+        self.adv.fade = if f.t >= half * 2.0 { None } else { Some(f) };
         self.adv.prev_cam = self.adv.cam;
         true
+    }
+
+    /// 어두운 한가운데: 장소를 바꾸고, 닿은 깊이를 적고, 새 지대로 내려왔으면 이름 카드(0156).
+    fn swap_place(&mut self, f: &mut Fade) {
+        f.swapped = true;
+        match f.kind {
+            Transition::ExitDungeon => self.exit_dungeon(),
+            Transition::Respawn => self.respawn_at_save(),
+            Transition::EnterCamp => self.enter_camp(),
+            Transition::EnterNode => self.enter_node(),
+        }
+        f.to_m = self.depth_m();
+        if f.kind.descends() && self.adv.shown_biome != Some(self.biome) {
+            self.adv.shown_biome = Some(self.biome);
+            self.adv.biome_card = Some((self.biome, f.to_m, t::BIOME_CARD_TIME));
+        }
     }
 
     /// 틱 뒤: 칸 위의 것(입구·출구·저장), 던전 방(잠금·클리어·보상), 카메라.
@@ -585,27 +626,69 @@ impl World {
 
     pub fn start_fade(&mut self, kind: Transition) {
         if self.adv.fade.is_none() {
+            let from_m = self.depth_m();
             self.adv.fade = Some(Fade {
                 kind,
                 t: 0.0,
                 swapped: false,
+                from_m,
+                to_m: self.next_depth_m(kind).unwrap_or(from_m),
             });
         }
     }
 
-    /// 화면을 덮는 검정(0..1). 렌더가 월드 위에 그린다.
+    /// 지금 있는 곳의 깊이(m, `depth.rs`).
+    pub fn depth_m(&self) -> u32 {
+        match self.adv.place {
+            Place::Arena | Place::Field | Place::Village => 0,
+            Place::Camp => depth::camp(self.adv.stage),
+            Place::Dungeon => match (self.adv.node, self.adv.route.as_ref()) {
+                (Some((l, _)), Some(r)) => depth::node(r.stage, l, r.layers.len()),
+                _ => depth::classic(self.adv.depth),
+            },
+        }
+    }
+
+    /// 전환이 닿을 곳의 깊이(미리 안다: 고른 길 칸, 다음 쉼터).
+    fn next_depth_m(&self, kind: Transition) -> Option<u32> {
+        match kind {
+            Transition::EnterCamp => Some(depth::camp(self.adv.stage + 1)),
+            Transition::EnterNode => {
+                let r = self.adv.route.as_ref()?;
+                let (l, _) = r.at?;
+                Some(depth::node(r.stage, l, r.layers.len()))
+            }
+            _ => None,
+        }
+    }
+
+    /// 화면을 덮는 검정(0..1). 렌더가 월드 위에 그린다. 내려가는 전환은 검정 대신 `descent`.
     pub fn fade_alpha(&self) -> f32 {
         match self.adv.fade {
-            Some(f) => {
-                let k = f.t / t::FADE_HALF;
+            Some(f) if !f.kind.descends() => {
+                let k = f.t / f.kind.half();
                 if k < 1.0 {
                     k
                 } else {
                     (2.0 - k).max(0.0)
                 }
             }
-            None => 0.0,
+            _ => 0.0,
         }
+    }
+
+    /// 내려가는 전환 중이면 지층 단면의 모습(0156).
+    pub fn descent(&self) -> Option<Descent> {
+        let f = self.adv.fade.filter(|f| f.kind.descends())?;
+        let k = (f.t / (f.kind.half() * 2.0)).clamp(0.0, 1.0);
+        // 처음 0.2·끝 0.2 동안 월드와 섞인다. 깊이는 가운데 0.15~0.85에서 떠난 곳 → 닿을 곳.
+        let cover = (k / 0.2).min((1.0 - k) / 0.2).clamp(0.0, 1.0);
+        let m = ((k - 0.15) / 0.7).clamp(0.0, 1.0);
+        let m = m * m * (3.0 - 2.0 * m);
+        Some(Descent {
+            depth_m: f.from_m as f32 + (f.to_m as f32 - f.from_m as f32) * m,
+            cover,
+        })
     }
 
     /// 앱이 부른다: 쓰러진 뒤 확인을 누르면 저장 지점으로(모험일 때).
@@ -1134,6 +1217,43 @@ fn exit_cell(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 내려가는 전환(0156): 검정 대신 단면이 덮고, 깊이가 쉼터 → 고른 굴로 늘어난다. 새 지대에서만 이름 카드.
+    #[test]
+    fn descent_goes_deeper_and_names_new_zones() {
+        let mut w = World::camp_start(1);
+        w.adv.shown_biome = Some(Biome::Meadow);
+        let camp_m = w.depth_m();
+        assert_eq!(camp_m, depth::camp(1));
+        let first = w.adv.route.as_ref().unwrap().choices()[0];
+        assert!(w.choose_node(first));
+        let mut f = w.adv.fade.expect("전환");
+        assert!(f.kind.descends());
+        assert_eq!(w.fade_alpha(), 0.0, "검정 덮개 대신 단면");
+        assert!(f.to_m > f.from_m, "고른 굴이 더 깊다");
+        w.adv.fade.as_mut().unwrap().t = f.kind.half();
+        let mid = w.descent().expect("단면");
+        assert!(mid.cover > 0.99 && mid.depth_m > camp_m as f32);
+        w.swap_place(&mut f);
+        assert_eq!(w.adv.place, Place::Dungeon);
+        assert_eq!(f.to_m, w.depth_m());
+        let card = w.adv.biome_card.expect("들판에서 뿌리 지대로 = 새 지대");
+        assert_eq!(card.0, w.biome);
+        // 같은 지대의 다음 굴로는 카드가 다시 뜨지 않는다.
+        w.adv.biome_card = None;
+        let next = w.adv.route.as_ref().unwrap().choices()[0];
+        if w.adv.route.as_ref().unwrap().node(next).biome == w.biome {
+            assert!(w.choose_node(next));
+            let mut f = w.adv.fade.unwrap();
+            w.swap_place(&mut f);
+            assert!(w.adv.biome_card.is_none());
+        }
+        // 나가는 전환은 예전처럼 검정.
+        w.adv.fade = None;
+        w.start_fade(Transition::Respawn);
+        w.adv.fade.as_mut().unwrap().t = t::FADE_HALF;
+        assert!(w.descent().is_none() && w.fade_alpha() > 0.99);
+    }
 
     /// 지름길(0151): 공터 안, 굴 입구 바로 위의 걸을 수 있는 칸에서 시작하고, 저장도 거기.
     #[test]
