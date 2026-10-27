@@ -516,7 +516,7 @@ impl World {
         let half = f.kind.half();
         if !f.swapped && f.t >= half {
             self.swap_place(&mut f);
-            self.audio.play(sfx::Id::Emerge);
+            self.juice.audio.play(sfx::Id::Emerge);
         }
         self.adv.fade = if f.t >= half * 2.0 { None } else { Some(f) };
         self.adv.prev_cam = self.adv.cam;
@@ -527,13 +527,13 @@ impl World {
     fn swap_place(&mut self, f: &mut Fade) {
         f.swapped = true;
         self.spring = None;
-        self.petal_at = None;
-        self.cocoons.clear();
-        self.waves.clear();
-        self.thread_lash = None;
+        self.story.petal_at = None;
+        self.hazards.cocoons.clear();
+        self.hazards.waves.clear();
+        self.hazards.thread_lash = None;
         self.exit_at = None;
         self.exit_age = 0.0;
-        self.petals = false;
+        self.juice.petals = false;
         match f.kind {
             Transition::ExitDungeon => self.exit_dungeon(),
             Transition::Respawn => self.respawn_at_save(),
@@ -554,17 +554,17 @@ impl World {
             return;
         }
         if self.cell_triggers() {
-            self.audio.play(sfx::Id::Heal);
+            self.juice.audio.play(sfx::Id::Heal);
         }
         if self.spring_tick() {
-            self.audio.play(sfx::Id::Heal);
+            self.juice.audio.play(sfx::Id::Heal);
         }
         if self.petal_tick() {
-            self.audio.play(sfx::Id::Glowbug);
+            self.juice.audio.play(sfx::Id::Glowbug);
         }
         if self.adv.place == Place::Field {
             if let Some(id) = self.field_boss() {
-                self.audio.play(id);
+                self.juice.audio.play(id);
             }
         }
         if self.adv.place == Place::Dungeon {
@@ -635,7 +635,7 @@ impl World {
                 }
                 self.adv.boss = BossFight::Fight;
                 self.adv.events.push(AdvEvent::BossIntro);
-                self.feel.add_trauma(0.35);
+                self.juice.feel.add_trauma(0.35);
                 return Some(sfx::Id::WallHit);
             }
             BossFight::Fight => {
@@ -661,7 +661,7 @@ impl World {
                             self.loot.push(Loot::spawn(LootKind::Seed, at));
                         }
                         self.adv.events.push(AdvEvent::BossBeaten);
-                        self.toast = Some((|s| s.toast_chief, 3.0));
+                        self.juice.toast = Some((|s| s.toast_chief, 3.0));
                         return Some(sfx::Id::Emerge);
                     }
                 }
@@ -769,7 +769,7 @@ impl World {
         }
         self.adv.save_pos = at;
         self.player.heal(self.player.stats.max_hp);
-        self.toast = Some((|s| s.toast_save, 2.5));
+        self.juice.toast = Some((|s| s.toast_save, 2.5));
         true
     }
 
@@ -809,21 +809,21 @@ impl World {
             return;
         };
         // 첫 길의 끝은 모모가 지킨다(아직 안 돌아왔고, 이번 런에 모모에게 쓰러지지 않았으면, 0046).
-        if self.momo_fight && stage == 1 && kind == NodeKind::Boss {
+        if self.story.momo_fight && stage == 1 && kind == NodeKind::Boss {
             prm.boss = Some(Kind::Momo);
             // 복선(0159): 모모가 지키는 굴에는 방마다 시든 꽃잎이 떠돈다.
-            self.petals = true;
+            self.juice.petals = true;
         }
         // 둘째 길의 끝은 도토가 지킨다(아직 기억해 내지 않았고, 이번 런에 도토에게 쓰러지지 않았으면, 0052).
-        if self.doto_fight && stage == 2 && kind == NodeKind::Boss {
+        if self.story.doto_fight && stage == 2 && kind == NodeKind::Boss {
             prm.boss = Some(Kind::Doto);
         }
         // 셋째 길(마지막 길)의 끝은 콩이가 지킨다. 이기면 출구가 가장 깊은 곳으로(0054).
-        if self.kongi_fight && stage == t::FINAL_STAGE && kind == NodeKind::Boss {
+        if self.story.kongi_fight && stage == t::FINAL_STAGE && kind == NodeKind::Boss {
             prm.boss = Some(Kind::Kongi);
         }
         // 굴토끼 옛 굴의 끝은 토끼풀이 지킨다(0165). 이기면 출구가 가장 깊은 곳으로.
-        if self.clover_fight && stage == t::FINAL_STAGE && kind == NodeKind::Warren {
+        if self.story.clover_fight && stage == t::FINAL_STAGE && kind == NodeKind::Warren {
             prm.boss = Some(Kind::Clover);
         }
         self.adv.node = Some(at);
@@ -849,8 +849,8 @@ impl World {
             self.loot.clear();
         }
         self.projectiles.clear();
-        self.clouds.clear();
-        self.rocks.clear();
+        self.hazards.clouds.clear();
+        self.hazards.rocks.clear();
         self.player.pos = d.start_pos();
         self.player.prev_pos = self.player.pos;
         self.adv.current_room = d.start;
@@ -873,8 +873,8 @@ impl World {
             self.biome = s.biome;
         }
         self.projectiles.clear();
-        self.clouds.clear();
-        self.rocks.clear();
+        self.hazards.clouds.clear();
+        self.hazards.rocks.clear();
         self.adv.dungeon = None;
         self.adv.node = None;
     }
@@ -891,9 +891,9 @@ impl World {
         self.enemies.clear();
         self.loot.clear();
         self.projectiles.clear();
-        self.clouds.clear();
-        self.rocks.clear();
-        self.mines.clear();
+        self.hazards.clouds.clear();
+        self.hazards.rocks.clear();
+        self.hazards.mines.clear();
         self.npc = None;
         self.neighbors.clear();
         self.biome = Biome::Deep;
@@ -902,7 +902,7 @@ impl World {
         self.player.pos = vec2(t::VIEW_W / 2.0, t::VIEW_H - 34.0);
         self.player.prev_pos = self.player.pos;
         self.player.vel = Vec2::ZERO;
-        self.toast = None;
+        self.juice.toast = None;
         self.snap_cam();
         self.adv.events.push(AdvEvent::DeepIntro);
     }
@@ -911,7 +911,11 @@ impl World {
     pub fn reroll_route(&mut self) {
         if let Some(r) = self.adv.route.as_ref() {
             let stage = r.stage;
-            self.adv.route = Some(Route::generate(self.adv.seed, stage, self.warren_open));
+            self.adv.route = Some(Route::generate(
+                self.adv.seed,
+                stage,
+                self.story.warren_open,
+            ));
         }
     }
 
@@ -933,8 +937,8 @@ impl World {
         self.enemies.clear();
         self.loot.clear();
         self.projectiles.clear();
-        self.clouds.clear();
-        self.rocks.clear();
+        self.hazards.clouds.clear();
+        self.hazards.rocks.clear();
         self.npc = None;
         self.neighbors.clear();
         for (ch, at) in &p.marks {
@@ -975,11 +979,15 @@ impl World {
         self.adv.place = Place::Camp;
         self.adv.heart_sold = false;
         self.adv.seed = self.adv.seed.wrapping_add(CAMP_SEED_STEP);
-        self.adv.route = Some(Route::generate(self.adv.seed, stage, self.warren_open));
+        self.adv.route = Some(Route::generate(
+            self.adv.seed,
+            stage,
+            self.story.warren_open,
+        ));
         self.adv.last_cell = None;
         self.adv.events.push(AdvEvent::CampArrive(stage));
         self.biome = crate::camp::biome(stage);
-        self.toast = Some((|s| s.toast_camp, 2.5));
+        self.juice.toast = Some((|s| s.toast_camp, 2.5));
         self.snap_cam();
     }
 
@@ -996,27 +1004,27 @@ impl World {
     fn respawn_at_save(&mut self) {
         // 모모에게 쓰러지면 이번 런의 첫 길 끝은 보통 무리로(이기지 않고도 지나갈 수 있게, 0046).
         if self.enemies.iter().any(|e| e.kind == Kind::Momo) {
-            self.momo_fight = false;
+            self.story.momo_fight = false;
         }
         if self.enemies.iter().any(|e| e.kind == Kind::Doto) {
-            self.doto_fight = false;
+            self.story.doto_fight = false;
         }
         if self.enemies.iter().any(|e| e.kind == Kind::Kongi) {
-            self.kongi_fight = false;
+            self.story.kongi_fight = false;
         }
         if self.enemies.iter().any(|e| e.kind == Kind::Clover) {
-            self.clover_fight = false;
+            self.story.clover_fight = false;
         }
-        self.mines.clear();
-        self.clouds.clear();
-        self.rocks.clear();
+        self.hazards.mines.clear();
+        self.hazards.clouds.clear();
+        self.hazards.rocks.clear();
         if self.adv.place == Place::Deep {
             // 실에 잠겼다(0162): 맡겨 둔 쉼터로 돌아간다. 매듭은 다음에 다시.
             self.deep = None;
             // 잠드는 장면(0163)이 남긴 어둠·침묵을 걷는다.
-            self.gloom.amount = 0.0;
-            self.hush = false;
-            self.boss_card = None;
+            self.juice.gloom.amount = 0.0;
+            self.juice.hush = false;
+            self.juice.boss_card = None;
             self.restore_field();
         }
         if self.adv.place == Place::Dungeon {
@@ -1029,14 +1037,18 @@ impl World {
             // 길은 새로 짠다(같은 쉼터에서 다시 고른다).
             let stage = self.adv.stage;
             self.adv.seed = self.adv.seed.wrapping_add(0x7F4A_7C15);
-            self.adv.route = Some(Route::generate(self.adv.seed, stage, self.warren_open));
+            self.adv.route = Some(Route::generate(
+                self.adv.seed,
+                stage,
+                self.story.warren_open,
+            ));
         }
         self.player.revive();
         self.player.hp = self.player.stats.max_hp;
         self.player.pos = self.adv.save_pos;
         self.player.prev_pos = self.player.pos;
-        self.glowbugs = self.glowbugs * 7 / 10;
-        self.toast = Some((|s| s.toast_respawn, 2.5));
+        self.inv.glowbugs = self.inv.glowbugs * 7 / 10;
+        self.juice.toast = Some((|s| s.toast_respawn, 2.5));
         self.snap_cam();
     }
 
@@ -1100,7 +1112,7 @@ impl World {
                         e.make_elite();
                     }
                     if kind == Kind::Momo {
-                        e.level = self.momo_wins.saturating_add(1);
+                        e.level = self.story.momo_wins.saturating_add(1);
                         self.adv.boss_last = e.pos;
                         self.adv.events.push(AdvEvent::MomoIntro);
                     }
@@ -1115,7 +1127,7 @@ impl World {
                     if kind == Kind::Clover {
                         // 아기들의 고치 둘은 방 위쪽 가운데(0165). 토끼풀은 그 앞을 지킨다.
                         let c = vec2(interior.center().x, interior.y + 22.0);
-                        self.cocoons = vec![c + vec2(-13.0, 0.0), c + vec2(13.0, 2.0)];
+                        self.hazards.cocoons = vec![c + vec2(-13.0, 0.0), c + vec2(13.0, 2.0)];
                         e.guard = Some(c);
                         self.adv.boss_last = e.pos;
                         self.adv.events.push(AdvEvent::CloverIntro);
@@ -1123,14 +1135,14 @@ impl World {
                     self.enemies.push(e);
                 }
             }
-            self.audio.play(sfx::Id::WallHit);
-            self.feel.add_trauma(0.25);
+            self.juice.audio.play(sfx::Id::WallHit);
+            self.juice.feel.add_trauma(0.25);
         }
         let mut gift_at = None;
         if self.room.doors_locked() && self.enemies.is_empty() {
             self.room.set_doors_locked(false);
             room.cleared = true;
-            self.audio.play(sfx::Id::Emerge);
+            self.juice.audio.play(sfx::Id::Emerge);
             if room.kind == RoomKind::Boss {
                 // 보상은 마지막으로 쓰러진 자리(플레이어 곁)에, 출구는 거기와 플레이어에서 떨어진 바닥 칸에.
                 // 예전엔 출구가 방 한가운데라, 가운데서 끝내면 서 있던 칸이 곧 출구가 되어 보상을 못 줍고 나갔다(0060).
@@ -1158,10 +1170,11 @@ impl World {
                 let ep = vec2(ex as f32 * 16.0 + 8.0, ey as f32 * 16.0 + 8.0);
                 self.exit_at = Some(ep);
                 self.exit_age = 0.0;
-                self.fx
+                self.juice
+                    .fx
                     .push(ring(ep, 4.0, 24.0, 0.5, Color::new(1.0, 0.92, 0.6, 1.0)));
-                clods(&mut self.fx, ep, 10, DIRT, 70.0);
-                puff(&mut self.fx, ep, 3, self.biome.dust(), 7.0, 0.5);
+                clods(&mut self.juice.fx, ep, 10, DIRT, 70.0);
+                puff(&mut self.juice.fx, ep, 3, self.biome.dust(), 7.0, 0.5);
                 if goal == Goal::Boss {
                     self.loot.push(Loot::place(LootKind::RootHeart, at));
                     for _ in 0..t::BOSS_SEEDS {
@@ -1181,13 +1194,13 @@ impl World {
                         // 토끼풀은 맑은 눈으로 돌아오고 고치가 풀린다(장면은 앱, 0165).
                         self.adv.events.push(AdvEvent::CloverBeaten);
                     } else {
-                        self.toast = Some((|s| s.toast_boss, 3.0));
+                        self.juice.toast = Some((|s| s.toast_boss, 3.0));
                     }
                 } else {
                     for _ in 0..t::PACK_SEEDS {
                         self.loot.push(Loot::spawn(LootKind::Seed, at));
                     }
-                    self.toast = Some((|s| s.toast_goal, 2.5));
+                    self.juice.toast = Some((|s| s.toast_goal, 2.5));
                     // 실타래 칸(0147): 엘리트를 풀어 주면 상자처럼 장신구 하나(다 있으면 반딧불).
                     if room.elite {
                         gift_at = Some(at);
@@ -1206,14 +1219,14 @@ impl World {
         });
         if let Some(i) = near {
             self.room.open_chest(i);
-            self.audio.play(sfx::Id::Chest);
+            self.juice.audio.play(sfx::Id::Chest);
             let at = self.room.props[i].rect.center();
             // 상자가 열리면 반짝임 셋(0081).
             for (k, d) in [vec2(-5.0, -8.0), vec2(4.0, -11.0), vec2(7.0, -5.0)]
                 .into_iter()
                 .enumerate()
             {
-                self.fx.push(crate::world::Fx {
+                self.juice.fx.push(crate::world::Fx {
                     pos: at + d,
                     vel: vec2(0.0, -8.0),
                     time: -0.08 * k as f32,
@@ -1226,19 +1239,20 @@ impl World {
             for _ in 0..rand::gen_range(t::CHEST_SEEDS.0, t::CHEST_SEEDS.1 + 1) {
                 self.push_loot(Loot::spawn(LootKind::Seed, at));
             }
-            self.chests += 1;
+            self.stats.chests += 1;
             self.charm_gift(at);
-            self.audio.play(sfx::Id::Emerge);
+            self.juice.audio.play(sfx::Id::Emerge);
         }
     }
 
     /// 아직 없는 장신구 하나(다 있으면 반딧불 한 줌). 상자·실타래 끝방(0147).
     fn charm_gift(&mut self, at: Vec2) {
         let missing: Vec<usize> = self
+            .inv
             .charm_pool
             .iter()
             .copied()
-            .filter(|c| !self.charms_found.contains(c))
+            .filter(|c| !self.inv.charms_found.contains(c))
             .collect();
         if missing.is_empty() {
             for _ in 0..12 {
@@ -1246,8 +1260,8 @@ impl World {
             }
         } else {
             let c = missing[rand::gen_range(0, missing.len())];
-            self.charms_found.push(c);
-            self.gifts.push(Gift::Charm(c));
+            self.inv.charms_found.push(c);
+            self.inv.gifts.push(Gift::Charm(c));
         }
     }
 
@@ -1458,7 +1472,7 @@ mod tests {
         assert!(w.enemies.is_empty(), "던전 시작방엔 적이 없다");
         assert_eq!(w.room.cell_at(w.player.pos), Some(Cell::Floor));
         // 쓰러져서 저장 지점으로: 필드가 돌아오고, 체력 가득, 반딧불 30% 잃음.
-        w.glowbugs = 10;
+        w.inv.glowbugs = 10;
         w.player.hp = 0;
         w.respawn_at_save();
         assert_eq!(w.adv.place, Place::Field);
@@ -1466,7 +1480,7 @@ mod tests {
         assert_eq!(w.enemies.len(), field_enemies, "맡겨 둔 필드 적이 돌아온다");
         assert_eq!(w.player.hp, w.player.stats.max_hp);
         assert_eq!(w.player.pos, w.adv.save_pos);
-        assert_eq!(w.glowbugs, 7);
+        assert_eq!(w.inv.glowbugs, 7);
         // 다시 들어갔다 나오면 굴 입구 앞.
         w.enter_dungeon_now();
         w.exit_dungeon();
@@ -1673,7 +1687,7 @@ mod tests {
     fn doto_guards_the_second_path_and_then_lives_in_the_village() {
         for (stage, fight, want) in [(2, true, true), (2, false, false), (1, true, false)] {
             let mut w = World::camp_start(stage);
-            w.doto_fight = fight;
+            w.story.doto_fight = fight;
             w.enter_route_boss_now();
             let boss = w.adv.dungeon.as_ref().and_then(|d| d.boss);
             assert_eq!(boss == Some(Kind::Doto), want, "길 {stage}, 싸움 {fight}");
@@ -1696,7 +1710,7 @@ mod tests {
             (2, true, false),
         ] {
             let mut w = World::camp_start(stage);
-            w.kongi_fight = fight;
+            w.story.kongi_fight = fight;
             w.enter_route_boss_now();
             let boss = w.adv.dungeon.as_ref().and_then(|d| d.boss);
             assert_eq!(boss == Some(Kind::Kongi), want, "길 {stage}, 싸움 {fight}");

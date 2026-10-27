@@ -12,33 +12,33 @@ use crate::world::World;
 /// 이번 런 통계(상태 탭·저널 셈의 바탕). 이름은 저장 글의 키다 — 바꾸지 않는다.
 fn stat_fields(w: &World) -> [(&'static str, u32); 11] {
     [
-        ("kills", w.kills),
-        ("emerge_kills", w.emerge_kills),
-        ("parries", w.parries),
-        ("items_used", w.items_used),
-        ("drills", w.drills),
-        ("emerge_hits", w.emerge_hits),
-        ("chests", w.chests),
-        ("springs", w.springs),
-        ("slams", w.slams),
-        ("finisher_hits", w.finisher_hits),
-        ("burrows", w.burrows),
+        ("kills", w.stats.kills),
+        ("emerge_kills", w.stats.emerge_kills),
+        ("parries", w.stats.parries),
+        ("items_used", w.stats.items_used),
+        ("drills", w.stats.drills),
+        ("emerge_hits", w.stats.emerge_hits),
+        ("chests", w.stats.chests),
+        ("springs", w.stats.springs),
+        ("slams", w.stats.slams),
+        ("finisher_hits", w.stats.finisher_hits),
+        ("burrows", w.stats.burrows),
     ]
 }
 
 fn set_stat(w: &mut World, name: &str, n: u32) {
     let f = match name {
-        "kills" => &mut w.kills,
-        "emerge_kills" => &mut w.emerge_kills,
-        "parries" => &mut w.parries,
-        "items_used" => &mut w.items_used,
-        "drills" => &mut w.drills,
-        "emerge_hits" => &mut w.emerge_hits,
-        "chests" => &mut w.chests,
-        "springs" => &mut w.springs,
-        "slams" => &mut w.slams,
-        "finisher_hits" => &mut w.finisher_hits,
-        "burrows" => &mut w.burrows,
+        "kills" => &mut w.stats.kills,
+        "emerge_kills" => &mut w.stats.emerge_kills,
+        "parries" => &mut w.stats.parries,
+        "items_used" => &mut w.stats.items_used,
+        "drills" => &mut w.stats.drills,
+        "emerge_hits" => &mut w.stats.emerge_hits,
+        "chests" => &mut w.stats.chests,
+        "springs" => &mut w.stats.springs,
+        "slams" => &mut w.stats.slams,
+        "finisher_hits" => &mut w.stats.finisher_hits,
+        "burrows" => &mut w.stats.burrows,
         _ => return,
     };
     *f = n;
@@ -54,17 +54,17 @@ impl App {
             depth: w.adv.depth,
             character: u8::from(w.character == Character::Momo),
             knots: w.knots.level,
-            seeds: w.seeds,
-            glowbugs: w.glowbugs,
-            berries: w.bag.berries,
-            worms: w.bag.worms,
-            selected: u8::from(w.bag.selected == Consumable::Worm),
-            root_hearts: w.root_hearts.max(0) as u32,
+            seeds: w.inv.seeds,
+            glowbugs: w.inv.glowbugs,
+            berries: w.inv.bag.berries,
+            worms: w.inv.bag.worms,
+            selected: u8::from(w.inv.bag.selected == Consumable::Worm),
+            root_hearts: w.inv.root_hearts.max(0) as u32,
             heart_sold: w.adv.heart_sold,
             sp_milli: (w.player.sp.max(0.0) * 1000.0) as u32,
-            momo_fight: w.momo_fight,
-            doto_fight: w.doto_fight,
-            kongi_fight: w.kongi_fight,
+            momo_fight: w.story.momo_fight,
+            doto_fight: w.story.doto_fight,
+            kongi_fight: w.story.kongi_fight,
             no_damage: w.no_damage,
             stats: stat_fields(w)
                 .iter()
@@ -82,8 +82,8 @@ impl App {
                 })
                 .collect(),
             equipped: self.inventory.equipped,
-            charms: w.charms.clone(),
-            charms_found: w.charms_found.clone(),
+            charms: w.inv.charms.clone(),
+            charms_found: w.inv.charms_found.clone(),
         }
     }
 
@@ -135,26 +135,26 @@ impl App {
         w.player.kit = ch;
         w.resume_camp(r.stage, r.seed, r.depth);
         w.adv.events.clear();
-        w.seeds = r.seeds;
-        w.glowbugs = r.glowbugs;
-        w.bag.berries = r.berries;
-        w.bag.worms = r.worms;
-        w.bag.selected = if r.selected == 1 {
+        w.inv.seeds = r.seeds;
+        w.inv.glowbugs = r.glowbugs;
+        w.inv.bag.berries = r.berries;
+        w.inv.bag.worms = r.worms;
+        w.inv.bag.selected = if r.selected == 1 {
             Consumable::Worm
         } else {
             Consumable::Berry
         };
-        w.root_hearts = r.root_hearts as i32;
+        w.inv.root_hearts = r.root_hearts as i32;
         w.adv.heart_sold = r.heart_sold;
-        w.charms = r.charms.clone();
+        w.inv.charms = r.charms.clone();
         for c in &r.charms_found {
-            if !w.charms_found.contains(c) {
-                w.charms_found.push(*c);
+            if !w.inv.charms_found.contains(c) {
+                w.inv.charms_found.push(*c);
             }
         }
-        w.momo_fight = r.momo_fight;
-        w.doto_fight = r.doto_fight;
-        w.kongi_fight = r.kongi_fight;
+        w.story.momo_fight = r.momo_fight;
+        w.story.doto_fight = r.doto_fight;
+        w.story.kongi_fight = r.kongi_fight;
         w.no_damage = r.no_damage;
         for (k, n) in &r.stats {
             set_stat(w, k, *n);

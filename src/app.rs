@@ -240,15 +240,15 @@ impl Tally {
 
     fn of(w: &World) -> Self {
         Self([
-            w.kills,
-            w.emerge_kills,
-            w.parries,
-            w.drills,
-            w.slams,
-            w.finisher_hits,
-            w.items_used,
-            w.chests,
-            w.springs,
+            w.stats.kills,
+            w.stats.emerge_kills,
+            w.stats.parries,
+            w.stats.drills,
+            w.stats.slams,
+            w.stats.finisher_hits,
+            w.stats.items_used,
+            w.stats.chests,
+            w.stats.springs,
         ])
     }
 }
@@ -256,7 +256,7 @@ impl Tally {
 pub enum Item {
     /// equipment::WEAPONS 번호.
     Weapon(usize),
-    /// equipment::CHARMS 번호. 끼고 있는지는 world.charms.
+    /// equipment::CHARMS 번호. 끼고 있는지는 world.inv.charms.
     Charm(usize),
 }
 
@@ -620,7 +620,7 @@ impl App {
         }
         let w = &self.world;
         // 컷씬이 음악을 내렸다(0159): 보스 곡도 아직. 장면이 풀면(Hush(false)) 바로 보스 곡.
-        if w.hush && self.scene == Scene::Cutscene {
+        if w.juice.hush && self.scene == Scene::Cutscene {
             return (None, false);
         }
         let boss = self.dream.is_some()
@@ -722,7 +722,7 @@ impl App {
                 }
                 if let Some(c) = self.cutscene.as_mut() {
                     c.update(&a, dt, &mut self.world);
-                    self.sfx.flush(&mut self.world.audio);
+                    self.sfx.flush(&mut self.world.juice.audio);
                     // 본 일러스트는 앨범에 남는다(개발 시나리오에서 봐도).
                     if let Some(il) = c.illust {
                         if self
@@ -733,7 +733,7 @@ impl App {
                         }
                     }
                     // 컷씬에서 받은 무기는 컷씬이 끝난 뒤 창으로 보여 준다.
-                    self.gift_queue.append(&mut self.world.gifts);
+                    self.gift_queue.append(&mut self.world.inv.gifts);
                     if c.is_done() {
                         self.cutscene = None;
                         match std::mem::replace(&mut self.after_cutscene, AfterCut::Game) {
@@ -831,9 +831,9 @@ impl App {
             if a.restart || (unlocked && (a.confirm || a.attack)) {
                 restart = true;
             }
-            self.world.effects = self.settings.effects_f();
+            self.world.juice.effects = self.settings.effects_f();
             self.world.tick(&a);
-            self.sfx.flush(&mut self.world.audio);
+            self.sfx.flush(&mut self.world.juice.audio);
             self.acc -= t::TICK_DT;
         }
         if self.world.player.is_alive() {
@@ -972,7 +972,7 @@ impl App {
             crate::profile::save(&self.profile);
         }
         // 도감은 런을 넘어 남는다. 시든 꽃잎(0164)도.
-        self.world.petal_found = self.profile.flag(crate::profile::key::PETAL);
+        self.world.story.petal_found = self.profile.flag(crate::profile::key::PETAL);
         for k in crate::species::BESTIARY {
             if self.profile.flag(&crate::profile::key::mob(k)) && !self.world.seen.contains(&k) {
                 self.world.seen.push(k);
@@ -992,8 +992,8 @@ impl App {
         self.world.player.parry_mul = knots.parry_mul();
         self.world.player.burrow_knot = knots.burrow_cd_mul();
         // 저널 보상(0048): 상자에서 나올 장신구, 털빛. 통계 기준은 새 월드에서 0부터.
-        self.world.charm_pool = crate::journal::charm_pool(&self.profile, ch);
-        self.world.fur = crate::journal::fur(&self.profile);
+        self.world.inv.charm_pool = crate::journal::charm_pool(&self.profile, ch);
+        self.world.inv.fur = crate::journal::fur(&self.profile);
         self.tally = Tally::of(&self.world);
         self.journal_ready = crate::journal::ready_count(&self.profile);
         // 큰 나무의 재주(0047): 튜토리얼만 빼고 모든 시작에(개발 시나리오도 고른 재주로 시험한다).
@@ -1004,26 +1004,30 @@ impl App {
         // 개발 시나리오 "모모"는 시나리오가 정한 값을 그대로 쓴다.
         if matches!(s, Scenario::Normal | Scenario::Village) {
             use crate::profile::key;
-            self.world.momo_wins = self.profile.count(key::MOMO_WINS).min(t::MOMO_FIGHTS) as u8;
+            self.world.story.momo_wins =
+                self.profile.count(key::MOMO_WINS).min(t::MOMO_FIGHTS) as u8;
             // 모모로 내려가면 모모 보스는 없다(0056).
-            self.world.momo_fight = s == Scenario::Normal
+            self.world.story.momo_fight = s == Scenario::Normal
                 && !self.profile.flag(key::MOMO_BACK)
                 && ch != Character::Momo;
             // 도토(0052)도 첫 시작에서만, 기억해 내기 전까지.
-            self.world.doto_fight = s == Scenario::Normal && !self.profile.flag(key::DOTO_MEMORY);
+            self.world.story.doto_fight =
+                s == Scenario::Normal && !self.profile.flag(key::DOTO_MEMORY);
             // 콩이(0054)도 첫 시작에서만, 이기기 전까지.
-            self.world.kongi_fight = s == Scenario::Normal && !self.profile.flag(key::KONGI_BACK);
+            self.world.story.kongi_fight =
+                s == Scenario::Normal && !self.profile.flag(key::KONGI_BACK);
             // 토끼풀(0165)도 첫 시작에서만, 돌아오기 전까지.
-            self.world.clover_fight = s == Scenario::Normal && !self.profile.flag(key::CLOVER_BACK);
-            self.world.clover_back = self.profile.flag(key::CLOVER_BACK);
+            self.world.story.clover_fight =
+                s == Scenario::Normal && !self.profile.flag(key::CLOVER_BACK);
+            self.world.story.clover_back = self.profile.flag(key::CLOVER_BACK);
             // 굴토끼 옛 굴(0165): 첫 시작은 모모가 돌아온 뒤, 오늘의 굴엔 없고, 개발 시나리오는 늘.
-            self.world.warren_open = match s {
+            self.world.story.warren_open = match s {
                 Scenario::Normal => self.profile.flag(key::MOMO_BACK),
                 Scenario::Daily => false,
                 _ => true,
             };
             // 개발 시나리오는 길을 이미 짰으니(쉼터에서 시작) 갈래를 넣어 다시 짠다.
-            if self.world.warren_open
+            if self.world.story.warren_open
                 && self
                     .world
                     .adv
@@ -1065,8 +1069,8 @@ impl App {
         if s != Scenario::Tutorial {
             for c in crate::journal::owned_charms(&self.profile, ch) {
                 self.inventory.add_charm(c);
-                if !self.world.charms_found.contains(&c) {
-                    self.world.charms_found.push(c);
+                if !self.world.inv.charms_found.contains(&c) {
+                    self.world.inv.charms_found.push(c);
                 }
             }
         }
@@ -1526,7 +1530,7 @@ impl App {
                         }
                         Some(Item::Charm(c)) => {
                             // 끼고 있으면 빼고, 아니면 낀다. 칸이 가득이면 먼저 낀 것과 바꾼다.
-                            let charms = &mut self.world.charms;
+                            let charms = &mut self.world.inv.charms;
                             if let Some(i) = charms.iter().position(|x| *x == c) {
                                 charms.remove(i);
                             } else {
@@ -2620,7 +2624,7 @@ impl App {
 
     /// 월드가 받은 무기(획득물·컷씬)를 가방에 넣고 획득 창을 띄운다.
     fn take_gifts(&mut self) {
-        self.gift_queue.append(&mut self.world.gifts);
+        self.gift_queue.append(&mut self.world.inv.gifts);
         if self.gift.is_some() || self.gift_queue.is_empty() {
             return;
         }
@@ -2812,10 +2816,11 @@ impl App {
             Some(i) => tr(WEAPONS[i].name).to_string(),
             None => s.bare_hands.to_string(),
         };
-        let charms = if w.charms.is_empty() {
+        let charms = if w.inv.charms.is_empty() {
             s.charms_none.to_string()
         } else {
-            w.charms
+            w.inv
+                .charms
                 .iter()
                 .map(|c| tr(CHARMS[*c].name))
                 .collect::<Vec<_>>()
@@ -2838,8 +2843,8 @@ impl App {
         ];
         let right: [(&str, String); 3] = [
             (s.stat_weapon, weapon),
-            (s.glowbugs, w.glowbugs.to_string()),
-            (s.seeds, w.seeds.to_string()),
+            (s.glowbugs, w.inv.glowbugs.to_string()),
+            (s.seeds, w.inv.seeds.to_string()),
         ];
         // 내린 만큼 위로 민 y. 칸 안에 다 들어오는 줄만 그린다.
         let off = self.status_scroll;
@@ -3018,7 +3023,7 @@ impl App {
         for (i, k) in BESTIARY.iter().enumerate().skip(first).take(fits) {
             let r = Rect::new(c.x, c.y + (i - first) as f32 * row_h, list_w, row_h - 1.0);
             let known = seen.contains(k);
-            let hinted = *k == crate::enemy::Kind::Momo && self.world.petal_found;
+            let hinted = *k == crate::enemy::Kind::Momo && self.world.story.petal_found;
             let name = if known {
                 tr(k.species().name)
             } else {
@@ -3057,7 +3062,7 @@ impl App {
         let w = c.right() - x;
         if !seen.contains(&k) {
             // 시든 꽃잎(0164)을 주웠으면 모모 칸엔 물음만 선다.
-            let text = if k == crate::enemy::Kind::Momo && self.world.petal_found {
+            let text = if k == crate::enemy::Kind::Momo && self.world.story.petal_found {
                 s.best_petal
             } else {
                 s.best_unseen
@@ -3169,7 +3174,7 @@ impl App {
                 }
                 Some(Item::Charm(c)) => {
                     draw_charm_icon(ui, r, CHARMS[*c].color);
-                    if self.world.charms.contains(c) {
+                    if self.world.inv.charms.contains(c) {
                         ui.text("E", r.x + 2.0, r.y + 1.0, FONT_PX, ui::ACCENT);
                     }
                 }
@@ -3214,13 +3219,13 @@ impl App {
                     y += 14.0;
                 }
                 ui.text(
-                    &fill(s.charm_slots, &[&self.world.charms.len(), &CHARM_SLOTS]),
+                    &fill(s.charm_slots, &[&self.world.inv.charms.len(), &CHARM_SLOTS]),
                     desc_x,
                     y + 4.0,
                     FONT_PX,
                     ui::TEXT_DIM,
                 );
-                let hint = if self.world.charms.contains(c) {
+                let hint = if self.world.inv.charms.contains(c) {
                     s.charm_unequip
                 } else {
                     s.charm_equip
@@ -3258,7 +3263,7 @@ impl App {
             ui::TEXT_DIM,
         );
         // 퀵 아이템(가방 칸과 따로, HUD 왼쪽 아래와 같은 것)
-        let bag = &self.world.bag;
+        let bag = &self.world.inv.bag;
         ui.text(
             &ui.fit(
                 &fill(

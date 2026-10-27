@@ -290,7 +290,7 @@ impl App {
                     }
                     // 쉼터에 닿으면 들고 온 반딧불은 마을로 간다(쓰러져 잃는 건 그 뒤에 주운 것만, 0047).
                     if self.bank_glowbugs() > 0 {
-                        self.world.toast = Some((|s| s.toast_camp_bank, 3.0));
+                        self.world.juice.toast = Some((|s| s.toast_camp_bank, 3.0));
                     }
                     self.checkpoint_run();
                     self.play(cutscene::camp_arrive(&self.world, n));
@@ -319,7 +319,7 @@ impl App {
                     self.play(cutscene::deep_sleep(&self.world));
                 }
                 AdvEvent::MomoIntro => {
-                    let level = self.world.momo_wins.saturating_add(1);
+                    let level = self.world.story.momo_wins.saturating_add(1);
                     let at = self.world.adv.boss_last;
                     self.play(cutscene::momo_meet(&self.world, level, at));
                 }
@@ -338,11 +338,11 @@ impl App {
     /// 개발 시나리오는 기록 없이 이번 월드에서만 센다.
     fn momo_beaten(&mut self) {
         use crate::profile::key;
-        let wins = self.world.momo_wins.saturating_add(1);
-        self.world.momo_wins = wins;
+        let wins = self.world.story.momo_wins.saturating_add(1);
+        self.world.story.momo_wins = wins;
         let back = wins as u32 >= t::MOMO_FIGHTS;
         if back {
-            self.world.momo_fight = false;
+            self.world.story.momo_fight = false;
         }
         if self.recording() {
             self.profile.set_count(key::MOMO_WINS, wins as u32);
@@ -363,7 +363,7 @@ impl App {
     /// 도토를 이겼다(0052): 씨앗 자리를 기억해 낸다(참 엔딩 조건 하나). 이번 런엔 다시 안 싸운다.
     /// 개발 시나리오는 기록 없이 장면만.
     fn doto_beaten(&mut self) {
-        self.world.doto_fight = false;
+        self.world.story.doto_fight = false;
         if self.recording() {
             self.profile.set(crate::profile::key::DOTO_MEMORY);
             self.save_profile();
@@ -375,7 +375,7 @@ impl App {
     /// 콩이를 이겼다(0054): 문을 열고 바위 발톱을 준다(장면 속 획득 창). 그 뒤 마을에 온다.
     fn kongi_beaten(&mut self) {
         use crate::profile::key;
-        self.world.kongi_fight = false;
+        self.world.story.kongi_fight = false;
         if self.recording() {
             self.profile.set(key::KONGI_BACK);
             self.profile.set(key::STONE);
@@ -388,7 +388,7 @@ impl App {
     /// 토끼풀을 이겼다(0165): 가족이 돌아온다(장면). 이번 런엔 다시 안 싸운다.
     fn clover_beaten(&mut self) {
         use crate::profile::key;
-        self.world.clover_fight = false;
+        self.world.story.clover_fight = false;
         if self.recording() {
             self.profile.set(key::CLOVER_BACK);
             self.save_profile();
@@ -435,7 +435,7 @@ impl App {
             // 남은 씨앗 + 보너스가 마을 씨앗이 된다(0045).
             self.profile.add(
                 crate::village::KEY_SEEDS,
-                self.world.seeds + t::VILLAGE_SEEDS_CLEAR,
+                self.world.inv.seeds + t::VILLAGE_SEEDS_CLEAR,
             );
             // 모모의 끝은 Naïl의 이야기 엔딩을 대신하지 않는다(0056).
             self.profile.set(if momo {
@@ -505,7 +505,7 @@ impl App {
             // 빈 자리: 모모를 이긴 만큼 꽃잎이 물들어 있다(0046). 모모로 왔으면 제 자리라 1인칭으로, 나일이 있는 곳도 말한다(0067).
             Interact::Seat => {
                 let momo = self.world.character == crate::equipment::Character::Momo;
-                let (line, face): (Tr, Face) = match self.world.momo_wins {
+                let (line, face): (Tr, Face) = match self.world.story.momo_wins {
                     _ if momo => (|s| s.seat_momo, Face::Happy),
                     0 => (|s| s.seat_1, Face::Worried),
                     1 => (|s| s.seat_p1, Face::Worried),
@@ -582,12 +582,12 @@ impl App {
             // 실 고리: 실의 꿈 고르기(0055).
             Interact::Dream => self.open_dream(),
             Interact::Puddle => {
-                let n = crate::journal::next_fur(&self.profile, self.world.fur);
-                let none = n == self.world.fur;
-                self.world.fur = n;
+                let n = crate::journal::next_fur(&self.profile, self.world.inv.fur);
+                let none = n == self.world.inv.fur;
+                self.world.inv.fur = n;
                 self.profile.set_count(crate::journal::KEY_FUR, n as u32);
                 crate::profile::save(&self.profile);
-                self.world.toast = Some((
+                self.world.juice.toast = Some((
                     if none {
                         |s| s.puddle_none
                     } else {
@@ -836,11 +836,11 @@ impl App {
     pub(super) fn wares(&self) -> Vec<Ware> {
         let w = &self.world;
         let mut v = vec![Ware::Berry, Ware::Worm];
-        if !w.adv.heart_sold && w.root_hearts < t::ROOT_HEART_MAX {
+        if !w.adv.heart_sold && w.inv.root_hearts < t::ROOT_HEART_MAX {
             v.push(Ware::Heart);
         }
         let missing: Vec<usize> = (0..CHARMS.len())
-            .filter(|c| !w.charms_found.contains(c))
+            .filter(|c| !w.inv.charms_found.contains(c))
             .collect();
         if !missing.is_empty() {
             v.push(Ware::Charm(missing[w.adv.stage as usize % missing.len()]));
@@ -917,12 +917,12 @@ impl App {
     /// 지금 이 물건을 살 수 없는 이유(포포의 말). 살 수 있으면 None.
     fn cant_buy(&self, ware: Ware) -> Option<Tr> {
         let w = &self.world;
-        if w.seeds < self.world.knots.price(ware.price()) {
+        if w.inv.seeds < self.world.knots.price(ware.price()) {
             return Some(|s| s.shop_poor);
         }
         let full = match ware {
-            Ware::Berry => !w.bag.has_room(Consumable::Berry),
-            Ware::Worm => !w.bag.has_room(Consumable::Worm),
+            Ware::Berry => !w.inv.bag.has_room(Consumable::Berry),
+            Ware::Worm => !w.inv.bag.has_room(Consumable::Worm),
             Ware::Heart | Ware::Charm(_) => false,
         };
         full.then_some(|s| s.shop_full)
@@ -931,38 +931,38 @@ impl App {
     fn buy(&mut self, ware: Ware) {
         let price = self.world.knots.price(ware.price());
         let w = &mut self.world;
-        let msg: Tr = if w.seeds < price {
+        let msg: Tr = if w.inv.seeds < price {
             self.sfx.play(crate::sfx::Id::Deny);
             |s| s.shop_poor
         } else {
             let ok = match ware {
                 Ware::Berry => {
-                    w.bag.has_room(Consumable::Berry) && {
-                        w.bag.add(Consumable::Berry);
+                    w.inv.bag.has_room(Consumable::Berry) && {
+                        w.inv.bag.add(Consumable::Berry);
                         true
                     }
                 }
                 Ware::Worm => {
-                    w.bag.has_room(Consumable::Worm) && {
-                        w.bag.add(Consumable::Worm);
+                    w.inv.bag.has_room(Consumable::Worm) && {
+                        w.inv.bag.add(Consumable::Worm);
                         true
                     }
                 }
                 Ware::Heart => {
-                    w.root_hearts += 1;
+                    w.inv.root_hearts += 1;
                     w.refresh_stats();
                     w.player.heal(w.player.stats.max_hp);
                     w.adv.heart_sold = true;
                     true
                 }
                 Ware::Charm(c) => {
-                    w.charms_found.push(c);
-                    w.gifts.push(Gift::Charm(c));
+                    w.inv.charms_found.push(c);
+                    w.inv.gifts.push(Gift::Charm(c));
                     true
                 }
             };
             if ok {
-                w.seeds -= price;
+                w.inv.seeds -= price;
                 self.sfx.play(crate::sfx::Id::Buy);
                 |s| s.shop_thanks
             } else {
@@ -980,7 +980,7 @@ impl App {
         ui.panel(panel, Some(s.shop_title));
         self.close_button(ui, panel);
         // 가진 씨앗(오른쪽 위, 닫기 단추 왼쪽)
-        let seeds = fill(s.shop_seeds, &[&self.world.seeds]);
+        let seeds = fill(s.shop_seeds, &[&self.world.inv.seeds]);
         ui.text_right(
             &seeds,
             panel.right() - 20.0,
@@ -1021,7 +1021,7 @@ impl App {
                 ui.rect(r, ui::PANEL_LIGHT);
                 ui.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ui::ACCENT);
             }
-            let afford = self.world.seeds >= self.world.knots.price(ware.price());
+            let afford = self.world.inv.seeds >= self.world.knots.price(ware.price());
             let c = match (on, afford) {
                 (_, false) => ui::TEXT_DIM,
                 (true, true) => ui::TEXT,
@@ -1145,7 +1145,7 @@ impl App {
             return;
         };
         // 알림(토스트)이 떠 있는 동안은 숨긴다: 방금 한 일의 대답이 알림이고, 둘이 위쪽에서 겹쳐 읽히지 않았다.
-        if w.toast.is_some() {
+        if w.juice.toast.is_some() {
             return;
         }
         let s = i18n::s();
@@ -1316,13 +1316,13 @@ impl App {
 
     /// 들고 있는 반딧불을 마을(큰 나무)로 보낸다: 쉼터에 닿을 때·런이 끝날 때(0047). 첫 시작만. 보낸 수.
     pub(super) fn bank_glowbugs(&mut self) -> u32 {
-        let n = self.world.glowbugs;
+        let n = self.world.inv.glowbugs;
         if !self.recording() || n == 0 {
             return 0;
         }
         self.profile.add(crate::talents::KEY_LIGHT, n);
         self.profile.add(crate::journal::stat::LIGHT, n);
-        self.world.glowbugs = 0;
+        self.world.inv.glowbugs = 0;
         crate::profile::save(&self.profile);
         n
     }
@@ -1667,7 +1667,7 @@ impl App {
             self.journal_check = 1.0;
             let ready = crate::journal::ready_count(&self.profile);
             if ready > self.journal_ready {
-                self.world.toast = Some((|s| s.j_toast, 3.0));
+                self.world.juice.toast = Some((|s| s.j_toast, 3.0));
                 self.sfx.play(crate::sfx::Id::Heal);
             }
             self.journal_ready = ready;
@@ -1690,14 +1690,14 @@ impl App {
                     v.decor[i] = true;
                 }
             }
-            Reward::Fur(_) => self.world.fur = crate::journal::fur(&self.profile),
+            Reward::Fur(_) => self.world.inv.fur = crate::journal::fur(&self.profile),
             // 장신구는 바로 가방에(0050). 이번 런의 상자에서는 다시 안 나온다.
             Reward::Charm(c) => {
-                self.world.charm_pool =
+                self.world.inv.charm_pool =
                     crate::journal::charm_pool(&self.profile, self.world.character);
                 self.inventory.add_charm(c);
-                if !self.world.charms_found.contains(&c) {
-                    self.world.charms_found.push(c);
+                if !self.world.inv.charms_found.contains(&c) {
+                    self.world.inv.charms_found.push(c);
                 }
             }
             Reward::Light(_) | Reward::Seeds(_) => {}

@@ -141,11 +141,16 @@ mod device_tests {
         for _ in 0..300 {
             c.update(&quiet, 1.0 / 60.0, &mut w);
         }
-        assert!(w.hush, "말하기 전엔 음악이 내려가 있다");
-        assert!(w.gloom.amount > 0.5, "어둠이 덮인다 {}", w.gloom.amount);
+        assert!(w.juice.hush, "말하기 전엔 음악이 내려가 있다");
         assert!(
-            w.audio.played(crate::sfx::Id::Rumble)
-                || w.fx
+            w.juice.gloom.amount > 0.5,
+            "어둠이 덮인다 {}",
+            w.juice.gloom.amount
+        );
+        assert!(
+            w.juice.audio.played(crate::sfx::Id::Rumble)
+                || w.juice
+                    .fx
                     .iter()
                     .any(|f| matches!(f.kind, crate::world::FxKind::Petal { .. })),
             "꽃잎·울림"
@@ -156,8 +161,8 @@ mod device_tests {
         };
         c.update(&skip, 1.0 / 60.0, &mut w);
         assert!(c.is_done());
-        assert!(!w.hush, "끝나면 음악(보스 곡)");
-        assert_eq!(w.gloom.amount, 0.0, "어둠은 걷힌다");
+        assert!(!w.juice.hush, "끝나면 음악(보스 곡)");
+        assert_eq!(w.juice.gloom.amount, 0.0, "어둠은 걷힌다");
         assert!(w.adv.cam_hold.is_none(), "카메라는 플레이어에게");
     }
 
@@ -207,9 +212,12 @@ mod device_tests {
         for _ in 0..200 {
             c.update(&quiet, 1.0 / 60.0, &mut w);
         }
-        assert!(w.hush);
-        assert!(w.gloom.amount > 0.95, "{}", w.gloom.amount);
-        assert!(w.audio.played(crate::sfx::Id::Rumble), "실이 휘감는 울림");
+        assert!(w.juice.hush);
+        assert!(w.juice.gloom.amount > 0.95, "{}", w.juice.gloom.amount);
+        assert!(
+            w.juice.audio.played(crate::sfx::Id::Rumble),
+            "실이 휘감는 울림"
+        );
         // 도망(0163): 사라지는 자리에 흙·실.
         let at = w.player.pos + vec2(60.0, 0.0);
         let c = momo_flee(&w, at, 1);
@@ -264,7 +272,7 @@ mod device_tests {
         };
         c.update(&skip, 1.0 / 60.0, &mut w);
         assert!(!c.is_done(), "한 번 건너뛰면 모모 등장은 남는다");
-        assert!(c.illust.is_none() && !c.actors[1].visible && !w.hush);
+        assert!(c.illust.is_none() && !c.actors[1].visible && !w.juice.hush);
         // 그대로 두면 모모가 나온다(어둠·음악 끊김).
         let go = Actions::default();
         for _ in 0..240 {
@@ -274,7 +282,7 @@ mod device_tests {
             }
         }
         assert!(
-            c.actors[1].visible && w.hush,
+            c.actors[1].visible && w.juice.hush,
             "멈춘 자리부터 재생돼 모모가 걸어 나온다"
         );
         // 한 번 더 건너뛰면 끝까지, 자리에 꽃잎이 남는다.
@@ -285,11 +293,11 @@ mod device_tests {
             }
         }
         assert!(c.is_done());
-        let at = w.petal_at.expect("시든 꽃잎이 남는다");
+        let at = w.story.petal_at.expect("시든 꽃잎이 남는다");
         assert!(!w.petal_tick(), "멀리서는 안 줍는다");
         w.player.pos = at;
         assert!(w.petal_tick(), "밟으면 줍는다");
-        assert!(w.petal_found && w.petal_at.is_none());
+        assert!(w.story.petal_found && w.story.petal_at.is_none());
         assert!(w
             .adv
             .events
@@ -301,7 +309,7 @@ mod device_tests {
     fn clover_family_hatches_after_unbind_and_leaves() {
         let mut w = World::new();
         let at = w.player.pos + vec2(0.0, -40.0);
-        w.cocoons = vec![at + vec2(-13.0, -10.0), at + vec2(13.0, -8.0)];
+        w.hazards.cocoons = vec![at + vec2(-13.0, -10.0), at + vec2(13.0, -8.0)];
         let mut c = clover_returns(&w, at);
         assert!(!c.actors[2].visible && !c.actors[3].visible);
         let go = Actions {
@@ -312,12 +320,17 @@ mod device_tests {
         let mut saw_petals = false;
         for _ in 0..1200 {
             c.update(&go, 1.0 / 60.0, &mut w);
-            saw_petals |=
-                w.fx.iter()
-                    .any(|f| matches!(f.kind, crate::world::FxKind::Petal { .. }));
+            saw_petals |= w
+                .juice
+                .fx
+                .iter()
+                .any(|f| matches!(f.kind, crate::world::FxKind::Petal { .. }));
             if c.actors[2].visible && c.actors[3].visible {
                 seen_babies = true;
-                assert!(w.cocoons.is_empty(), "아기들이 보이면 고치는 풀렸다");
+                assert!(
+                    w.hazards.cocoons.is_empty(),
+                    "아기들이 보이면 고치는 풀렸다"
+                );
             }
             if c.is_done() {
                 break;
@@ -343,7 +356,8 @@ mod device_tests {
         for i in 0..200 {
             c.update(&quiet, 1.0 / 60.0, &mut w);
             if unbound_at.is_none()
-                && w.fx
+                && w.juice
+                    .fx
                     .iter()
                     .any(|f| matches!(f.kind, crate::world::FxKind::Thread { .. }))
             {
@@ -564,10 +578,10 @@ impl Cutscene {
         // 입자 효과(실·꽃잎·반짝임)와 이름 카드는 컷씬 동안에도 흐른다(0159). 로직은 멈춘다.
         w.tick_fx(dt);
         w.time += dt;
-        if let Some((_, _, left)) = &mut w.boss_card {
+        if let Some((_, _, left)) = &mut w.juice.boss_card {
             *left -= dt;
             if *left <= 0.0 {
-                w.boss_card = None;
+                w.juice.boss_card = None;
             }
         }
         let Some(step) = self.steps.get(self.idx).cloned() else {
@@ -607,7 +621,7 @@ impl Cutscene {
             Step::Wait(secs) => self.t >= secs,
             Step::Checkpoint => true,
             Step::Give(i) => {
-                w.gifts.push(crate::world::Gift::Weapon(i));
+                w.inv.gifts.push(crate::world::Gift::Weapon(i));
                 true
             }
             Step::Show { actor, at } => {
@@ -625,7 +639,7 @@ impl Cutscene {
                 p >= 1.0
             }
             Step::Shake(amount) => {
-                w.feel.add_trauma(amount);
+                w.juice.feel.add_trauma(amount);
                 true
             }
             Step::Pan { to, secs } => {
@@ -652,7 +666,7 @@ impl Cutscene {
                 secs,
             } => {
                 if fresh {
-                    self.gloom_from = w.gloom.amount;
+                    self.gloom_from = w.juice.gloom.amount;
                 }
                 let p = (self.t / secs.max(0.01)).min(1.0);
                 let at = if actor == 0 {
@@ -660,7 +674,7 @@ impl Cutscene {
                 } else {
                     self.actors[actor].pos
                 };
-                w.gloom = crate::world::Gloom {
+                w.juice.gloom = crate::world::Gloom {
                     amount: self.gloom_from + (to - self.gloom_from) * p,
                     at,
                     radius,
@@ -668,7 +682,7 @@ impl Cutscene {
                 p >= 1.0
             }
             Step::Hush(on) => {
-                w.hush = on;
+                w.juice.hush = on;
                 true
             }
             Step::Cue { cue, at } => {
@@ -676,7 +690,7 @@ impl Cutscene {
                 true
             }
             Step::Card { name, sub, secs } => {
-                w.boss_card = Some((name, sub, secs));
+                w.juice.boss_card = Some((name, sub, secs));
                 true
             }
         };
@@ -742,7 +756,7 @@ impl Cutscene {
                     self.actors[actor].visible = true;
                 }
                 Step::Hide { actor } => self.actors[actor].visible = false,
-                Step::Give(i) => w.gifts.push(crate::world::Gift::Weapon(i)),
+                Step::Give(i) => w.inv.gifts.push(crate::world::Gift::Weapon(i)),
                 Step::Fade { to_clear, .. } => self.fade = if to_clear { 0.0 } else { 1.0 },
                 Step::Illust(il) => self.illust = il,
                 // 장치(0159)는 끝값만: 카메라는 잡아 둔 자리(또는 플레이어)로, 어둠은 그 값으로, 음악은 그대로.
@@ -753,7 +767,7 @@ impl Cutscene {
                 Step::Gloom {
                     to, actor, radius, ..
                 } => {
-                    w.gloom = crate::world::Gloom {
+                    w.juice.gloom = crate::world::Gloom {
                         amount: to,
                         at: if actor == 0 {
                             w.player.pos
@@ -763,12 +777,12 @@ impl Cutscene {
                         radius,
                     };
                 }
-                Step::Hush(on) => w.hush = on,
+                Step::Hush(on) => w.juice.hush = on,
                 // 남는 것(0164): 건너뛰어도 시든 꽃잎은 자리에 둔다(이펙트는 없이).
                 Step::Cue {
                     cue: Cue::Leave,
                     at,
-                } => w.petal_at = Some(at),
+                } => w.story.petal_at = Some(at),
                 _ => {}
             }
         }
@@ -861,7 +875,7 @@ fn nail_actor(w: &World) -> Actor {
         portrait: Some(if momo {
             Portrait::MOMO
         } else {
-            Portrait::nail(w.fur)
+            Portrait::nail(w.inv.fur)
         }),
         pos: w.player.pos,
         facing: w.player.facing,
@@ -1005,11 +1019,17 @@ pub fn clover_returns(w: &World, at: Vec2) -> Cutscene {
         ..story_actor("", CLOVER_FUR)
     };
     let c0 = w
+        .hazards
         .cocoons
         .first()
         .copied()
         .unwrap_or(at + vec2(-14.0, -10.0));
-    let c1 = w.cocoons.get(1).copied().unwrap_or(at + vec2(14.0, -8.0));
+    let c1 = w
+        .hazards
+        .cocoons
+        .get(1)
+        .copied()
+        .unwrap_or(at + vec2(14.0, -8.0));
     let actors = vec![nail_actor(w), clover, baby(c0), baby(c1)];
     let momo = w.character == crate::equipment::Character::Momo;
     let side = if at.x >= w.player.pos.x { 22.0 } else { -22.0 };
@@ -1966,7 +1986,7 @@ pub fn ending_half(w: &World) -> Cutscene {
 
 /// 참 엔딩 + 에필로그: 참 엔딩 조건(모모·도토)이 다 섰을 때.
 pub fn ending_true(w: &World) -> Cutscene {
-    Cutscene::new(story_actors(w), true_ending_steps(w.clover_back))
+    Cutscene::new(story_actors(w), true_ending_steps(w.story.clover_back))
 }
 
 /// 모모로 가장 깊은 곳에 닿았다(0056): 흰 실 속의 굴토끼 털과 시든 꽃잎. 모모는 꽃잎을 마을로 가져간다.

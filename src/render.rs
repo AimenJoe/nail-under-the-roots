@@ -239,7 +239,7 @@ impl Renderer {
         let center = vec2(RW / 2.0, RH / 2.0);
         // 흔들림 + 카메라 킥(0168), 둘 다 설정 배율을 따른다.
         let shake = w
-            .map(|w| ((w.feel.shake_offset + w.feel.kick) * shake_mul).round())
+            .map(|w| ((w.juice.feel.shake_offset + w.juice.feel.kick) * shake_mul).round())
             .unwrap_or(Vec2::ZERO);
         // 모험: 카메라 왼쪽 위(보간, 정수 px). 아레나·타이틀은 0.
         // 카메라는 반올림하지 않는다(`lerp`는 그림 위치용으로 반올림한다). 소수점은 아래에서 따로 쓴다.
@@ -317,10 +317,10 @@ impl Renderer {
             if let Some(sp) = &w.spring {
                 draw_spring(sp, w.time);
             }
-            if let Some(at) = w.petal_at {
+            if let Some(at) = w.story.petal_at {
                 draw_left_petal(at, w.time);
             }
-            for c in &w.cocoons {
+            for c in &w.hazards.cocoons {
                 draw_cocoon(*c, w.time);
             }
             if let Some(d) = &w.deep {
@@ -358,7 +358,7 @@ impl Renderer {
                 art.sunny.as_ref().map(|s| &s.sheet),
             );
             if draw_super_dim(w, cam) {
-                draw_nail(art, &w.player, w.fur, alpha, w.time);
+                draw_nail(art, &w.player, w.inv.fur, alpha, w.time);
                 draw_player_fx(&w.player, alpha);
             }
         } else {
@@ -369,7 +369,7 @@ impl Renderer {
                 draw_projectile(p, alpha);
             }
             for e in &w.enemies {
-                draw_enemy(None, e, alpha, w.time, w.feel.hitstop);
+                draw_enemy(None, e, alpha, w.time, w.juice.feel.hitstop);
             }
             draw_drill_trail(None, &w.player, alpha);
             draw_player(&w.player, alpha, w.time);
@@ -389,9 +389,9 @@ impl Renderer {
         // 그리면 소수점 밀기에 같이 흔들린다.
         self.cam.target = center;
         set_camera(&self.cam);
-        if w.feel.flash > 0.0 {
+        if w.juice.feel.flash > 0.0 {
             // 벽 쿵 번쩍임. 흔들림 설정을 따른다(0이면 끈다: 눈이 예민한 사람).
-            let k = (w.feel.flash / t::DRILL_WALL_FLASH).min(1.0) * shake_mul.min(1.0);
+            let k = (w.juice.feel.flash / t::DRILL_WALL_FLASH).min(1.0) * shake_mul.min(1.0);
             draw_rectangle(0.0, 0.0, RW, RH, Color::new(1.0, 0.97, 0.9, 0.55 * k));
         }
         let fade = w.fade_alpha();
@@ -763,9 +763,9 @@ impl Renderer {
         // 왼쪽 위 바탕판(0091): 체력·반딧불·씨앗이 밝은 바닥 위에서 묻혔다.
         {
             let gx = 3.0 + w.player.stats.max_hp as f32 * hp_step(sheet) + 5.0;
-            let sx = gx + 7.0 + ui.text_w(&w.glowbugs.to_string(), crate::ui::FONT_PX) + 6.0;
+            let sx = gx + 7.0 + ui.text_w(&w.inv.glowbugs.to_string(), crate::ui::FONT_PX) + 6.0;
             let tx = if sheet.is_some() { sx + 9.0 } else { sx + 5.0 };
-            let end = tx + ui.text_w(&w.seeds.to_string(), crate::ui::FONT_PX);
+            let end = tx + ui.text_w(&w.inv.seeds.to_string(), crate::ui::FONT_PX);
             hud_plate(ui, Rect::new(0.0, -1.0, end + 3.0, 13.0));
         }
         draw_hud_bars(ui, w, sheet);
@@ -784,14 +784,14 @@ impl Renderer {
         );
         ui.rect(Rect::new(x + 1.0, 1.0, 1.0, 1.0), OUTLINE);
         out.text(
-            &w.glowbugs.to_string(),
+            &w.inv.glowbugs.to_string(),
             x + 5.0,
             1.0,
             crate::ui::FONT_PX,
             crate::ui::TEXT,
         );
         // 씨앗(상점 화폐): 반딧불 오른쪽. 팩이 있으면 새싹 아이콘(0077).
-        let sx = x + 7.0 + ui.text_w(&w.glowbugs.to_string(), crate::ui::FONT_PX) + 6.0;
+        let sx = x + 7.0 + ui.text_w(&w.inv.glowbugs.to_string(), crate::ui::FONT_PX) + 6.0;
         let tx = if let Some(sheet) = sheet {
             ui.sprite(
                 sheet,
@@ -811,7 +811,7 @@ impl Renderer {
             sx + 5.0
         };
         out.text(
-            &w.seeds.to_string(),
+            &w.inv.seeds.to_string(),
             tx,
             1.0,
             crate::ui::FONT_PX,
@@ -821,7 +821,7 @@ impl Renderer {
         self.draw_biome_card(ui, w);
         self.draw_boss_card(ui, w);
         draw_exit_mark(ui, w);
-        if let Some((text, time)) = w.toast {
+        if let Some((text, time)) = w.juice.toast {
             let s = crate::i18n::tr(text);
             let a = (time / 0.4).min(1.0);
             // 긴 알림(물웅덩이 등)이 한 줄로 화면 폭을 넘어 오른쪽 위 HUD(게이지·마을 씨앗)와 겹쳤다(사장 피드백
@@ -1082,7 +1082,7 @@ fn hud_plate(ui: &Ui, r: Rect) {
 /// 저절로 바뀐 칸(`Bag::flash`)은 하얗게 깜빡인다. 수는 테두리 글자로 칸 오른쪽 아래.
 fn draw_quick_slots(ui: &Ui, w: &World) {
     use crate::items::Consumable;
-    let (x0, y0, size, gap) = (5.0 + deny_shake(w.deny[1]), 153.0, 22.0, 3.0);
+    let (x0, y0, size, gap) = (5.0 + deny_shake(w.juice.deny[1]), 153.0, 22.0, 3.0);
     let hint = crate::i18n::fill(
         crate::i18n::s().quick_hint,
         &[&crate::ui::key(crate::input::prompt(
@@ -1096,11 +1096,11 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
         Rect::new(x0 - 3.0, y0 - 3.0, hx + hw + 4.0 - (x0 - 3.0), size + 6.0),
     );
     let out = ui.with_outline();
-    let flash_on = w.bag.flash > 0.0 && ((w.bag.flash * 8.0) as i32) % 2 == 0;
+    let flash_on = w.inv.bag.flash > 0.0 && ((w.inv.bag.flash * 8.0) as i32) % 2 == 0;
     for (i, c) in Consumable::ALL.iter().enumerate() {
         let r = Rect::new(x0 + i as f32 * (size + gap), y0, size, size);
-        let n = w.bag.count(*c);
-        let selected = w.bag.selected == *c;
+        let n = w.inv.bag.count(*c);
+        let selected = w.inv.bag.selected == *c;
         ui.rect(
             r,
             if selected {
@@ -1109,8 +1109,8 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
                 Color::new(0.07, 0.05, 0.09, 0.85)
             },
         );
-        let border = if selected && w.deny[1] > 0.0 {
-            deny_color(w.deny[1])
+        let border = if selected && w.juice.deny[1] > 0.0 {
+            deny_color(w.juice.deny[1])
         } else if selected && flash_on {
             WHITE
         } else if selected {
@@ -1197,10 +1197,10 @@ fn draw_quick_slots(ui: &Ui, w: &World) {
     }
     out.text(&hint, hx, y0 + 5.0, crate::ui::FONT_PX, crate::ui::TEXT);
     // 못 먹었다(0149·0150): 고른 칸 위에 ✕.
-    if w.deny[1] > 0.0 {
+    if w.juice.deny[1] > 0.0 {
         let k = Consumable::ALL
             .iter()
-            .position(|c| *c == w.bag.selected)
+            .position(|c| *c == w.inv.bag.selected)
             .unwrap_or(0) as f32;
         deny_cross(
             ui,
@@ -2335,7 +2335,7 @@ fn draw_spring(sp: &world::Spring, time: f32) {
 
 /// 컷씬의 어둠(0159): `gloom.at` 둘레 `radius`만 밝고 바깥은 `amount`만큼 보랏빛 검정. 환경 어둠 위에 한 번 더.
 fn draw_gloom(art: &Art, w: &World, cam: Vec2) {
-    let g = w.gloom;
+    let g = w.juice.gloom;
     if g.amount <= 0.0 {
         return;
     }
@@ -2379,14 +2379,14 @@ fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
         draw_silk_fluff(w, cam);
         return;
     }
-    if w.petals && !glow {
+    if w.juice.petals && !glow {
         draw_wilted_petals(w, cam);
     }
     let (tw, th) = (RW + 48.0, RH + 48.0);
     let n = if deep { 18 } else { 22 };
     for i in 0..n {
         // 입자 효과 설정(0141): 그 비율만.
-        if !keep_share(i as usize, w.effects) {
+        if !keep_share(i as usize, w.juice.effects) {
             continue;
         }
         let (hx, hy, hs) = (hash01(i, 1), hash01(i, 2), hash01(i, 3));
@@ -2671,7 +2671,7 @@ fn draw_knot(k: &world::Knot, t: f32) {
 
 /// 토끼풀의 충격파(0165): 퍼지는 두꺼운 흰 고리 + 안쪽 옅은 빛, 다 퍼지면 옅어진다. 뻗은 실 한 가닥도 여기서.
 fn draw_waves(w: &World) {
-    for wv in &w.waves {
+    for wv in &w.hazards.waves {
         let k = (wv.time / t::CLOVER_WAVE_TIME).min(1.0);
         let r = t::CLOVER_WAVE_R * k;
         let fade = 1.0 - ((wv.time - t::CLOVER_WAVE_TIME) / 0.25).clamp(0.0, 1.0);
@@ -2696,7 +2696,7 @@ fn draw_waves(w: &World) {
             Color::new(0.70, 0.55, 0.95, 0.6 * fade),
         );
     }
-    if let Some((a, b, age)) = w.thread_lash {
+    if let Some((a, b, age)) = w.hazards.thread_lash {
         let k = 1.0 - (age / 0.3).clamp(0.0, 1.0);
         draw_line(
             a.x,
@@ -2774,7 +2774,7 @@ fn draw_silk_fluff(w: &World, cam: Vec2) {
     let (tw, th) = (RW + 48.0, RH + 48.0);
     let t = w.time;
     for i in 0..20u32 {
-        if !keep_share(i as usize, w.effects) {
+        if !keep_share(i as usize, w.juice.effects) {
             continue;
         }
         let (hx, hy, hs) = (hash01(i, 21), hash01(i, 22), hash01(i, 23));
@@ -2828,7 +2828,7 @@ fn draw_wilted_petals(w: &World, cam: Vec2) {
     let t = w.time;
     let c = Color::new(0.74, 0.56, 0.60, 0.9);
     for i in 0..9u32 {
-        if !keep_share(i as usize, w.effects) {
+        if !keep_share(i as usize, w.juice.effects) {
             continue;
         }
         let (hx, hy, hs) = (hash01(i, 11), hash01(i, 12), hash01(i, 13));
@@ -2896,7 +2896,7 @@ fn draw_world_lights(
             Color::new(0.92, 0.90, 1.0, 0.10 * k),
         );
     }
-    for r in &w.rocks {
+    for r in &w.hazards.rocks {
         let q = (r.time / t::ROCK_FALL).clamp(0.0, 1.0);
         let rad = t::ROCK_R * (1.5 - 0.5 * q);
         draw_circle_lines(
@@ -2914,7 +2914,7 @@ fn draw_world_lights(
         );
     }
     // 포자 구름(0146)은 어둠 속에서도 옅게 빛난다(아플 때만 조금 더).
-    for c in &w.clouds {
+    for c in &w.hazards.clouds {
         let fade = 1.0 - ((c.time / t::SPORE_CLOUD_TIME - 0.75) / 0.25).clamp(0.0, 1.0);
         let hot = if c.time < t::SPORE_CLOUD_GRACE {
             0.5
@@ -4131,10 +4131,10 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
         );
     }
     // 묻힌 도토리는 바닥에(세워 그리는 것들보다 먼저).
-    for m in w.mines.iter().filter(|_| ground) {
+    for m in w.hazards.mines.iter().filter(|_| ground) {
         draw_mine(m, w.time);
     }
-    for c in w.clouds.iter().filter(|_| ground) {
+    for c in w.hazards.clouds.iter().filter(|_| ground) {
         draw_cloud(c, w.time);
     }
     let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
@@ -4266,17 +4266,21 @@ fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLight>) {
                         None => draw_stall(r),
                     },
                     PropKind::Seat => match &art.sunny {
-                        Some(sunny) => draw_seat_sunny(sunny, r, w.momo_wins),
-                        None => draw_seat(r, w.momo_wins),
+                        Some(sunny) => draw_seat_sunny(sunny, r, w.story.momo_wins),
+                        None => draw_seat(r, w.story.momo_wins),
                     },
                 }
             }
             Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
             Drawable::Loot(i) => draw_loot(&w.loot[i], alpha, w.time, false),
-            Drawable::Player => draw_nail(art, &w.player, w.fur, alpha, w.time),
-            Drawable::Enemy(i) => {
-                draw_enemy(Some(art), &w.enemies[i], alpha, w.time, w.feel.hitstop)
-            }
+            Drawable::Player => draw_nail(art, &w.player, w.inv.fur, alpha, w.time),
+            Drawable::Enemy(i) => draw_enemy(
+                Some(art),
+                &w.enemies[i],
+                alpha,
+                w.time,
+                w.juice.feel.hitstop,
+            ),
             Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
             Drawable::Npc => {
                 if let (Some(n), Some(tex)) = (&w.npc, art.critters.as_ref()) {
@@ -5356,7 +5360,7 @@ fn draw_no_parry_ring(at: Vec2, r: f32, edge: Color) {
 fn draw_telegraphs(w: &World, alpha: f32) {
     use crate::species::Behavior;
     // 무너지는 천장(0147): 떨어질 자리에 그림자가 커지고, 붉은 고리가 조여 든다(청설모 내려앉기와 같은 말).
-    for r in &w.rocks {
+    for r in &w.hazards.rocks {
         let k = (r.time / t::ROCK_FALL).clamp(0.0, 1.0);
         let rad = t::ROCK_R;
         draw_ellipse(
@@ -5601,7 +5605,7 @@ fn draw_thorn(c: Vec2, time: f32, near: f32) {
 
 /// 무너지는 돌(0147): 떨어지기 전 반쯤부터 위에서 내려오는 돌(땅 그림자·고리는 `draw_telegraphs`).
 fn draw_falling_rocks(w: &World) {
-    for r in &w.rocks {
+    for r in &w.hazards.rocks {
         let k = (r.time / t::ROCK_FALL).clamp(0.0, 1.0);
         if k < 0.45 {
             continue;
@@ -5697,7 +5701,7 @@ fn draw_acorn(p: Vec2, spin: f32) {
 }
 
 fn draw_fx(w: &World) {
-    for f in &w.fx {
+    for f in &w.juice.fx {
         let p = (f.time / f.dur).clamp(0.0, 1.0);
         let pos = f.pos.round();
         match f.kind {
@@ -5858,7 +5862,7 @@ fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
     let cd = (w.player.burrow_cd / w.player.burrow_cd_full()).min(1.0);
     let bw = 34.0;
     // 필살기를 못 냈다(0149): 게이지 판이 좌우로 떨고 붉은 테두리.
-    let x = t::VIEW_W - 4.0 - bw + deny_shake(w.deny[0]);
+    let x = t::VIEW_W - 4.0 - bw + deny_shake(w.juice.deny[0]);
     hud_plate(ui, Rect::new(x - 3.0, -1.0, bw + 6.0, 16.0));
     let frame = Color::new(0.02, 0.01, 0.03, 1.0);
     ui.rect(Rect::new(x - 1.0, 1.0, bw + 2.0, 5.0), frame);
@@ -5884,10 +5888,10 @@ fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
         gc
     };
     ui.rect(Rect::new(x, 8.0, (bw * sp).round(), 5.0), gold);
-    if w.deny[0] > 0.0 {
+    if w.juice.deny[0] > 0.0 {
         ui.rect_lines(
             Rect::new(x - 2.0, 6.0, bw + 4.0, 9.0),
-            deny_color(w.deny[0]),
+            deny_color(w.juice.deny[0]),
         );
         deny_cross(ui, vec2(x + bw / 2.0, 10.0), 3.0);
     }
@@ -5971,7 +5975,7 @@ fn draw_hud_screen(w: &World, scale: f32, ox: f32, oy: f32, gamepad_count: usize
     // 웨이브·처치 수는 아레나(웨이브 시험장)에서만. 실의 꿈(0055)도 아레나지만 보이지 않는다.
     if w.adv.place == crate::adventure::Place::Arena && !w.dream {
         draw_text(
-            format!("wave {}  kills {}", w.wave, w.kills),
+            format!("wave {}  kills {}", w.wave, w.stats.kills),
             ox + 4.0,
             y,
             fs,
@@ -5997,8 +6001,8 @@ fn draw_hud_screen(w: &World, scale: f32, ox: f32, oy: f32, gamepad_count: usize
             w.player.hp,
             w.player.invuln,
             w.player.burrow_cd,
-            w.feel.hitstop,
-            w.feel.trauma
+            w.juice.feel.hitstop,
+            w.juice.feel.trauma
         ),
         "move WASD/stick  attack J/Z/X-btn  burrow K/X/Space/A-btn  restart R/Start".to_string(),
     ];
@@ -6095,7 +6099,7 @@ pub fn light_sources(w: &World, alpha: f32, cam: Vec2, player_radius: f32) -> Ve
         }
     }
     // 아기들의 고치(0165): 흰 빛이 조금.
-    for c in &w.cocoons {
+    for c in &w.hazards.cocoons {
         v.push(LightSrc {
             pos: *c,
             radius: 30.0,
@@ -6692,7 +6696,7 @@ fn draw_descent(
         let row = if w.player.kit == crate::equipment::Character::Momo {
             4
         } else {
-            u32::from(w.fur.min(3))
+            u32::from(w.inv.fur.min(3))
         };
         if spinning {
             // 돌며 흙을 나선으로 흩뿌린다(몸 둘레를 돌다 바깥으로).
@@ -6772,7 +6776,7 @@ impl Renderer {
 
     /// 보스 이름 카드(0159): 컷씬이 띄운다(모모의 '???'). HUD와 컷씬 그리기 둘 다 부른다.
     pub fn draw_boss_card(&self, ui: &Ui, w: &World) {
-        let Some((name, sub, left)) = w.boss_card else {
+        let Some((name, sub, left)) = w.juice.boss_card else {
             return;
         };
         // 카메라가 보스를 가운데에 두니 더 위에(건너뛰기 안내 아래).
@@ -6825,7 +6829,7 @@ impl Renderer {
 /// 뿌리 지대: 천장 틈으로 비스듬히 내려오는 빛줄기(더하기 빛)와 그 안의 먼지. 월드 칸(112px)에 붙어 있어
 /// 카메라가 움직여도 제자리다. 벽 칸에는 내리지 않는다.
 fn draw_light_shafts(w: &World, cam: Vec2, k: f32) {
-    if w.biome != Biome::Roots || w.effects <= 0.0 {
+    if w.biome != Biome::Roots || w.juice.effects <= 0.0 {
         return;
     }
     const CELL: f32 = 112.0;
@@ -6850,7 +6854,7 @@ fn draw_light_shafts(w: &World, cam: Vec2, k: f32) {
             }
             // 위(왼쪽 위 천장 틈)에서 바닥 p로: 위는 좁고 아래는 넓은 사다리꼴. 아주 천천히 숨쉰다.
             let breathe = 0.75 + 0.25 * (t * 0.6 + hash01(id, 54) * 6.0).sin();
-            let a = 0.11 * breathe * k * w.effects.min(1.0);
+            let a = 0.11 * breathe * k * w.juice.effects.min(1.0);
             let top = p + vec2(-30.0, -78.0);
             let (tw, bw) = (4.0, 12.0);
             let warm = Color::new(1.0, 0.88, 0.62, a);
@@ -6914,7 +6918,7 @@ fn draw_overhead_falls(w: &World, cam: Vec2) {
     const FALL: f32 = 0.45;
     const LAND: f32 = 0.35;
     for i in 0..6u32 {
-        if !keep_share(i as usize, w.effects) {
+        if !keep_share(i as usize, w.juice.effects) {
             continue;
         }
         let period = 2.4 + hash01(i, 61) * 2.2;

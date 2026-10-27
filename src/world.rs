@@ -290,23 +290,8 @@ pub struct Pickup {
     pub weapon: usize,
 }
 
-pub struct World {
-    /// 지금 조작하는 캐릭터(게이지 종류 등).
-    pub character: crate::equipment::Character,
-    pub room: Room,
-    pub player: Player,
-    pub enemies: Vec<Enemy>,
-    pub projectiles: Vec<Projectile>,
-    pub fx: Vec<Fx>,
-    /// 입자 효과 설정(0..=1, 0141). 1보다 작으면 새로 생긴 장식 효과(먼지·흙덩이·불똥·반짝임·실)를 그 비율만 남긴다.
-    /// 공격 범위를 보여 주는 고리(Ring)는 놀이 정보라 늘 남긴다.
-    pub effects: f32,
-    /// `fx` 앞에서부터 이미 남길지 정한 개수(새 효과는 늘 뒤에 붙는다). 줄이는 몫의 누적값.
-    fx_checked: usize,
-    fx_acc: f32,
-    pub pickups: Vec<Pickup>,
-    /// 바닥의 반딧불·산딸기.
-    pub loot: Vec<Loot>,
+/// 런이 들고 다니는 것(0169 R2): 가방·장신구·반딧불·씨앗·뿌리 심장·털빛·받을 선물. `suspend::RunSave`가 적는 쪽.
+pub struct Inventory {
     /// 모은 반딧불: 기술을 깨우는 데 쓴다(해금은 나중에). 쓰러지면 조금 잃는다.
     pub glowbugs: u32,
     /// 씨앗: 상점 화폐. 쓰러져도 잃지 않는다.
@@ -317,37 +302,20 @@ pub struct World {
     pub charms: Vec<usize>,
     /// 먹은 뿌리 심장 수(최대 체력 +1씩).
     pub root_hearts: i32,
-    /// 화면 위 한 줄 알림(되살아남, 씨앗)과 남은 시간. 글은 Tr이라 월드는 언어를 모른다.
-    pub toast: Option<(Tr, f32)>,
     /// 체력이 깎인 채로 산딸기 없이 지나간 처치 수(불운 보정).
     kills_since_berry: u32,
     /// 이번 틱에 얻은 것. 앱이 가방에 넣고 비운다. 획득물·컷씬·보물 상자 모두 여기로.
     pub gifts: Vec<Gift>,
-    /// 따라다니는 이웃(튜토리얼의 포포).
-    pub npc: Option<Npc>,
-    /// 제자리의 이웃(쉼터의 포포·보리, 공터에서 돌아온 보리).
-    pub neighbors: Vec<Npc>,
-    /// 연습: 맞아도 체력이 줄지 않는다(튜토리얼).
-    pub no_damage: bool,
-    /// 튜토리얼용 통계: 패링·아이템 먹기·필살기(튀어 나간 수)·솟구침 명중.
-    pub parries: u32,
-    pub items_used: u32,
-    pub drills: u32,
-    pub emerge_hits: u32,
-    /// 도감: 만난(깨어 있는 것을 본) 적 종류.
-    pub seen: Vec<Kind>,
     /// 지금까지 찾은 장신구(같은 걸 두 번 주지 않게).
     pub charms_found: Vec<usize>,
-    /// 모험 구조: 장소·카메라·던전·저장 지점(adventure.rs).
-    pub adv: Adventure,
-    pub feel: Feel,
-    /// 모으는 동안 빨려 드는 먼지의 간격 시계(0168).
-    charge_fx_t: f32,
-    pub debug: Debug,
-    /// 적을 다 잡으면 다음 웨이브를 자동으로 띄운다. 시나리오는 끌 수 있다.
-    pub auto_waves: bool,
-    /// 이번 런의 실뜨기(엔딩 뒤 어려움, docs/decisions/0043). 새로 나온 적에 한 번 건다.
-    pub knots: crate::knots::Knots,
+    /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것, 0048)와 Naïl의 털빛(그리기만).
+    pub charm_pool: Vec<usize>,
+    pub fur: u8,
+}
+
+/// 런의 이야기 깃발(0169 R2): 어떤 보스와 싸우는 중인지·이겼는지, 길이 열렸는지, 한 번만 알리는 토스트를 알렸는지.
+#[derive(Default)]
+pub struct Story {
     /// 모모(0046): 첫 길 끝에서 싸우나(앱이 기록에서 정하고, 모모에게 쓰러지면 이번 런엔 끈다), 지금까지 이긴 수(빈 자리의 꽃잎).
     pub momo_fight: bool,
     /// 굴토끼 옛 굴(0165)이 길 지도에 열렸나(모모가 돌아온 뒤). 길을 짤 때 본다.
@@ -355,66 +323,36 @@ pub struct World {
     pub momo_wins: u8,
     /// 도토(0052): 둘째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다). 묻힌 도토리.
     pub doto_fight: bool,
-    pub mines: Vec<Mine>,
-    pub clouds: Vec<Cloud>,
-    pub rocks: Vec<Rockfall>,
-    /// 할 수 없는 행동을 눌렀을 때 HUD가 붉게 떠는 남은 시간(0 = 필살기 게이지, 1 = 퀵 슬롯, 0149).
-    pub deny: [f32; 2],
     /// 이번 런에 덤불에 찔린 적이 있나(처음 한 번만 알려 준다, 0149).
     thorn_told: bool,
     /// 흰 실 그물(0165)에 처음 걸렸을 때 한 번 알려 줬나.
     web_told: bool,
-    /// 다음 돌까지(초).
-    rock_cd: f32,
     /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
     pub kongi_fight: bool,
     /// 토끼풀(0165): 굴토끼 옛 굴 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
     pub clover_fight: bool,
     /// 토끼풀 가족이 마을에 돌아왔다(기록 `CLOVER_BACK`): 참 엔딩 에필로그에 한 줄 더.
     pub clover_back: bool,
-    /// 아기들의 고치(0165): 토끼풀의 끝방에 둘. 때릴 수 없다(발톱이 튕긴다). 장소를 옮기면 없어진다.
-    pub cocoons: Vec<Vec2>,
-    /// 토끼풀의 충격파(0165).
-    pub waves: Vec<Wave>,
-    /// 뻗은 실 한 가닥(0165): 시작·끝·흐른 초. 잠깐 그린다.
-    pub thread_lash: Option<(Vec2, Vec2, f32)>,
     /// 고치를 쳤을 때 한 번 알려 줬나 / 마지막으로 튕긴 공격 번호.
     cocoon_told: bool,
-    cocoon_bounce_id: u32,
-    /// 실의 꿈(0055): 쓰러진 적이 아무것도 떨어뜨리지 않는다(기록이 공정하게).
-    pub dream: bool,
-    /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것, 0048)와 Naïl의 털빛(그리기만).
-    pub charm_pool: Vec<usize>,
-    pub fur: u8,
-    /// 런 통계(저널, 0048): 연 상자, 들른 샘, 드릴 벽 쿵.
-    pub chests: u32,
-    pub springs: u32,
-    pub slams: u32,
-    /// 길의 샘(0159): 쉼방 가운데의 맑은 샘. 발을 담그면 한 번 가득 회복.
-    pub spring: Option<Spring>,
     /// 모모가 떠난 자리의 시든 꽃잎(0164). 밟으면 줍는다(`petal_tick`).
     pub petal_at: Option<Vec2>,
     /// 시든 꽃잎을 주웠다(기록 `key::PETAL`): 모모를 만나기 전에도 도감에 '???' 칸이 선다.
     pub petal_found: bool,
-    /// 가장 깊은 곳의 실매듭 끊기(0162). 있으면 할매·매듭·당기기가 돈다.
-    pub deep: Option<Deep>,
-    /// 끝방의 출구 자리(0159)와 생긴 뒤 흐른 초: 화면 밖이면 HUD 가장자리 표시가 가리킨다(`EXIT_MARK_DELAY` 뒤).
-    /// 장소를 옮기면 없어진다.
-    pub exit_at: Option<Vec2>,
-    pub exit_age: f32,
-    /// 컷씬 장치(0159). `hush`면 음악을 내린다(보스 곡도 아직). `gloom`은 환경 어둠 위에 덮는 어둠(0~1)과 빛의 자리·반지름.
-    /// `boss_card`는 화면 가운데 큰 이름 카드(이름, 설명, 남은 시간). `petals`면 시든 꽃잎이 방을 떠돈다(모모 복선).
-    pub hush: bool,
-    pub gloom: Gloom,
-    /// 컷씬 이펙트가 낸 소리(0159): 앱이 프레임마다 꺼내 튼다(컷씬은 Sfx를 모른다 — 테스트에서 돌릴 수 있게).
-    /// 이번 틱에 낼 소리(0169 R1): 앱이 `Sfx::flush`로 비운다. 로직은 오디오 장치를 모른다.
-    pub audio: sfx::Queue,
-    pub boss_card: Option<(&'static str, Tr, f32)>,
-    pub petals: bool,
-    /// 지금 환경. `biome_by_wave`면 웨이브가 깊이를 대신해 바뀐다.
-    pub biome: Biome,
-    pub biome_by_wave: bool,
-    pub wave: u32,
+}
+
+/// 런 통계(0169 R2): 저널 `stat.*`·튜토리얼 단계가 읽는 수. `app/run.rs`가 저장한다.
+#[derive(Default)]
+pub struct RunStats {
+    /// 튜토리얼용 통계: 패링·아이템 먹기·필살기(튀어 나간 수)·솟구침 명중.
+    pub parries: u32,
+    pub items_used: u32,
+    pub drills: u32,
+    pub emerge_hits: u32,
+    /// 런 통계(저널, 0048): 연 상자, 들른 샘, 드릴 벽 쿵.
+    pub chests: u32,
+    pub springs: u32,
+    pub slams: u32,
     pub kills: u32,
     /// 솟구침으로 잡은 수(저널용).
     pub emerge_kills: u32,
@@ -424,13 +362,158 @@ pub struct World {
     pub heavy_hits: u32,
     /// 굴파기 횟수(튜토리얼용).
     pub burrows: u32,
+}
+
+/// 싸움 중 바닥의 위험물(0169 R2): 도토리 지뢰·포자 구름·떨어지는 돌·고치·충격파·실 가닥.
+pub struct Hazards {
+    pub mines: Vec<Mine>,
+    pub clouds: Vec<Cloud>,
+    pub rocks: Vec<Rockfall>,
+    /// 다음 돌까지(초).
+    rock_cd: f32,
+    /// 아기들의 고치(0165): 토끼풀의 끝방에 둘. 때릴 수 없다(발톱이 튕긴다). 장소를 옮기면 없어진다.
+    pub cocoons: Vec<Vec2>,
+    /// 토끼풀의 충격파(0165).
+    pub waves: Vec<Wave>,
+    /// 뻗은 실 한 가닥(0165): 시작·끝·흐른 초. 잠깐 그린다.
+    pub thread_lash: Option<(Vec2, Vec2, f32)>,
+    cocoon_bounce_id: u32,
+}
+
+/// 손맛·연출 상태(0169 R2): 멈춤·흔들림·킥(`feel`), 입자, 소리 큐, 토스트, 거절 표시, 이름 카드, 어둠·음악 끊김.
+pub struct Juice {
+    pub fx: Vec<Fx>,
+    /// 입자 효과 설정(0..=1, 0141). 1보다 작으면 새로 생긴 장식 효과(먼지·흙덩이·불똥·반짝임·실)를 그 비율만 남긴다.
+    /// 공격 범위를 보여 주는 고리(Ring)는 놀이 정보라 늘 남긴다.
+    pub effects: f32,
+    /// `fx` 앞에서부터 이미 남길지 정한 개수(새 효과는 늘 뒤에 붙는다). 줄이는 몫의 누적값.
+    fx_checked: usize,
+    fx_acc: f32,
+    /// 화면 위 한 줄 알림(되살아남, 씨앗)과 남은 시간. 글은 Tr이라 월드는 언어를 모른다.
+    pub toast: Option<(Tr, f32)>,
+    pub feel: Feel,
+    /// 모으는 동안 빨려 드는 먼지의 간격 시계(0168).
+    charge_fx_t: f32,
+    /// 할 수 없는 행동을 눌렀을 때 HUD가 붉게 떠는 남은 시간(0 = 필살기 게이지, 1 = 퀵 슬롯, 0149).
+    pub deny: [f32; 2],
+    /// 컷씬 장치(0159). `hush`면 음악을 내린다(보스 곡도 아직). `gloom`은 환경 어둠 위에 덮는 어둠(0~1)과 빛의 자리·반지름.
+    /// `boss_card`는 화면 가운데 큰 이름 카드(이름, 설명, 남은 시간). `petals`면 시든 꽃잎이 방을 떠돈다(모모 복선).
+    pub hush: bool,
+    pub gloom: Gloom,
+    /// 컷씬 이펙트가 낸 소리(0159): 앱이 프레임마다 꺼내 튼다(컷씬은 Sfx를 모른다 — 테스트에서 돌릴 수 있게).
+    /// 이번 틱에 낼 소리(0169 R1): 앱이 `Sfx::flush`로 비운다. 로직은 오디오 장치를 모른다.
+    pub audio: sfx::Queue,
+    pub boss_card: Option<(&'static str, Tr, f32)>,
+    pub petals: bool,
+    /// 발걸음 먼지(0081): 걸은 거리를 모아 한 걸음마다.
+    step_dist: f32,
+}
+
+pub struct World {
+    /// 지금 조작하는 캐릭터(게이지 종류 등).
+    pub character: crate::equipment::Character,
+    pub room: Room,
+    pub player: Player,
+    pub inv: Inventory,
+    pub story: Story,
+    pub stats: RunStats,
+    pub hazards: Hazards,
+    pub juice: Juice,
+    pub enemies: Vec<Enemy>,
+    pub projectiles: Vec<Projectile>,
+    pub pickups: Vec<Pickup>,
+    /// 바닥의 반딧불·산딸기.
+    pub loot: Vec<Loot>,
+    /// 따라다니는 이웃(튜토리얼의 포포).
+    pub npc: Option<Npc>,
+    /// 제자리의 이웃(쉼터의 포포·보리, 공터에서 돌아온 보리).
+    pub neighbors: Vec<Npc>,
+    /// 연습: 맞아도 체력이 줄지 않는다(튜토리얼).
+    pub no_damage: bool,
+    /// 도감: 만난(깨어 있는 것을 본) 적 종류.
+    pub seen: Vec<Kind>,
+    /// 모험 구조: 장소·카메라·던전·저장 지점(adventure.rs).
+    pub adv: Adventure,
+    pub debug: Debug,
+    /// 적을 다 잡으면 다음 웨이브를 자동으로 띄운다. 시나리오는 끌 수 있다.
+    pub auto_waves: bool,
+    /// 이번 런의 실뜨기(엔딩 뒤 어려움, docs/decisions/0043). 새로 나온 적에 한 번 건다.
+    pub knots: crate::knots::Knots,
+    /// 실의 꿈(0055): 쓰러진 적이 아무것도 떨어뜨리지 않는다(기록이 공정하게).
+    pub dream: bool,
+    /// 길의 샘(0159): 쉼방 가운데의 맑은 샘. 발을 담그면 한 번 가득 회복.
+    pub spring: Option<Spring>,
+    /// 가장 깊은 곳의 실매듭 끊기(0162). 있으면 할매·매듭·당기기가 돈다.
+    pub deep: Option<Deep>,
+    /// 끝방의 출구 자리(0159)와 생긴 뒤 흐른 초: 화면 밖이면 HUD 가장자리 표시가 가리킨다(`EXIT_MARK_DELAY` 뒤).
+    /// 장소를 옮기면 없어진다.
+    pub exit_at: Option<Vec2>,
+    pub exit_age: f32,
+    /// 지금 환경. `biome_by_wave`면 웨이브가 깊이를 대신해 바뀐다.
+    pub biome: Biome,
+    pub biome_by_wave: bool,
+    pub wave: u32,
     pub time: f32,
     /// 이번 틱의 공격 히트박스(디버그 표시용).
     pub last_strike: Option<Strike>,
     respawn_timer: f32,
-    /// 발걸음 먼지(0081): 걸은 거리를 모아 한 걸음마다.
-    step_dist: f32,
     enemy_events: Vec<enemy::Event>,
+}
+
+impl Default for Inventory {
+    fn default() -> Self {
+        Self {
+            bag: Bag::default(),
+            charms: Vec::new(),
+            charms_found: Vec::new(),
+            charm_pool: crate::journal::charm_pool(
+                &crate::profile::Profile::default(),
+                crate::equipment::Character::Mole,
+            ),
+            glowbugs: 0,
+            seeds: 0,
+            root_hearts: 0,
+            fur: 0,
+            gifts: Vec::new(),
+            kills_since_berry: 0,
+        }
+    }
+}
+
+impl Default for Hazards {
+    fn default() -> Self {
+        Self {
+            mines: Vec::new(),
+            clouds: Vec::new(),
+            rocks: Vec::new(),
+            rock_cd: t::ROCK_EVERY.1,
+            cocoons: Vec::new(),
+            waves: Vec::new(),
+            thread_lash: None,
+            cocoon_bounce_id: 0,
+        }
+    }
+}
+
+impl Default for Juice {
+    fn default() -> Self {
+        Self {
+            feel: Feel::default(),
+            fx: Vec::new(),
+            effects: 1.0,
+            fx_checked: 0,
+            fx_acc: 0.0,
+            audio: sfx::Queue::default(),
+            toast: None,
+            deny: [0.0; 2],
+            boss_card: None,
+            hush: false,
+            gloom: Gloom::NONE,
+            petals: false,
+            charge_fx_t: 0.0,
+            step_dist: 0.0,
+        }
+    }
 }
 
 impl World {
@@ -441,91 +524,37 @@ impl World {
             character: crate::equipment::Character::Mole,
             room,
             player,
+            inv: Inventory::default(),
+            story: Story::default(),
+            stats: RunStats::default(),
+            hazards: Hazards::default(),
+            juice: Juice::default(),
             enemies: Vec::new(),
             projectiles: Vec::new(),
-            fx: Vec::new(),
-            effects: 1.0,
-            fx_checked: 0,
-            fx_acc: 0.0,
             pickups: Vec::new(),
             loot: Vec::new(),
-            glowbugs: 0,
-            seeds: 0,
-            bag: Bag::default(),
-            charms: Vec::new(),
-            root_hearts: 0,
-            toast: None,
-            kills_since_berry: 0,
-            gifts: Vec::new(),
-            charms_found: Vec::new(),
             seen: Vec::new(),
             npc: None,
             neighbors: Vec::new(),
             no_damage: false,
-            parries: 0,
-            items_used: 0,
-            drills: 0,
-            emerge_hits: 0,
             adv: Adventure::default(),
-            feel: Feel::default(),
-            charge_fx_t: 0.0,
             debug: Debug {
                 overlay: false,
                 hitboxes: false,
             },
             auto_waves: true,
             knots: crate::knots::Knots::default(),
-            momo_fight: false,
-            warren_open: false,
-            momo_wins: 0,
-            doto_fight: false,
-            mines: Vec::new(),
-            clouds: Vec::new(),
-            rocks: Vec::new(),
-            deny: [0.0; 2],
-            thorn_told: false,
-            web_told: false,
-            rock_cd: t::ROCK_EVERY.1,
-            kongi_fight: false,
-            clover_fight: false,
-            clover_back: false,
-            cocoons: Vec::new(),
-            waves: Vec::new(),
-            thread_lash: None,
-            cocoon_told: false,
-            cocoon_bounce_id: 0,
             dream: false,
-            charm_pool: crate::journal::charm_pool(
-                &crate::profile::Profile::default(),
-                crate::equipment::Character::Mole,
-            ),
-            fur: 0,
-            chests: 0,
-            springs: 0,
             spring: None,
-            petal_at: None,
-            petal_found: false,
             deep: None,
             exit_at: None,
             exit_age: 0.0,
-            hush: false,
-            gloom: Gloom::NONE,
-            audio: sfx::Queue::default(),
-            boss_card: None,
-            petals: false,
-            slams: 0,
             biome: Biome::Meadow,
             biome_by_wave: true,
             wave: 0,
-            kills: 0,
-            emerge_kills: 0,
-            finisher_hits: 0,
-            heavy_hits: 0,
-            burrows: 0,
             time: 0.0,
             last_strike: None,
             respawn_timer: t::WAVE_RESPAWN_DELAY,
-            step_dist: 0.0,
             enemy_events: Vec::new(),
         };
         w.next_wave();
@@ -555,24 +584,24 @@ impl World {
     /// 입자 효과 설정(0141): 지난번 뒤로 새로 생긴 장식 효과를 `effects` 비율만 남긴다. 난수를 쓰지 않고 몫을 쌓아
     /// 고르게 솎는다(0.5면 둘에 하나). 어디서 효과를 만들든(월드·모험·컷씬) 여기 한 곳에서 거른다.
     fn thin_fx(&mut self) {
-        let start = self.fx_checked.min(self.fx.len());
-        if self.effects < 1.0 {
+        let start = self.juice.fx_checked.min(self.juice.fx.len());
+        if self.juice.effects < 1.0 {
             let mut i = start;
-            while i < self.fx.len() {
-                if matches!(self.fx[i].kind, FxKind::Ring { .. }) {
+            while i < self.juice.fx.len() {
+                if matches!(self.juice.fx[i].kind, FxKind::Ring { .. }) {
                     i += 1;
                     continue;
                 }
-                self.fx_acc += self.effects.max(0.0);
-                if self.fx_acc >= 1.0 {
-                    self.fx_acc -= 1.0;
+                self.juice.fx_acc += self.juice.effects.max(0.0);
+                if self.juice.fx_acc >= 1.0 {
+                    self.juice.fx_acc -= 1.0;
                     i += 1;
                 } else {
-                    self.fx.remove(i);
+                    self.juice.fx.remove(i);
                 }
             }
         }
-        self.fx_checked = self.fx.len();
+        self.juice.fx_checked = self.juice.fx.len();
     }
 
     fn step(&mut self, a: &Actions) {
@@ -591,15 +620,15 @@ impl World {
         if self.room.tick_doors(dt) {
             for p in self.room.door_cells() {
                 if (p - self.player.pos).length() < 360.0 {
-                    unravel(&mut self.fx, p, 10.0);
-                    puff(&mut self.fx, p, 2, self.biome.dust(), 7.0, 0.5);
+                    unravel(&mut self.juice.fx, p, 10.0);
+                    puff(&mut self.juice.fx, p, 2, self.biome.dust(), 7.0, 0.5);
                 }
             }
         }
-        self.feel.tick(dt);
-        if self.feel.hitstop > 0.0 {
+        self.juice.feel.tick(dt);
+        if self.juice.feel.hitstop > 0.0 {
             // 히트스톱: 로직 시계만 멈춘다. 입력은 버퍼에 쌓인다.
-            self.feel.hitstop -= dt;
+            self.juice.feel.hitstop -= dt;
             self.player.buffer(a);
             self.freeze_interp();
             return;
@@ -667,10 +696,10 @@ impl World {
         if self.player.is_burrowed() {
             let charge = self.player.burrow_charge();
             if charge > 0.0 {
-                self.feel.add_trauma(t::BURROW_RUMBLE_SHAKE * charge);
+                self.juice.feel.add_trauma(t::BURROW_RUMBLE_SHAKE * charge);
                 if ((self.time / dt).round() as u32).is_multiple_of(t::BURROW_RUMBLE_EVERY) {
                     clods(
-                        &mut self.fx,
+                        &mut self.juice.fx,
                         self.player.pos,
                         1 + (2.0 * charge) as usize,
                         DIRT,
@@ -682,44 +711,46 @@ impl World {
         let mut ate = None;
         for ev in &self.player.events {
             match ev {
-                player::Event::Swing(i) => self.audio.play(sfx::Id::Claw(*i)),
+                player::Event::Swing(i) => self.juice.audio.play(sfx::Id::Claw(*i)),
                 player::Event::Beat => {
                     // 박자에 맞췄다(0167): 발톱 끝 작은 반짝임 + 높은 '틱'.
-                    self.audio.play(sfx::Id::Beat);
+                    self.juice.audio.play(sfx::Id::Beat);
                     let p = self.player.pos + self.player.facing * 7.0;
-                    self.fx.push(glint(p, WHITE, 0.18));
+                    self.juice.fx.push(glint(p, WHITE, 0.18));
                 }
                 player::Event::Heavy => {
                     // 강공격(0161): 마무리 타 소리 + 앞으로 튀는 불똥.
-                    self.audio.play(sfx::Id::Claw(2));
+                    self.juice.audio.play(sfx::Id::Claw(2));
                     let p = self.player.pos + self.player.facing * 6.0;
-                    spray(&mut self.fx, p, self.player.facing, 6, WHITE, 120.0);
+                    spray(&mut self.juice.fx, p, self.player.facing, 6, WHITE, 120.0);
                 }
                 player::Event::HeavyReady => {
                     // 다 모였다: 발톱이 번쩍 + 짧은 흰 번쩍(0168, 흔들림 설정을 따른다).
-                    self.audio.play(sfx::Id::Charge);
-                    self.feel.flash = self.feel.flash.max(t::HEAVY_READY_FLASH);
+                    self.juice.audio.play(sfx::Id::Charge);
+                    self.juice.feel.flash = self.juice.feel.flash.max(t::HEAVY_READY_FLASH);
                     let p = self.player.pos + self.player.facing * 7.0;
-                    self.fx.push(glint(p, WHITE, 0.35));
-                    self.fx.push(ring(p, 2.0, 10.0, 0.2, WHITE));
+                    self.juice.fx.push(glint(p, WHITE, 0.35));
+                    self.juice.fx.push(ring(p, 2.0, 10.0, 0.2, WHITE));
                 }
-                player::Event::ChargeStart => self.audio.play(sfx::Id::ChargeUp),
+                player::Event::ChargeStart => self.juice.audio.play(sfx::Id::ChargeUp),
                 player::Event::HeavyPerfect => {
                     // 딱 맞춘 강타(0168): 박자 '틱' + 큰 반짝임.
-                    self.audio.play(sfx::Id::Beat);
+                    self.juice.audio.play(sfx::Id::Beat);
                     let p = self.player.pos + self.player.facing * 8.0;
-                    self.fx.push(glint(p, WHITE, 0.3));
-                    self.fx.push(ring(p, 4.0, 16.0, 0.18, WHITE));
+                    self.juice.fx.push(glint(p, WHITE, 0.3));
+                    self.juice.fx.push(ring(p, 4.0, 16.0, 0.18, WHITE));
                 }
                 player::Event::Burrow => {
                     // 파고들기(0160): 흙이 확 튀고 화면이 살짝 — 톡 한 번이 "동작"으로 읽히게.
-                    self.burrows += 1;
-                    self.audio.play(sfx::Id::Burrow);
-                    self.feel.add_trauma(0.12);
-                    self.fx.push(ring(self.player.pos, 4.0, 18.0, 0.22, DIRT));
-                    clods(&mut self.fx, self.player.pos, 10, DIRT, 85.0);
+                    self.stats.burrows += 1;
+                    self.juice.audio.play(sfx::Id::Burrow);
+                    self.juice.feel.add_trauma(0.12);
+                    self.juice
+                        .fx
+                        .push(ring(self.player.pos, 4.0, 18.0, 0.22, DIRT));
+                    clods(&mut self.juice.fx, self.player.pos, 10, DIRT, 85.0);
                     puff(
-                        &mut self.fx,
+                        &mut self.juice.fx,
                         self.player.pos,
                         3,
                         self.biome.dust(),
@@ -729,41 +760,45 @@ impl World {
                 }
                 player::Event::Rumble => {
                     // 힘 모으기 시작(0158): 땅이 울기 시작하는 소리 + 작은 흙 고리.
-                    self.audio.play(sfx::Id::Rumble);
-                    self.fx.push(ring(self.player.pos, 3.0, 10.0, 0.25, DIRT));
+                    self.juice.audio.play(sfx::Id::Rumble);
+                    self.juice
+                        .fx
+                        .push(ring(self.player.pos, 3.0, 10.0, 0.25, DIRT));
                 }
                 player::Event::Emerge => {
                     // 땅이 터진다(0090): 맞는 반지름의 밝은 고리 + 밀쳐내는 반지름까지 퍼지는 흙 고리.
                     // 모은 힘(0158)만큼 고리·흙·흔들림이 크고, 다 모았으면 소리도 무겁다.
                     let charge = self.player.burrow_charge();
                     let k = 1.0 + (t::EMERGE_CHARGE_RADIUS - 1.0) * charge;
-                    self.audio.stop(sfx::Id::Rumble);
-                    self.audio.play(if charge >= 0.5 {
+                    self.juice.audio.stop(sfx::Id::Rumble);
+                    self.juice.audio.play(if charge >= 0.5 {
                         sfx::Id::EmergeBig
                     } else {
                         sfx::Id::Emerge
                     });
-                    self.fx.push(ring(
+                    self.juice.fx.push(ring(
                         self.player.pos,
                         6.0,
                         self.player.emerge_radius_for(charge) + 4.0,
                         0.22 + 0.08 * charge,
                         WHITE,
                     ));
-                    self.fx.push(ring(
+                    self.juice.fx.push(ring(
                         self.player.pos,
                         10.0,
                         t::EMERGE_PUSH_RADIUS * k,
                         0.32 + 0.1 * charge,
                         DIRT,
                     ));
-                    self.feel.add_trauma(t::EMERGE_BURST_SHAKE * (1.0 + charge));
+                    self.juice
+                        .feel
+                        .add_trauma(t::EMERGE_BURST_SHAKE * (1.0 + charge));
                     let n = 14 + (12.0 * charge) as usize;
                     let speed = 110.0 * k;
-                    burst(&mut self.fx, self.player.pos, n, DIRT, speed);
-                    clods(&mut self.fx, self.player.pos, n, DIRT, speed);
+                    burst(&mut self.juice.fx, self.player.pos, n, DIRT, speed);
+                    clods(&mut self.juice.fx, self.player.pos, n, DIRT, speed);
                     puff(
-                        &mut self.fx,
+                        &mut self.juice.fx,
                         self.player.pos,
                         4 + (4.0 * charge) as usize,
                         self.biome.dust(),
@@ -773,44 +808,51 @@ impl World {
                 }
                 player::Event::DrillRev => {
                     // 부아아…: 소리 하나가 시동부터 돌진 끝까지 간다.
-                    self.audio
+                    self.juice
+                        .audio
                         .play(sfx::Id::Drill(self.player.talents.pick[2] as usize));
-                    self.fx
+                    self.juice
+                        .fx
                         .push(ring(self.player.pos, 22.0, 3.0, t::DRILL_REV, RAGE));
                 }
                 player::Event::Drill => {
                     // …아앙: 튀어 나간다.
-                    self.drills += 1;
+                    self.stats.drills += 1;
                     let p = self.player.pos;
-                    self.fx.push(ring(p, 4.0, 22.0, 0.25, WHITE));
-                    burst(&mut self.fx, p, 14, DIRT, 120.0);
-                    self.feel.add_trauma(0.35);
+                    self.juice.fx.push(ring(p, 4.0, 22.0, 0.25, WHITE));
+                    burst(&mut self.juice.fx, p, 14, DIRT, 120.0);
+                    self.juice.feel.add_trauma(0.35);
                 }
                 player::Event::DrillWall => {
-                    self.slams += 1;
-                    self.audio
+                    self.stats.slams += 1;
+                    self.juice
+                        .audio
                         .stop(sfx::Id::Drill(self.player.talents.pick[2] as usize));
-                    self.audio.play(sfx::Id::DrillWall);
+                    self.juice.audio.play(sfx::Id::DrillWall);
                     let p = self.player.pos + self.player.facing * 6.0;
-                    self.fx
+                    self.juice
+                        .fx
                         .push(ring(p, 6.0, t::DRILL_WALL_RADIUS + 10.0, 0.35, WHITE));
-                    self.fx.push(ring(p, 4.0, t::DRILL_WALL_RADIUS, 0.3, RAGE));
-                    self.fx
+                    self.juice
+                        .fx
+                        .push(ring(p, 4.0, t::DRILL_WALL_RADIUS, 0.3, RAGE));
+                    self.juice
+                        .fx
                         .push(ring(p, 2.0, t::DRILL_WALL_RADIUS * 0.6, 0.25, DIRT));
-                    burst(&mut self.fx, p, 30, DIRT, 170.0);
-                    burst(&mut self.fx, p, 10, RAGE, 120.0);
-                    clods(&mut self.fx, p, 10, DIRT, 110.0);
-                    puff(&mut self.fx, p, 5, self.biome.dust(), 10.0, 0.5);
-                    self.feel.flash = t::DRILL_WALL_FLASH;
+                    burst(&mut self.juice.fx, p, 30, DIRT, 170.0);
+                    burst(&mut self.juice.fx, p, 10, RAGE, 120.0);
+                    clods(&mut self.juice.fx, p, 10, DIRT, 110.0);
+                    puff(&mut self.juice.fx, p, 5, self.biome.dust(), 10.0, 0.5);
+                    self.juice.feel.flash = t::DRILL_WALL_FLASH;
                 }
                 player::Event::Ate(c) => ate = Some(*c),
                 // 모모(0056): 뛰어오를 때 흙먼지, 내려앉을 때 작은 고리(이어 뛰기는 크게 + 흔들림).
                 player::Event::Hop => {
-                    self.burrows += 1;
-                    self.audio.play(sfx::Id::Charge);
-                    burst(&mut self.fx, self.player.pos, 6, DIRT, 50.0);
+                    self.stats.burrows += 1;
+                    self.juice.audio.play(sfx::Id::Charge);
+                    burst(&mut self.juice.fx, self.player.pos, 6, DIRT, 50.0);
                     puff(
-                        &mut self.fx,
+                        &mut self.juice.fx,
                         self.player.pos + vec2(0.0, 4.0),
                         2,
                         self.biome.dust(),
@@ -822,17 +864,17 @@ impl World {
                     let p = self.player.pos;
                     if *big {
                         let r = self.player.chain_radius();
-                        self.audio.play(sfx::Id::WallHit);
-                        self.feel.add_trauma(0.25);
-                        self.fx.push(ring(p, 4.0, r + 4.0, 0.25, PETAL));
-                        self.fx.push(ring(p, 2.0, r, 0.2, DIRT));
-                        burst(&mut self.fx, p, 12, DIRT, 110.0);
-                        burst(&mut self.fx, p, 6, PETAL, 80.0);
+                        self.juice.audio.play(sfx::Id::WallHit);
+                        self.juice.feel.add_trauma(0.25);
+                        self.juice.fx.push(ring(p, 4.0, r + 4.0, 0.25, PETAL));
+                        self.juice.fx.push(ring(p, 2.0, r, 0.2, DIRT));
+                        burst(&mut self.juice.fx, p, 12, DIRT, 110.0);
+                        burst(&mut self.juice.fx, p, 6, PETAL, 80.0);
                     } else {
-                        self.fx.push(ring(p, 2.0, 9.0, 0.15, DIRT));
+                        self.juice.fx.push(ring(p, 2.0, 9.0, 0.15, DIRT));
                     }
                     puff(
-                        &mut self.fx,
+                        &mut self.juice.fx,
                         p + vec2(0.0, 4.0),
                         if *big { 5 } else { 2 },
                         self.biome.dust(),
@@ -842,10 +884,12 @@ impl World {
                 }
                 player::Event::Stamp => {
                     let p = self.player.pos;
-                    self.audio.play(sfx::Id::Emerge);
-                    self.feel.add_trauma(0.1);
-                    self.fx.push(ring(p, 2.0, t::TAL_STAMP_RADIUS, 0.18, PETAL));
-                    burst(&mut self.fx, p, 5, DIRT, 70.0);
+                    self.juice.audio.play(sfx::Id::Emerge);
+                    self.juice.feel.add_trauma(0.1);
+                    self.juice
+                        .fx
+                        .push(ring(p, 2.0, t::TAL_STAMP_RADIUS, 0.18, PETAL));
+                    burst(&mut self.juice.fx, p, 5, DIRT, 70.0);
                 }
                 player::Event::Hurt | player::Event::Die | player::Event::Parry => {}
             }
@@ -859,7 +903,7 @@ impl World {
             if time < t::DRILL_REV {
                 let ang = rand::gen_range(0.0, std::f32::consts::TAU);
                 let from = p + Vec2::from_angle(ang) * 20.0;
-                self.fx.push(Fx {
+                self.juice.fx.push(Fx {
                     pos: from,
                     vel: (p - from) / 0.2,
                     time: 0.0,
@@ -867,10 +911,10 @@ impl World {
                     kind: FxKind::Spark { color: RAGE },
                 });
             } else {
-                self.feel.add_trauma(t::DRILL_RIDE_SHAKE);
+                self.juice.feel.add_trauma(t::DRILL_RIDE_SHAKE);
                 let back = p - dir * 6.0;
                 let side = vec2(-dir.y, dir.x) * rand::gen_range(-4.0, 4.0);
-                self.fx.push(Fx {
+                self.juice.fx.push(Fx {
                     pos: back + side,
                     vel: -dir * rand::gen_range(40.0, 110.0) + side * 8.0,
                     time: 0.0,
@@ -880,7 +924,7 @@ impl World {
             }
         }
         // 쓰러졌다: 쥬시 지렁이가 있으면 저절로 먹고 일어난다(목숨).
-        if self.player.events.contains(&player::Event::Die) && self.bag.take(Consumable::Worm) {
+        if self.player.events.contains(&player::Event::Die) && self.inv.bag.take(Consumable::Worm) {
             self.revive();
         }
         strike
@@ -889,11 +933,11 @@ impl World {
     /// 1a. 퀵 아이템·거절 표시·먹기 시작·토스트 시계.
     fn tick_items(&mut self, a: &Actions, dt: f32) {
         // 1a. 퀵 아이템
-        self.bag.flash = (self.bag.flash - t::TICK_DT).max(0.0);
+        self.inv.bag.flash = (self.inv.bag.flash - t::TICK_DT).max(0.0);
         if a.item_prev || a.item_next {
-            self.bag.cycle(a.item_next);
+            self.inv.bag.cycle(a.item_next);
         }
-        for d in &mut self.deny {
+        for d in &mut self.juice.deny {
             *d = (*d - dt).max(0.0);
         }
         // 할 수 없는 행동(0149): 눌렀는데 아무 일도 안 일어나면 고장 난 줄 안다(0093과 같은 까닭).
@@ -901,7 +945,7 @@ impl World {
         if self.player.is_alive() && self.player.special_denied(a) {
             self.deny_feedback(0);
             puff(
-                &mut self.fx,
+                &mut self.juice.fx,
                 self.player.pos + vec2(0.0, 4.0),
                 2,
                 GRAY,
@@ -911,17 +955,17 @@ impl World {
         }
         if a.use_item
             && self.player.is_alive()
-            && (self.bag.count(self.bag.selected) == 0 || self.player.item_cooling())
+            && (self.inv.bag.count(self.inv.bag.selected) == 0 || self.player.item_cooling())
         {
             self.deny_feedback(1);
         }
         if self.player.wants_to_eat() {
             self.start_eating();
         }
-        if let Some((_, time)) = self.toast.as_mut() {
+        if let Some((_, time)) = self.juice.toast.as_mut() {
             *time -= dt;
             if *time <= 0.0 {
-                self.toast = None;
+                self.juice.toast = None;
             }
         }
         if let Some((_, _, time)) = self.adv.biome_card.as_mut() {
@@ -946,15 +990,15 @@ impl World {
             }
         });
         for (pos, w) in got {
-            self.gifts.push(Gift::Weapon(w));
-            self.audio.play(sfx::Id::Emerge);
-            self.fx.push(ring(pos, 4.0, 18.0, 0.3, WHITE));
-            burst(&mut self.fx, pos, 14, PROJECTILE, 80.0);
+            self.inv.gifts.push(Gift::Weapon(w));
+            self.juice.audio.play(sfx::Id::Emerge);
+            self.juice.fx.push(ring(pos, 4.0, 18.0, 0.3, WHITE));
+            burst(&mut self.juice.fx, pos, 14, PROJECTILE, 80.0);
         }
 
         // 1c. 반딧불·가방 아이템·씨앗. 땅속에서도 줍는다(굴파기로 지나가며 쓸어 담기).
         let alive = self.player.is_alive();
-        let mut bag = std::mem::take(&mut self.bag);
+        let mut bag = std::mem::take(&mut self.inv.bag);
         let (mut bugs, mut items, mut hearts, mut seeds) = (0, 0, 0, 0);
         let mut picked_at = Vec::new();
         let room = &self.room;
@@ -984,39 +1028,41 @@ impl World {
             picked_at.push((l.pos, l.kind));
             false
         });
-        self.bag = bag;
-        self.glowbugs += bugs;
-        self.seeds += seeds;
+        self.inv.bag = bag;
+        self.inv.glowbugs += bugs;
+        self.inv.seeds += seeds;
         if bugs > 0 || seeds > 0 {
-            self.audio.play(sfx::Id::Glowbug);
+            self.juice.audio.play(sfx::Id::Glowbug);
         }
         if items > 0 {
-            self.audio.play(sfx::Id::Claw(0));
+            self.juice.audio.play(sfx::Id::Claw(0));
         }
         if hearts > 0 {
-            self.root_hearts += hearts;
+            self.inv.root_hearts += hearts;
             self.refresh_stats();
             self.player.heal(self.player.stats.max_hp);
-            self.audio.play(sfx::Id::Heal);
-            self.toast = Some((|s| s.toast_heart, 2.5));
+            self.juice.audio.play(sfx::Id::Heal);
+            self.juice.toast = Some((|s| s.toast_heart, 2.5));
         }
         for (pos, kind) in picked_at {
             match kind {
                 LootKind::Glowbug => {
-                    self.fx.push(ring(pos, 1.0, 5.0, 0.15, GLOW));
-                    self.fx.push(glint(pos + vec2(0.0, -3.0), GLOW, 0.3));
+                    self.juice.fx.push(ring(pos, 1.0, 5.0, 0.15, GLOW));
+                    self.juice.fx.push(glint(pos + vec2(0.0, -3.0), GLOW, 0.3));
                 }
                 LootKind::Seed => {
-                    self.fx.push(ring(pos, 1.0, 6.0, 0.18, SEED));
-                    self.fx.push(glint(pos + vec2(0.0, -3.0), WHITE, 0.25));
+                    self.juice.fx.push(ring(pos, 1.0, 6.0, 0.18, SEED));
+                    self.juice
+                        .fx
+                        .push(glint(pos + vec2(0.0, -3.0), WHITE, 0.25));
                 }
                 LootKind::Berry | LootKind::Worm => {
-                    self.fx.push(ring(pos, 2.0, 10.0, 0.2, WHITE));
-                    self.fx.push(glint(pos + vec2(0.0, -4.0), WHITE, 0.3));
+                    self.juice.fx.push(ring(pos, 2.0, 10.0, 0.2, WHITE));
+                    self.juice.fx.push(glint(pos + vec2(0.0, -4.0), WHITE, 0.3));
                 }
                 LootKind::RootHeart => {
-                    self.fx.push(ring(pos, 4.0, 22.0, 0.4, POISON));
-                    burst(&mut self.fx, pos, 16, POISON, 90.0);
+                    self.juice.fx.push(ring(pos, 4.0, 22.0, 0.4, POISON));
+                    burst(&mut self.juice.fx, pos, 16, POISON, 90.0);
                 }
             }
         }
@@ -1082,10 +1128,10 @@ impl World {
         for e in self.enemies.iter_mut().filter(|e| e.died_of_poison) {
             e.died_of_poison = false;
             enemy_down(
-                &mut self.fx,
-                &mut self.audio,
-                &mut self.feel,
-                &mut self.kills,
+                &mut self.juice.fx,
+                &mut self.juice.audio,
+                &mut self.juice.feel,
+                &mut self.stats.kills,
                 deaths,
                 e,
                 POISON,
@@ -1094,19 +1140,19 @@ impl World {
         // 벽 쿵(0168): 강공격에 날아가다 벽에 박힌 적.
         for e in self.enemies.iter_mut().filter(|e| e.slammed) {
             e.slammed = false;
-            self.audio.play(sfx::Id::WallHit);
-            self.feel.add_hitstop(t::WALL_SLAM_HITSTOP);
-            self.feel.add_trauma(t::WALL_SLAM_SHAKE);
+            self.juice.audio.play(sfx::Id::WallHit);
+            self.juice.feel.add_hitstop(t::WALL_SLAM_HITSTOP);
+            self.juice.feel.add_trauma(t::WALL_SLAM_SHAKE);
             let back = e.vel.normalize_or_zero();
-            self.fx.push(ring(e.pos, 3.0, 18.0, 0.2, WHITE));
-            spray(&mut self.fx, e.pos, back, 6, WHITE, 160.0);
-            clods(&mut self.fx, e.pos - back * e.radius(), 5, DIRT, 90.0);
+            self.juice.fx.push(ring(e.pos, 3.0, 18.0, 0.2, WHITE));
+            spray(&mut self.juice.fx, e.pos, back, 6, WHITE, 160.0);
+            clods(&mut self.juice.fx, e.pos - back * e.radius(), 5, DIRT, 90.0);
             if !e.alive {
                 enemy_down(
-                    &mut self.fx,
-                    &mut self.audio,
-                    &mut self.feel,
-                    &mut self.kills,
+                    &mut self.juice.fx,
+                    &mut self.juice.audio,
+                    &mut self.juice.feel,
+                    &mut self.stats.kills,
                     deaths,
                     e,
                     enemy_color(e.kind),
@@ -1119,13 +1165,13 @@ impl World {
     fn charge_dust(&mut self, dt: f32) {
         // 모으는 동안(0168): 발 쪽으로 빨려 드는 먼지.
         if let player::State::Charging { .. } = self.player.state {
-            self.charge_fx_t += dt;
-            while self.charge_fx_t >= t::CHARGE_PULL_EVERY {
-                self.charge_fx_t -= t::CHARGE_PULL_EVERY;
+            self.juice.charge_fx_t += dt;
+            while self.juice.charge_fx_t >= t::CHARGE_PULL_EVERY {
+                self.juice.charge_fx_t -= t::CHARGE_PULL_EVERY;
                 let ang = rand::gen_range(0.0, std::f32::consts::TAU);
                 let off = vec2(ang.cos(), ang.sin()) * t::CHARGE_PULL_R;
                 let foot = self.player.pos + vec2(0.0, 4.0);
-                self.fx.push(Fx {
+                self.juice.fx.push(Fx {
                     pos: foot + off,
                     vel: -off / 0.2,
                     time: 0.0,
@@ -1136,7 +1182,7 @@ impl World {
                 });
             }
         } else {
-            self.charge_fx_t = 0.0;
+            self.juice.charge_fx_t = 0.0;
         }
     }
 
@@ -1148,26 +1194,26 @@ impl World {
         let mut threads = Vec::new();
         for ev in &self.enemy_events {
             match ev {
-                enemy::Event::Charge => self.audio.play(sfx::Id::Charge),
+                enemy::Event::Charge => self.juice.audio.play(sfx::Id::Charge),
                 enemy::Event::WallHit => {
-                    self.audio.play(sfx::Id::WallHit);
-                    self.feel.add_trauma(0.2);
+                    self.juice.audio.play(sfx::Id::WallHit);
+                    self.juice.feel.add_trauma(0.2);
                 }
-                enemy::Event::Shoot => self.audio.play(sfx::Id::Shoot),
-                enemy::Event::Leap => self.audio.play(sfx::Id::Charge),
+                enemy::Event::Shoot => self.juice.audio.play(sfx::Id::Shoot),
+                enemy::Event::Leap => self.juice.audio.play(sfx::Id::Charge),
                 enemy::Event::Land => {
-                    self.audio.play(sfx::Id::WallHit);
-                    self.feel.add_trauma(0.12);
+                    self.juice.audio.play(sfx::Id::WallHit);
+                    self.juice.feel.add_trauma(0.12);
                 }
                 enemy::Event::Summon => summon = true,
                 enemy::Event::Bury(n) => bury = *n,
-                enemy::Event::Dig => self.audio.play(sfx::Id::Burrow),
+                enemy::Event::Dig => self.juice.audio.play(sfx::Id::Burrow),
                 enemy::Event::Pop => {
-                    self.audio.play(sfx::Id::Emerge);
-                    self.feel.add_trauma(0.25);
+                    self.juice.audio.play(sfx::Id::Emerge);
+                    self.juice.feel.add_trauma(0.25);
                 }
-                enemy::Event::Tongue => self.audio.play(sfx::Id::Shoot),
-                enemy::Event::Spore => self.audio.play(sfx::Id::Burrow),
+                enemy::Event::Tongue => self.juice.audio.play(sfx::Id::Shoot),
+                enemy::Event::Spore => self.juice.audio.play(sfx::Id::Burrow),
                 enemy::Event::Thump(at) => thumps.push(*at),
                 enemy::Event::Thread(at, dir) => threads.push((*at, *dir)),
             }
@@ -1187,15 +1233,15 @@ impl World {
         for e in &self.enemies {
             match e.state {
                 enemy::State::Under { time } if time <= dt => {
-                    burst(&mut self.fx, e.pos, 10, DIRT, 70.0);
+                    burst(&mut self.juice.fx, e.pos, 10, DIRT, 70.0);
                 }
                 enemy::State::Pop { time } if time <= dt => {
                     let r = e.contact_radius();
-                    self.fx.push(ring(e.pos, 4.0, r, 0.25, DIRT));
-                    burst(&mut self.fx, e.pos, 14, DIRT, 110.0);
+                    self.juice.fx.push(ring(e.pos, 4.0, r, 0.25, DIRT));
+                    burst(&mut self.juice.fx, e.pos, 14, DIRT, 110.0);
                 }
                 enemy::State::Puff { time: 0.0 } => {
-                    self.clouds.push(Cloud {
+                    self.hazards.clouds.push(Cloud {
                         pos: e.pos,
                         time: 0.0,
                     });
@@ -1203,19 +1249,25 @@ impl World {
                 _ => {}
             }
         }
-        for c in self.clouds.iter_mut().filter(|_| !frozen) {
+        for c in self.hazards.clouds.iter_mut().filter(|_| !frozen) {
             c.time += dt;
         }
-        self.clouds.retain(|c| c.time < t::SPORE_CLOUD_TIME);
-        for wv in self.waves.iter_mut().filter(|_| !frozen) {
+        self.hazards.clouds.retain(|c| c.time < t::SPORE_CLOUD_TIME);
+        for wv in self.hazards.waves.iter_mut().filter(|_| !frozen) {
             wv.time += dt;
         }
-        self.waves.retain(|w| w.time < t::CLOVER_WAVE_TIME + 0.25);
-        if let Some((_, _, age)) = self.thread_lash.as_mut() {
+        self.hazards
+            .waves
+            .retain(|w| w.time < t::CLOVER_WAVE_TIME + 0.25);
+        if let Some((_, _, age)) = self.hazards.thread_lash.as_mut() {
             *age += dt;
         }
-        if self.thread_lash.is_some_and(|(_, _, age)| age > 0.3) {
-            self.thread_lash = None;
+        if self
+            .hazards
+            .thread_lash
+            .is_some_and(|(_, _, age)| age > 0.3)
+        {
+            self.hazards.thread_lash = None;
         }
     }
 
@@ -1229,11 +1281,11 @@ impl World {
             && !self.dream
             && !self.enemies.iter().any(|e| e.is_boss());
         if !quake {
-            self.rock_cd = self.rock_cd.max(t::ROCK_EVERY.0);
+            self.hazards.rock_cd = self.hazards.rock_cd.max(t::ROCK_EVERY.0);
         } else if !frozen {
-            self.rock_cd -= dt;
-            if self.rock_cd <= 0.0 {
-                self.rock_cd = rand::gen_range(t::ROCK_EVERY.0, t::ROCK_EVERY.1);
+            self.hazards.rock_cd -= dt;
+            if self.hazards.rock_cd <= 0.0 {
+                self.hazards.rock_cd = rand::gen_range(t::ROCK_EVERY.0, t::ROCK_EVERY.1);
                 let foes: Vec<Vec2> = self
                     .enemies
                     .iter()
@@ -1248,23 +1300,25 @@ impl World {
                 let a = rand::gen_range(0.0, std::f32::consts::TAU);
                 let mut p = base + Vec2::from_angle(a) * rand::gen_range(0.0, t::ROCK_SPREAD);
                 self.room.resolve_circle(&mut p, 6.0);
-                self.rocks.push(Rockfall { pos: p, time: 0.0 });
+                self.hazards.rocks.push(Rockfall { pos: p, time: 0.0 });
             }
         }
         let mut landed = Vec::new();
-        for r in self.rocks.iter_mut().filter(|_| !frozen) {
+        for r in self.hazards.rocks.iter_mut().filter(|_| !frozen) {
             r.time += dt;
             if r.time >= t::ROCK_FALL {
                 landed.push(r.pos);
             }
         }
-        self.rocks.retain(|r| r.time < t::ROCK_FALL);
+        self.hazards.rocks.retain(|r| r.time < t::ROCK_FALL);
         for &p in &landed {
-            self.audio.play(sfx::Id::WallHit);
-            self.feel.add_trauma(0.18);
-            self.fx.push(ring(p, 3.0, t::ROCK_R + 3.0, 0.25, DIRT));
-            clods(&mut self.fx, p, 8, ROCK, 100.0);
-            puff(&mut self.fx, p, 3, self.biome.dust(), 7.0, 0.5);
+            self.juice.audio.play(sfx::Id::WallHit);
+            self.juice.feel.add_trauma(0.18);
+            self.juice
+                .fx
+                .push(ring(p, 3.0, t::ROCK_R + 3.0, 0.25, DIRT));
+            clods(&mut self.juice.fx, p, 8, ROCK, 100.0);
+            puff(&mut self.juice.fx, p, 3, self.biome.dust(), 7.0, 0.5);
             for e in self.enemies.iter_mut().filter(|e| e.alive && e.hittable()) {
                 let rr = t::ROCK_R + e.radius();
                 if (e.pos - p).length_squared() > rr * rr {
@@ -1274,10 +1328,10 @@ impl World {
                 e.hurt(t::ROCK_ENEMY_DAMAGE, away, 140.0, 0.8);
                 if !e.alive {
                     enemy_down(
-                        &mut self.fx,
-                        &mut self.audio,
-                        &mut self.feel,
-                        &mut self.kills,
+                        &mut self.juice.fx,
+                        &mut self.juice.audio,
+                        &mut self.juice.feel,
+                        &mut self.stats.kills,
                         deaths,
                         e,
                         enemy_color(e.kind),
@@ -1309,14 +1363,14 @@ impl World {
                     continue;
                 }
                 e.hurt(t::THORN_ENEMY_DAMAGE, -dir, 60.0, t::THORN_STUN);
-                self.audio.play(sfx::Id::EnemyHit);
-                self.fx.push(ring(e.pos, 2.0, 10.0, 0.15, THORN));
+                self.juice.audio.play(sfx::Id::EnemyHit);
+                self.juice.fx.push(ring(e.pos, 2.0, 10.0, 0.15, THORN));
                 if !e.alive {
                     enemy_down(
-                        &mut self.fx,
-                        &mut self.audio,
-                        &mut self.feel,
-                        &mut self.kills,
+                        &mut self.juice.fx,
+                        &mut self.juice.audio,
+                        &mut self.juice.feel,
+                        &mut self.stats.kills,
                         deaths,
                         e,
                         enemy_color(e.kind),
@@ -1330,8 +1384,8 @@ impl World {
     fn summon_mice(&mut self, summon: bool) {
         // 대장이 울부짖으면 양옆에 생쥐 떼(셋).
         if summon {
-            self.audio.play(sfx::Id::Shoot);
-            self.feel.add_trauma(0.2);
+            self.juice.audio.play(sfx::Id::Shoot);
+            self.juice.feel.add_trauma(0.2);
             let chief: Vec<Vec2> = self
                 .enemies
                 .iter()
@@ -1347,8 +1401,8 @@ impl World {
                     e.wake_delay = 0.4;
                     self.enemies.push(e);
                 }
-                self.fx.push(ring(p, 4.0, 18.0, 0.3, DIRT));
-                burst(&mut self.fx, p, 10, DIRT, 70.0);
+                self.juice.fx.push(ring(p, 4.0, 18.0, 0.3, DIRT));
+                burst(&mut self.juice.fx, p, 10, DIRT, 70.0);
             }
         }
     }
@@ -1357,7 +1411,7 @@ impl World {
     fn bury_mines(&mut self, bury: usize) {
         // 도토가 묻으면: 하나는 플레이어 발밑, 나머지는 둘레에 고르게(바닥 안으로).
         if bury > 0 {
-            self.audio.play(sfx::Id::Burrow);
+            self.juice.audio.play(sfx::Id::Burrow);
             let fuse = t::DOTO_MINE_FUSE
                 * self
                     .enemies
@@ -1372,12 +1426,12 @@ impl World {
                     p += Vec2::from_angle(a) * t::DOTO_MINE_SPREAD;
                 }
                 self.room.resolve_circle(&mut p, 6.0);
-                self.mines.push(Mine {
+                self.hazards.mines.push(Mine {
                     pos: p,
                     time: 0.0,
                     fuse,
                 });
-                burst(&mut self.fx, p, 6, DIRT, 50.0);
+                burst(&mut self.juice.fx, p, 6, DIRT, 50.0);
             }
         }
     }
@@ -1392,26 +1446,27 @@ impl World {
         // 묻힌 도토리가 터진다(필살기 시동 중엔 멈춘다). 도토가 없으면 다 사라진다.
         let mut popped = Vec::new();
         if !self.enemies.iter().any(|e| e.kind == Kind::Doto) {
-            self.mines.clear();
+            self.hazards.mines.clear();
         }
-        for m in self.mines.iter_mut().filter(|_| !frozen) {
+        for m in self.hazards.mines.iter_mut().filter(|_| !frozen) {
             m.time += dt;
             if m.time >= m.fuse {
                 popped.push(m.pos);
             }
         }
-        self.mines.retain(|m| m.time < m.fuse);
+        self.hazards.mines.retain(|m| m.time < m.fuse);
         for &p in &popped {
-            self.audio.play(sfx::Id::Emerge);
-            self.feel.add_trauma(0.15);
-            self.fx
+            self.juice.audio.play(sfx::Id::Emerge);
+            self.juice.feel.add_trauma(0.15);
+            self.juice
+                .fx
                 .push(ring(p, 3.0, t::DOTO_MINE_RADIUS + 2.0, 0.25, PROJECTILE));
-            burst(&mut self.fx, p, 12, DIRT, 110.0);
+            burst(&mut self.juice.fx, p, 12, DIRT, 110.0);
         }
         for p in self.projectiles.iter_mut().filter(|_| !frozen) {
             p.update(&self.room, dt);
             if !p.alive {
-                self.fx.push(ring(p.pos, 2.0, 6.0, 0.12, PROJECTILE));
+                self.juice.fx.push(ring(p.pos, 2.0, 6.0, 0.12, PROJECTILE));
             }
         }
         // 되돌린 투사체 → 적
@@ -1430,14 +1485,14 @@ impl World {
                         0.4,
                     );
                     p.alive = false;
-                    self.audio.play(sfx::Id::EnemyHit);
-                    self.fx.push(ring(p.pos, 3.0, 12.0, 0.18, WHITE));
+                    self.juice.audio.play(sfx::Id::EnemyHit);
+                    self.juice.fx.push(ring(p.pos, 3.0, 12.0, 0.18, WHITE));
                     if !e.alive {
                         enemy_down(
-                            &mut self.fx,
-                            &mut self.audio,
-                            &mut self.feel,
-                            &mut self.kills,
+                            &mut self.juice.fx,
+                            &mut self.juice.audio,
+                            &mut self.juice.feel,
+                            &mut self.stats.kills,
                             deaths,
                             e,
                             enemy_color(e.kind),
@@ -1499,19 +1554,19 @@ impl World {
                     self.player.gain_sp(s.finisher);
                 }
                 if s.kind == crate::combat::StrikeKind::Heavy {
-                    self.heavy_hits += 1;
+                    self.stats.heavy_hits += 1;
                 }
                 if s.poison > 0.0 && e.alive {
                     e.apply_poison(s.poison);
                 }
                 if s.finisher {
-                    self.finisher_hits += 1;
+                    self.stats.finisher_hits += 1;
                 }
                 if s.kind == crate::combat::StrikeKind::Emerge {
-                    self.emerge_hits += 1;
+                    self.stats.emerge_hits += 1;
                 }
-                self.feel.add_hitstop(s.hitstop);
-                self.feel.add_trauma(s.shake);
+                self.juice.feel.add_hitstop(s.hitstop);
+                self.juice.feel.add_trauma(s.shake);
                 // 맞혔다는 확인(0168): 카메라를 맞힌 쪽으로 찬다. 박자·딱 맞춤이면 조금 더.
                 let kick = match s.kind {
                     crate::combat::StrikeKind::Heavy => {
@@ -1545,11 +1600,11 @@ impl World {
                     _ => 0.0,
                 };
                 if kick > 0.0 {
-                    self.feel.add_kick(dir, kick);
+                    self.juice.feel.add_kick(dir, kick);
                 }
                 hit_any = true;
                 if s.kind == crate::combat::StrikeKind::Heavy {
-                    self.feel.flash = self.feel.flash.max(t::HEAVY_HIT_FLASH);
+                    self.juice.feel.flash = self.juice.feel.flash.max(t::HEAVY_HIT_FLASH);
                     // 벽 쿵(0168): 강공격 넉백으로 벽에 박히면 한 번 더.
                     if e.alive {
                         e.slam = t::WALL_SLAM_DAMAGE;
@@ -1561,21 +1616,21 @@ impl World {
                 {
                     impact_at = Some((hit_point, dir));
                 }
-                self.fx.push(ring(hit_point, 2.0, 9.0, 0.12, WHITE));
+                self.juice.fx.push(ring(hit_point, 2.0, 9.0, 0.12, WHITE));
                 // 맞은 쪽으로 튀는 불똥(0081): 어디로 밀었는지 보인다.
-                spray(&mut self.fx, hit_point, dir, 4, WHITE, 140.0);
+                spray(&mut self.juice.fx, hit_point, dir, 4, WHITE, 140.0);
                 if e.alive {
-                    self.audio.play(sfx::Id::EnemyHit);
-                    self.audio.play(sfx::Id::HitTick);
+                    self.juice.audio.play(sfx::Id::EnemyHit);
+                    self.juice.audio.play(sfx::Id::HitTick);
                 } else {
                     if s.kind == crate::combat::StrikeKind::Emerge {
-                        self.emerge_kills += 1;
+                        self.stats.emerge_kills += 1;
                     }
                     enemy_down(
-                        &mut self.fx,
-                        &mut self.audio,
-                        &mut self.feel,
-                        &mut self.kills,
+                        &mut self.juice.fx,
+                        &mut self.juice.audio,
+                        &mut self.juice.feel,
+                        &mut self.stats.kills,
                         deaths,
                         e,
                         enemy_color(e.kind),
@@ -1587,11 +1642,11 @@ impl World {
                 self.player.vel = Vec2::ZERO;
             }
             if let Some((p, dir)) = impact_at {
-                self.audio.play(sfx::Id::Impact);
-                self.fx.push(ring(p, 3.0, 22.0, 0.2, WHITE));
-                spray(&mut self.fx, p, dir, 8, WHITE, 200.0);
-                clods(&mut self.fx, p, 6, DIRT, 90.0);
-                puff(&mut self.fx, p, 3, self.biome.dust(), 6.0, 0.4);
+                self.juice.audio.play(sfx::Id::Impact);
+                self.juice.fx.push(ring(p, 3.0, 22.0, 0.2, WHITE));
+                spray(&mut self.juice.fx, p, dir, 8, WHITE, 200.0);
+                clods(&mut self.juice.fx, p, 6, DIRT, 90.0);
+                puff(&mut self.juice.fx, p, 3, self.biome.dust(), 6.0, 0.4);
             }
             if s.kind == crate::combat::StrikeKind::Emerge {
                 let k = 1.0 + (t::EMERGE_CHARGE_RADIUS - 1.0) * self.player.burrow_charge();
@@ -1606,13 +1661,13 @@ impl World {
             if let Some((from, kind)) = shell_from {
                 self.player
                     .recoil(from, t::KONGI_RECOIL, t::KONGI_RECOIL_LOCK);
-                self.audio.play(sfx::Id::WallHit);
-                self.feel.add_hitstop(t::PARRY_HITSTOP * 0.6);
-                self.feel.add_trauma(0.2);
+                self.juice.audio.play(sfx::Id::WallHit);
+                self.juice.feel.add_hitstop(t::PARRY_HITSTOP * 0.6);
+                self.juice.feel.add_trauma(0.2);
                 let p = (self.player.pos + from) * 0.5;
-                self.fx.push(ring(p, 2.0, 14.0, 0.2, SHELL));
-                burst(&mut self.fx, p, 8, SHELL, 100.0);
-                self.toast = Some((
+                self.juice.fx.push(ring(p, 2.0, 14.0, 0.2, SHELL));
+                burst(&mut self.juice.fx, p, 8, SHELL, 100.0);
+                self.juice.toast = Some((
                     if kind == Kind::Hedgehog {
                         |s| s.toast_spines
                     } else if self.character == crate::equipment::Character::Momo {
@@ -1624,11 +1679,11 @@ impl World {
                 ));
             }
             if let Some(at) = broke_at {
-                self.audio.play(sfx::Id::DrillWall);
-                self.feel.add_trauma(0.3);
-                self.fx.push(ring(at, 4.0, 24.0, 0.3, SHELL));
-                burst(&mut self.fx, at, 14, SHELL, 130.0);
-                self.toast = Some((|s| s.toast_guard_break, 2.0));
+                self.juice.audio.play(sfx::Id::DrillWall);
+                self.juice.feel.add_trauma(0.3);
+                self.juice.fx.push(ring(at, 4.0, 24.0, 0.3, SHELL));
+                burst(&mut self.juice.fx, at, 14, SHELL, 130.0);
+                self.juice.toast = Some((|s| s.toast_guard_break, 2.0));
             }
             let parry = self.player.parry_dir();
             let mut parried = false;
@@ -1645,7 +1700,7 @@ impl World {
                     }
                     _ => {
                         p.alive = false;
-                        self.fx.push(ring(p.pos, 2.0, 8.0, 0.12, PROJECTILE));
+                        self.juice.fx.push(ring(p.pos, 2.0, 8.0, 0.12, PROJECTILE));
                     }
                 }
             }
@@ -1653,21 +1708,21 @@ impl World {
                 self.parry_feedback();
             }
             // 발톱이 닿은 묻힌 도토리는 파낸다(터지지 않는다).
-            let before = self.mines.len();
+            let before = self.hazards.mines.len();
             let mut dug = Vec::new();
-            self.mines.retain(|m| {
+            self.hazards.mines.retain(|m| {
                 let hit = s.shape.overlaps_circle(m.pos, 5.0);
                 if hit {
                     dug.push(m.pos);
                 }
                 !hit
             });
-            if self.mines.len() < before {
-                self.audio.play(sfx::Id::Claw(0));
+            if self.hazards.mines.len() < before {
+                self.juice.audio.play(sfx::Id::Claw(0));
             }
             for p in dug {
-                self.fx.push(ring(p, 2.0, 8.0, 0.15, DIRT));
-                burst(&mut self.fx, p, 6, DIRT, 70.0);
+                self.juice.fx.push(ring(p, 2.0, 8.0, 0.15, DIRT));
+                burst(&mut self.juice.fx, p, 6, DIRT, 70.0);
             }
         }
     }
@@ -1677,7 +1732,7 @@ impl World {
         for (pos, kind) in deaths {
             // 포자버섯은 쓰러지면서도 한 번 뿜는다.
             if kind == Kind::SporeCap {
-                self.clouds.push(Cloud { pos, time: 0.0 });
+                self.hazards.clouds.push(Cloud { pos, time: 0.0 });
             }
             self.adv.last_kill = pos;
             self.drop_loot(pos, kind);
@@ -1750,7 +1805,7 @@ impl World {
             }
             if hurt_from.is_none() && !parried {
                 let rr = pr + t::SPORE_CLOUD_R;
-                if let Some(c) = self.clouds.iter().find(|c| {
+                if let Some(c) = self.hazards.clouds.iter().find(|c| {
                     c.time >= t::SPORE_CLOUD_GRACE && (c.pos - ppos).length_squared() <= rr * rr
                 }) {
                     hurt_from = Some((c.pos, 1));
@@ -1767,7 +1822,7 @@ impl World {
             }
             // 토끼풀의 충격파(0165): 퍼지는 고리가 지나는 순간 한 번, 멀리 밀린다. 땅속·깡충·드릴은 안 맞는다.
             if hurt_from.is_none() && !parried && self.player.on_foot() {
-                for wv in self.waves.iter_mut() {
+                for wv in self.hazards.waves.iter_mut() {
                     if wv.hit {
                         continue;
                     }
@@ -1822,9 +1877,9 @@ impl World {
                     if let Some(v) = pull {
                         self.player.vel = v;
                     }
-                    if thorned && !self.thorn_told {
-                        self.thorn_told = true;
-                        self.toast = Some((
+                    if thorned && !self.story.thorn_told {
+                        self.story.thorn_told = true;
+                        self.juice.toast = Some((
                             if self.character == crate::equipment::Character::Momo {
                                 |s| s.toast_thorn_momo
                             } else {
@@ -1833,14 +1888,16 @@ impl World {
                             2.5,
                         ));
                     }
-                    self.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
-                    self.feel.add_trauma(t::PLAYER_HURT_SHAKE);
-                    self.fx.push(ring(self.player.pos, 4.0, 14.0, 0.2, RED));
+                    self.juice.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
+                    self.juice.feel.add_trauma(t::PLAYER_HURT_SHAKE);
+                    self.juice
+                        .fx
+                        .push(ring(self.player.pos, 4.0, 14.0, 0.2, RED));
                     if self.player.is_alive() {
-                        self.audio.play(sfx::Id::Hurt);
+                        self.juice.audio.play(sfx::Id::Hurt);
                     } else {
-                        self.audio.play(sfx::Id::Die);
-                        burst(&mut self.fx, self.player.pos, 16, MOLE, 90.0);
+                        self.juice.audio.play(sfx::Id::Die);
+                        burst(&mut self.juice.fx, self.player.pos, 16, MOLE, 90.0);
                     }
                 }
             }
@@ -1883,24 +1940,24 @@ impl World {
         if self.exit_at.is_some() {
             self.exit_age += dt;
         }
-        if let Some((_, _, left)) = &mut self.boss_card {
+        if let Some((_, _, left)) = &mut self.juice.boss_card {
             *left -= dt;
             if *left <= 0.0 {
-                self.boss_card = None;
+                self.juice.boss_card = None;
             }
         }
         // 발걸음 먼지(0081): 걷는 동안 12px마다 발 뒤에 작은 먼지. 효과가 넘치면 건너뛴다.
         let moved = (self.player.pos - self.player.prev_pos).length();
         if self.player.is_alive() && self.player.on_foot() && moved > 0.2 {
-            self.step_dist += moved;
-            if self.step_dist > STEP_DUST_EVERY && self.fx.len() < FX_SOFT_CAP {
-                self.step_dist = 0.0;
+            self.juice.step_dist += moved;
+            if self.juice.step_dist > STEP_DUST_EVERY && self.juice.fx.len() < FX_SOFT_CAP {
+                self.juice.step_dist = 0.0;
                 let back = -(self.player.pos - self.player.prev_pos).normalize_or_zero();
                 let at = self.player.pos + vec2(0.0, 5.0) + back * 3.0;
-                puff(&mut self.fx, at, 1, self.biome.dust(), 3.0, 0.35);
+                puff(&mut self.juice.fx, at, 1, self.biome.dust(), 3.0, 0.35);
             }
         } else {
-            self.step_dist = STEP_DUST_EVERY * 0.6;
+            self.juice.step_dist = STEP_DUST_EVERY * 0.6;
         }
     }
 
@@ -1923,43 +1980,43 @@ impl World {
     /// 패링 성공 연출: 번쩍, 히트스톱, SP.
     /// 할 수 없는 행동(0149): 소리 하나 + HUD 칸 떨기. 칸이 이미 떨고 있으면 소리를 다시 내지 않는다(연타).
     fn deny_feedback(&mut self, k: usize) {
-        if self.deny[k] < t::DENY_TIME * 0.5 {
-            self.audio.play(sfx::Id::Deny);
+        if self.juice.deny[k] < t::DENY_TIME * 0.5 {
+            self.juice.audio.play(sfx::Id::Deny);
         }
-        self.deny[k] = t::DENY_TIME;
+        self.juice.deny[k] = t::DENY_TIME;
     }
 
     fn parry_feedback(&mut self) {
-        self.parries += 1;
+        self.stats.parries += 1;
         self.player.on_parry();
-        self.feel.add_hitstop(t::PARRY_HITSTOP);
-        self.feel.add_trauma(t::PARRY_SHAKE);
+        self.juice.feel.add_hitstop(t::PARRY_HITSTOP);
+        self.juice.feel.add_trauma(t::PARRY_SHAKE);
         let p = self.player.pos + self.player.facing * 8.0;
-        self.fx.push(ring(p, 2.0, 18.0, 0.22, WHITE));
-        self.fx.push(ring(p, 2.0, 10.0, 0.15, PROJECTILE));
-        burst(&mut self.fx, p, 10, WHITE, 120.0);
-        self.audio.play(sfx::Id::Parry);
-        self.toast = Some((|s| s.toast_parry, 0.8));
+        self.juice.fx.push(ring(p, 2.0, 18.0, 0.22, WHITE));
+        self.juice.fx.push(ring(p, 2.0, 10.0, 0.15, PROJECTILE));
+        burst(&mut self.juice.fx, p, 10, WHITE, 120.0);
+        self.juice.audio.play(sfx::Id::Parry);
+        self.juice.toast = Some((|s| s.toast_parry, 0.8));
     }
 
     /// 장신구·씨앗으로 능력치를 다시 계산한다.
     pub fn refresh_stats(&mut self) {
         self.player
-            .set_stats(Stats::compute(&self.charms, self.root_hearts));
+            .set_stats(Stats::compute(&self.inv.charms, self.inv.root_hearts));
     }
 
     /// 퀵 슬롯 아이템을 먹기 시작한다. 체력이 가득이거나 슬롯이 비었으면 먹지 않는다(아깝지 않게).
     /// 회복은 다 먹었을 때(`Event::Ate`, docs/decisions/0038).
     fn start_eating(&mut self) {
         let p = &mut self.player;
-        let c = self.bag.selected;
-        if self.bag.count(c) == 0 {
+        let c = self.inv.bag.selected;
+        if self.inv.bag.count(c) == 0 {
             return;
         }
         if p.hp >= p.stats.max_hp {
             // 아무 일도 안 일어나면 고장 난 줄 안다(튜토리얼에서 막혔다, 0093): 왜 안 먹는지 알린다.
             p.drop_item_press();
-            self.toast = Some((|s| s.toast_eat_full, 1.6));
+            self.juice.toast = Some((|s| s.toast_eat_full, 1.6));
             self.deny_feedback(1);
             return;
         }
@@ -1969,18 +2026,18 @@ impl World {
     /// 다 먹었다: 가방에서 꺼내 회복. 먹는 사이 체력이 가득 찼으면(샘 등) 꺼내지 않는다.
     fn finish_eating(&mut self, c: Consumable) {
         let p = &mut self.player;
-        if p.hp >= p.stats.max_hp || !self.bag.take(c) {
+        if p.hp >= p.stats.max_hp || !self.inv.bag.take(c) {
             return;
         }
         match c {
             Consumable::Berry => p.heal(p.talents.berry_heal()),
             Consumable::Worm => p.heal(p.stats.max_hp),
         }
-        self.audio.play(sfx::Id::Heal);
-        self.items_used += 1;
+        self.juice.audio.play(sfx::Id::Heal);
+        self.stats.items_used += 1;
         let pos = p.pos;
-        self.fx.push(ring(pos, 3.0, 14.0, 0.3, BERRY));
-        burst(&mut self.fx, pos, 8, BERRY, 60.0);
+        self.juice.fx.push(ring(pos, 3.0, 14.0, 0.3, BERRY));
+        burst(&mut self.juice.fx, pos, 8, BERRY, 60.0);
     }
 
     /// 쥬시 지렁이로 일어난다: 체력 일부, 잠깐 무적, 주변을 밀어낸다.
@@ -1998,12 +2055,13 @@ impl World {
                 p.alive = false;
             }
         }
-        self.audio.play(sfx::Id::Heal);
-        self.fx
+        self.juice.audio.play(sfx::Id::Heal);
+        self.juice
+            .fx
             .push(ring(pos, 4.0, t::REVIVE_PUSH_RADIUS, 0.4, BERRY));
-        burst(&mut self.fx, pos, 20, BERRY, 120.0);
-        self.feel.add_trauma(0.4);
-        self.toast = Some((|s| s.toast_revive, 2.5));
+        burst(&mut self.juice.fx, pos, 20, BERRY, 120.0);
+        self.juice.feel.add_trauma(0.4);
+        self.juice.toast = Some((|s| s.toast_revive, 2.5));
     }
 
     /// 쓰러진 적이 떨어뜨린다: 반딧불 몇 마리 + 확률로 산딸기(loot::berry_chance).
@@ -2026,23 +2084,23 @@ impl World {
         }
         let max = self.player.stats.max_hp;
         let missing = self.player.hp < max;
-        let mut p = loot::berry_chance(self.player.hp, max, self.kills_since_berry, kind);
+        let mut p = loot::berry_chance(self.player.hp, max, self.inv.kills_since_berry, kind);
         // 실뜨기 3: 덜 떨어진다. 불운 보정(확정)은 그대로 둔다.
         if p < 1.0 {
             p *= self.knots.berry_mul();
         }
         if p > 0.0 && rand::gen_range(0.0, 1.0) < p {
             self.push_loot(Loot::spawn(LootKind::Berry, pos));
-            self.kills_since_berry = 0;
+            self.inv.kills_since_berry = 0;
         } else if missing && kind != Kind::Dummy {
-            self.kills_since_berry += 1;
+            self.inv.kills_since_berry += 1;
         }
     }
 
     /// 보간이 멈춘 화면(일시정지·히트스톱) 위에서 미끄러지지 않게 prev를 현재로 맞춘다.
     /// 입자 효과만 한 틱(컷씬에서도 돈다, 0159). 월드 틱의 6단계.
     pub fn tick_fx(&mut self, dt: f32) {
-        for f in &mut self.fx {
+        for f in &mut self.juice.fx {
             f.time += dt;
             f.pos += f.vel * dt;
             match &mut f.kind {
@@ -2072,9 +2130,9 @@ impl World {
             }
         }
         // 끝난 효과를 지운다. 이미 거른 것(앞쪽)이 몇 개 남는지 세어 둔다(thin_fx가 새것만 보게).
-        let checked = self.fx_checked;
+        let checked = self.juice.fx_checked;
         let (mut idx, mut kept) = (0, 0);
-        self.fx.retain(|f| {
+        self.juice.fx.retain(|f| {
             let keep = f.time < f.dur;
             if idx < checked && keep {
                 kept += 1;
@@ -2082,19 +2140,19 @@ impl World {
             idx += 1;
             keep
         });
-        self.fx_checked = kept;
+        self.juice.fx_checked = kept;
     }
 
     /// 컷씬 이펙트 묶음(0159)을 `at`에 낸다.
     pub fn cue(&mut self, cue: Cue, at: Vec2) {
         match cue {
             Cue::Unbind => {
-                self.audio.play(sfx::Id::Unbind);
-                self.feel.add_trauma(0.3);
-                self.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
-                self.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
-                unravel(&mut self.fx, at, 14.0);
-                unravel(&mut self.fx, at, 22.0);
+                self.juice.audio.play(sfx::Id::Unbind);
+                self.juice.feel.add_trauma(0.3);
+                self.juice.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
+                self.juice.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
+                unravel(&mut self.juice.fx, at, 14.0);
+                unravel(&mut self.juice.fx, at, 22.0);
                 for k in 0..10 {
                     let ang = k as f32 / 10.0 * std::f32::consts::TAU;
                     let r = 6.0 + (k % 3) as f32 * 6.0;
@@ -2104,7 +2162,7 @@ impl World {
                         0.6,
                     );
                     g.time = -0.05 * k as f32;
-                    self.fx.push(g);
+                    self.juice.fx.push(g);
                 }
             }
             Cue::Petals(bloom) => {
@@ -2113,88 +2171,101 @@ impl World {
                 } else {
                     Color::new(0.74, 0.56, 0.60, 1.0)
                 };
-                petals(&mut self.fx, at, 18, color, 70.0);
+                petals(&mut self.juice.fx, at, 18, color, 70.0);
             }
             Cue::Rise => {
-                self.audio.play(sfx::Id::Rumble);
-                self.feel.add_trauma(0.4);
-                self.fx.push(ring(at, 26.0, 4.0, 0.5, THREAD));
-                self.fx
+                self.juice.audio.play(sfx::Id::Rumble);
+                self.juice.feel.add_trauma(0.4);
+                self.juice.fx.push(ring(at, 26.0, 4.0, 0.5, THREAD));
+                self.juice
+                    .fx
                     .push(ring(at, 6.0, 40.0, 0.6, Color::new(0.5, 0.3, 0.6, 1.0)));
                 puff(
-                    &mut self.fx,
+                    &mut self.juice.fx,
                     at,
                     6,
                     Color::new(0.30, 0.22, 0.34, 1.0),
                     10.0,
                     0.7,
                 );
-                clods(&mut self.fx, at, 8, DIRT, 70.0);
+                clods(&mut self.juice.fx, at, 8, DIRT, 70.0);
             }
             Cue::Vanish => {
-                self.audio.play(sfx::Id::Burrow);
-                self.feel.add_trauma(0.15);
-                self.fx.push(ring(at, 16.0, 2.0, 0.35, THREAD));
+                self.juice.audio.play(sfx::Id::Burrow);
+                self.juice.feel.add_trauma(0.15);
+                self.juice.fx.push(ring(at, 16.0, 2.0, 0.35, THREAD));
                 puff(
-                    &mut self.fx,
+                    &mut self.juice.fx,
                     at,
                     5,
                     Color::new(0.30, 0.22, 0.34, 1.0),
                     8.0,
                     0.6,
                 );
-                clods(&mut self.fx, at, 6, DIRT, 60.0);
-                unravel(&mut self.fx, at, 10.0);
+                clods(&mut self.juice.fx, at, 6, DIRT, 60.0);
+                unravel(&mut self.juice.fx, at, 10.0);
             }
             Cue::Wrap => {
-                self.audio.play(sfx::Id::Rumble);
-                self.feel.add_trauma(0.35);
+                self.juice.audio.play(sfx::Id::Rumble);
+                self.juice.feel.add_trauma(0.35);
                 for (k, r) in [48.0, 36.0, 24.0].into_iter().enumerate() {
                     let mut f = ring(at, r, 3.0, 0.7, THREAD);
                     f.time = -0.18 * k as f32;
-                    self.fx.push(f);
+                    self.juice.fx.push(f);
                 }
                 puff(
-                    &mut self.fx,
+                    &mut self.juice.fx,
                     at,
                     8,
                     Color::new(0.24, 0.14, 0.34, 1.0),
                     12.0,
                     0.9,
                 );
-                unravel(&mut self.fx, at, 18.0);
-                unravel(&mut self.fx, at, 28.0);
+                unravel(&mut self.juice.fx, at, 18.0);
+                unravel(&mut self.juice.fx, at, 28.0);
             }
             Cue::Eyes => {
                 let violet = Color::new(0.80, 0.45, 1.0, 1.0);
                 for (k, dx) in [-4.0, 4.0].into_iter().enumerate() {
                     let mut g = glint(at + vec2(dx, -6.0), violet, 1.6);
                     g.time = -0.1 * k as f32;
-                    self.fx.push(g);
+                    self.juice.fx.push(g);
                 }
             }
             Cue::Leave => {
-                self.petal_at = Some(at);
-                petals(&mut self.fx, at, 6, Color::new(0.74, 0.56, 0.60, 1.0), 30.0);
+                self.story.petal_at = Some(at);
+                petals(
+                    &mut self.juice.fx,
+                    at,
+                    6,
+                    Color::new(0.74, 0.56, 0.60, 1.0),
+                    30.0,
+                );
             }
             Cue::Hatch => {
-                self.audio.play(sfx::Id::Unbind);
-                let cocoons = std::mem::take(&mut self.cocoons);
+                self.juice.audio.play(sfx::Id::Unbind);
+                let cocoons = std::mem::take(&mut self.hazards.cocoons);
                 for (k, c) in cocoons.into_iter().enumerate() {
-                    self.fx.push(ring(c, 3.0, 22.0, 0.4, WHITE));
-                    unravel(&mut self.fx, c, 12.0);
-                    petals(&mut self.fx, c, 8, Color::new(1.0, 0.70, 0.80, 1.0), 40.0);
+                    self.juice.fx.push(ring(c, 3.0, 22.0, 0.4, WHITE));
+                    unravel(&mut self.juice.fx, c, 12.0);
+                    petals(
+                        &mut self.juice.fx,
+                        c,
+                        8,
+                        Color::new(1.0, 0.70, 0.80, 1.0),
+                        40.0,
+                    );
                     for i in 0..5 {
                         let ang = i as f32 / 5.0 * std::f32::consts::TAU + k as f32;
                         let mut g =
                             glint(c + vec2(ang.cos() * 8.0, ang.sin() * 5.0 - 3.0), WHITE, 0.5);
                         g.time = -0.06 * i as f32;
-                        self.fx.push(g);
+                        self.juice.fx.push(g);
                     }
                 }
             }
             Cue::Sparkle => {
-                self.audio.play(sfx::Id::Glowbug);
+                self.juice.audio.play(sfx::Id::Glowbug);
                 for k in 0..6 {
                     let ang = k as f32 / 6.0 * std::f32::consts::TAU + 0.4;
                     let mut g = glint(
@@ -2203,7 +2274,7 @@ impl World {
                         0.5,
                     );
                     g.time = -0.06 * k as f32;
-                    self.fx.push(g);
+                    self.juice.fx.push(g);
                 }
             }
         }
@@ -2227,9 +2298,9 @@ impl World {
             return;
         }
         self.player.slow = true;
-        if !self.web_told {
-            self.web_told = true;
-            self.toast = Some((
+        if !self.story.web_told {
+            self.story.web_told = true;
+            self.juice.toast = Some((
                 if self.character == crate::equipment::Character::Momo {
                     |s| s.toast_web_momo
                 } else {
@@ -2242,16 +2313,16 @@ impl World {
 
     /// 토끼풀이 발을 굴렀다(0165): 충격파 고리 + 흙·흔들림, 플레이어 둘레에 흰 실 그물이 몇 개 떨어진다.
     fn thump_at(&mut self, at: Vec2) {
-        self.audio.play(sfx::Id::Impact);
-        self.feel.add_trauma(0.45);
-        self.feel.add_hitstop(0.03);
-        self.waves.push(Wave {
+        self.juice.audio.play(sfx::Id::Impact);
+        self.juice.feel.add_trauma(0.45);
+        self.juice.feel.add_hitstop(0.03);
+        self.hazards.waves.push(Wave {
             pos: at,
             time: 0.0,
             hit: false,
         });
-        clods(&mut self.fx, at, 10, DIRT, 90.0);
-        self.fx.push(ring(at, 6.0, 20.0, 0.2, DIRT));
+        clods(&mut self.juice.fx, at, 10, DIRT, 90.0);
+        self.juice.fx.push(ring(at, 6.0, 20.0, 0.2, DIRT));
         let pp = self.player.pos;
         let mut placed = 0;
         for k in 0..12 {
@@ -2275,7 +2346,7 @@ impl World {
             self.room.webs.push(p);
             // 천장에서 떨어진 실뭉치: 흰 보풀.
             puff(
-                &mut self.fx,
+                &mut self.juice.fx,
                 p,
                 4,
                 Color::new(0.92, 0.90, 0.98, 1.0),
@@ -2292,8 +2363,8 @@ impl World {
         let dir = dir.normalize_or(vec2(0.0, 1.0));
         let reach = self.room.ray_len(at, dir, 1.0, t::CLOVER_THREAD_REACH);
         let end = at + dir * reach;
-        self.thread_lash = Some((at, end, 0.0));
-        self.audio.play(sfx::Id::Shoot);
+        self.hazards.thread_lash = Some((at, end, 0.0));
+        self.juice.audio.play(sfx::Id::Shoot);
         let ppos = self.player.pos;
         let pr = self.player.radius();
         if !self.player.is_alive() || !self.player.on_foot() || self.player.is_invulnerable() {
@@ -2313,13 +2384,13 @@ impl World {
                 e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
                 e.on_parried();
             }
-            self.thread_lash = Some((at, ppos, 0.1));
+            self.hazards.thread_lash = Some((at, ppos, 0.1));
             self.player.on_parry();
-            self.audio.play(sfx::Id::Parry);
-            self.toast = Some((|s| s.toast_parry, 0.8));
-            self.feel.add_hitstop(t::PARRY_HITSTOP);
-            self.fx.push(ring(ppos, 4.0, 18.0, 0.2, WHITE));
-            unravel(&mut self.fx, ppos + from * 8.0, 10.0);
+            self.juice.audio.play(sfx::Id::Parry);
+            self.juice.toast = Some((|s| s.toast_parry, 0.8));
+            self.juice.feel.add_hitstop(t::PARRY_HITSTOP);
+            self.juice.fx.push(ring(ppos, 4.0, 18.0, 0.2, WHITE));
+            unravel(&mut self.juice.fx, ppos + from * 8.0, 10.0);
             return;
         }
         // 감긴다: 토끼풀 쪽으로 끌려가고 잠깐 손을 못 쓴다.
@@ -2329,17 +2400,18 @@ impl World {
             t::CLOVER_PULL_LOCK * self.player.stats.wrap_mul,
         );
         self.player.vel = from * t::CLOVER_PULL;
-        self.audio.play(sfx::Id::Rumble);
-        self.feel.add_trauma(0.25);
-        self.fx.push(ring(ppos, 6.0, 18.0, 0.3, THREAD));
+        self.juice.audio.play(sfx::Id::Rumble);
+        self.juice.feel.add_trauma(0.25);
+        self.juice.fx.push(ring(ppos, 6.0, 18.0, 0.3, THREAD));
     }
 
     /// 아기들의 고치(0165): 발톱이 닿으면 튕긴다(피해 없음). 처음엔 한마디.
     fn cocoon_hit(&mut self, s: &Strike) {
-        if self.cocoon_bounce_id == s.id {
+        if self.hazards.cocoon_bounce_id == s.id {
             return;
         }
         let Some(c) = self
+            .hazards
             .cocoons
             .iter()
             .copied()
@@ -2347,21 +2419,21 @@ impl World {
         else {
             return;
         };
-        self.cocoon_bounce_id = s.id;
-        self.audio.play(sfx::Id::WallHit);
-        self.feel.add_hitstop(0.04);
-        self.fx.push(ring(c, 4.0, 14.0, 0.2, WHITE));
+        self.hazards.cocoon_bounce_id = s.id;
+        self.juice.audio.play(sfx::Id::WallHit);
+        self.juice.feel.add_hitstop(0.04);
+        self.juice.fx.push(ring(c, 4.0, 14.0, 0.2, WHITE));
         puff(
-            &mut self.fx,
+            &mut self.juice.fx,
             c,
             3,
             Color::new(0.92, 0.90, 0.98, 1.0),
             5.0,
             0.4,
         );
-        if !self.cocoon_told {
-            self.cocoon_told = true;
-            self.toast = Some((|s| s.toast_cocoon, 2.5));
+        if !self.story.cocoon_told {
+            self.story.cocoon_told = true;
+            self.juice.toast = Some((|s| s.toast_cocoon, 2.5));
         }
     }
 
@@ -2377,23 +2449,23 @@ impl World {
             }
         });
         for c in cut {
-            self.audio.play(sfx::Id::Unbind);
-            self.fx.push(ring(c, 3.0, 16.0, 0.3, WHITE));
+            self.juice.audio.play(sfx::Id::Unbind);
+            self.juice.fx.push(ring(c, 3.0, 16.0, 0.3, WHITE));
             puff(
-                &mut self.fx,
+                &mut self.juice.fx,
                 c,
                 5,
                 Color::new(0.92, 0.90, 0.98, 1.0),
                 6.0,
                 0.5,
             );
-            unravel(&mut self.fx, c, 8.0);
+            unravel(&mut self.juice.fx, c, 8.0);
         }
     }
 
     /// 시든 꽃잎(0164): 밟으면 줍는다 — 토스트, 분홍 반짝임, 도감 '???'. 앱이 기록에 남긴다(`AdvEvent::PetalFound`).
     pub fn petal_tick(&mut self) -> bool {
-        let Some(at) = self.petal_at else {
+        let Some(at) = self.story.petal_at else {
             return false;
         };
         if !self.player.is_alive()
@@ -2402,15 +2474,21 @@ impl World {
         {
             return false;
         }
-        self.petal_at = None;
-        self.petal_found = true;
-        self.toast = Some((|s| s.toast_petal, 3.0));
-        self.fx.push(glint(
+        self.story.petal_at = None;
+        self.story.petal_found = true;
+        self.juice.toast = Some((|s| s.toast_petal, 3.0));
+        self.juice.fx.push(glint(
             at + vec2(0.0, -4.0),
             Color::new(1.0, 0.72, 0.80, 1.0),
             0.6,
         ));
-        petals(&mut self.fx, at, 4, Color::new(0.74, 0.56, 0.60, 1.0), 24.0);
+        petals(
+            &mut self.juice.fx,
+            at,
+            4,
+            Color::new(0.74, 0.56, 0.60, 1.0),
+            24.0,
+        );
         self.adv.events.push(crate::adventure::AdvEvent::PetalFound);
         true
     }
@@ -2428,9 +2506,10 @@ impl World {
         sp.drunk = true;
         let at = sp.pos;
         self.player.heal(self.player.stats.max_hp);
-        self.springs += 1;
-        self.toast = Some((|s| s.toast_spring, 2.5));
-        self.fx
+        self.stats.springs += 1;
+        self.juice.toast = Some((|s| s.toast_spring, 2.5));
+        self.juice
+            .fx
             .push(ring(at, 6.0, 26.0, 0.5, Color::new(0.75, 0.92, 1.0, 1.0)));
         for k in 0..8 {
             let ang = k as f32 / 8.0 * std::f32::consts::TAU;
@@ -2441,7 +2520,7 @@ impl World {
             );
             g.vel = vec2(0.0, -14.0);
             g.time = -0.07 * k as f32;
-            self.fx.push(g);
+            self.juice.fx.push(g);
         }
         true
     }
@@ -2521,19 +2600,19 @@ impl World {
                         {
                             p.snapped = true;
                             self.player.on_parry();
-                            self.audio.play(sfx::Id::Parry);
-                            self.toast = Some((|s| s.toast_parry, 0.8));
-                            self.feel.add_hitstop(t::PARRY_HITSTOP);
-                            self.fx.push(ring(pp, 4.0, 18.0, 0.2, WHITE));
-                            unravel(&mut self.fx, pp + from * 8.0, 10.0);
+                            self.juice.audio.play(sfx::Id::Parry);
+                            self.juice.toast = Some((|s| s.toast_parry, 0.8));
+                            self.juice.feel.add_hitstop(t::PARRY_HITSTOP);
+                            self.juice.fx.push(ring(pp, 4.0, 18.0, 0.2, WHITE));
+                            unravel(&mut self.juice.fx, pp + from * 8.0, 10.0);
                         } else {
                             d.wraps += 1;
                             let wrap = t::DEEP_WRAP_TIME * self.player.stats.wrap_mul;
                             d.wrapped = wrap;
                             self.player.recoil(pp - from, 0.0, wrap);
-                            self.audio.play(sfx::Id::Rumble);
-                            self.feel.add_trauma(0.3);
-                            self.fx.push(ring(pp, 6.0, 20.0, 0.3, THREAD));
+                            self.juice.audio.play(sfx::Id::Rumble);
+                            self.juice.feel.add_trauma(0.3);
+                            self.juice.fx.push(ring(pp, 6.0, 20.0, 0.3, THREAD));
                             // 가장 가까운 안 끊긴 매듭이 다시 조여진다.
                             if let Some(k) = d.knots.iter_mut().filter(|k| !k.cut).min_by(|x, y| {
                                 (x.pos - pp)
@@ -2542,11 +2621,11 @@ impl World {
                             }) {
                                 k.hp = t::DEEP_KNOT_HP;
                                 k.shake = 0.5;
-                                self.fx.push(ring(k.pos, 16.0, 4.0, 0.4, THREAD));
+                                self.juice.fx.push(ring(k.pos, 16.0, 4.0, 0.4, THREAD));
                             }
                             if !d.hinted {
                                 d.hinted = true;
-                                self.toast = Some((|s| s.deep_wrap, 3.5));
+                                self.juice.toast = Some((|s| s.deep_wrap, 3.5));
                             }
                         }
                     }
@@ -2565,33 +2644,33 @@ impl World {
         let crossed = |at: f32| was < at && now >= at;
         let white = Color::new(0.98, 0.96, 1.0, 1.0);
         if crossed(0.4) {
-            self.audio.play(sfx::Id::Unbind);
-            self.feel.add_trauma(0.25);
-            self.fx.push(ring(c, 10.0, 60.0, 0.7, WHITE));
-            self.fx.push(ring(c, 6.0, 40.0, 0.5, THREAD));
+            self.juice.audio.play(sfx::Id::Unbind);
+            self.juice.feel.add_trauma(0.25);
+            self.juice.fx.push(ring(c, 10.0, 60.0, 0.7, WHITE));
+            self.juice.fx.push(ring(c, 6.0, 40.0, 0.5, THREAD));
             for dx in [-30.0, 0.0, 30.0] {
-                unravel(&mut self.fx, c + vec2(dx, 4.0), 22.0);
+                unravel(&mut self.juice.fx, c + vec2(dx, 4.0), 22.0);
             }
         }
         if crossed(1.0) {
-            petals(&mut self.fx, c + vec2(0.0, -10.0), 24, white, 60.0);
+            petals(&mut self.juice.fx, c + vec2(0.0, -10.0), 24, white, 60.0);
         }
         if crossed(1.6) {
-            self.audio.play(sfx::Id::Unbind);
-            self.feel.add_trauma(0.2);
-            self.fx.push(ring(c, 20.0, 90.0, 0.9, WHITE));
-            unravel(&mut self.fx, c, 46.0);
-            unravel(&mut self.fx, c + vec2(0.0, 12.0), 34.0);
+            self.juice.audio.play(sfx::Id::Unbind);
+            self.juice.feel.add_trauma(0.2);
+            self.juice.fx.push(ring(c, 20.0, 90.0, 0.9, WHITE));
+            unravel(&mut self.juice.fx, c, 46.0);
+            unravel(&mut self.juice.fx, c + vec2(0.0, 12.0), 34.0);
         }
         if crossed(2.3) {
-            self.audio.play(sfx::Id::Glowbug);
+            self.juice.audio.play(sfx::Id::Glowbug);
             for k in 0..10 {
                 let ang = k as f32 / 10.0 * std::f32::consts::TAU;
                 let mut g = glint(c + vec2(ang.cos() * 40.0, ang.sin() * 26.0), white, 0.7);
                 g.time = -0.05 * k as f32;
-                self.fx.push(g);
+                self.juice.fx.push(g);
             }
-            petals(&mut self.fx, c + vec2(0.0, -20.0), 16, white, 50.0);
+            petals(&mut self.juice.fx, c + vec2(0.0, -20.0), 16, white, 50.0);
         }
     }
 
@@ -2616,17 +2695,17 @@ impl World {
             };
             k.hp -= dmg;
             k.shake = 0.35;
-            self.feel.add_hitstop(s.hitstop.min(0.08));
-            self.fx.push(ring(k.pos, 3.0, 12.0, 0.15, WHITE));
+            self.juice.feel.add_hitstop(s.hitstop.min(0.08));
+            self.juice.fx.push(ring(k.pos, 3.0, 12.0, 0.15, WHITE));
             spray(
-                &mut self.fx,
+                &mut self.juice.fx,
                 k.pos,
                 s.shape_dir_or(self.player.facing),
                 4,
                 THREAD,
                 120.0,
             );
-            self.audio.play(sfx::Id::EnemyHit);
+            self.juice.audio.play(sfx::Id::EnemyHit);
             if k.hp <= 0 {
                 k.cut = true;
                 cut_now = Some(i);
@@ -2635,14 +2714,14 @@ impl World {
         if let Some(i) = cut_now {
             let at = d.knots[i].pos;
             let n = d.cut_count();
-            self.audio.play(sfx::Id::Unbind);
-            self.feel.add_trauma(0.35);
-            self.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
-            self.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
-            unravel(&mut self.fx, at, 14.0);
-            unravel(&mut self.fx, at, 22.0);
+            self.juice.audio.play(sfx::Id::Unbind);
+            self.juice.feel.add_trauma(0.35);
+            self.juice.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
+            self.juice.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
+            unravel(&mut self.juice.fx, at, 14.0);
+            unravel(&mut self.juice.fx, at, 22.0);
             // 할매의 한마디(0162): 첫 매듭, 둘째 매듭.
-            self.toast = Some((
+            self.juice.toast = Some((
                 match n {
                     1 => |s| s.deep_k1,
                     2 => |s| s.deep_k2,
@@ -2962,13 +3041,13 @@ mod tests {
         let mut w = World::new();
         let at = w.player.pos + vec2(0.0, -60.0);
         w.thump_at(at);
-        assert_eq!(w.waves.len(), 1);
+        assert_eq!(w.hazards.waves.len(), 1);
         assert_eq!(w.room.webs.len(), t::CLOVER_WAVE_WEBS, "실 그물이 떨어진다");
-        assert!(w.audio.played(sfx::Id::Impact));
+        assert!(w.juice.audio.played(sfx::Id::Impact));
         // 고치: 튕기고 한마디.
         let c = w.player.pos + vec2(20.0, 0.0);
-        w.cocoons.push(c);
-        w.toast = None;
+        w.hazards.cocoons.push(c);
+        w.juice.toast = None;
         w.cocoon_hit(&Strike {
             id: 7,
             kind: StrikeKind::Claw(0),
@@ -2981,8 +3060,8 @@ mod tests {
             finisher: false,
             poison: 0.0,
         });
-        assert!(w.toast.is_some(), "고치는 때릴 수 없다");
-        assert!(w.audio.played(sfx::Id::WallHit));
+        assert!(w.juice.toast.is_some(), "고치는 때릴 수 없다");
+        assert!(w.juice.audio.played(sfx::Id::WallHit));
         // 실 한 가닥: 줄 위에 서 있으면 끌려간다.
         let mut e = Enemy::new(Kind::Clover, at);
         e.hp = 10;
@@ -2993,7 +3072,7 @@ mod tests {
             "토끼풀 쪽(위)으로 끌려간다 {:?}",
             w.player.vel
         );
-        assert!(w.thread_lash.is_some());
+        assert!(w.hazards.thread_lash.is_some());
         // 받아치면 토끼풀이 멈칫.
         w.player.vel = Vec2::ZERO;
         w.player.open_parry_for_test(vec2(0.0, -1.0));
@@ -3009,7 +3088,7 @@ mod tests {
             "받아치기 {:?}",
             w.enemies[i].state
         );
-        assert!(w.audio.played(sfx::Id::Parry));
+        assert!(w.juice.audio.played(sfx::Id::Parry));
     }
 
     /// 흰 실 그물(0165): 그물 위를 걸으면 느리고(처음엔 한마디), 땅속은 안 걸리고, 발톱이 닿으면 끊긴다.
@@ -3027,7 +3106,7 @@ mod tests {
         let y0 = w.player.pos.y;
         w.web_tick();
         assert!(w.player.slow, "그물 위에서 느리다");
-        assert!(w.toast.is_some(), "처음엔 한마디");
+        assert!(w.juice.toast.is_some(), "처음엔 한마디");
         w.player.update(&walk, &room, t::TICK_DT);
         let slowed = y0 - w.player.pos.y;
         // 땅속은 안 걸린다.
@@ -3049,7 +3128,7 @@ mod tests {
             poison: 0.0,
         });
         assert!(w.room.webs.is_empty(), "발톱이 그물을 끊는다");
-        assert!(w.audio.played(sfx::Id::Unbind));
+        assert!(w.juice.audio.played(sfx::Id::Unbind));
         w.web_tick();
         let y1 = w.player.pos.y;
         w.player.update(&walk, &room, t::TICK_DT);
@@ -3149,12 +3228,15 @@ mod tests {
         }
         assert!(w.adv.events.contains(&AdvEvent::DeepDone));
         assert!(
-            w.audio.count(sfx::Id::Unbind) >= 3,
+            w.juice.audio.count(sfx::Id::Unbind) >= 3,
             "놓아주기: 매듭 셋 + 할매의 실이 풀리는 소리가 더 난다(0163) {:?}",
-            w.audio
+            w.juice.audio
         );
         assert!(
-            w.fx.iter().any(|f| matches!(f.kind, FxKind::Petal { .. })),
+            w.juice
+                .fx
+                .iter()
+                .any(|f| matches!(f.kind, FxKind::Petal { .. })),
             "흰 꽃잎"
         );
     }
@@ -3174,7 +3256,7 @@ mod tests {
         w.player.pos = c + vec2(60.0 + t::SPRING_RADIUS - 1.0, 0.0);
         assert!(w.spring_tick(), "발을 담그면 회복");
         assert_eq!(w.player.hp, w.player.stats.max_hp);
-        assert_eq!(w.springs, 1);
+        assert_eq!(w.stats.springs, 1);
         assert!(w.spring.unwrap().drunk);
         w.player.hp = 1;
         assert!(!w.spring_tick(), "한 번만");
@@ -3207,21 +3289,25 @@ mod tests {
             },
         };
         let mut w = World::new();
-        w.effects = 0.5;
-        w.fx.extend((0..10).map(|i| dust(i as f32)));
-        w.fx.push(ring);
+        w.juice.effects = 0.5;
+        w.juice.fx.extend((0..10).map(|i| dust(i as f32)));
+        w.juice.fx.push(ring);
         w.thin_fx();
-        assert_eq!(w.fx.len(), 6, "먼지 열 중 다섯 + 고리");
-        assert!(w.fx.iter().any(|f| matches!(f.kind, FxKind::Ring { .. })));
+        assert_eq!(w.juice.fx.len(), 6, "먼지 열 중 다섯 + 고리");
+        assert!(w
+            .juice
+            .fx
+            .iter()
+            .any(|f| matches!(f.kind, FxKind::Ring { .. })));
         // 이미 거른 것은 그대로, 새로 붙은 것만 거른다.
-        w.fx.extend((0..4).map(|i| dust(i as f32)));
+        w.juice.fx.extend((0..4).map(|i| dust(i as f32)));
         w.thin_fx();
-        assert_eq!(w.fx.len(), 8);
+        assert_eq!(w.juice.fx.len(), 8);
         // 0이면 장식은 하나도 남지 않는다.
-        w.effects = 0.0;
-        w.fx.extend((0..5).map(|i| dust(i as f32)));
+        w.juice.effects = 0.0;
+        w.juice.fx.extend((0..5).map(|i| dust(i as f32)));
         w.thin_fx();
-        assert_eq!(w.fx.len(), 8);
+        assert_eq!(w.juice.fx.len(), 8);
     }
 
     /// 혀 줄 맞기(0146): 선분까지 거리.

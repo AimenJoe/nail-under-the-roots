@@ -300,7 +300,7 @@ pub fn build(s: Scenario) -> World {
         }
         Scenario::LastCamp | Scenario::Deepest => {
             let mut w = World::camp_start(crate::tuning::FINAL_STAGE);
-            w.seeds = 40;
+            w.inv.seeds = 40;
             w.adv.events.clear();
             w
         }
@@ -312,17 +312,17 @@ pub fn build(s: Scenario) -> World {
                 _ => 1,
             };
             let mut w = World::camp_start(stage);
-            w.seeds = 40;
+            w.inv.seeds = 40;
             w.adv.events.clear();
             if let Scenario::Momo(wins) = s {
-                w.momo_fight = true;
-                w.momo_wins = wins;
+                w.story.momo_fight = true;
+                w.story.momo_wins = wins;
             }
-            w.doto_fight = doto;
-            w.kongi_fight = s == Scenario::Kongi;
+            w.story.doto_fight = doto;
+            w.story.kongi_fight = s == Scenario::Kongi;
             if s == Scenario::Clover {
-                w.clover_fight = true;
-                w.warren_open = true;
+                w.story.clover_fight = true;
+                w.story.warren_open = true;
                 w.reroll_route();
                 w.enter_route_warren_now();
             } else {
@@ -344,7 +344,7 @@ pub fn build(s: Scenario) -> World {
         }
         Scenario::Camp2 => {
             let mut w = World::camp_start(2);
-            w.seeds = 40;
+            w.inv.seeds = 40;
             w.adv.events.clear();
             w
         }
@@ -392,7 +392,7 @@ pub fn build(s: Scenario) -> World {
         }
         Scenario::Camp => {
             let mut w = World::camp_start(1);
-            w.seeds = 40;
+            w.inv.seeds = 40;
             // 첫 쉼터 안내 컷씬은 건너뛴다(바로 확인).
             w.adv.events.clear();
             w
@@ -416,8 +416,8 @@ pub fn build(s: Scenario) -> World {
         Scenario::AllClaws => World::new(),
         Scenario::Gear => {
             let mut w = build(Scenario::Chargers(2));
-            w.bag.berries = 3;
-            w.bag.worms = 2;
+            w.inv.bag.berries = 3;
+            w.inv.bag.worms = 2;
             w.player.sp = crate::tuning::SP_MAX;
             w.player.hp = 3;
             w.loot.push(Loot::place(
@@ -546,7 +546,7 @@ mod tests {
         let mut w = build(Scenario::Chargers(1));
         w.player.armed = true;
         let mut tick = 0;
-        while tick < 60 * 20 && w.kills == 0 && w.player.is_alive() {
+        while tick < 60 * 20 && w.stats.kills == 0 && w.player.is_alive() {
             let target = w
                 .enemies
                 .iter()
@@ -572,9 +572,10 @@ mod tests {
             w.tick(&a);
             tick += 1;
         }
-        assert!(w.kills >= 1, "{}틱 안에 들쥐를 쓰러뜨린다", tick);
+        assert!(w.stats.kills >= 1, "{}틱 안에 들쥐를 쓰러뜨린다", tick);
         assert!(
-            w.audio.played(crate::sfx::Id::EnemyHit) || w.audio.played(crate::sfx::Id::EnemyDie)
+            w.juice.audio.played(crate::sfx::Id::EnemyHit)
+                || w.juice.audio.played(crate::sfx::Id::EnemyDie)
         );
         assert!(w.time >= t::TICK_DT);
     }

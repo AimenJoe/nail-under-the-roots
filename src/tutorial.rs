@@ -160,39 +160,39 @@ impl Tutorial {
                 }
             }
             Stage::Attack => {
-                if w.finisher_hits > self.base {
+                if w.stats.finisher_hits > self.base {
                     // 허수아비는 강공격 연습까지 쓴다(0161).
                     self.say(&[(|s| s.popo_heavy, Face::Happy, Some(Act::Attack))]);
-                    self.enter(Stage::Heavy, w.heavy_hits);
+                    self.enter(Stage::Heavy, w.stats.heavy_hits);
                 }
             }
             Stage::Heavy => {
-                if w.heavy_hits > self.base {
+                if w.stats.heavy_hits > self.base {
                     // 허수아비는 역할을 다했다.
                     clear_kind(w, Kind::Dummy);
                     let p = spot(w, 2);
                     w.spawn_enemy(Kind::Chipmunk, p);
                     self.say(&[(|s| s.popo_burrow, Face::Normal, Some(Act::Dodge))]);
-                    self.enter(Stage::Burrow, w.burrows);
+                    self.enter(Stage::Burrow, w.stats.burrows);
                 }
             }
             Stage::Burrow => {
-                if w.burrows > self.base {
+                if w.stats.burrows > self.base {
                     self.ensure_chipmunk(w);
                     self.say(&[(|s| s.popo_emerge, Face::Normal, Some(Act::Dodge))]);
-                    self.enter(Stage::Emerge, w.emerge_hits);
+                    self.enter(Stage::Emerge, w.stats.emerge_hits);
                 }
             }
             Stage::Emerge => {
-                if w.emerge_hits > self.base {
+                if w.stats.emerge_hits > self.base {
                     self.ensure_chipmunk(w);
                     self.say(&[(|s| s.popo_parry, Face::Happy, Some(Act::Attack))]);
-                    self.enter(Stage::Parry, w.parries);
+                    self.enter(Stage::Parry, w.stats.parries);
                 }
             }
             Stage::Parry => {
                 self.ensure_chipmunk(w);
-                let done = w.parries > self.base;
+                let done = w.stats.parries > self.base;
                 if done || self.t > PARRY_GIVE_UP {
                     if !done {
                         self.say(&[(|s| s.popo_parry_skip, Face::Normal, None)]);
@@ -205,44 +205,44 @@ impl Tutorial {
                     w.spawn_enemy(Kind::Dummy, a);
                     w.spawn_enemy(Kind::Dummy, b);
                     self.say(&[(|s| s.popo_special, Face::Happy, Some(Act::Special))]);
-                    self.enter(Stage::Special, w.drills);
+                    self.enter(Stage::Special, w.stats.drills);
                 }
             }
             Stage::Special => {
-                let finished = w.drills > self.base
+                let finished = w.stats.drills > self.base
                     && !matches!(w.player.state, crate::player::State::Drill { .. });
                 if finished {
                     clear_kind(w, Kind::Dummy);
                     if w.player.hp >= w.player.stats.max_hp {
                         w.player.hp = w.player.stats.max_hp - 1;
                     }
-                    if w.bag.count(Consumable::Berry) == 0 {
-                        w.bag.add(Consumable::Berry);
+                    if w.inv.bag.count(Consumable::Berry) == 0 {
+                        w.inv.bag.add(Consumable::Berry);
                     }
-                    w.bag.selected = Consumable::Berry;
+                    w.inv.bag.selected = Consumable::Berry;
                     self.say(&[(|s| s.popo_item, Face::Normal, Some(Act::UseItem))]);
-                    self.enter(Stage::Item, w.items_used);
+                    self.enter(Stage::Item, w.stats.items_used);
                 }
                 // 필살기를 아직 안 썼는데 게이지가 비었으면(다른 데 써 버림) 다시 채운다.
-                if w.drills == self.base && w.player.sp < crate::tuning::SP_MAX {
+                if w.stats.drills == self.base && w.player.sp < crate::tuning::SP_MAX {
                     w.player.sp = crate::tuning::SP_MAX;
                 }
             }
             Stage::Item => {
                 // 연습 동안은 맞지 않으니, 저장 지점(시작 자리 곁)·뿌리 심장으로 체력이 가득 차면 먹을 수 없어
                 // 이 단계에서 영영 막혔다(사장 2026-10-26, 0093). 먹기 전까지 한 칸 비워 두고 산딸기를 둔다.
-                if w.items_used == self.base {
+                if w.stats.items_used == self.base {
                     if w.player.hp >= w.player.stats.max_hp {
                         w.player.hp = w.player.stats.max_hp - 1;
                     }
-                    if w.bag.count(Consumable::Berry) == 0 {
-                        w.bag.add(Consumable::Berry);
+                    if w.inv.bag.count(Consumable::Berry) == 0 {
+                        w.inv.bag.add(Consumable::Berry);
                     }
-                    if w.bag.count(w.bag.selected) == 0 {
-                        w.bag.selected = Consumable::Berry;
+                    if w.inv.bag.count(w.inv.bag.selected) == 0 {
+                        w.inv.bag.selected = Consumable::Berry;
                     }
                 }
-                if w.items_used > self.base {
+                if w.stats.items_used > self.base {
                     self.say(&[
                         (|s| s.popo_item2, Face::Normal, None),
                         (|s| s.popo_menu, Face::Normal, Some(Act::Map)),
@@ -284,7 +284,7 @@ impl Tutorial {
     fn enter_attack(&mut self, w: &mut World) {
         spawn_dummy(w);
         self.say(&[(|s| s.popo_combo, Face::Happy, Some(Act::Attack))]);
-        self.enter(Stage::Attack, w.finisher_hits);
+        self.enter(Stage::Attack, w.stats.finisher_hits);
     }
 
     fn say(&mut self, lines: &[Line]) {
@@ -369,36 +369,36 @@ mod tests {
         // 개발 월드는 처음부터 무기가 있어 줍기를 건너뛴다.
         assert_eq!(tu.stage, Stage::Attack);
         assert!(!tu.take_talk().is_empty());
-        w.finisher_hits += 1;
+        w.stats.finisher_hits += 1;
         tu.update(&mut w, 0.1);
         assert_eq!(tu.stage, Stage::Heavy, "3연타 뒤 강공격(0161)");
         assert!(tu.hint().unwrap().starts_with("[4/10]"));
-        w.heavy_hits += 1;
+        w.stats.heavy_hits += 1;
         tu.update(&mut w, 0.1);
         assert_eq!(tu.stage, Stage::Burrow);
-        w.burrows += 1;
+        w.stats.burrows += 1;
         tu.update(&mut w, 0.1);
-        w.emerge_hits += 1;
+        w.stats.emerge_hits += 1;
         tu.update(&mut w, 0.1);
         assert_eq!(tu.stage, Stage::Parry);
         // 패링을 못 해도 시간이 지나면 넘어간다.
         tu.update(&mut w, PARRY_GIVE_UP + 1.0);
         assert_eq!(tu.stage, Stage::Special);
         assert!(w.player.sp_full(), "필살기 단계는 게이지를 채워 준다");
-        w.drills += 1;
+        w.stats.drills += 1;
         tu.update(&mut w, 0.1);
         assert_eq!(tu.stage, Stage::Item);
-        assert!(w.bag.count(Consumable::Berry) > 0);
+        assert!(w.inv.bag.count(Consumable::Berry) > 0);
         // 저장 지점에서 체력이 가득 차고 산딸기를 잃어도 다시 먹을 수 있게 된다(0093).
         w.player.hp = w.player.stats.max_hp;
-        w.bag.take(Consumable::Berry);
+        w.inv.bag.take(Consumable::Berry);
         tu.update(&mut w, 0.1);
         assert!(
             w.player.hp < w.player.stats.max_hp,
             "먹을 수 있게 한 칸 비운다"
         );
-        assert!(w.bag.count(Consumable::Berry) > 0, "산딸기를 다시 둔다");
-        w.items_used += 1;
+        assert!(w.inv.bag.count(Consumable::Berry) > 0, "산딸기를 다시 둔다");
+        w.stats.items_used += 1;
         tu.update(&mut w, 0.1);
         tu.update(&mut w, 3.5);
         assert!(tu.is_done());

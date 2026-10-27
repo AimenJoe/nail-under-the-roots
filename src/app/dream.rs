@@ -89,7 +89,7 @@ impl App {
         *run = DreamRun::new(row);
         self.world.dream = true;
         self.spawn_dream_boss();
-        self.world.toast = Some((|s| s.toast_dream_in, 2.0));
+        self.world.juice.toast = Some((|s| s.toast_dream_in, 2.0));
     }
 
     fn spawn_dream_boss(&mut self) {
@@ -101,9 +101,9 @@ impl App {
         let c = w.room.center();
         w.enemies.clear();
         w.projectiles.clear();
-        w.mines.clear();
-        w.clouds.clear();
-        w.rocks.clear();
+        w.hazards.mines.clear();
+        w.hazards.clouds.clear();
+        w.hazards.rocks.clear();
         w.loot.clear();
         let mut e = Enemy::new(k, c - vec2(0.0, 30.0));
         e.wake_delay = 1.0;
@@ -151,14 +151,14 @@ impl App {
         }
         // 보스가 쓰러졌다(대장이 부른 생쥐가 남았으면 같이 흩어진다).
         self.world.enemies.clear();
-        self.world.mines.clear();
-        self.world.clouds.clear();
-        self.world.rocks.clear();
+        self.world.hazards.mines.clear();
+        self.world.hazards.clouds.clear();
+        self.world.hazards.rocks.clear();
         if run.at + 1 < run.queue.len() {
             run.at += 1;
             let heal = dream::RUSH_HEAL;
             self.world.player.heal(heal);
-            self.world.toast = Some((|s| s.toast_dream_next, 2.0));
+            self.world.juice.toast = Some((|s| s.toast_dream_next, 2.0));
             self.spawn_dream_boss();
             return;
         }
@@ -167,7 +167,7 @@ impl App {
         let best = dream::record(&mut self.profile, row, secs, clean);
         crate::profile::save(&self.profile);
         self.sfx.play(crate::sfx::Id::Heal);
-        self.world.toast = Some((
+        self.world.juice.toast = Some((
             if best {
                 |s| s.toast_dream_best
             } else {
@@ -184,7 +184,7 @@ impl App {
         self.dream = None;
         self.start(Scenario::Village);
         if !won {
-            self.world.toast = Some((|s| s.toast_dream_wake, 2.5));
+            self.world.juice.toast = Some((|s| s.toast_dream_wake, 2.5));
         }
         // 할매 곁 실 고리 앞에서 깬다.
         if let Some(at) = self.world.dream_loop() {
