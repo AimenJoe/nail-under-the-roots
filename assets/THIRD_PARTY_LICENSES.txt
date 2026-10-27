@@ -8,9 +8,22 @@ web/macroquad-gamepads-0.1.js: gamepads(fornwall) — MIT OR Apache-2.0 (아래 
 == 폰트 ==
 assets/fonts/Galmuri11-Condensed.ttf — Galmuri, Copyright (c) 2019-2025 Lee Minseo, SIL Open Font License 1.1.
 원문: assets/fonts/OFL.md (예약 폰트 이름 없음. 글리프를 추린 서브셋)
-assets/fonts/NailCJK-ja.ttf, assets/fonts/NailCJK-zh-Hans.ttf — Ark Pixel Font(https://github.com/TakWolf/ark-pixel-font),
+assets/fonts/NailCJK-ja.ttf, NailCJK-zh-Hans.ttf, NailCJK-zh-Hant.ttf — Ark Pixel Font(https://github.com/TakWolf/ark-pixel-font),
   Copyright (c) 2021, TakWolf (https://takwolf.com), SIL Open Font License 1.1. 원문: assets/fonts/OFL-ArkPixel.txt
-  (예약 폰트 이름 없음. 게임에 쓰는 글자만 뽑아 다시 지은 수정본, 이름 Nail CJK 12 JA/SC — tools/fonts/build_cjk.py)
+  (예약 폰트 이름 없음. 게임에 쓰는 글자만 뽑아 다시 지은 수정본, 이름 Nail CJK 12 — tools/fonts/build_cjk.py)
+assets/fonts/NailCJK-zh-Hant.ttf의 한자 일부 — 俐方體11號 Cubic 11(https://github.com/ACh-K/Cubic-11), SIL Open Font License 1.1.
+  JF Dot M+H 12(Copyright (c) 2005 M+ FONTS PROJECT)·M+ BITMAP FONTS(Copyright (C) 2002-2004 COZ)에서 나왔다.
+  원문과 원 고지: assets/fonts/OFL-Cubic11.txt (예약 폰트 이름 없음)
+
+== 소리·음악 (CC0 1.0 — 표기 의무 없음, 고마움으로 적는다) ==
+효과음: Kenney (www.kenney.nl) — Interface Sounds, Impact Sounds, RPG Audio
+음악: Aureolus_Omicron — 15 Melodic RPG Chiptunes (OpenGameArt)
+음악: Music by Cleyton Kauffman - https://soundcloud.com/cleytonkauffman — Prologue Theme (OpenGameArt)
+음악: fluffclipse — Lovely town (OpenGameArt)
+음악: Music by Kistol — Snowfall (OpenGameArt)
+
+== 그림 ==
+일부 타일·장식: Sunnyside World by danieldiggle (https://danieldiggle.itch.io/sunnyside) — 작가 라이선스(크레딧 의무 없음)
 
 == Rust 크레이트 ==
 ------------------------------------------------------------------------
