@@ -2,11 +2,12 @@
 
 use super::*;
 
-pub(super) const SETTING_ROWS: [Tr; 10] = [
+pub(super) const SETTING_ROWS: [Tr; 11] = [
     |s| s.set_sound,
     |s| s.set_music,
     |s| s.set_shake,
     |s| s.set_effects,
+    |s| s.set_tells,
     |s| s.set_debug,
     |s| s.set_language,
     |s| s.set_assist,
@@ -15,10 +16,10 @@ pub(super) const SETTING_ROWS: [Tr; 10] = [
     |s| s.set_back,
 ];
 /// 설정의 "포포의 응원"·"조작 설정"·"기록 지우기"·"돌아가기" 줄.
-pub(super) const SETTING_ASSIST: usize = 6;
-pub(super) const SETTING_CONTROLS: usize = 7;
-pub(super) const SETTING_ERASE: usize = 8;
-pub(super) const SETTING_BACK: usize = 9;
+pub(super) const SETTING_ASSIST: usize = 7;
+pub(super) const SETTING_CONTROLS: usize = 8;
+pub(super) const SETTING_ERASE: usize = 9;
+pub(super) const SETTING_BACK: usize = 10;
 /// 설정 창에 한 번에 보이는 줄. 줄이 더 많으면 고른 줄이 보이게 굴린다(입자 줄을 더해 열 줄이 됐다, 0141).
 pub(super) const SETTING_VISIBLE: usize = 9;
 /// 값이 아니라 누르는 줄(좌우로 바뀌지 않는다).
@@ -48,6 +49,8 @@ pub struct Settings {
     pub shake: u8,
     /// 입자 효과(0..=10, 0141). 0이면 먼지·불똥·환경 입자를 그리지 않는다(공격 범위 고리는 남긴다).
     pub effects: u8,
+    /// 공격 예고 진하기(1..=10, 0198). 7이 0196·0197의 투명도, 기본 5.
+    pub tells: u8,
     pub debug_overlay: bool,
     /// 사람이 고른 언어(None = 기기 언어).
     pub lang: Option<i18n::Lang>,
@@ -62,6 +65,10 @@ impl Settings {
     }
     pub(super) fn effects_f(&self) -> f32 {
         self.effects as f32 / 10.0
+    }
+    /// 예고 잉크 투명도 배율(7 = 1).
+    pub(super) fn tells_f(&self) -> f32 {
+        self.tells as f32 / 7.0
     }
 }
 
@@ -79,11 +86,13 @@ impl App {
             }
             2 => self.settings.shake = (self.settings.shake as i8 + d).clamp(0, 10) as u8,
             3 => self.settings.effects = (self.settings.effects as i8 + d).clamp(0, 10) as u8,
-            4 => {
+            // 0은 두지 않는다: 예고는 놀이 정보라 아예 끄지는 못한다.
+            4 => self.settings.tells = (self.settings.tells as i8 + d).clamp(1, 10) as u8,
+            5 => {
                 self.settings.debug_overlay = !self.settings.debug_overlay;
                 self.world.debug.overlay = self.settings.debug_overlay;
             }
-            5 => {
+            6 => {
                 let l = i18n::lang().cycle(d);
                 i18n::set_lang(l);
                 self.settings.lang = Some(l);
@@ -106,6 +115,7 @@ impl App {
             music: self.settings.music,
             shake: self.settings.shake,
             effects: self.settings.effects,
+            tells: self.settings.tells,
             lang: self.settings.lang,
             bindings: crate::input::bindings(),
         });
@@ -176,17 +186,28 @@ impl App {
         }
     }
 
+    /// 설정 창에 보이는 첫 줄: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
+    pub(super) fn settings_first(&self) -> usize {
+        let n = SETTING_ROWS.len();
+        self.settings_cursor
+            .saturating_sub(SETTING_VISIBLE - 1)
+            .min(n.saturating_sub(SETTING_VISIBLE))
+    }
+
     pub(super) fn draw_settings(&mut self, ui: &Ui) {
         // 창을 위로 붙이고 줄 간격을 1px 줄여 아래 안내 두 줄 자리를 남긴다(0081). 열 줄이 되어 아홉 줄만 보이고 굴린다(0141).
         let panel = Rect::new(56.0, 0.0, 208.0, 155.0);
         let s = i18n::s();
         ui.panel(panel, Some(s.settings));
+        // 터치로도 나갈 수 있게 닫기 단추(0198): 돌아가기 줄이 가려져 있으면 손가락만으로는 나갈 길이 없었다.
+        self.close_button(ui, panel);
         let assist = self.assist_resist();
         let values = [
             format!("{}%", self.settings.volume * 10),
             format!("{}%", self.settings.music * 10),
             format!("{}%", self.settings.shake * 10),
             format!("{}%", self.settings.effects * 10),
+            format!("{}%", self.settings.tells * 10),
             if self.settings.debug_overlay {
                 s.on
             } else {
@@ -207,10 +228,7 @@ impl App {
         let row_h = FONT_PX + 3.0;
         // 줄이 창보다 많다: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
         let n = SETTING_ROWS.len();
-        let first = self
-            .settings_cursor
-            .saturating_sub(SETTING_VISIBLE - 1)
-            .min(n.saturating_sub(SETTING_VISIBLE));
+        let first = self.settings_first();
         for (i, label) in trs(&SETTING_ROWS)
             .into_iter()
             .enumerate()
@@ -254,24 +272,22 @@ impl App {
                 self.hits.push((row, Hit::SettingRow(i)));
             }
         }
-        // 가려진 줄이 있으면 위·아래 끝에 표시.
+        // 가려진 줄이 있으면 위·아래 끝에 표시. 누르면 그쪽으로 한 줄 굴린다(터치, 0198). ▲는 닫기 단추 옆.
         if first > 0 {
-            ui.text(
-                "▲",
-                panel.right() - 14.0,
-                panel.y + 4.0,
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
+            let at = vec2(panel.right() - 30.0, panel.y + 4.0);
+            ui.text("▲", at.x, at.y, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(at.x - 5.0, at.y - 4.0, 18.0, 18.0),
+                Hit::SettingScroll(-1),
+            ));
         }
         if first + SETTING_VISIBLE < n {
-            ui.text(
-                "▼",
-                panel.right() - 14.0,
-                panel.bottom() - 13.0,
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
+            let at = vec2(panel.right() - 14.0, panel.bottom() - 13.0);
+            ui.text("▼", at.x, at.y, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(at.x - 5.0, at.y - 4.0, 18.0, 18.0),
+                Hit::SettingScroll(1),
+            ));
         }
         let settings_hint = vfill(s.settings_hint, &[Verb::Change]);
         for (i, l) in ui::wrap(ui, &settings_hint, 300.0, FONT_PX)

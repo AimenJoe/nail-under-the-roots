@@ -495,6 +495,8 @@ pub struct Juice {
     /// 입자 효과 설정(0..=1, 0141). 1보다 작으면 새로 생긴 장식 효과(먼지·흙덩이·불똥·반짝임·실)를 그 비율만 남긴다.
     /// 공격 범위를 보여 주는 고리(Ring)는 놀이 정보라 늘 남긴다.
     pub effects: f32,
+    /// 공격 예고 진하기(설정, 0198): 잉크 투명도에 곱한다. 1 = 0196·0197의 값(설정 70%), 기본 설정 50%는 약 0.71.
+    pub tells: f32,
     /// `fx` 앞에서부터 이미 남길지 정한 개수(새 효과는 늘 뒤에 붙는다). 줄이는 몫의 누적값.
     fx_checked: usize,
     fx_acc: f32,
@@ -592,6 +594,7 @@ impl Default for Juice {
             feel: Feel::default(),
             fx: Vec::new(),
             effects: 1.0,
+            tells: 1.0,
             fx_checked: 0,
             fx_acc: 0.0,
             audio: sfx::Queue::default(),

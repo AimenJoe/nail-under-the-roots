@@ -3,7 +3,7 @@
 //! 줄 하나로 적는다(0175. 전엔 저장하지 않아 켤 때마다 기본값이었다 — 사장: "업데이트하면 언어가 사라진다").
 //!
 //! 칸: 0 표식(MAGIC), 1 소리+1, 2 흔들림+1, 3 언어(0 = 기기 언어), 4..11 키 번호+1, 11..18 패드 번호+1,
-//! 18 음악+1(0081), 19 입자 효과+1(0141). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
+//! 18 음악+1(0081), 19 입자 효과+1(0141), 20 공격 예고 진하기+1(0198). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
 //! 0은 "없음"(플러그인이 없거나 저장 전). 표식이 다르면 통째로 무시한다(형식이 바뀌면 MAGIC을 올린다).
 
 use crate::i18n::Lang;
@@ -11,7 +11,9 @@ use crate::input::Bindings;
 
 const MAGIC: u32 = 0x4E41_0001;
 /// 저장 칸 수.
-const CELLS: usize = 20;
+const CELLS: usize = 21;
+/// 공격 예고 진하기 기본값(1..=10, 0198).
+pub const TELLS_DEFAULT: u8 = 5;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Prefs {
@@ -20,6 +22,8 @@ pub struct Prefs {
     pub shake: u8,
     /// 입자 효과(0..=10, 0141). 접근성: 먼지·불똥·환경 입자를 줄인다.
     pub effects: u8,
+    /// 공격 예고 진하기(1..=10, 0198).
+    pub tells: u8,
     /// None = 기기 언어를 따른다.
     pub lang: Option<Lang>,
     pub bindings: Bindings,
@@ -70,6 +74,7 @@ fn encode(p: &Prefs) -> [u32; CELLS] {
     v[3] = p.lang.map(lang_code).unwrap_or(0);
     v[18] = p.music as u32 + 1;
     v[19] = p.effects as u32 + 1;
+    v[20] = p.tells as u32 + 1;
     for i in 0..7 {
         v[4 + i] = p.bindings.keys[i] as u32 + 1;
         v[11 + i] = p.bindings.pads[i] as u32 + 1;
@@ -100,6 +105,12 @@ fn decode(v: &[u32; CELLS]) -> Option<Prefs> {
             10
         } else {
             (v[19] - 1).min(10) as u8
+        },
+        // 예고 칸이 없던 옛 저장(0)은 기본값.
+        tells: if v[20] == 0 {
+            TELLS_DEFAULT
+        } else {
+            (v[20] - 1).clamp(1, 10) as u8
         },
         lang: lang_from(v[3]),
         bindings: b.sanitized(),
@@ -214,6 +225,7 @@ mod tests {
             music: 2,
             shake: 0,
             effects: 5,
+            tells: 3,
             lang: Some(Lang::Pl),
             bindings: Bindings::DEFAULT,
         };
@@ -252,7 +264,9 @@ mod tests {
         assert_eq!(p.bindings.keys[0], 7);
         assert_eq!(p.bindings.keys[1..], Bindings::DEFAULT.keys[1..]);
         assert_eq!(p.bindings.pads, Bindings::DEFAULT.pads);
-        assert_eq!(encode(&p), v);
+        // 예고 칸(20, 0198)은 v0.3에 없었다: 기본값으로 읽고, 다시 쓰면 그 칸만 채워진다.
+        assert_eq!(p.tells, TELLS_DEFAULT);
+        assert_eq!(encode(&p)[..20], v[..20]);
         // 음악(0081)·입자(0141) 칸이 없던 옛 저장: 0은 기본값 7·10.
         v[18] = 0;
         v[19] = 0;
@@ -272,6 +286,7 @@ mod tests {
             music: 9,
             shake: 0,
             effects: 4,
+            tells: 9,
             lang: Some(Lang::Ja),
             bindings: b,
         };
@@ -285,6 +300,10 @@ mod tests {
         let mut old = encode(&p);
         old[19] = 0;
         assert_eq!(decode(&old).map(|q| q.effects), Some(10));
+        // 예고 칸이 생기기 전 저장(0198): 기본값.
+        let mut old = encode(&p);
+        old[20] = 0;
+        assert_eq!(decode(&old).map(|q| q.tells), Some(TELLS_DEFAULT));
         let mut v = encode(&p);
         v[0] = 1;
         assert_eq!(decode(&v), None, "표식이 다르면 무시");

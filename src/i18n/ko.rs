@@ -31,6 +31,7 @@ pub static KO: Strings = Strings {
     set_music: "음악",
     set_shake: "화면 흔들림",
     set_effects: "입자 효과",
+    set_tells: "공격 예고",
     set_debug: "디버그 정보",
     set_language: "언어",
     set_back: "돌아가기",

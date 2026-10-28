@@ -431,6 +431,7 @@ strings! {
     // 플레이어블 도토(0195)
     pick_doto, stat_leap_cd, toast_shell_doto, toast_thorn_doto, toast_web_doto, gauge_acorn, w_acorn, w_acorn_desc, tal_leap, tal_leap_a, tal_leap_a_desc, tal_leap_b, tal_leap_b_desc, tal_bury, tal_bury_a, tal_bury_a_desc, tal_bury_b, tal_bury_b_desc,
     c_pinecone, c_pinecone_desc, c_acorn_cap, c_acorn_cap_desc, c_maple, c_maple_desc, jg_doto_deep, jg_doto_deep_d,
+    set_tells,
 }
 
 #[cfg(test)]

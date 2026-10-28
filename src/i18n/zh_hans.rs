@@ -31,6 +31,7 @@ pub static ZH_HANS: Strings = Strings {
     set_music: "音乐",
     set_shake: "画面震动",
     set_effects: "粒子效果",
+    set_tells: "敌人的预告",
     set_debug: "调试信息",
     set_language: "语言",
     set_back: "返回",

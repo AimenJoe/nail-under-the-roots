@@ -26,20 +26,54 @@ pub(super) fn draw_super_dim(w: &World, cam: Vec2) -> bool {
 pub(super) fn draw_left_petal(at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round());
     let bob = ((time * 1.4).sin() * 0.5).round();
+    // 꽃밭 한가운데라 꽃과 섞였다(사장, 0198): 숨 쉬듯 밝아지는 옅은 빛 자리 위에, 둘레 꽃보다 큰 꽃잎 + 어두운
+    // 테두리 — 꽃(무늬)이 아니라 "놓인 물건"으로 읽히게. 시든 빛(회분홍)보다 읽히는 것이 먼저라 조금 밝게 둔다.
+    let breathe = 0.5 + 0.5 * (time * 2.0).sin();
+    draw_ellipse(
+        x,
+        y + 1.0,
+        8.0,
+        4.0,
+        0.0,
+        Color::new(1.0, 0.90, 0.82, 0.10 + 0.14 * breathe),
+    );
+    draw_ellipse(
+        x,
+        y + 1.0,
+        5.0,
+        2.5,
+        0.0,
+        Color::new(1.0, 0.92, 0.86, 0.12 + 0.14 * breathe),
+    );
     draw_ellipse(x, y + 2.0, 4.0, 1.5, 0.0, SHADOW_SOFT);
-    let c = Color::new(0.74, 0.56, 0.60, 1.0);
-    let pink = Color::new(0.98, 0.70, 0.78, 1.0);
-    draw_rectangle(x - 2.0, y - 1.0 + bob, 5.0, 2.0, c);
-    draw_rectangle(x - 1.0, y - 2.0 + bob, 3.0, 1.0, c);
-    draw_rectangle(x - 1.0, y + 1.0 + bob, 2.0, 1.0, c);
-    draw_rectangle(x, y - 1.0 + bob, 1.0, 1.0, pink);
+    let edge = Color::new(0.40, 0.18, 0.26, 1.0);
+    let c = Color::new(0.94, 0.62, 0.72, 1.0);
+    let pink = Color::new(1.0, 0.86, 0.90, 1.0);
+    let y0 = y + bob;
+    // 테두리(한 칸 바깥) → 몸 → 밝은 점.
+    draw_rectangle(x - 3.0, y0 - 1.0, 7.0, 2.0, edge);
+    draw_rectangle(x - 2.0, y0 - 2.0, 5.0, 4.0, edge);
+    draw_rectangle(x - 1.0, y0 - 3.0, 3.0, 1.0, edge);
+    draw_rectangle(x - 1.0, y0 + 2.0, 2.0, 1.0, edge);
+    draw_rectangle(x - 2.0, y0 - 1.0, 5.0, 2.0, c);
+    draw_rectangle(x - 1.0, y0 - 2.0, 3.0, 1.0, c);
+    draw_rectangle(x - 1.0, y0 + 1.0, 2.0, 1.0, c);
+    draw_rectangle(x, y0 - 1.0, 1.0, 1.0, pink);
+    // 반짝임: 1.6초마다 위로 열십자 하나가 피었다 진다(줍는 것들의 반짝임과 같은 말).
+    let k = (time / 1.6).fract();
+    if k < 0.35 {
+        let a = (1.0 - (k / 0.35 - 0.5).abs() * 2.0).clamp(0.0, 1.0);
+        let (gx, gy) = (x + 3.0, y0 - 5.0 - (k * 6.0).round());
+        let col = Color::new(1.0, 0.92, 0.95, a);
+        draw_rectangle(gx, gy - 1.0, 1.0, 3.0, col);
+        draw_rectangle(gx - 1.0, gy, 3.0, 1.0, col);
+    }
     let tw = (time * 2.3).sin();
     if tw > 0.6 {
         let a = (tw - 0.6) / 0.4;
-        draw_rectangle(x + 2.0, y - 4.0, 1.0, 1.0, Color::new(1.0, 0.85, 0.9, a));
         draw_rectangle(
             x - 4.0,
-            y - 2.0,
+            y - 3.0,
             1.0,
             1.0,
             Color::new(1.0, 0.85, 0.9, a * 0.7),
@@ -392,18 +426,22 @@ pub(super) struct TeleInk {
     pub a: f32,
     /// 빈 안쪽.
     pub base_a: f32,
+    /// 가운데 X(0160).
+    pub mark_a: f32,
 }
 /// 밝은 바닥: 짙은 빨강.
 pub(super) const TELE_INK_SHADE: TeleInk = TeleInk {
     rgb: (0.55, 0.10, 0.12),
     a: 0.25,
     base_a: 0.03,
+    mark_a: 0.5,
 };
 /// 어두운 바닥: 원래 빨강(0196, 안내 그림의 어두운 판에도).
 pub(super) const TELE_INK_GLOW: TeleInk = TeleInk {
     rgb: (1.0, 0.32, 0.36),
     a: 0.25,
     base_a: 0.03,
+    mark_a: 0.5,
 };
 thread_local! {
     /// 이번 그리기의 잉크(`draw_telegraphs`가 지대로 정한다). 안내 그림은 원래 빨강.
@@ -420,7 +458,6 @@ pub(super) fn tele_ink_for(b: crate::biome::Biome) -> TeleInk {
 /// 테두리 띠의 폭(px).
 const TELE_RING: f32 = 2.0;
 const TELE_MARK_SHADE: f32 = 0.42;
-const TELE_MARK_A: f32 = 0.5;
 
 /// 테두리(= 다 찬 채움)·바탕의 색.
 fn tele_colors() -> (Color, Color) {
@@ -513,7 +550,8 @@ pub(super) fn draw_tele_disk(at: Vec2, r: f32, k: f32) {
 pub(super) fn draw_no_parry_mark(at: Vec2, edge: Color) {
     let (x, y) = (at.x.round() as i32, at.y.round() as i32);
     let k = TELE_MARK_SHADE;
-    let col = Color::new(edge.r * k, edge.g * k, edge.b * k, TELE_MARK_A);
+    let mark_a = TELE_INK.with(|c| c.get()).mark_a;
+    let col = Color::new(edge.r * k, edge.g * k, edge.b * k, mark_a);
     let mut pts: Vec<(i32, i32)> = Vec::with_capacity(40);
     for d in -4..=4 {
         for (px, py) in [(d, d), (d + 1, d), (d, -d), (d + 1, -d)] {
@@ -541,7 +579,13 @@ fn draw_aim_lane(w: &World, pos: Vec2, facing: Vec2, radius: f32, reach: f32, k:
 /// - 뛰기(웅크림·체공)·포자·발 구르기·돌: 내려앉을·덮을 자리의 원, 체공 중엔 가득.
 pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
     use crate::species::Behavior;
-    TELE_INK.with(|c| c.set(tele_ink_for(w.biome)));
+    // 진하기 설정(0198)은 잉크의 투명도·X에 함께 곱한다 — 테두리와 채움은 계속 같은 투명도.
+    let mut ink = tele_ink_for(w.biome);
+    let k = w.juice.tells.clamp(0.1, 1.6);
+    ink.a *= k;
+    ink.base_a *= k;
+    ink.mark_a *= k;
+    TELE_INK.with(|c| c.set(ink));
     // 무너지는 천장(0147): 떨어질 자리에 그림자가 커지고, 원 안쪽이 진해진다.
     for r in &w.hazards.rocks {
         let k = crate::enemy::tele_progress(r.time, t::ROCK_FALL);

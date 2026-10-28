@@ -31,6 +31,7 @@ pub static FR: Strings = Strings {
     set_music: "Musique",
     set_shake: "Secousse écran",
     set_effects: "Particules",
+    set_tells: "Signes ennemis",
     set_debug: "Infos debug",
     set_language: "Langue",
     set_back: "Retour",
