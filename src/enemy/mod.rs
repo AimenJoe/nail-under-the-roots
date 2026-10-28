@@ -98,6 +98,8 @@ pub enum Struck {
     Deflected,
     /// 맞았다. `dir`은 민 방향. `broke_guard`면 등딱지를 열었다(솟구치기·드릴·강공격, 0168).
     Hit { dir: Vec2, broke_guard: bool },
+    /// 밀치기만 닿았다(0214): 피해·경직 없이 `dir`로 밀렸다.
+    Shoved { dir: Vec2 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -579,6 +581,13 @@ impl Enemy {
             return Struck::Miss;
         }
         self.last_hit_by = s.id;
+        // 회피의 밀치기(0214): 밀기만 — 피해·번쩍·경직이 없어 하던 동작(예고·돌진)은 그대로 이어진다. 보스는 덜 밀린다.
+        if s.kind == StrikeKind::Shove {
+            let dir = (self.pos - origin).normalize_or(facing);
+            let boss = if self.is_boss() { t::SHOVE_BOSS } else { 1.0 };
+            self.vel = dir * s.knockback * self.sp().knock_mul * boss;
+            return Struck::Shoved { dir };
+        }
         // 콩이의 등딱지(0054): 발톱은 튕긴다(패링 거울). 솟구치기(아래 배)·드릴은 뚫고 연다.
         // 강공격은 튕기지 않고 자세를 깬다(0168: 모으기 = 자세 깨기).
         let guarded = self.guarding();
@@ -715,6 +724,36 @@ fn idle_of(b: Behavior) -> State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 회피의 밀치기(0214): 피해·번쩍·경직 없이 밀리기만 하고, 하던 공격 예고는 그대로 이어진다.
+    #[test]
+    fn shove_pushes_without_hurting_or_interrupting() {
+        let mut e = Enemy::new(Kind::FieldMouse, vec2(60.0, 50.0));
+        e.asleep = false;
+        e.state = State::Windup { time: 0.1 };
+        let hp = e.hp;
+        let s = Strike {
+            id: 7,
+            kind: StrikeKind::Shove,
+            shape: crate::combat::Shape::Circle {
+                center: vec2(50.0, 50.0),
+                r: t::SHOVE_RADIUS,
+            },
+            damage: 0,
+            knockback: t::SHOVE_KNOCK,
+            stun: 0.0,
+            hitstop: 0.0,
+            shake: 0.0,
+            finisher: false,
+            poison: 0.0,
+        };
+        let got = e.receive(&s, vec2(50.0, 50.0), vec2(1.0, 0.0));
+        assert!(matches!(got, Struck::Shoved { dir } if dir.x > 0.99));
+        assert_eq!(e.hp, hp);
+        assert_eq!(e.flash, 0.0);
+        assert_eq!(e.state, State::Windup { time: 0.1 }, "예고를 끊지 않는다");
+        assert!(e.vel.x > 0.0, "밀린다");
+    }
 
     /// 공격 예고의 진행(0179): 예고 시작 0, 끝 1, 공격 중·서 있을 때는 없음.
     #[test]

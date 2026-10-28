@@ -772,7 +772,7 @@ pub static ES: Strings = Strings {
     h_heavy: "Golpe fuerte",
     h_heavy_d: "Tras un golpe, mantén atacar y la luz se junta en las garras. Cuando brillen, suelta: un golpe duro que empuja lejos y estampa contra la pared. Suelta justo al brillar para un golpe fuerte perfecto (+1 daño). También abre caparazones y púas.",
     h_burrow: "Excavar y emerger",
-    h_burrow_d: "El botón de excavar te esconde bajo tierra (nada te alcanza). Mantenlo para quedarte abajo y reunir fuerza; suelta para emerger y empujar todo alrededor. Cuanto más tiempo, más amplio. Momo salta en su lugar (en el aire nada la toca).",
+    h_burrow_d: "El botón de excavar te esconde bajo tierra (nada te alcanza). Mantenlo para quedarte abajo y reunir fuerza; suelta para emerger y empujar todo alrededor. Cuanto más tiempo, más amplio. Momo salta en su lugar (en el aire nada la toca y al caer aparta a los cercanos, sin herirlos).",
     h_parry: "Repeler",
     h_parry_d: "Cuando un enemigo carga en línea recta (aviso en franja), ataca justo antes del impacto para repelerlo y dejarlo aturdido. Los enemigos acurrucados (Kongi, erizos) rebotan las garras en su caparazón: ábrelos con un golpe fuerte o emergiendo.",
     h_special: "Especial",
@@ -792,7 +792,7 @@ pub static ES: Strings = Strings {
     h_village: "Aldea, Gran Árbol y diario",
     h_village_d: "Entre bajadas vuelves a la aldea. Despierta talentos en el Gran Árbol con luciérnagas, sube la dificultad con los nudos y vuelve a luchar contra los jefes en los sueños de hilo. Cumplir las metas del diario (menú de pausa) da recompensas.",
     h_doto: "Luchar con Doto",
-    h_doto_d: "Doto lucha de lejos. El ataque lanza bellotas — la tercera en abanico de tres. Mantén y suelta para una bellota grande que estalla al caer. El salto atrás mantiene la mira. Con la barra llena, entierra bellotas delante — estallan pronto y solo dañan a enemigos. La mano que lanza devuelve lo que vuela hacia ti.",
+    h_doto_d: "Doto lucha de lejos. El ataque lanza bellotas — la tercera en abanico de tres. Mantén y suelta para una bellota grande que estalla al caer. El salto atrás aparta a los cercanos y mantiene la mira. Con la barra llena, entierra bellotas delante — estallan pronto y solo dañan a enemigos. La mano que lanza devuelve lo que vuela hacia ti.",
     h_run: "Correr y salto largo",
     h_run_d: "Momo y Doto: mantén el botón de excavar y correrás cuando el salto o el salto atrás aterrice. Al correr, una marca en el suelo delante muestra dónde caerás — apunta y suelta para saltar justo ahí; en el aire nada te alcanza. la marca de Momo se pega a un enemigo delante y ella lo pisotea al caer; Doto lanza tres solo al enemigo más cercano, en el aire. Ataca corriendo para golpear al instante.",
 };

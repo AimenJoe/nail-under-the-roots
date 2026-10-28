@@ -158,6 +158,8 @@ pub enum Event {
     Land(bool),
     /// 모모 깡충 착지 밟기(재주 발 구르기, 0142).
     Stamp,
+    /// 회피의 밀치기(0214): 모모 깡충 착지·도토 뒤로 뛰기 도약.
+    Shove,
     /// 멀리뛰기 착지(0209). `stomp` = 모모의 밟기(둘레 `jump_stomp_radius`).
     JumpLand {
         stomp: bool,

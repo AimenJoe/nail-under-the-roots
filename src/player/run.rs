@@ -159,6 +159,26 @@ impl Player {
             .map(|d| d.normalize())
     }
 
+    /// 회피의 밀치기(0214): 지금 자리 둘레, 피해 없이 밀기만.
+    pub(super) fn shove_strike(&mut self) -> Strike {
+        self.swing_id += 1;
+        Strike {
+            id: self.swing_id,
+            kind: StrikeKind::Shove,
+            shape: Shape::Circle {
+                center: self.pos,
+                r: t::SHOVE_RADIUS,
+            },
+            damage: 0,
+            knockback: t::SHOVE_KNOCK,
+            stun: 0.0,
+            hitstop: 0.0,
+            shake: 0.0,
+            finisher: false,
+            poison: 0.0,
+        }
+    }
+
     /// 모모 멀리뛰기 착지 밟기 반지름(0209). 재주 발 구르기(0142)를 골랐으면 더 넓다. 월드의 고리도 이 값.
     pub fn jump_stomp_radius(&self) -> f32 {
         if self.talents.hop_stamp() {
@@ -394,6 +414,34 @@ mod tests {
         );
         // 도토는 붙지 않는다.
         assert!(!run_and(Character::Doto, vec2(40.0, 0.0)).0 .2);
+    }
+
+    /// 첫 점프의 밀치기(0214): 모모는 깡충 착지 자리, 도토는 뒤로 뛰기 도약 자리 — 피해 0, 둘레 `SHOVE_RADIUS`.
+    #[test]
+    fn first_jump_shoves_without_damage() {
+        let (mut p, room) = player(Character::Momo);
+        p.update(&act(true, false, false), &room, t::TICK_DT);
+        let mut got = None;
+        for _ in 0..40 {
+            if let Some(s) = p.update(&Actions::default(), &room, t::TICK_DT) {
+                got = Some((s, p.pos));
+            }
+        }
+        let (s, at) = got.expect("착지 밀치기");
+        assert_eq!(s.kind, StrikeKind::Shove);
+        assert_eq!(s.damage, 0);
+        assert!(
+            matches!(s.shape, Shape::Circle { center, r } if r == t::SHOVE_RADIUS && (center - at).length() < 0.01)
+        );
+        let (mut p, room) = player(Character::Doto);
+        let from = p.pos;
+        let s = p.update(&act(true, false, false), &room, t::TICK_DT);
+        assert!(s.is_none() && matches!(p.state, State::Leap { .. }));
+        let s = p
+            .update(&Actions::default(), &room, t::TICK_DT)
+            .expect("도약 밀치기");
+        assert_eq!(s.kind, StrikeKind::Shove);
+        assert!(matches!(s.shape, Shape::Circle { center, .. } if (center - from).length() < 0.01));
     }
 
     /// 달리다 공격하면 그 자리에서 1타. Naïl은 달리지 않는다(쥐기는 땅파기).

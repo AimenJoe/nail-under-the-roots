@@ -772,7 +772,7 @@ pub static EN: Strings = Strings {
     h_heavy: "Heavy strike",
     h_heavy_d: "After a swing, keep holding attack and light gathers in your claws. When they glow, release: a hard hit that shoves far, slamming into walls. Release right as they glow for a perfect heavy (+1 damage). It also breaks shells and spines.",
     h_burrow: "Burrow and emerge",
-    h_burrow_d: "The burrow button hides you underground (you can't be hit). Hold it to stay down and gather strength; release to burst up and push everything around you. The longer you hold, the wider. Momo hops instead (untouchable in the air).",
+    h_burrow_d: "The burrow button hides you underground (you can't be hit). Hold it to stay down and gather strength; release to burst up and push everything around you. The longer you hold, the wider. Momo hops instead (untouchable in the air; the landing shoves foes aside without hurting them).",
     h_parry: "Parry",
     h_parry_d: "When an enemy charges straight at you (a lane-shaped tell), attack just before it lands to knock it back and leave it dizzy. Curled-up enemies (Kongi, hedgehogs) bounce claws off their shell: open them with a heavy strike or by emerging.",
     h_special: "Special",
@@ -792,7 +792,7 @@ pub static EN: Strings = Strings {
     h_village: "Village, Great Tree, journal",
     h_village_d: "Between runs you return to the village. Wake talents at the Great Tree with glowbugs, raise the difficulty with knots, and fight bosses again in thread dreams. Completing journal goals (in the pause menu) earns rewards.",
     h_doto: "Fighting as Doto",
-    h_doto_d: "Doto fights from afar. Attack throws acorns — the third is a fan of three. Hold and release for a big acorn that bursts where it lands. Leap back keeps facing your aim. With a full gauge, bury acorns ahead — they pop soon after and only hurt foes. Your throwing hand bats back what flies at you.",
+    h_doto_d: "Doto fights from afar. Attack throws acorns — the third is a fan of three. Hold and release for a big acorn that bursts where it lands. Leap back shoves nearby foes away and keeps facing your aim. With a full gauge, bury acorns ahead — they pop soon after and only hurt foes. Your throwing hand bats back what flies at you.",
     h_run: "Running and long jump",
     h_run_d: "Momo and Doto: keep holding the burrow button and you run once the hop or leap back lands. While running, a mark on the ground ahead shows where you'll land — steer, then release to jump right there; nothing hits you in the air. Momo's mark snaps onto a foe ahead and she stomps it on landing; Doto throws three at the nearest foe mid-air on its own. Attack while running to strike at once.",
 };

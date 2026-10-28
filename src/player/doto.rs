@@ -79,6 +79,11 @@ impl Player {
     }
 
     pub(super) fn tick_leap(&mut self, c: &Ctx<'_>, time: f32, dir: Vec2) -> Option<Strike> {
+        // 도약 첫 틱: 곁의 적을 밀치고 물러난다(0214).
+        let shove = (time == 0.0).then(|| {
+            self.events.push(Event::Shove);
+            self.shove_strike()
+        });
         let time = time + c.dt;
         self.pos +=
             dir * (self.talents.leap_dist() * self.stats.leap_mul / t::BACKLEAP_TIME) * c.dt;
@@ -88,7 +93,7 @@ impl Player {
         } else {
             self.state = State::Leap { time, dir };
         }
-        None
+        shove
     }
 
     /// 도토리 묻기(0195): 겨눈 쪽 앞에 부채꼴로(재주에 따라 셋·다섯), 잠시 뒤 터진다. 게이지를 다 쓴다.

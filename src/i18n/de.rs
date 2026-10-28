@@ -772,7 +772,7 @@ pub static DE: Strings = Strings {
     h_heavy: "Schwerer Hieb",
     h_heavy_d: "Halte nach einem Hieb Angriff gedrückt, und Licht sammelt sich in den Krallen. Wenn sie leuchten, loslassen: ein harter Hieb, der weit wegstößt und gegen Wände knallt. Genau beim Aufleuchten loslassen für einen perfekten schweren Hieb (+1 Schaden). Er öffnet auch Panzer und Stacheln.",
     h_burrow: "Graben und Auftauchen",
-    h_burrow_d: "Die Grabtaste versteckt dich unter der Erde (nichts trifft dich). Halte sie, um unten zu bleiben und Kraft zu sammeln; lass los, um hochzuschießen und alles ringsum wegzustoßen. Je länger, desto weiter. Momo hüpft stattdessen (in der Luft unverwundbar).",
+    h_burrow_d: "Die Grabtaste versteckt dich unter der Erde (nichts trifft dich). Halte sie, um unten zu bleiben und Kraft zu sammeln; lass los, um hochzuschießen und alles ringsum wegzustoßen. Je länger, desto weiter. Momo hüpft stattdessen (in der Luft unverwundbar; die Landung schubst Gegner weg, ohne Schaden).",
     h_parry: "Abwehren",
     h_parry_d: "Wenn ein Gegner geradeaus anstürmt (Warnung als Bahn), greif kurz vor dem Aufprall an, um ihn abzuwehren und benommen zu machen. Eingerollte Gegner (Kongi, Igel) prallen die Krallen am Panzer ab: öffne sie mit einem schweren Hieb oder durchs Auftauchen.",
     h_special: "Spezialattacke",
@@ -792,7 +792,7 @@ pub static DE: Strings = Strings {
     h_village: "Dorf, Großer Baum, Tagebuch",
     h_village_d: "Zwischen den Abstiegen kehrst du ins Dorf zurück. Wecke am Großen Baum Talente mit Glühwürmchen, erhöhe mit Knoten die Schwierigkeit und kämpfe in Fadenträumen erneut gegen Bosse. Erfüllte Tagebuchziele (im Pausenmenü) bringen Belohnungen.",
     h_doto: "Mit Doto kämpfen",
-    h_doto_d: "Doto kämpft aus der Ferne. Der Angriff wirft Eicheln — der dritte Wurf als Fächer aus drei. Halten und loslassen: eine große Eichel platzt beim Aufprall. Der Rücksprung behält das Ziel im Blick. Bei voller Leiste vergräbst du Eicheln vor dir — sie platzen bald und treffen nur Gegner. Die werfende Hand schlägt Heranfliegendes zurück.",
+    h_doto_d: "Doto kämpft aus der Ferne. Der Angriff wirft Eicheln — der dritte Wurf als Fächer aus drei. Halten und loslassen: eine große Eichel platzt beim Aufprall. Der Rücksprung schubst nahe Gegner weg und behält das Ziel im Blick. Bei voller Leiste vergräbst du Eicheln vor dir — sie platzen bald und treffen nur Gegner. Die werfende Hand schlägt Heranfliegendes zurück.",
     h_run: "Rennen und Weitsprung",
     h_run_d: "Momo und Doto: Halte die Grabtaste weiter, dann rennst du los, sobald Hüpfer oder Rücksprung landen. Beim Rennen zeigt eine Markierung vorn am Boden, wo du landest — richte dich aus und lass los, um genau dorthin zu springen; in der Luft trifft dich nichts. Momos Markierung rastet auf einem Gegner vorn ein, und sie stampft ihn bei der Landung; Doto wirft in der Luft von selbst drei auf den nächsten Gegner. Greif im Rennen an, um sofort zuzuschlagen.",
 };

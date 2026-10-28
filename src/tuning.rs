@@ -201,6 +201,11 @@ pub const HOP_HEIGHT: f32 = 10.0;
 /// 바닥에 보이고, 조준은 달리는 방향과 떼는 자리로 한다(0211, 예전엔 달린 시간만큼 64~100px라 어디 내려앉을지 몰랐다).
 /// 멀리뛰기는 공중 무적(`JUMP_TIME`), 모모는 내려앉으며 둘레를 밟는다(재주 발 구르기면 `JUMP_STOMP_TALENT`배 넓고 +1).
 pub const RUN_SPEED: f32 = 1.5;
+/// 회피의 밀치기(0214): 모모 깡충 착지·도토 뒤로 뛰기 도약 자리 둘레 `SHOVE_RADIUS` 안의 적을 `SHOVE_KNOCK`으로(피해 없음).
+/// 보스는 `SHOVE_BOSS`배.
+pub const SHOVE_RADIUS: f32 = 20.0;
+pub const SHOVE_KNOCK: f32 = 150.0;
+pub const SHOVE_BOSS: f32 = 0.35;
 pub const RUN_MIN: f32 = 0.2;
 pub const JUMP_TIME: f32 = 0.42;
 pub const JUMP_DIST: f32 = 84.0;

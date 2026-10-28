@@ -772,7 +772,7 @@ pub static FR: Strings = Strings {
     h_heavy: "Coup lourd",
     h_heavy_d: "Après un coup, garde attaque enfoncé et la lumière s'amasse dans les griffes. Quand elles brillent, relâche : un coup puissant qui repousse loin et cogne les murs. Relâche dès qu'elles brillent pour un coup lourd parfait (+1 dégât). Il ouvre aussi carapaces et piquants.",
     h_burrow: "Creuser et jaillir",
-    h_burrow_d: "Le bouton creuser te cache sous terre (rien ne te touche). Garde-le enfoncé pour rester dessous et rassembler ta force ; relâche pour jaillir et repousser tout autour. Plus tu attends, plus c'est large. Momo saute à la place (intouchable en l'air).",
+    h_burrow_d: "Le bouton creuser te cache sous terre (rien ne te touche). Garde-le enfoncé pour rester dessous et rassembler ta force ; relâche pour jaillir et repousser tout autour. Plus tu attends, plus c'est large. Momo saute à la place (intouchable en l'air ; en retombant elle repousse ceux qui l'entourent, sans les blesser).",
     h_parry: "Parer",
     h_parry_d: "Quand un ennemi charge tout droit (alerte en bande), attaque juste avant l'impact pour le renvoyer et l'étourdir. Les ennemis recroquevillés (Kongi, hérissons) renvoient les griffes sur leur carapace : ouvre-les avec un coup lourd ou en jaillissant.",
     h_special: "Botte secrète",
@@ -792,7 +792,7 @@ pub static FR: Strings = Strings {
     h_village: "Village, Grand Arbre, journal",
     h_village_d: "Entre deux descentes tu reviens au village. Éveille des talents au Grand Arbre avec des lucioles, monte la difficulté avec les nœuds et affronte à nouveau les boss dans les rêves de fil. Remplir les objectifs du journal (menu pause) donne des récompenses.",
     h_doto: "Combattre avec Doto",
-    h_doto_d: "Doto combat à distance. L'attaque lance des glands — le troisième en éventail de trois. Maintiens puis relâche pour un gros gland qui éclate à l'impact. Le bond en arrière garde ta visée. Jauge pleine, enterre des glands devant toi — ils éclatent vite et ne touchent que les ennemis. La main qui lance renvoie ce qui vole vers toi.",
+    h_doto_d: "Doto combat à distance. L'attaque lance des glands — le troisième en éventail de trois. Maintiens puis relâche pour un gros gland qui éclate à l'impact. Le bond en arrière repousse les ennemis proches et garde ta visée. Jauge pleine, enterre des glands devant toi — ils éclatent vite et ne touchent que les ennemis. La main qui lance renvoie ce qui vole vers toi.",
     h_run: "Course et saut en longueur",
     h_run_d: "Momo et Doto : garde le bouton creuser enfoncé et tu cours une fois le saut ou le bond en arrière retombé. En courant, une marque au sol devant toi montre où tu vas atterrir — oriente-toi, puis relâche pour sauter pile là ; rien ne te touche en l'air. la marque de Momo s'accroche à un ennemi devant elle et elle le piétine en retombant ; Doto en lance trois tout seul sur l'ennemi le plus proche, en l'air. Attaque en courant pour frapper aussitôt.",
 };

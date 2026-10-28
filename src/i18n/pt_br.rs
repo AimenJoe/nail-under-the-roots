@@ -772,7 +772,7 @@ pub static PT_BR: Strings = Strings {
     h_heavy: "Golpe pesado",
     h_heavy_d: "Depois de um golpe, segure atacar e a luz se junta nas garras. Quando brilharem, solte: um golpe forte que empurra longe e bate na parede. Solte assim que brilhar para um pesado perfeito (+1 de dano). Também abre cascos e espinhos.",
     h_burrow: "Cavar e irromper",
-    h_burrow_d: "O botão de cavar esconde você no chão (nada te acerta). Segure para ficar embaixo juntando força; solte para irromper e empurrar tudo ao redor. Quanto mais tempo, mais largo. Momo pula em vez disso (no ar, nada a acerta).",
+    h_burrow_d: "O botão de cavar esconde você no chão (nada te acerta). Segure para ficar embaixo juntando força; solte para irromper e empurrar tudo ao redor. Quanto mais tempo, mais largo. Momo pula em vez disso (no ar, nada a acerta, e ao cair ela empurra quem está perto, sem ferir).",
     h_parry: "Rebater",
     h_parry_d: "Quando um inimigo avança reto (aviso em faixa), ataque logo antes de ele chegar para rebatê-lo e deixá-lo tonto. Inimigos encolhidos (Kongi, ouriços) rebatem as garras no casco: abra-os com um golpe pesado ou irrompendo.",
     h_special: "Especial",
@@ -792,7 +792,7 @@ pub static PT_BR: Strings = Strings {
     h_village: "Vila, Grande Árvore e diário",
     h_village_d: "Entre as descidas você volta à vila. Desperte talentos na Grande Árvore com vaga-lumes, aumente a dificuldade com os nós e enfrente de novo os chefes nos sonhos de fio. Cumprir as metas do diário (no menu de pausa) dá recompensas.",
     h_doto: "Lutando com o Doto",
-    h_doto_d: "O Doto luta de longe. O ataque atira bolotas — a terceira sai em leque de três. Segure e solte para uma bolota grande que explode onde cai. O salto para trás mantém a mira. Com a barra cheia, enterra bolotas à frente — explodem logo e só ferem inimigos. A mão do arremesso rebate o que vier voando.",
+    h_doto_d: "O Doto luta de longe. O ataque atira bolotas — a terceira sai em leque de três. Segure e solte para uma bolota grande que explode onde cai. O salto para trás empurra quem está perto e mantém a mira. Com a barra cheia, enterra bolotas à frente — explodem logo e só ferem inimigos. A mão do arremesso rebate o que vier voando.",
     h_run: "Correr e salto longo",
     h_run_d: "Momo e Doto: continue segurando o botão de cavar e você corre depois que o pulo ou o salto para trás aterrissa. Correndo, uma marca no chão à frente mostra onde você vai cair — mire e solte para saltar até lá; nada te acerta no ar. a marca da Momo gruda num inimigo à frente e ela o pisoteia ao aterrissar; o Doto arremessa três sozinho no inimigo mais próximo, ainda no ar. Ataque correndo para golpear na hora.",
 };

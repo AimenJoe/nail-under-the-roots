@@ -772,7 +772,7 @@ pub static PL: Strings = Strings {
     h_heavy: "Ciężki cios",
     h_heavy_d: "Po ciosie trzymaj atak, a w pazurach zbierze się światło. Gdy zaświecą, puść: mocny cios, który odrzuca daleko i trzaska o ścianę. Puść zaraz po zaświeceniu dla idealnego ciężkiego ciosu (+1 obrażeń). Otwiera też pancerze i kolce.",
     h_burrow: "Kopanie i wyskok",
-    h_burrow_d: "Przycisk kopania chowa cię pod ziemią (nic cię nie trafi). Trzymaj, by zostać pod ziemią i zbierać siłę; puść, by wyskoczyć i odepchnąć wszystko wokół. Im dłużej, tym szerzej. Momo zamiast tego skacze (w powietrzu nic jej nie trafi).",
+    h_burrow_d: "Przycisk kopania chowa cię pod ziemią (nic cię nie trafi). Trzymaj, by zostać pod ziemią i zbierać siłę; puść, by wyskoczyć i odepchnąć wszystko wokół. Im dłużej, tym szerzej. Momo zamiast tego skacze (w powietrzu nic jej nie trafi, a lądując odpycha wrogów bez obrażeń).",
     h_parry: "Odbicie",
     h_parry_d: "Gdy wróg szarżuje prosto na ciebie (ostrzeżenie w pasie), zaatakuj tuż przed zderzeniem, by go odbić i zamroczyć. Zwinięci wrogowie (Kongi, jeże) odbijają pazury pancerzem: otwórz ich ciężkim ciosem albo wyskokiem.",
     h_special: "Specjał",
@@ -792,7 +792,7 @@ pub static PL: Strings = Strings {
     h_village: "Wioska, Wielkie Drzewo, dziennik",
     h_village_d: "Między zejściami wracasz do wioski. Budź talenty przy Wielkim Drzewie świetlikami, podnoś trudność supłami i walcz ponownie z bossami w snach z nici. Spełnione cele dziennika (w menu pauzy) dają nagrody.",
     h_doto: "Walka jako Doto",
-    h_doto_d: "Doto walczy z daleka. Atak rzuca żołędziami — trzeci rzut wachlarzem trzech. Przytrzymaj i puść: duży żołądź pęka tam, gdzie spadnie. Odskok zachowuje celownik. Z pełnym paskiem zakopujesz żołędzie przed sobą — wkrótce pękają i ranią tylko wrogów. Ręka w rzucie odbija to, co leci w ciebie.",
+    h_doto_d: "Doto walczy z daleka. Atak rzuca żołędziami — trzeci rzut wachlarzem trzech. Przytrzymaj i puść: duży żołądź pęka tam, gdzie spadnie. Odskok odpycha bliskich wrogów i zachowuje celownik. Z pełnym paskiem zakopujesz żołędzie przed sobą — wkrótce pękają i ranią tylko wrogów. Ręka w rzucie odbija to, co leci w ciebie.",
     h_run: "Bieg i skok w dal",
     h_run_d: "Momo i Doto: trzymaj dalej przycisk kopania, a po skoku lub odskoku zaczniesz biec. W biegu znacznik na ziemi przed tobą pokazuje, gdzie wylądujesz — wyceluj i puść, by skoczyć dokładnie tam; w powietrzu nic cię nie trafi. znacznik Momo przyczepia się do wroga przed nią, a ona tupie w niego przy lądowaniu; Doto w powietrzu sam rzuca trzy w najbliższego wroga. Atakuj w biegu, by uderzyć od razu.",
 };

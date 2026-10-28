@@ -11,9 +11,13 @@ impl Player {
         self.pos += dir * (self.talents.hop_dist() / t::HOP_TIME) * dt;
         if time >= t::HOP_TIME {
             self.events.push(Event::Land(false));
+            // 착지: 재주 발 구르기면 밟기(피해 1), 아니면 밀치기만(0214).
             if self.talents.hop_stamp() {
                 strike = Some(self.stamp_strike());
                 self.events.push(Event::Stamp);
+            } else {
+                strike = Some(self.shove_strike());
+                self.events.push(Event::Shove);
             }
             self.land_dodge(c);
         } else {

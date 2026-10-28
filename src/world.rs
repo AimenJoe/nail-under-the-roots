@@ -1012,6 +1012,21 @@ impl World {
                         0.4,
                     );
                 }
+                // 회피의 밀치기(0214): 흙먼지 고리(밀치는 둘레만큼) — 맞힘 소리는 없다.
+                player::Event::Shove => {
+                    let p = self.player.pos;
+                    self.juice
+                        .fx
+                        .push(ring(p, 3.0, t::SHOVE_RADIUS, 0.16, DIRT));
+                    puff(
+                        &mut self.juice.fx,
+                        p + vec2(0.0, 4.0),
+                        3,
+                        self.biome.dust(),
+                        6.0,
+                        0.35,
+                    );
+                }
                 player::Event::Stamp => {
                     let p = self.player.pos;
                     self.juice.audio.play(sfx::Id::Emerge);
@@ -1694,6 +1709,18 @@ impl World {
                 // 닿나·튕기나·얼마나 밀리나는 적이 정한다(0170 R10). 월드는 결과로 연출·통계만.
                 let dir = match e.receive(&s, origin, facing) {
                     enemy::Struck::Miss => continue,
+                    // 밀치기(0214): 흙먼지만 — 맞힘 연출·소리·게이지·통계는 없다.
+                    enemy::Struck::Shoved { dir } => {
+                        spray(
+                            &mut self.juice.fx,
+                            e.pos - dir * e.radius(),
+                            dir,
+                            3,
+                            DIRT,
+                            90.0,
+                        );
+                        continue;
+                    }
                     enemy::Struck::Deflected => {
                         shell_from = Some((e.pos, e.kind));
                         continue;
