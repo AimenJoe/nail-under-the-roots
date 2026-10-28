@@ -1,4 +1,5 @@
-"""들쥐 대장(튜토리얼 보스, docs/decisions/0032) 스프라이트 생성기. 이 파일이 원본이고 PNG는 산출물이다(직접 그린 그림).
+"""(얼림, 0216: 지금 chief.png는 `tools/art/bori_ai.py`가 나노바나나 원본에서 만든다.)
+들쥐 대장(튜토리얼 보스, docs/decisions/0032) 스프라이트 생성기 — 코드 그림 시절의 원본.
 
 실행: python3 tools/art/chief.py [출력 경로]  (기본 assets/art/chief.png)
 칸 32×32(졸개의 두 배 크기, 같은 픽셀 밀도), 오른쪽을 본다. 발바닥 y=30.
@@ -13,7 +14,7 @@ critters.py의 문법을 그대로 쓴다(채움 글자 + 자동 외곽선, 3단
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import critters as c  # noqa: E402
 
 N = 32

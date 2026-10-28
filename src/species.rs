@@ -335,7 +335,7 @@ pub static SPORE_CAP: Species = Species {
 
 /// 들쥐 대장(튜토리얼 보스, docs/decisions/0032). 원래는 들쥐 마을의 대장 보리. 뿌리에 물들어 남쪽 공터를 지킨다.
 /// 손맛: 예고가 길고(0.75초) 크게 보이는 대신, 맞아도 공격을 멈추지 않는다. 벽에 박으면 2초 넘게 어질어질(때릴 때).
-/// 그림은 32×32 따로(assets/art/chief.png). `sheet_row`는 쓰지 않는다.
+/// 그림은 40×40 따로(assets/art/chief.png, `bori_ai.py`, 0216). `sheet_row`는 쓰지 않는다.
 pub static CHIEF: Species = Species {
     name: |s| s.mob_chief,
     lore: |s| s.mob_chief_lore,

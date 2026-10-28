@@ -577,7 +577,7 @@ pub(super) fn draw_shot(s: &world::toss::Shot, alpha: f32) {
 
 // ---- 그림 에셋 경로 -----------------------------------------------------------
 
-/// 돌아온 보리(chief.png 줄 1, 32×32). 발이 `pos.y + 6` 근처.
+/// 돌아온 보리(chief.png 줄 0, 40칸·발바닥 38, 0216). 발이 `pos.y + 6`.
 pub fn draw_bori_at(art: &Art, pos: Vec2, face_left: bool, moving: bool, time: f32) {
     let Some(tex) = art.chief.as_ref() else {
         draw_circle(pos.x, pos.y, 10.0, Color::new(0.62, 0.45, 0.36, 1.0));
@@ -588,14 +588,15 @@ pub fn draw_bori_at(art: &Art, pos: Vec2, face_left: bool, moving: bool, time: f
     } else {
         ((time * 1.5) as u32) % 2
     };
+    let c = art::CHIEF_CELL;
     draw_texture_ex(
         tex,
-        (pos.x - 16.0).round(),
-        (pos.y - 24.0).round(),
+        (pos.x - c / 2.0).round(),
+        (pos.y + 6.0 - art::CHIEF_FOOT).round(),
         WHITE,
         DrawTextureParams {
             source: Some(art::chief_cell(frame, art::CHIEF_BORI)),
-            dest_size: Some(vec2(32.0, 32.0)),
+            dest_size: Some(vec2(c, c)),
             flip_x: face_left,
             ..Default::default()
         },
@@ -1278,13 +1279,14 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
     let flash = e.flash > 0.0;
     let chief = e.kind == crate::enemy::Kind::Chief;
     if let (true, Some(tex)) = (chief, art.and_then(|a| a.chief.as_ref())) {
-        // 대장: 32×32(발바닥 y=30).
+        // 대장: 40칸(발바닥 38, 0216). 발은 늘 `pos.y + r` — 찌그러짐(`body`/16배)은 발을 축으로.
         let row = art::CHIEF_TAINTED + if flash { art::CHIEF_ROWS } else { 0 };
-        let big = body * 2.0;
+        let k = body / 16.0;
+        let big = k * art::CHIEF_CELL;
         draw_texture_ex(
             tex,
             (pos.x - big.x / 2.0).round(),
-            (pos.y + r - 30.0 - (big.y - 32.0)).round(),
+            (pos.y + r - art::CHIEF_FOOT * k.y).round(),
             if flash { WHITE } else { tint },
             DrawTextureParams {
                 source: Some(art::chief_cell(frame, row)),

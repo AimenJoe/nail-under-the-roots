@@ -25,7 +25,7 @@ pub struct Art {
     pub big: Vec<Option<Texture2D>>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
-    /// 들쥐 대장·보리(tools/art/chief.py): 32×32, 줄 0 물든 대장, 줄 1 보리, 줄 2·3 흰 실루엣.
+    /// 들쥐 대장·보리(tools/art/bori_ai.py, 0216): 40×40(발바닥 38), 줄 0 돌아온 보리, 줄 1 물든 대장, 줄 2·3 흰 실루엣.
     pub chief: Option<Texture2D>,
     /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 털빛 1~3, 줄 4 돌아온 모모. 땅 단면 전환에서만.
     pub dig: Option<Texture2D>,
@@ -90,10 +90,13 @@ async fn load_sunny() -> Option<Sunny> {
     })
 }
 
-pub const CHIEF_CELL: f32 = 32.0;
-/// chief.png의 줄: 물든 대장 / 돌아온 보리. 실루엣은 + CHIEF_ROWS.
-pub const CHIEF_TAINTED: u32 = 0;
-pub const CHIEF_BORI: u32 = 1;
+/// chief.png 칸(0216 새 그림): 40×40, 발바닥 줄 38. 칸 0·1 서기, 2·3 걷기, 4 웅크림, 5 돌진, 6 맞음, 7 부르기,
+/// 8 기뻐하기, 9 쓰러짐 — 0~7은 옛 32칸 대장 줄과 같은 뜻이라 대장의 칸 고르기는 그대로.
+pub const CHIEF_CELL: f32 = 40.0;
+pub const CHIEF_FOOT: f32 = 38.0;
+/// chief.png의 줄: 돌아온 보리 / 물든 대장(보리 줄의 색을 바꾼 것). 실루엣은 + CHIEF_ROWS.
+pub const CHIEF_BORI: u32 = 0;
+pub const CHIEF_TAINTED: u32 = 1;
 pub const CHIEF_ROWS: u32 = 2;
 
 /// chief.png의 칸 사각형.
