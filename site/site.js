@@ -86,3 +86,20 @@
   addEventListener("resize", update);
   update();
 })();
+
+(() => {
+  // 게임 클립: 화면 가까이 오면 그때 받아 틀고(첫 화면을 가볍게), 벗어나면 멈춘다.
+  // 움직임 줄이기면 틀지 않고 재생 단추만 보인다.
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.querySelectorAll("video[data-src]").forEach((v) => {
+    const load = () => { if (!v.src) { v.src = v.dataset.src; } };
+    if (still) { v.controls = true; v.preload = "none"; load(); return; }
+    if (!("IntersectionObserver" in window)) { load(); v.play().catch(() => {}); return; }
+    new IntersectionObserver((es) => {
+      for (const e of es) {
+        if (e.isIntersecting) { load(); v.play().catch(() => { v.controls = true; }); }
+        else if (v.src) v.pause();
+      }
+    }, { rootMargin: "200px 0px" }).observe(v);
+  });
+})();

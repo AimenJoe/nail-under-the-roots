@@ -29,7 +29,7 @@ async function open(browser, prof) {
 async function dev(browser, idx, wait = 1500, prof = base) {
   const s = await open(browser, prof);
   await s.key('Enter', 600);
-  for (let i = 0; i < 5; i++) await s.key('ArrowDown', 150); // 이어하기·저장 슬롯·오늘의 굴·앨범·설정 다음이 개발(0078)
+  await s.key('ArrowUp', 300); // 개발은 타이틀 메뉴 맨 끝 — 위로 한 번이면 돌아서 닿는다(메뉴 줄 수와 상관없이)
   await s.key('Enter', 600);
   for (let i = 0; i < idx; i++) await s.key('ArrowDown', 80);
   await s.key('Enter', wait);
@@ -46,7 +46,7 @@ async function swings(s, name, n = 8, k = 'j') {
 
 (async () => {
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  { const s = await dev(browser, 27, 2500, full); await s.key('Escape', 1200);   // 마을(다 자란 기록)
+  { const s = await dev(browser, 27, 2500, full); await s.key('Escape', 1200);   // 마을(다 자란 기록) — 들어설 때 한마디를 건너뛴다
     await s.hold('ArrowUp', 700); await s.shot('village_a'); await s.hold('ArrowUp', 900); await s.shot('village_b'); await s.ctx.close(); }
   // 쉼터 셋: 첫 쉼터·둘째(뿌리 동굴)·마지막(버섯 숲). 말 걸기 창을 넘긴다.
   for (const [idx, name] of [[1, 'camp'], [2, 'camp2'], [25, 'camp3']]) {

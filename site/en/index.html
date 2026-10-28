@@ -12,8 +12,11 @@
 <meta property="og:description" content="The great tree is withering. A baby mole leaves the burrow alone for the first time.">
 <meta property="og:image" content="https://aimenjoe.github.io/nail-under-the-roots/img/i_title.png">
 <meta property="og:type" content="website">
+<meta property="og:image:width" content="640">
+<meta property="og:image:height" content="360">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#17130f">
-<link rel="stylesheet" href="../style.css?v=473f18f3">
+<link rel="stylesheet" href="../style.css?v=e556226e">
 </head>
 <body>
 <a class="skip" href="#story">Skip to content</a>
@@ -54,7 +57,7 @@
         <a class="btn" href="https://nail-under-the-roots.netlify.app" target="_blank" rel="noopener">Play in browser</a>
         <a class="btn alt" data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">Android APK</a>
       </div>
-      <p class="meta">Free · No install · Keyboard · Gamepad · Touch · Latest <b data-latest-version>v0.5.0</b> (<span data-latest-date>2026-10-28</span>)</p>
+      <p class="meta">Free · No install · Keyboard · Gamepad · Touch · Latest <b data-latest-version>v0.5.1</b> (<span data-latest-date>2026-10-28</span>)</p>
     </div>
     <a class="scroll-hint" href="#story">Dig down ▼</a>
   </section>
@@ -84,12 +87,16 @@
         <p>A fighting style only a mole could have. Enemies show where they will strike in red first: the attack lands the moment the fill reaches the border. Parry the lanes, dodge the circles with an X.</p>
       </header>
       <div class="fight">
-        <figure class="frame"><img class="px" src="../img/s_fight.png" alt="Naïl fighting a pack of tainted field mice on a meadow. One mouse is about to charge, and a red lane warning fills on the ground" width="960" height="540" loading="lazy"></figure>
+        <figure class="frame clip">
+          <video class="px" data-src="../img/play.mp4" poster="../img/play_poster.png" width="960" height="540" muted loop playsinline preload="none" aria-label="12 seconds of play: Naïl fights a pack of field mice, Momo runs and long-jumps onto them, Doto runs and throws acorns"></video>
+          <figcaption>Real gameplay (no sound) · Naïl → Momo → Doto</figcaption>
+        </figure>
         <ul class="moves">
           <li><span class="keys"><kbd>J</kbd></span><b>Claw combo · beat</b><span>A swing comes out at once. Chain on the beat as the ring closes to hit harder; land every beat for +1 damage on the finisher. Four claws to find: Sprout, Mole, Stone and Venom.</span></li>
           <li><span class="keys"><kbd>J</kbd></span><b>Heavy strike</b><span>After a swing, keep holding until your claws glow, then release. It shoves foes into walls and cracks shells and spines.</span></li>
           <li><span class="keys"><kbd>K</kbd></span><b>Burrow → burst up</b><span>Duck underground to let attacks pass, then burst out into a ram. Hold to stay under longer.</span></li>
           <li><span class="keys"><kbd>J</kbd></span><b>Parry</b><span>Swing just before a straight charge or a thrown attack lands to knock it back and leave the enemy dizzy.</span></li>
+          <li><span class="keys"><kbd>K</kbd></span><b>Run → long jump</b><span>Momo and Doto run while you hold dodge, and leap a set distance when you let go. Nothing hits them in the air.</span></li>
           <li><span class="keys"><kbd>L</kbd></span><b>Drill</b><span>When the gauge is full, dash a whole screen across.</span></li>
         </ul>
       </div>
@@ -145,10 +152,10 @@
       <header class="head">
         <p class="tag">Paths · Camps</p>
         <h2>A new branching path each run, a different camp on each path</h2>
-        <p>Open the path map at camp and pick your next burrow. Burrows are dug fresh every time. There are three camps, each with a hidden nook. Past the first camp, every fall winds a root thread; fall again after all three and you're back in the village. Banked glowbugs stay, and from your second run you start right by the burrow entrance.</p>
+        <p>Open the path map at camp and pick your next burrow. Burrows are dug fresh every time. There are three camps, each with a hidden nook. Past the first camp, every fall winds a root thread. When the third one winds, the run is over and you're back in the village, keeping only the glowbugs you banked at camp. Head down the root path in the village and you start straight at the path map.</p>
       </header>
       <div class="gallery">
-        <figure class="frame"><img class="px" src="../img/s_camp.png" alt="The first camp, neighbors around a campfire" width="960" height="540" loading="lazy"><figcaption>First camp</figcaption></figure>
+        <figure class="frame"><img class="px" src="../img/s_camp.png" alt="The first camp, neighbors around a campfire" width="960" height="540" loading="lazy"><figcaption>Under-root camp</figcaption></figure>
         <figure class="frame"><img class="px" src="../img/s_camp2.png" alt="A camp in a cave of tangled roots" width="960" height="540" loading="lazy"><figcaption>Root cave</figcaption></figure>
         <figure class="frame"><img class="px" src="../img/s_camp3.png" alt="A dark mushroom-forest camp lit by blue mushrooms" width="960" height="540" loading="lazy"><figcaption>Mushroom forest</figcaption></figure>
       </div>
@@ -175,11 +182,11 @@
         <li><img class="px" src="../img/p_susu.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mole cricket smith</p><h3>Susu</h3><p>By the stump at the first camp. Makes you Sprout Claws.</p></div></li>
       </ul>
       <div class="split">
-        <figure class="frame"><img class="px" src="../img/s_village.png" alt="The village under a flowering great tree, with neighbors and decorations" width="960" height="540" loading="lazy"></figure>
+        <figure class="frame"><img class="px" src="../img/s_village.png" alt="The village under the great tree. Woken neighbors gather around the shop stall, the fire pit and a log bench; below, a signpost and the root-path hole" width="960" height="540" loading="lazy"></figure>
         <div class="copy">
           <p class="tag">Village</p>
           <h3>The great tree blooms again</h3>
-          <p>Spend glowbugs to awaken the tree's talents and seeds to decorate the village. Every neighbor you wake brings new leaves, and in the end, flowers.</p>
+          <p>Spend glowbugs to awaken the tree's talents and seeds to decorate the village. Every neighbor you wake brings new leaves, and in the end, flowers. The root-path hole by the signpost is where each run begins.</p>
         </div>
       </div>
     </div>
@@ -203,9 +210,9 @@
           <p>Hind-leg kicks, a hop to dodge, three chained stomps. Hold dodge to run, let go to leap and land on a foe.</p>
         </article>
         <article>
-          <span class="sprite big" style="background-image: url(../img/sp_doto.png); --n: 2; --s: 160px"></span>
+          <span class="sprite big" style="background-image: url(../img/sp_doto.png); --n: 4; --s: 160px"></span>
           <h3>Doto</h3>
-          <p>Acorns from range: a three-throw combo ending in a fan, a charged big acorn, a high hop back, acorns buried as mines. Throw just as a shot arrives to bat it back.</p>
+          <p>Acorns from range: a three-throw combo ending in a fan, a charged big acorn, a high hop back, acorns buried as mines. Throw just as a shot arrives to bat it back. Runs with its tail streaming behind.</p>
         </article>
       </div>
       <div class="split">
@@ -316,8 +323,8 @@
     <div class="wrap split">
       <div class="copy">
         <p class="tag">Next</p>
-        <h2>Getting ready for v0.6, a public demo</h2>
-        <p>v0.5, "Doto and New Clothes", brought in Doto as a third hero and new art for everyone. Next is a public demo: smoothing the first minutes for new players and making it easy to tell us how it went. Until then, tell us what you think any time via <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">feedback &amp; bug reports</a>.</p>
+        <h2>Polishing v0.5, taking v0.6 slowly</h2>
+        <p>v0.5, "Doto and New Clothes", brought in Doto as a third hero and new art for everyone. Village and camp props and Doto's run are getting new art too. Fixes and new art ship right away as v0.5.x; v0.6 will hold something big that takes longer. Tell us what you think any time via <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">feedback &amp; bug reports</a>.</p>
       </div>
       <dl class="facts">
         <div><dt>Genre</dt><dd>Top-down action roguelite</dd></div>
@@ -346,10 +353,10 @@
     <div class="wrap">
       <header class="head"><p class="tag">News</p><h2>Updates</h2></header>
       <ul class="news" data-news>
+        <li><span class="v">v0.5.1</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.5.1">New village and camp art, Doto's run, straight from the village to the path</a></li>
         <li><span class="v">v0.5.0</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.5.0">Doto and new clothes: Doto joins, all-new sprites</a></li>
         <li><span class="v">v0.4.7</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.4.7">Wider pickups, tutorial no longer stalls</a></li>
         <li><span class="v">v0.4.6</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.4.6">The climb home, on-beat 2nd hit fixed</a></li>
-        <li><span class="v">v0.4.5</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.4.5">A readable heavy-attack charge</a></li>
       </ul>
       <p><a href="https://github.com/AimenJoe/nail-under-the-roots/releases">All releases</a></p>
     </div>
@@ -359,9 +366,9 @@
 <footer class="layer-core">
   <div class="wrap">
     <p>© 2026 Beardworks · <a href="https://github.com/AimenJoe/nail-under-the-roots">Source code (GitHub)</a> · <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">Feedback &amp; bug reports</a></p>
-    <p>Dialogue portraits, story illustrations and the title background were drawn with Google's Gemini image model (Nano Banana) and redrawn as pixel art (they carry a SynthID watermark). The moving characters are placeholder art drawn in code. Environment art: <a href="https://danieldiggle.itch.io/sunnyside">Sunnyside World</a> by danieldiggle. Music: Cleyton Kauffman · fluffclipse · Kistol · Aureolus_Omicron; sound effects: Kenney (all CC0). Fonts: <a href="https://github.com/quiple/galmuri">Galmuri</a> · Ark Pixel · Cubic 11 (SIL OFL 1.1). <a href="https://github.com/AimenJoe/nail-under-the-roots/blob/main/assets/LICENSES.md">All sources</a></p>
+    <p>Dialogue portraits, story illustrations and the title background were drawn with Google's Gemini image model (Nano Banana) and redrawn as pixel art (they carry a SynthID watermark). Character, enemy, prop and village sprites were made the same way and fitted into game cells. The clip in the fight section was captured frame by frame on a fake clock from a test build with incoming damage turned off (no sound). Environment art: <a href="https://danieldiggle.itch.io/sunnyside">Sunnyside World</a> by danieldiggle. Music: Cleyton Kauffman · fluffclipse · Kistol · Aureolus_Omicron; sound effects: Kenney (all CC0). Fonts: <a href="https://github.com/quiple/galmuri">Galmuri</a> · Ark Pixel · Cubic 11 (SIL OFL 1.1). <a href="https://github.com/AimenJoe/nail-under-the-roots/blob/main/assets/LICENSES.md">All sources</a></p>
   </div>
 </footer>
-<script src="../site.js?v=f6b465db" defer></script>
+<script src="../site.js?v=ae33b678" defer></script>
 </body>
 </html>

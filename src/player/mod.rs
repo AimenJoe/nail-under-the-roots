@@ -356,7 +356,8 @@ impl Player {
     }
 
     pub fn is_invulnerable(&self) -> bool {
-        self.invuln > 0.0
+        cfg!(feature = "clip")
+            || self.invuln > 0.0
             || self.is_burrowed()
             || matches!(
                 self.state,

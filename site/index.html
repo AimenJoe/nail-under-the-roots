@@ -12,8 +12,11 @@
 <meta property="og:description" content="큰 나무가 시들어 간다. 아기 두더지 나일이 처음으로 혼자 굴을 나선다.">
 <meta property="og:image" content="https://aimenjoe.github.io/nail-under-the-roots/img/i_title.png">
 <meta property="og:type" content="website">
+<meta property="og:image:width" content="640">
+<meta property="og:image:height" content="360">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#17130f">
-<link rel="stylesheet" href="style.css?v=473f18f3">
+<link rel="stylesheet" href="style.css?v=e556226e">
 </head>
 <body>
 <a class="skip" href="#story">본문으로</a>
@@ -55,7 +58,7 @@
         <a class="btn" href="https://nail-under-the-roots.netlify.app" target="_blank" rel="noopener">브라우저에서 하기</a>
         <a class="btn alt" data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">Android APK</a>
       </div>
-      <p class="meta">무료 · 설치 없이 · 키보드 · 게임패드 · 터치 · 최신 <b data-latest-version>v0.5.0</b> (<span data-latest-date>2026-10-28</span>)</p>
+      <p class="meta">무료 · 설치 없이 · 키보드 · 게임패드 · 터치 · 최신 <b data-latest-version>v0.5.1</b> (<span data-latest-date>2026-10-28</span>)</p>
     </div>
     <a class="scroll-hint" href="#story">땅속으로 ▼</a>
   </section>
@@ -85,12 +88,16 @@
         <p>두더지라서 할 수 있는 싸움. 적은 칠 자리를 붉게 먼저 보여 준다. 채움이 테두리에 닿는 순간이 공격이다. 띠는 받아치고, 가운데 X가 있는 원은 피한다.</p>
       </header>
       <div class="fight">
-        <figure class="frame"><img class="px" src="img/s_fight.png" alt="풀밭에서 나일이 물든 들쥐 떼와 싸우는 장면. 들쥐 하나가 나일 쪽으로 돌진하려 하고, 바닥에 붉은 띠 예고가 차오른다" width="960" height="540" loading="lazy"></figure>
+        <figure class="frame clip">
+          <video class="px" data-src="img/play.mp4" poster="img/play_poster.png" width="960" height="540" muted loop playsinline preload="none" aria-label="게임 장면 12초: 나일이 들쥐 떼와 싸우고, 모모가 달리다 멀리 뛰어 내려앉고, 도토가 달리며 도토리를 던진다"></video>
+          <figcaption>실제 게임 화면(소리 없음) · 나일 → 모모 → 도토</figcaption>
+        </figure>
         <ul class="moves">
           <li><span class="keys"><kbd>J</kbd></span><b>발톱 콤보 · 박자</b><span>누르면 바로 한 타. 고리가 닫히는 박자에 이으면 더 세고, 한 콤보를 다 맞추면 마무리 피해 +1. 발톱은 넷(새싹·두더지·바위·독).</span></li>
           <li><span class="keys"><kbd>J</kbd></span><b>강타</b><span>한 타 뒤 계속 누르다 발톱이 빛나면 뗀다. 멀리 밀어 벽에 쿵, 등딱지와 가시도 연다.</span></li>
           <li><span class="keys"><kbd>K</kbd></span><b>굴파기 → 솟구치기</b><span>땅속으로 숨어 공격을 흘리고, 튀어나오며 들이받는다. 누르고 있으면 더 오래 숨는다.</span></li>
           <li><span class="keys"><kbd>J</kbd></span><b>받아치기</b><span>곧게 돌진하거나 날아오는 공격이 닿기 직전에 휘두르면 튕겨 내고, 적이 어질어질해진다.</span></li>
+          <li><span class="keys"><kbd>K</kbd></span><b>달리기 → 멀리뛰기</b><span>모모·도토는 회피를 꾹 쥐면 달리고, 떼면 정해진 거리만큼 멀리 뛰어 내려앉는다. 공중에서는 맞지 않는다.</span></li>
           <li><span class="keys"><kbd>L</kbd></span><b>드릴</b><span>게이지가 차면 화면 한 폭을 가로지르는 필살기.</span></li>
         </ul>
       </div>
@@ -146,10 +153,10 @@
       <header class="head">
         <p class="tag">길 · 쉼터</p>
         <h2>매번 다른 갈래 길, 길마다 다른 쉼터</h2>
-        <p>쉼터에서 길 지도를 펴고 다음 굴을 고른다. 굴은 매번 새로 파인다. 쉼터는 세 곳이고 구석마다 숨은 자리가 있다. 쉼터를 지나면 쓰러질 때마다 실뿌리가 하나씩 감기고, 셋이 다 감긴 뒤 또 쓰러지면 마을로 돌아간다. 맡긴 반딧불은 남고, 두 번째 런부터는 굴 입구 곁에서 바로 시작한다.</p>
+        <p>쉼터에서 길 지도를 펴고 다음 굴을 고른다. 굴은 매번 새로 파인다. 쉼터는 세 곳이고 구석마다 숨은 자리가 있다. 첫 쉼터를 지나면 쓰러질 때마다 실뿌리가 하나씩 감긴다. 셋째가 감기면 그 런은 끝나고 마을로 돌아간다. 쉼터에 맡긴 반딧불만 남는다. 마을 뿌리 길로 내려가면 바로 길 지도부터 시작한다.</p>
       </header>
       <div class="gallery">
-        <figure class="frame"><img class="px" src="img/s_camp.png" alt="모닥불 둘레에 이웃이 모인 첫 쉼터" width="960" height="540" loading="lazy"><figcaption>첫 쉼터</figcaption></figure>
+        <figure class="frame"><img class="px" src="img/s_camp.png" alt="모닥불 둘레에 이웃이 모인 첫 쉼터" width="960" height="540" loading="lazy"><figcaption>뿌리 밑 쉼터</figcaption></figure>
         <figure class="frame"><img class="px" src="img/s_camp2.png" alt="뿌리가 얽힌 동굴 쉼터" width="960" height="540" loading="lazy"><figcaption>뿌리 동굴</figcaption></figure>
         <figure class="frame"><img class="px" src="img/s_camp3.png" alt="파란 버섯이 빛나는 어두운 버섯 숲 쉼터" width="960" height="540" loading="lazy"><figcaption>버섯 숲</figcaption></figure>
       </div>
@@ -176,11 +183,11 @@
         <li><img class="px" src="img/p_susu.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">땅강아지 장인</p><h3>수수</h3><p>첫 쉼터 그루터기 곁. 새싹 발톱을 만들어 준다.</p></div></li>
       </ul>
       <div class="split">
-        <figure class="frame"><img class="px" src="img/s_village.png" alt="꽃이 핀 큰 나무 아래 마을. 이웃들과 꾸민 소품이 보인다" width="960" height="540" loading="lazy"></figure>
+        <figure class="frame"><img class="px" src="img/s_village.png" alt="큰 나무 아래 마을. 가게 좌판·모닥불 화덕·통나무 의자 곁에 깨운 이웃들이 모여 있고, 아래에 팻말과 뿌리 길 구멍이 있다" width="960" height="540" loading="lazy"></figure>
         <div class="copy">
           <p class="tag">마을</p>
           <h3>다시 피는 큰 나무</h3>
-          <p>모은 반딧불로 큰 나무의 재주를 깨우고, 씨앗으로 마을을 꾸민다. 이웃을 깨울수록 잎이 돋고, 끝내 꽃이 핀다.</p>
+          <p>모은 반딧불로 큰 나무의 재주를 깨우고, 씨앗으로 마을을 꾸민다. 이웃을 깨울수록 잎이 돋고, 끝내 꽃이 핀다. 팻말 옆 뿌리 길 구멍이 다음 런의 입구다.</p>
         </div>
       </div>
     </div>
@@ -204,9 +211,9 @@
           <p>뒷발차기, 깡충 피하기, 이어 뛰며 세 번 밟기. 회피를 꾹 쥐면 달리고, 떼면 멀리 뛰어 적 위에 내려앉는다.</p>
         </article>
         <article>
-          <span class="sprite big" style="background-image: url(img/sp_doto.png); --n: 2; --s: 160px"></span>
+          <span class="sprite big" style="background-image: url(img/sp_doto.png); --n: 4; --s: 160px"></span>
           <h3>도토</h3>
-          <p>멀리서 던지는 도토리 3연타(셋째는 부채꼴), 모았다 던지는 큰 도토리, 뒤로 높이 뛰기, 앞에 묻는 도토리. 던지는 순간 날아오는 탄을 되받아친다.</p>
+          <p>멀리서 던지는 도토리 3연타(셋째는 부채꼴), 모았다 던지는 큰 도토리, 뒤로 높이 뛰기, 앞에 묻는 도토리. 던지는 순간 날아오는 탄을 되받아친다. 꼬리를 휘날리며 달린다.</p>
         </article>
       </div>
       <div class="split">
@@ -317,8 +324,8 @@
     <div class="wrap split">
       <div class="copy">
         <p class="tag">다음</p>
-        <h2>v0.6 "공개 데모"를 준비하는 중</h2>
-        <p>v0.5 "도토와 새 옷"으로 셋째 캐릭터 도토가 들어오고, 모두 새 그림을 입었다. 다음은 공개 데모다. 처음 하는 사람이 막힘없이 시작하고, 해 본 느낌을 쉽게 남길 수 있게 다듬는다. 그때까지 느낀 점은 언제든 <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">의견·버그 알리기</a>로.</p>
+        <h2>v0.5를 다듬으며, v0.6은 천천히</h2>
+        <p>v0.5 "도토와 새 옷"으로 셋째 캐릭터 도토가 들어오고, 모두 새 그림을 입었다. 마을·쉼터 물건과 도토의 달리기도 새 그림으로 바뀌는 중이다. 고침과 새 그림은 v0.5.x로 바로바로 내고, v0.6에는 오래 걸리는 큰 것을 담는다. 느낀 점은 언제든 <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">의견·버그 알리기</a>로.</p>
       </div>
       <dl class="facts">
         <div><dt>장르</dt><dd>탑다운 액션 로그라이트</dd></div>
@@ -347,10 +354,10 @@
     <div class="wrap">
       <header class="head"><p class="tag">소식</p><h2>업데이트</h2></header>
       <ul class="news" data-news>
+        <li><span class="v">v0.5.1</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.5.1">마을·쉼터 새 그림, 도토 달리기, 마을에서 곧장 길로</a></li>
         <li><span class="v">v0.5.0</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.5.0">도토와 새 옷: 셋째 플레이어블 도토, 모두 새 그림</a></li>
         <li><span class="v">v0.4.7</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.4.7">떨어진 것을 넉넉히 줍기, 튜토리얼 막힘 고침</a></li>
         <li><span class="v">v0.4.6</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.4.6">땅 위로 돌아오는 길, 박자 2타 고침</a></li>
-        <li><span class="v">v0.4.5</span><span class="d">2026-10-28</span><a href="https://github.com/AimenJoe/nail-under-the-roots/releases/tag/v0.4.5">강공격 모으기가 보인다</a></li>
       </ul>
       <p><a href="https://github.com/AimenJoe/nail-under-the-roots/releases">모든 릴리스</a></p>
     </div>
@@ -360,9 +367,9 @@
 <footer class="layer-core">
   <div class="wrap">
     <p>© 2026 Beardworks · <a href="https://github.com/AimenJoe/nail-under-the-roots">소스 코드(GitHub)</a> · <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">의견·버그 알리기</a></p>
-    <p>대화 초상화·컷씬 일러스트·타이틀 바탕은 Google Gemini 이미지 모델(나노바나나)로 그린 원본을 도트로 옮긴 것이다(SynthID 워터마크 포함). 움직이는 캐릭터는 코드로 그린 임시 그림이다. 환경 그림: <a href="https://danieldiggle.itch.io/sunnyside">Sunnyside World</a> by danieldiggle. 음악: Cleyton Kauffman · fluffclipse · Kistol · Aureolus_Omicron, 효과음: Kenney(모두 CC0). 글꼴: <a href="https://github.com/quiple/galmuri">Galmuri</a> · Ark Pixel · 俐方體11號(SIL OFL 1.1). <a href="https://github.com/AimenJoe/nail-under-the-roots/blob/main/assets/LICENSES.md">출처 전체</a></p>
+    <p>대화 초상화·컷씬 일러스트·타이틀 바탕은 Google Gemini 이미지 모델(나노바나나)로 그린 원본을 도트로 옮긴 것이다(SynthID 워터마크 포함). 캐릭터·적·소품·마을 물건 스프라이트도 같은 방식으로 받은 원본을 게임 칸으로 옮긴 것이다. 싸움 칸의 클립은 받는 피해만 끈 시험 빌드를 가짜 시계로 한 칸씩 찍은 것이다(소리 없음). 환경 그림: <a href="https://danieldiggle.itch.io/sunnyside">Sunnyside World</a> by danieldiggle. 음악: Cleyton Kauffman · fluffclipse · Kistol · Aureolus_Omicron, 효과음: Kenney(모두 CC0). 글꼴: <a href="https://github.com/quiple/galmuri">Galmuri</a> · Ark Pixel · 俐方體11號(SIL OFL 1.1). <a href="https://github.com/AimenJoe/nail-under-the-roots/blob/main/assets/LICENSES.md">출처 전체</a></p>
   </div>
 </footer>
-<script src="site.js?v=f6b465db" defer></script>
+<script src="site.js?v=ae33b678" defer></script>
 </body>
 </html>

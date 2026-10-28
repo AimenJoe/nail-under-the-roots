@@ -40,7 +40,7 @@ ILLUSTS = ["title", "mother_burrow"]
 SPRITES = {
     "nail": ("nail.png", 0, 2, 4),
     "momo": ("momo.png", 0, 2, 2),
-    "doto": ("doto.png", 0, 2, 2),
+    "doto": ("doto.png", 0, 8, 4),  # 달리기 바운드 네 칸(0226)
     "popo": ("popo.png", 0, 2, 2),
     "rat": ("field_mouse.png", 0, 2, 2),
     "squirrel": ("chipmunk.png", 0, 2, 2),
