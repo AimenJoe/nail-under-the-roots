@@ -3,6 +3,8 @@
 실행: python3 tools/art/nail_silhouette.py [출력 폴더]   (기본 tools/art/sources/ai/sprites/ref)
   - ref_nail_silhouette.png: 32칸 실루엣(한 색)을 16배로. "이 모양 그대로"의 기준.
   - ref_nail_blocking.png: 같은 모양을 큰 그림으로 칠한 색 안내(털·주둥이·분홍 코·삽 손·크림 발톱·주황 목도리·눈).
+  - ref_nail_round_silhouette.png: 둥근 몸 시안(사장 시트 nail_round_v2) + 몸 밖으로 뻗은 삽 손. 그 시트의 발 든 칸도
+    손이 몸 위에 겹쳐 32칸 실루엣은 공이었다 — 손을 윤곽 밖으로 내야 둥근 몸도 두더지로 읽힌다.
 
 왜(0206): 둥근 털뭉치는 한 색으로 칠하면 덩어리라 두더지로 안 읽혔다. 두더지 실루엣의 셋 —
 짧은 주둥이 끝의 크고 둥근 코(캐리커처), 옆으로 편 삽 손(발톱 부채), 물방울 몸 — 을 32칸에서 먼저 정하고 그 모양으로 그리게 한다.
@@ -65,6 +67,30 @@ COLORS = {
 }
 
 
+# 둥근 몸 시안: 공 몸 + 오른쪽 짧은 주둥이·큰 코 + 몸 밖으로 뻗은 두 삽 손(복서처럼 옆으로).
+ROUND_BODY = (14, 17, 11, 10.5)
+ROUND_FRONT = [(22, 20), (30, 19.5), (31.5, 24), (28, 26), (22, 25)]
+ROUND_BACK = [(5, 19), (0.5, 18.5), (-0.5, 23), (2.5, 25), (5, 24)]
+
+
+def draw_round(d, z):
+    E = lambda cx, cy, rx, ry: d.ellipse([(cx - rx) * z, (cy - ry) * z, (cx + rx) * z, (cy + ry) * z], fill=255)
+    P = lambda pts: d.polygon([(x * z, y * z) for x, y in pts], fill=255)
+    for x in (8, 18):
+        E(x, 28.5, 3, 2)
+    for x, y in [(9, 7.5), (13, 6.3), (17, 7)]:
+        P([(x - 1.8, y + 2.5), (x, y - 1.5), (x + 1.8, y + 2.5)])
+    E(*ROUND_BODY)
+    E(25, 15.5, 2.6, 2.4)          # 짧은 주둥이
+    E(27.6, 15.2, 2.8, 2.6)        # 큰 코
+    for pts, claws in ((ROUND_FRONT, (31.5, 25)), (ROUND_BACK, (-0.5, 24.5))):
+        P(pts)
+        cx, cy = claws
+        for k in range(3):          # 발톱 부채
+            ox = (k - 1) * 1.6
+            P([(cx + ox - 0.7, cy - 0.5), (cx + ox + (1.6 if cx > 15 else -1.6), cy + 2.2), (cx + ox + 0.7, cy - 0.5)])
+
+
 def silhouette(z=8):
     im = Image.new("L", (32 * z, 32 * z), 0)
     draw(ImageDraw.Draw(im), z, lambda k: 255)
@@ -81,6 +107,26 @@ def main():
     big = Image.new("RGB", (32 * z, 32 * z), (255, 255, 255))
     draw(ImageDraw.Draw(big), z, lambda k: COLORS[k])
     big.save(OUT / "ref_nail_blocking.png")
+    zz = 8
+    shifted = Image.new("L", (34 * zz, 32 * zz), 0)
+    draw_round(_Shift(ImageDraw.Draw(shifted), zz), zz)
+    m = np.asarray(shifted.resize((34, 32), Image.BOX)) > 110
+    sil = np.full((32, 34, 3), 255, np.uint8)
+    sil[m] = (30, 24, 34)
+    Image.fromarray(sil).resize((34 * 16, 32 * 16), Image.NEAREST).save(OUT / "ref_nail_round_silhouette.png")
+
+
+class _Shift:
+    """왼손이 x<0까지 가니 그림을 1칸 오른쪽으로 민다."""
+
+    def __init__(self, d, z):
+        self.d, self.z = d, z
+
+    def ellipse(self, box, **kw):
+        self.d.ellipse([box[0] + self.z, box[1], box[2] + self.z, box[3]], **kw)
+
+    def polygon(self, pts, **kw):
+        self.d.polygon([(x + self.z, y) for x, y in pts], **kw)
 
 
 if __name__ == "__main__":
