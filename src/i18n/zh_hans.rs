@@ -729,9 +729,6 @@ pub static ZH_HANS: Strings = Strings {
     jg_momo_deep_d: "和茉茉一起到达最深处。",
     // 안내 화면(docs/decisions/0178)
     pm_help: "帮助",
-    title_help: "帮助",
-    help_hint: "{1} 选择 · {0} 下一页 · {2} 关闭",
-    help_hint_touch: "点按选择，点按说明翻页 · 点按外侧关闭",
     h_move: "移动与瞄准",
     h_move_d: "用杆或方向键走路。杆轻推就慢走。右杆只负责瞄准（绝招也朝那个方向）。菜单用上下选择，用确认进入。",
     h_combo: "爪击连段与节拍",

@@ -77,10 +77,6 @@ enum Scene {
     Controls {
         back: Back,
     },
-    /// 안내(0178): 기능 설명. 일시정지 메뉴·타이틀에서.
-    Help {
-        back: Back,
-    },
     /// 개발용 시나리오 목록.
     Dev,
     /// 컷씬. 끝나면 게임.
@@ -493,9 +489,7 @@ impl App {
             Scene::Intro | Scene::Title | Scene::Slots | Scene::Album | Scene::Dev
         ) || matches!(
             self.scene,
-            Scene::Settings { back: Back::Title }
-                | Scene::Controls { back: Back::Title }
-                | Scene::Help { back: Back::Title }
+            Scene::Settings { back: Back::Title } | Scene::Controls { back: Back::Title }
         );
         if title {
             return (Some(Track::Title), false);
@@ -1091,11 +1085,6 @@ impl App {
                         self.settings_cursor = 0;
                         self.scene = Scene::Settings { back: Back::Title };
                     }
-                    Some(TitleItem::Help) => {
-                        self.help_cursor = 0;
-                        self.help_page = 0;
-                        self.scene = Scene::Help { back: Back::Title };
-                    }
                     #[cfg(feature = "dev")]
                     Some(TitleItem::Dev) => {
                         self.dev_cursor = 0;
@@ -1201,7 +1190,6 @@ impl App {
                 }
             }
             Scene::Controls { back } => self.update_controls(a, tap_hit, back, dt),
-            Scene::Help { back } => self.update_help(a, tap_hit, back),
             Scene::Pause => self.update_pause(a, tap_hit),
             Scene::Route => self.update_route(a, tap_hit),
             Scene::Shop => self.update_shop(a, tap_hit, dt),
@@ -1231,7 +1219,6 @@ impl App {
                 | Scene::CharPick
                 | Scene::Settings { back: Back::Pause }
                 | Scene::Controls { back: Back::Pause }
-                | Scene::Help { back: Back::Pause }
         );
         let alpha = if self.scene == Scene::Game {
             self.acc / t::TICK_DT
@@ -1273,9 +1260,7 @@ impl App {
         let title_bg = matches!(self.scene, Scene::Title | Scene::Slots | Scene::Dev)
             || matches!(
                 self.scene,
-                Scene::Settings { back: Back::Title }
-                    | Scene::Controls { back: Back::Title }
-                    | Scene::Help { back: Back::Title }
+                Scene::Settings { back: Back::Title } | Scene::Controls { back: Back::Title }
             );
         if title_bg {
             self.renderer.draw_title_art(&ui, get_time() as f32);
@@ -1324,14 +1309,6 @@ impl App {
                     ui.dim();
                 }
                 self.draw_controls(&ui);
-            }
-            Scene::Help { back } => {
-                if back == Back::Pause {
-                    self.renderer
-                        .draw_hud(&ui, &self.world, self.input.gamepad_count);
-                    ui.dim();
-                }
-                self.draw_help(&ui);
             }
             Scene::Game => {
                 self.draw_letterbox(&ui);

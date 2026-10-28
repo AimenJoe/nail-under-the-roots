@@ -726,9 +726,6 @@ pub static DE: Strings = Strings {
     jg_momo_deep_d: "Erreiche mit Momo den tiefsten Grund.",
     // 안내 화면(docs/decisions/0178)
     pm_help: "Hilfe",
-    title_help: "Hilfe",
-    help_hint: "{1} wählen · {0} nächste Seite · {2} schließen",
-    help_hint_touch: "Thema antippen, Text antippen für die nächste Seite · außerhalb tippen zum Schließen",
     h_move: "Bewegen und zielen",
     h_move_d: "Lauf mit dem Stick oder den Pfeiltasten. Stick nur leicht neigen, um langsam zu gehen. Der rechte Stick zielt nur (die Spezialattacke geht in diese Richtung). In Menüs mit hoch/runter wählen und mit Bestätigen öffnen.",
     h_combo: "Krallenkombo und Takt",

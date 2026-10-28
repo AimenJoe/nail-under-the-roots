@@ -726,9 +726,6 @@ pub static EN: Strings = Strings {
     jg_momo_deep_d: "Reach the deepest place with Momo.",
     // 안내 화면(docs/decisions/0178)
     pm_help: "Help",
-    title_help: "Help",
-    help_hint: "{1} pick · {0} next page · {2} close",
-    help_hint_touch: "Tap a topic, tap the text for the next page · tap outside to close",
     h_move: "Moving and aiming",
     h_move_d: "Walk with the stick or arrow keys. Tilt the stick a little to walk slowly. The right stick only aims (the special goes that way too). In menus, pick with up/down and enter with confirm.",
     h_combo: "Claw combo and the beat",

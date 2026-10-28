@@ -726,9 +726,6 @@ pub static PL: Strings = Strings {
     jg_momo_deep_d: "Dotrzyj z Momo do najgłębszego miejsca.",
     // 안내 화면(docs/decisions/0178)
     pm_help: "Pomoc",
-    title_help: "Pomoc",
-    help_hint: "{1} wybór · {0} następna strona · {2} zamknij",
-    help_hint_touch: "Dotknij tematu, dotknij tekstu dla następnej strony · dotknij obok, by zamknąć",
     h_move: "Ruch i celowanie",
     h_move_d: "Chodź gałką lub strzałkami. Lekko wychyl gałkę, by iść powoli. Prawa gałka tylko celuje (specjał też leci w tę stronę). W menu wybieraj górą/dołem i wchodź przyciskiem potwierdzenia.",
     h_combo: "Kombo pazurów i rytm",

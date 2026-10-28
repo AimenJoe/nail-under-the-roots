@@ -1,5 +1,5 @@
 //! 안내(0178 → 0180): 왼쪽 주제 목록(위아래), 오른쪽 힌트 그림 + 설명(쪽이 넘치면 확인·터치로 다음 쪽).
-//! 일시정지의 일곱째 탭과 타이틀의 "안내"가 같은 몸통(`help_nav`·`draw_help_body`)을 쓴다.
+//! 일시정지의 일곱째 탭에서만 연다(타이틀의 "안내"는 뺐다, 0182).
 
 use super::*;
 use crate::help::TOPICS;
@@ -10,18 +10,7 @@ const PIC_W: f32 = 132.0;
 const PIC_H: f32 = 40.0;
 
 impl App {
-    pub(super) fn update_help(&mut self, a: &Actions, tap_hit: Option<Hit>, back: Back) {
-        if a.cancel || a.menu || (a.tap.is_some() && tap_hit.is_none()) {
-            self.scene = match back {
-                Back::Pause => Scene::Pause,
-                Back::Title => Scene::Title,
-            };
-            return;
-        }
-        self.help_nav(a, tap_hit);
-    }
-
-    /// 주제 고르기(위아래·터치)와 쪽 넘기기(확인·설명 터치). 일시정지 탭과 타이틀이 같이 쓴다.
+    /// 주제 고르기(위아래·터치)와 쪽 넘기기(확인·설명 터치).
     pub(super) fn help_nav(&mut self, a: &Actions, tap_hit: Option<Hit>) {
         let n = TOPICS.len();
         let was = self.help_cursor;
@@ -42,30 +31,6 @@ impl App {
         } else if flip {
             self.help_page += 1;
         }
-    }
-
-    pub(super) fn draw_help(&mut self, ui: &Ui) {
-        let s = i18n::s();
-        let panel = Rect::new(12.0, 8.0, 296.0, 156.0);
-        ui.panel(panel, Some(s.pm_help));
-        ui.text_right(
-            &device_hint(
-                s.help_hint,
-                s.help_hint_touch,
-                &[Verb::Confirm, Verb::Pick, Verb::Back],
-            ),
-            panel.right() - 2.0,
-            panel.bottom() + 2.0,
-            FONT_PX,
-            ui::TEXT_DIM,
-        );
-        let c = Rect::new(
-            panel.x + 8.0,
-            panel.y + 20.0,
-            panel.w - 16.0,
-            panel.h - 26.0,
-        );
-        self.draw_help_body(ui, c);
     }
 
     /// 목록 + 그림 + 설명을 사각형 `c` 안에.

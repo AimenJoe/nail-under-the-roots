@@ -726,9 +726,6 @@ pub static ES: Strings = Strings {
     jg_momo_deep_d: "Llega a lo más profundo con Momo.",
     // 안내 화면(docs/decisions/0178)
     pm_help: "Ayuda",
-    title_help: "Ayuda",
-    help_hint: "{1} elegir · {0} página siguiente · {2} cerrar",
-    help_hint_touch: "Toca un tema, toca el texto para la página siguiente · toca fuera para cerrar",
     h_move: "Moverse y apuntar",
     h_move_d: "Camina con el stick o las flechas. Inclina poco el stick para andar despacio. El stick derecho solo apunta (el especial sale hacia allí). En los menús, elige con arriba/abajo y entra con confirmar.",
     h_combo: "Combo de garras y el ritmo",

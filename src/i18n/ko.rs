@@ -726,9 +726,6 @@ pub static KO: Strings = Strings {
     jg_momo_deep_d: "모모와 함께 가장 깊은 곳에 닿는다.",
     // 안내 화면(docs/decisions/0178)
     pm_help: "안내",
-    title_help: "안내",
-    help_hint: "{1} 고르기 · {0} 쪽 넘기기 · {2} 닫기",
-    help_hint_touch: "터치로 고르고 설명을 터치해 쪽 넘기기 · 바깥 터치 닫기",
     h_move: "이동과 조준",
     h_move_d: "스틱이나 방향키로 걷는다. 스틱을 살짝 기울이면 천천히 걷는다. 오른쪽 스틱은 겨누기만 한다(필살기도 그쪽으로). 메뉴는 위아래로 고르고 확인으로 들어간다.",
     h_combo: "발톱 콤보와 박자",

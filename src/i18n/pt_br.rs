@@ -726,9 +726,6 @@ pub static PT_BR: Strings = Strings {
     jg_momo_deep_d: "Chegue ao lugar mais profundo com a Momo.",
     // 안내 화면(docs/decisions/0178)
     pm_help: "Ajuda",
-    title_help: "Ajuda",
-    help_hint: "{1} escolher · {0} próxima página · {2} fechar",
-    help_hint_touch: "Toque num tema, toque no texto para a próxima página · toque fora para fechar",
     h_move: "Mover e mirar",
     h_move_d: "Ande com o direcional ou as setas. Incline pouco o direcional para andar devagar. O direcional direito só mira (o especial vai nessa direção). Nos menus, escolha com cima/baixo e entre com confirmar.",
     h_combo: "Combo de garras e o ritmo",

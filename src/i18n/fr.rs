@@ -726,9 +726,6 @@ pub static FR: Strings = Strings {
     jg_momo_deep_d: "Atteins le Tréfonds avec Momo.",
     // 안내 화면(docs/decisions/0178)
     pm_help: "Aide",
-    title_help: "Aide",
-    help_hint: "{1} choisir · {0} page suivante · {2} fermer",
-    help_hint_touch: "Touche un sujet, touche le texte pour la page suivante · touche à côté pour fermer",
     h_move: "Se déplacer et viser",
     h_move_d: "Marche avec le stick ou les flèches. Incline peu le stick pour marcher lentement. Le stick droit ne fait que viser (la botte secrète part dans ce sens). Dans les menus, choisis avec haut/bas et entre avec confirmer.",
     h_combo: "Combo de griffes et tempo",
