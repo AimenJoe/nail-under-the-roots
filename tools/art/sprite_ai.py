@@ -34,12 +34,15 @@ OUTLINE = (43, 29, 42)
 class Source:
     """원본 시트 한 장. frames: 이름 → 시트 좌표 (x0, y0, x1, y1). groups: 이름 → 배율 기준 칸 이름(같은 무리는 같은 배율).
     erase: 이름 → 효과(호)가 지나가는 네모 목록(시트 좌표) — 그 안의 `Spec.arc` 색만 지운다.
-    tidy: 가장 큰 덩어리의 이 비율보다 작은 떨어진 조각(흙먼지·옆 칸에서 넘어온 귀·얼굴)을 버린다. 0이면 안 버린다."""
+    tidy: 가장 큰 덩어리의 이 비율보다 작은 떨어진 조각(흙먼지·옆 칸에서 넘어온 귀·얼굴)을 버린다. 0이면 안 버린다.
+    strip: 원본이 이미 굵은 외곽선이 있는 도트(나노바나나가 게임 크기 그림을 다시 그린 것)면 바탕에서 이 px 안의
+    어두운 점을 걷어낸다 — 그대로 줄이면 원본 외곽선 위에 `outline`이 한 겹 더 붙어 선이 두 겹이 됐다."""
     path: Path
     frames: dict
     groups: dict
     erase: dict = field(default_factory=dict)
     tidy: float = 0.0
+    strip: int = 0
 
 
 @dataclass
@@ -81,6 +84,19 @@ def erase_color(a, keep, boxes, frame, color, tol=60):
         near = np.abs(sub - color).sum(-1) < tol
         keep[by0 - y0:by1 - y0, bx0 - x0:bx1 - x0] &= ~near
     return keep
+
+
+def strip_outline(a, keep, px):
+    """바탕에서 px 안쪽의 어두운 점(RGB 합 < 200)을 버린다: 원본의 외곽선."""
+    near = ~keep
+    for _ in range(px):
+        g = near.copy()
+        g[1:] |= near[:-1]
+        g[:-1] |= near[1:]
+        g[:, 1:] |= near[:, :-1]
+        g[:, :-1] |= near[:, 1:]
+        near = g
+    return keep & ~(near & (a.sum(-1) < 200))
 
 
 def grow(mask, seeds):
@@ -300,6 +316,8 @@ def convert(spec):
             keep = solid_mask(a)
             if k in s.erase:
                 keep = erase_color(a, keep, s.erase[k], s.frames[k], spec.arc)
+            if s.strip:
+                keep = strip_outline(a, keep, s.strip)
             masks[k] = main_parts(keep, s.tidy) if s.tidy else keep
         loaded.append((s, crops, masks))
     si, name = spec.palette_ref

@@ -286,10 +286,10 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
             Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
             Drawable::Shot(i) => draw_shot(&w.toss.shots[i], alpha),
             Drawable::Npc => {
-                if let (Some(n), Some(tex)) = (&w.npc, art.critters.as_ref()) {
+                if let Some(n) = &w.npc {
                     let q = lerp(n.prev_pos, n.pos, alpha);
                     let moving = (n.pos - n.prev_pos).length() > 0.05;
-                    draw_critter_at(tex, art::RACCOON_ROW, q, n.face_left, moving, w.time);
+                    draw_critter_at(art, art::RACCOON_ROW, q, n.face_left, moving, w.time);
                 }
             }
             Drawable::Neighbor(i) => {
@@ -297,52 +297,39 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                 let left = (w.player.pos.x < n.pos.x) != n.face_left;
                 match n.who {
                     world::Who::Popo => {
-                        if let Some(tex) = art.critters.as_ref() {
-                            draw_critter_at(tex, art::RACCOON_ROW, n.pos, left, false, w.time);
-                        }
+                        draw_critter_at(art, art::RACCOON_ROW, n.pos, left, false, w.time)
                     }
                     world::Who::Bori => draw_bori_at(art, n.pos, left, false, w.time),
                     world::Who::Halmae => draw_halmae_at(n.pos, w.time),
                     world::Who::Momo => {
-                        if let Some(tex) = art.critters.as_ref() {
-                            let on_seat = n.pos - vec2(0.0, 7.0);
-                            draw_critter_at(tex, art::MOMO_BLOOM_ROW, on_seat, left, false, w.time);
-                        }
+                        let on_seat = n.pos - vec2(0.0, 7.0);
+                        draw_critter_at(art, art::MOMO_BLOOM_ROW, on_seat, left, false, w.time);
                     }
                     world::Who::Doto => {
-                        if let Some(tex) = art.critters.as_ref() {
-                            draw_critter_at(tex, art::DOTO_BACK_ROW, n.pos, left, false, w.time);
-                        }
+                        draw_critter_at(art, art::DOTO_BACK_ROW, n.pos, left, false, w.time)
                     }
                     world::Who::Susu => {
-                        if let Some(tex) = art.critters.as_ref() {
-                            draw_critter_at(tex, art::SUSU_ROW, n.pos, left, false, w.time);
-                        }
+                        draw_critter_at(art, art::SUSU_ROW, n.pos, left, false, w.time)
                     }
                     world::Who::Kongi => {
-                        if let Some(tex) = art.critters.as_ref() {
-                            draw_critter_at(tex, art::KONGI_BACK_ROW, n.pos, left, false, w.time);
-                        }
+                        draw_critter_at(art, art::KONGI_BACK_ROW, n.pos, left, false, w.time)
                     }
                     world::Who::Clover => {
                         // 토끼풀 + 아기 둘(0165): 어미 곁에서 아기들이 번갈아 깡충.
-                        if let Some(tex) = art.critters.as_ref() {
-                            draw_critter_at(tex, art::CLOVER_BACK_ROW, n.pos, left, false, w.time);
-                            for (k, off) in
-                                [vec2(-13.0, 5.0), vec2(12.0, 7.0)].into_iter().enumerate()
-                            {
-                                let hop = ((w.time * 2.0 + k as f32 * 1.7).sin() * 2.0)
-                                    .max(0.0)
-                                    .round();
-                                draw_critter_at(
-                                    tex,
-                                    art::BABY_ROW,
-                                    n.pos + off - vec2(0.0, hop),
-                                    k == 0,
-                                    false,
-                                    w.time,
-                                );
-                            }
+                        draw_critter_at(art, art::CLOVER_BACK_ROW, n.pos, left, false, w.time);
+                        for (k, off) in [vec2(-13.0, 5.0), vec2(12.0, 7.0)].into_iter().enumerate()
+                        {
+                            let hop = ((w.time * 2.0 + k as f32 * 1.7).sin() * 2.0)
+                                .max(0.0)
+                                .round();
+                            draw_critter_at(
+                                art,
+                                art::BABY_ROW,
+                                n.pos + off - vec2(0.0, hop),
+                                k == 0,
+                                false,
+                                w.time,
+                            );
                         }
                     }
                 }

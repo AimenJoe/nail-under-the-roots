@@ -486,30 +486,32 @@ impl Renderer {
 
     /// 컷씬 배우(그림이 있는 이웃). 그림이 없으면 색 동그라미.
     pub fn draw_actor_sprite(&self, row: u32, pos: Vec2, facing: Vec2, moving: bool, color: Color) {
-        match self.art.as_ref().and_then(|a| a.critters.as_ref()) {
-            Some(tex) => draw_critter_at(tex, row, pos, facing.x < 0.0, moving, get_time() as f32),
-            None => draw_actor(pos, facing, color),
+        match self.art.as_ref() {
+            Some(art) if art.critter(0, row).is_some() => {
+                draw_critter_at(art, row, pos, facing.x < 0.0, moving, get_time() as f32)
+            }
+            _ => draw_actor(pos, facing, color),
         }
     }
 
-    /// 도감 그림: critters.png의 `row`줄 `frame`칸을 논리 사각형 `r`에 정수 배율로(가운데 맞춤).
+    /// 도감 그림: critters `row`줄 `frame`칸(모모는 새 그림 시트, `Art::critter`)을 논리 사각형 `r`에 정수 배율로(가운데 맞춤).
     pub fn draw_critter(&self, ui: &Ui, r: Rect, row: u32, frame: u32) {
-        let Some(tex) = self.art.as_ref().and_then(|a| a.critters.as_ref()) else {
+        let Some(c) = self.art.as_ref().and_then(|a| a.critter(frame, row)) else {
             return;
         };
-        let k = ((r.w / art::CELL).floor() * ui.scale).max(1.0);
-        let size = art::CELL * k;
+        let k = ((r.w / c.size).floor() * ui.scale).max(1.0);
+        let size = c.size * k;
         let p = ui.px(vec2(r.x, r.y));
         let (bw, bh) = (r.w * ui.scale, r.h * ui.scale);
         let x = (p.x + (bw - size) / 2.0).round();
         let y = (p.y + (bh - size) / 2.0).round();
         draw_texture_ex(
-            tex,
+            c.tex,
             x,
             y,
             WHITE,
             DrawTextureParams {
-                source: Some(art::cell(frame, row)),
+                source: Some(c.src),
                 dest_size: Some(vec2(size, size)),
                 ..Default::default()
             },

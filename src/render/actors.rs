@@ -696,20 +696,32 @@ pub fn draw_worm(p: Vec2, ph: f32, k: f32) {
 pub(super) const OUTLINE: Color = Color::new(0.17, 0.11, 0.16, 1.0);
 
 /// Naïl 스프라이트. 상태 → 칸, 좌우 반전, 피격 플래시는 흰 실루엣 줄.
-/// 모모·도토를 플레이어로(0056·0195): 돌아온 모습 줄(critters `MOMO_BLOOM_ROW`·`DOTO_BACK_ROW`, 임시 그림 — 0191 C).
-/// 칸 0·1 서기, 2·3 걷기, 4 웅크림, 5 차기·뛰기·던지기, 6 맞음.
+/// 모모·도토를 플레이어로(0056·0195): 돌아온 모습 줄(critters `MOMO_BLOOM_ROW`·`DOTO_BACK_ROW`).
+/// 칸 0·1 서기, 2·3 걷기, 4 웅크림, 5 차기·뛰기·던지기, 6 맞음. 모모는 새 그림 시트(0206 C3)라 쓰러짐(7)과
+/// 공중 칸(3 뜀)이 따로 있다 — 깡충·멀리뛰기는 뜀, 이어 뛰기(공격)는 차기.
 /// 뛸 때는 그림만 높이만큼 위로(그림자는 바닥에 남아 착지 자리를 보인다).
 pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time: f32) {
-    let Some(tex) = art.critters.as_ref() else {
-        return;
-    };
+    let big = art.critter_is_big(row);
     let pos = lerp(p.prev_pos, p.pos, alpha) - vec2(0.0, p.height().round());
     let moving = (p.pos - p.prev_pos).length() > 0.05;
     let frame = match p.state {
-        player::State::Dead => 6,
-        player::State::Hop { time: ht, .. }
-        | player::State::Leap { time: ht, .. }
-        | player::State::Chain { time: ht, .. } => {
+        player::State::Dead => {
+            if big {
+                7
+            } else {
+                6
+            }
+        }
+        player::State::Hop { time: ht, .. } | player::State::Leap { time: ht, .. } => {
+            if ht < 0.05 {
+                4
+            } else if big {
+                3
+            } else {
+                5
+            }
+        }
+        player::State::Chain { time: ht, .. } => {
             if ht < 0.05 {
                 4
             } else {
@@ -737,33 +749,22 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
     } else {
         0.0
     };
-    draw_texture_ex(
-        tex,
-        (pos.x - 8.0).round(),
-        (pos.y - 9.0).round() + crouch,
-        tint,
-        DrawTextureParams {
-            source: Some(art::cell(frame, row)),
-            dest_size: Some(vec2(16.0, 16.0)),
-            flip_x: p.face_left,
-            ..Default::default()
-        },
-    );
+    // 발바닥 자리: critters 16칸 시절의 그리기(칸 왼쪽 위 = pos − (8, 9), 발바닥 줄 14)와 같은 점.
+    let feet = vec2(pos.x, (pos.y - 9.0).round() + art::CRITTER_FOOT + crouch);
+    if let Some(c) = art.critter(frame, row) {
+        c.draw(feet, Vec2::ONE, p.face_left, tint);
+    }
     // 다 모였다(0202): 흰 실루엣 줄을 반투명으로 겹친다.
     let glow = charge_glow(p);
     if glow > 0.0 && !flash {
-        draw_texture_ex(
-            tex,
-            (pos.x - 8.0).round(),
-            (pos.y - 9.0).round() + crouch,
-            Color::new(1.0, 1.0, 1.0, glow),
-            DrawTextureParams {
-                source: Some(art::cell(frame, row + art::CRITTER_ROWS)),
-                dest_size: Some(vec2(16.0, 16.0)),
-                flip_x: p.face_left,
-                ..Default::default()
-            },
-        );
+        if let Some(c) = art.critter(frame, row + art::CRITTER_ROWS) {
+            c.draw(
+                feet,
+                Vec2::ONE,
+                p.face_left,
+                Color::new(1.0, 1.0, 1.0, glow),
+            );
+        }
     }
 }
 
@@ -1212,20 +1213,19 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
         );
         return;
     }
-    match art.and_then(|a| a.critters.as_ref()) {
-        Some(tex) => {
-            let row = sp.sheet_row + if flash { art::CRITTER_ROWS } else { 0 };
-            draw_texture_ex(
-                tex,
-                (pos.x - body.x / 2.0).round(),
-                (pos.y + r - 15.0 - (body.y - 16.0)).round(),
+    let row = sp.sheet_row + if flash { art::CRITTER_ROWS } else { 0 };
+    match art.and_then(|a| a.critter(frame, row)) {
+        Some(c) => {
+            // 발바닥 자리는 16칸 시절(칸 위 = pos.y + r − 15 − 찌그러짐)과 같은 점. 큰 그림 칸(모모)도 같은 배율로 찌그러진다.
+            let feet = vec2(
+                pos.x,
+                (pos.y + r - 15.0 - (body.y - 16.0)).round() + art::CRITTER_FOOT,
+            );
+            c.draw(
+                feet,
+                body / 16.0,
+                e.facing.x < 0.0,
                 if flash { WHITE } else { tint },
-                DrawTextureParams {
-                    source: Some(art::cell(frame, row)),
-                    dest_size: Some(body),
-                    flip_x: e.facing.x < 0.0,
-                    ..Default::default()
-                },
             );
         }
         None => {
@@ -1268,9 +1268,9 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
     }
 }
 
-/// 이웃 그림 한 칸(발이 `pos.y + 6` 근처). 걸으면 칸 2·3, 서 있으면 0·1.
+/// 이웃 그림 한 칸(발바닥이 `pos.y + 5`). 걸으면 칸 2·3, 서 있으면 0·1. 모모는 새 그림 시트(`Art::critter`).
 pub(super) fn draw_critter_at(
-    tex: &Texture2D,
+    art: &Art,
     row: u32,
     pos: Vec2,
     face_left: bool,
@@ -1282,18 +1282,10 @@ pub(super) fn draw_critter_at(
     } else {
         ((time * 2.0) as u32) % 2
     };
-    draw_texture_ex(
-        tex,
-        (pos.x - 8.0).round(),
-        (pos.y - 9.0).round(),
-        WHITE,
-        DrawTextureParams {
-            source: Some(art::cell(frame, row)),
-            dest_size: Some(vec2(16.0, 16.0)),
-            flip_x: face_left,
-            ..Default::default()
-        },
-    );
+    if let Some(c) = art.critter(frame, row) {
+        let feet = vec2(pos.x, (pos.y - 9.0).round() + art::CRITTER_FOOT);
+        c.draw(feet, Vec2::ONE, face_left, WHITE);
+    }
 }
 
 /// 내 캐릭터 표시: 발밑의 따뜻한 빛 고리(색이 아니라 모양으로도 구별되게). 바닥에 그려 다른 그림을 가리지 않는다.

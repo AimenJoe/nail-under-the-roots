@@ -30,18 +30,12 @@ fn nail(art: Option<&Art>, col: u32, row: u32, at: Vec2, left: bool) {
 
 fn critter(art: Option<&Art>, kind: Kind, frame: u32, at: Vec2, left: bool, tint: Color) {
     draw_ellipse(at.x, at.y + 6.0, 5.0, 2.0, 0.0, SHADOW_SOFT);
-    match art.and_then(|a| a.critters.as_ref()) {
-        Some(tex) => draw_texture_ex(
-            tex,
-            (at.x - 8.0).round(),
-            (at.y - 8.0).round(),
+    match art.and_then(|a| a.critter(frame, kind.species().sheet_row)) {
+        Some(c) => c.draw(
+            vec2(at.x, (at.y - 8.0).round() + art::CRITTER_FOOT),
+            Vec2::ONE,
+            left,
             tint,
-            DrawTextureParams {
-                source: Some(art::cell(frame, kind.species().sheet_row)),
-                dest_size: Some(vec2(16.0, 16.0)),
-                flip_x: left,
-                ..Default::default()
-            },
         ),
         None => draw_circle(at.x, at.y, 5.0, kind.species().color),
     }
