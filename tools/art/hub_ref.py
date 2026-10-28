@@ -5,6 +5,11 @@
   - ref_hub_b.png: 마을 꾸미기 여섯(꽃밭·반딧불 등·빛나는 버섯·통나무 의자·바람종·깃발 줄)
   - ref_hub_c.png: 마을 꾸미기 다섯(반딧불 병·들꽃 화분·실 그네·물웅덩이·실 고리)
   게임 크기 Naïl(24칸) 옆에 목표 크기로 칠한 색 안내, 마젠타 바탕 8배.
+  - ref_hub_style.png: 그림체 기준 — 이미 게임에 들어간 새 그림(Naïl·포포·부술 것·상자, 모두 나노바나나 원본에서 옮긴 우리 그림) 6배.
+
+도형 판(a·b·c)은 **붙이지 않는다**(2026-10-28 시트 A 첫 시도): 도형을 그대로 베껴 납작한 색면 + 선뿐인 그림이 왔다
+(KB `image-model-for-game-illustrations` "구도 그림을 붙이면 그 모양을 따라 그린다"). 크기·자리를 우리가 볼 때만 쓰고,
+나노바나나에는 그림체 판(`ref_hub_style.png`) 한 장 + 크기는 글로("두더지 키의 몇 배").
 
 왜 도형으로: 지금 이 물건들 대부분이 Sunnyside 팩 그림이라 팩 그림은 생성 참고로 쓸 수 없다(0064). 크기·색·자리만 주고
 생김새는 프롬프트 글로 준다(`docs/art/hub-sprite-prompts.md`). 소품(0222)과 같은 길.
@@ -218,11 +223,30 @@ def board(items):
     return out
 
 
+def style_board():
+    """그림체 판: 우리 새 그림 몇 칸을 발 줄을 맞춰 6배로(마젠타 바탕)."""
+    art = HERE.parents[1] / "assets" / "art"
+    cells = [
+        (Image.open(art / "nail.png").convert("RGBA").crop((0, 0, 24, 24)), 22),
+        (Image.open(art / "popo.png").convert("RGBA").crop((0, 0, 32, 32)), 30),
+        (Image.open(art / "susu.png").convert("RGBA").crop((0, 0, 32, 32)), 30),
+    ] + [(Image.open(art / "props.png").convert("RGBA").crop((c * 24, 0, c * 24 + 24, 24)), 22) for c in (0, 1, 2, 4)]
+    k, foot = 6, 34
+    w = sum(c.width for c, _ in cells) + 4 * (len(cells) + 1)
+    out = Image.new("RGBA", (w, foot + 4), (255, 0, 255, 255))
+    x = 4
+    for c, f in cells:
+        out.alpha_composite(c, (x, foot - f))
+        x += c.width + 4
+    return out.resize((out.width * k, out.height * k), Image.NEAREST)
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for k, items in SHEETS.items():
         board(items).save(OUT / f"ref_hub_{k}.png")
-    print(", ".join(f"ref_hub_{k}.png" for k in SHEETS))
+    style_board().save(OUT / "ref_hub_style.png")
+    print(", ".join(f"ref_hub_{k}.png" for k in SHEETS), "+ ref_hub_style.png")
 
 
 if __name__ == "__main__":
