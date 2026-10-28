@@ -61,6 +61,8 @@ pub enum Scenario {
     DotoArena,
     /// 도토로 새 졸개 다섯(0195): 박쥐·고슴도치(등딱지)·두꺼비 혀를 멀리서.
     DotoMobs,
+    /// 모모로 싸우기(0208): 아레나 웨이브, 플레이어는 모모. 보통 런은 모모가 돌아온 기록이 있어야 고를 수 있다.
+    MomoArena,
     /// 실타래 칸 굴(0147): 방 셋, 끝방에 엘리트. 지대가 장애물을 정한다(뿌리 = 가시 덤불, 심층 = 무너지는 천장).
     Tangle(Biome),
     /// 튜토리얼 보스: 필드 공터 앞에서, 문은 열려 있다(docs/decisions/0032).
@@ -89,7 +91,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 41] = [
+pub const LIST: [Entry; 42] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -295,6 +297,11 @@ pub const LIST: [Entry; 41] = [
         desc: "도토로 새 졸개 다섯(어두운 심층). 박쥐도 도토리는 닿는다. 고슴도치 가시는 큰 도토리·묻은 도토리로.",
         scenario: Scenario::DotoMobs,
     },
+    Entry {
+        name: "모모: 아레나",
+        desc: "모모로 웨이브(0056). 뒷발 차기 콤보·깡충 회피·이어 뛰기(게이지 가득). 기록과 상관없이 바로.",
+        scenario: Scenario::MomoArena,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -440,7 +447,7 @@ pub fn build(s: Scenario) -> World {
             w.enter_tangle_now(b);
             w
         }
-        Scenario::Arena | Scenario::DotoArena => World::new(),
+        Scenario::Arena | Scenario::DotoArena | Scenario::MomoArena => World::new(),
         Scenario::Empty
         | Scenario::CutsceneOnly
         | Scenario::StoryPreview

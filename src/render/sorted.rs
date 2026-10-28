@@ -193,167 +193,177 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                 continue;
             }
         }
-        if let Some(l) = sun {
-            let at = vec2(drawable_x(w, alpha, &d), foot);
-            let Some(k) = shadow_dir(at, l.fire, l.bright) else {
-                continue;
-            };
-            unsafe { get_internal_gl() }
-                .quad_gl
-                .push_model_matrix(sun_shear(foot, k));
-        }
-        match d {
-            Drawable::Pillar(i) => {
-                let p = w.room.props[i];
-                let r = p.rect;
-                match p.kind {
-                    // 들판의 나무(T): 팩이 있으면 흔들리는 둥근 나무. 충돌은 밑동 한 칸 그대로.
-                    PropKind::Stump
-                        if w.biome == crate::biome::Biome::Meadow && art.sunny.is_some() =>
-                    {
-                        if let Some(sunny) = &art.sunny {
-                            let (tw, th) = art::SUNNY_TREE;
-                            let f = ((w.time * 3.0 + r.x * 0.07) as u32 % 4) as f32;
-                            draw_texture_ex(
-                                &sunny.tree,
-                                (r.center().x - tw / 2.0).round(),
-                                (r.bottom() - th + 3.0).round(),
-                                WHITE,
-                                DrawTextureParams {
-                                    source: Some(Rect::new(f * tw, 0.0, tw, th)),
-                                    ..Default::default()
-                                },
-                            );
-                        }
-                    }
-                    // 팩이 있으면 그루터기·바위도 Sunnyside(0066). 바위는 자리 해시로 셋 중 하나.
-                    PropKind::Stump | PropKind::Rock if art.sunny.is_some() => {
-                        if let Some(sunny) = &art.sunny {
-                            let pick = (r.x as usize / 16 * 7 + r.y as usize / 16 * 3) % 3;
-                            let spr = if p.kind == PropKind::Stump {
-                                crate::sunny::STUMPS[pick % 2]
-                            } else {
-                                crate::sunny::BOULDERS[pick]
-                            };
-                            let foot = vec2(r.center().x, r.bottom() + 2.0);
-                            draw_ellipse(
-                                foot.x,
-                                foot.y - 1.0,
-                                spr.2 as f32 * 0.42,
-                                2.5,
-                                0.0,
-                                SHADOW_SOFT,
-                            );
-                            crate::sunny::draw_at_foot(
-                                &sunny.sheet,
-                                spr,
-                                foot,
-                                w.biome.wall_tint(),
-                            );
-                        }
-                    }
-                    PropKind::Stump | PropKind::Rock => {
-                        let col = if p.kind == PropKind::Stump { 0.0 } else { 16.0 };
-                        let src = Rect::new(col, 32.0, 16.0, 32.0);
-                        draw_tile(&art.tiles, src, r.x, r.bottom() - 32.0, w.biome.wall_tint());
-                    }
-                    PropKind::Chest { opened } => draw_chest(r, opened, w.time),
-                    PropKind::Breakable(b) => draw_breakable(b, r, w.time),
-                    PropKind::Campfire => match &art.sunny {
-                        Some(sunny) => draw_campfire_sunny(sunny, r, w.time),
-                        None => draw_campfire(r, w.time),
-                    },
-                    PropKind::Stall => match &art.sunny {
-                        Some(sunny) => draw_stall_sunny(sunny, r),
-                        None => draw_stall(r),
-                    },
-                    PropKind::Seat => match &art.sunny {
-                        Some(sunny) => draw_seat_sunny(sunny, r, w.story.momo_wins()),
-                        None => draw_seat(r, w.story.momo_wins()),
-                    },
-                }
-            }
-            Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
-            Drawable::Loot(i) => draw_loot(&w.loot[i], alpha, w.time, false),
-            Drawable::Player => draw_nail(art, &w.player, w.inv.fur, alpha, w.time),
-            Drawable::Enemy(i) => draw_enemy(
-                Some(art),
-                &w.enemies[i],
-                alpha,
-                w.time,
-                w.juice.feel.hitstop,
-            ),
-            Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
-            Drawable::Shot(i) => draw_shot(&w.toss.shots[i], alpha),
-            Drawable::Npc => {
-                if let Some(n) = &w.npc {
-                    let q = lerp(n.prev_pos, n.pos, alpha);
-                    let moving = (n.pos - n.prev_pos).length() > 0.05;
-                    draw_critter_at(art, art::RACCOON_ROW, q, n.face_left, moving, w.time);
-                }
-            }
-            Drawable::Neighbor(i) => {
-                let n = &w.neighbors[i];
-                let left = (w.player.pos.x < n.pos.x) != n.face_left;
-                match n.who {
-                    world::Who::Popo => {
-                        draw_critter_at(art, art::RACCOON_ROW, n.pos, left, false, w.time)
-                    }
-                    world::Who::Bori => draw_bori_at(art, n.pos, left, false, w.time),
-                    world::Who::Halmae => draw_halmae_at(n.pos, w.time),
-                    world::Who::Momo => {
-                        let on_seat = n.pos - vec2(0.0, 7.0);
-                        draw_critter_at(art, art::MOMO_BLOOM_ROW, on_seat, left, false, w.time);
-                    }
-                    world::Who::Doto => {
-                        draw_critter_at(art, art::DOTO_BACK_ROW, n.pos, left, false, w.time)
-                    }
-                    world::Who::Susu => {
-                        draw_critter_at(art, art::SUSU_ROW, n.pos, left, false, w.time)
-                    }
-                    world::Who::Kongi => {
-                        draw_critter_at(art, art::KONGI_BACK_ROW, n.pos, left, false, w.time)
-                    }
-                    world::Who::Clover => {
-                        // 토끼풀 + 아기 둘(0165): 어미 곁에서 아기들이 번갈아 깡충.
-                        draw_critter_at(art, art::CLOVER_BACK_ROW, n.pos, left, false, w.time);
-                        for (k, off) in [vec2(-13.0, 5.0), vec2(12.0, 7.0)].into_iter().enumerate()
-                        {
-                            let hop = ((w.time * 2.0 + k as f32 * 1.7).sin() * 2.0)
-                                .max(0.0)
-                                .round();
-                            draw_critter_at(
-                                art,
-                                art::BABY_ROW,
-                                n.pos + off - vec2(0.0, hop),
-                                k == 0,
-                                false,
-                                w.time,
-                            );
-                        }
-                    }
-                }
-            }
-            Drawable::Tree(at, growth) => {
-                match art.sunny.as_ref() {
-                    Some(sunny) if growth > 0 => draw_great_tree_sunny(sunny, at, growth, w.time),
-                    _ => draw_great_tree(at, growth, w.time),
-                }
-                if w.adv.village.is_some_and(|v| v.tree_ready) && !shadow_pass() {
-                    draw_tree_motes(at + vec2(0.0, 14.0), w.time);
-                }
-            }
-            Drawable::Decor(i, at) => match &art.sunny {
-                Some(sunny) if matches!(i, 0 | 2 | 3 | 7) => draw_decor_sunny(sunny, i, at, w.time),
-                _ => draw_decor(i, at, w.time),
-            },
-            Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
-        }
-        if sun.is_some() {
-            unsafe { get_internal_gl() }.quad_gl.pop_model_matrix();
+        // 해 그림자 패스의 몸(플레이어·적·이웃)은 눕힌 그림을 위아래 1px씩 더 찍어 메운다(0208): 세로가 1/3로
+        // 납작해지면서 목·꼬리처럼 가는 곳이 1px 줄이나 틈으로 남아 머리·몸·꼬리 그림자가 따로 놀았다(도토).
+        // 위로 1px은 거의 몸에 가려지고, 보이는 두께는 아래로 1px만 는다.
+        let body = matches!(
+            d,
+            Drawable::Player | Drawable::Enemy(_) | Drawable::Npc | Drawable::Neighbor(_)
+        );
+        let Some(l) = sun else {
+            draw_one(art, w, alpha, d);
+            continue;
+        };
+        let Some(k) = shadow_dir(vec2(drawable_x(w, alpha, &d), foot), l.fire, l.bright) else {
+            continue;
+        };
+        let gl = unsafe { get_internal_gl() };
+        for dy in if body {
+            &[-1.0, 0.0, 1.0][..]
+        } else {
+            &[0.0][..]
+        } {
+            gl.quad_gl.push_model_matrix(
+                Mat4::from_translation(vec3(0.0, *dy, 0.0)) * sun_shear(foot, k),
+            );
+            draw_one(art, w, alpha, d);
+            gl.quad_gl.pop_model_matrix();
         }
     }
     SHADOW_PASS.with(|c| c.set(false));
+}
+
+/// 정렬 그리기 한 개(땅 위 그림, 해 그림자 패스에서는 눕힌 행렬 안에서).
+fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
+    match d {
+        Drawable::Pillar(i) => {
+            let p = w.room.props[i];
+            let r = p.rect;
+            match p.kind {
+                // 들판의 나무(T): 팩이 있으면 흔들리는 둥근 나무. 충돌은 밑동 한 칸 그대로.
+                PropKind::Stump
+                    if w.biome == crate::biome::Biome::Meadow && art.sunny.is_some() =>
+                {
+                    if let Some(sunny) = &art.sunny {
+                        let (tw, th) = art::SUNNY_TREE;
+                        let f = ((w.time * 3.0 + r.x * 0.07) as u32 % 4) as f32;
+                        draw_texture_ex(
+                            &sunny.tree,
+                            (r.center().x - tw / 2.0).round(),
+                            (r.bottom() - th + 3.0).round(),
+                            WHITE,
+                            DrawTextureParams {
+                                source: Some(Rect::new(f * tw, 0.0, tw, th)),
+                                ..Default::default()
+                            },
+                        );
+                    }
+                }
+                // 팩이 있으면 그루터기·바위도 Sunnyside(0066). 바위는 자리 해시로 셋 중 하나.
+                PropKind::Stump | PropKind::Rock if art.sunny.is_some() => {
+                    if let Some(sunny) = &art.sunny {
+                        let pick = (r.x as usize / 16 * 7 + r.y as usize / 16 * 3) % 3;
+                        let spr = if p.kind == PropKind::Stump {
+                            crate::sunny::STUMPS[pick % 2]
+                        } else {
+                            crate::sunny::BOULDERS[pick]
+                        };
+                        let foot = vec2(r.center().x, r.bottom() + 2.0);
+                        draw_ellipse(
+                            foot.x,
+                            foot.y - 1.0,
+                            spr.2 as f32 * 0.42,
+                            2.5,
+                            0.0,
+                            SHADOW_SOFT,
+                        );
+                        crate::sunny::draw_at_foot(&sunny.sheet, spr, foot, w.biome.wall_tint());
+                    }
+                }
+                PropKind::Stump | PropKind::Rock => {
+                    let col = if p.kind == PropKind::Stump { 0.0 } else { 16.0 };
+                    let src = Rect::new(col, 32.0, 16.0, 32.0);
+                    draw_tile(&art.tiles, src, r.x, r.bottom() - 32.0, w.biome.wall_tint());
+                }
+                PropKind::Chest { opened } => draw_chest(r, opened, w.time),
+                PropKind::Breakable(b) => draw_breakable(b, r, w.time),
+                PropKind::Campfire => match &art.sunny {
+                    Some(sunny) => draw_campfire_sunny(sunny, r, w.time),
+                    None => draw_campfire(r, w.time),
+                },
+                PropKind::Stall => match &art.sunny {
+                    Some(sunny) => draw_stall_sunny(sunny, r),
+                    None => draw_stall(r),
+                },
+                PropKind::Seat => match &art.sunny {
+                    Some(sunny) => draw_seat_sunny(sunny, r, w.story.momo_wins()),
+                    None => draw_seat(r, w.story.momo_wins()),
+                },
+            }
+        }
+        Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
+        Drawable::Loot(i) => draw_loot(&w.loot[i], alpha, w.time, false),
+        Drawable::Player => draw_nail(art, &w.player, w.inv.fur, alpha, w.time),
+        Drawable::Enemy(i) => draw_enemy(
+            Some(art),
+            &w.enemies[i],
+            alpha,
+            w.time,
+            w.juice.feel.hitstop,
+        ),
+        Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
+        Drawable::Shot(i) => draw_shot(&w.toss.shots[i], alpha),
+        Drawable::Npc => {
+            if let Some(n) = &w.npc {
+                let q = lerp(n.prev_pos, n.pos, alpha);
+                let moving = (n.pos - n.prev_pos).length() > 0.05;
+                draw_critter_at(art, art::RACCOON_ROW, q, n.face_left, moving, w.time);
+            }
+        }
+        Drawable::Neighbor(i) => {
+            let n = &w.neighbors[i];
+            let left = (w.player.pos.x < n.pos.x) != n.face_left;
+            match n.who {
+                world::Who::Popo => {
+                    draw_critter_at(art, art::RACCOON_ROW, n.pos, left, false, w.time)
+                }
+                world::Who::Bori => draw_bori_at(art, n.pos, left, false, w.time),
+                world::Who::Halmae => draw_halmae_at(n.pos, w.time),
+                world::Who::Momo => {
+                    let on_seat = n.pos - vec2(0.0, 7.0);
+                    draw_critter_at(art, art::MOMO_BLOOM_ROW, on_seat, left, false, w.time);
+                }
+                world::Who::Doto => {
+                    draw_critter_at(art, art::DOTO_BACK_ROW, n.pos, left, false, w.time)
+                }
+                world::Who::Susu => draw_critter_at(art, art::SUSU_ROW, n.pos, left, false, w.time),
+                world::Who::Kongi => {
+                    draw_critter_at(art, art::KONGI_BACK_ROW, n.pos, left, false, w.time)
+                }
+                world::Who::Clover => {
+                    // 토끼풀 + 아기 둘(0165): 어미 곁에서 아기들이 번갈아 깡충.
+                    draw_critter_at(art, art::CLOVER_BACK_ROW, n.pos, left, false, w.time);
+                    for (k, off) in [vec2(-13.0, 5.0), vec2(12.0, 7.0)].into_iter().enumerate() {
+                        let hop = ((w.time * 2.0 + k as f32 * 1.7).sin() * 2.0)
+                            .max(0.0)
+                            .round();
+                        draw_critter_at(
+                            art,
+                            art::BABY_ROW,
+                            n.pos + off - vec2(0.0, hop),
+                            k == 0,
+                            false,
+                            w.time,
+                        );
+                    }
+                }
+            }
+        }
+        Drawable::Tree(at, growth) => {
+            match art.sunny.as_ref() {
+                Some(sunny) if growth > 0 => draw_great_tree_sunny(sunny, at, growth, w.time),
+                _ => draw_great_tree(at, growth, w.time),
+            }
+            if w.adv.village.is_some_and(|v| v.tree_ready) && !shadow_pass() {
+                draw_tree_motes(at + vec2(0.0, 14.0), w.time);
+            }
+        }
+        Drawable::Decor(i, at) => match &art.sunny {
+            Some(sunny) if matches!(i, 0 | 2 | 3 | 7) => draw_decor_sunny(sunny, i, at, w.time),
+            _ => draw_decor(i, at, w.time),
+        },
+        Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
+    }
 }
 
 /// 정렬 그리기 한 개의 발 x(그림자 패스가 모닥불까지 거리를 잴 때).

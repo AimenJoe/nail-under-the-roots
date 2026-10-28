@@ -871,6 +871,7 @@ impl App {
             Scenario::Normal | Scenario::Daily | Scenario::Deepest => self.picked(),
             // 개발: 도토로 싸워 보기(0195).
             Scenario::DotoArena | Scenario::DotoMobs => Character::Doto,
+            Scenario::MomoArena => Character::Momo,
             _ => Character::Mole,
         };
         self.world.character = ch;
