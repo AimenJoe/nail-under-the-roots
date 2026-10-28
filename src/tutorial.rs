@@ -160,6 +160,8 @@ impl Tutorial {
                 }
             }
             Stage::Attack => {
+                // 허수아비(체력 6)를 연타로 부숴 버리면 칠 것이 없어 영영 막혔다(사장 2026-10-28, 0207).
+                self.ensure(w, Kind::Dummy);
                 if w.stats.finisher_hits > self.base {
                     // 허수아비는 강공격 연습까지 쓴다(0161).
                     self.say(&[(|s| s.popo_heavy, Face::Happy, Some(Act::Attack))]);
@@ -167,6 +169,7 @@ impl Tutorial {
                 }
             }
             Stage::Heavy => {
+                self.ensure(w, Kind::Dummy);
                 if w.stats.heavy_hits > self.base {
                     // 허수아비는 역할을 다했다.
                     clear_kind(w, Kind::Dummy);
@@ -178,20 +181,20 @@ impl Tutorial {
             }
             Stage::Burrow => {
                 if w.stats.burrows > self.base {
-                    self.ensure_chipmunk(w);
+                    self.ensure(w, Kind::Chipmunk);
                     self.say(&[(|s| s.popo_emerge, Face::Normal, Some(Act::Dodge))]);
                     self.enter(Stage::Emerge, w.stats.emerge_hits);
                 }
             }
             Stage::Emerge => {
+                self.ensure(w, Kind::Chipmunk);
                 if w.stats.emerge_hits > self.base {
-                    self.ensure_chipmunk(w);
                     self.say(&[(|s| s.popo_parry, Face::Happy, Some(Act::Attack))]);
                     self.enter(Stage::Parry, w.stats.parries);
                 }
             }
             Stage::Parry => {
-                self.ensure_chipmunk(w);
+                self.ensure(w, Kind::Chipmunk);
                 let done = w.stats.parries > self.base;
                 if done || self.t > PARRY_GIVE_UP {
                     if !done {
@@ -297,15 +300,17 @@ impl Tutorial {
         self.base = base;
     }
 
-    /// 연습 다람쥐가 없으면(잡아 버렸으면) 하나 더.
-    fn ensure_chipmunk(&self, w: &mut World) {
-        if !w
-            .enemies
-            .iter()
-            .any(|e| e.kind == Kind::Chipmunk && e.alive)
-        {
+    /// 맞혀야 넘어가는 단계의 과녁(허수아비·연습 다람쥐)이 없으면(부쉈거나 잡아 버렸으면) 하나 더.
+    /// 허수아비는 바로 앞에, 다람쥐는 떨어진 자리에.
+    fn ensure(&self, w: &mut World, kind: Kind) {
+        if w.enemies.iter().any(|e| e.kind == kind && e.alive) {
+            return;
+        }
+        if kind == Kind::Dummy {
+            spawn_dummy(w);
+        } else {
             let p = spot(w, 1);
-            w.spawn_enemy(Kind::Chipmunk, p);
+            w.spawn_enemy(kind, p);
         }
     }
 }
@@ -404,5 +409,36 @@ mod tests {
         assert!(tu.is_done());
         assert!(!w.no_damage);
         assert!(tu.hint().is_none());
+    }
+
+    /// 맞혀야 넘어가는 단계에서 과녁을 다 없애도 다시 나와 막히지 않는다(0207).
+    #[test]
+    fn hit_lessons_bring_back_a_target_when_all_are_gone() {
+        let alive =
+            |w: &World, k: Kind| w.enemies.iter().filter(|e| e.kind == k && e.alive).count();
+        let mut w = World::empty();
+        let mut tu = Tutorial::new(&mut w);
+        w.player.pos += vec2(50.0, 0.0);
+        tu.update(&mut w, 0.1);
+        for (stage, kind) in [
+            (Stage::Attack, Kind::Dummy),
+            (Stage::Heavy, Kind::Dummy),
+            (Stage::Emerge, Kind::Chipmunk),
+            (Stage::Parry, Kind::Chipmunk),
+        ] {
+            let base = match stage {
+                Stage::Attack => w.stats.finisher_hits,
+                Stage::Heavy => w.stats.heavy_hits,
+                Stage::Emerge => w.stats.emerge_hits,
+                _ => w.stats.parries,
+            };
+            tu.enter(stage, base);
+            for e in w.enemies.iter_mut() {
+                e.alive = false;
+            }
+            tu.update(&mut w, 0.1);
+            assert_eq!(tu.stage, stage, "{stage:?}: 아직 넘어가지 않는다");
+            assert_eq!(alive(&w, kind), 1, "{stage:?}: 과녁 {kind:?}가 다시 나온다");
+        }
     }
 }

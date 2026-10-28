@@ -112,12 +112,11 @@ impl Loot {
         let ready = self.age >= t::LOOT_PICKUP_DELAY;
         let to = player - self.pos;
         let dist = to.length();
-        let magnet = matches!(self.kind, LootKind::Glowbug | LootKind::Seed);
-        if ready && can_take && magnet && dist < t::GLOWBUG_MAGNET_RADIUS {
+        if ready && can_take && dist < t::LOOT_MAGNET_RADIUS {
             // 가까울수록 세게 끌린다.
-            let k = 1.0 - dist / t::GLOWBUG_MAGNET_RADIUS;
-            self.vel += to / dist.max(0.01) * t::GLOWBUG_MAGNET_ACCEL * (0.3 + k) * dt;
-            let max = t::GLOWBUG_MAGNET_MAX_SPEED;
+            let k = 1.0 - dist / t::LOOT_MAGNET_RADIUS;
+            self.vel += to / dist.max(0.01) * t::LOOT_MAGNET_ACCEL * (0.3 + k) * dt;
+            let max = t::LOOT_MAGNET_MAX_SPEED;
             if self.vel.length() > max {
                 self.vel = self.vel.normalize() * max;
             }
@@ -180,6 +179,31 @@ mod tests {
         let three = berry_chance(2, 5, 0, Kind::FieldMouse);
         assert!(three > one && one > 0.0);
         assert_eq!(berry_chance(4, 5, t::BERRY_PITY_KILLS, Kind::Chipmunk), 1.0);
+    }
+
+    /// 모든 떨어진 것이 반딧불만큼 끌려와 주워진다. 못 담는 것(can_take = false)은 끌리지 않는다(0207).
+    #[test]
+    fn every_loot_kind_is_pulled_in_like_glowbugs() {
+        let room = Room::new();
+        let player = vec2(160.0, 90.0);
+        let from = player + vec2(t::LOOT_MAGNET_RADIUS - 4.0, 0.0);
+        for kind in [
+            LootKind::Glowbug,
+            LootKind::Seed,
+            LootKind::Berry,
+            LootKind::Worm,
+            LootKind::RootHeart,
+        ] {
+            let mut l = Loot::place(kind, from);
+            let got = (0..120).any(|_| l.update(t::TICK_DT, player, true, &room));
+            assert!(got, "{kind:?}는 자석 거리 안에서 주워진다");
+            let mut full = Loot::place(kind, from);
+            let got = (0..120).any(|_| full.update(t::TICK_DT, player, false, &room));
+            assert!(
+                !got && full.pos == from,
+                "{kind:?}: 못 담으면 끌리지 않는다"
+            );
+        }
     }
 
     #[test]
