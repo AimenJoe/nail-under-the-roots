@@ -1086,26 +1086,6 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
             draw_circle(nose.x.round(), nose.y.round(), 1.5, BLACK);
         }
     }
-    // 공격 예고 고리(0175): 발밑의 과녁 고리로 큰 고리가 닫히고, 닿는 순간 공격. 마지막 15%는 밝게.
-    if let (true, false, Some((k, parryable))) = (marks, e.asleep, e.telegraph()) {
-        let feet = lerp(e.prev_pos, e.pos, alpha);
-        let (cx, cy) = (feet.x.round(), (feet.y + r * 0.4).round());
-        let (r1, r0) = (r + 2.0, r + 12.0);
-        let rr = r0 + (r1 - r0) * k;
-        let base = if parryable {
-            Color::new(1.0, 0.85, 0.35, 1.0)
-        } else {
-            Color::new(0.95, 0.25, 0.3, 1.0)
-        };
-        let late = k > 0.85;
-        let col = if late {
-            Color::new(1.0, 1.0, 1.0, 0.95)
-        } else {
-            Color::new(base.r, base.g, base.b, 0.45 + 0.4 * k)
-        };
-        draw_circle_lines(cx, cy, r1, 1.0, Color::new(base.r, base.g, base.b, 0.35));
-        draw_circle_lines(cx, cy, rr, if late { 1.5 } else { 1.0 }, col);
-    }
     // 엘리트는 처음부터 작은 막대(점이 너무 많다).
     if marks && e.elite {
         let (w, y) = (18.0, (pos.y - r - 9.0).round());

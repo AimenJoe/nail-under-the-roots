@@ -300,25 +300,26 @@ impl Enemy {
         }
     }
 
-    /// 공격 예고의 진행(0175): 0 = 예고 시작, 1 = 공격이 나가는 순간. 예고 중이 아니면 None.
-    /// 그림은 몸으로 닫히는 고리(플레이어의 박자 고리와 같은 말: 고리가 닿는 순간 일어난다). 돌진 예고(받아칠 수 있다)는
-    /// 황금, 나머지(내려앉기·쏘기·울부짖기·발 구르기)는 진홍 — 0160의 색 약속.
-    pub fn telegraph(&self) -> Option<(f32, bool)> {
-        let (time, dur, parryable) = match self.state {
-            State::Windup { time } => (time, self.windup(), true),
-            State::Aim { time } | State::Crouch { time, .. } => (time, self.windup(), false),
+    /// 공격 예고의 진행(0176 → 0179): 0 = 예고 시작, 1 = 공격이 나가는 순간. 예고 중이 아니면 None.
+    /// 길이는 각 상태가 쓰는 식(`windup()`·배율·`thump_windup()`)과 같아 그림과 판정이 어긋나지 않는다.
+    /// 그림은 공격 방향 안내(돌진 띠·조준 점선·내려앉을 자리) 자체가 적 쪽부터 차오른다(`render/fx.rs draw_telegraphs`).
+    pub fn telegraph(&self) -> Option<f32> {
+        let (time, dur) = match self.state {
+            State::Windup { time } | State::Aim { time } | State::Crouch { time, .. } => {
+                (time, self.windup())
+            }
             State::Howl { time } => {
                 let m = if self.sp().behavior == Behavior::Doto {
                     t::DOTO_BURY_MUL
                 } else {
                     t::CHIEF_HOWL_MUL
                 };
-                (time, self.windup() * m, false)
+                (time, self.windup() * m)
             }
-            State::Thump { time } => (time, self.thump_windup(), false),
+            State::Thump { time } => (time, self.thump_windup()),
             _ => return None,
         };
-        Some(((time / dur.max(1e-3)).clamp(0.0, 1.0), parryable))
+        Some((time / dur.max(1e-3)).clamp(0.0, 1.0))
     }
 
     /// 받아칠 수 있는 공격인가(0160): 곧게 오는 돌진(물기·구르기·내리꽂기도 `Charge`)만. 내려앉기·튀어나오기는
@@ -713,28 +714,27 @@ fn idle_of(b: Behavior) -> State {
 mod tests {
     use super::*;
 
-    /// 공격 예고 고리(0175): 돌진 예고는 황금(받아칠 수 있다), 웅크림·조준은 진홍, 예고가 아니면 없음. 예고 끝에 1.
+    /// 공격 예고의 진행(0179): 예고 시작 0, 끝 1, 공격 중·서 있을 때는 없음.
     #[test]
-    fn telegraph_progress_and_color_follow_the_windup() {
+    fn telegraph_progress_follows_the_windup() {
         let mut e = Enemy::new(Kind::FieldMouse, vec2(50.0, 50.0));
         assert_eq!(e.telegraph(), None);
         e.state = State::Windup { time: 0.0 };
-        assert_eq!(e.telegraph(), Some((0.0, true)));
+        assert_eq!(e.telegraph(), Some(0.0));
         e.state = State::Windup { time: e.windup() };
-        assert_eq!(e.telegraph(), Some((1.0, true)));
+        assert_eq!(e.telegraph(), Some(1.0));
         e.state = State::Crouch {
             time: e.windup() * 0.5,
             target: Vec2::ZERO,
         };
-        let (k, parry) = e.telegraph().unwrap();
-        assert!((k - 0.5).abs() < 1e-5 && !parry);
+        assert!((e.telegraph().unwrap() - 0.5).abs() < 1e-5);
         e.state = State::Aim { time: 0.0 };
-        assert_eq!(e.telegraph(), Some((0.0, false)));
+        assert_eq!(e.telegraph(), Some(0.0));
         e.state = State::Charge {
             time: 0.0,
             dir: vec2(1.0, 0.0),
         };
-        assert_eq!(e.telegraph(), None, "공격 중엔 고리 없음");
+        assert_eq!(e.telegraph(), None, "공격 중엔 예고 없음");
     }
 
     fn strike(kind: StrikeKind, at: Vec2, damage: i32) -> Strike {

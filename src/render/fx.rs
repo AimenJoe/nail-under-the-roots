@@ -409,12 +409,79 @@ pub(super) fn draw_no_parry_ring(at: Vec2, r: f32, edge: Color) {
     draw_circle_lines(at.x, at.y, r, 1.0, edge);
 }
 
+/// 차오름의 앞줄(0179): 띠를 가로지르는 밝은 줄(어두운 밑띠 위). `side`는 띠 반폭 벡터.
+fn draw_fuse_front(f: Vec2, side: Vec2) {
+    let (p, q) = (f + side, f - side);
+    draw_line(p.x, p.y, q.x, q.y, 4.0, Color::new(0.1, 0.05, 0.02, 0.55));
+    draw_line(p.x, p.y, q.x, q.y, 2.0, TELEGRAPH_BLINK);
+}
+
+/// 둘레 공격의 차오름(0179): 가운데부터 반지름 `r`까지 채운 원(테두리 색).
+fn draw_fill_disk(at: Vec2, r: f32, edge: Color) {
+    if r > 0.5 {
+        draw_circle(at.x, at.y, r, Color::new(edge.r, edge.g, edge.b, 0.28));
+    }
+}
+
+/// 점선 예고(0179): 3px 칠하고 2px 비움. 적 쪽부터 `k`만큼은 밝게 차오르고(어두운 밑띠 위) 그 앞은 밑띠 없이 옅게 —
+/// 밝기 차로 "어디까지 왔나"가 읽힌다. 앞끝에 밝은 점.
+fn draw_dots(start: Vec2, dir: Vec2, len: f32, k: f32, edge: Color) {
+    let lit = len * k;
+    let mut d = 0.0;
+    while d < len {
+        let p0 = start + dir * d;
+        let p1 = start + dir * (d + 3.0).min(len);
+        if d < lit {
+            let rim = Color::new(0.1, 0.05, 0.02, 0.45);
+            draw_line(p0.x, p0.y, p1.x, p1.y, 3.0, rim);
+            let c = Color::new(edge.r, edge.g, edge.b, 1.0);
+            draw_line(p0.x, p0.y, p1.x, p1.y, 1.0, c);
+        } else {
+            let fade = 1.0 - d / 150.0 * 0.5;
+            let c = Color::new(edge.r, edge.g, edge.b, 0.28 * fade);
+            draw_line(p0.x, p0.y, p1.x, p1.y, 1.0, c);
+        }
+        d += 5.0;
+    }
+    let f = start + dir * lit;
+    let (x, y) = (f.x.round(), f.y.round());
+    draw_rectangle(
+        x - 2.0,
+        y - 2.0,
+        5.0,
+        5.0,
+        Color::new(0.1, 0.05, 0.02, 0.55),
+    );
+    draw_rectangle(x - 1.0, y - 1.0, 3.0, 3.0, TELEGRAPH_BLINK);
+}
+
+/// 쏘기·혀·실 가닥의 점선 예고(0179): 적 앞에서 `reach`까지(벽에서 끊김), 진행 `k`만큼 차오른다. 받아칠 수 있어 황금.
+fn draw_dotted_fuse(w: &World, pos: Vec2, facing: Vec2, radius: f32, reach: f32, k: f32) {
+    let dir = facing.normalize_or(vec2(1.0, 0.0));
+    let start = pos + dir * (radius + 2.0);
+    let len = w.room.ray_len(start, dir, t::PROJECTILE_RADIUS, reach);
+    let blink = k > 0.85 && ((w.time * 16.0) as i32) % 2 == 0;
+    let edge = if blink {
+        TELEGRAPH_BLINK
+    } else {
+        Color::new(
+            PARRY_EDGE_RGB.0,
+            PARRY_EDGE_RGB.1,
+            PARRY_EDGE_RGB.2,
+            TELEGRAPH_EDGE.0 + (TELEGRAPH_EDGE.1 - TELEGRAPH_EDGE.0) * k,
+        )
+    };
+    draw_dots(start, dir, len, k, edge);
+}
+
 /// 공격 예고(바닥, 적·플레이어보다 먼저 그린다): 맞을 자리를 붉게, 공격 순간이 가까울수록 진하게.
 /// - 돌격형(떨기): 돌진할 길(몸 폭 × 돌진 거리, 벽에서 끊김)을 띠로. 방향은 지금 보는 쪽(떨기 끝에 굳는다).
 /// - 던지기(조준): 도토리가 날아갈 줄.
 /// - 뛰기(웅크림·체공): 내려앉을 자리 고리, 체공 중엔 가득.
 ///
 /// 진하기 k = 예고 경과 / 예고 시간(0→1). 마지막 15%는 깜빡여 "지금"을 알린다.
+/// 언제(0179): 눈은 적이 아니라 공격이 올 길을 본다. 그래서 띠·점선은 적 쪽부터 빛이 차올라 끝에 닿는 순간 공격,
+/// 둘레(내려앉기·포자·발 구르기)는 가운데부터 채워져 고리에 닿는 순간 공격. 차오른 끝에는 밝은 앞줄.
 pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
     use crate::species::Behavior;
     // 무너지는 천장(0147): 떨어질 자리에 그림자가 커지고, 붉은 고리가 조여 든다(청설모 내려앉기와 같은 말).
@@ -446,8 +513,10 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
     for e in w.enemies.iter().filter(|e| e.alive && !e.asleep) {
         let sp = e.sp();
         let pos = lerp(e.prev_pos, e.pos, alpha);
-        let (k, kind) = match e.state {
-            enemy::State::Windup { time }
+        // 진행은 적이 쓰는 식 그대로(`Enemy::telegraph`) — 그림과 판정이 어긋나지 않게. 체공 중엔 가득.
+        let k = e.telegraph().unwrap_or(1.0);
+        let kind = match e.state {
+            enemy::State::Windup { .. }
                 if matches!(
                     sp.behavior,
                     Behavior::Charger
@@ -458,22 +527,22 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                         | Behavior::Swooper
                 ) =>
             {
-                ((time / e.windup()).min(1.0), 0)
+                0
             }
             enemy::State::Lash { time, dir } => {
                 draw_tongue(w, pos, e.radius(), dir, time);
                 continue;
             }
-            enemy::State::Aim { time } if sp.behavior == Behavior::Spore => {
-                ((time / e.windup()).min(1.0), 3)
-            }
-            enemy::State::Aim { time } => ((time / e.windup()).min(1.0), 1),
-            enemy::State::Crouch { time, .. } => ((time / e.windup()).min(1.0), 2),
-            enemy::State::Thump { time } => ((time / e.thump_windup()).min(1.0), 4),
+            enemy::State::Aim { .. } if sp.behavior == Behavior::Spore => 3,
+            enemy::State::Aim { .. } => 1,
+            enemy::State::Crouch { .. } => 2,
+            enemy::State::Thump { .. } => 4,
             enemy::State::Gather { time } if time < t::CLOVER_THREAD_AT => {
-                ((time / t::CLOVER_THREAD_AT).min(1.0), 1)
+                let k = (time / t::CLOVER_THREAD_AT).min(1.0);
+                draw_dotted_fuse(w, pos, e.facing, e.radius(), 150.0, k);
+                continue;
             }
-            enemy::State::Leap { .. } => (1.0, 2),
+            enemy::State::Leap { .. } => 2,
             _ => continue,
         };
         // 투명하게: 바닥이 비쳐 보여야 화면이 붉게 덮이지 않는다(사람 피드백 "너무 샛빨갛다", 2026-10-25).
@@ -507,6 +576,12 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                 let (a, b) = (pos + dir * r, pos + dir * (len + r));
                 draw_triangle(a + side, a - side, b + side, fill);
                 draw_triangle(a - side, b - side, b + side, fill);
+                // 차오름(0179): 적 쪽부터 끝까지, 다 차면 돌진. 앞줄은 밝게 가로로.
+                let f = a + (b - a) * k;
+                let charged = Color::new(edge.r, edge.g, edge.b, 0.30 + 0.25 * k);
+                draw_triangle(a + side, a - side, f + side, charged);
+                draw_triangle(a - side, f - side, f + side, charged);
+                draw_fuse_front(f, side);
                 // 황금 테두리 밑에 어두운 띠(0160): 밝은 풀밭·색약·흑백에서도 선이 남는다.
                 let tip = b + dir * 3.0;
                 let rim = Color::new(0.1, 0.05, 0.02, edge.a * 0.45);
@@ -523,46 +598,26 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                 // 토끼풀 발 구르기(0165): 충격파가 닿을 둘레. 못 받아치니 진홍 고리 + ✕. 땅속으로.
                 let r = t::CLOVER_WAVE_R;
                 draw_circle(pos.x, pos.y, r, fill);
-                draw_no_parry_ring(pos, r * (0.4 + 0.6 * k), edge);
+                draw_fill_disk(pos, r * k, edge);
+                draw_no_parry_ring(pos, r, edge);
                 draw_no_parry_mark(pos + vec2(0.0, -r - 6.0), edge);
             }
             3 => {
                 // 포자버섯: 구름이 덮을 자리. 고리가 안에서 밖으로 부푼다.
                 let r = t::SPORE_CLOUD_R;
                 draw_circle(pos.x, pos.y, r, fill);
-                draw_no_parry_ring(pos, r * (0.5 + 0.5 * k), edge);
+                draw_fill_disk(pos, r * k, edge);
+                draw_no_parry_ring(pos, r, edge);
                 draw_no_parry_mark(pos + vec2(0.0, -r - 6.0), edge);
             }
             1 => {
-                let dir = e.facing.normalize_or(vec2(1.0, 0.0));
-                let start = pos + dir * (e.radius() + 2.0);
                 // 두꺼비 혀는 닿는 데까지만, 도토리는 멀리.
                 let reach = if sp.behavior == Behavior::Tongue {
                     t::TOAD_TONGUE_REACH
                 } else {
                     150.0
                 };
-                let len = w.room.ray_len(start, dir, t::PROJECTILE_RADIUS, reach);
-                // 점선: 3px 칠하고 2px 비움, 멀수록 옅게.
-                let mut d = 0.0;
-                while d < len {
-                    let p0 = start + dir * d;
-                    let p1 = start + dir * (d + 3.0).min(len);
-                    // 줄은 1px라 띠보다 잘 안 보인다: 처음부터 조금 진하게.
-                    let fade = 1.0 - d / 150.0 * 0.5;
-                    let c = Color::new(edge.r, edge.g, edge.b, edge.a.max(0.3) * fade);
-                    // 점선도 어두운 밑띠 위에(0160).
-                    draw_line(
-                        p0.x,
-                        p0.y,
-                        p1.x,
-                        p1.y,
-                        3.0,
-                        Color::new(0.1, 0.05, 0.02, c.a * 0.45),
-                    );
-                    draw_line(p0.x, p0.y, p1.x, p1.y, 1.0, c);
-                    d += 5.0;
-                }
+                draw_dotted_fuse(w, pos, e.facing, e.radius(), reach, k);
             }
             _ => {
                 let at = match e.state {
@@ -574,7 +629,8 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                 };
                 let r = sp.land_radius;
                 draw_circle(at.x, at.y, r, fill);
-                // 고리가 바깥에서 조여 들어 내려앉을 때 딱 맞는다.
+                // 가운데부터 차오르고 고리는 바깥에서 조여 든다 — 둘이 만나는 순간 내려앉는다.
+                draw_fill_disk(at, r * k, edge);
                 draw_no_parry_ring(at, r * (1.5 - 0.5 * k), edge);
                 let inner = Color::new(edge.r, edge.g, edge.b, edge.a * 0.5);
                 draw_circle_lines(at.x, at.y, r, 1.0, inner);
@@ -597,21 +653,7 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
         } else {
             Color::new(PARRY_EDGE_RGB.0, PARRY_EDGE_RGB.1, PARRY_EDGE_RGB.2, a)
         };
-        let mut d0 = 0.0;
-        while d0 < p.len {
-            let p0 = c + p.dir * d0;
-            let p1 = c + p.dir * (d0 + 3.0).min(p.len);
-            draw_line(
-                p0.x,
-                p0.y,
-                p1.x,
-                p1.y,
-                3.0,
-                Color::new(0.1, 0.05, 0.02, edge.a * 0.45),
-            );
-            draw_line(p0.x, p0.y, p1.x, p1.y, 1.0, edge);
-            d0 += 5.0;
-        }
+        draw_dots(c, p.dir, p.len, k, edge);
     }
 }
 
