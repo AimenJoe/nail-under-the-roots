@@ -319,7 +319,7 @@ impl Enemy {
             State::Thump { time } => (time, self.thump_windup()),
             _ => return None,
         };
-        Some((time / dur.max(1e-3)).clamp(0.0, 1.0))
+        Some(tele_progress(time, dur))
     }
 
     /// 받아칠 수 있는 공격인가(0160): 곧게 오는 돌진(물기·구르기·내리꽂기도 `Charge`)만. 내려앉기·튀어나오기는
@@ -723,11 +723,21 @@ mod tests {
         assert_eq!(e.telegraph(), Some(0.0));
         e.state = State::Windup { time: e.windup() };
         assert_eq!(e.telegraph(), Some(1.0));
+        // 다 찬 그림은 공격 `TELE_FULL_HOLD`초 전부터 보인다(0188): 그 직전까진 고르게 차오르고, 그 뒤로는 1.
+        let lead = t::TELE_FULL_HOLD.min(e.windup() * 0.25);
         e.state = State::Crouch {
-            time: e.windup() * 0.5,
+            time: (e.windup() - lead) * 0.5,
             target: Vec2::ZERO,
         };
         assert!((e.telegraph().unwrap() - 0.5).abs() < 1e-5);
+        e.state = State::Windup {
+            time: e.windup() - lead * 0.5,
+        };
+        assert_eq!(e.telegraph(), Some(1.0), "공격 직전엔 다 찬 채로");
+        e.state = State::Windup {
+            time: e.windup() - lead - 0.02,
+        };
+        assert!(e.telegraph().unwrap() < 1.0, "그 전엔 아직 덜 찼다");
         e.state = State::Aim { time: 0.0 };
         assert_eq!(e.telegraph(), Some(0.0));
         e.state = State::Charge {
@@ -1343,4 +1353,10 @@ mod tests {
         assert_eq!(e.poison, 0.0);
         assert!(e.alive);
     }
+}
+
+/// 예고 진행(0..1): 공격 `TELE_FULL_HOLD`초 전에 1이 되어 그대로 남는다(0188). 적·떨어지는 돌·할매 당기기가 같이 쓴다.
+pub fn tele_progress(time: f32, dur: f32) -> f32 {
+    let lead = t::TELE_FULL_HOLD.min(dur * 0.25);
+    (time / (dur - lead).max(1e-3)).clamp(0.0, 1.0)
 }

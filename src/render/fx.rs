@@ -373,8 +373,8 @@ pub(super) fn draw_mine(m: &world::Mine, time: f32) {
 /// 테두리와 채움은 겹쳐 그리지 않는다(반투명이 겹치면 그 자리만 진해져 다른 색으로 보인다, 0186): 테두리는 겹치지 않는
 /// 삼각형으로 짓고, 채움은 테두리 안쪽까지만. 어두운 밑띠도 뺐다 — 그게 "외곽선"으로 읽혀 채움과 색이 달라 보였다(사장, 0186).
 /// 색은 붉은 계열 하나(`TELE_RGB`, 0187). 못 받아치는 것(둘레)은 가운데 X(0160, X만 어두운 같은 색).
-pub(super) const TELE_A: f32 = 0.75;
-pub(super) const TELE_BASE_A: f32 = 0.1;
+pub(super) const TELE_A: f32 = 0.6;
+pub(super) const TELE_BASE_A: f32 = 0.08;
 /// 테두리 띠의 폭(px).
 const TELE_RING: f32 = 2.0;
 /// 예고 색은 하나, 붉은 계열(0187, 사장): 황금 띠는 풀밭 초록과 섞여 흐렸다. 받아칠 수 있는지는 색이 아니라 모양으로
@@ -504,7 +504,7 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
     use crate::species::Behavior;
     // 무너지는 천장(0147): 떨어질 자리에 그림자가 커지고, 원 안쪽이 진해진다.
     for r in &w.hazards.rocks {
-        let k = (r.time / t::ROCK_FALL).clamp(0.0, 1.0);
+        let k = crate::enemy::tele_progress(r.time, t::ROCK_FALL);
         let rad = t::ROCK_R;
         draw_ellipse(
             r.pos.x,
@@ -578,7 +578,7 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
             .filter(|p| p.time < t::DEEP_PULL_WINDUP)
             .map(|p| (d.center, p))
     }) {
-        let k = (p.time / t::DEEP_PULL_WINDUP).clamp(0.0, 1.0);
+        let k = crate::enemy::tele_progress(p.time, t::DEEP_PULL_WINDUP);
         draw_tele_lane(c, c + p.dir * p.len, 2.5, k);
     }
 }
