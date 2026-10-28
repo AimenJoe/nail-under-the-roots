@@ -14,7 +14,10 @@
 칸 배치는 16칸 시절(nail.py)과 같다(게임 코드는 칸 크기 `art::NAIL_CELL`만 안다):
   줄 0: 서기 2, 걷기 4 / 줄 1: 치기 3, 맞음, 쓰러짐, 들기 3, 거두기 / 줄 2: 흙더미 2, 그림자(16칸 그림을 칸 아래 가운데에)
   줄 3~5: 줄 0~2의 흰 실루엣(피격 번쩍·다 모인 몸빛)
-원본에 없는 동작(줄 1)은 당분간 서기 칸을 옮기고 기울여 만든다(`derived`) — 동작 시트가 오면 `FRAMES`에 칸을 더해 바꾼다.
+줄 1은 시트 B(`SRC_B`, 3×3: 들기 A·치기 A·들기 B / 치기 B·크게 들기·내려찍기 / 거두기·맞음·쓰러짐)에서.
+시트 B의 함정: 그리지 말라 한 휘두름 호(살구 갈색)·흙먼지를 그려 왔다 → 정한 네모 안의 그 색만 지우고(`ERASE`),
+몸에서 떨어진 작은 조각은 버린다(`main_parts`). 칸 안 가로 자리는 몸통 털의 가운데로 맞춘다(`fur_cx`) — 겉 네모로
+가운데에 두면 발톱을 뻗는 칸마다 몸이 옆으로 뛴다.
 """
 import colorsys
 import os
@@ -48,6 +51,23 @@ SRC_FRAMES = {               # 원본의 발밑 보라 줄(윗줄 y 386~391, 아
 GROUP = {"idle_a": "idle_a", "idle_b": "idle_a", "walk_a": "walk_a", "walk_b": "walk_a", "walk_c": "walk_a", "walk_d": "walk_a"}
 REF = "idle_a"
 
+# 시트 B(동작): 눈 크기가 아홉 칸 모두 같아(같은 배율로 그렸다) 배율 하나 — 똑바로 선 들기 A 칸의 몸 키를 BODY_H로.
+SRC_B = HERE / "sources" / "ai" / "sprites" / "nail_s1_v2_b.png"
+B_FRAMES = {
+    "windup0": (9, 5, 331, 295),
+    "attack0": (350, 5, 669, 295),
+    "windup1": (692, 5, 1022, 295),
+    "attack1": (9, 317, 335, 604),
+    "windup2": (378, 314, 658, 607),
+    "attack2": (722, 320, 1022, 608),
+    "settle": (9, 626, 335, 913),
+    "hurt": (353, 621, 668, 913),
+    "dead": (698, 678, 1022, 913),
+}
+B_REF = "windup0"
+ARC = (192, 145, 108)   # 휘두름 호의 살구 갈색(발톱 크림·주둥이·코와는 RGB 차 합 100 넘게 떨어진다)
+ERASE = {"attack0": [(455, 170, 669, 295)], "attack1": [(255, 317, 335, 604)]}   # 호가 지나가는 네모(시트 좌표)
+
 
 def magenta(a):
     return np.minimum(a[..., 0], a[..., 2]) - a[..., 1]
@@ -56,6 +76,39 @@ def magenta(a):
 def solid_mask(a, erode=3):
     keep = (magenta(a) < 60).astype(np.uint8) * 255
     return np.asarray(Image.fromarray(keep).filter(ImageFilter.MinFilter(erode))) > 0
+
+
+def erase_arc(a, keep, box, frame):
+    """정한 네모 안에서 호 색(ARC ± 60)만 버린다."""
+    x0, y0 = frame[0], frame[1]
+    for bx0, by0, bx1, by1 in box:
+        sub = a[by0 - y0:by1 - y0, bx0 - x0:bx1 - x0]
+        near = np.abs(sub - ARC).sum(-1) < 60
+        keep[by0 - y0:by1 - y0, bx0 - x0:bx1 - x0] &= ~near
+    return keep
+
+
+def main_parts(keep, frac=0.02):
+    """가장 큰 덩어리의 frac보다 작은 조각(흙먼지·호 찌꺼기)을 버린다."""
+    lab = np.zeros(keep.shape, np.int32)
+    sizes = [0]
+    H, W = keep.shape
+    for y0, x0 in zip(*np.nonzero(keep)):
+        if lab[y0, x0]:
+            continue
+        n = len(sizes)
+        lab[y0, x0] = n
+        stack, size = [(y0, x0)], 0
+        while stack:
+            y, x = stack.pop()
+            size += 1
+            for yy, xx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if 0 <= yy < H and 0 <= xx < W and keep[yy, xx] and not lab[yy, xx]:
+                    lab[yy, xx] = n
+                    stack.append((yy, xx))
+        sizes.append(size)
+    sizes = np.array(sizes)
+    return (sizes >= sizes.max() * frac)[lab] & keep
 
 
 def body_h(a, keep):
@@ -113,6 +166,19 @@ def outline(rgba):
     return out
 
 
+def is_fur(key):
+    r, g, b = (v / 255 for v in key)
+    hh, ll, ss = colorsys.rgb_to_hls(r, g, b)
+    return 0.03 <= hh <= 0.12 and 0.12 <= ss <= 0.55 and 0.15 <= ll <= 0.75 and tuple(key) != OUTLINE
+
+
+def fur_cx(sprite):
+    """몸통 털(갈색) 점들의 가로 가운데."""
+    ys, xs = np.nonzero(sprite[..., 3])
+    fx = [x for y, x in zip(ys, xs) if is_fur(tuple(int(v) for v in sprite[y, x, :3]))]
+    return float(np.median(fx))
+
+
 def seat(sprite, dx=0, dy=0):
     """CELL×CELL 칸에 발바닥 FOOT·가운데로(외곽선 한 겹 둘레 포함). dx·dy로 옮긴다."""
     h, w = sprite.shape[:2]
@@ -124,43 +190,6 @@ def seat(sprite, dx=0, dy=0):
             if 0 <= yy < CELL and 0 <= xx < CELL and sprite[y, x, 3]:
                 cell[yy, xx] = sprite[y, x]
     return outline(cell)
-
-
-def shear(sprite, k):
-    """윗몸을 앞(+)·뒤(−)로 기울인다: 위에서부터 줄마다 조금씩 민다(발 줄은 그대로)."""
-    h = sprite.shape[0]
-    out = np.zeros_like(sprite)
-    for y in range(h):
-        s = round(k * (h - 1 - y) / (h - 1))
-        out[y] = np.roll(sprite[y], s, axis=0)
-        if s > 0:
-            out[y, :s] = 0
-        elif s < 0:
-            out[y, s:] = 0
-    return out
-
-
-def squash(sprite, rows):
-    """몸을 위에서 `rows`줄 눌러 납작하게(발은 그대로): 가운데 줄을 뺀다."""
-    h = sprite.shape[0]
-    drop = set(range(h // 3, h // 3 + rows))
-    return np.stack([sprite[y] for y in range(h) if y not in drop])
-
-
-def derived(base):
-    """원본에 없는 동작(줄 1): 서기 칸을 기울이고 옮겨 당분간 쓴다. 동작 시트가 오면 바꾼다."""
-    fwd = shear(base, 3)
-    return {
-        "attack0": seat(fwd, dx=2),
-        "attack1": seat(squash(fwd, 1), dx=2, dy=0),
-        "attack2": seat(squash(shear(base, 4), 2), dx=3),
-        "hurt": seat(shear(base, -3), dx=-2),
-        "dead": seat(base[::-1], dy=-1),
-        "windup0": seat(shear(base, -2), dy=-1),
-        "windup1": seat(shear(base, -2), dy=-1),
-        "windup2": seat(shear(base, -3), dy=-2),
-        "settle": seat(squash(base, 1), dx=1),
-    }
 
 
 def small(grid_text):
@@ -185,12 +214,24 @@ def build():
     pal = shared_palette([(crops[REF], masks[REF])])
     scale = {g: BODY_H / body_h(crops[g], masks[g]) for g in set(GROUP.values())}
     spr = {k: shrink(crops[k], masks[k], scale[GROUP[k]], pal) for k in crops}
-    d = derived(spr[REF])
+    src_b = np.asarray(Image.open(SRC_B).convert("RGB")).astype(int)
+    b_crops = {k: src_b[y0:y1, x0:x1] for k, (x0, y0, x1, y1) in B_FRAMES.items()}
+    b_masks = {}
+    for k, a in b_crops.items():
+        keep = solid_mask(a)
+        if k in ERASE:
+            keep = erase_arc(a, keep, ERASE[k], B_FRAMES[k])
+        b_masks[k] = main_parts(keep)
+    b_scale = BODY_H / body_h(b_crops[B_REF], b_masks[B_REF])
+    act = {k: shrink(b_crops[k], b_masks[k], b_scale, pal) for k in b_crops}
+    # 칸 안 가로 자리: 서기 칸을 가운데에 둔 그 몸통 자리에 모두 맞춘다.
+    w0 = spr[REF].shape[1]
+    anchor = (CELL - w0) // 2 + fur_cx(spr[REF])
+    put = lambda sp: seat(sp, dx=round(anchor - ((CELL - sp.shape[1]) // 2 + fur_cx(sp))))
     rows = [
         [seat(spr["idle_a"]), seat(spr["idle_b"]), seat(spr["walk_a"]), seat(spr["walk_b"]),
          seat(spr["walk_c"]), seat(spr["walk_d"])],
-        [d["attack0"], d["attack1"], d["attack2"], d["hurt"], d["dead"],
-         d["windup0"], d["windup1"], d["windup2"], d["settle"]],
+        [put(act[k]) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
         [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
     ]
     sheet = np.zeros((CELL * 6, CELL * 9, 4), np.uint8)
@@ -222,10 +263,7 @@ def fur_variant(sheet, fur):
             continue
         key = tuple(int(v) for v in px[:3])
         if key not in cache:
-            r, g, b = (v / 255 for v in key)
-            hh, ll, ss = colorsys.rgb_to_hls(r, g, b)
-            is_fur = 0.03 <= hh <= 0.12 and 0.12 <= ss <= 0.55 and 0.15 <= ll <= 0.75 and key != OUTLINE
-            if not is_fur:
+            if not is_fur(key):
                 cache[key] = None
             else:
                 # 기본 털 4단 밝기 사이 어디쯤인가 → 같은 자리의 털빛 색
