@@ -25,6 +25,8 @@ NAIL = {
     'o': (43, 29, 42), 'd': (92, 62, 52), 'b': (128, 92, 74), 'h': (166, 128, 102), 'l': (206, 172, 142),
     'p': (242, 152, 164), 'q': (200, 104, 124), 'c': (248, 238, 216), 'C': (206, 190, 164),
     'e': (26, 16, 32), 'w': (255, 255, 255), 'r': (236, 132, 132),
+    # 주황 목도리(0206 새 옷: 게임 스프라이트와 같은 색)
+    'j': (238, 128, 60), 'k': (214, 92, 29), 'K': (174, 66, 19),
 }
 MOMO = {
     'o': (43, 29, 42), 'd': (104, 84, 74), 'b': (150, 124, 106), 'h': (190, 164, 140), 'l': (228, 212, 192),
@@ -147,6 +149,24 @@ def attach_x(ells, y, width, side, overlap=1):
     return xs[0] - width + overlap if side == 'L' else xs[-1] + 1 - overlap
 
 
+def scarf(g, y, tail=None):
+    """목(y−1~y+1, 세 줄 — 게임 스프라이트처럼 몸의 5분의 1쯤)을 두른 주황 목도리(0206 새 옷). 몸통 털(bhdl)만 칠해 앞발은 위에 남는다. 몸통 폭의 왼쪽은 밝게,
+    오른쪽은 그늘로(원통). tail = (x, 위 끝 y): 등 위로 늘어진 끝자락 — 뒷모습에서 목도리가 보이는 자리."""
+    for yy in (y - 1, y, y + 1):
+        xs = [x for x in range(S) if g[yy][x] in 'bhdl']
+        if not xs:
+            continue
+        x0, x1 = xs[0], xs[-1]
+        for x in xs:
+            t = (x - x0 + 0.5) / (x1 - x0 + 1)
+            g[yy][x] = 'j' if t < 0.22 else 'K' if t > 0.74 else 'k'
+    if tail:
+        put(g, tail[0], tail[1], SCARF_TAIL)
+
+
+SCARF_TAIL = [".k", "jk", "jk", "kK", "kK"]
+
+
 def outline(g):
     out = [r[:] for r in g]
     for y in range(S):
@@ -203,6 +223,7 @@ def nail_frame(i):
     ell = [(cx, cy + dy * (k >= 2), rx, ry) for k, (cx, cy, rx, ry) in enumerate(NAIL_BODY)]
     g = back(ell, [(x, y + dy * (y > 14)) for x, y in NAIL_GRAIN], hump=(12.5, 13.5, 4.2))
     head_shade(g, 23 + dy)
+    scarf(g, 21 + dy, tail=(14, 15 + dy))
     put(g, 15, 1, TAIL)
     up_left = i % 2 == 0
     for side in ('L', 'R'):
@@ -242,6 +263,7 @@ def nail_look(wink):
     g = nail_frame(0)
     # outline()을 거친 뒤라 외곽선 포함. 머리를 다시 얹고 외곽선을 다시 두른다.
     g = [[ch if ch != 'o' else '.' for ch in row] for row in g]
+    scarf(g, 18)      # 고개를 들면 목은 머리 바로 위
     put(g, 9, 19, LOOK_HEAD)
     if wink:
         put(g, 19, 22, WINK)
@@ -253,6 +275,8 @@ def nail_spin(k):
     phase = k / 8 * 2 * math.pi
     g = back(NAIL_BODY, NAIL_GRAIN, hump=(12.5, 13.5, 4.2), phase=phase, belly=1.4)
     head_shade(g, 23)
+    tx = spin_x(NAIL_BODY, 19, -0.3, phase, 2)      # 끝자락은 등 가운데 조금 왼쪽에 붙어 함께 돈다
+    scarf(g, 21, tail=None if tx is None else (tx, 15))
     put(g, 15, 1, TAIL)
     for am, rows in ((-math.pi / 2, PAW_DOWN), (math.pi / 2, flip(PAW_DOWN))):
         x = spin_x(NAIL_BODY, 20, am, phase, len(rows[0]))
