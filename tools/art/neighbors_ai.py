@@ -103,10 +103,10 @@ def body_map(cell, src, box):
     return r, body, lambda y, x: (cys.min() + (y - rows.min()) * sy, cxs.min() + (x - cols.min()) * sx)
 
 
-def redraw_eyes(cell, src, box, happy):
+def redraw_eyes(cell, src, box, happy, ink=OUTLINE, band=(0.2, 0.55)):
     """눈을 원본에서 다시 찍는다: 원본의 검은 눈(밝기 45 미만, 바탕에 닿지 않는 덩어리, 몸 위쪽 반, 꽉 찬 둥근 꼴)을 찾아
     (몸 키의 20~55% 줄 — 고글·앞발 테두리를 빼려고) 칸 자리로 옮기고, 그 둘레의 줄이며 남은 검은 점을 얼굴색으로 덮은 뒤 2×2 눈 + 오른쪽 위 흰 빛점(기쁨은 ^)을 찍는다.
-    32칸으로 줄이면 원본의 둥근 눈 + 빛점이 십자 모양 검은 덩어리가 됐다."""
+    32칸으로 줄이면 원본의 둥근 눈 + 빛점이 십자 모양 검은 덩어리가 됐다. `ink`는 눈 색(잡몹은 물든 붉은 눈, 0221)."""
     r, body, to = body_map(cell, src, box)
     dark = body & ((r * [0.299, 0.587, 0.114]).sum(-1) < 45)
     h, w = dark.shape
@@ -131,7 +131,7 @@ def redraw_eyes(cell, src, box, happy):
         fill = len(comp) / (bh * bw)
         rows = np.nonzero(body.any(1))[0]
         at = (np.mean(ys) - rows.min()) / (rows.max() - rows.min())
-        face_band = 0.2 < at < 0.55                       # 고글(맨 위)·앞발(아래)의 검은 테두리는 빼고
+        face_band = band[0] < at < band[1]                # 고글(맨 위)·앞발(아래)의 검은 테두리는 빼고
         eye_like = 300 < len(comp) < 4000 and fill > 0.5 and 0.4 < bh / bw < 2.5
         arc_like = 200 < len(comp) < 2000 and bh >= 25 and 0.3 < bh / bw <= 1.05   # 기쁨 ^: 속이 빈 꺾쇠(입·이마 줄은 낮다)
         if not edge and face_band and (arc_like if happy else eye_like):
@@ -153,7 +153,7 @@ def redraw_eyes(cell, src, box, happy):
                 out[y, x, :3] = base
         glyph = [(0, -1), (-1, 0), (0, 1)] if happy else [(-1, -1), (-1, 0), (0, -1), (0, 0)]
         for dy, dx in glyph:
-            out[ty + dy, tx + dx, :3] = OUTLINE
+            out[ty + dy, tx + dx, :3] = ink
         if not happy:
             out[ty - 1, tx, :3] = (255, 255, 255)
     return out

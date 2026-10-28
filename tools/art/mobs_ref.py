@@ -42,15 +42,17 @@ MOBS = [
      "cap squashed down, about to burst", "cap puffed up, releasing a puff (no spore cloud, the game draws it)"),
 ]
 
+# 들쥐·생쥐(첫 둘)에서 배운 것: 들쥐는 서기·걷기를 뒷모습으로 그렸고 눈을 검게 그렸다 → "모든 칸 오른쪽 옆모습, 뒷모습 금지",
+# "눈은 빛나는 빨강"을 세게 적는다.
 PROMPT = """Redraw the creature in the attached image (the right figure) as a pixel art sprite sheet for a cute top-down
-action game: {look}. It is corrupted by purple threads: glowing red eyes and a few small purple root-threads on its
-back. No mouth line.
+action game: {look}. It is corrupted by purple threads: its eyes are GLOWING RED (red, not black), and a few small
+purple root-threads grow on its back. No mouth line.
 
 Use the attached image for size: draw it as big as the right figure next to the small mole, same pixel block size.
 Keep every frame the same body size.
 
-3 columns x 2 rows, 6 frames, all facing right (3/4 view), solid magenta background (#FF00FF), figures well separated,
-no text, no grid lines, no shadows, no effects.
+3 columns x 2 rows, 6 frames. EVERY frame is a side view facing RIGHT (never a back view or front view).
+Solid magenta background (#FF00FF), figures well separated, no text, no grid lines, no shadows, no effects.
 1. standing   2. walking (one leg forward)   3. {windup}
 4. {attack}   5. hurt (flinching back, eyes squeezed shut)   6. defeated (lying on its side, eyes closed)"""
 
