@@ -3,8 +3,9 @@
 이 레포는 1인 개발(사장) + Claude가 함께 만든다. 공개 레포지만 오픈소스 라이선스는 없다(모든 권리 보유). 외부 PR을 받을 준비는 되어 있지 않지만, 규칙은 누가 와도 같다. 코드 규칙의 전문은 `CLAUDE.md`, 설계의 "왜"는 `docs/decisions/`.
 
 ## 브랜치와 배포
-- **main = 배포.** main에 push하면 웹이 바로 배포되고(Netlify), 버전이 올라가 있으면 Release(APK)가 만들어진다. 그래서 **main에는 배포하기로 정한 것만** push한다.
-- 평소 작업은 작업 브랜치(`claude/…` 등)에 커밋·push한다. 배포는 사장이 정한다: 고친 것을 모아 "이것들을 고쳤는데 v<버전>으로 배포할까요?"라고 묻고, 답을 받은 뒤 `docs/release.md`대로.
+- **main = 운영판 배포.** main에 push하면 웹이 바로 배포되고(Netlify), 버전이 올라가 있으면 Release(APK)가 만들어진다. 그래서 **main에는 배포하기로 정한 것만** push한다. 운영판은 개발 기능 없이 빌드한다(`--no-default-features`, 0193).
+- **`release/v<마일스톤>` = 개발판**(지금 `release/v0.5`). 마일스톤 작업은 작업 브랜치에서 여기로 합친다. push하면 개발판 웹(https://dev--nail-under-the-roots.netlify.app)과 APK(미리 보기 Release `dev`의 `nail-dev.apk`, 운영 앱과 나란히 깔린다)가 갈린다. main에 넣은 패치는 이 갈래에도 합친다. 마일스톤을 닫을 때 main에 합친다.
+- 평소 작업은 작업 브랜치(`claude/…` 등)에 커밋·push한다. 운영판 배포는 사장이 정한다: 고친 것을 모아 "이것들을 고쳤는데 v<버전>으로 배포할까요?"라고 묻고, 답을 받은 뒤 `docs/release.md`대로.
 - PR은 필수가 아니다(1인). PR을 열면 `deploy-web.yml`이 `pr-<번호>--nail-under-the-roots.netlify.app`에 미리보기를 올린다.
 - 커밋 메시지·문서는 **한국어**, 코드 식별자는 영어. 커밋 첫 줄에 결정 번호를 붙인다(예: `박자 콤보(0167): …`). 모델 이름·ID는 커밋에 쓰지 않는다.
 
@@ -12,7 +13,7 @@
 ```sh
 cargo fmt --all -- --check
 cargo clippy --target wasm32-unknown-unknown -- -D warnings
-cargo clippy --target wasm32-unknown-unknown --features dev -- -D warnings
+cargo clippy --target wasm32-unknown-unknown --no-default-features -- -D warnings   # 운영판(0193)
 cargo build --release --target wasm32-unknown-unknown
 cargo check --target aarch64-linux-android          # Android에서만 깨지는 의존성
 cargo check --release --target aarch64-apple-ios    # 리눅스에서도 된다

@@ -32,7 +32,8 @@ pub fn key(name: &str) -> String {
     format!("{KEY_OPEN}{name}{KEY_CLOSE}")
 }
 
-/// 표식을 뺀 글(소리·검사·저장용).
+/// 표식을 뺀 글(글자 넘침 검사용, 개발 빌드만).
+#[cfg(any(feature = "dev", test))]
 pub fn plain(s: &str) -> String {
     s.chars()
         .filter(|c| *c != KEY_OPEN && *c != KEY_CLOSE)

@@ -238,8 +238,13 @@ mod store {
         let dir = if let Some(d) = std::env::var_os("NAIL_SAVE_DIR") {
             PathBuf::from(d)
         } else if cfg!(target_os = "android") {
-            // 앱 전용 내부 폴더(다른 앱은 못 본다). 패키지 이름은 Cargo.toml [package.metadata.android].
-            PathBuf::from("/data/data/io.github.aimenjoe.nail/files")
+            // 앱 전용 내부 폴더(다른 앱은 못 본다). 패키지 이름은 Cargo.toml [package.metadata.android]이지만,
+            // 개발판은 CI가 `.dev`로 바꿔 짓는다(0193) — 그래서 프로세스 이름(= 패키지 이름)에서 읽는다.
+            let cmdline = std::fs::read_to_string("/proc/self/cmdline").unwrap_or_default();
+            PathBuf::from(format!(
+                "/data/data/{}/files",
+                super::android_package(&cmdline)
+            ))
         } else if cfg!(target_os = "windows") {
             PathBuf::from(std::env::var_os("APPDATA")?).join("nail")
         } else if cfg!(any(target_os = "macos", target_os = "ios")) {
@@ -349,8 +354,32 @@ pub fn save_run(i: usize, p: Option<&Profile>) {
     store::write(run_cell(i), &p.map(|p| p.encode()).unwrap_or_default());
 }
 
+/// Android 앱의 패키지 이름. `/proc/self/cmdline`의 첫 칸이 프로세스 이름이고, 앱 프로세스는 패키지 이름을 쓴다.
+/// 우리 패키지(운영 `io.github.aimenjoe.nail`, 개발판 `….dev`, 0193)가 아니면 운영 이름으로.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+fn android_package(cmdline: &str) -> String {
+    const BASE: &str = "io.github.aimenjoe.nail";
+    let name = cmdline.split('\0').next().unwrap_or("").trim();
+    let ours = name == BASE || name.strip_prefix(BASE) == Some(".dev");
+    if ours { name } else { BASE }.to_string()
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn android_save_dir_follows_the_package() {
+        use super::android_package as pkg;
+        assert_eq!(pkg("io.github.aimenjoe.nail\0"), "io.github.aimenjoe.nail");
+        assert_eq!(
+            pkg("io.github.aimenjoe.nail.dev\0\0"),
+            "io.github.aimenjoe.nail.dev"
+        );
+        // 읽지 못했거나 남의 이름이면 운영 이름.
+        assert_eq!(pkg(""), "io.github.aimenjoe.nail");
+        assert_eq!(pkg("io.github.aimenjoe.nailx"), "io.github.aimenjoe.nail");
+        assert_eq!(pkg("../../etc\0"), "io.github.aimenjoe.nail");
+    }
+
     use super::*;
 
     /// v0.3.8이 쓴 기록 글의 고정 샘플(0169 R8): 형식이 바뀌어도 옛 저장을 같은 값으로 읽어야 한다.

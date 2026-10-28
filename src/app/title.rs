@@ -19,12 +19,13 @@ pub(super) enum TitleItem {
 }
 /// 앨범 칸 배치(가로 칸 수).
 /// 타이틀에 보이는 버전: Cargo.toml 버전(= 릴리스 태그 v<버전>, 0059) + CI에서 만들었으면 커밋 앞 7자.
-/// 같은 버전이라도 main에 올라간 웹 빌드가 어느 커밋인지 알 수 있다.
+/// 같은 버전이라도 main에 올라간 웹 빌드가 어느 커밋인지 알 수 있다. 개발판(개발 기능)이면 끝에 `dev`(0193).
 pub(super) fn build_label() -> String {
     let v = env!("CARGO_PKG_VERSION");
+    let dev = if cfg!(feature = "dev") { " · dev" } else { "" };
     match option_env!("GITHUB_SHA") {
-        Some(sha) if sha.len() >= 7 => format!("{v} · {}", &sha[..7]),
-        _ => v.to_string(),
+        Some(sha) if sha.len() >= 7 => format!("{v} · {}{dev}", &sha[..7]),
+        _ => format!("{v}{dev}"),
     }
 }
 

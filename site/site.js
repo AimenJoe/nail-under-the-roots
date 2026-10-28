@@ -11,10 +11,11 @@
     const i = first.indexOf("—");
     return i >= 0 ? first.slice(i + 1).trim() : "";
   };
-  fetch(`https://api.github.com/repos/${REPO}/releases?per_page=4`, { headers: { Accept: "application/vnd.github+json" } })
+  fetch(`https://api.github.com/repos/${REPO}/releases?per_page=8`, { headers: { Accept: "application/vnd.github+json" } })
     .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
     .then((list) => {
-      const rel = list.filter((r) => !r.draft && !r.prerelease);
+      // 개발판(미리 보기 릴리스 `dev`, 0193)은 건너뛴다. 넉넉히 읽고 넷만.
+      const rel = list.filter((r) => !r.draft && !r.prerelease).slice(0, 4);
       if (!rel.length) return;
       const latest = rel[0];
       const apk = (latest.assets || []).find((a) => a.name.endsWith(".apk"));

@@ -3,9 +3,10 @@ name: build-ios
 # 내 기기에서 시험: 받은 nail-ios-unsigned.ipa를 Sideloadly·AltStore로 내 Apple ID로 서명해 설치(무료 계정은 7일마다 다시).
 # 나중에 TestFlight·App Store로 내려면 Apple Developer Program 인증서·프로비저닝 프로필을 Secrets에 두고 서명 단계를 더한다.
 # 공개 레포의 macOS 러너는 무료. main push(관련 파일)와 수동 실행(작업 브랜치는 Run workflow에서 고른다, 0169 R8).
+# 갈래(0193): main = 운영판(--no-default-features). release/**·수동 실행 = 개발판(개발 기능 + 번들 아이디 `.dev`, 이름 "Naïl dev").
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
     paths:
       - 'src/**'
       - 'assets/**'
@@ -41,8 +42,16 @@ jobs:
           targets: aarch64-apple-ios
       - uses: Swatinem/rust-cache@v2
 
+      - name: Build flavor
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "FEATURES=--no-default-features" >> "$GITHUB_ENV"; echo "FLAVOR=release" >> "$GITHUB_ENV"
+          else
+            echo "FEATURES=" >> "$GITHUB_ENV"; echo "FLAVOR=dev" >> "$GITHUB_ENV"
+          fi
+
       - name: Build (aarch64-apple-ios, release)
-        run: cargo build --release --target aarch64-apple-ios
+        run: cargo build --release --target aarch64-apple-ios $FEATURES
 
       - name: Assemble Naïl.app and unsigned ipa
         run: |
@@ -57,6 +66,12 @@ jobs:
           rm -rf "$app/assets/vendor/.git"
           cp ios/icons/*.png "$app/"
           sed -e "s/__VERSION__/$v/" -e "s/__BUILD__/$b/" ios/Info.plist > "$app/Info.plist"
+          if [ "$FLAVOR" = "dev" ]; then
+            # 운영 앱과 나란히 깔리게(기록도 따로): 번들 아이디·보이는 이름만 바꾼다.
+            sed -i '' -e 's|<string>io.github.aimenjoe.nail</string>|<string>io.github.aimenjoe.nail.dev</string>|' \
+                      -e 's|<string>Naïl</string>|<string>Naïl dev</string>|g' "$app/Info.plist"
+            grep -q "io.github.aimenjoe.nail.dev" "$app/Info.plist"
+          fi
           plutil -lint "$app/Info.plist"
           echo "APPL????" > "$app/PkgInfo"
           ditto -c -k --sequesterRsrc --keepParent Payload nail-ios-unsigned.ipa
@@ -66,6 +81,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nail-ios-unsigned
+          name: nail-ios-unsigned-${{ env.FLAVOR }}
           path: nail-ios-unsigned.ipa
           if-no-files-found: error

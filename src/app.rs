@@ -77,7 +77,8 @@ enum Scene {
     Controls {
         back: Back,
     },
-    /// 개발용 시나리오 목록.
+    /// 개발용 시나리오 목록. 운영 빌드(`--no-default-features`)에는 들어가는 길이 없다(0193).
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))]
     Dev,
     /// 컷씬. 끝나면 게임.
     Cutscene,

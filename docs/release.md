@@ -5,12 +5,19 @@
 ## 무엇이 어디로 나가나
 | 대상 | 트리거 | 워크플로 | 결과 |
 |---|---|---|---|
-| 웹(게임) | `main` push | `deploy-web.yml` | fmt·clippy·test·wasm 빌드 → Netlify 프로덕션(https://nail-under-the-roots.netlify.app). PR이면 미리보기 `pr-<번호>--…` |
+| 웹(게임) | `main` push | `deploy-web.yml` | fmt·clippy(두 갈래)·test·운영판 wasm 빌드(`--no-default-features`) → Netlify 프로덕션(https://nail-under-the-roots.netlify.app). PR이면 미리보기 `pr-<번호>--…` |
+| 웹(개발판, 0193) | `release/**` push | `deploy-web.yml` | 개발 기능을 넣은 빌드 → 별칭 `dev`(https://dev--nail-under-the-roots.netlify.app, noindex). 올린 뒤 `build.txt`가 그 커밋인지 확인 |
+| APK(개발판, 0193) | `release/**` push(`src/`·`assets/`·…) | `build-android.yml` | 패키지 `io.github.aimenjoe.nail.dev`("Naïl dev") → 미리 보기 Release `dev`의 `nail-dev.apk`를 갈아 끼움(태그 `dev`도 그 커밋으로) |
 | Release + APK | `main` push에 `Cargo.toml` 버전이 새 값 **그리고** `docs/releases/v<버전>.md`가 있음 | `release.yml` → `build-android.yml` | 태그 `v<버전>`, GitHub Release(본문 = 그 md), `nail.apk` 첨부 |
-| APK(시험용) | `main` push(`src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`), 또는 Actions → build-android → Run workflow에서 브랜치를 골라 수동 실행(0169 R8) | `build-android.yml` | Actions 아티팩트 `nail-apk-<sha>` |
+| APK(시험용) | `main` push(`src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`), 또는 Actions → build-android → Run workflow에서 브랜치를 골라 수동 실행(0169 R8) | `build-android.yml` | Actions 아티팩트 `nail-apk-<release 또는 dev>-<sha>`(main은 운영판, 수동 실행한 작업 브랜치는 개발판) |
 | 웹 연기 시험 | `main` push(`src/`·`assets/`·`web/`·`Cargo.*`·`tools/test/`), 또는 수동 | `smoke-web.yml` | 헤드리스 Chromium으로 타이틀·개발 시나리오 아홉 개(콘솔 에러·패닉·멈춘 화면), 스크린숏 아티팩트 `smoke-shots` |
-| iOS(서명 없음) | push | `build-ios.yml` | 아티팩트 `nail-ios-unsigned`(.ipa). 기기 시험은 Sideloadly·AltStore로 직접 서명 |
+| iOS(서명 없음) | `main`·`release/**` push | `build-ios.yml` | 아티팩트 `nail-ios-unsigned-release`/`-dev`(.ipa, 개발판은 번들 아이디 `….dev`). 기기 시험은 Sideloadly·AltStore로 직접 서명 |
 | 공식 페이지 | `main` push(`site/`) | `pages.yml` | GitHub Pages(https://aimenjoe.github.io/nail-under-the-roots/). 최신 버전·소식은 `site.js`가 Releases API에서 읽고, 못 읽으면 HTML에 적은 값 |
+
+## 갈래(0193)
+- `main` = 운영판, 패치만. `release/v0.5` = 마일스톤 개발판(작업 브랜치를 합친다, 묻지 않는다).
+- 패치를 main에 넣었으면 `git checkout release/v0.5 && git merge origin/main` 후 push.
+- 마일스톤을 닫을 때: release 갈래에 main을 합쳐 두고 → 버전 0.x.0·`docs/releases/v0.x.0.md`를 release 갈래에 커밋 → 그 커밋을 `git push origin HEAD:main`(아래 절차 5). 다음 마일스톤 갈래는 새 main에서 판다.
 
 ## 버전 규칙(0079)
 - **패치(0.x.y)**: 고친 것·더한 것. 사장이 기기에서 볼 것이 생기면 언제든. 사장이 "배포해"라고 할 때만.

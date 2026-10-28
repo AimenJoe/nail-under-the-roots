@@ -4,7 +4,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 
 ## 먼저 읽을 것
 1. `docs/concept.md` — 무엇을 만드는가
-2. `docs/phase-1-combat-prototype.md` — 1단계 범위와 판정 기준. 끝의 **"구현 상태"와 "사람이 할 일"**이 현재 위치다. 버전 규칙은 `docs/decisions/0079`(v0.2.0·v0.3.0은 닫음 0148, v0.4.0 "깊은 곳"은 닫음 0145). 지금 마일스톤(v0.5.0 "도토와 새 옷": 셋째 플레이어블 도토 + 그림 갈아입기)은 `docs/decisions/0191`, 그다음 v0.6 = 공개 데모
+2. `docs/phase-1-combat-prototype.md` — 1단계 범위와 판정 기준. 끝의 **"구현 상태"와 "사람이 할 일"**이 현재 위치다. 버전 규칙은 `docs/decisions/0079`(v0.2.0·v0.3.0은 닫음 0148, v0.4.0 "깊은 곳"은 닫음 0145). 지금 마일스톤(v0.5.0 "도토와 새 옷": 셋째 플레이어블 도토 + 그림 갈아입기)은 `docs/decisions/0191`, 그다음 v0.6 = 공개 데모. **마일스톤 작업은 `release/v0.5` 갈래로 합친다**(0193, 아래 "갈래")
 3. `docs/decisions/` — 왜 그렇게 정했나. 바꾸려면 새 번호로 기록
 
 세션 시작 프롬프트는 따로 없다. 이 파일과 위 세 문서가 그 역할을 한다. 세션이 끝나면 "구현 상태"·"사람이 할 일"을 갱신하고 커밋한다.
@@ -43,14 +43,16 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 ```sh
 cargo fmt --all -- --check
 cargo clippy --target wasm32-unknown-unknown -- -D warnings
+cargo clippy --target wasm32-unknown-unknown --no-default-features -- -D warnings   # 운영판(개발 기능 없음, 0193)
 cargo build --release --target wasm32-unknown-unknown
 cargo check --target aarch64-linux-android   # NDK 없이 됨. Android에서만 깨지는 의존성(gamepads 등)을 잡는다
 cargo test                                   # 단위·규칙 테스트(무브셋·번역·폰트 글자·지도·굽기·패드 키 등). 리눅스면 libx11-dev 등 필요(README)
 python3 tools/licenses.py                    # 의존성을 바꿨을 때만. assets/THIRD_PARTY_LICENSES.txt 갱신
 ```
-**배포는 사장에게 먼저 묻는다**(2026-10-26 사장 지시): 고친 것은 작업 브랜치에만 커밋·push하고, main push·버전 올리기·릴리스는 하지 않는다(main에 push하면 웹이 바로 배포된다). 고친 것을 모아 "이것들을 고쳤는데 v<버전>으로 배포할까요?"라고 묻고, 사장이 다음 수정 사항을 말하면 그것까지 넣어 배포 시점을 함께 정한다.
+**갈래(0193)**: `main` = 운영판(패치만), `release/v0.5` = 마일스톤 개발판(작업 브랜치를 여기로 합친다, 묻지 않는다 — 개발판 웹 https://dev--nail-under-the-roots.netlify.app · APK는 미리 보기 Release `dev`의 `nail-dev.apk`, 패키지 `….nail.dev`라 운영 앱과 나란히). main에 넣은 패치는 release 갈래에도 합친다. 마일스톤을 닫으면 release → main + 버전 올리기. 운영판 빌드는 `--no-default-features`(개발 메뉴 없음), 그 밖은 기본값(`dev`).
+**배포는 사장에게 먼저 묻는다**(2026-10-26 사장 지시): main push·버전 올리기·릴리스는 하지 않는다(main에 push하면 웹이 바로 배포된다). 고친 것을 모아 "이것들을 고쳤는데 v<버전>으로 배포할까요?"라고 묻고, 사장이 다음 수정 사항을 말하면 그것까지 넣어 배포 시점을 함께 정한다.
 
-CI: `deploy-web.yml`이 fmt·clippy·`cargo test`·wasm 빌드를 돌리고 Netlify 시크릿이 있으면 배포한다. `build-android.yml`이 APK를 만들어 아티팩트(태그면 Release)로 올리고, `build-ios.yml`(macOS 러너)이 서명하지 않은 `.ipa`를 아티팩트로 올린다 — 둘 다 main push·태그·수동 실행만(작업 브랜치 APK는 Actions에서 Run workflow, 0169 R8). `smoke-web.yml`은 main push마다 헤드리스 Chromium으로 웹 빌드를 띄워 본다(`tools/test/smoke.js`)(내 기기 시험은 Sideloadly·AltStore로 직접 서명, 0086). iOS에서는 패드가 아직 안 된다(gilrs에 iOS 백엔드 없음). `cargo check --release --target aarch64-apple-ios`는 리눅스에서도 된다. 앱 아이콘(iOS·Android)은 `tools/icons/make_icons.py`가 코드로 찍은 큰 나무·실에 얽힌 뿌리 실루엣에서 만든다(0087·0123). 릴리스는 `Cargo.toml` 버전을 올리고 `docs/releases/v<버전>.md`를 함께 main에 push하면 `release.yml`이 태그·APK·Release를 만든다(세션 프록시는 태그 push를 받지 않는다). 로컬에 Android SDK/NDK는 두지 않는다(docs/decisions/0005).
+CI: `deploy-web.yml`이 fmt·clippy(두 갈래)·`cargo test`·wasm 빌드를 돌리고 Netlify 시크릿이 있으면 배포한다(main = 운영, release/** = 별칭 `dev`). `build-android.yml`이 APK를 만들어 아티팩트(태그면 Release, release/**면 미리 보기 Release `dev`)로 올리고, `build-ios.yml`(macOS 러너)이 서명하지 않은 `.ipa`를 아티팩트로 올린다 — 둘 다 main·release/** push·태그·수동 실행만(작업 브랜치 APK는 Actions에서 Run workflow, 0169 R8). `smoke-web.yml`은 main push마다 헤드리스 Chromium으로 웹 빌드를 띄워 본다(`tools/test/smoke.js`)(내 기기 시험은 Sideloadly·AltStore로 직접 서명, 0086). iOS에서는 패드가 아직 안 된다(gilrs에 iOS 백엔드 없음). `cargo check --release --target aarch64-apple-ios`는 리눅스에서도 된다. 앱 아이콘(iOS·Android)은 `tools/icons/make_icons.py`가 코드로 찍은 큰 나무·실에 얽힌 뿌리 실루엣에서 만든다(0087·0123). 릴리스는 `Cargo.toml` 버전을 올리고 `docs/releases/v<버전>.md`를 함께 main에 push하면 `release.yml`이 태그·APK·Release를 만든다(세션 프록시는 태그 push를 받지 않는다). 로컬에 Android SDK/NDK는 두지 않는다(docs/decisions/0005).
 
 공식 페이지(0069, 땅속으로 내려가는 한 장 0155): `site/`(한국어 `index.html`, 영어 `en/`)를 `pages.yml`이 GitHub Pages에 올린다. 그림·글꼴은 `python3 tools/site/make_images.py`(초상화 자르기·일러스트 복사·걷는 스프라이트 띠 `SPRITES`·페이지 글자만 남긴 Galmuri), 스크린숏은 `tools/site/shots.js`. 페이지 글을 바꾸면 두 언어를 다 고치고 `make_images.py`를 다시 돌린다(글꼴 글자). 최신 버전·APK·소식은 `site.js`가 GitHub Releases에서 읽는다(못 읽으면 적어 둔 값).
 
