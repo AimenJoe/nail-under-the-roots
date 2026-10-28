@@ -4,7 +4,7 @@ Naïl: Under the Roots. 귀여운 탑다운 액션 로그라이트. Rust + macro
 
 ## 먼저 읽을 것
 1. `docs/concept.md` — 무엇을 만드는가
-2. `docs/phase-1-combat-prototype.md` — 1단계 범위와 판정 기준. 끝의 **"구현 상태"와 "사람이 할 일"**이 현재 위치다. 버전 규칙은 `docs/decisions/0079`(v0.2.0·v0.3.0은 닫음 0148, v0.4.0 "깊은 곳"은 닫음 0145). 다음 마일스톤(v0.5)은 아직 정하지 않았다(후보: 공개 데모·셋째 캐릭터·그림 갈아입기)
+2. `docs/phase-1-combat-prototype.md` — 1단계 범위와 판정 기준. 끝의 **"구현 상태"와 "사람이 할 일"**이 현재 위치다. 버전 규칙은 `docs/decisions/0079`(v0.2.0·v0.3.0은 닫음 0148, v0.4.0 "깊은 곳"은 닫음 0145). 지금 마일스톤(v0.5.0 "도토와 새 옷": 셋째 플레이어블 도토 + 그림 갈아입기)은 `docs/decisions/0191`, 그다음 v0.6 = 공개 데모
 3. `docs/decisions/` — 왜 그렇게 정했나. 바꾸려면 새 번호로 기록
 
 세션 시작 프롬프트는 따로 없다. 이 파일과 위 세 문서가 그 역할을 한다. 세션이 끝나면 "구현 상태"·"사람이 할 일"을 갱신하고 커밋한다.
@@ -58,6 +58,6 @@ CI: `deploy-web.yml`이 fmt·clippy·`cargo test`·wasm 빌드를 돌리고 Netl
 - `mq_js_bundle.js`나 게임패드 JS 플러그인을 외부 URL로 핫링크하지 않는다. `web/`에 복사본.
 - 에셋 팩을 라이선스 확인 없이 커밋하지 않는다. `assets/LICENSES.md`에 기록. **이 레포는 공개다. 유료·제3자 팩 원본은 `assets/vendor/`(gitignore)에만 두고 커밋하지 않는다**(docs/decisions/0010). 팩 그림은 Claude가 보고 고르고 확인해도 되지만 AI 학습·생성 참조에는 쓰지 않는다(0064).
 - 직접 그린 그림은 PNG를 손으로 고치지 않는다. 점으로 다듬을 때는 `tools/pixel`(`.pxl` 텍스트 원본, `pxl.py check`의 계단·외톨이 검사, 브라우저 편집기 `editor.html`, 0070). 그 밖에는 `tools/art/*.py`를 고치고 다시 생성한다(Naïl `nail.py`, 적·이웃 `critters.py`, 보스 `chief.py`, 땅 단면 전환의 파 내려가기 32px `dig.py`(0156), 초상화 `portraits.py`(칸 4 그림자만 코드, 나머지는 `tools/art/sources/ai/` 나노바나나 원본을 `ai_portraits.py`가 칸으로, 0108. 일러스트 첨부용 시트 묶음은 `ref_pack.py`, 0124), 타일 `tiles.py`, 컷씬 일러스트·타이틀 바탕 `illust.py`(타이틀 안개 `title_fog`만 코드, 장면·타이틀은 `tools/art/sources/ai/illust/` 나노바나나 원본을 `ai_illust.py`가 칸으로 — `AI_SCENES`, 0125. 나노바나나 원본을 새로 넣으면 `strip_logo.py`로 ✦ 로고를 원본에서 한 번 지운다, 0133) — 스프라이트·타일은 임시 그림. 지금 게임 초상화(칸 4 그림자 빼고)·일러스트·타이틀은 모두 나노바나나 원본에서 만든다. 예전 코드 그림과 파스텔·수채 바탕(`pastel_bg`, 0073)은 `tools/art/legacy/`에 얼려 두었다(0169 R8) — 원본이 없는 장면을 코드로 그릴 때만 거기서 돌린다. 사람이 그린 그림으로 바꿀 때는 `docs/art/cutscene-illustrations.md`).
-- 마일스톤(버전 규칙 0079, v0.4.0까지는 0145, 다음은 정해지면 그 번호) 밖의 큰 기능을 사장 지시 없이 먼저 만들지 않는다. 마이너 버전은 마일스톤을 마쳤을 때만 올린다(패치는 자유).
+- 마일스톤(버전 규칙 0079, 지금은 0191) 밖의 큰 기능을 사장 지시 없이 먼저 만들지 않는다. 마이너 버전은 마일스톤을 마쳤을 때만 올린다(패치는 자유).
 - `cargo-quad-apk` 커밋(`build-android.yml`의 `CARGO_QUAD_APK_REV`)과 `web/*.js` 복사본은 의도적으로만 올린다. 올리면 CI 콘솔/로그를 확인한다.
 - 언어: 문서·커밋 메시지 한국어, 코드 식별자 영어.
