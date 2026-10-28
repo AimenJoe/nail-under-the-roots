@@ -967,7 +967,7 @@ impl App {
             let on = i == self.shop_cursor;
             if on {
                 ui.rect(r, ui::PANEL_LIGHT);
-                ui.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ui::ACCENT);
+                ui.text("▶", r.x + 2.0, ui::mid_y(r), FONT_PX, ui::ACCENT);
             }
             let afford = self.world.inv.seeds >= self.world.knots.price(ware.price());
             let c = match (on, afford) {
@@ -978,8 +978,8 @@ impl App {
             let price = fill(s.shop_price, &[&self.world.knots.price(ware.price())]);
             let pw = ui.text_w(&price, FONT_PX);
             let name = ui.fit(tr(ware.name()), r.w - pw - 26.0, FONT_PX);
-            ui.text(&name, r.x + 14.0, r.y + 2.0, FONT_PX, c);
-            ui.text_right(&price, r.right() - 4.0, r.y + 2.0, FONT_PX, c);
+            ui.text(&name, r.x + 14.0, ui::mid_y(r), FONT_PX, c);
+            ui.text_right(&price, r.right() - 4.0, ui::mid_y(r), FONT_PX, c);
         }
         // 고른 물건 설명
         if let Some(ware) = wares.get(self.shop_cursor) {
@@ -1053,7 +1053,7 @@ impl App {
             ui.rect_lines(r, if on { ui::ACCENT } else { ui::BORDER });
             let label = ui.fit(label, r.w - 4.0, FONT_PX);
             let c = if on { ui::TEXT } else { ui::TEXT_DIM };
-            ui.text_center(&label, r.center().x, r.y + 2.0, FONT_PX, c);
+            ui.text_center(&label, r.center().x, ui::mid_y(r), FONT_PX, c);
             // 누르는 칸은 위아래로 조금 넉넉히.
             self.hits
                 .push((Rect::new(r.x, r.y - 4.0, r.w, r.h + 8.0), hit));
@@ -1237,7 +1237,7 @@ impl App {
             let on = i == self.decor_cursor;
             if on {
                 ui.rect(r, ui::PANEL_LIGHT);
-                ui.text("▶", r.x + 2.0, r.y + 1.0, FONT_PX, ui::ACCENT);
+                ui.text("▶", r.x + 2.0, ui::mid_y(r), FONT_PX, ui::ACCENT);
             }
             let owned = self.profile.flag(&key_decor(i));
             let right = if owned {
@@ -1254,8 +1254,8 @@ impl App {
             };
             let pw = ui.text_w(&right, FONT_PX);
             let name = ui.fit(tr(d.name), r.w - pw - 26.0, FONT_PX);
-            ui.text(&name, r.x + 14.0, r.y + 1.0, FONT_PX, c);
-            ui.text_right(&right, r.right() - 4.0, r.y + 1.0, FONT_PX, c);
+            ui.text(&name, r.x + 14.0, ui::mid_y(r), FONT_PX, c);
+            ui.text_right(&right, r.right() - 4.0, ui::mid_y(r), FONT_PX, c);
         }
         let hint = super::vfill(s.decor_hint, &[Verb::Confirm, Verb::Back]);
         let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
@@ -1529,18 +1529,18 @@ impl App {
                 } else {
                     ui.text_w(&cost, FONT_PX) + 4.0
                 };
-                ui.text(mark, cell.x + 3.0, cell.y + 3.0, FONT_PX, mc);
+                ui.text(mark, cell.x + 3.0, ui::mid_y(cell), FONT_PX, mc);
                 let nx = mark_end(ui, cell.x);
                 let name = ui.fit(tr(tal.name), cell.right() - nx - 3.0 - cw, FONT_PX);
                 let tc = if awake { ui::TEXT } else { ui::TEXT_DIM };
-                ui.text(&name, nx, cell.y + 3.0, FONT_PX, tc);
+                ui.text(&name, nx, ui::mid_y(cell), FONT_PX, tc);
                 if !cost.is_empty() {
                     let cc = if have >= tal.cost {
                         ui::ACCENT
                     } else {
                         ui::TEXT_DIM
                     };
-                    ui.text_right(&cost, cell.right() - 3.0, cell.y + 3.0, FONT_PX, cc);
+                    ui.text_right(&cost, cell.right() - 3.0, ui::mid_y(cell), FONT_PX, cc);
                 }
             }
         }
@@ -1563,7 +1563,7 @@ impl App {
                 },
             );
             if venom {
-                ui.text("●", cell.x + 3.0, cell.y + 3.0, FONT_PX, ui::ACCENT);
+                ui.text("●", cell.x + 3.0, ui::mid_y(cell), FONT_PX, ui::ACCENT);
             } else {
                 let cost = t::VENOM_AWAKE_COST.to_string();
                 let cc = if have >= t::VENOM_AWAKE_COST {
@@ -1571,12 +1571,12 @@ impl App {
                 } else {
                     ui::TEXT_DIM
                 };
-                ui.text_right(&cost, cell.right() - 3.0, cell.y + 3.0, FONT_PX, cc);
+                ui.text_right(&cost, cell.right() - 3.0, ui::mid_y(cell), FONT_PX, cc);
             }
             let tc = if venom { ui::TEXT } else { ui::TEXT_DIM };
             let nx = mark_end(ui, cell.x);
             let name = ui.fit(s.w_venom, cell.right() - nx - 30.0, FONT_PX);
-            ui.text(&name, nx, cell.y + 3.0, FONT_PX, tc);
+            ui.text(&name, nx, ui::mid_y(cell), FONT_PX, tc);
         }
         // 고른 칸의 설명 + 상태(또는 방금 한 일).
         let (r, c) = self.tree_cursor;

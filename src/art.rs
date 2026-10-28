@@ -23,10 +23,15 @@ pub struct Art {
     /// 새 그림 시트(`BIG_SHEETS` 순서, 0206 C3): 모모(momo_ai.py)·도토(doto_ai.py)·콩이(kongi_ai.py, 0217)·토끼풀(clover_ai.py, 0218)·이웃 포포·수수(neighbors_ai.py, 0220)·잡몹(mobs_ai.py, 0221). 줄 0 돌아온 모습, 줄 1 물든 모습,
     /// 줄 2·3 흰 실루엣. critters의 그 두 줄 대신 쓴다(`Art::critter`). 없으면 critters 16칸.
     pub big: Vec<Option<Texture2D>>,
+    /// 큰 시트마다 줄 0·1의 몸 자리(칸 안, 서기 두 칸 0·1의 불투명 범위를 합친 것). 도감 그림이 칸이 아니라 몸을
+    /// 가운데에 맞춰 키운다 — 칸은 가장 길게 뻗는 동작에 맞춰 커서(32·40칸) 서기 몸은 칸 아래쪽에 작게 앉아 있다.
+    pub big_body: Vec<[Rect; 2]>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
     /// 들쥐 대장·보리(tools/art/bori_ai.py, 0216): 40×40(발바닥 38), 줄 0 돌아온 보리, 줄 1 물든 대장, 줄 2·3 흰 실루엣.
     pub chief: Option<Texture2D>,
+    /// chief.png 물든 대장 줄의 몸 자리(`big_body`와 같은 뜻).
+    pub chief_body: Rect,
     /// 누룩 할매(tools/art/halmae_ai.py, 0219): 줄 0 가장 깊은 곳 96칸, 줄 1 마을 40칸. 없으면 코드 그림.
     pub halmae: Option<Texture2D>,
     /// 소품(tools/art/props_ai.py, 0222): 24칸 여섯(`PROP_*`) — 부술 수 있는 것 넷 + 상자 닫힘·열림. 없으면 코드 그림.
@@ -272,10 +277,15 @@ impl Art {
         if let Some(c) = &critters {
             c.set_filter(FilterMode::Nearest);
         }
-        let chief = crate::loading::texture("art/chief.png").await.ok();
-        if let Some(c) = &chief {
-            c.set_filter(FilterMode::Nearest);
-        }
+        let (chief, chief_body) = match crate::loading::image("art/chief.png").await {
+            Ok(img) => {
+                let body = body_box(&img, CHIEF_CELL, CHIEF_TAINTED);
+                let t = Texture2D::from_image(&img);
+                t.set_filter(FilterMode::Nearest);
+                (Some(t), body)
+            }
+            Err(_) => (None, Rect::new(0.0, 0.0, CHIEF_CELL, CHIEF_CELL)),
+        };
         let props = crate::loading::texture("art/props.png").await.ok();
         if let Some(p) = &props {
             p.set_filter(FilterMode::Nearest);
@@ -285,12 +295,21 @@ impl Art {
             h.set_filter(FilterMode::Nearest);
         }
         let mut big = Vec::new();
+        let mut big_body = Vec::new();
         for b in BIG_SHEETS {
-            let t = crate::loading::texture(b.file).await.ok();
-            if let Some(t) = &t {
-                t.set_filter(FilterMode::Nearest);
+            let full = Rect::new(0.0, 0.0, b.cell, b.cell);
+            match crate::loading::image(b.file).await {
+                Ok(img) => {
+                    big_body.push([body_box(&img, b.cell, 0), body_box(&img, b.cell, 1)]);
+                    let t = Texture2D::from_image(&img);
+                    t.set_filter(FilterMode::Nearest);
+                    big.push(Some(t));
+                }
+                Err(_) => {
+                    big_body.push([full, full]);
+                    big.push(None);
+                }
             }
-            big.push(t);
         }
         let dig = crate::loading::texture("art/dig.png").await.ok();
         if let Some(d) = &dig {
@@ -329,14 +348,38 @@ impl Art {
             light: light_blob(),
             critters,
             big,
+            big_body,
             portraits,
             chief,
+            chief_body,
             halmae,
             props,
             dig,
             illust,
         })
     }
+}
+
+/// 시트 `row`줄 서기 두 칸(0·1)의 불투명 범위를 합친 사각형(칸 왼쪽 위 기준). 비었으면 칸 전체.
+pub fn body_box(img: &Image, cell: f32, row: u32) -> Rect {
+    let (w, h, c) = (img.width as usize, img.height as usize, cell as usize);
+    let (mut x0, mut y0, mut x1, mut y1) = (usize::MAX, usize::MAX, 0, 0);
+    for f in 0..2 {
+        for y in 0..c {
+            let py = row as usize * c + y;
+            for x in 0..c {
+                let px = f * c + x;
+                if px >= w || py >= h || img.bytes[(py * w + px) * 4 + 3] == 0 {
+                    continue;
+                }
+                (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x + 1), y1.max(y + 1));
+            }
+        }
+    }
+    if x0 > x1 {
+        return Rect::new(0.0, 0.0, cell, cell);
+    }
+    Rect::new(x0 as f32, y0 as f32, (x1 - x0) as f32, (y1 - y0) as f32)
 }
 
 /// 64×64 원형 어둠 마스크. 가운데는 투명, 가장자리로 갈수록 검정. 부드러운 빛이라 Linear로 늘린다.
@@ -531,6 +574,8 @@ pub struct CritterCell<'a> {
     pub src: Rect,
     pub size: f32,
     pub foot: f32,
+    /// 칸 안의 몸 자리(서기 두 칸, `Art::big_body`). 옛 16칸 시트는 칸 전체.
+    pub body: Rect,
 }
 
 impl CritterCell<'_> {
@@ -554,24 +599,32 @@ impl CritterCell<'_> {
 
 impl Art {
     /// 이 critters 줄을 대신하는 새 그림 시트와 그 안의 줄(0 돌아온, 1 물든).
-    fn big_sheet(&self, base: u32) -> Option<(&BigSheet, &Texture2D, u32)> {
-        BIG_SHEETS.iter().zip(&self.big).find_map(|(b, t)| {
-            let r = if base == b.back {
-                0
-            } else if Some(base) == b.tainted {
-                1
-            } else {
-                return None;
-            };
-            t.as_ref().map(|t| (b, t, r))
-        })
+    fn big_sheet(&self, base: u32) -> Option<(usize, &BigSheet, &Texture2D, u32)> {
+        BIG_SHEETS
+            .iter()
+            .zip(&self.big)
+            .enumerate()
+            .find_map(|(i, (b, t))| {
+                let r = if base == b.back {
+                    0
+                } else if Some(base) == b.tainted {
+                    1
+                } else {
+                    return None;
+                };
+                t.as_ref().map(|t| (i, b, t, r))
+            })
     }
 
     /// critters `row`줄 `frame`칸(`row`에 `CRITTER_ROWS`를 더하면 흰 실루엣). 새 그림으로 옮긴 줄(모모·도토, 0206 C3)은
     /// 그 시트로 — 칸 번호의 뜻은 같다(0·1 서기, 2·3 걷기·깡충, 4 웅크림·겨누기, 5 공격, 6 맞음; 큰 시트는 7 쓰러짐도).
     pub fn critter(&self, frame: u32, row: u32) -> Option<CritterCell<'_>> {
         let (base, sil) = (row % CRITTER_ROWS, row >= CRITTER_ROWS);
-        if let Some((b, tex, r)) = self.big_sheet(base) {
+        if let Some((i, b, tex, r)) = self.big_sheet(base) {
+            let body = self
+                .big_body
+                .get(i)
+                .map_or(Rect::new(0.0, 0.0, b.cell, b.cell), |bb| bb[r as usize]);
             let r = r + if sil { 2 } else { 0 };
             return Some(CritterCell {
                 tex,
@@ -583,6 +636,7 @@ impl Art {
                 )),
                 size: b.cell,
                 foot: b.foot,
+                body,
             });
         }
         self.critters.as_ref().map(|tex| CritterCell {
@@ -590,6 +644,7 @@ impl Art {
             src: cell(frame.min(6), row),
             size: CELL,
             foot: CRITTER_FOOT,
+            body: Rect::new(0.0, 0.0, CELL, CELL),
         })
     }
 

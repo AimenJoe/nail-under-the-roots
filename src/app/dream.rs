@@ -262,10 +262,11 @@ impl App {
                 ui::TEXT
             };
             let name = ui.fit(&name, r.w - rw - 8.0, FONT_PX);
-            ui.text(&name, r.x + 4.0, r.y + 2.0, FONT_PX, c);
-            ui.text_right(&rec, r.right() - 3.0, r.y + 2.0, FONT_PX, c);
+            let ty = ui::mid_y(r);
+            ui.text(&name, r.x + 4.0, ty, FONT_PX, c);
+            ui.text_right(&rec, r.right() - 3.0, ty, FONT_PX, c);
             if star {
-                ui.text("★", r.right() - rw + 2.0, r.y + 2.0, FONT_PX, ui::ACCENT);
+                ui.text("★", r.right() - rw + 2.0, ty, FONT_PX, ui::ACCENT);
             }
             y += 17.0;
         }

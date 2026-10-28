@@ -39,9 +39,7 @@ impl App {
     pub(super) fn draw_help_body(&mut self, ui: &Ui, c: Rect) {
         // 목록: 열세 줄이 다 들어가지 않으면 고른 줄을 따라 넘긴다(도감과 같은 방식).
         // 줄 간격은 글자 높이 + 2 아래로 줄이지 않는다(열셋을 다 넣으면 겹친다) — 넘치면 ▲▼로 굴린다.
-        let row_h = (c.h / TOPICS.len() as f32)
-            .floor()
-            .clamp(FONT_PX + 2.0, FONT_PX + 3.0);
+        let row_h = FONT_PX + 4.0;
         let fits = ((c.h / row_h).floor() as usize).max(1);
         let arrow_w = ui.text_w("▼", FONT_PX).max(9.0);
         let arrows = if fits < TOPICS.len() { arrow_w } else { 0.0 };
@@ -80,7 +78,7 @@ impl App {
             ui.text(
                 &ui.fit(tr(t.title), list_w - 6.0 - arrows, FONT_PX),
                 r.x + 3.0,
-                r.y + (row_h - FONT_PX) * 0.5 - 1.0,
+                ui::mid_y(r),
                 FONT_PX,
                 if on { ui::ACCENT } else { ui::TEXT },
             );

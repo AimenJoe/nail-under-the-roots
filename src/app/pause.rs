@@ -469,12 +469,11 @@ impl App {
         use crate::species::{self, BESTIARY};
         let s = i18n::s();
         let seen = &self.world.seen;
-        // 목록이 아래 "만난 이웃 n/m" 줄에 닿지 않게. 줄 간격은 13 아래로 줄이지 않는다(9종에서 일본어가 겹쳤다, 0054).
-        // 다 안 들어가면 고른 줄을 따라 넘긴다(▲▼).
+        // 목록이 아래 "만난 이웃 n/m" 줄에 닿지 않게. 다 안 들어가면 고른 줄을 따라 넘긴다(▲▼).
+        // 줄은 늘 글자 + 4(고른 칸 15px 안에 글자 11px이 가운데): 열다섯 종을 다 넣으려 13으로 줄이면 고른 칸 테두리가
+        // 글자에 닿았다(9종에서 일본어가 겹친 것은 0054, 칸 높이는 사장 피드백 2026-10-28).
         let avail = c.h - FONT_PX - 6.0;
-        let row_h = (avail / BESTIARY.len() as f32)
-            .floor()
-            .clamp(13.0, FONT_PX + 4.0);
+        let row_h = FONT_PX + 4.0;
         let fits = ((avail / row_h).floor() as usize).max(1);
         // 넘기면 목록 오른쪽 9px에 ▲▼(이름·설명과 겹쳤다). 목록 폭은 가장 긴 아는 이름에 맞춰 74~100
         // (더 넓히면 오른쪽 능력 말이 잘렸다. 아주 긴 이름은 목록에서만 "…", 오른쪽 제목엔 다 나온다)
@@ -524,7 +523,7 @@ impl App {
             ui.text(
                 &ui.fit(name, list_w - 6.0 - arrows, FONT_PX),
                 r.x + 3.0,
-                r.y + 1.0,
+                ui::mid_y(r),
                 FONT_PX,
                 if on {
                     ui::ACCENT
@@ -948,7 +947,7 @@ impl App {
             let b = Rect::new(dx, sy + 1.0, dw, 15.0);
             ui.rect(b, ui::PANEL_LIGHT);
             ui.rect_lines(b, if blink { ui::ACCENT } else { ui::BORDER });
-            ui.text(&state_l[0], dx + 3.0, sy + 3.0, FONT_PX, ui::ACCENT);
+            ui.text(&state_l[0], dx + 3.0, ui::mid_y(b), FONT_PX, ui::ACCENT);
         } else if claimed {
             for (k, l) in state_l.iter().enumerate() {
                 ui.text(l, dx, sy + k as f32 * 13.0, FONT_PX, ui::TEXT_DIM);

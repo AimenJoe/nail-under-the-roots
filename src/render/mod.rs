@@ -496,28 +496,13 @@ impl Renderer {
         }
     }
 
-    /// 도감 그림: critters `row`줄 `frame`칸(모모는 새 그림 시트, `Art::critter`)을 논리 사각형 `r`에 정수 배율로(가운데 맞춤).
+    /// 도감 그림: critters `row`줄 `frame`칸(새 그림 시트면 그 시트, `Art::critter`)을 논리 사각형 `r`에 —
+    /// 칸이 아니라 몸 자리(`CritterCell::body`)를 가운데에 맞춰 키운다.
     pub fn draw_critter(&self, ui: &Ui, r: Rect, row: u32, frame: u32) {
         let Some(c) = self.art.as_ref().and_then(|a| a.critter(frame, row)) else {
             return;
         };
-        let k = ((r.w / c.size).floor() * ui.scale).max(1.0);
-        let size = c.size * k;
-        let p = ui.px(vec2(r.x, r.y));
-        let (bw, bh) = (r.w * ui.scale, r.h * ui.scale);
-        let x = (p.x + (bw - size) / 2.0).round();
-        let y = (p.y + (bh - size) / 2.0).round();
-        draw_texture_ex(
-            c.tex,
-            x,
-            y,
-            WHITE,
-            DrawTextureParams {
-                source: Some(c.src),
-                dest_size: Some(vec2(size, size)),
-                ..Default::default()
-            },
-        );
+        draw_body_fit(ui, r, c.tex, c.src, c.size, c.body);
     }
 
     /// 안내 화면의 힌트 그림(0180): 논리 사각형 `r` 안에, 게임 픽셀을 화면 배율 그대로(정수) 찍는다.
@@ -907,28 +892,16 @@ impl Renderer {
         draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
     }
 
-    /// 도감 그림(대장): chief.png 줄 0의 `frame`칸을 `r`에 정수 배율로.
+    /// 도감 그림(대장): chief.png 물든 대장 줄의 `frame`칸을 `r`에 몸 자리 맞춤으로.
     pub fn draw_chief_icon(&self, ui: &Ui, r: Rect, frame: u32) {
-        let Some(tex) = self.art.as_ref().and_then(|a| a.chief.as_ref()) else {
+        let Some(art) = self.art.as_ref() else {
             return;
         };
-        let k = ((r.w / art::CHIEF_CELL).floor() * ui.scale)
-            .max(ui.scale * 0.5)
-            .floor();
-        let size = art::CHIEF_CELL * k.max(1.0);
-        let p = ui.px(vec2(r.x, r.y));
-        let (bw, bh) = (r.w * ui.scale, r.h * ui.scale);
-        draw_texture_ex(
-            tex,
-            (p.x + (bw - size) / 2.0).round(),
-            (p.y + (bh - size) / 2.0).round(),
-            WHITE,
-            DrawTextureParams {
-                source: Some(art::chief_cell(frame, art::CHIEF_TAINTED)),
-                dest_size: Some(vec2(size, size)),
-                ..Default::default()
-            },
-        );
+        let Some(tex) = art.chief.as_ref() else {
+            return;
+        };
+        let src = art::chief_cell(frame, art::CHIEF_TAINTED);
+        draw_body_fit(ui, r, tex, src, art::CHIEF_CELL, art.chief_body);
     }
 
     /// 컷씬 배우: 돌아온 보리.
@@ -1044,3 +1017,25 @@ impl Renderer {
 }
 
 // ---- 방 안의 "위"(0156): 땅속이라는 것이 방에서도 느껴지게 ---------------------
+
+/// 도감 그림 한 칸: 칸(`size`) 안의 몸 자리 `body`가 논리 사각형 `r` 가운데에 오게, 화면 점 정수 배율로(게임 점의 2배까지).
+/// 칸 전체로 맞추면 큰 칸(32·40)은 반 배율로 작아지고, 칸 아래쪽에 앉은 몸이 아래로 쏠렸다.
+fn draw_body_fit(ui: &Ui, r: Rect, tex: &Texture2D, src: Rect, size: f32, body: Rect) {
+    let fit = (r.w / body.w).min(r.h / body.h).min(2.0);
+    let k = (fit * ui.scale).floor().max(1.0);
+    let p = ui.px(vec2(r.x, r.y));
+    let (cx, cy) = (p.x + r.w * ui.scale / 2.0, p.y + r.h * ui.scale / 2.0);
+    let x = (cx - (body.x + body.w / 2.0) * k).round();
+    let y = (cy - (body.y + body.h / 2.0) * k).round();
+    draw_texture_ex(
+        tex,
+        x,
+        y,
+        WHITE,
+        DrawTextureParams {
+            source: Some(src),
+            dest_size: Some(vec2(size, size) * k),
+            ..Default::default()
+        },
+    );
+}

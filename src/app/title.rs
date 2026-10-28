@@ -122,15 +122,15 @@ impl App {
                     let w = ui.text_w(&label, FONT_PX) + 18.0;
                     self.renderer.draw_soft_shade(
                         ui,
-                        Rect::new(r.x, r.y + 2.0, w, row_h - 4.0),
+                        Rect::new(r.x, r.y + 1.0, w, row_h - 2.0),
                         0.75,
                     );
-                    ui.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ui::ACCENT);
+                    ui.text("▶", r.x + 2.0, ui::mid_y(r), FONT_PX, ui::ACCENT);
                 }
                 ui.text(
                     &label,
                     r.x + 14.0,
-                    r.y + 2.0,
+                    ui::mid_y(r),
                     FONT_PX,
                     if on { ui::ACCENT } else { ui::TEXT_DIM },
                 );

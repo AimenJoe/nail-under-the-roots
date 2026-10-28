@@ -298,11 +298,11 @@ impl Ui {
             let r = Rect::new(x, y + i as f32 * row_h, w, row_h);
             if i == cursor {
                 self.rect(r, PANEL_LIGHT);
-                self.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ACCENT);
+                self.text("▶", r.x + 2.0, mid_y(r), FONT_PX, ACCENT);
             }
             let c = if i == cursor { TEXT } else { TEXT_DIM };
             let label = self.fit(it, w - 16.0, FONT_PX);
-            self.text(&label, r.x + 14.0, r.y + 2.0, FONT_PX, c);
+            self.text(&label, r.x + 14.0, mid_y(r), FONT_PX, c);
             rects.push(r);
         }
         rects
@@ -328,7 +328,7 @@ impl Ui {
         self.rect_lines(f, edge);
         let c = if sel { TEXT } else { TEXT_DIM };
         let label = self.fit(label, f.w - 4.0, FONT_PX);
-        self.text_center(&label, f.center().x, f.y + 2.0, FONT_PX, c);
+        self.text_center(&label, f.center().x, mid_y(f), FONT_PX, c);
     }
 
     /// 가로 탭 줄(폭 `max_w` 안). 각 탭의 논리 rect를 돌려준다.
@@ -355,7 +355,7 @@ impl Ui {
             self.text(
                 &l,
                 r.x + pad / 2.0,
-                r.y + 2.0,
+                mid_y(r),
                 FONT_PX,
                 if i == active { ACCENT } else { TEXT_DIM },
             );
@@ -387,17 +387,12 @@ impl Ui {
         let r_arrow = Rect::new(right - arrow_w, y, arrow_w, row.h);
         let l_arrow = Rect::new(right - arrow_w * 2.0 - vw, y, arrow_w, row.h);
         let label = self.fit(label, l_arrow.x - x - 8.0, FONT_PX);
-        self.text(&label, x + 4.0, y + 2.0, FONT_PX, c);
+        let ty = mid_y(row);
+        self.text(&label, x + 4.0, ty, FONT_PX, c);
         let ac = if selected { ACCENT } else { TEXT_DIM };
-        self.text("◀", l_arrow.x + 2.0, y + 2.0, FONT_PX, ac);
-        self.text_center(
-            value,
-            (l_arrow.right() + r_arrow.x) / 2.0,
-            y + 2.0,
-            FONT_PX,
-            c,
-        );
-        self.text("▶", r_arrow.x + 2.0, y + 2.0, FONT_PX, ac);
+        self.text("◀", l_arrow.x + 2.0, ty, FONT_PX, ac);
+        self.text_center(value, (l_arrow.right() + r_arrow.x) / 2.0, ty, FONT_PX, c);
+        self.text("▶", r_arrow.x + 2.0, ty, FONT_PX, ac);
         (row, l_arrow, r_arrow)
     }
 
@@ -405,6 +400,13 @@ impl Ui {
     pub fn dim(&self) {
         draw_rectangle(0.0, 0.0, screen_width(), screen_height(), DIM_OVERLAY);
     }
+}
+
+/// 칸 `r` 안에 글자 한 줄을 세로 가운데로 놓을 때의 `text` y. 글자는 y보다 위에서 시작한다(Galmuri 한글은 y−1.4 ~ y+9.6,
+/// 일본어·중국어 Ark Pixel은 y−0.4 ~ y+10.6 — 먹 가운데가 대략 y+4.5). 칸 위에서 +2로 찍으면 글자 윗줄이 칸 테두리에
+/// 닿아 고른 칸이 낮아 보였다(사장 피드백 2026-10-28).
+pub fn mid_y(r: Rect) -> f32 {
+    (r.y + r.h * 0.5 - FONT_PX * 0.375).round()
 }
 
 /// 줄바꿈. 띄어쓰기가 있는 글(한국어·영어)은 단어 단위, 띄어쓰기가 없는 글(일본어·중국어)은 글자 단위.

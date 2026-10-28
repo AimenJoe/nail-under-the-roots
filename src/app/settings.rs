@@ -235,7 +235,7 @@ impl App {
                 let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, FONT_PX + 3.0);
                 if selected {
                     ui.rect(r, ui::PANEL_LIGHT);
-                    ui.text("▶", r.x + 2.0, r.y + 2.0, FONT_PX, ui::ACCENT);
+                    ui.text("▶", r.x + 2.0, ui::mid_y(r), FONT_PX, ui::ACCENT);
                 }
                 let label = if i == SETTING_CONTROLS {
                     format!("{label}  →")
@@ -247,7 +247,7 @@ impl App {
                 ui.text(
                     &label,
                     r.x + 14.0,
-                    r.y + 2.0,
+                    ui::mid_y(r),
                     FONT_PX,
                     if selected { ui::TEXT } else { ui::TEXT_DIM },
                 );
@@ -327,13 +327,15 @@ impl App {
         );
         for row in 0..=CONTROL_BACK {
             let y = y0 + (row as f32 + 1.0) * row_h;
+            // 고른 칸은 y − 1부터 한 줄(창이 꽉 차 칸을 더 키울 수 없다) — 글자는 그 칸의 세로 가운데에.
+            let ty = ui::mid_y(Rect::new(0.0, y - 1.0, 1.0, row_h));
             let on = row == self.controls_cursor;
             if row < CONTROL_RESET {
                 let act = ACTS[row];
                 ui.text(
                     &ui.fit(tr(CONTROL_NAMES[row]), name_w - 4.0, FONT_PX),
                     x0 + 2.0,
-                    y,
+                    ty,
                     FONT_PX,
                     if on { ui::TEXT } else { ui::TEXT_DIM },
                 );
@@ -360,7 +362,7 @@ impl App {
                     ui.text(
                         &ui.fit(&label, r.w - 6.0, FONT_PX),
                         r.x + 4.0,
-                        y,
+                        ty,
                         FONT_PX,
                         if waiting { ui::ACCENT } else { ui::TEXT },
                     );
@@ -375,12 +377,12 @@ impl App {
                 let r = Rect::new(x0, y - 1.0, panel.w - 12.0, row_h);
                 if on {
                     ui.rect(r, ui::PANEL_LIGHT);
-                    ui.text("▶", r.x + 2.0, y, FONT_PX, ui::ACCENT);
+                    ui.text("▶", r.x + 2.0, ty, FONT_PX, ui::ACCENT);
                 }
                 ui.text(
                     label,
                     r.x + 14.0,
-                    y,
+                    ty,
                     FONT_PX,
                     if on { ui::TEXT } else { ui::TEXT_DIM },
                 );
