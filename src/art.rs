@@ -648,6 +648,14 @@ impl Art {
         })
     }
 
+    /// 이 줄의 시트가 가진 칸 수(큰 시트: 텍스처 폭 / 칸, 옛 16칸 시트는 7). 도토 달리기 네 칸(8~11, 0226)이 있는지 본다.
+    pub fn critter_frames(&self, row: u32) -> u32 {
+        match self.big_sheet(row % CRITTER_ROWS) {
+            Some((_, b, tex, _)) => (tex.width() / b.cell) as u32,
+            None => 7,
+        }
+    }
+
     /// 이 줄이 새 그림 시트에 있나(쓰러짐 칸 7이 있다).
     pub fn critter_is_big(&self, row: u32) -> bool {
         self.big_sheet(row % CRITTER_ROWS).is_some()

@@ -810,7 +810,10 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
                 5
             }
         }
-        // 달리기: 걷기 두 칸을 빠르게.
+        // 달리기: 달리기 네 칸(8~11, 도토 바운드 0226)이 있으면 그것을, 없으면 걷기 두 칸을 빠르게.
+        player::State::Run { .. } if moving && art.critter_frames(row) >= 12 => {
+            8 + ((time * 14.0) as u32) % 4
+        }
         player::State::Run { .. } if moving => 2 + ((time * 16.0) as u32) % 2,
         player::State::Attack { .. } | player::State::Heavy { .. } => 5,
         player::State::Charging { .. } => 5,

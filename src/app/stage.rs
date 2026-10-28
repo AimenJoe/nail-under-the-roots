@@ -567,7 +567,7 @@ impl App {
     }
 
     /// 길 지도를 연다. 쉼터의 뿌리 길에서 열면 뒤로 닫을 수 있고, 굴의 출구에서 열면 골라야 한다.
-    fn open_route(&mut self, can_cancel: bool) {
+    pub(super) fn open_route(&mut self, can_cancel: bool) {
         if self.world.adv.route.is_none() {
             return;
         }
@@ -788,7 +788,13 @@ impl App {
         if !w.adv.heart_sold && w.inv.root_hearts < t::ROOT_HEART_MAX {
             v.push(Ware::Heart);
         }
-        let missing: Vec<usize> = (0..CHARMS.len())
+        // 장신구는 이 런의 풀에서(캐릭터 전용 `Charm::only`를 거른 것, 상자·실타래와 같다). 전에는 CHARMS 전체라
+        // 도토 런에서 모모 장신구를 팔았다(사장 피드백 2026-10-28).
+        let missing: Vec<usize> = w
+            .inv
+            .charm_pool
+            .iter()
+            .copied()
             .filter(|c| !w.inv.charms_found.contains(c))
             .collect();
         if !missing.is_empty() {

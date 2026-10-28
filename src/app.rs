@@ -367,6 +367,10 @@ pub struct App {
     pending_run_start: bool,
     /// 쉼터 도착 한마디(쉼터 번호): 내려가는 전환이 끝나면 튼다(0225).
     pending_camp: Option<u32>,
+    /// 마을에서 내려온 런(0226): 첫 쉼터에 닿으면 도착 한마디 대신 길 지도를 바로 연다(쉼터는 깨어나는 자리로만).
+    village_run: bool,
+    /// 길 지도를 열 차례(런 첫 한마디가 끝난 뒤).
+    pending_route: bool,
     /// 설정 "기록 지우기"를 한 번 눌렀다(한 번 더 누르면 지운다).
     erase_armed: bool,
     /// 이 컷씬이 끝나면 갈 곳(엔딩 = 런의 끝).
@@ -492,6 +496,8 @@ impl App {
             pending_wake: false,
             pending_run_start: false,
             pending_camp: None,
+            village_run: false,
+            pending_route: false,
             erase_armed: false,
             album_cursor: 0,
             album_view: None,
@@ -788,7 +794,11 @@ impl App {
             && self.scene == Scene::Game
         {
             let n = self.pending_camp.take().unwrap_or(1);
-            self.play(cutscene::camp_arrive(&self.world, n));
+            if std::mem::take(&mut self.village_run) {
+                self.pending_route = true;
+            } else {
+                self.play(cutscene::camp_arrive(&self.world, n));
+            }
         }
         if self.pending_run_start
             && self.pending_camp.is_none()
@@ -798,6 +808,15 @@ impl App {
         {
             self.pending_run_start = false;
             self.say_story(crate::story::When::RunStart);
+        }
+        if self.pending_route
+            && !self.pending_run_start
+            && self.world.adv.fade.is_none()
+            && self.cutscene.is_none()
+            && self.scene == Scene::Game
+        {
+            self.pending_route = false;
+            self.open_route(true);
         }
         self.take_gifts();
         if let Some(tu) = self.tutorial.as_mut() {
@@ -938,6 +957,8 @@ impl App {
         self.pending_wake = false;
         self.pending_run_start = false;
         self.pending_camp = None;
+        self.village_run = false;
+        self.pending_route = false;
         self.apply_assist();
         self.seed_run_from_profile(s, ch);
         self.fill_inventory(s, ch, start, veteran);
@@ -1099,6 +1120,7 @@ impl App {
                     self.world.descend_to_first_camp();
                     self.scene = Scene::Game;
                     self.pending_run_start = true;
+                    self.village_run = true;
                     return;
                 }
             }
