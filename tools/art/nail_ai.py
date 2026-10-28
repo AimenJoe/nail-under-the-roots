@@ -65,6 +65,13 @@ B_FRAMES = {
     "dead": (698, 678, 1022, 913),
 }
 B_REF = "windup0"
+# 손발: 원본은 검게 왔지만 초상화는 분홍 손 + 크림 발톱이다(사장 "검은 다리가 어색"). 손은 초상화 분홍, 발은 한 단 짙게.
+LIMB = (32, 24, 35)      # 원본 검은 손발이 색표에서 받은 색(눈 (20, 9, 25)과는 RGB 차 합 37)
+PAW = (198, 102, 120)    # 코(231, 137, 153)보다 한 단 짙게 — 코 바로 아래 앞발과 섞이지 않게
+SOLE = (150, 80, 96)
+CLAW = (232, 217, 174)
+# 걷기 칸마다 앞발(오른쪽)·뒷발톱(왼쪽)을 반대로 1px 흔든다 — 원본 걷기는 손이 그대로였다(사장).
+SWING = {"walk_a": 1, "walk_b": 0, "walk_c": -1, "walk_d": 0}
 ARC = (192, 145, 108)   # 휘두름 호의 살구 갈색(발톱 크림·주둥이·코와는 RGB 차 합 100 넘게 떨어진다)
 ERASE = {"attack0": [(455, 170, 669, 295)], "attack1": [(255, 317, 335, 604)]}   # 호가 지나가는 네모(시트 좌표)
 
@@ -86,6 +93,20 @@ def erase_arc(a, keep, box, frame):
         near = np.abs(sub - ARC).sum(-1) < 60
         keep[by0 - y0:by1 - y0, bx0 - x0:bx1 - x0] &= ~near
     return keep
+
+
+def grow(mask, seeds):
+    """mask 안에서 seeds에 이어진 점만(4방향)."""
+    out = seeds.copy()
+    stack = list(zip(*np.nonzero(seeds)))
+    h, w = mask.shape
+    while stack:
+        y, x = stack.pop()
+        for yy, xx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+            if 0 <= yy < h and 0 <= xx < w and mask[yy, xx] and not out[yy, xx]:
+                out[yy, xx] = True
+                stack.append((yy, xx))
+    return out
 
 
 def main_parts(keep, frac=0.02):
@@ -166,6 +187,51 @@ def outline(rgba):
     return out
 
 
+def paws(sprite):
+    """검은 손발 → 분홍. 아래 세 줄은 발(SOLE), 그 위는 손(PAW).
+    손발 = 검은 덩어리 중 크림 발톱에 닿거나 아래 세 줄에 걸친 것. 머리 둘레의 검은 점은 털 그늘이라 둔다."""
+    out = sprite.copy()
+    h, w = out.shape[:2]
+    rgb = out[..., :3].astype(int)
+    on = (out[..., 3] > 0) & (np.abs(rgb - LIMB).sum(-1) < 20)
+    claw = (out[..., 3] > 0) & (np.abs(rgb - CLAW).sum(-1) < 8)
+    near = np.zeros_like(claw)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            near |= np.roll(np.roll(claw, dy, 0), dx, 1)
+    seeds = near.copy()
+    seeds[h - 3:] = True
+    on = grow(on, seeds & on)
+    rows = np.arange(h)[:, None] >= h - 3
+    out[on & rows, :3] = SOLE
+    out[on & ~rows, :3] = PAW
+    return out
+
+
+def swing(sprite, k):
+    """앞발(가운데 오른쪽의 손·발톱, 발 줄 위)은 k, 뒷발톱(왼쪽)은 −k만큼 옆으로. 빈 자리는 몸 쪽 이웃 색, 몸 밖이면 비운다."""
+    if k == 0:
+        return sprite
+    h, w = sprite.shape[:2]
+    rgb = sprite[..., :3].astype(int)
+    hand = (sprite[..., 3] > 0) & ((np.abs(rgb - PAW).sum(-1) < 8) | (np.abs(rgb - CLAW).sum(-1) < 8))
+    hand[h - 3:] = False
+    out = sprite.copy()
+    for side, d in ((np.arange(w) >= w // 2, k), (np.arange(w) < w // 2, -k)):
+        m = hand & side[None, :]
+        ys, xs = np.nonzero(m)
+        px = sprite[ys, xs].copy()
+        inward = -1 if side[-1] else 1          # 몸 쪽(가운데) 방향
+        for y, x in zip(ys, xs):
+            n = x + inward
+            keep = 0 <= n < w and sprite[y, n, 3] and not hand[y, n]
+            out[y, x] = sprite[y, n] if keep else 0
+        for (y, x), c in zip(zip(ys, xs), px):
+            if 0 <= x + d < w:
+                out[y, x + d] = c
+    return out
+
+
 def is_fur(key):
     r, g, b = (v / 255 for v in key)
     hh, ll, ss = colorsys.rgb_to_hls(r, g, b)
@@ -213,7 +279,8 @@ def build():
     # 색표는 기준 칸 하나에서(다섯 칸을 합쳐 고르면 넓은 갈색에 밀려 목도리 주황이 빠졌다), 다른 칸은 이 색표에 맞춘다.
     pal = shared_palette([(crops[REF], masks[REF])])
     scale = {g: BODY_H / body_h(crops[g], masks[g]) for g in set(GROUP.values())}
-    spr = {k: shrink(crops[k], masks[k], scale[GROUP[k]], pal) for k in crops}
+    spr = {k: paws(shrink(crops[k], masks[k], scale[GROUP[k]], pal)) for k in crops}
+    spr = {k: swing(s, SWING.get(k, 0)) for k, s in spr.items()}
     src_b = np.asarray(Image.open(SRC_B).convert("RGB")).astype(int)
     b_crops = {k: src_b[y0:y1, x0:x1] for k, (x0, y0, x1, y1) in B_FRAMES.items()}
     b_masks = {}
@@ -223,7 +290,7 @@ def build():
             keep = erase_arc(a, keep, ERASE[k], B_FRAMES[k])
         b_masks[k] = main_parts(keep)
     b_scale = BODY_H / body_h(b_crops[B_REF], b_masks[B_REF])
-    act = {k: shrink(b_crops[k], b_masks[k], b_scale, pal) for k in b_crops}
+    act = {k: paws(shrink(b_crops[k], b_masks[k], b_scale, pal)) for k in b_crops}
     # 칸 안 가로 자리: 서기 칸을 가운데에 둔 그 몸통 자리에 모두 맞춘다.
     w0 = spr[REF].shape[1]
     anchor = (CELL - w0) // 2 + fur_cx(spr[REF])
