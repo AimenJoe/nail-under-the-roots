@@ -95,7 +95,7 @@ def taint(cell):
 
 
 def thread(cell):
-    """보라 실 한 가닥: 몸 위 45% 줄을 가로질러(서기는 얼굴 앞쪽 35%를 비운다, 공은 다). 외곽선·밝은 점은 그대로."""
+    """보라 실 한 가닥: 몸 위 45% 줄을 가로질러(서기는 얼굴 앞쪽 45%를 비운다 — 35%면 눈에 닿았다, 공은 다). 외곽선·밝은 점은 그대로."""
     out = cell.copy()
     on = cell[..., 3] > 0
     ys = np.nonzero(on.any(1))[0]
@@ -103,7 +103,7 @@ def thread(cell):
     y = int(ys.min()) + int((ys.max() - ys.min() + 1) * 0.45)
     x0, x1 = int(xs.min()), int(xs.max())
     wide = (x1 - x0) > (ys.max() - ys.min()) * 1.2
-    face = x0 + (x1 - x0) * 0.65 if wide else x1 + 1
+    face = x0 + (x1 - x0) * 0.55 if wide else x1 + 1
     for x in range(x0, x1 + 1):
         if x >= face or not on[y, x]:
             continue
@@ -115,30 +115,39 @@ def thread(cell):
 
 
 def bands(cell, box, pal):
-    """공의 띠를 원본에서 다시 옮긴다. 띠는 원본에서 4px 굵기라 공 배율(블록 약 11px)로 줄이면 사라진다 — 원본의 띠 점(밝기
-    60~120, 외곽선보다 밝고 등딱지보다 어둡다)을 공의 테두리 상자끼리 맞춰 옮기고 외곽선 안쪽 칸에만 칠한다(띠 색 = 서기 칸
-    팔레트에서 가장 가까운 색 — 공 A 칸에는 바탕색 하나뿐이라 제 칸에서 고르면 안 보인다)."""
+    """등딱지 띠를 원본에서 다시 옮긴다. 띠는 원본에서 4px 굵기의 갈색 줄이라 칸 배율(블록 9~11px)로 줄이면 흩어진 점이나
+    민무늬가 된다(서기 칸은 점 몇 개, 공 A는 민무늬) — 콩이의 표지가 사라진다. 원본의 띠 점(밝기 50~125의 갈색: 붉은 기가
+    푸른 기보다 25 넘게 많다)을 몸의 테두리 상자끼리 맞춰 옮기고, 칸에서 등딱지 쪽 점(분홍이 아닌 것, 외곽선 아님)에만
+    칠한다. 띠 색 = 서기 칸 팔레트에서 가장 가까운 색(공 A 칸에는 바탕색 하나뿐이라 제 칸에서 고르면 안 보인다)."""
     src = np.asarray(Image.open(SRC).convert("RGB")).astype(int)
     x0, y0, x1, y1 = box
     r = src[y0:y1, x0:x1]
-    mag = (r[..., 0] > 200) & (r[..., 1] < 60)
+    body = ~((r[..., 0] > 200) & (r[..., 1] < 60))
     L = (r * [0.299, 0.587, 0.114]).sum(-1)
-    body = ~mag
-    band = body & (L > 60) & (L < 120)
-    bys, bxs = np.nonzero(body)
+    band = body & (L > 50) & (L < 125) & (r[..., 0] - r[..., 2] > 25) & (r[..., 1] >= r[..., 2])
+    rows = np.nonzero(body.sum(1) >= 6)[0]                     # 반짝이 같은 작은 조각은 상자에서 뺀다
+    cols = np.nonzero(body.sum(0) >= 6)[0]
     out = cell.copy()
     on = cell[..., 3] > 0
     cys, cxs = np.nonzero(on)
-    sy = (cys.max() - cys.min() + 1) / (bys.max() - bys.min() + 1)
-    sx = (cxs.max() - cxs.min() + 1) / (bxs.max() - bxs.min() + 1)
+    sy = (cys.max() - cys.min() + 1) / (rows.max() - rows.min() + 1)
+    sx = (cxs.max() - cxs.min() + 1) / (cols.max() - cols.min() + 1)
     want = tuple(int(v) for v in np.median(r[band], 0))
     ink = min(pal, key=lambda c: sum((a - b) ** 2 for a, b in zip(c, want)))
     hit = np.zeros(on.shape, int)
     for y, x in zip(*np.nonzero(band)):
-        hit[int(cys.min() + (y - bys.min()) * sy), int(cxs.min() + (x - bxs.min()) * sx)] += 1
-    for y, x in zip(*np.nonzero(hit >= 4)):
-        if on[y, x] and tuple(int(v) for v in cell[y, x, :3]) != OUTLINE:
-            out[y, x, :3] = ink
+        ty = int(cys.min() + (y - rows.min()) * sy)
+        tx = int(cxs.min() + (x - cols.min()) * sx)
+        if 0 <= ty < hit.shape[0] and 0 <= tx < hit.shape[1]:
+            hit[ty, tx] += 1
+    for y, x in zip(*np.nonzero(hit >= 6)):
+        key = tuple(int(v) for v in cell[y, x, :3])
+        if not on[y, x] or key == OUTLINE:
+            continue
+        h, _, _ = colorsys.rgb_to_hls(*(v / 255 for v in key))
+        if h < 0.07 or h > 0.85:                                # 분홍 살갗(머리·발)은 그대로
+            continue
+        out[y, x, :3] = ink
     return out
 
 
@@ -148,7 +157,7 @@ def build():
     cells = {k: seat(spr[k], CELL, FOOT) for k in ORDER}
     stand = cells["idle_a"]
     pal = {tuple(int(v) for v in p[:3]) for p in stand[stand[..., 3] > 0]} - {OUTLINE}
-    for k, box in zip(BALL, BALL_BOXES):
+    for k, box in zip(STAND + BALL, STAND_BOXES + BALL_BOXES):
         cells[k] = bands(cells[k], box, pal)
     sheet = np.zeros((CELL * 4, CELL * len(ORDER), 4), np.uint8)
     for c, k in enumerate(ORDER):
