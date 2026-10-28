@@ -44,6 +44,19 @@ Top-down 3/4 view. Solid magenta background (#FF00FF), one row, three props well
 3. A short log lying on its side as a seat, a little wider than the mole: bark on the side, rings on the cut end.
 ```
 
+### A3 — 뿌리 길 입구 다시(첫 A1에서 흙 바닥 위에 그려 옴)
+
+```
+Draw one new prop in EXACTLY the same pixel art style as the attached sprites (a cute top-down action game:
+chunky pixels, each pixel a 6x6 block, dark plum 1px outline, soft 3-4 tone shading, light from the top-left).
+The attached sprites are only a STYLE reference: do not redraw them.
+
+A burrow entrance, about two and a half moles wide: a dark round hole with a raised lip of packed earth around it,
+gnarled roots curling over the rim, and a small wooden arrow signpost on the left.
+IMPORTANT: draw ONLY the object on a solid magenta background (#FF00FF). Do NOT draw any ground, grass or soil tile
+around it; the magenta must touch the outer dark outline of the earth lip all around. No text, no shadows.
+```
+
 ## 시트 B — 마을 꾸미기 여섯
 
 ```

@@ -36,6 +36,8 @@ pub struct Art {
     pub halmae: Option<Texture2D>,
     /// 소품(tools/art/props_ai.py, 0222): 24칸 여섯(`PROP_*`) — 부술 수 있는 것 넷 + 상자 닫힘·열림. 없으면 코드 그림.
     pub props: Option<Texture2D>,
+    /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸 다섯(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리. 없으면 팩·코드 그림.
+    pub hub: Option<Texture2D>,
     /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 털빛 1~3, 줄 4 돌아온 모모. 땅 단면 전환에서만.
     pub dig: Option<Texture2D>,
     /// 컷씬 일러스트(illust::Illust::ALL 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
@@ -154,6 +156,32 @@ pub const PROP_CELL: f32 = 24.0;
 pub const PROP_FOOT: f32 = 22.0;
 pub const PROP_CHEST: u32 = 4;
 pub const PROP_CHEST_OPEN: u32 = 5;
+pub const HUB_CELL: f32 = 48.0;
+pub const HUB_FOOT: f32 = 46.0;
+pub const HUB_STALL: u32 = 0;
+pub const HUB_FIREPIT: u32 = 1;
+pub const HUB_STUMP: u32 = 2;
+pub const HUB_BOULDER: u32 = 3;
+pub const HUB_LOG: u32 = 4;
+
+/// 마을·쉼터 물건 한 칸을 발바닥 `feet`(가운데)에 그린다.
+pub fn draw_hub(tex: &Texture2D, frame: u32, feet: Vec2, tint: Color) {
+    draw_texture_ex(
+        tex,
+        (feet.x - HUB_CELL / 2.0).round(),
+        (feet.y - HUB_FOOT).round(),
+        tint,
+        DrawTextureParams {
+            source: Some(inset(Rect::new(
+                frame as f32 * HUB_CELL,
+                0.0,
+                HUB_CELL,
+                HUB_CELL,
+            ))),
+            ..Default::default()
+        },
+    );
+}
 
 /// 소품 한 칸을 발바닥 `feet`(가운데)에 그린다.
 pub fn draw_prop(tex: &Texture2D, frame: u32, feet: Vec2) {
@@ -236,6 +264,7 @@ impl Art {
                 "art/chief.png",
                 "art/halmae.png",
                 "art/props.png",
+                "art/hub.png",
                 "art/dig.png",
             ]
             .iter()
@@ -289,6 +318,10 @@ impl Art {
         let props = crate::loading::texture("art/props.png").await.ok();
         if let Some(p) = &props {
             p.set_filter(FilterMode::Nearest);
+        }
+        let hub = crate::loading::texture("art/hub.png").await.ok();
+        if let Some(h) = &hub {
+            h.set_filter(FilterMode::Nearest);
         }
         let halmae = crate::loading::texture("art/halmae.png").await.ok();
         if let Some(h) = &halmae {
@@ -354,6 +387,7 @@ impl Art {
             chief_body,
             halmae,
             props,
+            hub,
             dig,
             illust,
         })

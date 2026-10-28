@@ -249,6 +249,19 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
                         );
                     }
                 }
+                // 새 그림(0224 A)이 있으면 그루터기·바위는 그것(마을 들판의 나무는 위에서 팩 나무).
+                PropKind::Stump | PropKind::Rock if art.hub.is_some() => {
+                    if let Some(hub) = &art.hub {
+                        let (frame, rx) = if p.kind == PropKind::Stump {
+                            (art::HUB_STUMP, 9.0)
+                        } else {
+                            (art::HUB_BOULDER, 10.0)
+                        };
+                        let foot = vec2(r.center().x, r.bottom() + 2.0);
+                        draw_ellipse(foot.x, foot.y - 1.0, rx, 2.5, 0.0, SHADOW_SOFT);
+                        art::draw_hub(hub, frame, foot, w.biome.wall_tint());
+                    }
+                }
                 // 팩이 있으면 그루터기·바위도 Sunnyside(0066). 바위는 자리 해시로 셋 중 하나.
                 PropKind::Stump | PropKind::Rock if art.sunny.is_some() => {
                     if let Some(sunny) = &art.sunny {
@@ -278,13 +291,23 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
                 PropKind::Chest { opened } => draw_chest(art.props.as_ref(), r, opened, w.time),
                 PropKind::Breakable(b) => draw_breakable(art.props.as_ref(), b, r, w.time),
                 PropKind::Campfire => match &art.sunny {
-                    Some(sunny) => draw_campfire_sunny(sunny, r, w.time),
+                    Some(sunny) => draw_campfire_sunny(sunny, art.hub.as_ref(), r, w.time),
                     None => draw_campfire(r, w.time),
                 },
-                PropKind::Stall => match &art.sunny {
-                    Some(sunny) => draw_stall_sunny(sunny, r),
-                    None => draw_stall(r),
+                PropKind::Stall => match (&art.hub, &art.sunny) {
+                    (Some(hub), _) => {
+                        let foot = vec2(r.center().x.round(), r.bottom().round() + 1.0);
+                        draw_ellipse(foot.x, foot.y - 1.0, 18.0, 3.0, 0.0, SHADOW_SOFT);
+                        art::draw_hub(hub, art::HUB_STALL, foot, WHITE);
+                    }
+                    (None, Some(sunny)) => draw_stall_sunny(sunny, r),
+                    (None, None) => draw_stall(r),
                 },
+                PropKind::Seat if art.hub.is_some() => {
+                    if let Some(hub) = &art.hub {
+                        draw_seat_hub(hub, r, w.story.momo_wins());
+                    }
+                }
                 PropKind::Seat => match &art.sunny {
                     Some(sunny) => draw_seat_sunny(sunny, r, w.story.momo_wins()),
                     None => draw_seat(r, w.story.momo_wins()),

@@ -896,7 +896,8 @@ pub(super) fn draw_campfire(r: Rect, time: f32) {
 }
 
 /// 모닥불, 팩 그림판(0066): 돌 두른 자리 + 불꽃 4칸 + 따뜻한 빛·불티(직접).
-pub(super) fn draw_campfire_sunny(sunny: &art::Sunny, r: Rect, time: f32) {
+/// 새 화덕 그림(0224 A)이 있으면 팩 돌 자리 대신 그것을(불꽃·빛·불티는 그대로).
+pub(super) fn draw_campfire_sunny(sunny: &art::Sunny, hub: Option<&Texture2D>, r: Rect, time: f32) {
     let c = vec2(r.center().x, r.bottom() - 4.0);
     let flick = (time * 9.0).sin() * 0.5 + (time * 13.7).sin() * 0.5;
     draw_circle(
@@ -911,12 +912,15 @@ pub(super) fn draw_campfire_sunny(sunny: &art::Sunny, r: Rect, time: f32) {
         14.0 + flick * 0.5,
         Color::new(1.0, 0.7, 0.35, 0.08),
     );
-    crate::sunny::draw_at_foot(
-        &sunny.sheet,
-        crate::sunny::FIRE_PIT,
-        c + vec2(0.0, 6.0),
-        WHITE,
-    );
+    match hub {
+        Some(h) => art::draw_hub(h, art::HUB_FIREPIT, c + vec2(0.0, 6.0), WHITE),
+        None => crate::sunny::draw_at_foot(
+            &sunny.sheet,
+            crate::sunny::FIRE_PIT,
+            c + vec2(0.0, 6.0),
+            WHITE,
+        ),
+    }
     let (fw, fh) = crate::sunny::FIRE_FRAME;
     let f = ((time * 8.0) as u32 % 4) as f32;
     draw_texture_ex(
@@ -980,6 +984,15 @@ pub(super) fn draw_stall_sunny(sunny: &art::Sunny, r: Rect) {
     draw_circle(x + 6.0, top - 1.0, 2.0, world::BERRY);
     draw_rectangle(x + 10.0, top - 4.0, 4.0, 4.0, OUTLINE);
     draw_rectangle(x + 10.5, top - 3.5, 3.0, 3.5, world::SEED);
+}
+
+/// 빈 자리(0046): 새 통나무 자리 그림(0224 A) + 꽃잎. 꽃잎 규칙은 `draw_seat`와 같다.
+pub(super) fn draw_seat_hub(hub: &Texture2D, r: Rect, petals: u8) {
+    let foot = vec2((r.center().x).round(), r.bottom().round() + 1.0);
+    draw_ellipse(foot.x, foot.y - 1.0, 10.0, 2.0, 0.0, SHADOW_SOFT);
+    art::draw_hub(hub, art::HUB_LOG, foot, WHITE);
+    let (x, y) = (foot.x - 7.0, foot.y - 13.0);
+    seat_petals(x, y, petals);
 }
 
 /// 빈 자리(0046): 팩 그루터기 + 꽃잎. 꽃잎 규칙은 `draw_seat`와 같다.
