@@ -25,6 +25,9 @@ pub enum Id {
     EnemyHit,
     EnemyDie,
     Hurt,
+    /// 맞았다(플레이어)의 '아야'(합성, 짧게 내려가는 높은 소리). `Hurt`(파일, 둔탁한 타격)에 얹는다 — 둔탁한 소리만으로는
+    /// 적을 때리는 소리(같은 Kenney 주먹 타격)와 구분이 안 됐다(사장 피드백 2026-10-28).
+    Ouch,
     Die,
     Shoot,
     Charge,
@@ -144,6 +147,7 @@ pub struct Sfx {
     enemy_hit: Sound,
     enemy_die: Sound,
     hurt: Sound,
+    ouch: Sound,
     die: Sound,
     shoot: Sound,
     charge: Sound,
@@ -260,6 +264,11 @@ impl Sfx {
             hurt: make(&[
                 Layer::tone(0.25, 220.0, 160.0, Wave::Square, 0.5, 0.8),
                 Layer::tone(0.25, 227.0, 150.0, Wave::Square, 0.4, 0.8),
+            ])
+            .await,
+            ouch: make(&[
+                Layer::tone(0.14, 1250.0, 560.0, Wave::Triangle, 0.5, 1.1),
+                Layer::tone(0.07, 880.0, 700.0, Wave::Square, 0.12, 1.5),
             ])
             .await,
             die: make(&[
@@ -457,6 +466,7 @@ impl Sfx {
             Id::EnemyHit => &self.enemy_hit,
             Id::EnemyDie => &self.enemy_die,
             Id::Hurt => &self.hurt,
+            Id::Ouch => &self.ouch,
             Id::Die => &self.die,
             Id::Shoot => &self.shoot,
             Id::Charge => &self.charge,

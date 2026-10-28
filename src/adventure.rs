@@ -288,6 +288,16 @@ impl World {
 
     /// 지름길(0151): 보리가 돌아온 뒤의 런은 넓은 필드를 다 걷지 않고, 남쪽 공터 굴 입구 바로 위에서 시작한다.
     /// 쓰러지면 돌아올 자리(저장)도 여기. 필드는 첫 런·튜토리얼, 그리고 걸어서 올라가 보고 싶을 때를 위해 그대로 둔다.
+    /// 마을 뿌리 길에서 내려온 런(0225): 땅 위 필드를 거치지 않고 첫 쉼터로 곧장 내려간다. 내려가는 전환(지층 단면,
+    /// 0156)을 이미 다 덮인 자리부터 틀어 필드는 보이지 않는다 — 마을(0 m)에서 쉼터 깊이까지 단면이 흐른다.
+    /// 전에는 공터 굴 입구 위(지름길, 0151)에서 시작해 마을에서 내려왔는데 다시 땅 위 필드였고, 거기서 또 내려갔다.
+    pub fn descend_to_first_camp(&mut self) {
+        self.start_fade(Transition::EnterCamp);
+        if let Some(f) = self.adv.fade.as_mut() {
+            f.t = f.kind.half() * 2.0 * 0.2;
+        }
+    }
+
     pub fn start_near_entrance(&mut self) {
         let at = self.adv.entrance_pos - vec2(0.0, t::FIELD_SHORTCUT_UP);
         self.player.pos = at;
@@ -1027,9 +1037,11 @@ impl World {
         self.snap_cam();
     }
 
-    /// 실뿌리가 다 감겼는데 또 쓰러졌다(0210): 앱이 쉼터로 돌리지 않고 런을 끝낸다. 도움 모드·쉼터 전(필드)은 끝없이 깨어난다.
+    /// 이번 쓰러짐으로 실뿌리 셋째가 감긴다(0210 → 0225): 앱이 쉼터로 돌리지 않고 런을 끝낸다. 셋 = 쓰러질 수 있는 수 —
+    /// 전에는 "셋이 다 감긴 뒤 또"라 넷째에야 끝나 셋이라는 표시와 어긋났다(사장 피드백 2026-10-28).
+    /// 도움 모드·쉼터 전(필드)은 끝없이 깨어난다.
     pub fn run_over(&self) -> bool {
-        !self.assist && self.adv.home == Place::Camp && self.adv.falls >= t::RUN_LIVES
+        !self.assist && self.adv.home == Place::Camp && self.adv.falls + 1 >= t::RUN_LIVES
     }
 
     /// 실뿌리를 셀 때인가(쉼터를 지난 런, 도움 모드 아님). HUD가 셋을 그린다.
@@ -1093,7 +1105,7 @@ impl World {
             (|s| s.toast_respawn, 2.5)
         } else if !strand {
             (|s| s.toast_fall, 3.0)
-        } else if self.adv.falls >= t::RUN_LIVES {
+        } else if self.adv.falls + 1 >= t::RUN_LIVES {
             (|s| s.toast_fall_last, 4.0)
         } else {
             (|s| s.toast_fall_root, 3.5)
@@ -1483,6 +1495,28 @@ mod tests {
         assert!(w.descent().is_none() && w.fade_alpha() > 0.99);
     }
 
+    /// 마을에서 내려온 런(0225): 필드를 보이지 않고(처음부터 다 덮인 단면) 첫 쉼터에 닿는다.
+    #[test]
+    fn village_run_descends_straight_to_first_camp() {
+        let mut w = World::field();
+        w.open_glade();
+        w.skip_glade_boss();
+        w.descend_to_first_camp();
+        assert!(
+            w.descent().is_some_and(|d| d.cover > 0.99),
+            "필드는 보이지 않는다"
+        );
+        for _ in 0..2000 {
+            if !w.adventure_pre() {
+                break;
+            }
+        }
+        assert!(w.adv.fade.is_none());
+        assert_eq!(w.adv.place, Place::Camp);
+        assert_eq!(w.adv.stage, 1);
+        assert!(w.strands_shown());
+    }
+
     /// 지름길(0151): 공터 안, 굴 입구 바로 위의 걸을 수 있는 칸에서 시작하고, 저장도 거기.
     #[test]
     fn veteran_shortcut_starts_in_glade_above_entrance() {
@@ -1529,7 +1563,7 @@ mod tests {
         assert_eq!(w.adv.home, Place::Camp);
         assert!(w.strands_shown());
         w.story.set_fight(Kind::Momo, true);
-        for n in 1..=t::RUN_LIVES {
+        for n in 1..t::RUN_LIVES {
             assert!(!w.run_over());
             let at = w.player.pos + vec2(30.0, 0.0);
             w.spawn_mob(Kind::Momo, at);
@@ -1547,7 +1581,7 @@ mod tests {
         w.player.hp = 0;
         w.respawn_at_save();
         assert!(!w.story.fight(Kind::Momo), "도움 모드: 그 런은 지나간다");
-        assert_eq!(w.adv.falls, t::RUN_LIVES, "도움 모드에서는 세지 않는다");
+        assert_eq!(w.adv.falls, t::RUN_LIVES - 1, "도움 모드에서는 세지 않는다");
     }
 
     #[test]

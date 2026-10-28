@@ -363,6 +363,10 @@ pub struct App {
     death_noted: bool,
     /// 깨어나는 장면(어두워졌다 밝아짐)이 끝나면 한마디.
     pending_wake: bool,
+    /// 내려가는 전환이 끝나면 런 첫 한마디(마을에서 첫 쉼터로 곧장 내려간 런, 0225).
+    pending_run_start: bool,
+    /// 쉼터 도착 한마디(쉼터 번호): 내려가는 전환이 끝나면 튼다(0225).
+    pending_camp: Option<u32>,
     /// 설정 "기록 지우기"를 한 번 눌렀다(한 번 더 누르면 지운다).
     erase_armed: bool,
     /// 이 컷씬이 끝나면 갈 곳(엔딩 = 런의 끝).
@@ -486,6 +490,8 @@ impl App {
             profile: crate::profile::load(),
             death_noted: false,
             pending_wake: false,
+            pending_run_start: false,
+            pending_camp: None,
             erase_armed: false,
             album_cursor: 0,
             album_view: None,
@@ -760,6 +766,10 @@ impl App {
             self.death_t += dt;
             if !self.death_noted {
                 self.death_noted = true;
+                if self.world.run_over() {
+                    // 런이 끝나는 쓰러짐: 땅이 울고 뿌리가 감는다(보통 쓰러짐과 다른 소리·그림, draw_dead).
+                    self.sfx.play(crate::sfx::Id::Rumble);
+                }
                 self.on_death();
             }
         }
@@ -771,6 +781,23 @@ impl App {
         {
             self.pending_wake = false;
             self.say_story(crate::story::When::Wake);
+        }
+        if self.pending_camp.is_some()
+            && self.world.adv.fade.is_none()
+            && self.world.player.is_alive()
+            && self.scene == Scene::Game
+        {
+            let n = self.pending_camp.take().unwrap_or(1);
+            self.play(cutscene::camp_arrive(&self.world, n));
+        }
+        if self.pending_run_start
+            && self.pending_camp.is_none()
+            && self.world.adv.fade.is_none()
+            && self.world.player.is_alive()
+            && self.scene == Scene::Game
+        {
+            self.pending_run_start = false;
+            self.say_story(crate::story::When::RunStart);
         }
         self.take_gifts();
         if let Some(tu) = self.tutorial.as_mut() {
@@ -909,6 +936,8 @@ impl App {
         self.note_run_start(s);
         self.death_noted = false;
         self.pending_wake = false;
+        self.pending_run_start = false;
+        self.pending_camp = None;
         self.apply_assist();
         self.seed_run_from_profile(s, ch);
         self.fill_inventory(s, ch, start, veteran);
@@ -1062,8 +1091,16 @@ impl App {
             self.world.open_glade();
             if self.profile.flag(crate::profile::key::BORI_BACK) {
                 self.world.skip_glade_boss();
-                // 지름길(0151): 이미 다 아는 필드를 런마다 걷지 않는다.
-                self.world.start_near_entrance();
+                if self.resuming {
+                    // 쉼터 이어하기는 곧바로 그 쉼터를 다시 세운다(`resume_run`).
+                    self.world.start_near_entrance();
+                } else {
+                    // 마을 뿌리 길에서 첫 쉼터로 곧장 내려간다(0225, 지름길 0151을 대신한다). 런 첫 한마디는 닿은 뒤에.
+                    self.world.descend_to_first_camp();
+                    self.scene = Scene::Game;
+                    self.pending_run_start = true;
+                    return;
+                }
             }
             self.scene = Scene::Game;
             if !self.resuming {
@@ -1876,7 +1913,12 @@ impl App {
     }
 
     /// 사망 연출: 서서히 어두워지고 글자가 떠오른 뒤, 입력 잠금이 풀리면 안내가 깜빡인다.
+    /// 런이 끝나는 쓰러짐(실뿌리 셋째, 0225)은 따로: 화면 가장자리에서 실뿌리가 자라 나일을 감고, 글·안내가 다르다.
     fn draw_dead(&self, ui: &Ui) {
+        if self.world.run_over() {
+            self.draw_run_lost(ui);
+            return;
+        }
         let k = (self.death_t / t::DEATH_FADE).min(1.0);
         draw_rectangle(
             0.0,
@@ -1896,6 +1938,82 @@ impl App {
         if self.death_t >= t::DEATH_INPUT_LOCK && (get_time() * 2.0) as i64 % 2 == 0 {
             let hint = vfill(s.dead_hint, &[Verb::Restart, Verb::Menu]);
             ui.text_center(&hint, 160.0, 96.0, FONT_PX, ui::TEXT);
+        }
+    }
+
+    /// 런이 끝나는 쓰러짐(0225): 더 어둡게 + 화면 가장자리에서 실뿌리 열넷이 나일 쪽으로 자라 감고, 보랏빛 글.
+    fn draw_run_lost(&self, ui: &Ui) {
+        let tt = self.death_t;
+        let k = (tt / t::DEATH_FADE).min(1.0);
+        draw_rectangle(
+            0.0,
+            0.0,
+            screen_width(),
+            screen_height(),
+            Color::new(0.03, 0.01, 0.04, 0.7 * k),
+        );
+        // 뿌리가 자라는 정도 0..1(1.4초), 끝은 나일(화면 좌표) 둘레 14px에서 멈춘다.
+        let grow = (tt / t::RUN_LOST_GROW).min(1.0);
+        let grow = 1.0 - (1.0 - grow) * (1.0 - grow);
+        let target = self.renderer.to_view(self.world.player.pos);
+        for i in 0..14 {
+            let a = i as f32 / 14.0 * std::f32::consts::TAU + 0.37;
+            // 가장자리의 출발점: 방향 a로 화면 밖까지 뻗은 자리.
+            let dir = vec2(a.cos(), a.sin());
+            let reach = (170.0 / dir.x.abs().max(0.01)).min(100.0 / dir.y.abs().max(0.01));
+            let start = target + dir * reach;
+            let end = target + dir * 14.0;
+            let n = 18;
+            let shown = (n as f32 * grow) as usize;
+            let mut prev = start;
+            for j in 1..=shown {
+                let f = j as f32 / n as f32;
+                let side = vec2(-dir.y, dir.x);
+                let wob = (f * 9.0 + i as f32 * 1.7).sin() * 5.0 * (1.0 - f);
+                let p = start.lerp(end, f) + side * wob;
+                // 뿌리는 끝으로 갈수록 가늘게(3 → 1.5), 어두운 테두리 위에 보랏빛.
+                let wd = 3.0 - 1.5 * f;
+                let c = Color::new(0.50, 0.30, 0.48, 1.0);
+                ui.line_w(prev, p, wd + 1.5, Color::new(0.10, 0.04, 0.10, 1.0));
+                ui.line_w(prev, p, wd, c);
+                if j % 6 == 3 {
+                    // 곁뿌리 하나.
+                    let off = p + side * (if i % 2 == 0 { 5.0 } else { -5.0 }) + dir * 3.0;
+                    ui.line_w(p, off, 2.0, Color::new(0.10, 0.04, 0.10, 1.0));
+                    ui.line_w(p, off, 1.0, c);
+                }
+                prev = p;
+            }
+        }
+        // 다 자라면 나일 둘레를 감는 고리 셋(실뿌리 셋이 다 감겼다).
+        if grow >= 1.0 {
+            let wrap = ((tt - t::RUN_LOST_GROW) / 0.5).clamp(0.0, 1.0);
+            for r in 0..3 {
+                let ry = 4.0 + r as f32 * 3.0;
+                let rx = 11.0 - r as f32;
+                let n = (24.0 * wrap) as usize;
+                let at = |k: usize| {
+                    let a = k as f32 / 24.0 * std::f32::consts::TAU;
+                    target + vec2(a.cos() * rx, -6.0 + ry + a.sin() * 3.0)
+                };
+                for k in 0..n {
+                    ui.line_w(at(k), at(k + 1), 2.5, Color::new(0.10, 0.04, 0.10, 1.0));
+                    ui.line_w(at(k), at(k + 1), 1.2, Color::new(0.62, 0.40, 0.60, 1.0));
+                }
+            }
+        }
+        let s = i18n::s();
+        let tk = ((tt - 0.6) / 0.6).clamp(0.0, 1.0);
+        ui.text_center(
+            s.dead_final,
+            160.0,
+            48.0,
+            FONT_PX * 2.0,
+            Color::new(0.78, 0.55, 0.9, tk),
+        );
+        if tt >= t::DEATH_INPUT_LOCK && (get_time() * 2.0) as i64 % 2 == 0 {
+            let hint = vfill(s.dead_final_hint, &[Verb::Confirm]);
+            ui.text_center(&hint, 160.0, 140.0, FONT_PX, ui::TEXT);
         }
     }
 }

@@ -367,7 +367,7 @@ strings! {
     // 컷씬
     cut_skip, op_1, op_2, op_3, op_4, op_5,
     // 사망
-    dead, dead_hint,
+    dead, dead_hint, dead_final, dead_final_hint,
     // 장신구·가방·필살기(docs/decisions/0017, 0018)
     c_shell, c_shell_desc, c_whisker, c_whisker_desc, c_soil, c_soil_desc, c_flint, c_flint_desc, c_amulet, c_amulet_desc, it_berry, it_berry_desc, it_worm, it_worm_desc, toast_heart, toast_revive, quick_hint, special_name, special_desc, charms_label, charms_none, stat_attack, charm_equip, charm_unequip, bag_items, charm_slots,
     // 모험(docs/decisions/0019)

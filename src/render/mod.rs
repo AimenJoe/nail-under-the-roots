@@ -419,6 +419,22 @@ impl Renderer {
             let k = (w.juice.feel.flash / t::DRILL_WALL_FLASH).min(1.0) * shake_mul.min(1.0);
             draw_rectangle(0.0, 0.0, RW, RH, Color::new(1.0, 0.97, 0.9, 0.55 * k));
         }
+        if w.juice.feel.hurt > 0.0 {
+            // 맞음 테두리: 가장자리부터 안으로 옅어지는 붉은 띠. 흔들림 설정을 따른다(번쩍임과 같다).
+            let k = (w.juice.feel.hurt / t::PLAYER_HURT_EDGE).min(1.0) * shake_mul.min(1.0);
+            for i in 0..8 {
+                let a = 0.6 * k * (1.0 - i as f32 / 8.0);
+                let inset = i as f32 * 2.0;
+                draw_rectangle_lines(
+                    inset,
+                    inset,
+                    RW - 2.0 * inset,
+                    RH - 2.0 * inset,
+                    4.0,
+                    Color::new(0.95, 0.12, 0.14, a),
+                );
+            }
+        }
         let fade = w.fade_alpha();
         if fade > 0.0 {
             draw_rectangle(0.0, 0.0, RW, RH, Color::new(0.0, 0.0, 0.0, fade));

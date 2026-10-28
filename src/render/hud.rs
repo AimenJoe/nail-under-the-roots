@@ -521,9 +521,11 @@ pub(super) fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
             (4.0, 2.0),
             (5.0, 1.0),
         ];
+        // 런을 끝내는 쓰러짐(셋째)이면 쓰러진 동안 셋째도 감긴 것으로.
+        let wound = w.adv.falls + u32::from(!w.player.is_alive() && w.run_over());
         for i in 0..t::RUN_LIVES {
             let x = 4.0 + i as f32 * 9.0;
-            let (fill, edge) = if i < w.adv.falls {
+            let (fill, edge) = if i < wound {
                 (
                     Color::new(0.86, 0.62, 0.38, 1.0),
                     Color::new(0.20, 0.12, 0.08, 1.0),

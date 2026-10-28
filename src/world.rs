@@ -2055,6 +2055,9 @@ impl World {
                     }
                     self.juice.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
                     self.juice.feel.add_trauma(t::PLAYER_HURT_SHAKE);
+                    self.juice.feel.add_kick(ppos - from, t::PLAYER_HURT_KICK);
+                    self.juice.feel.hurt = t::PLAYER_HURT_EDGE;
+                    self.juice.audio.play(sfx::Id::Ouch);
                     self.juice
                         .fx
                         .push(ring(self.player.pos, 4.0, 14.0, 0.2, RED));

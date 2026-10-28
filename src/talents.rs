@@ -27,8 +27,13 @@ pub struct Talent {
     pub cost: u32,
 }
 
+/// `cost`는 처음 정한 값(0047), 실제 값은 `TALENT_PRICE_MUL`배(0225).
 const fn talent(name: Tr, desc: Tr, cost: u32) -> Talent {
-    Talent { name, desc, cost }
+    Talent {
+        name,
+        desc,
+        cost: cost * t::TALENT_PRICE_MUL,
+    }
 }
 
 /// 자리 2·4(패링·먹기)는 두 캐릭터가 함께 쓴다(0142).

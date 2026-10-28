@@ -26,7 +26,11 @@ pub const QUICK_FLASH: f32 = 1.2;
 pub const PLAYER_HURT_INVULN: f32 = 0.8;
 pub const PLAYER_HURT_KNOCKBACK: f32 = 170.0;
 pub const PLAYER_HURT_HITSTOP: f32 = 0.12;
-pub const PLAYER_HURT_SHAKE: f32 = 0.55;
+pub const PLAYER_HURT_SHAKE: f32 = 0.7;
+/// 맞으면 화면을 밀려난 쪽으로 차는 킥(px). 흔들림은 세기²라 0.55로는 1px 남짓 0.1초뿐이었다 — 작은 타격은 킥이 맡는다(0168).
+pub const PLAYER_HURT_KICK: f32 = 5.0;
+/// 맞음 테두리(화면 가장자리 붉은 번쩍임) 길이(초).
+pub const PLAYER_HURT_EDGE: f32 = 0.35;
 /// 입력 버퍼. 이 시간 안에 들어온 공격/굴파기 입력은 가능해지는 순간 실행된다.
 pub const INPUT_BUFFER: f32 = 0.10;
 /// 스틱 데드존(반지름). 데스크톱·웹 패드와 Android 패드 축(0143)이 같이 쓴다.
@@ -490,6 +494,8 @@ pub const SHAKE_DECAY: f32 = 2.2;
 // ---- 사망 연출 ------------------------------------------------------------
 /// 쓰러진 뒤 화면이 어두워지는 시간.
 pub const DEATH_FADE: f32 = 0.8;
+/// 런이 끝나는 쓰러짐(0225)에서 실뿌리가 화면 가장자리부터 나일까지 자라는 시간(초).
+pub const RUN_LOST_GROW: f32 = 1.4;
 /// 쓰러진 뒤 입력을 버리는 시간. 연타 중이던 손이 멈출 여유. 이 뒤에 안내가 뜨고 새 눌림만 받는다.
 pub const DEATH_INPUT_LOCK: f32 = 1.2;
 
@@ -680,7 +686,10 @@ pub const KONGI_RECOIL_LOCK: f32 = 0.35;
 pub const KONGI_BREAK_STUN: f32 = 1.6;
 
 /// 깨운 독 발톱(큰 나무, 0052)의 값(반딧불).
-pub const VENOM_AWAKE_COST: u32 = 120;
+pub const VENOM_AWAKE_COST: u32 = 120 * TALENT_PRICE_MUL;
+/// 큰 나무 재주·독 발톱 값의 배율(0225). 한 런(길 셋)에 반딧불이 350~450 모여, 처음 값(재주 40~80, 셋 캐릭터 다 해서
+/// 940 + 독 발톱 120)으로는 세 런이면 다 깨웠다(사장 "반딧불 수집량이 너무 많다"). 줍는 손맛은 두고 값을 올린다.
+pub const TALENT_PRICE_MUL: u32 = 3;
 
 // ---- 쉼터·상점(docs/decisions/0030) ---------------------------------------------------
 /// 상점 값(씨앗). 산딸기 · 쥬시 지렁이 · 뿌리 심장(최대 체력 +1, 쉼터마다 하나) · 장신구.

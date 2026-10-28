@@ -103,6 +103,8 @@ pub struct Feel {
     pub shake_offset: Vec2,
     /// 화면 번쩍임(남은 초). 렌더가 하얗게 덮는다.
     pub flash: f32,
+    /// 맞음 테두리(남은 초): 플레이어가 맞으면 화면 가장자리가 붉게 번쩍인다(렌더).
+    pub hurt: f32,
     /// 카메라 킥(0168): 맞힌 쪽으로 찼다가 지수로 돌아오는 오프셋(px). 흔들림의 제곱 곡선이 못 담는 작은 타격을 맡는다.
     pub kick: Vec2,
 }
@@ -112,6 +114,7 @@ impl Feel {
     pub fn tick(&mut self, dt: f32) {
         self.trauma = (self.trauma - tuning::SHAKE_DECAY * dt).max(0.0);
         self.flash = (self.flash - dt).max(0.0);
+        self.hurt = (self.hurt - dt).max(0.0);
         self.kick *= (-tuning::KICK_DECAY * dt).exp();
         if self.kick.length_squared() < 0.04 {
             self.kick = Vec2::ZERO;

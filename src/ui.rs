@@ -124,6 +124,12 @@ impl Ui {
         draw_line(a.x, a.y, b.x, b.y, self.scale, c);
     }
 
+    /// 굵기 `w`(논리 px) 선.
+    pub fn line_w(&self, a: Vec2, b: Vec2, w: f32, c: Color) {
+        let (a, b) = (self.px(a), self.px(b));
+        draw_line(a.x, a.y, b.x, b.y, self.scale * w, c);
+    }
+
     fn params(&self, size: f32, c: Color) -> TextParams<'_> {
         let (font_size, font_scale) = glyph_plan(size, self.scale, miniquad::window::dpi_scale());
         TextParams {

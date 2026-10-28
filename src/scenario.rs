@@ -71,6 +71,8 @@ pub enum Scenario {
     Camp,
     /// 둘째 쉼터(뿌리 동굴 지도, 0151).
     Camp2,
+    /// 첫 쉼터, 실뿌리 둘이 감긴 채 체력 1, 곁에 들쥐(0225): 런이 끝나는 쓰러짐 연출을 바로 본다.
+    LastRootlet,
     /// 첫 길 끝 굴(모모가 지킨다)에 바로. 숫자 = 이미 이긴 수(0 → 첫 만남, 2 → 세 번째, docs/decisions/0046).
     Momo(u8),
     /// 둘째 길 끝 굴(도토가 지킨다)에 바로(docs/decisions/0052).
@@ -91,7 +93,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 42] = [
+pub const LIST: [Entry; 43] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -302,6 +304,11 @@ pub const LIST: [Entry; 42] = [
         desc: "모모로 웨이브(0056). 뒷발 차기 콤보·깡충 회피·이어 뛰기(게이지 가득). 기록과 상관없이 바로.",
         scenario: Scenario::MomoArena,
     },
+    Entry {
+        name: "쉼터: 실뿌리 둘",
+        desc: "실뿌리 둘이 감긴 채 체력 1, 곁에 들쥐(0225). 맞으면 셋째가 감기며 런이 끝나는 연출 → 확인으로 마을.",
+        scenario: Scenario::LastRootlet,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -380,6 +387,15 @@ pub fn build(s: Scenario) -> World {
                 w.player.prev_pos = w.player.pos;
                 w.snap_cam();
             }
+            w
+        }
+        Scenario::LastRootlet => {
+            let mut w = World::camp_start(1);
+            w.adv.events.clear();
+            w.adv.falls = crate::tuning::RUN_LIVES - 1;
+            w.player.hp = 1;
+            let at = w.player.pos + vec2(26.0, 0.0);
+            w.spawn_mob(Kind::FieldMouse, at);
             w
         }
         Scenario::Camp2 => {
