@@ -101,7 +101,7 @@ p { margin: 0; }
 @keyframes frames { to { background-position-x: calc(var(--n) * var(--s) * -1); } }
 
 /* 첫 화면 아래: 나일과 포포가 굴 쪽으로 걸어간다 */
-.parade { position: relative; height: 56px; background: var(--soil); border-bottom: 4px solid var(--soil-3);
+.parade { position: relative; height: 76px; background: var(--soil); border-bottom: 4px solid var(--soil-3);
   background-image: linear-gradient(var(--soil-3) 0 0); background-size: 100% 4px; background-position: 0 100%; background-repeat: no-repeat; overflow: hidden; }
 .parade .walker { position: absolute; bottom: 4px; left: -60px; animation: frames .64s steps(var(--n)) infinite, walk 26s linear infinite; }
 .parade .w2 { animation-delay: 0s, 1.4s; }
