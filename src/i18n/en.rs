@@ -462,7 +462,7 @@ pub static EN: Strings = Strings {
     tal_eat_b: "One Gulp",
     tal_eat_b_desc: "Eat very quickly.",
     tal_hop: "Hop",
-    tal_hop_a: "Long Jump",
+    tal_hop_a: "Far Hop",
     tal_hop_a_desc: "Hop much farther. Longer wait to hop again.",
     tal_hop_b: "Stamp",
     tal_hop_b_desc: "Landing a hop stomps around you (1 damage). Slightly longer wait to hop again.",

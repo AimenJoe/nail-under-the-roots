@@ -462,7 +462,7 @@ pub static KO: Strings = Strings {
     tal_eat_b: "한입에",
     tal_eat_b_desc: "아주 빨리 먹는다.",
     tal_hop: "깡충",
-    tal_hop_a: "멀리뛰기",
+    tal_hop_a: "먼 깡충",
     tal_hop_a_desc: "깡충이 훨씬 멀리 간다. 다시 뛰기까지는 길다.",
     tal_hop_b: "발 구르기",
     tal_hop_b_desc: "깡충 착지에 둘레를 밟는다(피해 1). 다시 뛰기까지 조금 길다.",

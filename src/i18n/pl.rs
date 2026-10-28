@@ -462,7 +462,7 @@ pub static PL: Strings = Strings {
     tal_eat_b: "Jeden kęs",
     tal_eat_b_desc: "Jesz bardzo szybko.",
     tal_hop: "Skok",
-    tal_hop_a: "Skok w dal",
+    tal_hop_a: "Daleki sus",
     tal_hop_a_desc: "Skaczesz dużo dalej. Dłużej czekasz na kolejny skok.",
     tal_hop_b: "Tupot",
     tal_hop_b_desc: "Lądując, tupiesz wokół siebie (1 obrażenie). Nieco dłużej czekasz na kolejny skok.",

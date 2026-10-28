@@ -19,4 +19,7 @@
 - `shove_pushes_without_hurting_or_interrupting`(적: 체력·번쩍 그대로, 예고 상태 그대로, 밀림), `first_jump_shoves_without_damage`(모모 착지 자리·도토 도약 자리, 피해 0).
 
 ## 남은 것
-- 모모 재주 깡충 A의 이름 "멀리뛰기"가 새 동작(0209)과 겹친다 — 바꿀지는 사장 결정 대기("먼 깡충" 제안).
+- (끝) 모모 재주 이름은 아래 덧붙임.
+
+## 덧붙임: 모모 재주 이름(사장 "응 바꾸자")
+- 깡충 자리 A "멀리뛰기"(깡충이 훨씬 멀리)가 새 동작 멀리뛰기(0209)와 겹쳐 "먼 깡충"으로. 겹치던 아홉 언어를 바꿨다: Far Hop · 远距跳跃 · 遠距跳躍 · Pulo distante · Brinco lejano · Weiter Hüpfer · Дальний скачок · Daleki sus. 일본어(大ジャンプ ↔ 幅とび)·프랑스어(Grand bond ↔ saut en longueur)는 원래 달라 그대로. 기록 키(`talent.hop.*`)는 그대로라 저장은 바뀌지 않는다. 바뀐 이름은 각 언어의 기존 재주 이름 가장 긴 것보다 짧거나 같다.

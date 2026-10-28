@@ -464,7 +464,7 @@ pub static ZH_HANT: Strings = Strings {
     tal_eat_b: "一口吞",
     tal_eat_b_desc: "吃得非常快。",
     tal_hop: "跳躍",
-    tal_hop_a: "跳遠",
+    tal_hop_a: "遠距跳躍",
     tal_hop_a_desc: "跳得更遠。再次跳躍要等更久。",
     tal_hop_b: "跺腳",
     tal_hop_b_desc: "跳躍落地時踩踏周圍（傷害1）。再次跳躍要稍等更久。",

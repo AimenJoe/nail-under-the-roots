@@ -464,7 +464,7 @@ pub static ZH_HANS: Strings = Strings {
     tal_eat_b: "一口吞",
     tal_eat_b_desc: "吃得非常快。",
     tal_hop: "跳跃",
-    tal_hop_a: "跳远",
+    tal_hop_a: "远距跳跃",
     tal_hop_a_desc: "跳得更远。再次跳跃要等更久。",
     tal_hop_b: "跺脚",
     tal_hop_b_desc: "跳跃落地时踩踏周围（伤害1）。再次跳跃要稍等更久。",
