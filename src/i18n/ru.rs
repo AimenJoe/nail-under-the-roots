@@ -31,6 +31,7 @@ pub static RU: Strings = Strings {
     set_music: "Музыка",
     set_shake: "Тряска экрана",
     set_effects: "Частицы",
+    set_tells: "Замах врага",
     set_debug: "Отладка",
     set_language: "Язык",
     set_back: "Назад",

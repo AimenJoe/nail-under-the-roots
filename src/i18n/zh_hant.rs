@@ -31,6 +31,7 @@ pub static ZH_HANT: Strings = Strings {
     set_music: "音樂",
     set_shake: "畫面震動",
     set_effects: "粒子效果",
+    set_tells: "敵人的預告",
     set_debug: "除錯資訊",
     set_language: "語言",
     set_back: "返回",

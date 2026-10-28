@@ -31,6 +31,7 @@ pub static JA: Strings = Strings {
     set_music: "音楽",
     set_shake: "画面のゆれ",
     set_effects: "パーティクル",
+    set_tells: "敵の予告",
     set_debug: "デバッグ表示",
     set_language: "言語",
     set_back: "もどる",

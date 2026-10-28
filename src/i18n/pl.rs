@@ -31,6 +31,7 @@ pub static PL: Strings = Strings {
     set_music: "Muzyka",
     set_shake: "Wstrząsy ekranu",
     set_effects: "Cząsteczki",
+    set_tells: "Zamach wroga",
     set_debug: "Debugowanie",
     set_language: "Język",
     set_back: "Wstecz",

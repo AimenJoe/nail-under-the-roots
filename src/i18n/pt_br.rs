@@ -31,6 +31,7 @@ pub static PT_BR: Strings = Strings {
     set_music: "Música",
     set_shake: "Tremor da tela",
     set_effects: "Partículas",
+    set_tells: "Aviso do inimigo",
     set_debug: "Info de depuração",
     set_language: "Idioma",
     set_back: "Voltar",

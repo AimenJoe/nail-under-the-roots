@@ -266,6 +266,8 @@ enum Hit {
     /// 큰 나무의 재주 칸(자리, 갈래).
     TreeCell(usize, usize),
     /// 큰 나무의 캐릭터 탭(0 Naïl, 1 모모, 0142).
+    /// 설정 창 ▲▼(0198): -1 위, 1 아래.
+    SettingScroll(i8),
     TreeTab(usize),
     /// 실의 꿈 줄.
     DreamRow(usize),
@@ -391,6 +393,9 @@ impl App {
             music: saved.map(|p| p.music).unwrap_or(7),
             shake: saved.map(|p| p.shake).unwrap_or(10),
             effects: saved.map(|p| p.effects).unwrap_or(10),
+            tells: saved
+                .map(|p| p.tells)
+                .unwrap_or(crate::prefs::TELLS_DEFAULT),
             debug_overlay: false,
             lang: saved.and_then(|p| p.lang),
         };
@@ -709,6 +714,7 @@ impl App {
                 restart = true;
             }
             self.world.juice.effects = self.settings.effects_f();
+            self.world.juice.tells = self.settings.tells_f();
             self.world.tick(&a);
             self.sfx.flush(&mut self.world.juice.audio);
             self.acc -= t::TICK_DT;
@@ -1134,6 +1140,16 @@ impl App {
                 if a.right {
                     adjust = 1;
                 }
+                // ▲▼(0198): 가려진 다음 줄로 커서를 옮겨 창을 한 줄 굴린다.
+                if let Some(Hit::SettingScroll(d)) = tap_hit {
+                    let first = self.settings_first();
+                    self.settings_cursor = if d < 0 {
+                        first.saturating_sub(1)
+                    } else {
+                        (first + SETTING_VISIBLE).min(n - 1)
+                    };
+                    self.erase_armed = false;
+                }
                 let mut row = self.settings_cursor;
                 match tap_hit {
                     Some(Hit::SettingLeft(i)) => {
@@ -1179,6 +1195,7 @@ impl App {
                     }
                 }
                 let back_chosen = a.cancel
+                    || matches!(tap_hit, Some(Hit::Close))
                     || (a.confirm && self.settings_cursor == SETTING_BACK)
                     || matches!(tap_hit, Some(Hit::SettingRow(SETTING_BACK)));
                 if back_chosen {
