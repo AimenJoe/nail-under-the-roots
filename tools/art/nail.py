@@ -47,17 +47,19 @@ FURS = {
 }
 
 # 채움만. 외곽선 자동. 오른쪽을 본다(3/4: 먼 눈이 보인다).
-# 자리: 털 끝 1줄, 몸 2~12줄, 발 13줄(5~6·9~10열). 먼 눈 7열 4~5줄, 가까운 눈 11~12열(빛은 11,4), 볼 10,6, 코 13~14열 5~6줄.
+# 자리: 털 끝 1줄, 몸 2~12줄, 발 13줄(5~6·9~10열). 눈 둘 다 2×2(먼 눈 6~7열, 가까운 눈 10~11열, 4~5줄, 빛은 왼쪽 위),
+# 볼 5·10열 6줄, 코 13~14열 6~7줄. 코는 눈과 한 칸 띄운다(붙으면 눈·코가 한 덩어리로 번진다, 첫 시안 사장 "눈이 별로").
+# 먼 눈을 1×2로 좁히면 찢어진 눈으로 읽혔다 — 3/4이어도 두 눈은 같은 크기.
 # 목도리 8~9줄(매듭 10~11줄 7~9열). 뒷발(보는 쪽) 1~2열·앞발 13~14열, 9~11줄, 발톱 11줄. 입은 그리지 않는다.
 BASE = """
 ................
 .....hl..hh.....
 ....hllhhhhhh...
 ...hlhhhhhhbbb..
-...hhhhebhbweb..
-..hhhhhebbbeepp.
-..hhhhbbbbrbbpq.
-..hbbbbbbbbbbb..
+...hhhwebbwebb..
+..hhhheebbeebbb.
+..hhhrbbbbrbbpp.
+..hbbbbbbbbbbpq.
 ..gffffffffffg..
 .ppgffffffffgpp.
 .qpoddddggddopq.
@@ -217,9 +219,9 @@ def bob(a, dy):
 
 def eyes_shut(f, dy=0):
     # 눈 질끈(가로선). 몸을 옮긴 만큼 눈 줄도 옮긴다.
-    put(f, 11, 4 + dy, 'bb')
-    put(f, 11, 5 + dy, 'ee')
-    put(f, 7, 4 + dy, 'b')
+    for x in (6, 10):
+        put(f, x, 4 + dy, 'bb')
+        put(f, x, 5 + dy, 'ee')
 
 
 def attack(a, i):
@@ -271,21 +273,23 @@ def settle(a):
 
 def hurt(a):
     f = shift(a, dx=-1)
-    put(f, 10, 3, 'eb')  # > 모양 눈
-    put(f, 10, 4, 'be')
-    put(f, 10, 5, 'eb')
-    put(f, 6, 4, 'b')
+    put(f, 9, 3, 'eb')  # > 모양 눈(가까운 눈), 먼 눈은 질끈
+    put(f, 9, 4, 'be')
+    put(f, 9, 5, 'eb')
+    put(f, 5, 4, 'bb')
+    put(f, 5, 5, 'ee')
     return f
 
 
 def dead(a):
     f = shift(list(reversed(a)), dy=-2)  # 뒤집혀 누움
     # 눈(4~5줄 → 거꾸로 8~9줄)을 × 눈으로. 검은 2×2로 두면 벌린 입처럼 보인다.
-    put(f, 10, 7, 'ebe')
-    put(f, 10, 8, 'beb')
-    put(f, 10, 9, 'ebe')
-    put(f, 7, 8, 'b')
-    put(f, 7, 9, 'b')
+    put(f, 9, 7, 'ebe')
+    put(f, 9, 8, 'beb')
+    put(f, 9, 9, 'ebe')
+    put(f, 5, 7, 'ebe')
+    put(f, 5, 8, 'beb')
+    put(f, 5, 9, 'ebe')
     return f
 
 
