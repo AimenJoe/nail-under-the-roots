@@ -334,6 +334,44 @@ pub(super) fn draw_charge_under(p: &Player, alpha: f32) {
     }
 }
 
+/// 멀리뛰기 조준(0211): 모모·도토가 달리는 동안 내려앉을 자리를 바닥에(스프라이트 밑에). 거리는 늘 `JUMP_DIST`,
+/// 벽에 막히면 막히는 자리까지. 모모는 밟기 둘레(타격과 같은 반지름), 도토는 작은 고리. 아직 덜 달렸으면(떼도 안 뛴다)
+/// 흐린 고리만, 뛸 수 있으면 밝게 숨 쉬고 가는 길에 점. 어두운 밑줄을 깔아 풀밭·굴 어디서나 보인다(모으기 고리와 같은 약속).
+pub(super) fn draw_jump_aim(w: &World, alpha: f32) {
+    let p = &w.player;
+    let Some((dir, ready)) = p.jump_aim() else {
+        return;
+    };
+    let from = lerp(p.prev_pos, p.pos, alpha);
+    let reach = w.room.ray_len(from, dir, p.radius(), t::JUMP_DIST);
+    let to = from + dir * reach;
+    let feet = vec2(0.0, 6.0);
+    let stomp = w.character == crate::equipment::Character::Momo;
+    let r = if stomp { p.jump_stomp_radius() } else { 6.0 };
+    let pulse = 0.5 + 0.5 * (w.time * 9.0).sin();
+    let a = if ready { 0.7 + 0.3 * pulse } else { 0.3 };
+    let col = if stomp {
+        Color::new(1.0, 0.78, 0.86, a)
+    } else {
+        Color::new(1.0, 0.80, 0.42, a)
+    };
+    let back = Color::new(0.10, 0.06, 0.10, 0.55 * a);
+    let c = (to + feet).round();
+    draw_circle_lines(c.x, c.y, r, 2.5, back);
+    draw_circle_lines(c.x, c.y, r, 1.0, col);
+    if !ready {
+        return;
+    }
+    // 가운데 표시와 가는 길의 점(12px마다).
+    draw_rectangle(c.x - 1.0, c.y - 1.0, 3.0, 3.0, back);
+    draw_rectangle(c.x, c.y, 1.0, 1.0, col);
+    let n = (reach / 12.0) as i32;
+    for i in 1..n {
+        let q = (from + feet + dir * (i as f32 * 12.0)).round();
+        draw_rectangle(q.x, q.y, 1.0, 1.0, Color::new(col.r, col.g, col.b, 0.5 * a));
+    }
+}
+
 /// 다 모인 강공격을 쥐고 있는 동안 몸에 얹는 흰 실루엣의 투명도(0202). 딱 맞춘 창 동안 가장 밝다. 아니면 0.
 fn charge_glow(p: &Player) -> f32 {
     match p.state {

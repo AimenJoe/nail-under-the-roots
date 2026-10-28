@@ -632,7 +632,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             }
         }
         Pic::Run => {
-            // 모모가 깡충 → 쥔 채 달리고 → 떼면 멀리 뛰어 생쥐 곁에 내려앉으며 밟는다(0209).
+            // 모모가 깡충 → 쥔 채 달리고(앞 바닥에 내려앉을 자리, 0211) → 떼면 그 자리로 멀리 뛰어 생쥐 곁을 밟는다(0209).
             let ph = time % 2.8;
             let start = 12.0;
             let run_end = mid - 6.0;
@@ -646,6 +646,15 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             } else if ph < 1.25 {
                 let k = (ph - 0.35) / 0.9;
                 let x = start + 12.0 + (run_end - start - 12.0) * k;
+                // 달리는 동안 내려앉을 자리(0211): 늘 같은 거리 앞, 밟기 둘레.
+                let ahead = land - run_end;
+                draw_circle_lines(
+                    (x + ahead).round(),
+                    y + 6.0,
+                    10.0,
+                    1.0,
+                    Color::new(1.0, 0.78, 0.86, if k > 0.25 { 0.9 } else { 0.35 }),
+                );
                 momo(art, 2 + ((time * 16.0) as u32) % 2, vec2(x, y), 0.0, false);
                 critter(art, Kind::FieldMouse, 0, mouse, true, WHITE);
             } else if ph < 1.75 {

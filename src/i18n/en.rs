@@ -794,5 +794,5 @@ pub static EN: Strings = Strings {
     h_doto: "Fighting as Doto",
     h_doto_d: "Doto fights from afar. Attack throws acorns — the third is a fan of three. Hold and release for a big acorn that bursts where it lands. Leap back keeps facing your aim. With a full gauge, bury acorns ahead — they pop soon after and only hurt foes. Your throwing hand bats back what flies at you.",
     h_run: "Running and long jump",
-    h_run_d: "Momo and Doto: keep holding the burrow button and you run once the hop or leap back lands. Release to jump far — the longer the run, the farther, and nothing hits you in the air. Momo stomps around her on landing; Doto can throw once mid-air. Attack while running to strike at once.",
+    h_run_d: "Momo and Doto: keep holding the burrow button and you run once the hop or leap back lands. While running, a mark on the ground ahead shows where you'll land — steer, then release to jump right there; nothing hits you in the air. Momo stomps the marked circle on landing; Doto can throw once mid-air. Attack while running to strike at once.",
 };

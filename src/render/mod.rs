@@ -350,6 +350,7 @@ impl Renderer {
             self.draw_sun_shadows(art, w, alpha);
             draw_drill_trail(Some(art), &w.player, alpha);
             draw_charge_under(&w.player, alpha);
+            draw_jump_aim(w, alpha);
             draw_telegraphs(w, alpha);
             if self.cut.is_some() {
                 draw_mushrooms(art, w, cam);
@@ -395,6 +396,7 @@ impl Renderer {
             }
             draw_drill_trail(None, &w.player, alpha);
             draw_charge_under(&w.player, alpha);
+            draw_jump_aim(w, alpha);
             draw_player(&w.player, alpha, w.time);
             draw_player_fx(&w.player, alpha);
             draw_fx(w);

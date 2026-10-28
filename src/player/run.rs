@@ -37,7 +37,7 @@ impl Player {
             self.start_swing(0, a.aim, false);
         } else if !a.dodge_held {
             if time >= t::RUN_MIN {
-                self.start_jump(time);
+                self.start_jump();
             } else {
                 self.burrow_cd = self.burrow_cd_full();
                 self.state = State::Free;
@@ -48,13 +48,16 @@ impl Player {
         None
     }
 
-    /// 멀리뛰기 거리: 도움닫기 `RUN_MIN`에서 가장 짧고 `RUN_BUILD`에서 가장 멀다.
-    pub fn jump_dist(run: f32) -> f32 {
-        let k = ((run - t::RUN_MIN) / (t::RUN_BUILD - t::RUN_MIN)).clamp(0.0, 1.0);
-        t::JUMP_DIST_MIN + (t::JUMP_DIST_MAX - t::JUMP_DIST_MIN) * k
+    /// 달리는 동안 멀리뛰기 조준(0211): (뛸 쪽, 지금 떼면 뛰는가). 렌더가 내려앉을 자리를 바닥에 그린다.
+    /// 거리는 늘 `JUMP_DIST` — 벽에 막히는 만큼은 그리는 쪽이 줄인다.
+    pub fn jump_aim(&self) -> Option<(Vec2, bool)> {
+        match self.state {
+            State::Run { time } => Some((self.facing, time >= t::RUN_MIN)),
+            _ => None,
+        }
     }
 
-    fn start_jump(&mut self, run: f32) {
+    fn start_jump(&mut self) {
         self.attack_buf = 0.0;
         self.dodge_buf = 0.0;
         self.combo_timer = 0.0;
@@ -62,7 +65,7 @@ impl Player {
         self.state = State::Jump {
             time: 0.0,
             dir: self.facing,
-            dist: Self::jump_dist(run),
+            dist: t::JUMP_DIST,
             thrown: false,
         };
         self.events.push(Event::Hop);
@@ -77,8 +80,10 @@ impl Player {
         dist: f32,
         thrown: bool,
     ) -> Option<Strike> {
+        // 마지막 틱은 남은 만큼만: 조준 자리(0211)에 딱 내려앉게.
+        let was = time;
         let time = time + c.dt;
-        self.pos += dir * (dist / t::JUMP_TIME) * c.dt;
+        self.pos += dir * (dist / t::JUMP_TIME) * (time.min(t::JUMP_TIME) - was);
         let mut thrown = thrown;
         let doto = self.kit.def().dodge == crate::characters::Dodge::Leap;
         if doto && !thrown && self.armed && self.no_attack <= 0.0 && self.attack_buf > 0.0 {
@@ -171,6 +176,10 @@ mod tests {
             p.update(&act(false, true, false), room, t::TICK_DT);
             ran += t::TICK_DT;
         }
+        if let Some((dir, ready)) = p.jump_aim() {
+            assert_eq!(ready, ran >= t::RUN_MIN, "조준 자리는 뛸 수 있을 때 밝다");
+            assert_eq!(dir, vec2(1.0, 0.0));
+        }
         let x0 = p.pos.x;
         let (mut strikes, mut events) = (Vec::new(), Vec::new());
         for _ in 0..60 {
@@ -199,9 +208,10 @@ mod tests {
         }
     }
 
-    /// 쥐고 있으면 내려앉은 뒤 달리고(맞는다, 걷기보다 빠르다), 떼면 멀리 뛴다 — 오래 달릴수록 멀리, 공중 무적.
+    /// 쥐고 있으면 내려앉은 뒤 달리고(맞는다, 걷기보다 빠르다), 떼면 멀리 뛴다 — 공중 무적.
+    /// 거리는 달린 시간과 상관없이 `JUMP_DIST`, 달리는 동안 보이는 조준 자리에 그대로 내려앉는다(0211).
     #[test]
-    fn hold_runs_and_release_jumps_farther_with_run_up() {
+    fn hold_runs_and_release_jumps_to_the_aimed_spot() {
         let (mut p, room) = player(Character::Doto);
         p.update(&act(true, true, false), &room, t::TICK_DT);
         while !matches!(p.state, State::Run { .. }) {
@@ -212,21 +222,21 @@ mod tests {
             "달리는 동안은 맞고 발밑 함정도 밟는다"
         );
         assert_eq!(p.burrow_cd, 0.0, "대기는 멀리뛰기 뒤에");
+        assert_eq!(
+            p.jump_aim(),
+            Some((vec2(1.0, 0.0), false)),
+            "아직 덜 달렸다"
+        );
         let x = p.pos.x;
         p.update(&act(false, true, false), &room, t::TICK_DT);
         let step = p.pos.x - x;
         assert!((step - t::PLAYER_SPEED * t::RUN_SPEED * t::TICK_DT).abs() < 0.01);
 
-        let (_, ev, short) = hold_run_release(&mut player(Character::Doto).0, &room, t::RUN_MIN);
-        assert!(ev.contains(&Event::JumpLand { stomp: false }));
-        let (_, _, longer) = hold_run_release(&mut player(Character::Doto).0, &room, 0.35);
-        // 달린 시간은 틱 단위라 조금 넘친다(한 틱 = 거리 1px 남짓).
-        let near = |got: f32, run: f32| (got - Player::jump_dist(run)).abs() < 4.0;
-        assert!(near(short, t::RUN_MIN), "{short}");
-        assert!(near(longer, 0.35), "{longer}");
-        assert!(longer > short + 5.0);
-        assert_eq!(Player::jump_dist(t::RUN_MIN), t::JUMP_DIST_MIN);
-        assert_eq!(Player::jump_dist(t::RUN_BUILD + 1.0), t::JUMP_DIST_MAX);
+        for run in [t::RUN_MIN, 0.35, 0.6] {
+            let (_, ev, d) = hold_run_release(&mut player(Character::Doto).0, &room, run);
+            assert!(ev.contains(&Event::JumpLand { stomp: false }));
+            assert!((d - t::JUMP_DIST).abs() < 1.0, "달린 시간 {run}: {d}");
+        }
         // 짧게 달리고 떼면 뛰지 않고 선다(회피를 두 번 얻지 않는다).
         let (mut p, room) = player(Character::Momo);
         let (s, ev, _) = hold_run_release(&mut p, &room, 0.05);
