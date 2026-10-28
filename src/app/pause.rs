@@ -1,24 +1,26 @@
-//! 일시정지 메뉴의 탭 여섯(메뉴·상태·가방·저널·도감·지도).
+//! 일시정지 메뉴의 탭 일곱(메뉴·상태·가방·저널·도감·지도·안내, 안내는 0180).
 
 use super::*;
 
 /// 상태 탭 글 한 줄 높이 = 위아래로 한 번 내리는 양.
 pub(super) const STATUS_LINE: f32 = 12.0;
-pub(super) const PAUSE_TABS: [Tr; 6] = [
+pub(super) const PAUSE_TABS: [Tr; 7] = [
     |s| s.tab_menu,
     |s| s.tab_status,
     |s| s.tab_bag,
     |s| s.tab_journal,
     |s| s.tab_bestiary,
     |s| s.tab_map,
+    |s| s.pm_help,
 ];
+/// 안내 탭 번호(0180).
+pub(super) const TAB_HELP: usize = 6;
 /// 지도 탭 번호(지도 버튼으로 바로 연다).
 pub(super) const TAB_MAP: usize = 5;
-pub(super) const PAUSE_MENU: [Tr; 5] = [
+pub(super) const PAUSE_MENU: [Tr; 4] = [
     |s| s.pm_resume,
     |s| s.pm_restart,
     |s| s.pm_settings,
-    |s| s.pm_help,
     |s| s.pm_title,
 ];
 /// 가방 칸의 발톱 아이콘: 크림/무기 색 발톱 세 개.
@@ -110,11 +112,6 @@ impl App {
                         self.scene = Scene::Settings { back: Back::Pause };
                     }
                     Some(3) => {
-                        self.help_cursor = 0;
-                        self.help_page = 0;
-                        self.scene = Scene::Help { back: Back::Pause };
-                    }
-                    Some(4) => {
                         self.bank_glowbugs();
                         // 쉼터에서 나가면 그 쉼터부터 이어한다(굴 안이면 마지막 쉼터, 0080).
                         self.checkpoint_run();
@@ -227,6 +224,7 @@ impl App {
                     self.bestiary_page = (self.bestiary_page + 1) % 3;
                 }
             }
+            TAB_HELP => self.help_nav(a, tap_hit),
             _ => {}
         }
     }
@@ -283,6 +281,7 @@ impl App {
             2 => self.draw_inventory(ui, content),
             3 => self.draw_journal(ui, content),
             4 => self.draw_bestiary(ui, content),
+            TAB_HELP => self.draw_help_body(ui, content),
             _ => self.draw_map(ui, content),
         }
     }

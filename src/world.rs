@@ -792,6 +792,17 @@ impl World {
         for ev in &self.player.events {
             match ev {
                 player::Event::Swing(i) => self.juice.audio.play(sfx::Id::Claw(*i)),
+                player::Event::BeatTick => {
+                    // 박자가 왔다(0180): 메트로놈 '똑' + 과녁 고리에서 작은 흰 고리가 퍼진다.
+                    self.juice.audio.play(sfx::Id::BeatTick);
+                    self.juice.fx.push(ring(
+                        self.player.pos,
+                        t::BEAT_RING_END,
+                        t::BEAT_RING_END + 5.0,
+                        0.12,
+                        Color::new(1.0, 1.0, 1.0, 0.8),
+                    ));
+                }
                 player::Event::Beat(n) => {
                     // 박자에 맞췄다(0167 → 0174): 몸에서 퍼지는 고리 + 연속 수만큼 오르는 음 + 발톱 끝 반짝임.
                     self.juice.audio.play(sfx::Id::Beat(*n));

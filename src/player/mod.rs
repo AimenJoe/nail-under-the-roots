@@ -109,6 +109,8 @@ pub enum Event {
     Swing(usize),
     /// 박자에 맞춰 이어진 타(0167·0174): 퍼지는 고리·연속 수만큼 오르는 음. 값은 연속 수(1부터).
     Beat(usize),
+    /// 박자가 왔다(0180): 콤보 중 박자 시계가 박자를 지나는 틱. 그 틱에 타가 나가지 않았을 때만 — 메트로놈 '똑' + 과녁 번쩍.
+    BeatTick,
     /// 강공격이 나갔다 / 다 모여 발톱이 빛난다(0161). `HeavyPerfect`는 다 모인 직후에 뗐다(0168).
     Heavy,
     HeavyReady,
@@ -463,6 +465,11 @@ impl Player {
         })
     }
 
+    /// 지금 콤보의 박자 간격(초, 공격 속도 배율을 넣은 시계 기준).
+    pub fn beat_period(&self) -> f32 {
+        self.beat_at
+    }
+
     /// 연달아 맞춘 박자 수와 그 표시가 남은 시간(0174, 머리 위 음표).
     pub fn beat_pips(&self) -> (usize, f32) {
         (self.beat_streak, self.beat_show)
@@ -604,7 +611,13 @@ impl Player {
         self.parry_cd = (self.parry_cd - dt).max(0.0);
         self.no_attack = (self.no_attack - dt).max(0.0);
         self.swing_age += dt;
+        // 박자를 지나는 틱인가(0180): 콤보 중일 때만. 타가 나가 시계가 되감기면 그 소리가 박자다.
+        let before = self.beat_clock;
         self.beat_clock = (self.beat_clock + dt * self.stats.attack_speed).min(60.0);
+        let beat_now = self.armed
+            && self.combo_pending()
+            && before < self.beat_at
+            && self.beat_clock >= self.beat_at;
         self.beat_show = (self.beat_show - dt).max(0.0);
         if !matches!(
             self.state,
@@ -647,6 +660,10 @@ impl Player {
             } => strike = self.tick_drill(&c, time, dir, aim, next_hit),
             State::Recover { time } => strike = self.tick_recover(&c, time),
             State::Eat { item, time } => strike = self.tick_eat(&c, item, time),
+        }
+
+        if beat_now && !self.events.iter().any(|e| matches!(e, Event::Swing(_))) {
+            self.events.push(Event::BeatTick);
         }
 
         self.attack_buf = (self.attack_buf - dt).max(0.0);
@@ -1562,6 +1579,51 @@ mod tests {
                 "연타 간격 {gaps:?} vs {want:?}"
             );
         }
+    }
+
+    /// 메트로놈(0180): 한 타 뒤 아무것도 안 누르면 박자에 `BeatTick` 한 번. 이른 눌림이 박자에 나가면
+    /// 그 틱은 타 소리가 박자라 `BeatTick`이 없다. 콤보가 아닐 때(서 있기만)는 울리지 않는다.
+    #[test]
+    fn metronome_ticks_on_the_beat_unless_a_swing_lands_there() {
+        let room = Room::new();
+        let tap = Actions {
+            attack: true,
+            ..Default::default()
+        };
+        let none = Actions::default();
+        let hit0 = crate::moveset::CLAWS.hits[0];
+        let beat_at = t::BEAT_PERIOD.max(hit0.swing + hit0.recovery);
+        let ticks_of = |p: &mut Player, presses: &[usize]| {
+            let mut at = vec![];
+            for n in 1..60 {
+                let a = if presses.contains(&n) { &tap } else { &none };
+                let (_, ev) = tick(p, &room, a);
+                if ev.contains(&Event::BeatTick) {
+                    at.push(n);
+                }
+            }
+            at
+        };
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &tap);
+        let at = ticks_of(&mut p, &[]);
+        assert_eq!(at.len(), 1, "박자에 한 번: {at:?}");
+        assert!(
+            (at[0] as f32 * t::TICK_DT - beat_at).abs() <= t::TICK_DT + 1e-4,
+            "박자에: {at:?}"
+        );
+        // 이른 눌림 → 박자에 2타가 나가고 그 틱엔 똑이 없다.
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &tap);
+        let at = ticks_of(&mut p, &[2]);
+        let first = ((beat_at / t::TICK_DT).round() as usize).max(1);
+        assert!(
+            !at.iter().any(|n| n.abs_diff(first) <= 1),
+            "타가 박자: {at:?}"
+        );
+        // 콤보가 아니면 울리지 않는다.
+        let mut p = Player::new(room.center());
+        assert!(ticks_of(&mut p, &[]).is_empty());
     }
 
     /// 땅속 대시(0160): 정한 시간까지는 빠르게, 힘을 모으는 동안은 느리게 간다.

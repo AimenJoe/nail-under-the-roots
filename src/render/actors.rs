@@ -295,6 +295,12 @@ fn draw_beat_cue(p: &Player, pos: Vec2) {
             Color::new(1.0, 1.0, 1.0, 0.3 * fade),
         );
         draw_circle_lines(x, y, r, w, col);
+        // 박자 순간(0180): 과녁 고리가 한 번 굵고 하얗게 번쩍인다(박자 앞뒤 반 창 동안). "지금"이 모양으로도 보이게.
+        let d = (c.k - 1.0).abs() * p.beat_period();
+        if d <= t::BEAT_WINDOW * 0.5 {
+            let a = 1.0 - d / (t::BEAT_WINDOW * 0.5);
+            draw_circle_lines(x, y, t::BEAT_RING_END, 2.5, Color::new(1.0, 1.0, 1.0, a));
+        }
     }
     let (n, show) = p.beat_pips();
     if n > 0 && show > 0.0 {

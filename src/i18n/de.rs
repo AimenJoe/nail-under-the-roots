@@ -732,7 +732,7 @@ pub static DE: Strings = Strings {
     h_move: "Bewegen und zielen",
     h_move_d: "Lauf mit dem Stick oder den Pfeiltasten. Stick nur leicht neigen, um langsam zu gehen. Der rechte Stick zielt nur (die Spezialattacke geht in diese Richtung). In Menüs mit hoch/runter wählen und mit Bestätigen öffnen.",
     h_combo: "Krallenkombo und Takt",
-    h_combo_d: "Drück Angriff und der Hieb kommt sofort. Der Ring um dich zieht sich auf den Zielring zusammen: der Moment, in dem er ihn berührt, ist der Takt. Drück dann, und der nächste Hieb kommt auf der Stelle und trifft härter (Glöckchen, Noten über dem Kopf). Zu früh wartet er auf den Takt; zu spät läuft die Kombo trotzdem weiter.",
+    h_combo_d: "Drück Angriff und der Hieb kommt sofort. Der Ring um dich zieht sich auf den Zielring zusammen: der Moment, in dem er ihn berührt, ist der Takt. Drück dann, und der nächste Hieb kommt auf der Stelle und trifft härter (Glöckchen, Noten über dem Kopf). Zu früh wartet er auf den Takt; zu spät läuft die Kombo trotzdem weiter. Jeder Takt klickt und lässt den Zielring aufleuchten: drück auf den Klick.",
     h_heavy: "Schwerer Hieb",
     h_heavy_d: "Halte nach einem Hieb Angriff gedrückt, und Licht sammelt sich in den Krallen. Wenn sie leuchten, loslassen: ein harter Hieb, der weit wegstößt und gegen Wände knallt. Genau beim Aufleuchten loslassen für einen perfekten schweren Hieb (+1 Schaden). Er öffnet auch Panzer und Stacheln.",
     h_burrow: "Graben und Auftauchen",

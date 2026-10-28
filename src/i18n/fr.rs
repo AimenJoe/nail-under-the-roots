@@ -732,7 +732,7 @@ pub static FR: Strings = Strings {
     h_move: "Se déplacer et viser",
     h_move_d: "Marche avec le stick ou les flèches. Incline peu le stick pour marcher lentement. Le stick droit ne fait que viser (la botte secrète part dans ce sens). Dans les menus, choisis avec haut/bas et entre avec confirmer.",
     h_combo: "Combo de griffes et tempo",
-    h_combo_d: "Appuie sur attaque et le coup part aussitôt. L'anneau autour de toi se referme sur l'anneau-cible : l'instant où il le touche est le temps. Appuie à ce moment et le coup suivant part sur place, plus fort (clochette, notes au-dessus de la tête). Trop tôt, il attend le temps ; trop tard, le combo continue quand même.",
+    h_combo_d: "Appuie sur attaque et le coup part aussitôt. L'anneau autour de toi se referme sur l'anneau-cible : l'instant où il le touche est le temps. Appuie à ce moment et le coup suivant part sur place, plus fort (clochette, notes au-dessus de la tête). Trop tôt, il attend le temps ; trop tard, le combo continue quand même. Chaque temps fait un petit clic et allume l'anneau-cible : appuie sur le clic.",
     h_heavy: "Coup lourd",
     h_heavy_d: "Après un coup, garde attaque enfoncé et la lumière s'amasse dans les griffes. Quand elles brillent, relâche : un coup puissant qui repousse loin et cogne les murs. Relâche dès qu'elles brillent pour un coup lourd parfait (+1 dégât). Il ouvre aussi carapaces et piquants.",
     h_burrow: "Creuser et jaillir",

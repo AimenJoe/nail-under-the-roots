@@ -732,7 +732,7 @@ pub static PL: Strings = Strings {
     h_move: "Ruch i celowanie",
     h_move_d: "Chodź gałką lub strzałkami. Lekko wychyl gałkę, by iść powoli. Prawa gałka tylko celuje (specjał też leci w tę stronę). W menu wybieraj górą/dołem i wchodź przyciskiem potwierdzenia.",
     h_combo: "Kombo pazurów i rytm",
-    h_combo_d: "Naciśnij atak, a cios wychodzi od razu. Pierścień wokół ciebie zaciska się na pierścieniu-celu: chwila zetknięcia to takt. Naciśnij wtedy, a następny cios wyjdzie na miejscu i uderzy mocniej (dzwonek, nutki nad głową). Za wcześnie — poczeka na takt; za późno — kombo i tak trwa.",
+    h_combo_d: "Naciśnij atak, a cios wychodzi od razu. Pierścień wokół ciebie zaciska się na pierścieniu-celu: chwila zetknięcia to takt. Naciśnij wtedy, a następny cios wyjdzie na miejscu i uderzy mocniej (dzwonek, nutki nad głową). Za wcześnie — poczeka na takt; za późno — kombo i tak trwa. Każdy takt to kliknięcie i błysk pierścienia-celu: naciskaj na kliknięcie.",
     h_heavy: "Ciężki cios",
     h_heavy_d: "Po ciosie trzymaj atak, a w pazurach zbierze się światło. Gdy zaświecą, puść: mocny cios, który odrzuca daleko i trzaska o ścianę. Puść zaraz po zaświeceniu dla idealnego ciężkiego ciosu (+1 obrażeń). Otwiera też pancerze i kolce.",
     h_burrow: "Kopanie i wyskok",

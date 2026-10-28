@@ -410,14 +410,14 @@ pub(super) fn draw_no_parry_ring(at: Vec2, r: f32, edge: Color) {
 }
 
 /// 차오름의 앞줄(0179): 띠를 가로지르는 밝은 줄(어두운 밑띠 위). `side`는 띠 반폭 벡터.
-fn draw_fuse_front(f: Vec2, side: Vec2) {
+pub(super) fn draw_fuse_front(f: Vec2, side: Vec2) {
     let (p, q) = (f + side, f - side);
     draw_line(p.x, p.y, q.x, q.y, 4.0, Color::new(0.1, 0.05, 0.02, 0.55));
     draw_line(p.x, p.y, q.x, q.y, 2.0, TELEGRAPH_BLINK);
 }
 
 /// 둘레 공격의 차오름(0179): 가운데부터 반지름 `r`까지 채운 원(테두리 색).
-fn draw_fill_disk(at: Vec2, r: f32, edge: Color) {
+pub(super) fn draw_fill_disk(at: Vec2, r: f32, edge: Color) {
     if r > 0.5 {
         draw_circle(at.x, at.y, r, Color::new(edge.r, edge.g, edge.b, 0.28));
     }
@@ -425,7 +425,7 @@ fn draw_fill_disk(at: Vec2, r: f32, edge: Color) {
 
 /// 점선 예고(0179): 3px 칠하고 2px 비움. 적 쪽부터 `k`만큼은 밝게 차오르고(어두운 밑띠 위) 그 앞은 밑띠 없이 옅게 —
 /// 밝기 차로 "어디까지 왔나"가 읽힌다. 앞끝에 밝은 점.
-fn draw_dots(start: Vec2, dir: Vec2, len: f32, k: f32, edge: Color) {
+pub(super) fn draw_dots(start: Vec2, dir: Vec2, len: f32, k: f32, edge: Color) {
     let lit = len * k;
     let mut d = 0.0;
     while d < len {

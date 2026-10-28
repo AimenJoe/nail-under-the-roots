@@ -732,7 +732,7 @@ pub static PT_BR: Strings = Strings {
     h_move: "Mover e mirar",
     h_move_d: "Ande com o direcional ou as setas. Incline pouco o direcional para andar devagar. O direcional direito só mira (o especial vai nessa direção). Nos menus, escolha com cima/baixo e entre com confirmar.",
     h_combo: "Combo de garras e o ritmo",
-    h_combo_d: "Aperte atacar e o golpe sai na hora. O anel ao seu redor se fecha sobre o anel-alvo: o instante em que encosta é a batida. Aperte nessa hora e o próximo golpe sai ali mesmo, mais forte (sino, notas sobre a cabeça). Cedo demais, ele espera a batida; tarde demais, o combo continua mesmo assim.",
+    h_combo_d: "Aperte atacar e o golpe sai na hora. O anel ao seu redor se fecha sobre o anel-alvo: o instante em que encosta é a batida. Aperte nessa hora e o próximo golpe sai ali mesmo, mais forte (sino, notas sobre a cabeça). Cedo demais, ele espera a batida; tarde demais, o combo continua mesmo assim. Cada batida faz um clique e acende o anel-alvo: aperte no clique.",
     h_heavy: "Golpe pesado",
     h_heavy_d: "Depois de um golpe, segure atacar e a luz se junta nas garras. Quando brilharem, solte: um golpe forte que empurra longe e bate na parede. Solte assim que brilhar para um pesado perfeito (+1 de dano). Também abre cascos e espinhos.",
     h_burrow: "Cavar e irromper",

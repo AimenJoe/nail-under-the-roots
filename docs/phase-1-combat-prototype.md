@@ -98,6 +98,7 @@
 | 적 공격 예고의 "언제"(0176 → 0179) | `enemy/mod.rs`(telegraph), `render/fx.rs`(draw_telegraphs·draw_fuse_front·draw_dots·draw_dotted_fuse·draw_fill_disk) | 방향 안내 자체가 차오른다: 돌진 띠는 적 쪽부터 끝까지 + 흰 가로줄, 점선은 밝아지며 흰 점, 둘레는 가운데부터 원. 끝에 닿는 순간 공격. 적 발밑 고리는 뺌 |
 | 부술 수 있는 것(0177) | `room.rs`(PropKind::Breakable·remove_prop), `dungeon.rs`(breakables), `world.rs`(prop_break·stats.broken), `render/props.rs`(draw_breakable), `sfx.rs`(Break), `tuning.rs`(BREAK_*) | 굴 방마다 1~3개(지대마다 흙더미·뿌리혹·돌무더기·실뭉치), 공격이 닿으면 깨져 씨앗 30%·산딸기 12%·반딧불 10%·지렁이 4% |
 | 안내 화면(0178) | `help.rs`(TOPICS), `app/help.rs`(update_help·draw_help), `i18n/`(h_* 30키 × 11), `app/pause.rs`(PAUSE_MENU 5), `app/title.rs`(TitleItem::Help) | 일시정지·타이틀의 "안내": 주제 열셋, 쪽 넘기기. 산딸기는 송이 비트맵(`draw_berry`) |
+| 안내 탭·힌트 그림·메트로놈(0180) | `app/pause.rs`(PAUSE_TABS 7·TAB_HELP), `app/help.rs`(help_nav·draw_help_body), `help.rs`(Pic), `render/help.rs`(draw_pic), `player/`(BeatTick·beat_period), `sfx.rs`(BeatTick) | 안내는 일시정지 일곱째 탭(타이틀에도). 주제마다 진짜 그림으로 한 장면을 되풀이. 콤보 중 박자에 '똑' + 과녁 번쩍(그 틱에 타가 나가면 없음) |
 | 타격 피드백·강타 보상(0168) | `tuning.rs`(KICK_*·BEAT_*·HEAVY_PERFECT·WALL_SLAM_*·CHARGE_PULL_*), `combat.rs`(Feel::kick), `moveset.rs`(heavy_of), `player.rs`(on_beat·combo_beats·perfect), `enemy.rs`(slam), `world.rs`, `render.rs`(draw_enemy 진동·눌림, 킥), `sfx.rs`(ChargeUp·HitTick) | 히트스톱 5/9/13f, 맞은 적 진동·눌림, 맞히면 전진 멈춤 + 카메라 킥 2/3/4px, '틱'. 강타 피해 3·경직 +0.5·넉백 ×1.7 → 벽 쿵 +1, 콩이 등딱지 깨기, 모으는 동안 소리·웅크림·먼지. 박자 타 덤, 이음 다 맞춘 마무리 ×1.25, 다 모인 직후 뗀 강타 +1 |
 | 코드 건강(0169 R1~R4) | `sfx.rs`(Queue·flush), `world.rs`(step 단계 메서드·enemy_down·Inventory·Story·RunStats·Hazards·Juice), `render/`(아홉 모듈), `app/`(pause·settings·album·title, start 넷으로), `scenario.rs`(통째 시험) | 로직은 오디오 장치를 모른다 → 시나리오 37개를 600틱씩 돌리는 시험. 동작 변화는 적 쓰러짐 손맛 통일뿐 |
 | 코드 건강(0169 R5~R8) | `enemy/`(mod·melee·ranged·boss, `Ctx`), `i18n/`(mod + 언어 열하나), `tools/test/smoke.js`·`smoke-web.yml`, `equipment.rs`(발톱 상수), `profile.rs`·`prefs.rs`·`suspend.rs`(고정 샘플 시험), `tools/art/legacy/`, `build-android.yml`·`build-ios.yml`(main만), `render/actors.rs`(모모 웅크림) | 브라우저 연기 시험이 main push마다 돈다. 동작 변화는 모모 모으기 웅크림 1px뿐 |
@@ -171,6 +172,7 @@
 - [x] D. 스테이지 다양화(0147): 뿌리 지대 가시뿌리 덤불(걸으면 찔림, 돌진하던 적은 박혀 멈칫), 심층 무너지는 천장(예고 뒤 돌), 길 지도 "실타래" 칸(엘리트 + 졸개 둘, 이기면 장신구). 세기·빈도는 사장(개발 → "실타래 굴: 뿌리/심층")
 - [x] E. 열한 언어·도감·저널(0146·0147·0162·0165의 글은 모두 열한 언어. 앨범은 토끼풀 일러스트 원본이 오면)
 - [ ] F. 사장 판정
+- [ ] **안내 탭·그림·'똑'(0180)**: '똑'이 박자를 잡게 해 주는지·거슬리지 않는지, 그림 칸 크기, 그림이 바로 읽히는지
 - [ ] **안내 화면(0178)**: 빠진 주제가 있는지, 설명이 너무 긴 언어(쪽 셋 넘음), 산딸기가 산딸기로 보이는지
 - [ ] **설정 파일(0175)**: Android에서 언어·음량·버튼을 바꾸고 껐다 켜면 남는지, APK를 덮어 설치해도 남는지
 - [ ] **적 예고의 차오름(0179)**: 여러 적이 겹칠 때·짧은 예고(땃쥐)에서도 "끝에 닿는 순간"이 읽히는지, 흰 줄·점이 너무 튀지 않는지, 어두운 지대

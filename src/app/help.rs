@@ -1,13 +1,16 @@
-//! 안내 화면(0178): 왼쪽 주제 목록(위아래), 오른쪽 설명(쪽이 넘치면 확인·터치로 다음 쪽). 일시정지 메뉴·타이틀에서 연다.
+//! 안내(0178 → 0180): 왼쪽 주제 목록(위아래), 오른쪽 힌트 그림 + 설명(쪽이 넘치면 확인·터치로 다음 쪽).
+//! 일시정지의 일곱째 탭과 타이틀의 "안내"가 같은 몸통(`help_nav`·`draw_help_body`)을 쓴다.
 
 use super::*;
 use crate::help::TOPICS;
 
 const BODY_LINE: f32 = 12.0;
+/// 힌트 그림 칸(게임 픽셀). 그림의 발바닥 줄은 30.
+const PIC_W: f32 = 132.0;
+const PIC_H: f32 = 40.0;
 
 impl App {
     pub(super) fn update_help(&mut self, a: &Actions, tap_hit: Option<Hit>, back: Back) {
-        let n = TOPICS.len();
         if a.cancel || a.menu || (a.tap.is_some() && tap_hit.is_none()) {
             self.scene = match back {
                 Back::Pause => Scene::Pause,
@@ -15,6 +18,12 @@ impl App {
             };
             return;
         }
+        self.help_nav(a, tap_hit);
+    }
+
+    /// 주제 고르기(위아래·터치)와 쪽 넘기기(확인·설명 터치). 일시정지 탭과 타이틀이 같이 쓴다.
+    pub(super) fn help_nav(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        let n = TOPICS.len();
         let was = self.help_cursor;
         if a.up {
             self.help_cursor = (self.help_cursor + n - 1) % n;
@@ -56,6 +65,11 @@ impl App {
             panel.w - 16.0,
             panel.h - 26.0,
         );
+        self.draw_help_body(ui, c);
+    }
+
+    /// 목록 + 그림 + 설명을 사각형 `c` 안에.
+    pub(super) fn draw_help_body(&mut self, ui: &Ui, c: Rect) {
         // 목록: 열세 줄이 다 들어가지 않으면 고른 줄을 따라 넘긴다(도감과 같은 방식).
         // 줄 간격은 글자 높이 + 2 아래로 줄이지 않는다(열셋을 다 넣으면 겹친다) — 넘치면 ▲▼로 굴린다.
         let row_h = (c.h / TOPICS.len() as f32)
@@ -106,7 +120,11 @@ impl App {
         let x = c.x + list_w + 8.0;
         let w = c.right() - x;
         ui.text(tr(t.title), x, c.y, FONT_PX, ui::ACCENT);
-        let body_y = c.y + FONT_PX + 4.0;
+        // 힌트 그림(0180): 제목 아래, 설명 위. 그 기능의 한 장면이 되풀이된다.
+        let pic = Rect::new(x, c.y + FONT_PX + 2.0, (w - 2.0).min(PIC_W), PIC_H);
+        self.renderer
+            .draw_help_pic(ui, t.pic, pic, get_time() as f32);
+        let body_y = pic.bottom() + 3.0;
         let lines = ui::wrap(ui, tr(t.body), w - 2.0, FONT_PX);
         let per = (((c.bottom() - 8.0 - body_y) / BODY_LINE).floor() as usize).max(1);
         let pages = lines.len().div_ceil(per).max(1);

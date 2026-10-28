@@ -22,6 +22,7 @@ mod actors;
 mod deep;
 mod descent;
 mod fx;
+mod help;
 mod hud;
 mod lights;
 mod props;
@@ -511,6 +512,23 @@ impl Renderer {
                 ..Default::default()
             },
         );
+    }
+
+    /// 안내 화면의 힌트 그림(0180): 논리 사각형 `r` 안에, 게임 픽셀을 화면 배율 그대로(정수) 찍는다.
+    pub fn draw_help_pic(&self, ui: &Ui, pic: crate::help::Pic, r: Rect, t: f32) {
+        ui.rect(r, Color::new(0.20, 0.30, 0.18, 1.0));
+        let o = ui.px(vec2(r.x, r.y));
+        let gl = unsafe { get_internal_gl() };
+        gl.quad_gl
+            .push_model_matrix(Mat4::from_scale_rotation_translation(
+                vec3(ui.scale, ui.scale, 1.0),
+                Quat::IDENTITY,
+                vec3(o.x.round(), o.y.round(), 0.0),
+            ));
+        help::draw_pic(self.art.as_ref(), pic, r.w, r.h, t);
+        let gl = unsafe { get_internal_gl() };
+        gl.quad_gl.pop_model_matrix();
+        ui.rect_lines(r, crate::ui::BORDER);
     }
 
     /// 대화창 초상화를 논리 사각형 `r`(44×44) 안에 찍는다. 원본 1px = 게임 픽셀 반(화면 배율의 절반, 정수).

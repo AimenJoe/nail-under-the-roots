@@ -30,6 +30,8 @@ pub enum Id {
     Charge,
     /// 박자에 맞춘 타(0167 → 0174): 값은 연속으로 맞춘 수(1부터) — 도·미·솔·높은 도로 오르고 되풀이.
     Beat(usize),
+    /// 박자가 왔다(0180): 나무 두드리는 짧은 '똑'(메트로놈). 종소리보다 낮고 작다.
+    BeatTick,
     /// 모으기 시작(0168), 맞힘 '틱'(0168).
     ChargeUp,
     HitTick,
@@ -146,6 +148,7 @@ pub struct Sfx {
     shoot: Sound,
     charge: Sound,
     beat: [Sound; 4],
+    beat_tick: Sound,
     /// 모으기 시작부터 올라가는 소리(0168).
     charge_up: Sound,
     /// 맞힘 소리 위에 얹는 짧고 높은 '틱'(0168).
@@ -267,6 +270,11 @@ impl Sfx {
             shoot: make(&[Layer::tone(0.09, 760.0, 420.0, Wave::Sine, 0.4, 1.0)]).await,
             charge: make(&[Layer::tone(0.12, 90.0, 260.0, Wave::Triangle, 0.45, 0.8)]).await,
             // 박자 콤보(0167 → 0174): 짧은 종소리, 연속으로 맞추면 도·미·솔·높은 도.
+            beat_tick: make(&[
+                Layer::tone(0.035, 880.0, 660.0, Wave::Triangle, 0.22, 2.5),
+                Layer::noise(0.008, 0.08, 3.0),
+            ])
+            .await,
             beat: [
                 make(&beat_layers(1046.5)).await,
                 make(&beat_layers(1318.5)).await,
@@ -453,6 +461,7 @@ impl Sfx {
             Id::Shoot => &self.shoot,
             Id::Charge => &self.charge,
             Id::Beat(n) => &self.beat[n.saturating_sub(1) % self.beat.len()],
+            Id::BeatTick => &self.beat_tick,
             Id::ChargeUp => &self.charge_up,
             Id::HitTick => &self.hit_tick,
             Id::WallHit => &self.wall_hit,
