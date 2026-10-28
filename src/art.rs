@@ -20,7 +20,7 @@ pub struct Art {
     pub light: Texture2D,
     /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이, 줄 14~18 땃쥐·고슴도치·두꺼비·박쥐·포자버섯(0146). 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
-    /// 새 그림 시트(`BIG_SHEETS` 순서, 0206 C3): 모모(momo_ai.py)·도토(doto_ai.py)·콩이(kongi_ai.py, 0217). 줄 0 돌아온 모습, 줄 1 물든 모습,
+    /// 새 그림 시트(`BIG_SHEETS` 순서, 0206 C3): 모모(momo_ai.py)·도토(doto_ai.py)·콩이(kongi_ai.py, 0217)·토끼풀(clover_ai.py, 0218). 줄 0 돌아온 모습, 줄 1 물든 모습,
     /// 줄 2·3 흰 실루엣. critters의 그 두 줄 대신 쓴다(`Art::critter`). 없으면 critters 16칸.
     pub big: Vec<Option<Texture2D>>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
@@ -323,7 +323,7 @@ pub fn nail_origin(pos: macroquad::math::Vec2) -> macroquad::math::Vec2 {
 
 /// 새 그림 시트 하나(0206 C3): critters의 돌아온·물든 두 줄을 대신한다. 몸은 Naïl과 같은 크기, 칸은 가장 길게
 /// 뻗는 칸이 들어가게(모모 차기·쓰러짐 28px → 32칸, 도토 달리기·쓰러짐은 꼬리까지 37px → 40칸, 콩이는 길의 주인이라
-/// 키 20px·옆으로 긴 몸 → 32칸, 0217).
+/// 키 20px·옆으로 긴 몸 → 32칸, 0217, 토끼풀은 모모보다 크고 덮치기가 36px → 40칸, 0218).
 pub struct BigSheet {
     pub file: &'static str,
     pub back: u32,
@@ -333,7 +333,7 @@ pub struct BigSheet {
     pub foot: f32,
 }
 
-pub const BIG_SHEETS: [BigSheet; 3] = [
+pub const BIG_SHEETS: [BigSheet; 4] = [
     BigSheet {
         file: "art/momo.png",
         back: MOMO_BLOOM_ROW,
@@ -354,6 +354,13 @@ pub const BIG_SHEETS: [BigSheet; 3] = [
         tainted: KONGI_ROW,
         cell: 32.0,
         foot: 30.0,
+    },
+    BigSheet {
+        file: "art/clover.png",
+        back: CLOVER_BACK_ROW,
+        tainted: CLOVER_ROW,
+        cell: 40.0,
+        foot: 38.0,
     },
 ];
 /// critters 16칸의 발바닥 줄(critters.py "발바닥 y=14").

@@ -36,13 +36,16 @@ class Source:
     erase: 이름 → 효과(호)가 지나가는 네모 목록(시트 좌표) — 그 안의 `Spec.arc` 색만 지운다.
     tidy: 가장 큰 덩어리의 이 비율보다 작은 떨어진 조각(흙먼지·옆 칸에서 넘어온 귀·얼굴)을 버린다. 0이면 안 버린다.
     strip: 원본이 이미 굵은 외곽선이 있는 도트(나노바나나가 게임 크기 그림을 다시 그린 것)면 바탕에서 이 px 안의
-    어두운 점을 걷어낸다 — 그대로 줄이면 원본 외곽선 위에 `outline`이 한 겹 더 붙어 선이 두 겹이 됐다."""
+    어두운 점을 걷어낸다 — 그대로 줄이면 원본 외곽선 위에 `outline`이 한 겹 더 붙어 선이 두 겹이 됐다.
+    pink: 그림에 마젠타에 가까운 진분홍(꽃 등)이 있으면 True — 바탕을 "R≈B인 마젠타"로만 본다(`magenta`만 보면 진분홍도
+    바탕으로 지워진다, 토끼풀의 꽃 0218)."""
     path: Path
     frames: dict
     groups: dict
     erase: dict = field(default_factory=dict)
     tidy: float = 0.0
     strip: int = 0
+    pink: bool = False
 
 
 @dataclass
@@ -71,8 +74,11 @@ def magenta(a):
     return np.minimum(a[..., 0], a[..., 2]) - a[..., 1]
 
 
-def solid_mask(a, erode=3):
-    keep = (magenta(a) < 60).astype(np.uint8) * 255
+def solid_mask(a, erode=3, pink=False):
+    bg = magenta(a) >= 60
+    if pink:                                # 진분홍(R이 B보다 한참 크다)은 바탕이 아니다
+        bg &= np.abs(a[..., 0] - a[..., 2]) < 40
+    keep = (~bg).astype(np.uint8) * 255
     return np.asarray(Image.fromarray(keep).filter(ImageFilter.MinFilter(erode))) > 0
 
 
@@ -313,7 +319,7 @@ def convert(spec):
         crops = {k: img[y0:y1, x0:x1] for k, (x0, y0, x1, y1) in s.frames.items()}
         masks = {}
         for k, a in crops.items():
-            keep = solid_mask(a)
+            keep = solid_mask(a, pink=s.pink)
             if k in s.erase:
                 keep = erase_color(a, keep, s.erase[k], s.frames[k], spec.arc)
             if s.strip:
