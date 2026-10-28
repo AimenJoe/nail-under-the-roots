@@ -503,6 +503,45 @@ pub(super) fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
             }
         }
     }
+    // 실뿌리(0210): 체력 아래 셋. 쓰러져 쉼터에서 깨어날 때마다 하나씩 감긴다(밝은 갈색). 다 감긴 뒤 또 쓰러지면 런 끝.
+    // 쉼터를 지난 런에서만(도움 모드·필드에서는 세지 않는다). 모양(꼬인 뿌리 vs 빈 칸 점)으로도 갈린다.
+    if w.strands_shown() {
+        let y = if sheet.is_some() { 12.0 } else { 10.0 };
+        hud_plate(
+            ui,
+            Rect::new(1.0, y - 2.0, 3.0 + t::RUN_LIVES as f32 * 9.0, 8.0),
+        );
+        // 물결 모양 실뿌리 한 가닥(6×3).
+        const WAVE: [(f32, f32); 6] = [
+            (0.0, 2.0),
+            (1.0, 1.0),
+            (2.0, 0.0),
+            (3.0, 1.0),
+            (4.0, 2.0),
+            (5.0, 1.0),
+        ];
+        for i in 0..t::RUN_LIVES {
+            let x = 4.0 + i as f32 * 9.0;
+            let (fill, edge) = if i < w.adv.falls {
+                (
+                    Color::new(0.86, 0.62, 0.38, 1.0),
+                    Color::new(0.20, 0.12, 0.08, 1.0),
+                )
+            } else {
+                // 아직 안 감긴 자리: 같은 모양을 어둡게.
+                (
+                    Color::new(0.36, 0.30, 0.32, 1.0),
+                    Color::new(0.10, 0.07, 0.10, 0.0),
+                )
+            };
+            for (dx, dy) in WAVE {
+                ui.rect(Rect::new(x + dx - 1.0, y + dy - 1.0, 3.0, 3.0), edge);
+            }
+            for (dx, dy) in WAVE {
+                ui.rect(Rect::new(x + dx, y + dy, 1.0, 2.0), fill);
+            }
+        }
+    }
     // 오른쪽 위(0091): 굴파기 대기(위, 가늘게)와 SP 게이지(아래, 굵게). 24px·3~4px로는 눈에 안 띄었다 →
     // 34px, 바탕판, 칸마다 어두운 테두리, 가득 찬 SP는 금빛 테두리가 숨 쉰다.
     let cd = (w.player.burrow_cd / w.player.burrow_cd_full()).min(1.0);

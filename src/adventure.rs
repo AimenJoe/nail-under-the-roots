@@ -191,6 +191,8 @@ pub struct Adventure {
     pub stage: u32,
     /// 쓰러지면 돌아갈 곳(필드 또는 쉼터). save_pos는 이 장소의 좌표.
     pub home: Place,
+    /// 이번 런에 감긴 실뿌리(0210): 쉼터를 지난 뒤 쓰러져 쉼터에서 깨어난 수. `RUN_LIVES`가 다 감긴 뒤 또 쓰러지면 런이 끝난다.
+    pub falls: u32,
     /// 지금 쉼터에서 다음 쉼터까지의 길.
     pub route: Option<Route>,
     /// 지금 들어와 있는 길의 칸(없으면 필드에서 들어온 예전 던전).
@@ -1025,20 +1027,27 @@ impl World {
         self.snap_cam();
     }
 
+    /// 실뿌리가 다 감겼는데 또 쓰러졌다(0210): 앱이 쉼터로 돌리지 않고 런을 끝낸다. 도움 모드·쉼터 전(필드)은 끝없이 깨어난다.
+    pub fn run_over(&self) -> bool {
+        !self.assist && self.adv.home == Place::Camp && self.adv.falls >= t::RUN_LIVES
+    }
+
+    /// 실뿌리를 셀 때인가(쉼터를 지난 런, 도움 모드 아님). HUD가 셋을 그린다.
+    pub fn strands_shown(&self) -> bool {
+        !self.assist && self.adv.home == Place::Camp
+    }
+
     fn respawn_at_save(&mut self) {
-        // 모모에게 쓰러지면 이번 런의 첫 길 끝은 보통 무리로(이기지 않고도 지나갈 수 있게, 0046).
-        if self.enemies.iter().any(|e| e.kind == Kind::Momo) {
-            self.story.set_fight(crate::enemy::Kind::Momo, false);
+        // 길의 주인에게 쓰러져도 주인은 남는다(0210). 이기지 않고 지나가기(0046)는 도움 모드에서만:
+        // 그 런에서는 그 길 끝이 보통 무리가 된다.
+        if self.assist {
+            for k in [Kind::Momo, Kind::Doto, Kind::Kongi, Kind::Clover] {
+                if self.enemies.iter().any(|e| e.kind == k) {
+                    self.story.set_fight(k, false);
+                }
+            }
         }
-        if self.enemies.iter().any(|e| e.kind == Kind::Doto) {
-            self.story.set_fight(crate::enemy::Kind::Doto, false);
-        }
-        if self.enemies.iter().any(|e| e.kind == Kind::Kongi) {
-            self.story.set_fight(crate::enemy::Kind::Kongi, false);
-        }
-        if self.enemies.iter().any(|e| e.kind == Kind::Clover) {
-            self.story.set_fight(crate::enemy::Kind::Clover, false);
-        }
+        let strand = self.strands_shown();
         self.hazards.mines.clear();
         self.hazards.clouds.clear();
         self.hazards.rocks.clear();
@@ -1071,8 +1080,24 @@ impl World {
         self.player.hp = self.player.stats.max_hp;
         self.player.pos = self.adv.save_pos;
         self.player.prev_pos = self.player.pos;
-        self.inv.glowbugs = self.inv.glowbugs * 7 / 10;
-        self.juice.toast = Some((|s| s.toast_respawn, 2.5));
+        // 쉼터에 닿기 전(맡기기 전)에 주운 반딧불(0047): 쓰러지면 다 잃는다(0210). 도움 모드는 예전처럼 30%만.
+        if self.assist {
+            self.inv.glowbugs = self.inv.glowbugs * 7 / 10;
+        } else {
+            self.inv.glowbugs = 0;
+        }
+        if strand {
+            self.adv.falls += 1;
+        }
+        self.juice.toast = Some(if self.assist {
+            (|s| s.toast_respawn, 2.5)
+        } else if !strand {
+            (|s| s.toast_fall, 3.0)
+        } else if self.adv.falls >= t::RUN_LIVES {
+            (|s| s.toast_fall_last, 4.0)
+        } else {
+            (|s| s.toast_fall_root, 3.5)
+        });
         self.snap_cam();
     }
 
@@ -1496,6 +1521,35 @@ mod tests {
         assert_eq!(w.biome, Biome::Deep);
     }
 
+    /// 쓰러짐의 대가(0210): 쉼터를 지난 뒤 쓰러질 때마다 실뿌리 하나, 셋이 다 감긴 뒤면 런이 끝난다(앱이 본다).
+    /// 길의 주인은 쓰러져도 남는다 — 이기지 않고 지나가기는 도움 모드에서만. 도움 모드는 실뿌리도 없다.
+    #[test]
+    fn falls_wind_rootlets_end_the_run_and_keepers_stay() {
+        let mut w = World::camp_start(1);
+        assert_eq!(w.adv.home, Place::Camp);
+        assert!(w.strands_shown());
+        w.story.set_fight(Kind::Momo, true);
+        for n in 1..=t::RUN_LIVES {
+            assert!(!w.run_over());
+            let at = w.player.pos + vec2(30.0, 0.0);
+            w.spawn_mob(Kind::Momo, at);
+            w.inv.glowbugs = 5;
+            w.player.hp = 0;
+            w.respawn_at_save();
+            assert_eq!(w.adv.falls, n);
+            assert_eq!(w.inv.glowbugs, 0);
+            assert!(w.story.fight(Kind::Momo), "모모에게 쓰러져도 모모는 남는다");
+        }
+        assert!(w.run_over());
+        w.assist = true;
+        assert!(!w.run_over() && !w.strands_shown());
+        w.spawn_mob(Kind::Momo, w.player.pos + vec2(30.0, 0.0));
+        w.player.hp = 0;
+        w.respawn_at_save();
+        assert!(!w.story.fight(Kind::Momo), "도움 모드: 그 런은 지나간다");
+        assert_eq!(w.adv.falls, t::RUN_LIVES, "도움 모드에서는 세지 않는다");
+    }
+
     #[test]
     fn dungeon_round_trip_and_respawn() {
         let mut w = World::field();
@@ -1506,7 +1560,7 @@ mod tests {
         assert_eq!(w.adv.place, Place::Dungeon);
         assert!(w.enemies.is_empty(), "던전 시작방엔 적이 없다");
         assert_eq!(w.room.cell_at(w.player.pos), Some(Cell::Floor));
-        // 쓰러져서 저장 지점으로: 필드가 돌아오고, 체력 가득, 반딧불 30% 잃음.
+        // 쓰러져서 저장 지점으로: 필드가 돌아오고, 체력 가득, 맡기지 않은 반딧불은 다 잃음(0210).
         w.inv.glowbugs = 10;
         w.player.hp = 0;
         w.respawn_at_save();
@@ -1515,7 +1569,15 @@ mod tests {
         assert_eq!(w.enemies.len(), field_enemies, "맡겨 둔 필드 적이 돌아온다");
         assert_eq!(w.player.hp, w.player.stats.max_hp);
         assert_eq!(w.player.pos, w.adv.save_pos);
+        assert_eq!(w.inv.glowbugs, 0);
+        assert_eq!(w.adv.falls, 0, "쉼터 전(필드)에는 실뿌리를 세지 않는다");
+        // 도움 모드는 예전처럼 30%만.
+        w.assist = true;
+        w.inv.glowbugs = 10;
+        w.player.hp = 0;
+        w.respawn_at_save();
         assert_eq!(w.inv.glowbugs, 7);
+        w.assist = false;
         // 다시 들어갔다 나오면 굴 입구 앞.
         w.enter_dungeon_now();
         w.exit_dungeon();

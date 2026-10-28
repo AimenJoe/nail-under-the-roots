@@ -103,8 +103,10 @@ impl App {
                 match chosen {
                     Some(0) => self.scene = Scene::Game,
                     Some(1) => {
-                        // 다시 하기·타이틀로: 런이 끝난다. 들고 있던 반딧불은 마을로(0047).
-                        self.bank_glowbugs();
+                        // 다시 하기·타이틀로: 런이 끝난다. 들고 있던 반딧불은 마을로(0047) — 굴 안이면 잃는다(0210).
+                        if self.safe_to_bank() {
+                            self.bank_glowbugs();
+                        }
                         self.start_game();
                     }
                     Some(2) => {
@@ -112,7 +114,9 @@ impl App {
                         self.scene = Scene::Settings { back: Back::Pause };
                     }
                     Some(3) => {
-                        self.bank_glowbugs();
+                        if self.safe_to_bank() {
+                            self.bank_glowbugs();
+                        }
                         // 쉼터에서 나가면 그 쉼터부터 이어한다(굴 안이면 마지막 쉼터, 0080).
                         self.checkpoint_run();
                         self.title_cursor = 0;

@@ -48,6 +48,8 @@ pub struct RunSave {
     pub stats: Vec<(String, u32)>,
     /// 이번 런 시간(초).
     pub run_secs: u32,
+    /// 감긴 실뿌리(0210). 0이면 적지 않는다(옛 글과 같다).
+    pub falls: u32,
     pub slots: Vec<Option<Slot>>,
     pub equipped: Option<usize>,
     pub charms: Vec<usize>,
@@ -77,6 +79,9 @@ impl RunSave {
         p.set_count("root_hearts", self.root_hearts);
         p.set_count("sp", self.sp_milli);
         p.set_count("run_secs", self.run_secs);
+        if self.falls > 0 {
+            p.set_count("falls", self.falls);
+        }
         for (on, key) in [
             (self.heart_sold, "heart_sold"),
             (self.momo_fight, "momo_fight"),
@@ -160,6 +165,7 @@ impl RunSave {
             no_damage: p.flag("no_damage"),
             stats,
             run_secs: p.count("run_secs"),
+            falls: p.count("falls"),
             slots,
             equipped: match p.count("equipped") {
                 0 => None,
@@ -196,6 +202,7 @@ mod tests {
             no_damage: false,
             stats: vec![("kills".into(), 17), ("parries".into(), 3)],
             run_secs: 412,
+            falls: 0,
             slots: vec![
                 Some(Slot::Weapon(4)),
                 None,

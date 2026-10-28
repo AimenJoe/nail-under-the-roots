@@ -71,6 +71,7 @@ impl App {
                 .map(|(k, n)| (k.to_string(), *n))
                 .collect(),
             run_secs: self.run_time.max(0.0) as u32,
+            falls: w.adv.falls,
             slots: self
                 .inventory
                 .slots
@@ -169,6 +170,7 @@ impl App {
         self.inventory = inv;
         self.apply_equipped();
         self.run_time = r.run_secs as f32;
+        self.world.adv.falls = r.falls;
         self.tally = Tally::of(&self.world);
         self.cutscene = None;
         self.tutorial = None;

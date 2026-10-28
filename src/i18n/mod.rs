@@ -371,7 +371,7 @@ strings! {
     // 장신구·가방·필살기(docs/decisions/0017, 0018)
     c_shell, c_shell_desc, c_whisker, c_whisker_desc, c_soil, c_soil_desc, c_flint, c_flint_desc, c_amulet, c_amulet_desc, it_berry, it_berry_desc, it_worm, it_worm_desc, toast_heart, toast_revive, quick_hint, special_name, special_desc, charms_label, charms_none, stat_attack, charm_equip, charm_unequip, bag_items, charm_slots,
     // 모험(docs/decisions/0019)
-    toast_save, toast_respawn, toast_boss, gift_charm, map_field, map_dungeon, map_legend, toast_parry,
+    toast_save, toast_respawn, toast_fall, toast_fall_root, toast_fall_last, toast_run_lost, toast_boss, gift_charm, map_field, map_dungeon, map_legend, toast_parry,
     // 적 종류·도감·게이지(docs/decisions/0021)
     gauge_rage, gauge_ki, mob_field_mouse, mob_field_mouse_lore, mob_field_mouse_atk, mob_field_mouse_tip, mob_house_mouse, mob_house_mouse_lore, mob_house_mouse_atk, mob_house_mouse_tip, mob_sewer_rat, mob_sewer_rat_lore, mob_sewer_rat_atk, mob_sewer_rat_tip, mob_chipmunk, mob_chipmunk_lore, mob_chipmunk_atk, mob_chipmunk_tip, mob_red_squirrel, mob_red_squirrel_lore, mob_red_squirrel_atk, mob_red_squirrel_tip, mob_shrew, mob_shrew_lore, mob_shrew_atk, mob_shrew_tip, mob_hedgehog, mob_hedgehog_lore, mob_hedgehog_atk, mob_hedgehog_tip, mob_toad, mob_toad_lore, mob_toad_atk, mob_toad_tip, mob_bat, mob_bat_lore, mob_bat_atk, mob_bat_tip, mob_spore, mob_spore_lore, mob_spore_atk, mob_spore_tip, mob_dummy, mob_dummy_lore, mob_dummy_atk, mob_dummy_tip, w_hp_1, w_hp_2, w_hp_3, w_hp_4, w_pow_1, w_pow_2, w_spd_1, w_spd_2, w_spd_3, w_spd_4,
     // 상태 탭·도감 탭

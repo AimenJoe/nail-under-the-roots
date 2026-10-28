@@ -569,6 +569,7 @@ impl App {
 
     fn apply_assist(&mut self) {
         self.world.player.resist = self.assist_resist();
+        self.world.assist = self.profile.flag(crate::profile::key::ASSIST);
     }
 
     /// 짧은 한마디(런 사이). 맞는 줄이 있으면 대화 컷씬.
@@ -657,6 +658,7 @@ impl App {
                                 self.start(Scenario::Village);
                                 self.world.start_ascent();
                             }
+                            AfterCut::Respawn if self.world.run_over() => self.lose_run(),
                             AfterCut::Respawn => {
                                 self.scene = Scene::Game;
                                 self.world.start_fade(crate::adventure::Transition::Respawn);
@@ -803,6 +805,10 @@ impl App {
             if self.world.adv.place != crate::adventure::Place::Arena
                 && !self.world.player.is_alive()
             {
+                if self.world.run_over() {
+                    self.lose_run();
+                    return;
+                }
                 self.world.begin_respawn();
                 self.death_t = 0.0;
                 self.pending_wake = self.recording();
@@ -814,6 +820,25 @@ impl App {
         } else if open_map {
             self.open_pause();
             self.pause_tab = TAB_MAP;
+        }
+    }
+
+    /// 실뿌리가 다 감긴 뒤 또 쓰러졌다(0210): 런이 끝난다. 쉼터 뒤에 주운 반딧불은 마을로 가지 않는다(잃는다).
+    /// 이야기 런은 마을로(뿌리가 데려다 놓는다), 오늘의 굴은 타이틀로. 맡겨 둔 반딧불·기록은 그대로.
+    fn lose_run(&mut self) {
+        self.world.inv.glowbugs = 0;
+        self.clear_run();
+        if self.recording() {
+            self.profile.add(crate::profile::key::RUNS_LOST, 1);
+            self.save_profile();
+        }
+        if self.current == Scenario::Normal {
+            self.start(Scenario::Village);
+            self.world.juice.toast = Some((|s| s.toast_run_lost, 5.0));
+        } else {
+            self.title_cursor = 0;
+            self.title_note = Some((|s| s.toast_run_lost, 5.0));
+            self.scene = Scene::Title;
         }
     }
 

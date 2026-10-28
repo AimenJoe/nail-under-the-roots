@@ -543,6 +543,9 @@ pub struct World {
     pub neighbors: Vec<Npc>,
     /// 연습: 맞아도 체력이 줄지 않는다(튜토리얼).
     pub no_damage: bool,
+    /// 도움 모드 "포포의 응원"(0041)이 켜져 있다. 앱이 넣는다. 쓰러짐이 너그럽다: 실뿌리 없음, 반딧불 30%만,
+    /// 길의 주인에게 쓰러지면 그 런은 지나간다(0210).
+    pub assist: bool,
     /// 도감: 만난(깨어 있는 것을 본) 적 종류.
     pub seen: Vec<Kind>,
     /// 모험 구조: 장소·카메라·던전·저장 지점(adventure.rs).
@@ -632,6 +635,7 @@ impl World {
             npc: None,
             neighbors: Vec::new(),
             no_damage: false,
+            assist: false,
             adv: Adventure::default(),
             debug: Debug {
                 overlay: false,

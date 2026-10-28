@@ -188,6 +188,8 @@ pub const BURROW_RUMBLE_EVERY: u32 = 5;
 pub const SPRING_RADIUS: f32 = 15.0;
 /// 끝방 출구가 화면 밖일 때 가장자리 표시를 띄우기까지(초): 보상을 줍는 동안은 조용히.
 pub const EXIT_MARK_DELAY: f32 = 1.5;
+/// 실뿌리(0210): 쉼터를 지난 런에서 쓰러져 쉼터에서 깨어날 수 있는 횟수. 다 감긴 뒤 또 쓰러지면 런이 끝난다(도움 모드는 없음).
+pub const RUN_LIVES: u32 = 3;
 /// 쿨다운(솟구친 순간부터).
 pub const BURROW_COOLDOWN: f32 = 0.6;
 /// 모모의 회피 깡충(0056): 체공 시간·거리·높이(그림). 공중에서는 안 맞고 적·탄·묻힌 도토리를 넘는다. 대기는 굴파기 대기와 같은 값을 쓴다.

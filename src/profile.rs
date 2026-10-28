@@ -22,6 +22,8 @@ pub mod key {
     pub const RUNS: &str = "runs";
     /// 쓰러진 수(이야기 조건·도움 모드).
     pub const DEATHS: &str = "deaths";
+    /// 실뿌리가 다 감겨 끝난 런 수(0210).
+    pub const RUNS_LOST: &str = "runs_lost";
     /// 도움 모드 "포포의 응원"이 켜져 있다(0040).
     pub const ASSIST: &str = "assist";
     /// 도움 모드를 켠 채 쓰러진 수(받는 피해가 이만큼 더 준다).

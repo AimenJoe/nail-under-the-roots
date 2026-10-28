@@ -1262,6 +1262,13 @@ impl App {
         ui.text_center(&hint, 160.0, panel.bottom() + 1.0, FONT_PX, ui::TEXT_DIM);
     }
 
+    /// 그만둘 때(다시 하기·타이틀로) 들고 있는 반딧불을 마을로 보내도 되나(0210): 굴·가장 깊은 곳 안이면 아니다.
+    /// 쓰러지면 잃는 반딧불을, 쓰러지기 직전에 그만둬서 지키지 못하게. 도움 모드는 늘 보낸다.
+    pub(super) fn safe_to_bank(&self) -> bool {
+        use crate::adventure::Place;
+        self.world.assist || !matches!(self.world.adv.place, Place::Dungeon | Place::Deep)
+    }
+
     /// 들고 있는 반딧불을 마을(큰 나무)로 보낸다: 쉼터에 닿을 때·런이 끝날 때(0047). 첫 시작만. 보낸 수.
     pub(super) fn bank_glowbugs(&mut self) -> u32 {
         let n = self.world.inv.glowbugs;
