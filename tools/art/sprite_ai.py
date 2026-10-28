@@ -33,12 +33,13 @@ OUTLINE = (43, 29, 42)
 @dataclass
 class Source:
     """원본 시트 한 장. frames: 이름 → 시트 좌표 (x0, y0, x1, y1). groups: 이름 → 배율 기준 칸 이름(같은 무리는 같은 배율).
-    erase: 이름 → 효과(호)가 지나가는 네모 목록(시트 좌표) — 그 안의 `Spec.arc` 색만 지운다. tidy: 떨어진 조각을 버릴 칸."""
+    erase: 이름 → 효과(호)가 지나가는 네모 목록(시트 좌표) — 그 안의 `Spec.arc` 색만 지운다.
+    tidy: 가장 큰 덩어리의 이 비율보다 작은 떨어진 조각(흙먼지·옆 칸에서 넘어온 귀·얼굴)을 버린다. 0이면 안 버린다."""
     path: Path
     frames: dict
     groups: dict
     erase: dict = field(default_factory=dict)
-    tidy: bool = False
+    tidy: float = 0.0
 
 
 @dataclass
@@ -299,7 +300,7 @@ def convert(spec):
             keep = solid_mask(a)
             if k in s.erase:
                 keep = erase_color(a, keep, s.erase[k], s.frames[k], spec.arc)
-            masks[k] = main_parts(keep) if s.tidy else keep
+            masks[k] = main_parts(keep, s.tidy) if s.tidy else keep
         loaded.append((s, crops, masks))
     si, name = spec.palette_ref
     _, crops, masks = loaded[si]

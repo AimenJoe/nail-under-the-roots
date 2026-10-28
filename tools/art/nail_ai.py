@@ -60,7 +60,7 @@ SPEC = Spec(
                 ("windup0", "attack0", "windup1", "attack1", "windup2", "attack2", "settle", "hurt", "dead"), "windup0"
             ),
             erase={"attack0": [(455, 170, 669, 295)], "attack1": [(255, 317, 335, 604)]},
-            tidy=True,
+            tidy=0.02,
         ),
     ],
     # 색표는 기준 칸 하나에서(다섯 칸을 합쳐 고르면 넓은 갈색에 밀려 목도리 주황이 빠졌다).
