@@ -1088,7 +1088,11 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
             };
             let k = (wt / e.windup()).min(1.0);
             tint = Color::new(1.0, 1.0 - 0.45 * k, 1.0 - 0.45 * k, 1.0);
+            // 다람쥐 새 그림(0221)은 예고 칸이 도토리를 쳐들고 있어 코드 도토리를 그리지 않는다.
+            let holds = sp.behavior == crate::species::Behavior::Shooter
+                && art.is_some_and(|a| a.critter_is_big(sp.sheet_row));
             if matches!(e.state, enemy::State::Aim { .. })
+                && !holds
                 && !matches!(
                     sp.behavior,
                     crate::species::Behavior::Tongue | crate::species::Behavior::Spore

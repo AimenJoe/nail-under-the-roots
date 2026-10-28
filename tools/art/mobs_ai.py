@@ -53,6 +53,29 @@ MOBS = {
         body_h=10,
         strip=12,
     ),
+    "sewer_rat": dict(
+        frames={"stand": (58, 30, 283, 232), "walk": (359, 30, 627, 232), "crouch": (704, 45, 971, 233),
+                "charge": (9, 281, 313, 480), "hurt": (375, 281, 632, 480), "down": (700, 326, 1006, 480)},
+        order=["stand", "~stand", "walk", "stand", "crouch", "charge", "hurt", "down"],
+        body_h=14,
+        strip=12,
+    ),
+    # 다람쥐: 예고 칸이 도토리를 쳐들고 있다(게임은 큰 시트면 코드 도토리를 그리지 않는다, render/actors.rs).
+    # 던지기 칸의 날아가는 도토리는 떨어진 조각이라 `tidy`가 버린다(투사체는 게임이 그린다).
+    "chipmunk": dict(
+        frames={"stand": (43, 40, 244, 243), "walk": (377, 40, 575, 243), "aim": (714, 29, 973, 243),
+                "throw": (24, 276, 263, 483), "hurt": (406, 276, 625, 483), "down": (676, 370, 995, 483)},
+        order=["stand", "~stand", "walk", "stand", "aim", "throw", "hurt", "down"],
+        body_h=15,
+        strip=12,
+    ),
+    "red_squirrel": dict(
+        frames={"stand": (57, 22, 284, 227), "walk": (384, 22, 640, 227), "crouch": (719, 57, 981, 227),
+                "leap": (15, 271, 320, 462), "hurt": (384, 271, 625, 490), "down": (697, 384, 1002, 476)},
+        order=["stand", "~stand", "walk", "stand", "crouch", "leap", "hurt", "down"],
+        body_h=16,
+        strip=11,
+    ),
 }
 
 
