@@ -1,4 +1,5 @@
-"""모모(굴토끼) 스프라이트 시트(24×24 칸, 발바닥 22 — Naïl과 같은 칸, 0206 C3).
+"""모모(굴토끼) 스프라이트 시트(32×32 칸, 발바닥 30, 0206 C3). 몸 크기는 Naïl과 같고 칸만 넓다 — 차기·쓰러짐은
+몸을 옆으로 길게 뻗어 외곽선까지 28px라 24칸에서는 얼굴·뒷발이 잘렸다(사장).
 
 실행: python3 tools/art/momo_ai.py [출력 경로]   (기본 assets/art/momo.png)
 
@@ -26,7 +27,8 @@ sys.path.insert(0, str(HERE.parent / "pixel"))
 from pxl import Pxl  # noqa: E402
 from sprite_ai import OUTLINE, Source, Spec, convert, seat  # noqa: E402
 
-CELL, FOOT = 24, 22
+CELL, FOOT = 32, 30
+A_CELL, A_FOOT = 24, 22     # 시트 A(.pxl)의 칸
 SHEET_A = HERE / "sources" / "pxl" / "momo_a.pxl"
 A_COLS = {"idle_a": 0, "idle_b": 1, "crouch": 2, "jump": 4}      # .pxl 안의 칸 번호(3 = 귀 젖힘은 안 쓴다)
 SPEC_B = Spec(
@@ -88,7 +90,12 @@ def taint(cell):
 
 def build():
     a = np.asarray(Pxl.load(SHEET_A).image())
-    cells = {k: a[:, c * CELL:(c + 1) * CELL].copy() for k, c in A_COLS.items()}
+    cells = {}
+    for k, c in A_COLS.items():
+        cell = np.zeros((CELL, CELL, 4), np.uint8)
+        x0, y0 = (CELL - A_CELL) // 2, FOOT - A_FOOT
+        cell[y0:y0 + A_CELL, x0:x0 + A_CELL] = a[:, c * A_CELL:(c + 1) * A_CELL]
+        cells[k] = cell
     b = convert(SPEC_B)
     for k in ("windup", "kick", "hurt", "down"):
         cells[k] = seat(b[k], CELL, FOOT)

@@ -20,7 +20,7 @@ pub struct Art {
     pub light: Texture2D,
     /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이, 줄 14~18 땃쥐·고슴도치·두꺼비·박쥐·포자버섯(0146). 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
-    /// 모모 새 그림(tools/art/momo_ai.py, 0206 C3): 24×24 칸, 발바닥 `BIG_FOOT`. 줄 0 돌아온 모모, 줄 1 물든 모모,
+    /// 모모 새 그림(tools/art/momo_ai.py, 0206 C3): 32×32 칸, 발바닥 `BIG_FOOT`. 줄 0 돌아온 모모, 줄 1 물든 모모,
     /// 줄 2·3 흰 실루엣. critters 모모 두 줄 대신 쓴다(`Art::critter`). 없으면 critters 16칸.
     pub momo: Option<Texture2D>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
@@ -314,9 +314,10 @@ pub fn nail_origin(pos: macroquad::math::Vec2) -> macroquad::math::Vec2 {
     macroquad::math::vec2(pos.x - NAIL_CELL / 2.0, pos.y + 6.0 - NAIL_FOOT)
 }
 
-/// 큰 그림 시트(momo.png, 0206 C3): 24×24 칸, 발바닥 줄(칸 위에서). Naïl 칸(`NAIL_CELL`·`NAIL_FOOT`)과 같다.
-pub const BIG_CELL: f32 = 24.0;
-pub const BIG_FOOT: f32 = 22.0;
+/// 큰 그림 시트(momo.png, 0206 C3): 32×32 칸, 발바닥 줄(칸 위에서). 몸은 Naïl과 같은 크기, 칸만 넓다 —
+/// 차기·쓰러짐은 몸을 옆으로 뻗어 외곽선까지 28px라 24칸에서는 얼굴이 잘렸다.
+pub const BIG_CELL: f32 = 32.0;
+pub const BIG_FOOT: f32 = 30.0;
 /// critters 16칸의 발바닥 줄(critters.py "발바닥 y=14").
 pub const CRITTER_FOOT: f32 = 14.0;
 
