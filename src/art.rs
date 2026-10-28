@@ -373,7 +373,7 @@ pub struct BigSheet {
     pub foot: f32,
 }
 
-pub const BIG_SHEETS: [BigSheet; 14] = [
+pub const BIG_SHEETS: [BigSheet; 16] = [
     BigSheet {
         file: "art/momo.png",
         back: MOMO_BLOOM_ROW,
@@ -416,8 +416,8 @@ pub const BIG_SHEETS: [BigSheet; 14] = [
         cell: 32.0,
         foot: 30.0,
     },
-    // 잡몹(0221): 24칸, 물든 모습 하나. critters 줄 0 들쥐·1 생쥐·2 시궁쥐·3 다람쥐·4 청설모·땃쥐·고슴도치·두꺼비
-    // (species.rs `sheet_row`).
+    // 잡몹(0221): 24칸(박쥐만 날개 때문에 32), 물든 모습 하나. critters 줄 0 들쥐·1 생쥐·2 시궁쥐·3 다람쥐·4 청설모·
+    // 땃쥐·고슴도치·두꺼비·박쥐·포자버섯(species.rs `sheet_row`).
     BigSheet {
         file: "art/field_mouse.png",
         back: 0,
@@ -470,6 +470,20 @@ pub const BIG_SHEETS: [BigSheet; 14] = [
     BigSheet {
         file: "art/toad.png",
         back: TOAD_ROW,
+        tainted: None,
+        cell: 24.0,
+        foot: 22.0,
+    },
+    BigSheet {
+        file: "art/bat.png",
+        back: BAT_ROW,
+        tainted: None,
+        cell: 32.0,
+        foot: 30.0,
+    },
+    BigSheet {
+        file: "art/spore.png",
+        back: SPORE_ROW,
         tainted: None,
         cell: 24.0,
         foot: 22.0,

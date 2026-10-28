@@ -3,7 +3,8 @@
 실행: python3 tools/art/mobs_ai.py [이름 ...]   (기본: 원본이 있는 잡몹 모두)
 
 참고 그림·프롬프트는 `mobs_ref.py`(0221). 받은 시트는 3×2 여섯 칸(서기·걷기·예고·공격·맞음·쓰러짐)이 기본이지만 잡몹마다
-다르게 와서(뒷모습 칸 등) `frames`(원본 칸 상자)와 `order`(게임 칸 여덟)로 고른다. "~이름"은 그 칸을 1px 내쉰 칸.
+다르게 와서(뒷모습 칸 등) `frames`(원본 칸 상자)와 `order`(게임 칸 여덟)로 고른다. "~이름"은 그 칸을 1px 내쉰 칸,
+"!이름"은 좌우로 뒤집은 칸(왼쪽을 보고 온 칸). 칸 크기는 기본 24(발바닥 22), 박쥐만 날개 때문에 32(`cell`).
 게임 칸(critters 그 잡몹 줄과 같은 뜻 + 큰 시트의 7): 0 서기, 1 날숨, 2·3 걷기, 4 예고, 5 공격, 6 맞음, 7 쓰러짐.
 시트: 줄 0 잡몹, 줄 1은 줄 0과 같다(잡몹은 물든 모습 하나 — 큰 시트 줄 순서를 맞추려고), 줄 2·3 흰 실루엣(피격 번쩍).
 
@@ -99,6 +100,26 @@ MOBS = {
         body_h=11,
         strip=12,
     ),
+    # 박쥐: 거의 앞모습으로 왔다(날아다니는 잡몹이라 괜찮다). 늘 날아 서기·걷기 칸이 날갯짓 — 날개 든 칸 ↔ 활짝 편 칸.
+    # 예고 = 활짝 편 칸, 내리꽂기 칸은 왼쪽 아래를 보고 와서 뒤집는다. 옆모습 한 칸(1줄 둘째)은 쓰지 않는다.
+    # 날개를 펴면 폭이 24칸을 넘어 칸 32(발바닥 30).
+    "bat": dict(
+        frames={"up": (57, 43, 290, 219), "spread": (691, 43, 1016, 212), "dive": (93, 292, 263, 469),
+                "hurt": (392, 278, 590, 483), "down": (712, 356, 974, 483)},
+        order=["up", "spread", "up", "spread", "spread", "!dive", "hurt", "down"],
+        body_h=13,
+        strip=11,
+        cell=(32, 30),
+    ),
+    # 포자버섯: 4×2 여덟 칸으로 왔다. 서기·걷기·눌림(예고)·포자 뿜기(공격, 2줄 첫째 — 위로 튄 포자 조각은 떨어진 조각이라
+    # `tidy`가 버린다, 포자 구름은 게임이 그린다)·질끈 감은 눈(맞음)·쓰러짐. 1줄 넷째·2줄 둘째는 쓰지 않는다.
+    "spore": dict(
+        frames={"stand": (40, 43, 220, 233), "walk": (299, 43, 478, 233), "squash": (549, 62, 733, 233),
+                "puff": (40, 287, 220, 483), "hurt": (549, 292, 729, 483), "down": (798, 328, 995, 483)},
+        order=["stand", "~stand", "walk", "stand", "squash", "puff", "hurt", "down"],
+        body_h=15,
+        strip=11,
+    ),
 }
 
 
@@ -117,18 +138,24 @@ def build(name):
     m = MOBS[name]
     spr = convert(spec(name))
     src = np.asarray(Image.open(HERE / "sources" / "ai" / "sprites" / f"{name}_v1.png").convert("RGB")).astype(int)
-    sheet = np.zeros((CELL * 4, CELL * len(m["order"]), 4), np.uint8)
+    size, foot = m.get("cell", (CELL, FOOT))
+    sheet = np.zeros((size * 4, size * len(m["order"]), 4), np.uint8)
     for c, src_name in enumerate(m["order"]):
-        base = src_name.lstrip("~")
-        cell = seat(breathe(spr[base]) if src_name.startswith("~") else spr[base], CELL, FOOT)
-        for pred, ink, hits in m.get("marks", TAINT):
-            cell = transfer(cell, src, m["frames"][base], pred, ink, hits)
+        base = src_name.lstrip("~!")
+        sprite = spr[base]
+        if src_name.startswith("~"):
+            sprite = breathe(sprite)
+        if src_name.startswith("!"):
+            sprite = sprite[:, ::-1]
+        cell = seat(sprite, size, foot)
+        for pred, ink, hits in m.get("marks", TAINT) if not src_name.startswith("!") else []:
+            cell = transfer(cell, src, m["frames"][base], pred, ink, hits)   # 뒤집은 칸은 자리가 안 맞아 건너뛴다
         if base in m.get("red_eyes", ()):
             cell = redraw_eyes(cell, src, m["frames"][base], False, ink=RED_EYE[1], band=(0.15, 0.7))
         sil = np.zeros_like(cell)
         sil[cell[..., 3] > 0] = [255, 255, 255, 255]
         for r, im in enumerate((cell, cell, sil, sil)):
-            sheet[r * CELL:(r + 1) * CELL, c * CELL:(c + 1) * CELL] = im
+            sheet[r * size:(r + 1) * size, c * size:(c + 1) * size] = im
     return sheet
 
 
