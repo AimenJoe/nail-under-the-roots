@@ -573,6 +573,8 @@ pub struct World {
     /// 이번 틱의 공격 히트박스(디버그 표시용).
     pub last_strike: Option<Strike>,
     respawn_timer: f32,
+    /// 달리며 모으기의 땅울림이 켜져 있나(0215): 켜지고 꺼지는 틱에 소리를 낸다/멈춘다.
+    run_rumble: bool,
     enemy_events: Vec<enemy::Event>,
 }
 
@@ -654,6 +656,7 @@ impl World {
             time: 0.0,
             last_strike: None,
             respawn_timer: t::WAVE_RESPAWN_DELAY,
+            run_rumble: false,
             enemy_events: Vec::new(),
         };
         w.next_wave();
@@ -821,6 +824,34 @@ impl World {
                         30.0 + 50.0 * charge,
                     );
                 }
+            }
+        }
+        // 달리며 모으기(0215, 사장 "땅파기 모으기처럼 구구구 하는 효과"): 모모·도토가 멀리뛰기를 뛸 수 있게 되면(`RUN_MIN` 뒤)
+        // 땅이 울기 시작한다 — 땅파기와 같은 소리·흙 고리, 달리는 동안 흔들림과 발밑 흙알. 뛰거나 멈추면 소리를 끊는다.
+        let ready = self.player.jump_aim().is_some_and(|(_, r, _)| r);
+        if ready != self.run_rumble {
+            self.run_rumble = ready;
+            if ready {
+                self.juice.audio.play(sfx::Id::Rumble);
+                self.juice
+                    .fx
+                    .push(ring(self.player.pos, 3.0, 10.0, 0.25, DIRT));
+            } else {
+                self.juice.audio.stop(sfx::Id::Rumble);
+            }
+        }
+        if ready {
+            self.juice
+                .feel
+                .add_trauma(t::BURROW_RUMBLE_SHAKE * t::RUN_RUMBLE);
+            if ((self.time / dt).round() as u32).is_multiple_of(t::BURROW_RUMBLE_EVERY) {
+                clods(
+                    &mut self.juice.fx,
+                    self.player.pos + vec2(0.0, 4.0),
+                    2,
+                    DIRT,
+                    55.0,
+                );
             }
         }
         let mut ate = None;

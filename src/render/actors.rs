@@ -823,7 +823,16 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
         0.0
     };
     // 발바닥 자리: critters 16칸 시절의 그리기(칸 왼쪽 위 = pos − (8, 9), 발바닥 줄 14)와 같은 점.
-    let feet = vec2(pos.x, (pos.y - 9.0).round() + art::CRITTER_FOOT + crouch);
+    // 달리며 모으기(0215): 뛸 수 있게 되면 몸이 좌우로 1px 떤다(땅파기 모으기·강공격 다 모임과 같은 말).
+    let tremble = if p.jump_aim().is_some_and(|(_, r, _)| r) {
+        ((time * 60.0) as i32 % 2) as f32
+    } else {
+        0.0
+    };
+    let feet = vec2(
+        pos.x + tremble,
+        (pos.y - 9.0).round() + art::CRITTER_FOOT + crouch,
+    );
     if let Some(c) = art.critter(frame, row) {
         c.draw(feet, Vec2::ONE, p.face_left, tint);
     }

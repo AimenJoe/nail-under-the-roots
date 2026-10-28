@@ -235,6 +235,30 @@ mod tests {
         }
     }
 
+    /// 달리며 모으기(0215): 회피를 쥐고 달려 멀리뛰기를 뛸 수 있게 되면 땅울림이 켜지고, 떼서 뛰면 꺼진다.
+    #[test]
+    fn running_rumbles_once_the_jump_is_ready() {
+        let mut w = doto();
+        w.player.pos = w.room.center() - vec2(60.0, 0.0);
+        let hold = Actions {
+            move_dir: vec2(1.0, 0.0),
+            dodge: true,
+            dodge_held: true,
+            ..Default::default()
+        };
+        w.tick(&hold);
+        let keep = Actions {
+            dodge: false,
+            ..hold
+        };
+        run(&mut w, &keep, 20);
+        assert!(matches!(w.player.state, crate::player::State::Run { .. }));
+        run(&mut w, &keep, (t::RUN_MIN / t::TICK_DT) as usize + 2);
+        assert!(w.run_rumble, "뛸 수 있게 되면 운다");
+        w.tick(&Actions::default());
+        assert!(!w.run_rumble, "떼서 뛰면 그친다");
+    }
+
     /// 플레이어에서 `off`만큼 떨어진 자리에 허수아비.
     fn dummy(w: &mut World, off: Vec2) -> usize {
         let at = w.player.pos + off;
