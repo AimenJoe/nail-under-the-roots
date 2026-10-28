@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://aimenjoe.github.io/nail-under-the-roots/img/i_title.png">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#17130f">
-<link rel="stylesheet" href="../style.css?v=795fc143">
+<link rel="stylesheet" href="../style.css?v=4536b663">
 </head>
 <body>
 <a class="skip" href="#story">Skip to content</a>
@@ -81,14 +81,15 @@
       <header class="head">
         <p class="tag">Fight</p>
         <h2>Dig in, burst out, claw</h2>
-        <p>A fighting style only a mole could have. It gets faster as it gets familiar.</p>
+        <p>A fighting style only a mole could have. Enemies show where they will strike in red first: the attack lands the moment the fill reaches the border. Parry the lanes, dodge the circles with an X.</p>
       </header>
       <div class="fight">
-        <figure class="frame"><img class="px" src="../img/s_fight.png" alt="Naïl fighting tainted field mice and squirrels on a meadow, a charge warning line on the ground" width="960" height="540" loading="lazy"></figure>
+        <figure class="frame"><img class="px" src="../img/s_fight.png" alt="Naïl fighting a pack of tainted field mice on a meadow. One mouse is about to charge, and a red lane warning fills on the ground" width="960" height="540" loading="lazy"></figure>
         <ul class="moves">
-          <li><span class="keys"><kbd>J</kbd></span><b>Three-hit claws</b><span>The third hit lands hardest. Four claws to find: Sprout, Mole, Stone and Venom.</span></li>
+          <li><span class="keys"><kbd>J</kbd></span><b>Claw combo · beat</b><span>A swing comes out at once. Chain on the beat as the ring closes to hit harder; land every beat for +1 damage on the finisher. Four claws to find: Sprout, Mole, Stone and Venom.</span></li>
+          <li><span class="keys"><kbd>J</kbd></span><b>Heavy strike</b><span>After a swing, keep holding until your claws glow, then release. It shoves foes into walls and cracks shells and spines.</span></li>
           <li><span class="keys"><kbd>K</kbd></span><b>Burrow → burst up</b><span>Duck underground to let attacks pass, then burst out into a ram. Hold to stay under longer.</span></li>
-          <li><span class="keys"><kbd>J</kbd></span><b>Parry</b><span>Swing right as an enemy strikes to knock it back.</span></li>
+          <li><span class="keys"><kbd>J</kbd></span><b>Parry</b><span>Swing just before a straight charge or a thrown attack lands to knock it back and leave the enemy dizzy.</span></li>
           <li><span class="keys"><kbd>L</kbd></span><b>Drill</b><span>When the gauge is full, dash a whole screen across.</span></li>
         </ul>
       </div>
@@ -99,7 +100,7 @@
     <div class="wrap">
       <header class="head">
         <p class="tag">Zones</p>
-        <h2>Three zones, darker the deeper you go</h2>
+        <h2>Four zones, darker the deeper you go</h2>
         <p>Each zone has its own creatures and its own dangerous ground. Their tricks come from how the real animals live.</p>
       </header>
       <ol class="zones">
@@ -125,6 +126,13 @@
             <h3><span class="z-n">3</span>Dark Depths</h3>
             <p>The only light is around Naïl. <b>Bats</b> your burst can't reach, <b>spore caps</b> that puff out clouds, and a <b>ceiling that falls</b> while you fight.</p>
             <p class="crit"><span class="sprite" style="background-image: url(../img/sp_bat.png); --n: 4" title="Bat"></span><span class="sprite" style="background-image: url(../img/sp_sporecap.png); --n: 2" title="Spore Cap"></span></p>
+          </div>
+        </li>
+        <li class="zone">
+          <img class="px shot" src="../img/s_silk.png" alt="" width="960" height="540" loading="lazy">
+          <div>
+            <h3><span class="z-n">4</span>White Silk Warren</h3>
+            <p>A branch on the third path that opens once Momo is home. <b>Silk webs</b> on the floor hold you in place (cut them with your claws or dig under), and deep inside waits a <b>mother rabbit</b> guarding her babies' cocoons.</p>
           </div>
         </li>
       </ol>
@@ -162,7 +170,8 @@
         <li><img class="px" src="../img/p_momo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Rabbit</p><h3>Momo</h3><p>Met three times at the end of the first path. Later, you can take her down yourself.</p></div></li>
         <li><img class="px" src="../img/p_doto.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Squirrel</p><h3>Doto</h3><p>At the tangled roots where the second path ends. Gives up nothing it buried.</p></div></li>
         <li><img class="px" src="../img/p_kongi.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Armadillo</p><h3>Kongi</h3><p>Keeper of the deep door. Curls up so no one can go further down.</p></div></li>
-        <li><img class="px" src="../img/p_halmae.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mushroom elder</p><h3>Granny Nuruk</h3><p>Spins threads. Her cat's cradle sets how hard your next run is.</p></div></li>
+        <li><img class="px" src="../img/p_clover.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mother rabbit</p><h3>Clover</h3><p>Momo's mother. Bound in thread at the back of the old warren, still guarding her babies.</p></div></li>
+        <li><img class="px" src="../img/p_halmae.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mushroom elder</p><h3>Granny Nuruk</h3><p>Waits at the very bottom, where the threads meet. Cut her knots to free everyone. Later, her cat's cradle sets the difficulty.</p></div></li>
         <li><img class="px" src="../img/p_susu.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mole cricket smith</p><h3>Susu</h3><p>By the stump at the first camp. Makes you Sprout Claws.</p></div></li>
       </ul>
       <div class="split">
@@ -208,7 +217,8 @@
         <li><b>Cat's Cradle 1–10</b><span>Difficulty steps that open one by one as you clear. Tracked per hero.</span></li>
         <li><b>Today's Burrow</b><span>The same burrow for everyone on a given date, with your best distance kept.</span></li>
         <li><b>Thread Dream</b><span>Fight the bosses you beat again, inside a dream.</span></li>
-        <li><b>Journal · Bestiary · Album</b><span>Goals across runs, fourteen creatures to meet, the pictures you saw.</span></li>
+        <li><b>Journal · Bestiary · Album</b><span>Goals across runs, fifteen creatures to meet, the pictures you saw.</span></li>
+        <li><b>Help</b><span>The Help tab in the menu shows combos, heavy strikes, parries and how to read warnings as moving pictures.</span></li>
         <li><b>Three save slots · resume at camp</b><span>A run that reached camp carries on after you quit.</span></li>
       </ul>
     </div>
@@ -295,8 +305,8 @@
     <div class="wrap split">
       <div class="copy">
         <p class="tag">Next</p>
-        <h2>Working on v0.4, "The Deep"</h2>
-        <p>A new, deeper path with a neighbor at its end, and a last fight at the very bottom. Tell us what you think any time via <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">feedback &amp; bug reports</a>.</p>
+        <h2>Working on v0.5, "Doto and New Clothes"</h2>
+        <p>With v0.4, "The Deep", the path now runs all the way to the bottom. Next: <b>Doto</b>, the acorn-throwing squirrel, as a third playable hero, and new art for everyone. After that, a public demo. Tell us what you think any time via <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">feedback &amp; bug reports</a>.</p>
       </div>
       <dl class="facts">
         <div><dt>Genre</dt><dd>Top-down action roguelite</dd></div>

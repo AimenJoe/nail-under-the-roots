@@ -30,6 +30,7 @@ PORTRAITS = {
     "doto": 31,
     "susu": 33,
     "kongi": 36,
+    "clover": 39,
 }
 # 스포일러가 없는 일러스트만(타이틀 바탕·오프닝의 엄마 굴).
 ILLUSTS = ["title", "mother_burrow"]

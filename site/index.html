@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://aimenjoe.github.io/nail-under-the-roots/img/i_title.png">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#17130f">
-<link rel="stylesheet" href="style.css?v=795fc143">
+<link rel="stylesheet" href="style.css?v=4536b663">
 </head>
 <body>
 <a class="skip" href="#story">본문으로</a>
@@ -82,14 +82,15 @@
       <header class="head">
         <p class="tag">싸움</p>
         <h2>파고들고, 솟구치고, 할퀴고</h2>
-        <p>두더지라서 할 수 있는 싸움. 손에 익을수록 빨라진다.</p>
+        <p>두더지라서 할 수 있는 싸움. 적은 칠 자리를 붉게 먼저 보여 준다. 채움이 테두리에 닿는 순간이 공격이다. 띠는 받아치고, 가운데 X가 있는 원은 피한다.</p>
       </header>
       <div class="fight">
-        <figure class="frame"><img class="px" src="img/s_fight.png" alt="풀밭에서 나일이 물든 들쥐·청설모와 싸우는 장면. 바닥에 돌진 예고선이 보인다" width="960" height="540" loading="lazy"></figure>
+        <figure class="frame"><img class="px" src="img/s_fight.png" alt="풀밭에서 나일이 물든 들쥐 떼와 싸우는 장면. 들쥐 하나가 나일 쪽으로 돌진하려 하고, 바닥에 붉은 띠 예고가 차오른다" width="960" height="540" loading="lazy"></figure>
         <ul class="moves">
-          <li><span class="keys"><kbd>J</kbd></span><b>발톱 3연타</b><span>세 번째가 가장 묵직하다. 발톱은 넷(새싹·두더지·바위·독).</span></li>
+          <li><span class="keys"><kbd>J</kbd></span><b>발톱 콤보 · 박자</b><span>누르면 바로 한 타. 고리가 닫히는 박자에 이으면 더 세고, 한 콤보를 다 맞추면 마무리 피해 +1. 발톱은 넷(새싹·두더지·바위·독).</span></li>
+          <li><span class="keys"><kbd>J</kbd></span><b>강타</b><span>한 타 뒤 계속 누르다 발톱이 빛나면 뗀다. 멀리 밀어 벽에 쿵, 등딱지와 가시도 연다.</span></li>
           <li><span class="keys"><kbd>K</kbd></span><b>굴파기 → 솟구치기</b><span>땅속으로 숨어 공격을 흘리고, 튀어나오며 들이받는다. 누르고 있으면 더 오래 숨는다.</span></li>
-          <li><span class="keys"><kbd>J</kbd></span><b>패링</b><span>적이 휘두르는 순간 맞받아치면 튕겨 낸다.</span></li>
+          <li><span class="keys"><kbd>J</kbd></span><b>받아치기</b><span>곧게 돌진하거나 날아오는 공격이 닿기 직전에 휘두르면 튕겨 내고, 적이 어질어질해진다.</span></li>
           <li><span class="keys"><kbd>L</kbd></span><b>드릴</b><span>게이지가 차면 화면 한 폭을 가로지르는 필살기.</span></li>
         </ul>
       </div>
@@ -100,7 +101,7 @@
     <div class="wrap">
       <header class="head">
         <p class="tag">지대</p>
-        <h2>내려갈수록 어두워지는 세 지대</h2>
+        <h2>내려갈수록 어두워지는 네 지대</h2>
         <p>지대마다 사는 동물이 다르고, 바닥이 위험해진다. 실제 동물의 습성에서 꺼낸 적들이다.</p>
       </header>
       <ol class="zones">
@@ -126,6 +127,13 @@
             <h3><span class="z-n">3</span>어두운 심층</h3>
             <p>빛은 나일 곁뿐. 솟구치기가 닿지 않는 <b>박쥐</b>, 포자 구름을 뿜는 <b>포자버섯</b>. 싸우는 동안 <b>천장이 무너진다</b>.</p>
             <p class="crit"><span class="sprite" style="background-image: url(img/sp_bat.png); --n: 4" title="박쥐"></span><span class="sprite" style="background-image: url(img/sp_sporecap.png); --n: 2" title="포자버섯"></span></p>
+          </div>
+        </li>
+        <li class="zone">
+          <img class="px shot" src="img/s_silk.png" alt="" width="960" height="540" loading="lazy">
+          <div>
+            <h3><span class="z-n">4</span>흰 실 굴</h3>
+            <p>모모를 집에 데려다준 뒤 셋째 길에 열리는 갈래. 바닥엔 발을 묶는 <b>흰 실 그물</b>(발톱으로 끊거나 땅속으로 지나간다), 가장 안쪽엔 아기들의 고치를 품은 <b>어미 굴토끼</b>.</p>
           </div>
         </li>
       </ol>
@@ -163,7 +171,8 @@
         <li><img class="px" src="img/p_momo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">굴토끼</p><h3>모모</h3><p>첫 길 끝에서 세 번 만난다. 나중엔 직접 데리고 내려갈 수 있다.</p></div></li>
         <li><img class="px" src="img/p_doto.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">청설모</p><h3>도토</h3><p>둘째 길 끝, 뿌리 엉킨 곳. 묻어 둔 것은 아무에게도 안 준다.</p></div></li>
         <li><img class="px" src="img/p_kongi.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">세띠아르마딜로</p><h3>콩이</h3><p>깊은 곳의 문지기. 아무도 못 지나가게 몸을 만다.</p></div></li>
-        <li><img class="px" src="img/p_halmae.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">누룩 할매</p><h3>할매</h3><p>실을 뜨는 버섯 할매. 실뜨기로 다음 런의 어려움을 고른다.</p></div></li>
+        <li><img class="px" src="img/p_clover.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">어미 굴토끼</p><h3>토끼풀</h3><p>모모의 엄마. 옛 굴 가장 안쪽에서 실에 감긴 채 아기들을 지킨다.</p></div></li>
+        <li><img class="px" src="img/p_halmae.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">누룩 할매</p><h3>할매</h3><p>모든 실이 모이는 가장 깊은 곳의 버섯 할매. 할매 곁의 매듭을 다 끊으면 모두가 풀려나고, 그 뒤엔 실뜨기로 다음 런의 어려움을 골라 준다.</p></div></li>
         <li><img class="px" src="img/p_susu.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">땅강아지 장인</p><h3>수수</h3><p>첫 쉼터 그루터기 곁. 새싹 발톱을 만들어 준다.</p></div></li>
       </ul>
       <div class="split">
@@ -209,7 +218,8 @@
         <li><b>실뜨기 1~10단계</b><span>깰 때마다 한 단계씩 열리는 어려움. 캐릭터마다 따로.</span></li>
         <li><b>오늘의 굴</b><span>날짜마다 같은 굴. 그날 가장 멀리 간 기록이 남는다.</span></li>
         <li><b>실의 꿈</b><span>이긴 길의 주인과 꿈속에서 다시 싸우기.</span></li>
-        <li><b>저널 · 도감 · 앨범</b><span>런을 넘는 목표와 보상, 만난 적 열네 종, 본 그림.</span></li>
+        <li><b>저널 · 도감 · 앨범</b><span>런을 넘는 목표와 보상, 만난 적 열다섯 종, 본 그림.</span></li>
+        <li><b>안내</b><span>메뉴의 안내 탭에서 콤보·강타·받아치기·예고 읽기를 움직이는 그림으로 다시 본다.</span></li>
         <li><b>저장 슬롯 셋 · 쉼터에서 이어하기</b><span>쉼터까지 온 런은 껐다 켜도 이어진다.</span></li>
       </ul>
     </div>
@@ -296,8 +306,8 @@
     <div class="wrap split">
       <div class="copy">
         <p class="tag">다음</p>
-        <h2>v0.4 "깊은 곳"을 만드는 중</h2>
-        <p>더 깊은 새 길과 그 끝의 이웃, 그리고 가장 깊은 곳의 마지막 싸움. 해 보고 느낀 점은 언제든 <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">의견·버그 알리기</a>로.</p>
+        <h2>v0.5 "도토와 새 옷"을 만드는 중</h2>
+        <p>v0.4 "깊은 곳"으로 가장 깊은 곳까지 길이 이어졌다. 다음은 도토리를 던지는 청설모 <b>도토</b>를 셋째 캐릭터로, 그리고 모두의 그림을 새로 그린다. 그다음은 공개 데모. 해 보고 느낀 점은 언제든 <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">의견·버그 알리기</a>로.</p>
       </div>
       <dl class="facts">
         <div><dt>장르</dt><dd>탑다운 액션 로그라이트</dd></div>
