@@ -461,7 +461,8 @@ pub fn build(s: Scenario) -> World {
             .into_iter()
             .enumerate()
             {
-                let at = c + vec2(-48.0 + 32.0 * i as f32, -40.0);
+                // 플레이어 아래 줄(위 줄은 빈 방의 나무가 흙더미를 가렸다).
+                let at = c + vec2(-48.0 + 32.0 * i as f32, 36.0);
                 w.room.add_prop(Prop {
                     rect: Rect::new(at.x - 8.0, at.y - 8.0, 16.0, 16.0),
                     kind: PropKind::Breakable(b),
