@@ -47,6 +47,11 @@ impl App {
         if a.down || matches!(tap_hit, Some(Hit::AlbumRow(true))) {
             self.album_cursor = step_row(c, true);
         }
+        // 끌기·휠(0199): 줄 창을 굴리고 고른 칸을 같은 열의 보이는 줄로.
+        let mut row = self.album_cursor / ALBUM_COLS;
+        if self.album_rows.scroll(self.scroll_in, &mut row, rows) {
+            self.album_cursor = (row * ALBUM_COLS + self.album_cursor % ALBUM_COLS).min(n - 1);
+        }
         let chosen = if a.confirm {
             Some(self.album_cursor)
         } else if let Some(Hit::AlbumItem(i)) = tap_hit {
@@ -83,24 +88,21 @@ impl App {
         let y0 = panel.y + 38.0;
         let rows = Illust::ALL.len().div_ceil(ALBUM_COLS);
         let row = self.album_cursor / ALBUM_COLS;
-        if row < self.album_top {
-            self.album_top = row;
-        } else if row >= self.album_top + ALBUM_ROWS {
-            self.album_top = row + 1 - ALBUM_ROWS;
-        }
-        self.album_top = self.album_top.min(rows.saturating_sub(ALBUM_ROWS));
+        let top = self
+            .album_rows
+            .window(row, rows, ALBUM_ROWS, ch + gap + 10.0);
         let seen = Illust::ALL
             .iter()
             .filter(|il| self.album_seen(**il))
             .count();
         for (i, il) in Illust::ALL.iter().enumerate() {
             let r_row = i / ALBUM_COLS;
-            if r_row < self.album_top || r_row >= self.album_top + ALBUM_ROWS {
+            if r_row < top || r_row >= top + ALBUM_ROWS {
                 continue;
             }
             let r = Rect::new(
                 x0 + (i % ALBUM_COLS) as f32 * (cw + gap),
-                y0 + (r_row - self.album_top) as f32 * (ch + gap + 10.0),
+                y0 + (r_row - top) as f32 * (ch + gap + 10.0),
                 cw,
                 ch,
             );
@@ -121,14 +123,14 @@ impl App {
             self.hits.push((r, Hit::AlbumItem(i)));
         }
         // 위·아래에 더 있으면 ▲▼(누르면 한 줄 굴린다). 칸이 패널 폭을 거의 다 써서 가운데 위·아래에 둔다.
-        if self.album_top > 0 {
+        if top > 0 {
             ui.text_center("▲", 160.0, y0 - 12.0, FONT_PX, ui::ACCENT);
             self.hits.push((
                 Rect::new(146.0, y0 - 14.0, 28.0, 13.0),
                 Hit::AlbumRow(false),
             ));
         }
-        if self.album_top + ALBUM_ROWS < rows {
+        if top + ALBUM_ROWS < rows {
             let yb = y0 + ALBUM_ROWS as f32 * (ch + gap + 10.0) - 8.0;
             ui.text_center("▼", 160.0, yb, FONT_PX, ui::ACCENT);
             self.hits

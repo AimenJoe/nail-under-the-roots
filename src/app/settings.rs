@@ -186,14 +186,6 @@ impl App {
         }
     }
 
-    /// 설정 창에 보이는 첫 줄: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
-    pub(super) fn settings_first(&self) -> usize {
-        let n = SETTING_ROWS.len();
-        self.settings_cursor
-            .saturating_sub(SETTING_VISIBLE - 1)
-            .min(n.saturating_sub(SETTING_VISIBLE))
-    }
-
     pub(super) fn draw_settings(&mut self, ui: &Ui) {
         // 창을 위로 붙이고 줄 간격을 1px 줄여 아래 안내 두 줄 자리를 남긴다(0081). 열 줄이 되어 아홉 줄만 보이고 굴린다(0141).
         let panel = Rect::new(56.0, 0.0, 208.0, 155.0);
@@ -228,7 +220,9 @@ impl App {
         let row_h = FONT_PX + 3.0;
         // 줄이 창보다 많다: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
         let n = SETTING_ROWS.len();
-        let first = self.settings_first();
+        let first = self
+            .settings_view
+            .window(self.settings_cursor, n, SETTING_VISIBLE, row_h);
         for (i, label) in trs(&SETTING_ROWS)
             .into_iter()
             .enumerate()
@@ -278,7 +272,7 @@ impl App {
             ui.text("▲", at.x, at.y, FONT_PX, ui::TEXT_DIM);
             self.hits.push((
                 Rect::new(at.x - 5.0, at.y - 4.0, 18.0, 18.0),
-                Hit::SettingScroll(-1),
+                Hit::Scroll(-1),
             ));
         }
         if first + SETTING_VISIBLE < n {
@@ -286,7 +280,7 @@ impl App {
             ui.text("▼", at.x, at.y, FONT_PX, ui::TEXT_DIM);
             self.hits.push((
                 Rect::new(at.x - 5.0, at.y - 4.0, 18.0, 18.0),
-                Hit::SettingScroll(1),
+                Hit::Scroll(1),
             ));
         }
         let settings_hint = vfill(s.settings_hint, &[Verb::Change]);

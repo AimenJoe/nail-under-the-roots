@@ -266,8 +266,8 @@ enum Hit {
     /// 큰 나무의 재주 칸(자리, 갈래).
     TreeCell(usize, usize),
     /// 큰 나무의 캐릭터 탭(0 Naïl, 1 모모, 0142).
-    /// 설정 창 ▲▼(0198): -1 위, 1 아래.
-    SettingScroll(i8),
+    /// 목록의 ▲▼(0198·0199): -1 위, 1 아래. 그 화면의 목록이 한 칸 굴린다.
+    Scroll(i8),
     TreeTab(usize),
     /// 실의 꿈 줄.
     DreamRow(usize),
@@ -320,7 +320,15 @@ pub struct App {
     /// 저널: 런 통계 기준, 받을 수 있는 수(새로 생기면 알림), 목록 스크롤, 다시 세기까지(0048).
     tally: Tally,
     journal_ready: usize,
-    journal_scroll: usize,
+    /// 저널 목록의 창(0199).
+    journal_view: crate::ui::ListView,
+    /// 굴리는 목록들의 창(0199): 설정·안내 주제·도감·개발 목록.
+    settings_view: crate::ui::ListView,
+    help_view: crate::ui::ListView,
+    bestiary_view: crate::ui::ListView,
+    dev_view: crate::ui::ListView,
+    /// 이번 프레임의 굴리기 입력(논리 px 끌기, 칸: 휠·▲▼, 0199).
+    scroll_in: (f32, i32),
     journal_check: f32,
     inventory: Inventory,
     sfx: Sfx,
@@ -377,7 +385,8 @@ pub struct App {
     album_cursor: usize,
     album_view: Option<f32>,
     /// 앨범에서 보이는 첫 줄(그림이 두 줄을 넘으면 굴린다, 0085).
-    album_top: usize,
+    /// 앨범의 줄 창(0199, 다섯 칸이 한 줄).
+    album_rows: crate::ui::ListView,
 }
 
 impl App {
@@ -445,7 +454,12 @@ impl App {
             world,
             tally: Tally::default(),
             journal_ready: 0,
-            journal_scroll: 0,
+            journal_view: Default::default(),
+            settings_view: Default::default(),
+            help_view: Default::default(),
+            bestiary_view: Default::default(),
+            dev_view: Default::default(),
+            scroll_in: (0.0, 0),
             journal_check: 0.0,
             inventory: Inventory::new(&[]),
             gift: None,
@@ -471,7 +485,7 @@ impl App {
             erase_armed: false,
             album_cursor: 0,
             album_view: None,
-            album_top: 0,
+            album_rows: Default::default(),
             after_cutscene: AfterCut::Game,
             decor_cursor: 0,
             tree_cursor: (0, 0),
@@ -821,7 +835,7 @@ impl App {
         self.world.debug.overlay = self.settings.debug_overlay;
         self.world.debug.hitboxes = hitboxes;
         self.journal_cursor = 0;
-        self.journal_scroll = 0;
+        self.journal_view = Default::default();
         // 캐릭터(0056): 런(첫 시작·오늘의 굴·실의 꿈)은 뿌리 길에서 고른 캐릭터, 그 밖(마을·개발)은 Naïl.
         // 고른 캐릭터(0056): 보통 런·오늘의 굴, 개발의 가장 깊은 곳(모모 끝 장면 보기).
         // 실의 꿈은 Naïl만: 꿈 목록에 모모가 있다.
@@ -1045,6 +1059,12 @@ impl App {
 
     fn update_menu(&mut self, a: &Actions, dt: f32) {
         let tap_hit = a.tap.and_then(|p| self.hit_at(p));
+        // 굴리기(0199): 손가락 끌기는 화면 px → 논리 px, 휠·▲▼는 칸. 목록이 있는 화면이 쓴다.
+        let mut steps = a.wheel;
+        if let Some(Hit::Scroll(d)) = tap_hit {
+            steps += d as i32;
+        }
+        self.scroll_in = (a.drag / self.last_ui.0.max(0.01), steps);
         match self.scene {
             Scene::Intro => {
                 self.intro_t += dt;
@@ -1085,7 +1105,7 @@ impl App {
                     }
                     Some(TitleItem::Album) => {
                         self.album_cursor = 0;
-                        self.album_top = 0;
+                        self.album_rows = Default::default();
                         self.album_view = None;
                         self.scene = Scene::Album;
                     }
@@ -1109,6 +1129,8 @@ impl App {
                 if a.down {
                     self.dev_cursor = (self.dev_cursor + 1) % n;
                 }
+                self.dev_view
+                    .scroll(self.scroll_in, &mut self.dev_cursor, n);
                 if a.cancel {
                     self.scene = Scene::Title;
                     return;
@@ -1141,14 +1163,11 @@ impl App {
                 if a.right {
                     adjust = 1;
                 }
-                // ▲▼(0198): 가려진 다음 줄로 커서를 옮겨 창을 한 줄 굴린다.
-                if let Some(Hit::SettingScroll(d)) = tap_hit {
-                    let first = self.settings_first();
-                    self.settings_cursor = if d < 0 {
-                        first.saturating_sub(1)
-                    } else {
-                        (first + SETTING_VISIBLE).min(n - 1)
-                    };
+                // 끌기·휠·▲▼(0198·0199): 창을 굴리고 커서를 창 안으로.
+                if self
+                    .settings_view
+                    .scroll(self.scroll_in, &mut self.settings_cursor, n)
+                {
                     self.erase_armed = false;
                 }
                 let mut row = self.settings_cursor;
