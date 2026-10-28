@@ -372,20 +372,20 @@ pub(super) fn draw_mine(m: &world::Mine, time: f32) {
 /// **그 순간이 공격**. 원은 가운데부터 바깥으로, 띠는 끝까지 깔린 가운데 줄에서 양옆으로 폭이 넓어진다(0185).
 /// 테두리와 채움은 겹쳐 그리지 않는다(반투명이 겹치면 그 자리만 진해져 다른 색으로 보인다, 0186): 테두리는 겹치지 않는
 /// 삼각형으로 짓고, 채움은 테두리 안쪽까지만. 어두운 밑띠도 뺐다 — 그게 "외곽선"으로 읽혀 채움과 색이 달라 보였다(사장, 0186).
-/// 받아칠 수 있는 것(곧게 오는 돌진·던지기·혀)은 황금, 못 받아치는 것(둘레)은 진홍 + 가운데 X(0160, X만 어두운 같은 색).
+/// 색은 붉은 계열 하나(`TELE_RGB`, 0187). 못 받아치는 것(둘레)은 가운데 X(0160, X만 어두운 같은 색).
 pub(super) const TELE_A: f32 = 0.75;
 pub(super) const TELE_BASE_A: f32 = 0.1;
 /// 테두리 띠의 폭(px).
 const TELE_RING: f32 = 2.0;
-/// 못 튕겨내는 공격(둘레: 내려앉기·포자·돌·발 구르기): 진홍.
-pub(super) const TELEGRAPH_EDGE_RGB: (f32, f32, f32) = (1.0, 0.32, 0.36);
-/// 튕겨낼 수 있는 공격(곧게 오는 것: 돌진·던지기·혀·당기기): 황금. 진홍보다 밝아 색약·흑백에서도 갈린다(0160).
-pub(super) const PARRY_EDGE_RGB: (f32, f32, f32) = (1.0, 0.88, 0.45);
+/// 예고 색은 하나, 붉은 계열(0187, 사장): 황금 띠는 풀밭 초록과 섞여 흐렸다. 받아칠 수 있는지는 색이 아니라 모양으로
+/// 가른다 — 곧게 오는 띠는 받아칠 수 있고, 가운데 X가 있는 원은 피해야 한다(0160의 뜻은 그대로).
+pub(super) const TELE_RGB: (f32, f32, f32) = (1.0, 0.32, 0.36);
 const TELE_MARK_SHADE: f32 = 0.42;
 const TELE_MARK_A: f32 = 0.85;
 
 /// 테두리(= 다 찬 채움)·바탕의 색.
-fn tele_colors(rgb: (f32, f32, f32)) -> (Color, Color) {
+fn tele_colors() -> (Color, Color) {
+    let rgb = TELE_RGB;
     let c = |a| Color::new(rgb.0, rgb.1, rgb.2, a);
     (c(TELE_A), c(TELE_BASE_A))
 }
@@ -419,8 +419,8 @@ fn fill_ring(o: &[Vec2], n: &[Vec2], col: Color) {
 
 /// 곧게 오는 공격의 면(0183 → 0186): `a`에서 `b`까지 반폭 `half`의 띠 + 끝의 화살촉. 채움은 끝까지 깔린 가운데 줄에서
 /// 양옆으로 폭이 넓어져 테두리 안쪽에 닿으면(테두리와 한 덩어리) 공격. 돌진 띠·던지기·혀·실 가닥·할매 당기기.
-pub(super) fn draw_tele_lane(a: Vec2, b: Vec2, half: f32, rgb: (f32, f32, f32), k: f32) {
-    let (edge, base) = tele_colors(rgb);
+pub(super) fn draw_tele_lane(a: Vec2, b: Vec2, half: f32, k: f32) {
+    let (edge, base) = tele_colors();
     let tip_len = half + 2.0;
     let ring = TELE_RING.min(half * 0.5);
     // 화살촉 비스듬한 변을 `ring`만큼 들이려면 끝점을 축 방향으로 ring / sin(반각)만큼 당긴다.
@@ -451,8 +451,8 @@ fn circle_pts(at: Vec2, r: f32, n: usize) -> Vec<Vec2> {
 
 /// 둘레 공격의 면(0183 → 0186): 반지름 `r` 원 + 테두리 + 가운데 X(못 받아친다). 테두리와 같은 색의 원이 가운데부터 자라
 /// 테두리 안쪽에 닿으면 공격. 내려앉기·포자·발 구르기·떨어지는 돌.
-pub(super) fn draw_tele_disk(at: Vec2, r: f32, rgb: (f32, f32, f32), k: f32) {
-    let (edge, base) = tele_colors(rgb);
+pub(super) fn draw_tele_disk(at: Vec2, r: f32, k: f32) {
+    let (edge, base) = tele_colors();
     let n = ((r * 3.0) as usize).clamp(24, 96);
     let outer = circle_pts(at, r, n);
     let inner_r = (r - TELE_RING).max(0.5);
@@ -488,18 +488,12 @@ pub(super) fn draw_no_parry_mark(at: Vec2, edge: Color) {
     }
 }
 
-/// 던지기·혀·실 가닥의 띠(0183): 적 앞에서 `reach`까지(벽에서 끊김), 탄 폭만큼. 받아칠 수 있어 황금.
+/// 던지기·혀·실 가닥의 띠(0183): 적 앞에서 `reach`까지(벽에서 끊김), 탄 폭만큼. 받아칠 수 있다(띠 모양).
 fn draw_aim_lane(w: &World, pos: Vec2, facing: Vec2, radius: f32, reach: f32, k: f32) {
     let dir = facing.normalize_or(vec2(1.0, 0.0));
     let start = pos + dir * (radius + 2.0);
     let len = w.room.ray_len(start, dir, t::PROJECTILE_RADIUS, reach);
-    draw_tele_lane(
-        start,
-        start + dir * len,
-        t::PROJECTILE_RADIUS + 1.5,
-        PARRY_EDGE_RGB,
-        k,
-    );
+    draw_tele_lane(start, start + dir * len, t::PROJECTILE_RADIUS + 1.5, k);
 }
 
 /// 공격 예고(바닥, 적·플레이어보다 먼저 그린다): 맞을 자리를 면으로, 안쪽이 진해져 테두리와 같아지는 순간 공격(0183).
@@ -520,7 +514,7 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
             0.0,
             Color::new(0.0, 0.0, 0.0, 0.18 + 0.27 * k),
         );
-        draw_tele_disk(r.pos, rad, TELEGRAPH_EDGE_RGB, k);
+        draw_tele_disk(r.pos, rad, k);
     }
     for e in w.enemies.iter().filter(|e| e.alive && !e.asleep) {
         let sp = e.sp();
@@ -542,14 +536,14 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                 let dir = e.facing.normalize_or(vec2(1.0, 0.0));
                 let r = e.radius();
                 let len = w.room.ray_len(pos, dir, r, sp.dash_speed * sp.dash_time);
-                draw_tele_lane(pos + dir * r, pos + dir * (len + r), r, PARRY_EDGE_RGB, k);
+                draw_tele_lane(pos + dir * r, pos + dir * (len + r), r, k);
             }
             enemy::State::Lash { time, dir } => {
                 actors::draw_tongue(w, pos, e.radius(), dir, time);
             }
             enemy::State::Aim { .. } if sp.behavior == Behavior::Spore => {
                 // 포자버섯: 구름이 덮을 자리.
-                draw_tele_disk(pos, t::SPORE_CLOUD_R, TELEGRAPH_EDGE_RGB, k);
+                draw_tele_disk(pos, t::SPORE_CLOUD_R, k);
             }
             enemy::State::Aim { .. } => {
                 // 두꺼비 혀는 닿는 데까지만, 도토리는 멀리.
@@ -562,7 +556,7 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
             }
             enemy::State::Thump { .. } => {
                 // 토끼풀 발 구르기(0165): 충격파가 닿을 둘레.
-                draw_tele_disk(pos, t::CLOVER_WAVE_R, TELEGRAPH_EDGE_RGB, k);
+                draw_tele_disk(pos, t::CLOVER_WAVE_R, k);
             }
             enemy::State::Gather { time } if time < t::CLOVER_THREAD_AT => {
                 let k = (time / t::CLOVER_THREAD_AT).min(1.0);
@@ -570,22 +564,22 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
             }
             enemy::State::Crouch { target, .. } => {
                 let at = e.pos + (target - e.pos).clamp_length_max(sp.trigger * 1.2);
-                draw_tele_disk(at, sp.land_radius, TELEGRAPH_EDGE_RGB, k);
+                draw_tele_disk(at, sp.land_radius, k);
             }
             enemy::State::Leap { to, .. } => {
-                draw_tele_disk(to, sp.land_radius, TELEGRAPH_EDGE_RGB, 1.0);
+                draw_tele_disk(to, sp.land_radius, 1.0);
             }
             _ => {}
         }
     }
-    // 가장 깊은 곳(0162): 할매의 당기기 예고 — 받아칠 수 있으니 황금 띠.
+    // 가장 깊은 곳(0162): 할매의 당기기 예고 — 받아칠 수 있으니 띠.
     if let Some((c, p)) = w.deep.as_ref().and_then(|d| {
         d.pull
             .filter(|p| p.time < t::DEEP_PULL_WINDUP)
             .map(|p| (d.center, p))
     }) {
         let k = (p.time / t::DEEP_PULL_WINDUP).clamp(0.0, 1.0);
-        draw_tele_lane(c, c + p.dir * p.len, 2.5, PARRY_EDGE_RGB, k);
+        draw_tele_lane(c, c + p.dir * p.len, 2.5, k);
     }
 }
 
