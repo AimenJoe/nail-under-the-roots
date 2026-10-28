@@ -741,7 +741,7 @@ pub static PL: Strings = Strings {
     h_eat: "Jedzenie",
     h_eat_d: "Przycisk przedmiotu zjada malinę (1 serce) lub dżdżownicę (pełne zdrowie). Jeśli masz dżdżownicę i upadniesz, zjesz ją sam i wstaniesz. Miejsce w torbie wybieraj lewo/prawo. Jedząc, idziesz powoli.",
     h_enemy: "Czytanie zamachu wroga",
-    h_enemy_d: "Wróg, który drży i czerwienieje, bierze zamach. Na ziemi widać obszar ataku z wyraźnym brzegiem, a w środku rośnie ciemniejsze wypełnienie: w pasie od wroga do grotu, w kole od środka na zewnątrz. Atak trafia w chwili, gdy wypełnienie dotknie brzegu. Złote można odbić (szarże, rzuty, języki); karmazynowe z X pośrodku trzeba ominąć (skoki, zarodniki, tupnięcia). Bestiariusz ma radę do każdego gatunku.",
+    h_enemy_d: "Wróg, który drży i czerwienieje, bierze zamach. Na ziemi widać obszar ataku z brzegiem, a w środku rośnie kolor brzegu: pas poszerza się od linii środkowej na obie strony, koło rośnie od środka na zewnątrz. Atak trafia w chwili, gdy wypełnienie dojdzie do brzegu i zleje się z nim. Złote można odbić (szarże, rzuty, języki); karmazynowe z X pośrodku trzeba ominąć (skoki, zarodniki, tupnięcia). Bestiariusz ma radę do każdego gatunku.",
     h_loot: "Świetliki i nasiona",
     h_loot_d: "Świetliki wypadają z pokonanych wrogów. Wydawaj je przy Wielkim Drzewie w wiosce, by budzić talenty (po upadku tracisz kilka). Nasiona to pieniądze sklepu (nigdy nie giną). Zjedzenie serca korzenia daje +1 serce maksymalne.",
     h_camp: "Obozy i mapa drogi",

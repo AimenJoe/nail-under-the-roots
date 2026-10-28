@@ -367,16 +367,15 @@ pub(super) fn draw_mine(m: &world::Mine, time: f32) {
     );
 }
 
-/// 공격 예고(0183 → 0184): 맞을 자리를 **면**으로. 테두리는 처음부터 진하고(`TELE_EDGE_A`), 면 전체는 옅게(`TELE_BASE_A`)
-/// 깔린다. 그 안에서 진한 채움(`TELE_GROW_A`)이 **자라** — 띠는 적 쪽부터 끝으로, 원은 가운데부터 바깥으로 — **테두리에 닿는
-/// 순간이 공격**이다. 진하기만 오르는 채움(0183)은 끝에 갈수록 차이가 안 보여 "끝"이 없었다: 움직이는 앞이 멈춘 테두리에 닿는
-/// 것은 한 번에 일어나는 일이고, 앞이 일정한 빠르기로 오니 닿을 때를 미리 잴 수 있다. 앞에 선은 두지 않는다(가려진다).
+/// 공격 예고(0183 → 0184 → 0185): 맞을 자리를 **면**으로. 면 전체는 옅게(`TELE_BASE_A`) 깔리고, 테두리와 그 안에서 자라는
+/// 채움은 **같은 색·같은 투명도**(`TELE_A`)라 채움이 테두리에 닿으면 한 덩어리가 된다 — **그 순간이 공격**.
+/// 원은 가운데부터 바깥으로, 띠는 끝까지 깔린 가운데 줄에서 양옆 테두리로 폭이 넓어진다(진행 막대처럼 한쪽 끝부터 차지 않는다, 0185).
+/// 앞이 일정한 빠르기로 오니 닿을 때를 미리 잴 수 있다. 앞에 선은 두지 않는다(가려진다).
 /// 받아칠 수 있는 것(곧게 오는 돌진·던지기·혀)은 황금, 못 받아치는 것(둘레)은 진홍 + 가운데 X(0160).
 /// 테두리 밑의 밑띠는 같은 색의 어두운 톤(`TELE_RIM_SHADE`, 0184) — 검은 테는 다른 색으로 읽혀 채움과 테두리가 한 그림으로 안 보였다(사장).
 /// 밝기 차이는 그대로라 밝은 풀밭·색약·흑백에서도 모양이 남는다(0150).
-pub(super) const TELE_EDGE_A: f32 = 0.75;
+pub(super) const TELE_A: f32 = 0.6;
 pub(super) const TELE_BASE_A: f32 = 0.1;
-pub(super) const TELE_GROW_A: f32 = 0.5;
 /// 못 튕겨내는 공격(둘레: 내려앉기·포자·돌·발 구르기): 진홍.
 pub(super) const TELEGRAPH_EDGE_RGB: (f32, f32, f32) = (1.0, 0.32, 0.36);
 /// 튕겨낼 수 있는 공격(곧게 오는 것: 돌진·던지기·혀·당기기): 황금. 진홍보다 밝아 색약·흑백에서도 갈린다(0160).
@@ -390,15 +389,10 @@ fn tele_rim(rgb: (f32, f32, f32)) -> Color {
     Color::new(rgb.0 * k, rgb.1 * k, rgb.2 * k, TELE_RIM_A)
 }
 
-/// 테두리·바탕·자라는 채움·밑띠의 색.
-fn tele_colors(rgb: (f32, f32, f32)) -> (Color, Color, Color, Color) {
+/// 테두리(= 자라는 채움)·바탕·밑띠의 색.
+fn tele_colors(rgb: (f32, f32, f32)) -> (Color, Color, Color) {
     let c = |a| Color::new(rgb.0, rgb.1, rgb.2, a);
-    (
-        c(TELE_EDGE_A),
-        c(TELE_BASE_A),
-        c(TELE_GROW_A),
-        tele_rim(rgb),
-    )
+    (c(TELE_A), c(TELE_BASE_A), tele_rim(rgb))
 }
 
 fn rim_line(p: Vec2, q: Vec2, edge: Color, rim: Color) {
@@ -406,37 +400,29 @@ fn rim_line(p: Vec2, q: Vec2, edge: Color, rim: Color) {
     draw_line(p.x, p.y, q.x, q.y, 1.0, edge);
 }
 
-/// 띠 `a`→`b`(반폭 `half`) + 끝 화살촉을, 적 쪽부터 길이 비율 `k`(0..1)만큼 칠한다.
-fn fill_lane(a: Vec2, b: Vec2, half: f32, k: f32, col: Color) {
+/// 띠 `a`→`b` + 끝 화살촉을 반폭 `half`로 칠한다(화살촉 끝점은 그대로라 폭을 줄이면 가운데 줄로 모인다).
+fn fill_lane(a: Vec2, b: Vec2, half: f32, tip_len: f32, col: Color) {
     let dir = (b - a).normalize_or(vec2(1.0, 0.0));
     let side = vec2(-dir.y, dir.x) * half;
-    let body = (b - a).length();
-    let tip = half + 2.0;
-    let g = (body + tip) * k.clamp(0.0, 1.0);
-    if g <= 0.0 {
-        return;
-    }
-    let m = a + dir * g.min(body);
-    draw_triangle(a + side, a - side, m + side, col);
-    draw_triangle(a - side, m - side, m + side, col);
-    if g > body {
-        let d = (g - body).min(tip);
-        let p = b + dir * d;
-        let s2 = side * (1.0 - d / tip);
-        draw_triangle(b + side, b - side, p + s2, col);
-        draw_triangle(b - side, p - s2, p + s2, col);
-    }
+    let tip = b + dir * tip_len;
+    draw_triangle(a + side, a - side, b + side, col);
+    draw_triangle(a - side, b - side, b + side, col);
+    draw_triangle(b + side, b - side, tip, col);
 }
 
-/// 곧게 오는 공격의 면(0183·0184): `a`에서 `b`까지 반폭 `half`의 띠 + 끝의 화살촉. 진한 채움이 적 쪽부터 자라 화살촉 끝에
-/// 닿으면 공격. 돌진 띠·던지기·혀·실 가닥·할매 당기기.
+/// 곧게 오는 공격의 면(0183 → 0185): `a`에서 `b`까지 반폭 `half`의 띠 + 끝의 화살촉. 채움은 끝까지 깔린 가운데 줄에서
+/// 양옆으로 폭이 넓어져(반폭 `half`·k) 양옆 테두리에 닿으면 공격. 돌진 띠·던지기·혀·실 가닥·할매 당기기.
 pub(super) fn draw_tele_lane(a: Vec2, b: Vec2, half: f32, rgb: (f32, f32, f32), k: f32) {
-    let (edge, base, grow, rim) = tele_colors(rgb);
+    let (edge, base, rim) = tele_colors(rgb);
     let dir = (b - a).normalize_or(vec2(1.0, 0.0));
     let side = vec2(-dir.y, dir.x) * half;
-    let tip = b + dir * (half + 2.0);
-    fill_lane(a, b, half, 1.0, base);
-    fill_lane(a, b, half, k, grow);
+    let tip_len = half + 2.0;
+    let tip = b + dir * tip_len;
+    fill_lane(a, b, half, tip_len, base);
+    let w = half * k.clamp(0.0, 1.0);
+    if w > 0.25 {
+        fill_lane(a, b, w, tip_len, edge);
+    }
     rim_line(a + side, b + side, edge, rim);
     rim_line(a - side, b - side, edge, rim);
     rim_line(a + side, a - side, edge, rim);
@@ -444,14 +430,14 @@ pub(super) fn draw_tele_lane(a: Vec2, b: Vec2, half: f32, rgb: (f32, f32, f32), 
     rim_line(b - side, tip, edge, rim);
 }
 
-/// 둘레 공격의 면(0183·0184): 반지름 `r` 원 + 진한 테두리 + 가운데 X(못 받아친다). 진한 원이 가운데부터 자라 테두리에
-/// 닿으면 공격. 내려앉기·포자·발 구르기·떨어지는 돌.
+/// 둘레 공격의 면(0183 → 0185): 반지름 `r` 원 + 테두리 + 가운데 X(못 받아친다). 테두리와 같은 색의 원이 가운데부터 자라
+/// 테두리에 닿으면 공격. 내려앉기·포자·발 구르기·떨어지는 돌.
 pub(super) fn draw_tele_disk(at: Vec2, r: f32, rgb: (f32, f32, f32), k: f32) {
-    let (edge, base, grow, rim) = tele_colors(rgb);
+    let (edge, base, rim) = tele_colors(rgb);
     draw_circle(at.x, at.y, r, base);
     let g = r * k.clamp(0.0, 1.0);
     if g > 0.5 {
-        draw_circle(at.x, at.y, g, grow);
+        draw_circle(at.x, at.y, g, edge);
     }
     draw_circle_lines(at.x, at.y, r, 3.0, rim);
     draw_circle_lines(at.x, at.y, r, 1.0, edge);

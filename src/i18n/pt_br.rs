@@ -741,7 +741,7 @@ pub static PT_BR: Strings = Strings {
     h_eat: "Comer",
     h_eat_d: "O botão de item come uma framboesa (1 coração) ou uma minhoca (vida cheia). Com uma minhoca na bolsa, se você cair, come sozinho e levanta. Escolha o espaço da bolsa com esquerda/direita. Comendo, você anda devagar.",
     h_enemy: "Ler o aviso do inimigo",
-    h_enemy_d: "Um inimigo que treme e fica vermelho está se preparando. O chão mostra a área que o ataque vai atingir, com uma borda forte, e uma cor mais escura cresce lá dentro: do inimigo até a ponta nas faixas, do centro para fora nos círculos. O ataque acerta no instante em que a cor chega à borda. Dourado dá para rebater (avanços, arremessos, línguas); carmesim com um X no meio é para desviar (saltos, esporos, pisadas). O bestiário tem dicas de cada tipo.",
+    h_enemy_d: "Um inimigo que treme e fica vermelho está se preparando. O chão mostra a área que o ataque vai atingir, com borda, e a cor da borda cresce lá dentro: as faixas se alargam da linha do meio para os dois lados, os círculos crescem do centro para fora. O ataque acerta no instante em que a cor chega à borda e as duas viram uma só. Dourado dá para rebater (avanços, arremessos, línguas); carmesim com um X no meio é para desviar (saltos, esporos, pisadas). O bestiário tem dicas de cada tipo.",
     h_loot: "Vaga-lumes e sementes",
     h_loot_d: "Vaga-lumes caem de inimigos derrotados. Gaste-os na Grande Árvore da vila para despertar talentos (ao cair, perde alguns). Sementes são o dinheiro da loja (nunca se perdem). Comer um coração de raiz dá +1 coração máximo.",
     h_camp: "Acampamentos e mapa da trilha",
