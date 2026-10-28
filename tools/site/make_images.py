@@ -35,20 +35,22 @@ PORTRAITS = {
 # 스포일러가 없는 일러스트만(타이틀 바탕·오프닝의 엄마 굴).
 ILLUSTS = ["title", "mother_burrow"]
 # 페이지에서 걷는 스프라이트(0155): (시트, 줄, 첫 칸, 칸 수). 정사각 칸을 가로 띠로 잘라 CSS steps()로 돌린다.
-# 칸은 16px, nail.png만 24px(art::NAIL_CELL, 0206). nail.png 줄 0 = 서 있기 2 + 걷기 4, critters.png는 tools/art/critters.py 머리말의 줄 번호.
+# v0.5.0 새 그림(0206~0221): 시트마다 칸 크기가 다르다(`CELLS`, art::BIG_SHEETS와 같은 값). 줄 0, 칸 2·3 = 걷기
+# (나일은 nail.png 줄 0 = 서 있기 2 + 걷기 4, 박쥐는 0~3 날갯짓). 페이지는 칸 크기의 2배(--s)로 그린다.
 SPRITES = {
     "nail": ("nail.png", 0, 2, 4),
-    "momo": ("critters.png", 8, 2, 2),
-    "rat": ("critters.png", 0, 2, 2),
-    "squirrel": ("critters.png", 3, 2, 2),
-    "shrew": ("critters.png", 14, 2, 2),
-    "hedgehog": ("critters.png", 15, 2, 2),
-    "toad": ("critters.png", 16, 0, 2),
-    "bat": ("critters.png", 17, 0, 4),
-    "sporecap": ("critters.png", 18, 0, 2),
-    "popo": ("critters.png", 6, 2, 2),
+    "momo": ("momo.png", 0, 2, 2),
+    "doto": ("doto.png", 0, 2, 2),
+    "popo": ("popo.png", 0, 2, 2),
+    "rat": ("field_mouse.png", 0, 2, 2),
+    "squirrel": ("chipmunk.png", 0, 2, 2),
+    "shrew": ("shrew.png", 0, 2, 2),
+    "hedgehog": ("hedgehog.png", 0, 2, 2),
+    "toad": ("toad.png", 0, 2, 2),
+    "bat": ("bat.png", 0, 0, 4),
+    "sporecap": ("spore.png", 0, 2, 2),
 }
-CELLS = {"nail.png": 24}
+CELLS = {"nail.png": 24, "momo.png": 32, "doto.png": 40, "popo.png": 32, "bat.png": 32}
 
 
 def main() -> None:
@@ -61,7 +63,7 @@ def main() -> None:
         shutil.copyfile(ART / "illust" / f"{name}.png", OUT / f"i_{name}.png")
     for name, (sheet_name, row, first, n) in SPRITES.items():
         sh = Image.open(ART / sheet_name).convert("RGBA")
-        c = CELLS.get(sheet_name, 16)
+        c = CELLS.get(sheet_name, 24)
         sh.crop((first * c, row * c, (first + n) * c, row * c + c)).save(OUT / f"sp_{name}.png", optimize=True)
     # 파비콘: 나일 스프라이트 첫 칸.
     c = CELLS["nail.png"]
