@@ -2965,6 +2965,19 @@ pub fn enemy_color(kind: Kind) -> Color {
 /// 밀쳐내기(0090): 솟구치기에 안 맞은 둘레의 잡몹을 피해 없이 바깥으로 민다. 가까울수록 세게. 보스는 버틴다.
 /// 같은 공격 번호(`id`)로 맞은 적은 이미 맞았으니 건너뛴다.
 /// `radius`: 미는 반지름(모은 힘만큼 넓다, 0158).
+impl World {
+    /// 엔딩 뒤 마을 땅 위로 튀어나온다(0204, 올라오는 전환의 끝): 흙이 터지는 고리 둘 + 흙덩이 + 쿵.
+    pub(crate) fn surface_burst(&mut self) {
+        let at = self.player.pos;
+        self.juice.audio.play(sfx::Id::EmergeBig);
+        self.juice.fx.push(ring(at, 6.0, 24.0, 0.3, WHITE));
+        self.juice.fx.push(ring(at, 10.0, 36.0, 0.42, DIRT));
+        self.juice.feel.add_trauma(t::EMERGE_BURST_SHAKE * 2.0);
+        burst(&mut self.juice.fx, at, 24, DIRT, 130.0);
+        clods(&mut self.juice.fx, at, 24, DIRT, 130.0);
+    }
+}
+
 fn emerge_push(
     enemies: &mut [crate::enemy::Enemy],
     origin: Vec2,

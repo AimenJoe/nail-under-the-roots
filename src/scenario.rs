@@ -39,6 +39,8 @@ pub enum Scenario {
     Dream,
     /// 큰 나무 아래 마을(모습은 기록에서, docs/decisions/0045).
     Village,
+    /// 엔딩 뒤처럼 가장 깊은 곳에서 마을로 올라온다(0204). 앱이 마을로 바꿔 시작한다.
+    Ascent,
     /// 가장 깊은 곳에 바로 닿는다: 반쪽 엔딩 → 타이틀(기록은 남기지 않는다).
     Deepest,
     /// 컷씬 없이 튜토리얼만.
@@ -87,7 +89,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 40] = [
+pub const LIST: [Entry; 41] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -227,6 +229,11 @@ pub const LIST: [Entry; 40] = [
         name: "마을",
         desc: "큰 나무 아래 마을(지금 기록의 모습).",
         scenario: Scenario::Village,
+    },
+    Entry {
+        name: "마을로 올라오기",
+        desc: "엔딩 뒤처럼 가장 깊은 곳(130m)에서 땅 위까지 올라와 뿌리 길 곁으로 튀어나온다(0204).",
+        scenario: Scenario::Ascent,
     },
     Entry {
         name: "모모 첫 만남",
@@ -438,6 +445,7 @@ pub fn build(s: Scenario) -> World {
         | Scenario::CutsceneOnly
         | Scenario::StoryPreview
         | Scenario::Village
+        | Scenario::Ascent
         | Scenario::Tutorial => World::empty(),
         Scenario::AllClaws => World::new(),
         Scenario::Breakables => {

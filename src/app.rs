@@ -290,6 +290,9 @@ pub struct App {
     slots_load: bool,
     /// 쉼터부터 이어하는 중(0080): `start`가 새 런 셈·이야기 한마디·이어하기 지우기를 건너뛴다.
     resuming: bool,
+    /// 엔딩 뒤 마을로 올라오는 중(0204): 마을의 이야기 한마디는 땅 위로 튀어나오고 잠깐 뒤에(튀어나오는 모습을 가리지 않게).
+    /// 값은 튀어나온 뒤 지난 시간.
+    story_after_ascent: Option<f32>,
     pause_tab: usize,
     pause_cursor: usize,
     settings_cursor: usize,
@@ -431,6 +434,7 @@ impl App {
             slots_press: None,
             slots_load: false,
             resuming: false,
+            story_after_ascent: None,
             pause_tab: 0,
             pause_cursor: 0,
             settings_cursor: 0,
@@ -604,6 +608,15 @@ impl App {
             Scene::Game => {
                 let heard = self.sfx.played();
                 self.update_game(dt);
+                if let (Some(w), None) = (self.story_after_ascent, self.world.adv.fade) {
+                    let w = w + dt;
+                    self.story_after_ascent = if w >= t::ASCENT_STORY_DELAY {
+                        self.say_story(crate::story::When::Village);
+                        None
+                    } else {
+                        Some(w)
+                    };
+                }
                 // 게임에서 멈춤 창을 열면 메뉴 소리 하나(다른 창은 말 걸기·상자 소리가 이미 난다).
                 if self.scene == Scene::Pause && self.sfx.played() == heard {
                     self.sfx.play(crate::sfx::Id::UiConfirm);
@@ -638,7 +651,12 @@ impl App {
                                 self.title_cursor = 0;
                                 self.scene = Scene::Title;
                             }
-                            AfterCut::Village => self.start(Scenario::Village),
+                            AfterCut::Village => {
+                                // 엔딩 뒤(0204): 가장 깊은 곳에서 땅 위까지 올라와 뿌리 길 곁으로 튀어나온다.
+                                self.story_after_ascent = Some(0.0);
+                                self.start(Scenario::Village);
+                                self.world.start_ascent();
+                            }
                             AfterCut::Respawn => {
                                 self.scene = Scene::Game;
                                 self.world.start_fade(crate::adventure::Transition::Respawn);
@@ -823,6 +841,16 @@ impl App {
 
     /// 시나리오로 새 런을 시작한다. Normal과 CutsceneOnly는 오프닝 컷씬을 먼저 재생한다.
     fn start(&mut self, s: Scenario) {
+        // 개발(0204): 엔딩 뒤 마을로 올라오는 장면만.
+        if s == Scenario::Ascent {
+            self.story_after_ascent = Some(0.0);
+            self.start(Scenario::Village);
+            self.world.start_ascent();
+            return;
+        }
+        if s != Scenario::Village {
+            self.story_after_ascent = None;
+        }
         let hitboxes = self.world.debug.hitboxes;
         if s != Scenario::Dream {
             self.dream = None;
@@ -999,7 +1027,9 @@ impl App {
         // 첫 시작은 컷씬 → 플레이 튜토리얼 → 웨이브 1. 튜토리얼이 끝나야 자동 웨이브가 켜진다.
         if s == Scenario::Village {
             self.scene = Scene::Game;
-            self.say_story(crate::story::When::Village);
+            if self.story_after_ascent.is_none() {
+                self.say_story(crate::story::When::Village);
+            }
             return;
         }
         if veteran {
@@ -1368,7 +1398,9 @@ impl App {
                 self.draw_dream_hud(&ui);
                 // 마을: 마을 씨앗·맡긴 반딧불(오른쪽 위 막대 아래).
                 // 깨울 수 있는 재주가 있으면 반딧불 줄이 빛나고, 나무 밑동도 빛난다(0061).
-                if self.world.adv.place == crate::adventure::Place::Village {
+                // 올라오는 단면(0204)이 덮고 있으면 숨긴다(깊이 숫자만).
+                let strata = self.world.descent().is_some_and(|d| d.cover > 0.5);
+                if self.world.adv.place == crate::adventure::Place::Village && !strata {
                     let ready = self.tree_affordable();
                     if let Some(v) = self.world.adv.village.as_mut() {
                         v.tree_ready = ready;
