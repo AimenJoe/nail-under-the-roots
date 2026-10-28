@@ -109,6 +109,9 @@ pub const PORTRAIT: f32 = 88.0;
 pub const PORTRAIT_COLS: u32 = 12;
 
 pub const CELL: f32 = 16.0;
+/// Naïl 시트(nail.png·nail_fur*.png)의 칸(0206): 32×32, 발바닥 줄 `NAIL_FOOT`(칸 위에서). 다른 시트는 `CELL`.
+pub const NAIL_CELL: f32 = 32.0;
+pub const NAIL_FOOT: f32 = 30.0;
 
 /// critters.png에서 실루엣 줄까지의 거리(그림 줄 수).
 pub const CRITTER_ROWS: u32 = 22;
@@ -287,6 +290,21 @@ fn light_blob() -> Texture2D {
 }
 
 /// 시트의 칸 사각형.
+/// Naïl 시트의 칸(0206).
+pub fn nail_cell(col: u32, row: u32) -> Rect {
+    inset(Rect::new(
+        col as f32 * NAIL_CELL,
+        row as f32 * NAIL_CELL,
+        NAIL_CELL,
+        NAIL_CELL,
+    ))
+}
+
+/// Naïl 칸을 그릴 왼쪽 위(월드): 발바닥이 몸 자리 + 6(16칸 시절과 같은 발 자리)에 오게.
+pub fn nail_origin(pos: macroquad::math::Vec2) -> macroquad::math::Vec2 {
+    macroquad::math::vec2(pos.x - NAIL_CELL / 2.0, pos.y + 6.0 - NAIL_FOOT)
+}
+
 pub fn cell(col: u32, row: u32) -> Rect {
     inset(Rect::new(col as f32 * CELL, row as f32 * CELL, CELL, CELL))
 }

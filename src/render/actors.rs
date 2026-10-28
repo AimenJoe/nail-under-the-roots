@@ -411,12 +411,12 @@ pub(super) fn draw_drill_trail(art: Option<&Art>, p: &Player, alpha: f32) {
         match art {
             Some(art) => draw_texture_ex(
                 &art.nail,
-                (q.x - 8.0).round(),
-                (q.y - 8.0).round(),
+                art::nail_origin(q).x.round(),
+                art::nail_origin(q).y.round(),
                 c,
                 DrawTextureParams {
-                    source: Some(art::cell(2, 4)),
-                    dest_size: Some(vec2(16.0, 16.0)),
+                    source: Some(art::nail_cell(2, 4)),
+                    dest_size: Some(vec2(art::NAIL_CELL, art::NAIL_CELL)),
                     flip_x: p.face_left,
                     ..Default::default()
                 },
@@ -783,31 +783,38 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     if let player::State::Burrow { time: bt } = p.state {
         if bt < t::BURROW_DIVE_TIME {
             let k = (bt / t::BURROW_DIVE_TIME).clamp(0.0, 1.0);
-            let sink = (16.0 * k).round();
-            if sink < 16.0 {
+            let o = art::nail_origin(pos);
+            let sink = (art::NAIL_CELL * k).round();
+            if sink < art::NAIL_CELL {
                 draw_texture_ex(
                     art.nail_fur(fur),
-                    pos.x - 8.0,
-                    pos.y - 8.0 + sink,
+                    o.x,
+                    o.y + sink,
                     WHITE,
                     DrawTextureParams {
-                        source: Some(Rect::new(0.0, 0.0, art::CELL, art::CELL - sink)),
-                        dest_size: Some(vec2(16.0, 16.0 - sink)),
+                        source: Some(Rect::new(0.0, 0.0, art::NAIL_CELL, art::NAIL_CELL - sink)),
+                        dest_size: Some(vec2(art::NAIL_CELL, art::NAIL_CELL - sink)),
                         flip_x: p.face_left,
                         ..Default::default()
                     },
                 );
             }
             // 흙더미는 아래서부터 올라온다.
+            // 흙더미는 32칸의 아래 16줄에만 있다(0206).
             let rise = (16.0 * (1.0 - k)).round();
             draw_texture_ex(
                 art.nail_fur(fur),
-                pos.x - 8.0,
-                pos.y - 8.0 + rise,
+                o.x,
+                o.y + 16.0 + rise,
                 WHITE,
                 DrawTextureParams {
-                    source: Some(Rect::new(0.0, art::CELL * 2.0, art::CELL, art::CELL - rise)),
-                    dest_size: Some(vec2(16.0, 16.0 - rise)),
+                    source: Some(Rect::new(
+                        0.0,
+                        art::NAIL_CELL * 2.0 + 16.0,
+                        art::NAIL_CELL,
+                        16.0 - rise,
+                    )),
+                    dest_size: Some(vec2(art::NAIL_CELL, 16.0 - rise)),
                     flip_x: p.face_left,
                     ..Default::default()
                 },
@@ -874,7 +881,7 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
         WHITE
     };
     if pop > 0.0 {
-        draw_ellipse(pos.x, pos.y + 6.0, 7.0 - pop * 0.25, 2.5, 0.0, SHADOW_SOFT);
+        draw_ellipse(pos.x, pos.y + 6.0, 10.0 - pop * 0.25, 3.0, 0.0, SHADOW_SOFT);
     }
     // 다 모이면 떨린다(0161).
     let jitter = match p.state {
@@ -889,14 +896,15 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     } else {
         0.0
     };
+    let o = art::nail_origin(pos);
     draw_texture_ex(
         art.nail_fur(fur),
-        pos.x - 8.0 + jitter,
-        pos.y - 8.0 - pop + crouch,
+        o.x + jitter,
+        o.y - pop + crouch,
         tint,
         DrawTextureParams {
-            source: Some(art::cell(col, row)),
-            dest_size: Some(vec2(16.0, 16.0)),
+            source: Some(art::nail_cell(col, row)),
+            dest_size: Some(vec2(art::NAIL_CELL, art::NAIL_CELL)),
             flip_x: p.face_left,
             ..Default::default()
         },
@@ -906,12 +914,12 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     if glow > 0.0 && !flash {
         draw_texture_ex(
             art.nail_fur(fur),
-            pos.x - 8.0 + jitter,
-            pos.y - 8.0 - pop + crouch,
+            o.x + jitter,
+            o.y - pop + crouch,
             Color::new(1.0, 1.0, 1.0, glow),
             DrawTextureParams {
-                source: Some(art::cell(col, row + 3)),
-                dest_size: Some(vec2(16.0, 16.0)),
+                source: Some(art::nail_cell(col, row + 3)),
+                dest_size: Some(vec2(art::NAIL_CELL, art::NAIL_CELL)),
                 flip_x: p.face_left,
                 ..Default::default()
             },

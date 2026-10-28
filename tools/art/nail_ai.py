@@ -6,8 +6,9 @@
 줄일 때의 함정 셋을 피한다:
   - 마젠타 바탕이 가장자리에 섞여 보라·청록 얼룩이 된다 → 마젠타스러움(min(R,B) − G)이 높은 점을 버리고 한 겹 깎는다.
   - 평균으로 줄이면 줄무늬(목도리 주황·빨강·짙은 줄)가 자줏빛으로 섞인다 → 원본에서 색을 먼저 고르고, 칸마다 **다수결**.
-  - 색을 MEDIANCUT으로 고르면 넓은 갈색이 색을 다 가져가 좁은 주황이 없어진다 → MAXCOVERAGE. 모든 칸이 **같은 색표**(기준 칸에서
-    골라 — 다섯 칸을 합쳐 고르면 주황이 또 밀렸다). 칸마다 따로 고르면 털빛이 칸마다 달라진다.
+  - 색을 MEDIANCUT으로 고르면 넓은 갈색이 색을 다 가져가 좁은 주황이 없어지고, MAXCOVERAGE는 원본에 없는 색(자줏빛)을
+    만들었다 → 원본이 **실제로 쓴 색**을 많이 쓴 순서로, 가까운 색은 합쳐 고른다. 모든 칸이 **같은 색표**(기준 칸에서).
+    칸마다 따로 고르면 털빛이 칸마다 달라진다.
 배율도 하나(기준 칸의 몸 키 → `BODY_H`)라 칸마다 몸 크기가 같다. 발바닥(가장 아래 칠한 줄)은 `FOOT`, 가로는 가운데.
 
 칸 배치는 16칸 시절(nail.py)과 같다(게임 코드는 칸 크기 `art::NAIL_CELL`만 안다):
@@ -27,22 +28,24 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림과 털빛 표(FURS)를 같이 쓴다
 
-SRC = HERE / "sources" / "ai" / "sprites" / "nail_idle_walk_v1.png"
+SRC = HERE / "sources" / "ai" / "sprites" / "nail_s1_v1.png"   # 실루엣 시안 1로 받은 시트(0206, ✦는 지움)
 CELL = 32
 FOOT = 30          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(16칸 시절 그대로).
 BODY_H = 28        # 기준 칸의 몸 키(px)
 NCOL = 20
 OUTLINE = (43, 29, 42)
 
-# 원본 칸(시트 좌표 x0, y0, x1, y1) → 쓸 곳. 원본의 위아래 줄이 맞닿아 y=208에서 가른다.
-# 정면 칸(왼쪽 위·왼쪽 아래)은 3/4 오른쪽이 아니라 쓰지 않는다.
+# 원본 칸(시트 좌표 x0, y0, x1, y1). 원본은 줄마다 그린 크기가 다르다(윗줄 블록 8px, 아랫줄 4px) →
+# 배율은 줄(무리)마다 그 무리의 첫 칸 몸 키로 맞춘다(칸마다 맞추면 걷기의 들썩임이 사라진다).
 SRC_FRAMES = {
-    "idle_a": (276, 0, 496, 208),
-    "idle_b": (792, 8, 1008, 208),
-    "walk_a": (276, 212, 496, 424),
-    "walk_b": (536, 212, 752, 424),
-    "walk_c": (792, 212, 1008, 424),
+    "idle_a": (40, 56, 488, 424),
+    "idle_b": (536, 56, 968, 424),
+    "walk_a": (20, 504, 260, 736),
+    "walk_b": (272, 504, 508, 736),
+    "walk_c": (508, 504, 752, 736),
+    "walk_d": (760, 504, 1000, 736),
 }
+GROUP = {"idle_a": "idle_a", "idle_b": "idle_a", "walk_a": "walk_a", "walk_b": "walk_a", "walk_c": "walk_a", "walk_d": "walk_a"}
 REF = "idle_a"
 
 
@@ -60,12 +63,24 @@ def body_h(a, keep):
     return ys.max() - ys.min() + 1
 
 
-def shared_palette(arrs):
-    """모든 칸 안쪽 점에서 MAXCOVERAGE로 NCOL색."""
+def shared_palette(arrs, near=36):
+    """원본이 실제로 쓴 색에서 NCOL색: 많이 쓴 색부터, 이미 고른 색과 가까우면(RGB 차 합 < near) 건너뛴다.
+    PIL의 MAXCOVERAGE·MEDIANCUT은 원본에 없는 색을 만들었다(가장 많은 갈색 #654838 → 자줏빛 #722d3f).
+    격자가 살아 있는 원본은 색 수가 적어 이 방식이 원래 색을 그대로 지킨다."""
     inner = np.concatenate([a[k] for a, k in arrs])
-    side = int(np.sqrt(len(inner)))
-    sq = inner[: side * side].reshape(side, side, 3).astype(np.uint8)
-    return Image.fromarray(sq).quantize(NCOL, method=Image.Quantize.MAXCOVERAGE, dither=Image.Dither.NONE)
+    cols, counts = np.unique(inner.reshape(-1, 3), axis=0, return_counts=True)
+    chosen = []
+    for i in np.argsort(-counts):
+        c = cols[i]
+        if all(np.abs(c - q).sum() >= near for q in chosen):
+            chosen.append(c)
+        if len(chosen) == NCOL:
+            break
+    while len(chosen) < NCOL:
+        chosen.append(chosen[-1])
+    pal = Image.new("P", (1, 1))
+    pal.putpalette([int(v) for c in chosen for v in c] + [0] * (768 - 3 * NCOL))
+    return pal
 
 
 def shrink(a, keep, scale, pal):
@@ -168,12 +183,12 @@ def build():
     masks = {k: solid_mask(a) for k, a in crops.items()}
     # 색표는 기준 칸 하나에서(다섯 칸을 합쳐 고르면 넓은 갈색에 밀려 목도리 주황이 빠졌다), 다른 칸은 이 색표에 맞춘다.
     pal = shared_palette([(crops[REF], masks[REF])])
-    scale = BODY_H / body_h(crops[REF], masks[REF])
-    spr = {k: shrink(crops[k], masks[k], scale, pal) for k in crops}
+    scale = {g: BODY_H / body_h(crops[g], masks[g]) for g in set(GROUP.values())}
+    spr = {k: shrink(crops[k], masks[k], scale[GROUP[k]], pal) for k in crops}
     d = derived(spr[REF])
     rows = [
-        [seat(spr["idle_a"]), seat(spr["idle_b"]), seat(spr["walk_a"]), seat(spr["walk_b"], dy=-1),
-         seat(spr["walk_c"]), seat(spr["idle_b"], dy=-1)],
+        [seat(spr["idle_a"]), seat(spr["idle_b"]), seat(spr["walk_a"]), seat(spr["walk_b"]),
+         seat(spr["walk_c"]), seat(spr["walk_d"])],
         [d["attack0"], d["attack1"], d["attack2"], d["hurt"], d["dead"],
          d["windup0"], d["windup1"], d["windup2"], d["settle"]],
         [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],

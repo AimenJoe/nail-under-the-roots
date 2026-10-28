@@ -10,16 +10,16 @@ use crate::help::Pic;
 const FLOOR: f32 = 30.0;
 
 fn nail(art: Option<&Art>, col: u32, row: u32, at: Vec2, left: bool) {
-    draw_ellipse(at.x, at.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+    draw_ellipse(at.x, at.y + 6.0, 9.0, 2.6, 0.0, SHADOW_SOFT);
     match art {
         Some(a) => draw_texture_ex(
             &a.nail,
-            (at.x - 8.0).round(),
-            (at.y - 8.0).round(),
+            art::nail_origin(at).x.round(),
+            art::nail_origin(at).y.round(),
             WHITE,
             DrawTextureParams {
-                source: Some(art::cell(col, row)),
-                dest_size: Some(vec2(16.0, 16.0)),
+                source: Some(art::nail_cell(col, row)),
+                dest_size: Some(vec2(art::NAIL_CELL, art::NAIL_CELL)),
                 flip_x: left,
                 ..Default::default()
             },
