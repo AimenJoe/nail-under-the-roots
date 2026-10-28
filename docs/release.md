@@ -15,13 +15,13 @@
 | 공식 페이지 | `main` push(`site/`) | `pages.yml` | GitHub Pages(https://aimenjoe.github.io/nail-under-the-roots/). 최신 버전·소식은 `site.js`가 Releases API에서 읽고, 못 읽으면 HTML에 적은 값 |
 
 ## 갈래(0193)
-- `main` = 운영판, 패치만. `release/v0.5` = 마일스톤 개발판(작업 브랜치를 합친다, 묻지 않는다).
-- 패치를 main에 넣었으면 `git checkout release/v0.5 && git merge origin/main` 후 push.
+- `main` = 운영판, 패치만. `release/v0.6` = 마일스톤 개발판(작업 브랜치를 합친다, 묻지 않는다).
+- 패치를 main에 넣었으면 `git checkout release/v0.6 && git merge origin/main` 후 push.
 - 마일스톤을 닫을 때: release 갈래에 main을 합쳐 두고 → 버전 0.x.0·`docs/releases/v0.x.0.md`를 release 갈래에 커밋 → 그 커밋을 `git push origin HEAD:main`(아래 절차 5). 다음 마일스톤 갈래는 새 main에서 판다.
 
 ## 버전 규칙(0079)
 - **패치(0.x.y)**: 고친 것·더한 것. 사장이 기기에서 볼 것이 생기면 언제든. 사장이 "배포해"라고 할 때만.
-- **마이너(0.x.0)**: 마일스톤 조건표(지금은 0191, v0.4.0은 0145)를 마쳤을 때만.
+- **마이너(0.x.0)**: 마일스톤 조건표(지금은 0223, v0.5.0은 0191)를 마쳤을 때만.
 - Android `version_code`는 **릴리스마다 하나씩** 올린다(0.3.18 = 48, 0.4.0 = 49 — 처음엔 "0.3.8 = 38"이었지만 0.3.10부터 맞지 않는다). 버전 숫자에서 만들면 0.4.0 = 40처럼 **작아져** 덮어 설치가 막힌다. 덮어 설치는 같은 서명 키 + 큰 version_code일 때만 된다.
 
 ## 릴리스 절차(v0.3.8에서 그대로 한 것)
