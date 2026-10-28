@@ -225,6 +225,7 @@ pub static DE: Strings = Strings {
     popo_hi0: "…Die Kleine eben, die kenne ich. Früher war sie nicht so.",
     op_stop: "…Nein.",
     toast_petal: "Ein welkes Blütenblatt. Ein bisschen Rosa ist noch da.",
+    toast_petal_trail: "Noch ein welkes Blütenblatt. Jemand ist diesen Weg hinuntergegangen.",
     best_petal: "Die ein welkes Blütenblatt zurückließ und ging. Wer war sie?",
     popo_pickup: "Siehst du das glänzende Ding da? Das sind deine Krallen. Heb sie auf.",
     popo_combo: "Schlag die Vogelscheuche dreimal hintereinander. Der dritte Hieb ist der schwerste!",

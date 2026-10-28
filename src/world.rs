@@ -117,8 +117,10 @@ pub enum Cue {
     Wrap,
     /// 어둠 속 눈빛(0164): 보라 빛 두 점이 천천히 깜빡인다(나타나기 전).
     Eyes,
-    /// 떠난 자리에 시든 꽃잎 하나를 남긴다(0164): `World::petal_at`. 밟으면 토스트 + 도감 '???'.
+    /// 떠난 자리에 시든 꽃잎 하나를 남긴다(0164): `Story::petals`. 밟으면 토스트 + 도감 '???'.
     Leave,
+    /// 길에 시든 꽃잎 하나(0190): 이펙트 없이 `at`에 — 모모가 지나간 자국(보리 공터 앞 길, `field::PETAL_ROAD`).
+    Trail,
     /// 아기들의 고치가 풀린다(0165): 고치마다 실이 풀리고 반짝임·분홍 꽃잎, 고치가 없어진다.
     Hatch,
 }
@@ -339,7 +341,7 @@ pub struct Story {
     /// 고치를 쳤을 때 한 번 알려 줬나 / 마지막으로 튕긴 공격 번호.
     cocoon_told: bool,
     /// 모모가 떠난 자리의 시든 꽃잎(0164). 밟으면 줍는다(`petal_tick`).
-    petal_at: Option<Vec2>,
+    petals: Vec<Vec2>,
     /// 시든 꽃잎을 주웠다(기록 `key::PETAL`): 모모를 만나기 전에도 도감에 '???' 칸이 선다.
     petal_found: bool,
 }
@@ -430,11 +432,15 @@ impl Story {
     pub fn set_petal_found(&mut self, on: bool) {
         self.petal_found = on;
     }
-    pub fn petal_at(&self) -> Option<Vec2> {
-        self.petal_at
+    /// 바닥에 남은 시든 꽃잎들(0164·0190).
+    pub fn petals(&self) -> &[Vec2] {
+        &self.petals
     }
-    pub fn set_petal(&mut self, at: Option<Vec2>) {
-        self.petal_at = at;
+    pub fn add_petal(&mut self, at: Vec2) {
+        self.petals.push(at);
+    }
+    pub fn clear_petals(&mut self) {
+        self.petals.clear();
     }
 }
 
@@ -2270,8 +2276,9 @@ impl World {
                     self.juice.fx.push(g);
                 }
             }
+            Cue::Trail => self.story.petals.push(at),
             Cue::Leave => {
-                self.story.petal_at = Some(at);
+                self.story.petals.push(at);
                 petals(
                     &mut self.juice.fx,
                     at,
@@ -2550,18 +2557,27 @@ impl World {
 
     /// 시든 꽃잎(0164): 밟으면 줍는다 — 토스트, 분홍 반짝임, 도감 '???'. 앱이 기록에 남긴다(`AdvEvent::PetalFound`).
     pub fn petal_tick(&mut self) -> bool {
-        let Some(at) = self.story.petal_at else {
-            return false;
-        };
-        if !self.player.is_alive()
-            || !self.player.on_foot()
-            || (self.player.pos - at).length() > 10.0
-        {
+        if !self.player.is_alive() || !self.player.on_foot() {
             return false;
         }
-        self.story.petal_at = None;
+        let p = self.player.pos;
+        let Some(i) = self
+            .story
+            .petals
+            .iter()
+            .position(|q| (p - *q).length() <= 10.0)
+        else {
+            return false;
+        };
+        let at = self.story.petals.remove(i);
+        // 처음 주운 꽃잎은 "누구의 것일까", 그다음은 "이 길로 갔다"(0190).
+        let first = !self.story.petal_found;
         self.story.petal_found = true;
-        self.juice.toast = Some((|s| s.toast_petal, 3.0));
+        self.juice.toast = Some(if first {
+            (|s| s.toast_petal, 3.0)
+        } else {
+            (|s| s.toast_petal_trail, 3.0)
+        });
         self.juice.fx.push(glint(
             at + vec2(0.0, -4.0),
             Color::new(1.0, 0.72, 0.80, 1.0),

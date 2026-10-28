@@ -50,6 +50,11 @@ pub const ROWS: [&str; 40] = [
     "##################################################",
 ];
 
+/// 보리 공터 문(`++`, 28~29줄 37~38칸) 바로 위 길에 놓는 시든 꽃잎(0190): 모모가 이 길로 내려갔다는 자국.
+pub fn petal_road() -> macroquad::math::Vec2 {
+    map::cell_center(37, 25) + macroquad::math::vec2(6.0, 2.0)
+}
+
 pub fn parse() -> Parsed {
     map::parse(&ROWS)
 }
@@ -77,6 +82,11 @@ mod tests {
         assert!(p.grid.find(Cell::Entrance).iter().all(|e| e.y > top));
         assert!(!p.grid.find(Cell::Save).is_empty());
         assert!(!p.enemies.is_empty());
+        // 길의 꽃잎(0190)은 바닥 위, 공터 문보다 위(문을 지나기 전에 밟는다).
+        let pr = petal_road();
+        let (pc, prow) = ((pr.x / map::TILE) as usize, (pr.y / map::TILE) as usize);
+        assert_eq!(p.grid.get(pc, prow), Cell::Floor);
+        assert!(pr.y < top);
         // 오프닝 컷씬이 걷는 줄(y≈90, x 30..300)은 바닥이어야 한다.
         for x in (32..300).step_by(16) {
             let (cx, cy) = (x / 16, 90 / 16);

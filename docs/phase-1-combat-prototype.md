@@ -106,6 +106,7 @@
 | 예고 색 하나(0187) | `render/fx.rs`(TELE_RGB), `i18n/`(h_parry_d·h_enemy_d) | 예고는 모두 붉은 계열. 받아칠 수 있는지는 모양으로 — 띠는 받아칠 수 있고, X가 있는 원은 피한다 |
 | 예고가 다 찬 채로 0.1초(0188) | `tuning.rs`(TELE_FULL_HOLD), `enemy/mod.rs`(tele_progress), `render/fx.rs`(TELE_A 0.6·TELE_BASE_A 0.08) | 예고는 공격 0.1초 전에 다 차고 남는다(전엔 다 찬 그림이 한 프레임도 안 그려졌다). 공격 시각은 그대로 |
 | 다 맞춘 마무리·즉시 강타·받아치기(0189) | `tuning.rs`(FULL_BEAT_DAMAGE·PARRY_COOLDOWN 0.3·PARRY_THREAT_*), `player/attack.rs`(full_beat), `moveset.rs`(heavy_of 활성 0초부터), `player/mod.rs`(threat·queue_due), `world.rs`(parry_threat) | 이음을 다 맞춘 마무리 타 피해 +1. 강타는 뗀 다음 틱에 맞는다. 받아칠 위협이 90px 안이면 창 전 눌림도 박자를 기다리지 않고, 받아치기 대기는 박자보다 짧게 |
+| 길의 꽃잎·빛 건너가기·옅은 예고(0190) | `world.rs`(Story::petals·Cue::Trail·petal_tick), `field.rs`(petal_road), `cutscene.rs`(Step::Gloom 빛 보간), `render/fx.rs`(TELE_A 0.45) | 오프닝이 보리 공터 앞 길에 꽃잎을 하나 더 남긴다("이 길로 갔다"). 물든 것의 등장에서 빛이 Naïl에서 그쪽으로 0.9초에 건너간다. 예고 투명도 0.45 |
 | 타격 피드백·강타 보상(0168) | `tuning.rs`(KICK_*·BEAT_*·HEAVY_PERFECT·WALL_SLAM_*·CHARGE_PULL_*), `combat.rs`(Feel::kick), `moveset.rs`(heavy_of), `player.rs`(on_beat·combo_beats·perfect), `enemy.rs`(slam), `world.rs`, `render.rs`(draw_enemy 진동·눌림, 킥), `sfx.rs`(ChargeUp·HitTick) | 히트스톱 5/9/13f, 맞은 적 진동·눌림, 맞히면 전진 멈춤 + 카메라 킥 2/3/4px, '틱'. 강타 피해 3·경직 +0.5·넉백 ×1.7 → 벽 쿵 +1, 콩이 등딱지 깨기, 모으는 동안 소리·웅크림·먼지. 박자 타 덤, 이음 다 맞춘 마무리 ×1.25, 다 모인 직후 뗀 강타 +1 |
 | 코드 건강(0169 R1~R4) | `sfx.rs`(Queue·flush), `world.rs`(step 단계 메서드·enemy_down·Inventory·Story·RunStats·Hazards·Juice), `render/`(아홉 모듈), `app/`(pause·settings·album·title, start 넷으로), `scenario.rs`(통째 시험) | 로직은 오디오 장치를 모른다 → 시나리오 37개를 600틱씩 돌리는 시험. 동작 변화는 적 쓰러짐 손맛 통일뿐 |
 | 코드 건강(0169 R5~R8) | `enemy/`(mod·melee·ranged·boss, `Ctx`), `i18n/`(mod + 언어 열하나), `tools/test/smoke.js`·`smoke-web.yml`, `equipment.rs`(발톱 상수), `profile.rs`·`prefs.rs`·`suspend.rs`(고정 샘플 시험), `tools/art/legacy/`, `build-android.yml`·`build-ios.yml`(main만), `render/actors.rs`(모모 웅크림) | 브라우저 연기 시험이 main push마다 돈다. 동작 변화는 모모 모으기 웅크림 1px뿐 |
@@ -184,6 +185,7 @@
 - [ ] **설정 파일(0175)**: Android에서 언어·음량·버튼을 바꾸고 껐다 켜면 남는지, APK를 덮어 설치해도 남는지
 - [ ] **적 예고 면(0179 → … → 0187 → 0188)**: 다 찬 뒤 0.1초가 "이제 온다"로 읽히는지, 투명도 0.6, 붉은 한 색에서 띠(받아침)와 X 원(피함)이 모양만으로 갈리는지, 붉은 지대에서 묻히지 않는지, 다 찬 순간 외곽선과 채움이 한 색으로 보이는지, 밑띠 없이 풀밭·어두운 지대에서 외곽선이 보이는지, 채움이 테두리에 닿아 "한 덩어리가 되는 순간"이 피할 만큼 읽히는지, 좁은 띠(던지기·혀)의 폭 변화, 풀밭 위 황금 띠의 대비, 여러 적이 겹칠 때 면이 쌓여 진해지지 않는지, 짧은 예고(땃쥐), 어두운 지대
 - [ ] **부술 수 있는 것(0177)**: 방마다 1~3개가 알맞은지, 빈손 44%가 "운"으로 느껴지는지, 들판·쉼터·마을에도 둘지
+- [ ] **길의 꽃잎·빛 건너가기·옅은 예고(0190)**: 보리 공터 앞 꽃잎이 눈에 띄는지, 빛 건너가기 0.9초, 예고 0.45가 너무 옅지 않은지
 - [ ] **강타·받아치기 반응(0189)**: 강타가 떼는 순간 나가는지, 받아치기가 누른 때 바로인지, 위협 90px, 다 맞춘 마무리 +1이 센지
 - [ ] **박자 콤보(0174 → 0183 → 0184)**: 0.42초 템포가 "타·타·탕"으로 읽히는지, 창 ±0.09초, 연타가 박자에 스냅되는 게 둔하지 않은지, 닫히는 고리·종소리·음표가 싸움을 가리거나 유치하지 않은지, 모모 발차기의 쉼
 

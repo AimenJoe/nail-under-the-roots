@@ -189,11 +189,16 @@ mod device_tests {
             }
         }
         assert!(c.is_done());
-        let at = w.story.petal_at().expect("시든 꽃잎이 남는다");
+        assert_eq!(w.story.petals().len(), 2, "선 자리 + 보리 공터 앞 길(0190)");
+        let at = w.story.petals()[0];
         assert!(!w.petal_tick(), "멀리서는 안 줍는다");
         w.player.pos = at;
         assert!(w.petal_tick(), "밟으면 줍는다");
-        assert!(w.story.petal_found() && w.story.petal_at().is_none());
+        assert!(w.story.petal_found() && w.story.petals().len() == 1);
+        assert_eq!(w.story.petals()[0], crate::field::petal_road());
+        w.player.pos = crate::field::petal_road();
+        assert!(w.petal_tick(), "길의 꽃잎도 줍는다");
+        assert!(w.story.petals().is_empty());
         assert!(w
             .adv
             .events
@@ -406,6 +411,9 @@ pub struct Cutscene {
     /// 팬·어둠의 출발값.
     pan_from: Vec2,
     gloom_from: f32,
+    /// 빛이 떠나는 자리·반지름(0190): 새 자리로 미끄러지듯 옮긴다(한 번에 뛰면 어색했다, 사장).
+    gloom_at0: Vec2,
+    gloom_r0: f32,
 }
 
 /// 렌더용: 지금 열린 대화창.
@@ -442,6 +450,8 @@ impl Cutscene {
             fresh: true,
             pan_from: Vec2::ZERO,
             gloom_from: 0.0,
+            gloom_at0: Vec2::ZERO,
+            gloom_r0: 0.0,
         }
     }
 
@@ -561,19 +571,29 @@ impl Cutscene {
                 radius,
                 secs,
             } => {
-                if fresh {
-                    self.gloom_from = w.juice.gloom.amount;
-                }
                 let p = (self.t / secs.max(0.01)).min(1.0);
-                let at = if actor == 0 {
+                let target = if actor == 0 {
                     w.player.pos
                 } else {
                     self.actors[actor].pos
                 };
+                if fresh {
+                    self.gloom_from = w.juice.gloom.amount;
+                    // 어둠이 아직 없으면 빛은 처음부터 그 자리에(어디서 미끄러져 올 데가 없다).
+                    let (at0, r0) = if w.juice.gloom.amount < 0.05 {
+                        (target, radius)
+                    } else {
+                        (w.juice.gloom.at, w.juice.gloom.radius)
+                    };
+                    self.gloom_at0 = at0;
+                    self.gloom_r0 = r0;
+                }
+                // 빛의 자리·크기는 부드럽게(처음·끝이 느린 곡선) 옮긴다 — Naïl에서 보리로 빛이 건너간다(0190).
+                let e = p * p * (3.0 - 2.0 * p);
                 w.juice.gloom = crate::world::Gloom {
                     amount: self.gloom_from + (to - self.gloom_from) * p,
-                    at,
-                    radius,
+                    at: self.gloom_at0.lerp(target, e),
+                    radius: self.gloom_r0 + (radius - self.gloom_r0) * e,
                 };
                 p >= 1.0
             }
@@ -676,9 +696,9 @@ impl Cutscene {
                 Step::Hush(on) => w.juice.hush = on,
                 // 남는 것(0164): 건너뛰어도 시든 꽃잎은 자리에 둔다(이펙트는 없이).
                 Step::Cue {
-                    cue: Cue::Leave,
+                    cue: Cue::Leave | Cue::Trail,
                     at,
-                } => w.story.set_petal(Some(at)),
+                } => w.story.add_petal(at),
                 _ => {}
             }
         }
@@ -1206,11 +1226,12 @@ fn tainted_meet_steps(w: &World, at: Vec2, sub: Tr, lines: Vec<Step>) -> Vec<Ste
             to: Some(at),
             secs: 0.9,
         },
+        // 빛이 Naïl에서 물든 것으로 건너간다(0190, 한 번에 뛰지 않고).
         Step::Gloom {
             to: 0.88,
             actor: 1,
             radius: 58.0,
-            secs: 0.6,
+            secs: 0.9,
         },
         Step::Cue { cue: Cue::Rise, at },
         Step::Shake(0.2),
@@ -1339,6 +1360,32 @@ pub fn keeper_beaten(kind: crate::enemy::Kind, w: &World, r: crate::world::BossB
 #[cfg(test)]
 mod keeper_tests {
     use super::*;
+
+    /// 보리의 등장(0190): 빛은 한 번에 뛰지 않고 Naïl에서 보리로 건너간다 — 가운데쯤엔 둘 사이에 있다.
+    #[test]
+    fn the_light_slides_from_nail_to_bori() {
+        let mut w = World::new();
+        let mut c = boss_intro(&w);
+        let from = w.player.pos;
+        let bori = c.actors[1].pos;
+        let gap = (bori - from).length();
+        assert!(gap > 20.0, "시험이 되려면 둘이 떨어져 있어야 한다: {gap}");
+        let go = Actions::default();
+        let mut seen_between = false;
+        for _ in 0..600 {
+            c.update(&go, 1.0 / 60.0, &mut w);
+            let g = w.juice.gloom;
+            let (d0, d1) = ((g.at - from).length(), (g.at - bori).length());
+            if g.amount > 0.5 && d0 > gap * 0.25 && d1 > gap * 0.25 {
+                seen_between = true;
+            }
+            if d1 < 1.0 {
+                break;
+            }
+        }
+        assert!(seen_between, "빛이 둘 사이를 지나간다");
+        assert!((w.juice.gloom.at - bori).length() < 1.0, "끝에는 보리에게");
+    }
 
     /// 보스 표(bosses.rs)의 주인마다 만남·이긴 뒤 장면이 있다(표에 줄을 더하고 가지를 빼먹으면 여기서 터진다).
     #[test]
@@ -1716,6 +1763,11 @@ pub fn opening(w: &World) -> Cutscene {
         Step::Cue {
             cue: Cue::Leave,
             at: vec2(136.0, 96.0),
+        },
+        // 하나 더, 보리 공터 앞 길에(0190): 걸어 내려가다 밟으면 "이 길로 갔다".
+        Step::Cue {
+            cue: Cue::Trail,
+            at: crate::field::petal_road(),
         },
         // 침묵: 꽃잎만 떨어진다.
         Step::Wait(1.0),

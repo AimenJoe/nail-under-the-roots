@@ -338,8 +338,8 @@ impl Renderer {
             if let Some(sp) = &w.spring {
                 draw_spring(sp, w.time);
             }
-            if let Some(at) = w.story.petal_at() {
-                draw_left_petal(at, w.time);
+            for at in w.story.petals() {
+                draw_left_petal(*at, w.time);
             }
             for c in &w.hazards.cocoons {
                 draw_cocoon(*c, w.time);

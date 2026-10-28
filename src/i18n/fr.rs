@@ -225,6 +225,7 @@ pub static FR: Strings = Strings {
     popo_hi0: "…Cette petite, là, je la connais. Avant, elle n'était pas comme ça.",
     op_stop: "…Non.",
     toast_petal: "Un pétale fané. Il reste un peu de rose.",
+    toast_petal_trail: "Encore un pétale fané. Quelqu'un est descendu par ici.",
     best_petal: "Celle qui a laissé un pétale fané avant de partir. Qui était-ce?",
     popo_pickup: "Tu vois ce truc qui brille? Ce sont tes griffes. Va les ramasser.",
     popo_combo: "Frappe l'épouvantail trois fois de suite. Le troisième coup est le plus lourd!",

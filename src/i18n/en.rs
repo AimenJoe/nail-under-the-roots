@@ -225,6 +225,7 @@ pub static EN: Strings = Strings {
     popo_hi0: "…That kid just now. I know her. She never used to be like that.",
     op_stop: "…No.",
     toast_petal: "A wilted petal. A little pink is still left in it.",
+    toast_petal_trail: "Another wilted petal. Someone went down this way.",
     best_petal: "The one who left a wilted petal and went away. Who was she?",
     popo_pickup: "See that shiny thing? Those are your claws. Go pick them up.",
     popo_combo: "Hit the scarecrow three times in a row. The third hit is the heaviest!",

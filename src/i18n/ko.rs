@@ -225,6 +225,7 @@ pub static KO: Strings = Strings {
     popo_hi0: "…방금 그 아이, 나도 알아. 전엔 저러지 않았는데.",
     op_stop: "…아니야.",
     toast_petal: "시든 꽃잎. 분홍빛이 조금 남아 있다.",
+    toast_petal_trail: "또 시든 꽃잎. 누군가 이 길로 내려간 것 같다.",
     best_petal: "시든 꽃잎을 남기고 간 아이. 누구였을까.",
     popo_pickup: "저기 반짝이는 거 보이지? 네 발톱이야. 가서 주워 와.",
     popo_combo: "허수아비를 세 번 연달아 쳐 봐. 세 번째가 제일 묵직해!",

@@ -518,7 +518,7 @@ impl World {
     fn swap_place(&mut self, f: &mut Fade) {
         f.swapped = true;
         self.spring = None;
-        self.story.set_petal(None);
+        self.story.clear_petals();
         self.hazards.cocoons.clear();
         self.hazards.waves.clear();
         self.hazards.thread_lash = None;
