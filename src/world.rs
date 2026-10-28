@@ -1094,10 +1094,16 @@ impl World {
 
     /// 1b·1c. 획득물(무기)과 떨어진 것(반딧불·씨앗·가방 아이템·뿌리 심장) 줍기.
     fn tick_pickups(&mut self, dt: f32) {
-        // 1b. 획득물
+        // 1b. 획득물: 떨어진 것처럼 자석 거리 안이면 끌려온다(0207).
         let ppos = self.player.pos;
         let mut got = Vec::new();
-        self.pickups.retain(|p| {
+        let pull = t::LOOT_MAGNET_MAX_SPEED * dt;
+        self.pickups.retain_mut(|p| {
+            let to = ppos - p.pos;
+            let d = to.length();
+            if d < t::LOOT_MAGNET_RADIUS && d > 0.0 {
+                p.pos += to / d * pull.min(d);
+            }
             if (p.pos - ppos).length() <= t::PICKUP_RADIUS {
                 got.push((p.pos, p.weapon));
                 false

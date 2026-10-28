@@ -241,7 +241,7 @@ pub const PROJECTILE_RADIUS: f32 = 3.0;
 pub const PROJECTILE_DAMAGE: i32 = 1;
 
 // ---- 획득 ------------------------------------------------------------
-/// 바닥 무기에 이만큼 다가가면 줍는다.
+/// 바닥 무기에 이만큼 다가가면 줍는다. 자석 거리(`LOOT_MAGNET_RADIUS`) 안이면 먼저 끌려온다(0207).
 pub const PICKUP_RADIUS: f32 = 10.0;
 
 // ---- 떨어지는 것: 반딧불(화폐)·산딸기(회복) (src/loot.rs, docs/decisions/0016) -------------
@@ -255,10 +255,12 @@ pub const LOOT_FRICTION: f32 = 5.0;
 pub const LOOT_PICKUP_DELAY: f32 = 0.35;
 /// 이 거리 안이면 줍는다.
 pub const LOOT_COLLECT_RADIUS: f32 = 8.0;
-/// 반딧불 자석: 이 거리 안이면 끌려온다(넉넉하게 — "스쳤는데 못 주웠다"가 없게).
-pub const GLOWBUG_MAGNET_RADIUS: f32 = 44.0;
-pub const GLOWBUG_MAGNET_ACCEL: f32 = 900.0;
-pub const GLOWBUG_MAGNET_MAX_SPEED: f32 = 230.0;
+/// 자석: 떨어진 것은 이 거리 안이면 끌려온다(넉넉하게 — "스쳤는데 못 주웠다"가 없게).
+/// 반딧불·씨앗만 끌던 것을 산딸기·지렁이·뿌리 심장까지(사장 2026-10-28 "아이템 습득 반경이 좁다", 0207).
+/// 가방이 차서 못 담는 것은 끌지 않는다(`can_take`).
+pub const LOOT_MAGNET_RADIUS: f32 = 44.0;
+pub const LOOT_MAGNET_ACCEL: f32 = 900.0;
+pub const LOOT_MAGNET_MAX_SPEED: f32 = 230.0;
 /// 산딸기가 떨어질 확률 = 기본 + 깎인 체력 1칸마다. 체력이 가득이면 0.
 pub const BERRY_BASE_CHANCE: f32 = 0.06;
 pub const BERRY_CHANCE_PER_MISSING: f32 = 0.08;
