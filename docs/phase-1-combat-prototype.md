@@ -99,6 +99,7 @@
 | 부술 수 있는 것(0177) | `room.rs`(PropKind::Breakable·remove_prop), `dungeon.rs`(breakables), `world.rs`(prop_break·stats.broken), `render/props.rs`(draw_breakable), `sfx.rs`(Break), `tuning.rs`(BREAK_*) | 굴 방마다 1~3개(지대마다 흙더미·뿌리혹·돌무더기·실뭉치), 공격이 닿으면 깨져 씨앗 30%·산딸기 12%·반딧불 10%·지렁이 4% |
 | 안내 화면(0178) | `help.rs`(TOPICS), `app/help.rs`(update_help·draw_help), `i18n/`(h_* 30키 × 11), `app/pause.rs`(PAUSE_MENU 5), `app/title.rs`(TitleItem::Help) | 일시정지·타이틀의 "안내": 주제 열셋, 쪽 넘기기. 산딸기는 송이 비트맵(`draw_berry`) |
 | 안내 탭·힌트 그림·메트로놈(0180) | `app/pause.rs`(PAUSE_TABS 7·TAB_HELP), `app/help.rs`(help_nav·draw_help_body), `help.rs`(Pic), `render/help.rs`(draw_pic), `player/`(BeatTick·beat_period), `sfx.rs`(BeatTick) | 안내는 일시정지 일곱째 탭(타이틀에서는 뺌, 0182). 주제마다 진짜 그림으로 한 장면을 되풀이. 콤보 중 박자에 '똑' + 과녁 번쩍(그 틱에 타가 나가면 없음) |
+| 적 예고 면·느린 박자(0183) | `render/fx.rs`(tele_colors·draw_tele_lane·draw_tele_disk·TELE_EDGE_A·TELE_FILL_A0), `render/help.rs`, `tuning.rs`(BEAT_PERIOD 0.36·BEAT_WINDOW 0.08), `player/attack.rs`(combo_window_after_swing) | 예고는 면 + 진한 테두리, 안쪽이 진해져 테두리와 같은 색이 되는 순간 공격(황금 띠 = 받아침, 진홍 원판 + X = 피함). 평타 박자 0.25 → 0.36초, 창 ±0.08초 |
 | 타격 피드백·강타 보상(0168) | `tuning.rs`(KICK_*·BEAT_*·HEAVY_PERFECT·WALL_SLAM_*·CHARGE_PULL_*), `combat.rs`(Feel::kick), `moveset.rs`(heavy_of), `player.rs`(on_beat·combo_beats·perfect), `enemy.rs`(slam), `world.rs`, `render.rs`(draw_enemy 진동·눌림, 킥), `sfx.rs`(ChargeUp·HitTick) | 히트스톱 5/9/13f, 맞은 적 진동·눌림, 맞히면 전진 멈춤 + 카메라 킥 2/3/4px, '틱'. 강타 피해 3·경직 +0.5·넉백 ×1.7 → 벽 쿵 +1, 콩이 등딱지 깨기, 모으는 동안 소리·웅크림·먼지. 박자 타 덤, 이음 다 맞춘 마무리 ×1.25, 다 모인 직후 뗀 강타 +1 |
 | 코드 건강(0169 R1~R4) | `sfx.rs`(Queue·flush), `world.rs`(step 단계 메서드·enemy_down·Inventory·Story·RunStats·Hazards·Juice), `render/`(아홉 모듈), `app/`(pause·settings·album·title, start 넷으로), `scenario.rs`(통째 시험) | 로직은 오디오 장치를 모른다 → 시나리오 37개를 600틱씩 돌리는 시험. 동작 변화는 적 쓰러짐 손맛 통일뿐 |
 | 코드 건강(0169 R5~R8) | `enemy/`(mod·melee·ranged·boss, `Ctx`), `i18n/`(mod + 언어 열하나), `tools/test/smoke.js`·`smoke-web.yml`, `equipment.rs`(발톱 상수), `profile.rs`·`prefs.rs`·`suspend.rs`(고정 샘플 시험), `tools/art/legacy/`, `build-android.yml`·`build-ios.yml`(main만), `render/actors.rs`(모모 웅크림) | 브라우저 연기 시험이 main push마다 돈다. 동작 변화는 모모 모으기 웅크림 1px뿐 |
@@ -175,9 +176,9 @@
 - [ ] **안내 탭·그림·'똑'(0180)**: '똑'이 박자를 잡게 해 주는지·거슬리지 않는지, 그림 칸 크기, 그림이 바로 읽히는지
 - [ ] **안내 화면(0178)**: 빠진 주제가 있는지, 설명이 너무 긴 언어(쪽 셋 넘음), 산딸기가 산딸기로 보이는지
 - [ ] **설정 파일(0175)**: Android에서 언어·음량·버튼을 바꾸고 껐다 켜면 남는지, APK를 덮어 설치해도 남는지
-- [ ] **적 예고의 차오름(0179)**: 여러 적이 겹칠 때·짧은 예고(땃쥐)에서도 "끝에 닿는 순간"이 읽히는지, 흰 줄·점이 너무 튀지 않는지, 어두운 지대
+- [ ] **적 예고 면(0179 → 0183)**: 안쪽이 테두리와 "같아지는 순간"이 피할 만큼 읽히는지, 여러 적이 겹칠 때 면이 쌓여 진해지지 않는지, 짧은 예고(땃쥐), 어두운 지대
 - [ ] **부술 수 있는 것(0177)**: 방마다 1~3개가 알맞은지, 빈손 44%가 "운"으로 느껴지는지, 들판·쉼터·마을에도 둘지
-- [ ] **박자 콤보(0174)**: 0.25초 템포가 "타·타·탕"으로 읽히는지, 창 ±0.06초, 연타가 박자에 스냅되는 게 둔하지 않은지, 닫히는 고리·종소리·음표가 싸움을 가리거나 유치하지 않은지, 모모 발차기의 쉼
+- [ ] **박자 콤보(0174 → 0183)**: 0.36초 템포가 "타·타·탕"으로 읽히는지, 창 ±0.08초, 연타가 박자에 스냅되는 게 둔하지 않은지, 닫히는 고리·종소리·음표가 싸움을 가리거나 유치하지 않은지, 모모 발차기의 쉼
 
 ### v0.3.0 마일스톤(0081·0140) — 닫음(2026-10-27, 사장 결정으로 v0.3.0 배포, 0148). 7·10~12는 아래 "먼저"로 넘김
 - [x] 1~6. 특수효과·소리 바탕·메뉴 소리·효과음·음악(0081)

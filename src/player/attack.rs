@@ -53,7 +53,7 @@ impl Player {
             } else {
                 self.state = State::Free;
                 self.combo_next = next;
-                self.combo_timer = ms.combo_window;
+                self.combo_timer = self.combo_window_after_swing();
             }
         }
         strike
@@ -148,7 +148,7 @@ impl Player {
             } else {
                 self.state = State::Free;
                 self.combo_next = next;
-                self.combo_timer = ms.combo_window;
+                self.combo_timer = self.combo_window_after_swing();
             }
         }
         strike
@@ -204,6 +204,15 @@ impl Player {
         if beat {
             self.events.push(Event::Beat(self.beat_streak));
         }
+    }
+
+    /// 스윙이 끝나 설 때 콤보 창(0183): 무기의 `combo_window`와, 박자 창이 다 닫힐 때까지(박자 + 창 두 배) 중 긴 쪽.
+    /// 박자가 느려도(0.36초) 늦게 누른 타가 1타로 돌아가지 않게.
+    fn combo_window_after_swing(&self) -> f32 {
+        let until_beat = (self.beat_at - self.beat_clock) / self.stats.attack_speed.max(0.1);
+        self.moveset
+            .combo_window
+            .max(until_beat + 2.0 * t::BEAT_WINDOW)
     }
 
     /// 박자 시계를 되감고 다음 타의 박자를 정한다(0174): 스윙 시작부터 `BEAT_PERIOD`, 스윙·후딜레이가 더 길면 그 끝.

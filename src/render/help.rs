@@ -86,12 +86,6 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
         fx::PARRY_EDGE_RGB.2,
         0.9,
     );
-    let crimson = Color::new(
-        fx::TELEGRAPH_EDGE_RGB.0,
-        fx::TELEGRAPH_EDGE_RGB.1,
-        fx::TELEGRAPH_EDGE_RGB.2,
-        0.9,
-    );
     let mark = Color::new(1.0, 0.95, 0.85, 1.0);
     match pic {
         Pic::Move => {
@@ -295,18 +289,13 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             let start = vec2(w - 18.0, y);
             if ph < 1.0 {
                 let k = ph;
-                let side = vec2(0.0, 5.0);
-                let (a, b) = (start - vec2(6.0, 0.0), at + vec2(8.0, 0.0));
-                let fill = Color::new(gold.r, gold.g, gold.b, 0.08);
-                draw_triangle(a + side, a - side, b + side, fill);
-                draw_triangle(a - side, b - side, b + side, fill);
-                let f = a + (b - a) * k;
-                let charged = Color::new(gold.r, gold.g, gold.b, 0.30 + 0.25 * k);
-                draw_triangle(a + side, a - side, f + side, charged);
-                draw_triangle(a - side, f - side, f + side, charged);
-                draw_line(a.x, a.y - 5.0, b.x, b.y - 5.0, 1.0, gold);
-                draw_line(a.x, a.y + 5.0, b.x, b.y + 5.0, 1.0, gold);
-                fx::draw_fuse_front(f, side);
+                fx::draw_tele_lane(
+                    start - vec2(6.0, 0.0),
+                    at + vec2(8.0, 0.0),
+                    5.0,
+                    fx::PARRY_EDGE_RGB,
+                    k,
+                );
                 let shake = if ((time * 60.0) as i32) % 2 == 0 {
                     1.0
                 } else {
@@ -429,28 +418,17 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             }
         }
         Pic::Enemy => {
-            // 왼쪽: 돌진 띠가 적 쪽부터 차올라 끝에 닿는 순간 돌진(황금 = 받아칠 수 있다).
-            // 오른쪽: 내려앉을 자리가 가운데부터 차오르고 고리가 조여 들어 만나는 순간(진홍 X = 피한다).
+            // 왼쪽: 돌진할 길의 면이 점점 진해져 테두리와 같아지는 순간 돌진(황금 = 받아칠 수 있다).
+            // 오른쪽: 내려앉을 자리의 원이 진해져 테두리와 같아지는 순간(진홍 X = 피한다). 둘은 같은 박자로.
             let k = (time % 1.6 / 1.3).min(1.0);
             let m = vec2(12.0, y - 6.0);
-            let side = vec2(0.0, 4.0);
-            let (a, b) = (m + vec2(7.0, 0.0), m + vec2(mid - 12.0, 0.0));
-            let f = a + (b - a) * k;
-            draw_triangle(
-                a + side,
-                a - side,
-                f + side,
-                Color::new(gold.r, gold.g, gold.b, 0.4),
+            fx::draw_tele_lane(
+                m + vec2(7.0, 0.0),
+                m + vec2(mid - 14.0, 0.0),
+                4.0,
+                fx::PARRY_EDGE_RGB,
+                k,
             );
-            draw_triangle(
-                a - side,
-                f - side,
-                f + side,
-                Color::new(gold.r, gold.g, gold.b, 0.4),
-            );
-            draw_line(a.x, a.y - 4.0, b.x, b.y - 4.0, 1.0, gold);
-            draw_line(a.x, a.y + 4.0, b.x, b.y + 4.0, 1.0, gold);
-            fx::draw_fuse_front(f, side);
             critter(
                 art,
                 Kind::FieldMouse,
@@ -461,9 +439,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             );
             let at = vec2(w - 22.0, y);
             let r = 10.0;
-            fx::draw_fill_disk(at, r * k, crimson);
-            fx::draw_no_parry_ring(at, r * (1.5 - 0.5 * k), crimson);
-            fx::draw_no_parry_mark(at, crimson);
+            fx::draw_tele_disk(at, r, fx::TELEGRAPH_EDGE_RGB, k);
             if k >= 1.0 {
                 draw_circle_lines(at.x, at.y, r, 2.0, Color::new(1.0, 1.0, 1.0, 0.9));
             }

@@ -741,7 +741,7 @@ pub static EN: Strings = Strings {
     h_eat: "Eating",
     h_eat_d: "The item button eats a raspberry (1 heart) or a worm (full health). Carry a worm and if you fall, you eat it and get back up on your own. Pick the bag slot with the left/right buttons. You walk slowly while eating.",
     h_enemy: "Reading enemy tells",
-    h_enemy_d: "An enemy that trembles and flushes red is winding up. The floor shows where the attack will go (a lane or a dotted line) or land (a ring), and light fills it from the enemy outward: the attack comes the moment it reaches the end. Area attacks fill from the center and strike when they reach the ring. Gold can be parried (charges, throws, tongues); crimson with an X in the middle must be dodged (pounces, spores, stomps). The bestiary has tips for each kind.",
+    h_enemy_d: "An enemy that trembles and flushes red is winding up. The floor shows the area the attack will cover: the border is solid from the start, and the inside darkens until it matches the border, which is the moment the attack lands. Gold can be parried (charges, throws, tongues); crimson with an X in the middle must be dodged (pounces, spores, stomps). The bestiary has tips for each kind.",
     h_loot: "Glowbugs and seeds",
     h_loot_d: "Glowbugs drop from fallen enemies. Spend them at the Great Tree in the village to wake up talents (you lose a few when you fall). Seeds are shop money (never lost). Eating a root heart adds 1 max heart.",
     h_camp: "Camps and the route map",

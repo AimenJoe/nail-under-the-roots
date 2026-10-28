@@ -112,9 +112,10 @@ pub const COCOON_R: f32 = 9.0;
 pub const HEAVY_CHARGE: f32 = 0.45;
 /// 박자 콤보(0167 → 0174): 다음 타의 박자는 이번 스윙(평타·강타) 시작부터 `BEAT_PERIOD`(초) — 스윙·후딜레이가 더 길면 그 끝.
 /// 박자 ±`BEAT_WINDOW` 안에서 누르면 그 자리에서 나가고 덤(`Event::Beat`). 창 전에 누르면 박자까지 기다렸다 나간다(스냅,
-/// 덤 없음 — 연타는 박자보다 빠를 수 없다). 창 뒤에 누르면 그 자리에서 나간다(덤 없음). 0.25초 = 120 BPM의 8분음표.
-pub const BEAT_PERIOD: f32 = 0.25;
-pub const BEAT_WINDOW: f32 = 0.06;
+/// 덤 없음 — 연타는 박자보다 빠를 수 없다). 창 뒤에 누르면 그 자리에서 나간다(덤 없음).
+/// 0.25초(초당 4타)는 귀로 박자를 잡기엔 빨랐다(사장, 0183) → 0.36초(약 167 BPM, 편하게 두드리는 빠르기), 창 ±0.08초.
+pub const BEAT_PERIOD: f32 = 0.36;
+pub const BEAT_WINDOW: f32 = 0.08;
 /// 박자 고리(0174): 스윙 시작에 `BEAT_RING_START` 반지름에서 박자에 `BEAT_RING_END`(과녁 고리)로 닫힌다. 창 안이면 밝게.
 pub const BEAT_RING_START: f32 = 18.0;
 pub const BEAT_RING_END: f32 = 7.0;

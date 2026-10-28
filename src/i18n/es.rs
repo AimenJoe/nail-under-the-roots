@@ -741,7 +741,7 @@ pub static ES: Strings = Strings {
     h_eat: "Comer",
     h_eat_d: "El botón de objeto come una frambuesa (1 corazón) o una lombriz (vida llena). Si llevas una lombriz y caes, te la comes solo y te levantas. Elige el hueco de la bolsa con izquierda/derecha. Mientras comes, andas despacio.",
     h_enemy: "Leer los avisos del enemigo",
-    h_enemy_d: "Un enemigo que tiembla y se pone rojo se está preparando. El suelo muestra por dónde irá el ataque (una franja o una línea de puntos) o dónde caerá (un anillo), y la luz lo llena desde el enemigo: el ataque sale en el momento en que llega al final. Los ataques de área se llenan desde el centro y golpean al tocar el anillo. Dorado: se puede repeler (cargas, lanzamientos, lenguas); carmesí con una X en medio: hay que esquivar (saltos, esporas, pisotones). El bestiario tiene un consejo por especie.",
+    h_enemy_d: "Un enemigo que tiembla y se pone rojo se está preparando. El suelo muestra la zona que tocará el ataque: el borde es fuerte desde el principio y el interior se oscurece hasta tener el color del borde, y en ese momento golpea. Dorado: se puede repeler (cargas, lanzamientos, lenguas); carmesí con una X en medio: hay que esquivar (saltos, esporas, pisotones). El bestiario tiene un consejo por especie.",
     h_loot: "Luciérnagas y semillas",
     h_loot_d: "Las luciérnagas caen de los enemigos derrotados. Gástalas en el Gran Árbol de la aldea para despertar talentos (al caer pierdes unas pocas). Las semillas son el dinero de la tienda (nunca se pierden). Comer un corazón de raíz da +1 corazón máximo.",
     h_camp: "Campamentos y mapa del camino",
