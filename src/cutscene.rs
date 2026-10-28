@@ -1997,6 +1997,28 @@ pub fn ending_momo(w: &World) -> Cutscene {
     Cutscene::new(vec![nail_actor(w)], steps)
 }
 
+/// 도토로 가장 깊은 곳(0201): 오래전에 묻은 씨앗을 흰 실이 안고 있다. 도토는 곁에 표시를 묻고 돌아간다.
+/// 씨앗을 할매 곁에 묻는 것은 나일의 참 엔딩(true_1)이라 여기서는 하지 않는다(0056: 다른 캐릭터의 끝은 대신하지 않는다).
+/// 그림은 도토의 기억(같은 자리, 오래전) — 새 일러스트가 오면 바꾼다(0191 C).
+pub fn ending_doto(w: &World) -> Cutscene {
+    let steps = vec![
+        Step::Illust(Some(Illust::DotoMemory)),
+        Step::Fade {
+            to_clear: true,
+            secs: 1.0,
+        },
+        Step::Narrate(|s| s.dend_1),
+        say(0, Face::Worried, |s| s.dend_2),
+        say(0, Face::Normal, |s| s.dend_3),
+        Step::Narrate(|s| s.dend_4),
+        Step::Fade {
+            to_clear: false,
+            secs: 1.0,
+        },
+    ];
+    Cutscene::new(vec![nail_actor(w)], steps)
+}
+
 /// 개발: 아직 게임에 자리가 없는 이야기 장면을 이어서(모모 → 반쪽 엔딩 → 참 엔딩·에필로그).
 pub fn story_preview(w: &World) -> Cutscene {
     let mut steps = momo_steps();

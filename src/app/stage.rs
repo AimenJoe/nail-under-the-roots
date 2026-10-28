@@ -388,9 +388,11 @@ impl App {
             });
             self.save_profile();
         }
-        // 도토의 엔딩 장면은 0191 B4(이야기)에서 — 그때까지는 Naïl의 장면을 본다(기록은 위의 deep_flag).
         let c = if momo {
             cutscene::ending_momo(&self.world)
+        } else if ch == crate::equipment::Character::Doto {
+            // 도토의 끝(0201): 씨앗 자리를 찾지만 실이 안고 있다 — 묻는 것은 나일의 참 엔딩에 남긴다.
+            cutscene::ending_doto(&self.world)
         } else if true_end {
             cutscene::ending_true(&self.world)
         } else {
@@ -446,9 +448,13 @@ impl App {
             }
             // 빈 자리: 모모를 이긴 만큼 꽃잎이 물들어 있다(0046). 모모로 왔으면 제 자리라 1인칭으로, 나일이 있는 곳도 말한다(0067).
             Interact::Seat => {
-                let momo = self.world.character == crate::equipment::Character::Momo;
+                let ch = self.world.character;
+                let momo = ch == crate::equipment::Character::Momo;
+                let doto = ch == crate::equipment::Character::Doto;
                 let (line, face): (Tr, Face) = match self.world.story.momo_wins() {
                     _ if momo => (|s| s.seat_momo, Face::Happy),
+                    // 도토(0201): 남의 자리 곁에 도토리 하나 — 잊지 않게 묻는 버릇.
+                    _ if doto => (|s| s.seat_doto, Face::Normal),
                     0 => (|s| s.seat_1, Face::Worried),
                     1 => (|s| s.seat_p1, Face::Worried),
                     2 => (|s| s.seat_p2, Face::Worried),

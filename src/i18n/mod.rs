@@ -433,6 +433,7 @@ strings! {
     c_pinecone, c_pinecone_desc, c_acorn_cap, c_acorn_cap_desc, c_maple, c_maple_desc, jg_doto_deep, jg_doto_deep_d,
     set_tells,
     h_doto, h_doto_d,
+    run_doto, seat_doto, dend_1, dend_2, dend_3, dend_4, doto_t_deep,
 }
 
 #[cfg(test)]

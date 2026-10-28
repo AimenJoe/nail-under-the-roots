@@ -29,6 +29,8 @@ pub enum Cond {
     DeathsAtLeast(u32),
     /// 기록의 수가 이만큼 이상(모모를 이긴 수 등).
     CountAtLeast(&'static str, u32),
+    /// 기록의 수가 꼭 이만큼(고른 캐릭터 번호 `char_pick` 등, 0201).
+    CountIs(&'static str, u32),
     Flag(&'static str),
     NotFlag(&'static str),
     /// 다른 줄을 이미 봤다(순서 잇기).
@@ -40,6 +42,7 @@ impl Cond {
         match self {
             Cond::DeathsAtLeast(n) => p.count(key::DEATHS) >= n,
             Cond::CountAtLeast(k, n) => p.count(k) >= n,
+            Cond::CountIs(k, n) => p.count(k) == n,
             Cond::Flag(k) => p.flag(k),
             Cond::NotFlag(k) => !p.flag(k),
             Cond::Seen(id) => p.flag(&key::line(id)),
@@ -318,6 +321,15 @@ pub const LINES: &[Line] = &[
         needs: &[Flag(key::VENOM)],
         once: true,
     },
+    // 도토로 가장 깊은 곳에 닿았다(0201): 씨앗은 실이 안고 있다 — 묻어 줄 것은 나일(참 엔딩 true_1).
+    Line {
+        id: "doto_t_deep",
+        when: When::TalkDoto,
+        who: Speaker::Doto,
+        text: |s| s.doto_t_deep,
+        needs: &[Flag(key::DOTO_DEEP), NotFlag(key::TRUE_ENDING)],
+        once: true,
+    },
     Line {
         id: "doto_t_true",
         when: When::TalkDoto,
@@ -389,7 +401,21 @@ pub const LINES: &[Line] = &[
         needs: &[
             Flag(key::TUTORIAL),
             Flag(key::MOMO_BACK),
-            CountAtLeast(key::CHAR_PICK, 1),
+            // 1 = 모모. "1 이상"이면 도토(2) 런에도 모모를 배웅했다(0201).
+            CountIs(key::CHAR_PICK, 1),
+        ],
+        once: false,
+    },
+    // 도토와 내려갈 때(0201): 포포가 도토를 배웅한다.
+    Line {
+        id: "again_doto",
+        when: When::RunStart,
+        who: Speaker::Popo,
+        text: |s| s.run_doto,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::DOTO_MEMORY),
+            CountIs(key::CHAR_PICK, 2),
         ],
         once: false,
     },
@@ -424,6 +450,25 @@ pub fn take(p: &mut Profile, when: When) -> Option<&'static Line> {
 
 #[cfg(test)]
 mod tests {
+    /// 포포의 배웅(0201): 고른 캐릭터마다 제 줄. 예전엔 "char_pick ≥ 1"이라 도토 런에도 모모를 배웅했다.
+    #[test]
+    fn run_start_line_follows_picked_character() {
+        let mut p = Profile::default();
+        p.set(key::TUTORIAL);
+        p.set(key::MOMO_BACK);
+        p.set(key::DOTO_MEMORY);
+        p.set_count(key::CHAR_PICK, 1);
+        assert_eq!(take(&mut p, When::RunStart).unwrap().id, "again_momo");
+        p.set_count(key::CHAR_PICK, 2);
+        assert_eq!(take(&mut p, When::RunStart).unwrap().id, "again_doto");
+        p.set_count(key::CHAR_PICK, 0);
+        let id = take(&mut p, When::RunStart).unwrap().id;
+        assert!(id != "again_momo" && id != "again_doto", "{id}");
+        // 도토로 끝까지 닿은 뒤 마을의 도토는 한 번 씨앗 이야기를 한다(참 엔딩 전에만).
+        p.set(key::DOTO_DEEP);
+        assert_eq!(take(&mut p, When::TalkDoto).unwrap().id, "doto_t_deep");
+    }
+
     use super::*;
 
     fn died(p: &mut Profile, n: u32) {
