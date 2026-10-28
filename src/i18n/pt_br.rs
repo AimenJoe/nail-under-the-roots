@@ -780,4 +780,6 @@ pub static PT_BR: Strings = Strings {
     h_break_d: "Montes de terra, galhas de raiz, pilhas de pedra e novelos de seda pelas tocas quebram quando você bate. Com sorte soltam sementes, framboesas, vaga-lumes ou minhocas. Eles bloqueiam o caminho, então também servem de escudo contra um inimigo avançando.",
     h_village: "Vila, Grande Árvore e diário",
     h_village_d: "Entre as descidas você volta à vila. Desperte talentos na Grande Árvore com vaga-lumes, aumente a dificuldade com os nós e enfrente de novo os chefes nos sonhos de fio. Cumprir as metas do diário (no menu de pausa) dá recompensas.",
+    h_doto: "Lutando com o Doto",
+    h_doto_d: "O Doto luta de longe. O ataque atira bolotas — a terceira sai em leque de três. Segure e solte para uma bolota grande que explode onde cai. O salto para trás mantém a mira. Com a barra cheia, enterra bolotas à frente — explodem logo e só ferem inimigos. A mão do arremesso rebate o que vier voando.",
 };

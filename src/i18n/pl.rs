@@ -780,4 +780,6 @@ pub static PL: Strings = Strings {
     h_break_d: "Kopce ziemi, narośla korzeni, stosy kamieni i kłębki jedwabiu w norach rozbijają się od uderzenia. Przy odrobinie szczęścia wypadną nasiona, maliny, świetliki lub dżdżownice. Zagradzają drogę, więc mogą też osłonić cię przed szarżą.",
     h_village: "Wioska, Wielkie Drzewo, dziennik",
     h_village_d: "Między zejściami wracasz do wioski. Budź talenty przy Wielkim Drzewie świetlikami, podnoś trudność supłami i walcz ponownie z bossami w snach z nici. Spełnione cele dziennika (w menu pauzy) dają nagrody.",
+    h_doto: "Walka jako Doto",
+    h_doto_d: "Doto walczy z daleka. Atak rzuca żołędziami — trzeci rzut wachlarzem trzech. Przytrzymaj i puść: duży żołądź pęka tam, gdzie spadnie. Odskok zachowuje celownik. Z pełnym paskiem zakopujesz żołędzie przed sobą — wkrótce pękają i ranią tylko wrogów. Ręka w rzucie odbija to, co leci w ciebie.",
 };

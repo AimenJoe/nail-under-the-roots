@@ -780,4 +780,6 @@ pub static DE: Strings = Strings {
     h_break_d: "Erdhaufen, Wurzelknollen, Steinhaufen und Seidenknäuel überall in den Bauen zerbrechen, wenn du zuschlägst. Mit Glück fallen Samen, Himbeeren, Glühwürmchen oder Würmer heraus. Sie versperren den Weg und schirmen dich so auch vor einem anstürmenden Gegner ab.",
     h_village: "Dorf, Großer Baum, Tagebuch",
     h_village_d: "Zwischen den Abstiegen kehrst du ins Dorf zurück. Wecke am Großen Baum Talente mit Glühwürmchen, erhöhe mit Knoten die Schwierigkeit und kämpfe in Fadenträumen erneut gegen Bosse. Erfüllte Tagebuchziele (im Pausenmenü) bringen Belohnungen.",
+    h_doto: "Mit Doto kämpfen",
+    h_doto_d: "Doto kämpft aus der Ferne. Der Angriff wirft Eicheln — der dritte Wurf als Fächer aus drei. Halten und loslassen: eine große Eichel platzt beim Aufprall. Der Rücksprung behält das Ziel im Blick. Bei voller Leiste vergräbst du Eicheln vor dir — sie platzen bald und treffen nur Gegner. Die werfende Hand schlägt Heranfliegendes zurück.",
 };

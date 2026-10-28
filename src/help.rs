@@ -26,9 +26,11 @@ pub enum Pic {
     Gear,
     Break,
     Village,
+    /// 도토로 싸우기(0195): 던지기 셋·부채꼴, 뒤로 뛰기, 묻은 도토리.
+    Doto,
 }
 
-pub const TOPICS: [Topic; 13] = [
+pub const TOPICS: [Topic; 14] = [
     Topic {
         title: |s| s.h_move,
         body: |s| s.h_move_d,
@@ -93,5 +95,11 @@ pub const TOPICS: [Topic; 13] = [
         title: |s| s.h_village,
         body: |s| s.h_village_d,
         pic: Pic::Village,
+    },
+    // 고를 수 있는 이웃(0195): 도토는 멀리서 싸운다 — 조작이 다른 캐릭터는 안내에 한 주제.
+    Topic {
+        title: |s| s.h_doto,
+        body: |s| s.h_doto_d,
+        pic: Pic::Doto,
     },
 ];

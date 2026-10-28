@@ -780,4 +780,6 @@ pub static EN: Strings = Strings {
     h_break_d: "Dirt mounds, root galls, rock piles, and silk balls around the burrows break when you hit them. With luck they drop seeds, raspberries, glowbugs, or worms. They block the way, so they can also shield you from a charging enemy.",
     h_village: "Village, Great Tree, journal",
     h_village_d: "Between runs you return to the village. Wake talents at the Great Tree with glowbugs, raise the difficulty with knots, and fight bosses again in thread dreams. Completing journal goals (in the pause menu) earns rewards.",
+    h_doto: "Fighting as Doto",
+    h_doto_d: "Doto fights from afar. Attack throws acorns — the third is a fan of three. Hold and release for a big acorn that bursts where it lands. Leap back keeps facing your aim. With a full gauge, bury acorns ahead — they pop soon after and only hurt foes. Your throwing hand bats back what flies at you.",
 };

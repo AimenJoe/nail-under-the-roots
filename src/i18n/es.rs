@@ -780,4 +780,6 @@ pub static ES: Strings = Strings {
     h_break_d: "Montones de tierra, agallas de raíz, pilas de piedras y ovillos de seda por las madrigueras se rompen al golpearlos. Con suerte sueltan semillas, frambuesas, luciérnagas o lombrices. Bloquean el paso, así que también sirven de escudo contra una carga.",
     h_village: "Aldea, Gran Árbol y diario",
     h_village_d: "Entre bajadas vuelves a la aldea. Despierta talentos en el Gran Árbol con luciérnagas, sube la dificultad con los nudos y vuelve a luchar contra los jefes en los sueños de hilo. Cumplir las metas del diario (menú de pausa) da recompensas.",
+    h_doto: "Luchar con Doto",
+    h_doto_d: "Doto lucha de lejos. El ataque lanza bellotas — la tercera en abanico de tres. Mantén y suelta para una bellota grande que estalla al caer. El salto atrás mantiene la mira. Con la barra llena, entierra bellotas delante — estallan pronto y solo dañan a enemigos. La mano que lanza devuelve lo que vuela hacia ti.",
 };

@@ -780,4 +780,6 @@ pub static FR: Strings = Strings {
     h_break_d: "Tas de terre, galles de racine, tas de pierres et pelotes de soie dans les galeries se cassent quand tu frappes. Avec de la chance ils lâchent graines, framboises, lucioles ou vers. Ils bloquent le passage : ils peuvent aussi te protéger d'une charge.",
     h_village: "Village, Grand Arbre, journal",
     h_village_d: "Entre deux descentes tu reviens au village. Éveille des talents au Grand Arbre avec des lucioles, monte la difficulté avec les nœuds et affronte à nouveau les boss dans les rêves de fil. Remplir les objectifs du journal (menu pause) donne des récompenses.",
+    h_doto: "Combattre avec Doto",
+    h_doto_d: "Doto combat à distance. L'attaque lance des glands — le troisième en éventail de trois. Maintiens puis relâche pour un gros gland qui éclate à l'impact. Le bond en arrière garde ta visée. Jauge pleine, enterre des glands devant toi — ils éclatent vite et ne touchent que les ennemis. La main qui lance renvoie ce qui vole vers toi.",
 };

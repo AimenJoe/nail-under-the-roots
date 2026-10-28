@@ -47,6 +47,40 @@ fn critter(art: Option<&Art>, kind: Kind, frame: u32, at: Vec2, left: bool, tint
     }
 }
 
+/// 돌아온 도토(critters `DOTO_BACK_ROW`, 칸 0·1 서기, 4 웅크림, 5 던지기·뛰기). 그림이 없으면 밤색 동그라미.
+fn doto(art: Option<&Art>, frame: u32, at: Vec2, lift: f32, left: bool) {
+    draw_ellipse(at.x, at.y + 6.0, 5.0, 2.0, 0.0, SHADOW_SOFT);
+    match art.and_then(|a| a.critters.as_ref()) {
+        Some(tex) => draw_texture_ex(
+            tex,
+            (at.x - 8.0).round(),
+            (at.y - 9.0 - lift).round(),
+            WHITE,
+            DrawTextureParams {
+                source: Some(art::cell(frame, art::DOTO_BACK_ROW)),
+                dest_size: Some(vec2(16.0, 16.0)),
+                flip_x: left,
+                ..Default::default()
+            },
+        ),
+        None => draw_circle(at.x, at.y - lift, 5.0, Color::new(0.72, 0.38, 0.20, 1.0)),
+    }
+}
+
+/// 도토리 한 알(2×3 + 깍정이).
+fn acorn(at: Vec2) {
+    let (x, y) = (at.x.round(), at.y.round());
+    draw_rectangle(x - 1.0, y - 1.0, 3.0, 3.0, OUTLINE);
+    draw_rectangle(x, y, 1.0, 1.0, Color::new(0.80, 0.55, 0.28, 1.0));
+    draw_rectangle(
+        x - 1.0,
+        y - 2.0,
+        3.0,
+        1.0,
+        Color::new(0.45, 0.30, 0.18, 1.0),
+    );
+}
+
 /// 체력 하트 하나(꽉 참·빔).
 fn heart(x: f32, y: f32, full: bool) {
     let c = if full {
@@ -522,6 +556,82 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 let b = ((ph - 0.7) / 0.4).clamp(0.0, 1.0);
                 let hop = (10.0 * (b * std::f32::consts::PI).sin()).round();
                 props::draw_berry(c.x + 6.0 * b, c.y + 2.0 - hop, 1.0, 1.0);
+            }
+        }
+        Pic::Doto => {
+            // 셋을 던진다(셋째는 부채꼴) → 생쥐가 달려들면 뒤로 뛰어 물러난다 → 묻어 둔 도토리가 생쥐 밑에서 터진다.
+            let ph = time % 3.0;
+            let me = vec2(14.0, y);
+            let foe_home = vec2(w - 16.0, y);
+            if ph < 1.2 {
+                let k = (ph % 0.4) / 0.4;
+                let n = (ph / 0.4) as usize;
+                doto(art, if k < 0.3 { 5 } else { 0 }, me, 0.0, false);
+                let target = foe_home;
+                let fan: &[f32] = if n == 2 { &[-5.0, 0.0, 5.0] } else { &[0.0] };
+                for dy in fan {
+                    let p = me.lerp(target + vec2(0.0, *dy), k) + vec2(6.0 * (1.0 - k), -4.0);
+                    if k < 0.9 {
+                        acorn(p);
+                    }
+                }
+                let hit = k > 0.85;
+                critter(
+                    art,
+                    Kind::FieldMouse,
+                    if hit { 6 } else { 0 },
+                    foe_home,
+                    true,
+                    WHITE,
+                );
+            } else if ph < 2.0 {
+                // 달려든다 — 뒤로 뛴다(겨눈 쪽은 그대로, 몸은 왼쪽으로).
+                let k = (ph - 1.2) / 0.8;
+                let foe = foe_home.lerp(vec2(mid, y), k.min(1.0));
+                critter(
+                    art,
+                    Kind::FieldMouse,
+                    2 + ((time * 10.0) as u32) % 2,
+                    foe,
+                    true,
+                    WHITE,
+                );
+                let back = (k * 1.6).min(1.0);
+                let lift = (back * std::f32::consts::PI).sin() * 7.0;
+                doto(
+                    art,
+                    if back < 1.0 { 5 } else { 0 },
+                    me + vec2(-6.0 * back, 0.0),
+                    lift,
+                    false,
+                );
+                // 뛰기 전에 발밑에 묻어 둔 셋.
+                for i in 0..3 {
+                    let b = vec2(mid - 10.0 + i as f32 * 10.0, y + 4.0);
+                    draw_rectangle(b.x - 2.0, b.y, 4.0, 1.0, Color::new(0.45, 0.30, 0.18, 1.0));
+                }
+            } else {
+                // 터진다: 묻은 자리에서 고리, 생쥐가 튕긴다.
+                let k = ((ph - 2.0) / 0.5).min(1.0);
+                doto(art, 0, me + vec2(-6.0, 0.0), 0.0, false);
+                for i in 0..3 {
+                    let b = vec2(mid - 10.0 + i as f32 * 10.0, y + 3.0);
+                    draw_circle_lines(
+                        b.x,
+                        b.y,
+                        2.0 + 7.0 * k,
+                        1.0,
+                        Color::new(1.0, 0.75, 0.35, 1.0 - k),
+                    );
+                }
+                critter(
+                    art,
+                    Kind::FieldMouse,
+                    6,
+                    vec2(mid + 4.0 * k, y - 5.0 * k),
+                    true,
+                    WHITE,
+                );
             }
         }
         Pic::Village => {
