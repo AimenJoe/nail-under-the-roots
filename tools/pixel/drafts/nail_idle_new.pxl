@@ -1,0 +1,36 @@
+# Naïl 새 옷 시안 2 — 서기 1칸(16×16, 발바닥 y14). 나노바나나 시트(사장 2026-10-28)의 생김새를 손으로.
+size 16 16
+palette
+. transparent
+o #2b1d2a 외곽선
+d #573834 털 그림자
+b #86624a 털
+l #ac7e65 털 밝음
+h #cfa781 털 반사
+e #2a1c3a 눈
+w #ffffff 눈빛
+n #dd767c 코
+N #f6b0b4 코 밝음
+k #e48a8a 볼
+s #d0662e 목도리
+S #8c3624 목도리 그림자
+p #e8a2a8 발
+P #b86a78 발 그림자
+c #f0dcb0 발톱
+grid
+................
+.....oo..oo.....
+....olhoolloo...
+...olhhllllllo..
+..olhllllllbbbo.
+..olllleblbwebo.
+.olllllebbbeenno
+.ollllbbbbkbbnNo
+.olbbbbbbbbbbbo.
+.oSssssssssssSo.
+oppSssssssssSppo
+oPpoddddSSddopPo
+occodddSSdddocco
+.oo.oddddddo.oo.
+....oppooppo....
+................

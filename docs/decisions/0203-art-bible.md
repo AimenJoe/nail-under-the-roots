@@ -95,3 +95,12 @@ for i in range(6): b.alpha_composite(a.crop((i * 16, 0, i * 16 + 16, 16)), (4 + 
 b.resize((b.width * 8, b.height * 8), Image.NEAREST).save('nail_ref_x8.png')"
 ```
 > Pixel art sprite sheet of the same mole character as the attached images (the small sprite strip shows pose and proportions, the portrait shows the look). 16×16-pixel sprites drawn big: one game pixel is a hard square 8×8 block — no anti-aliasing, no gradients, no dithering, no soft edges. Flat solid magenta background (#FF00FF), no grid lines, leave clear empty space around every sprite. Top row: idle breathing, 2 frames. Bottom row: walk cycle, 4 frames. Facing right, 3/4 top-down view (top of head and back slightly visible). Light from the top left. Dark plum 1-pixel outline around the silhouette (#2B1D2A). Chibi 2-head proportions, big 2×2 eyes with one white highlight pixel, round pink nose, one blush pixel, no mouth. Feet on the same line in every frame, same body size in every frame. No ground shadow, no text. At most 12 colors.
+
+## C3 첫 시트 결과(2026-10-28, `tools/art/sources/ai/sprites/nail_idle_walk_v1.png`, ✦는 `strip_logo.py`로 지움 n = 1.08)
+- **생김새는 맞다**: 둥근 털뭉치 몸·주황 뜨개 목도리와 매듭·분홍 큰 앞발과 크림 발톱·분홍 코·보라 눈 — 초상화(`nail_normal.png`)와 같은 캐릭터다. 지금 게임 스프라이트(길쭉한 옆모습 두더지)는 초상화와 처음부터 달랐다.
+- **크기는 안 지켰다**: "16×16, 픽셀 하나 = 8×8 블록"이라 했는데 그림 하나가 약 55~60 게임 픽셀 높이(블록 약 3.7px)로 그렸다. 받은 판(1024×432)은 줄여 저장된 것이라 격자도 남지 않았다(가장자리 원 위 평균이 모든 크기에서 0.06 아래 — 블록 크기를 잴 수 없다). `snap --find`가 36.9px을 블록으로 잡았다.
+- **16칸으로 억지로 줄이면 못 쓴다**: 블록 15px로 `snap`(블록 가운데) / 면적 평균 + 12색 둘 다 외곽선이 없어지고 얼굴이 사라지고 마젠타 번짐이 테두리에 남았다(직접 비교).
+- 그 밖에: 첫 칸(위·아래)은 정면에 입을 그렸다(나머지는 3/4 오른쪽), 위 줄은 2칸이 아니라 3칸, 위아래 줄 그림이 맞닿아(틈 0) 한 덩어리로 잡혔다.
+- **손으로 16칸에 옮기면 읽힌다**: 이 시트를 보고 서기 한 칸을 `.pxl`로 찍은 시안(16색, 발바닥 y14)은 게임 크기(1배)에서 "둥근 털뭉치 + 주황 목도리 + 분홍 발"로 읽혔다. 얼굴은 2×2 눈 + 먼 눈 1×2 + 볼 + 코 2칸.
+- 시안 원본: `tools/pixel/drafts/nail_idle_new.pxl`(게임에는 아직 안 넣었다).
+- 그래서 제안(사장 결정 전): 나노바나나 시트는 **생김새·자세 참고**로 쓰고 16칸 프레임은 손으로(`.pxl`) 찍는다. `snap`은 진짜 격자로 그린 그림(가끔 나오는 작은 판, 다른 도구)에만.
