@@ -46,9 +46,9 @@ impl Player {
             self.spawns.push(Spawn::Shot {
                 from: self.pos + d * 5.0,
                 vel: d * speed,
-                reach,
+                reach: reach * self.stats.throw_reach,
                 radius,
-                splash,
+                splash: splash * self.stats.blast,
                 strike,
             });
         }
@@ -70,7 +70,7 @@ impl Player {
             self.spawns.push(Spawn::Bury {
                 at: self.pos,
                 fuse: t::TAL_DROP_FUSE,
-                radius: t::BURY_RADIUS * 0.8,
+                radius: t::BURY_RADIUS * 0.8 * self.stats.blast,
                 damage: t::TAL_DROP_DAMAGE + self.stats.damage,
             });
         }
@@ -80,7 +80,8 @@ impl Player {
 
     pub(super) fn tick_leap(&mut self, c: &Ctx<'_>, time: f32, dir: Vec2) -> Option<Strike> {
         let time = time + c.dt;
-        self.pos += dir * (self.talents.leap_dist() / t::BACKLEAP_TIME) * c.dt;
+        self.pos +=
+            dir * (self.talents.leap_dist() * self.stats.leap_mul / t::BACKLEAP_TIME) * c.dt;
         if time >= t::BACKLEAP_TIME {
             self.burrow_cd = self.burrow_cd_full();
             self.events.push(Event::Land(false));
@@ -109,7 +110,7 @@ impl Player {
             self.spawns.push(Spawn::Bury {
                 at: self.pos + d * ahead,
                 fuse: self.talents.bury_fuse(),
-                radius: self.talents.bury_radius(),
+                radius: self.talents.bury_radius() * self.stats.blast,
                 damage: t::BURY_DAMAGE + self.stats.damage,
             });
         }

@@ -156,6 +156,10 @@ pub struct Stats {
     pub chain_radius: f32,
     /// 실에 감기는 시간 배율(0165, 흰 실 매듭): 가장 깊은 곳의 당기기·토끼풀의 실.
     pub wrap_mul: f32,
+    /// 도토(0195 → B3): 던진 도토리의 사거리 배율, 뒤로 뛰기 거리 배율, 큰 도토리·묻은 도토리가 터지는 둘레 배율.
+    pub throw_reach: f32,
+    pub leap_mul: f32,
+    pub blast: f32,
 }
 
 impl Stats {
@@ -168,6 +172,9 @@ impl Stats {
         finisher_knockback: 1.0,
         chain_radius: 0.0,
         wrap_mul: 1.0,
+        throw_reach: 1.0,
+        leap_mul: 1.0,
+        blast: 1.0,
     };
 
     /// 기본값에 장신구와 뿌리 심장을 더한다. 배율은 곱, 더하기는 합. 너무 극단으로 가지 않게 묶는다.
@@ -183,6 +190,9 @@ impl Stats {
             s.finisher_knockback *= m.finisher_knockback;
             s.chain_radius += m.chain_radius;
             s.wrap_mul *= m.wrap_mul;
+            s.throw_reach *= m.throw_reach;
+            s.leap_mul *= m.leap_mul;
+            s.blast *= m.blast;
         }
         s.max_hp = (s.max_hp + root_hearts.min(crate::tuning::ROOT_HEART_MAX)).max(1);
         s.attack_speed = s.attack_speed.clamp(0.6, 1.8);
@@ -202,6 +212,9 @@ pub struct Mods {
     pub finisher_knockback: f32,
     pub chain_radius: f32,
     pub wrap_mul: f32,
+    pub throw_reach: f32,
+    pub leap_mul: f32,
+    pub blast: f32,
 }
 
 const NO_MODS: Mods = Mods {
@@ -213,9 +226,12 @@ const NO_MODS: Mods = Mods {
     finisher_knockback: 1.0,
     chain_radius: 0.0,
     wrap_mul: 1.0,
+    throw_reach: 1.0,
+    leap_mul: 1.0,
+    blast: 1.0,
 };
 
-/// 장신구: 2칸. 얻는 곳은 상자·상점(맵 단계)·저널. 대부분 누구나 끼고, 모모 것(0142)은 모모 런에서만 나온다.
+/// 장신구: 2칸. 얻는 곳은 상자·상점(맵 단계)·저널. 대부분 누구나 끼고, 모모 것(0142)·도토 것(0195)은 그 캐릭터 런에서만 나온다.
 pub struct Charm {
     pub name: Tr,
     pub desc: Tr,
@@ -239,8 +255,10 @@ pub const CHARM_SLOTS: usize = 2;
 pub const CROWN: usize = 10;
 /// 흰 실 매듭(저널 "가족"의 보상, 0165).
 pub const SILK_KNOT: usize = 11;
+/// 단풍잎 목도리(저널 doto_deep의 보상).
+pub const MAPLE_SCARF: usize = 14;
 
-pub static CHARMS: [Charm; 12] = [
+pub static CHARMS: [Charm; 15] = [
     Charm {
         name: |s| s.c_shell,
         desc: |s| s.c_shell_desc,
@@ -385,6 +403,45 @@ pub static CHARMS: [Charm; 12] = [
         },
         color: Color::new(0.94, 0.92, 0.99, 1.0),
         only: None,
+        journal: true,
+    },
+    // 도토 런에서만(0195). 솔방울: 도토리가 멀리 날지만 던지기가 조금 느리다.
+    Charm {
+        name: |s| s.c_pinecone,
+        desc: |s| s.c_pinecone_desc,
+        mods: Mods {
+            throw_reach: 1.3,
+            attack_speed: 0.9,
+            ..NO_MODS
+        },
+        color: Color::new(0.58, 0.40, 0.24, 1.0),
+        only: Some(Character::Doto),
+        journal: false,
+    },
+    // 도토리 깍정이 모자: 뒤로 뛰기가 멀지만 몸이 약하다.
+    Charm {
+        name: |s| s.c_acorn_cap,
+        desc: |s| s.c_acorn_cap_desc,
+        mods: Mods {
+            leap_mul: 1.3,
+            max_hp: -1,
+            ..NO_MODS
+        },
+        color: Color::new(0.70, 0.56, 0.34, 1.0),
+        only: Some(Character::Doto),
+        journal: false,
+    },
+    // 단풍잎 목도리(저널 "도토와 가장 깊은 곳"): 터지는 둘레가 넓지만 도토리 게이지가 느리게 찬다.
+    Charm {
+        name: |s| s.c_maple,
+        desc: |s| s.c_maple_desc,
+        mods: Mods {
+            blast: 1.35,
+            sp_gain: 0.85,
+            ..NO_MODS
+        },
+        color: Color::new(0.92, 0.50, 0.24, 1.0),
+        only: Some(Character::Doto),
         journal: true,
     },
 ];

@@ -262,6 +262,17 @@ pub const GOALS: &[Goal] = &[
         Some("deeper"),
         Light(40)
     ),
+    // 도토와 가장 깊은 곳(0195): 도토를 골라 끝까지. 보상은 단풍잎 목도리.
+    goal!(
+        "doto_deep",
+        Story,
+        jg_doto_deep,
+        jg_doto_deep_d,
+        Flag(key::DOTO_DEEP),
+        1,
+        Some("doto"),
+        Charm(crate::equipment::MAPLE_SCARF)
+    ),
     goal!(
         "true_end",
         Story,
@@ -792,7 +803,7 @@ mod tests {
         use crate::equipment::{Character, CHARMS, CROWN};
         let mut p = Profile::default();
         let momo_only: Vec<usize> = (0..CHARMS.len())
-            .filter(|i| CHARMS[*i].only.is_some())
+            .filter(|i| CHARMS[*i].only == Some(Character::Momo))
             .collect();
         assert_eq!(momo_only.len(), 3);
         for i in &momo_only {
@@ -803,6 +814,30 @@ mod tests {
         // 옛 기록: momo_deep을 받은 깃발만 있다(그때 보상은 반딧불).
         p.set(&key_claimed("momo_deep"));
         assert_eq!(owned_charms(&p, Character::Momo), vec![CROWN]);
+        assert!(owned_charms(&p, Character::Mole).is_empty());
+    }
+
+    /// 도토 장신구(0195): 도토 런에서만, 목도리는 doto_deep을 받으면 들고 시작한다.
+    #[test]
+    fn doto_charms_only_in_doto_runs() {
+        use crate::equipment::{Character, CHARMS, MAPLE_SCARF};
+        let mut p = Profile::default();
+        let doto_only: Vec<usize> = (0..CHARMS.len())
+            .filter(|i| CHARMS[*i].only == Some(Character::Doto))
+            .collect();
+        assert_eq!(doto_only.len(), 3);
+        for ch in [Character::Mole, Character::Momo] {
+            assert!(doto_only.iter().all(|i| !charm_pool(&p, ch).contains(i)));
+        }
+        let pool = charm_pool(&p, Character::Doto);
+        assert!(pool.contains(&12) && pool.contains(&13) && !pool.contains(&MAPLE_SCARF));
+        assert!(!pool.contains(&8), "모모 것은 도토 런에 없다");
+        p.set(key::DOTO_MEMORY);
+        p.set(key::DOTO_DEEP);
+        claim(&mut p, by_id("doto").unwrap());
+        claim(&mut p, by_id("doto_deep").unwrap());
+        assert_eq!(owned_charms(&p, Character::Doto), vec![MAPLE_SCARF]);
+        assert!(charm_pool(&p, Character::Doto).contains(&MAPLE_SCARF));
         assert!(owned_charms(&p, Character::Mole).is_empty());
     }
 }

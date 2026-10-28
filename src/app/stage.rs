@@ -378,9 +378,9 @@ impl App {
                 crate::village::KEY_SEEDS,
                 self.world.inv.seeds + t::VILLAGE_SEEDS_CLEAR,
             );
-            // 모모의 끝은 Naïl의 이야기 엔딩을 대신하지 않는다(0056).
-            self.profile.set(if momo {
-                key::MOMO_DEEP
+            // 모모·도토의 끝은 Naïl의 이야기 엔딩을 대신하지 않는다(0056).
+            self.profile.set(if let Some(f) = ch.def().deep_flag {
+                f
             } else if true_end {
                 key::TRUE_ENDING
             } else {
@@ -388,6 +388,7 @@ impl App {
             });
             self.save_profile();
         }
+        // 도토의 엔딩 장면은 0191 B4(이야기)에서 — 그때까지는 Naïl의 장면을 본다(기록은 위의 deep_flag).
         let c = if momo {
             cutscene::ending_momo(&self.world)
         } else if true_end {
@@ -547,8 +548,8 @@ impl App {
                 self.scene = Scene::Tree;
             }
             // 마을의 뿌리 길: 내려가면 런이 시작된다.
-            // 모모가 돌아왔으면 누구와 내려갈지 고른다(0056).
-            Interact::Gate if village && self.profile.flag(crate::profile::key::MOMO_BACK) => {
+            // 고를 수 있는 캐릭터가 둘 이상이면 누구와 내려갈지 고른다(0056·0195).
+            Interact::Gate if village && self.pick_list().len() > 1 => {
                 self.char_cursor = self.picked_index();
                 self.world.freeze();
                 self.scene = Scene::CharPick;
@@ -1285,7 +1286,7 @@ impl App {
         k
     }
 
-    /// 큰 나무에 탭이 있나: 모모가 돌아오면 Naïl/모모(0142).
+    /// 큰 나무에 탭이 있나: 고를 수 있는 캐릭터가 둘 이상이면 Naïl/모모/도토(0142·0195).
     fn tree_tabs(&self) -> bool {
         crate::characters::available(&self.profile).count() > 1
     }
@@ -1333,9 +1334,15 @@ impl App {
             let tab = match tap_hit {
                 Some(Hit::TreeTab(i)) => Some(i),
                 _ if a.tab_prev || a.tab_next => {
+                    // 셋 이상(도토, 0195)이면 방향이 있다: LB = 앞, RB = 뒤.
                     let chars = self.tree_chars();
+                    let n = chars.len().max(1);
                     let at = chars.iter().position(|c| *c == self.tree_char).unwrap_or(0);
-                    Some((at + 1) % chars.len().max(1))
+                    Some(if a.tab_prev {
+                        (at + n - 1) % n
+                    } else {
+                        (at + 1) % n
+                    })
                 }
                 _ => None,
             };
@@ -1431,10 +1438,21 @@ impl App {
         use crate::talents::{key_awake, key_pick, table, KEY_LIGHT, SLOTS};
         let s = i18n::s();
         let panel = Rect::new(20.0, 8.0, 280.0, 156.0);
-        ui.panel(panel, Some(s.tree_title));
-        self.close_button(ui, panel);
         let have = self.profile.count(KEY_LIGHT);
         let light = fill(s.tree_light, &[&have]);
+        // 탭 이름이 제목과 반딧불 수 사이에 다 안 들어가면(캐릭터 셋 + 긴 언어, 0195) 탭이 제목 자리를 쓴다 —
+        // 나무 앞에서 연 창이라 제목이 없어도 어디인지 안다.
+        let chars = self.tree_chars();
+        let tabs_w: f32 = chars
+            .iter()
+            .map(|c| ui.text_w(c.name(), FONT_PX) + 8.0)
+            .sum::<f32>()
+            + 2.0 * chars.len().saturating_sub(1) as f32;
+        let right = panel.right() - 20.0 - ui.text_w(&light, FONT_PX) - 6.0;
+        let titled = !self.tree_tabs()
+            || panel.x + 6.0 + ui.text_w(s.tree_title, FONT_PX) + 6.0 + tabs_w <= right;
+        ui.panel(panel, titled.then_some(s.tree_title));
+        self.close_button(ui, panel);
         ui.text_right(
             &light,
             panel.right() - 20.0,
@@ -1444,10 +1462,12 @@ impl App {
         );
         let ch = self.tree_char;
         if self.tree_tabs() {
-            // 제목과 반딧불 수 사이 제목 줄에 Naïl/모모 탭(0142).
-            let x = panel.x + 6.0 + ui.text_w(s.tree_title, FONT_PX) + 6.0;
-            let right = panel.right() - 20.0 - ui.text_w(&light, FONT_PX) - 6.0;
-            let chars = self.tree_chars();
+            // 제목과 반딧불 수 사이 제목 줄에 Naïl/모모/도토 탭(0142).
+            let x = if titled {
+                panel.x + 6.0 + ui.text_w(s.tree_title, FONT_PX) + 6.0
+            } else {
+                panel.x + 6.0
+            };
             let names: Vec<&str> = chars.iter().map(|c| c.name()).collect();
             let active = chars.iter().position(|c| *c == ch).unwrap_or(0);
             for (i, r) in ui

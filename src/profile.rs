@@ -48,6 +48,8 @@ pub mod key {
     /// 마을 뿌리 길에서 마지막으로 고른 캐릭터(0 = Naïl, 1 = 모모, 0056). 모모로 가장 깊은 곳에 닿았다.
     pub const CHAR_PICK: &str = "char_pick";
     pub const MOMO_DEEP: &str = "momo_deep";
+    /// 도토로 가장 깊은 곳에 닿았다(0195).
+    pub const DOTO_DEEP: &str = "doto_deep";
     /// 오프닝에서 모모가 남긴 시든 꽃잎을 주웠다(0164): 도감에 '???' 칸.
     pub const PETAL: &str = "petal";
 

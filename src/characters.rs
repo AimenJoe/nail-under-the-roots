@@ -60,6 +60,9 @@ pub struct CharacterDef {
     pub name: Tr,
     /// 고를 수 있는 조건(기록 깃발). None = 처음부터.
     pub unlock: Option<&'static str>,
+    /// 이 캐릭터로 가장 깊은 곳에 닿았다는 기록 깃발. None = Naïl(이야기 엔딩 깃발을 쓴다). 다른 캐릭터의 끝은
+    /// Naïl의 이야기 엔딩을 대신하지 않는다(0056).
+    pub deep_flag: Option<&'static str>,
     pub weapon_kind: WeaponKind,
     pub gauge: Gauge,
     /// 처음 들고 시작하는 무기(`equipment::WEAPONS` 번호).
@@ -89,6 +92,7 @@ pub static ALL: [CharacterDef; 3] = [
         code: 0,
         name: |s| s.name_nail,
         unlock: None,
+        deep_flag: None,
         weapon_kind: WeaponKind::Claw,
         gauge: Gauge::Rage,
         starting_weapon: 1,
@@ -111,6 +115,7 @@ pub static ALL: [CharacterDef; 3] = [
         code: 1,
         name: |s| s.name_momo,
         unlock: Some(key::MOMO_BACK),
+        deep_flag: Some(key::MOMO_DEEP),
         weapon_kind: WeaponKind::Kick,
         gauge: Gauge::Ki,
         starting_weapon: 4,
@@ -133,6 +138,7 @@ pub static ALL: [CharacterDef; 3] = [
         code: 2,
         name: |s| s.name_doto,
         unlock: Some(key::DOTO_MEMORY),
+        deep_flag: Some(key::DOTO_DEEP),
         weapon_kind: WeaponKind::Acorn,
         gauge: Gauge::Acorn,
         starting_weapon: crate::equipment::ACORN,
