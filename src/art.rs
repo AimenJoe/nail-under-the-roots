@@ -20,7 +20,7 @@ pub struct Art {
     pub light: Texture2D,
     /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이, 줄 14~18 땃쥐·고슴도치·두꺼비·박쥐·포자버섯(0146). 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
-    /// 새 그림 시트(`BIG_SHEETS` 순서, 0206 C3): 모모(momo_ai.py)·도토(doto_ai.py)·콩이(kongi_ai.py, 0217)·토끼풀(clover_ai.py, 0218). 줄 0 돌아온 모습, 줄 1 물든 모습,
+    /// 새 그림 시트(`BIG_SHEETS` 순서, 0206 C3): 모모(momo_ai.py)·도토(doto_ai.py)·콩이(kongi_ai.py, 0217)·토끼풀(clover_ai.py, 0218)·이웃 포포·수수(neighbors_ai.py, 0220). 줄 0 돌아온 모습, 줄 1 물든 모습,
     /// 줄 2·3 흰 실루엣. critters의 그 두 줄 대신 쓴다(`Art::critter`). 없으면 critters 16칸.
     pub big: Vec<Option<Texture2D>>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
@@ -366,40 +366,48 @@ pub fn nail_origin(pos: macroquad::math::Vec2) -> macroquad::math::Vec2 {
 pub struct BigSheet {
     pub file: &'static str,
     pub back: u32,
-    pub tainted: u32,
+    /// 물든 모습 줄(시트 줄 1). 이웃(포포·수수, 0220)은 없다.
+    pub tainted: Option<u32>,
     pub cell: f32,
     /// 발바닥 줄(칸 위에서).
     pub foot: f32,
 }
 
-pub const BIG_SHEETS: [BigSheet; 4] = [
+pub const BIG_SHEETS: [BigSheet; 5] = [
     BigSheet {
         file: "art/momo.png",
         back: MOMO_BLOOM_ROW,
-        tainted: MOMO_ROW,
+        tainted: Some(MOMO_ROW),
         cell: 32.0,
         foot: 30.0,
     },
     BigSheet {
         file: "art/doto.png",
         back: DOTO_BACK_ROW,
-        tainted: DOTO_ROW,
+        tainted: Some(DOTO_ROW),
         cell: 40.0,
         foot: 38.0,
     },
     BigSheet {
         file: "art/kongi.png",
         back: KONGI_BACK_ROW,
-        tainted: KONGI_ROW,
+        tainted: Some(KONGI_ROW),
         cell: 32.0,
         foot: 30.0,
     },
     BigSheet {
         file: "art/clover.png",
         back: CLOVER_BACK_ROW,
-        tainted: CLOVER_ROW,
+        tainted: Some(CLOVER_ROW),
         cell: 40.0,
         foot: 38.0,
+    },
+    BigSheet {
+        file: "art/popo.png",
+        back: RACCOON_ROW,
+        tainted: None,
+        cell: 32.0,
+        foot: 30.0,
     },
 ];
 /// critters 16칸의 발바닥 줄(critters.py "발바닥 y=14").
@@ -438,7 +446,7 @@ impl Art {
         BIG_SHEETS.iter().zip(&self.big).find_map(|(b, t)| {
             let r = if base == b.back {
                 0
-            } else if base == b.tainted {
+            } else if Some(base) == b.tainted {
                 1
             } else {
                 return None;
