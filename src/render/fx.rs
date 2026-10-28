@@ -367,96 +367,124 @@ pub(super) fn draw_mine(m: &world::Mine, time: f32) {
     );
 }
 
-/// 공격 예고(0183 → 0184 → 0185): 맞을 자리를 **면**으로. 면 전체는 옅게(`TELE_BASE_A`) 깔리고, 테두리와 그 안에서 자라는
-/// 채움은 **같은 색·같은 투명도**(`TELE_A`)라 채움이 테두리에 닿으면 한 덩어리가 된다 — **그 순간이 공격**.
-/// 원은 가운데부터 바깥으로, 띠는 끝까지 깔린 가운데 줄에서 양옆 테두리로 폭이 넓어진다(진행 막대처럼 한쪽 끝부터 차지 않는다, 0185).
-/// 앞이 일정한 빠르기로 오니 닿을 때를 미리 잴 수 있다. 앞에 선은 두지 않는다(가려진다).
-/// 받아칠 수 있는 것(곧게 오는 돌진·던지기·혀)은 황금, 못 받아치는 것(둘레)은 진홍 + 가운데 X(0160).
-/// 테두리 밑의 밑띠는 같은 색의 어두운 톤(`TELE_RIM_SHADE`, 0184) — 검은 테는 다른 색으로 읽혀 채움과 테두리가 한 그림으로 안 보였다(사장).
-/// 밝기 차이는 그대로라 밝은 풀밭·색약·흑백에서도 모양이 남는다(0150).
-pub(super) const TELE_A: f32 = 0.6;
+/// 공격 예고(0183 → 0184 → 0185 → 0186): 맞을 자리를 **면**으로. 면 전체는 옅게(`TELE_BASE_A`) 깔리고, 테두리(`TELE_RING`
+/// 폭의 띠)와 그 안에서 자라는 채움은 **같은 색·같은 투명도**(`TELE_A`)라 채움이 테두리 안쪽에 닿으면 한 덩어리가 된다 —
+/// **그 순간이 공격**. 원은 가운데부터 바깥으로, 띠는 끝까지 깔린 가운데 줄에서 양옆으로 폭이 넓어진다(0185).
+/// 테두리와 채움은 겹쳐 그리지 않는다(반투명이 겹치면 그 자리만 진해져 다른 색으로 보인다, 0186): 테두리는 겹치지 않는
+/// 삼각형으로 짓고, 채움은 테두리 안쪽까지만. 어두운 밑띠도 뺐다 — 그게 "외곽선"으로 읽혀 채움과 색이 달라 보였다(사장, 0186).
+/// 받아칠 수 있는 것(곧게 오는 돌진·던지기·혀)은 황금, 못 받아치는 것(둘레)은 진홍 + 가운데 X(0160, X만 어두운 같은 색).
+pub(super) const TELE_A: f32 = 0.75;
 pub(super) const TELE_BASE_A: f32 = 0.1;
+/// 테두리 띠의 폭(px).
+const TELE_RING: f32 = 2.0;
 /// 못 튕겨내는 공격(둘레: 내려앉기·포자·돌·발 구르기): 진홍.
 pub(super) const TELEGRAPH_EDGE_RGB: (f32, f32, f32) = (1.0, 0.32, 0.36);
 /// 튕겨낼 수 있는 공격(곧게 오는 것: 돌진·던지기·혀·당기기): 황금. 진홍보다 밝아 색약·흑백에서도 갈린다(0160).
 pub(super) const PARRY_EDGE_RGB: (f32, f32, f32) = (1.0, 0.88, 0.45);
-pub(super) const TELE_RIM_SHADE: f32 = 0.42;
-const TELE_RIM_A: f32 = 0.8;
+const TELE_MARK_SHADE: f32 = 0.42;
+const TELE_MARK_A: f32 = 0.85;
 
-/// 같은 색의 어두운 톤(테두리 밑띠·X 밑띠).
-fn tele_rim(rgb: (f32, f32, f32)) -> Color {
-    let k = TELE_RIM_SHADE;
-    Color::new(rgb.0 * k, rgb.1 * k, rgb.2 * k, TELE_RIM_A)
-}
-
-/// 테두리(= 자라는 채움)·바탕·밑띠의 색.
-fn tele_colors(rgb: (f32, f32, f32)) -> (Color, Color, Color) {
+/// 테두리(= 다 찬 채움)·바탕의 색.
+fn tele_colors(rgb: (f32, f32, f32)) -> (Color, Color) {
     let c = |a| Color::new(rgb.0, rgb.1, rgb.2, a);
-    (c(TELE_A), c(TELE_BASE_A), tele_rim(rgb))
+    (c(TELE_A), c(TELE_BASE_A))
 }
 
-fn rim_line(p: Vec2, q: Vec2, edge: Color, rim: Color) {
-    draw_line(p.x, p.y, q.x, q.y, 3.0, rim);
-    draw_line(p.x, p.y, q.x, q.y, 1.0, edge);
-}
-
-/// 띠 `a`→`b` + 끝 화살촉을 반폭 `half`로 칠한다(화살촉 끝점은 그대로라 폭을 줄이면 가운데 줄로 모인다).
-fn fill_lane(a: Vec2, b: Vec2, half: f32, tip_len: f32, col: Color) {
+/// 띠의 바깥 둘레(뒤 왼쪽 → 앞 왼쪽 → 화살촉 → 앞 오른쪽 → 뒤 오른쪽). 반폭 `half`, 뒤끝을 `back`만큼 앞으로,
+/// 화살촉 끝을 `nose`만큼 뒤로 당길 수 있다(안쪽 둘레용).
+fn lane_outline(a: Vec2, b: Vec2, half: f32, tip_len: f32, back: f32, nose: f32) -> [Vec2; 5] {
     let dir = (b - a).normalize_or(vec2(1.0, 0.0));
     let side = vec2(-dir.y, dir.x) * half;
-    let tip = b + dir * tip_len;
-    draw_triangle(a + side, a - side, b + side, col);
-    draw_triangle(a - side, b - side, b + side, col);
-    draw_triangle(b + side, b - side, tip, col);
+    let a = a + dir * back;
+    let tip = b + dir * (tip_len - nose);
+    [a + side, b + side, tip, b - side, a - side]
 }
 
-/// 곧게 오는 공격의 면(0183 → 0185): `a`에서 `b`까지 반폭 `half`의 띠 + 끝의 화살촉. 채움은 끝까지 깔린 가운데 줄에서
-/// 양옆으로 폭이 넓어져(반폭 `half`·k) 양옆 테두리에 닿으면 공격. 돌진 띠·던지기·혀·실 가닥·할매 당기기.
+/// 볼록 다각형을 부채꼴 삼각형으로(겹침 없음).
+fn fill_poly(p: &[Vec2], col: Color) {
+    for i in 1..p.len() - 1 {
+        draw_triangle(p[0], p[i], p[i + 1], col);
+    }
+}
+
+/// 바깥 둘레 `o`와 안쪽 둘레 `n` 사이(닫힌 띠)를 겹치지 않는 사각형으로.
+fn fill_ring(o: &[Vec2], n: &[Vec2], col: Color) {
+    let m = o.len();
+    for i in 0..m {
+        let j = (i + 1) % m;
+        draw_triangle(o[i], o[j], n[j], col);
+        draw_triangle(o[i], n[j], n[i], col);
+    }
+}
+
+/// 곧게 오는 공격의 면(0183 → 0186): `a`에서 `b`까지 반폭 `half`의 띠 + 끝의 화살촉. 채움은 끝까지 깔린 가운데 줄에서
+/// 양옆으로 폭이 넓어져 테두리 안쪽에 닿으면(테두리와 한 덩어리) 공격. 돌진 띠·던지기·혀·실 가닥·할매 당기기.
 pub(super) fn draw_tele_lane(a: Vec2, b: Vec2, half: f32, rgb: (f32, f32, f32), k: f32) {
-    let (edge, base, rim) = tele_colors(rgb);
-    let dir = (b - a).normalize_or(vec2(1.0, 0.0));
-    let side = vec2(-dir.y, dir.x) * half;
+    let (edge, base) = tele_colors(rgb);
     let tip_len = half + 2.0;
-    let tip = b + dir * tip_len;
-    fill_lane(a, b, half, tip_len, base);
-    let w = half * k.clamp(0.0, 1.0);
+    let ring = TELE_RING.min(half * 0.5);
+    // 화살촉 비스듬한 변을 `ring`만큼 들이려면 끝점을 축 방향으로 ring / sin(반각)만큼 당긴다.
+    let nose = ring * (half * half + tip_len * tip_len).sqrt() / half;
+    let outer = lane_outline(a, b, half, tip_len, 0.0, 0.0);
+    let inner_half = half - ring;
+    let inner = lane_outline(a, b, inner_half, tip_len - ring, ring, nose - ring);
+    fill_poly(&outer, base);
+    fill_ring(&outer, &inner, edge);
+    let w = inner_half * k.clamp(0.0, 1.0);
     if w > 0.25 {
-        fill_lane(a, b, w, tip_len, edge);
+        fill_poly(
+            &lane_outline(a, b, w, tip_len - ring, ring, nose - ring),
+            edge,
+        );
     }
-    rim_line(a + side, b + side, edge, rim);
-    rim_line(a - side, b - side, edge, rim);
-    rim_line(a + side, a - side, edge, rim);
-    rim_line(b + side, tip, edge, rim);
-    rim_line(b - side, tip, edge, rim);
 }
 
-/// 둘레 공격의 면(0183 → 0185): 반지름 `r` 원 + 테두리 + 가운데 X(못 받아친다). 테두리와 같은 색의 원이 가운데부터 자라
-/// 테두리에 닿으면 공격. 내려앉기·포자·발 구르기·떨어지는 돌.
+/// 원 둘레 점(바깥·안쪽 띠를 같은 각도로 나눠 겹치지 않게).
+fn circle_pts(at: Vec2, r: f32, n: usize) -> Vec<Vec2> {
+    (0..n)
+        .map(|i| {
+            let t = i as f32 / n as f32 * std::f32::consts::TAU;
+            at + vec2(t.cos(), t.sin()) * r
+        })
+        .collect()
+}
+
+/// 둘레 공격의 면(0183 → 0186): 반지름 `r` 원 + 테두리 + 가운데 X(못 받아친다). 테두리와 같은 색의 원이 가운데부터 자라
+/// 테두리 안쪽에 닿으면 공격. 내려앉기·포자·발 구르기·떨어지는 돌.
 pub(super) fn draw_tele_disk(at: Vec2, r: f32, rgb: (f32, f32, f32), k: f32) {
-    let (edge, base, rim) = tele_colors(rgb);
-    draw_circle(at.x, at.y, r, base);
-    let g = r * k.clamp(0.0, 1.0);
+    let (edge, base) = tele_colors(rgb);
+    let n = ((r * 3.0) as usize).clamp(24, 96);
+    let outer = circle_pts(at, r, n);
+    let inner_r = (r - TELE_RING).max(0.5);
+    let inner = circle_pts(at, inner_r, n);
+    fill_poly(&outer, base);
+    fill_ring(&outer, &inner, edge);
+    let g = inner_r * k.clamp(0.0, 1.0);
     if g > 0.5 {
-        draw_circle(at.x, at.y, g, edge);
+        if k >= 1.0 {
+            fill_poly(&inner, edge);
+        } else {
+            fill_poly(&circle_pts(at, g, n), edge);
+        }
     }
-    draw_circle_lines(at.x, at.y, r, 3.0, rim);
-    draw_circle_lines(at.x, at.y, r, 1.0, edge);
     draw_no_parry_mark(at, edge);
 }
 
-/// 못 튕겨내는 둘레 공격의 X(0160): 가운데, 어두운 밑띠 위에 테두리 색 2px.
+/// 못 튕겨내는 둘레 공격의 X(0160): 가운데, 테두리와 같은 색의 어두운 톤 2px(점을 겹치지 않게 한 번씩).
 pub(super) fn draw_no_parry_mark(at: Vec2, edge: Color) {
-    let (x, y) = (at.x.round(), at.y.round());
-    let rim = tele_rim((edge.r, edge.g, edge.b));
+    let (x, y) = (at.x.round() as i32, at.y.round() as i32);
+    let k = TELE_MARK_SHADE;
+    let col = Color::new(edge.r * k, edge.g * k, edge.b * k, TELE_MARK_A);
+    let mut pts: Vec<(i32, i32)> = Vec::with_capacity(40);
     for d in -4..=4 {
-        let d = d as f32;
-        draw_rectangle(x + d - 1.0, y + d - 1.0, 4.0, 4.0, rim);
-        draw_rectangle(x + d - 1.0, y - d - 1.0, 4.0, 4.0, rim);
+        for (px, py) in [(d, d), (d + 1, d), (d, -d), (d + 1, -d)] {
+            if !pts.contains(&(px, py)) {
+                pts.push((px, py));
+            }
+        }
     }
-    for d in -4..=4 {
-        let d = d as f32;
-        draw_rectangle(x + d, y + d, 2.0, 2.0, edge);
-        draw_rectangle(x + d, y - d, 2.0, 2.0, edge);
+    for (px, py) in pts {
+        draw_rectangle((x + px) as f32, (y + py) as f32, 1.0, 1.0, col);
     }
 }
 
