@@ -1,7 +1,7 @@
 # 0203. 그림 규칙(art bible): 칸·비율·팔레트·외곽선·빛·값 위계·동작 목록·생성 파이프라인
 
 - 날짜: 2026-10-28
-- 상태: 제안(사장 확인 전). 0191 C1. 확인되면 C2(파이프라인 도구)·C3(플레이어 셋)로.
+- 상태: 채택(2026-10-28, 사장 "응 다 진행해도 되겠음" — 아래 "사람이 정할 것" 네 가지 모두 제안대로). 0191 C1. C2(도구)는 아래 "C2 구현", 다음은 C3(Naïl 기준 시트).
 - 사장: "0.5의 b 진행하고" → B 끝, C1 차례.
 
 ## 왜 숫자로 정하나
@@ -12,7 +12,7 @@
 | 무엇 | 칸 | 몸 | 지금 |
 |---|---|---|---|
 | 플레이어(Naïl·모모·도토)·이웃·잡몹 | **16×16** | 키 12~14px, 발바닥 줄 y = 14(그림자 타원은 발 + 6) | 같다(코드 그림) |
-| 이름 있는 보스(모모·도토·콩이·토끼풀) | **24×24** (제안) | 키 18~20px | 지금 16×16 — 잡몹과 크기가 같아 "주인"으로 덜 읽힌다 |
+| 이름 있는 보스(모모·도토·콩이·토끼풀) | **24×24** (채택) | 키 18~20px | 지금 16×16 — 잡몹과 크기가 같아 "주인"으로 덜 읽힌다. 새 그림부터 24칸(발바닥 줄 y = 21) |
 | 큰 보스(대장) | 32×32 | 키 26~28px | 같다(`chief.py`) |
 | 타일·소품 | 16×16 | — | Sunnyside 팩(바꾸지 않음, C5는 선택) |
 
@@ -54,8 +54,8 @@
 
 ## 7. 생성 파이프라인(C2에서 도구로 만든다)
 1. **기준 시트를 먼저 하나**: Naïl의 서기·걷기 시트를 사장이 나노바나나로 그린다 → 확정. 그다음 시트마다 이 확정본을 참고 그림으로 붙인다(같은 캐릭터 반복은 앞선 그림을 다시 넣는 것이 공식 권장, KB).
-2. **프롬프트 틀**: "16×16 픽셀 아트 스프라이트 시트, 한 칸 = 128×128 정사각(픽셀 하나 = 8×8 블록), N열 × M줄 격자, 단색 배경(#FF00FF), 오른쪽을 봄, 왼쪽 위 빛, 어두운 자두색 1px 외곽선, 2등신, 입 없음, 그림자 없음" + 캐릭터 생김새 한두 문장(틀리기 쉬운 것: 털빛·귀·꼬리·옷).
-3. **격자 맞추기**(`pxl.py snap`, C2에서 만든다): 배경색으로 칸을 찾고, 블록 크기를 재서 16칸으로 줄이고(블록 가운데 색), 팔레트(위 2)로 묶고, 외톨이 정리.
+2. **프롬프트 틀**: "16×16 픽셀 아트 스프라이트 시트, 한 칸 = 128×128 정사각(픽셀 하나 = 8×8 블록), N열 × M줄 격자, 단색 배경(#FF00FF), 격자선 없음, 그림끼리 떨어뜨림, 오른쪽을 봄, 왼쪽 위 빛, 어두운 자두색 1px 외곽선, 2등신, 입 없음, 그림자 없음" + 캐릭터 생김새 한두 문장(틀리기 쉬운 것: 털빛·귀·꼬리·옷).
+3. **격자 맞추기**(`pxl.py snap`, 아래 "C2 구현"): 그림 덩어리를 찾고, 블록 크기·어긋남을 재서 16칸으로 줄이고(블록 가운데 색), 팔레트(위 2)로 묶는다. 외톨이 정리는 하지 않는다(16칸의 눈은 한 점이다) — 손질에서.
 4. **손질**(`.pxl` 원본, 브라우저 편집기): 얼굴은 손으로(자동으로는 뭉개진다), `pxl.py check`(계단·외톨이·빛 방향).
 5. **한 줄 검사**(C2 시험): 칸마다 몸 키·발바닥 줄이 같은지, 팔레트 밖 색이 없는지.
 6. 게임에서 확인: 원본 1배·8배·게임 화면 셋, 흑백·색약 화면.
@@ -64,8 +64,34 @@
 ## 순서(0191 C)
 C1 확인 → C2 도구(`pxl.py snap` + 한 줄 검사) → C3 Naïl 기준 시트 → 모모·도토 → C4 잡몹 열·보스 다섯·이웃.
 
-## 사람이 정할 것
-1. 이름 있는 보스를 **24×24**로 키울지(제안) / 지금처럼 16×16.
-2. 어두운 외곽선 1px(제안) / 선택 외곽선(sel-out, 더 부드럽지만 바닥에 녹을 수 있다).
-3. 2등신(제안) / 2.5등신(몸이 길어 동작이 잘 보이지만 얼굴이 작아진다).
-4. 시험으로 Naïl 서기·걷기 한 장을 먼저 그려 볼지 — 위 프롬프트 틀을 그대로 드린다.
+## 사람이 정할 것 → 정함(2026-10-28, 모두 제안대로)
+1. 이름 있는 보스 **24×24**(16×16 아님).
+2. **어두운 외곽선 1px**(선택 외곽선 아님).
+3. **2등신**(2.5등신 아님).
+4. **Naïl 서기·걷기 한 장을 먼저** 시험으로 — 프롬프트는 사장에게 드린 것(아래 "C3 첫 시트").
+
+## C2 구현(2026-10-28): `pxl.py snap`
+나노바나나 "도트"는 격자가 어긋나고(블록이 7.8px처럼 정수가 아니거나 그림마다 밀림), 가장자리가 번지고, 중간색이 섞인다. 그대로 줄이면 한 점씩 밀리거나 흐린 색이 남는다(2차: [How to tame your AI pixel art](https://dev.to/jenissimo/how-to-tame-your-ai-pixel-art-3pk5) — 격자 찾기 → 블록 가운데 → 팔레트 묶기, [Sprite Fusion Pixel Snapper](https://www.gigazine.net/gsc_news/en/20260516-spritefusion-pixel-snapper) 같은 방식). 그래서:
+
+```sh
+python3 tools/art/strip_logo.py tools/art/sources/ai/sprites/nail_idle_walk.png     # ✦ 로고를 먼저(0133) — 안 지우면 그림 하나로 잡힌다
+python3 tools/pixel/pxl.py snap tools/art/sources/ai/sprites/nail_idle_walk.png 새.pxl --find --palette assets/art/nail.png --preview 미리.png
+python3 tools/pixel/test_snap.py                                                    # 도구를 고치면 왕복 시험
+```
+- **`--find`(기본으로 쓸 것)**: 배경(네 귀퉁이 색 또는 `--bg`)이 아닌 점이 이어진 덩어리를 그림 하나로 찾고, 덩어리마다 가장자리 자리의 "원 위 평균"이 가장 잘 모이는 블록 크기를 잰다(s/2도 모이고 2s부터 흩어지므로 잘 모이는 것 중 가장 큰 s, 덩어리마다 어긋남이 달라도 된다, `--block`으로 줄 수도). 덩어리마다 위상(어긋남)을 재고 블록 가운데 반쪽의 밝기 가운데 값을 찍는다. 그림은 칸(`--cell`, 기본 16)에 **발바닥 줄 `--foot`(기본 14)·가운데로** 앉힌다. 줄은 위아래가 겹치는 덩어리끼리, 왼쪽부터.
+- **`--grid 4x2`**: 시트를 똑같이 나눌 때(블록 = 칸 폭 / 16). 그림이 칸 끝에 닿으면 밀린 블록이 번짐에 진다 — 칸 가장자리에서 1px 띄울 것.
+- 색: `--palette 그림.png`면 그 색 가운데 가까운 것으로(지금 그림과 색을 맞출 때), 아니면 시트 전체를 `--colors`(기본 12)색으로 합친다(redmean).
+- **한 줄 검사**(위 5): 줄(동작)마다 칸끼리 발바닥 줄(`--foot-tol`, 걷기 들썩임 1)·몸 키(`--tall-tol` 1)가 다르면 "← 칸마다 다르다", `--strict`면 1로 끝난다. 칸을 넘는 그림은 "잘린다"고 알린다(블록을 잘못 쟀거나 그림이 너무 크다).
+- 시험(`test_snap.py`, 직접 실행): `nail.png` 여덟 칸을 블록 확대(8px·7.8·8.3·8.8, `--find`는 7.7·8.0·9.3px)·어긋남 0~6px·흐림 1.3·잡음 ±12·마젠타 배경·잡티로 망가뜨려 다시 맞춘다. 2048점 중 틀린 점 2~12, 남는 것은 거의 다 **1px 눈**(번짐에 섞여 아주 가까운 외곽선 색으로 간다) — 얼굴은 위 4대로 손으로.
+- 한계: 그림 둘이 블록 한두 개 거리로 붙어 있으면 한 덩어리로 잡힌다(프롬프트에 "그림끼리 떨어뜨림"). 디더·반투명 그림자는 가운데 값으로 뭉개진다(16칸은 디더 없음, 위 4). 실제 나노바나나 시트로는 아직 안 돌려 봤다 — C3 첫 시트에서 확인.
+
+## C3 첫 시트(사장에게 드린 프롬프트)
+첨부: 지금 Naïl 코드 그림 첫 줄(서기 2 + 걷기 4)을 틈을 두고 마젠타 바탕에 8배로 키운 것(Naïl은 칸 16열을 다 써서 틈이 없으면 `--find`가 한 덩어리로 잡는다, 우리 그림이라 0064에 걸리지 않는다, 만들기는 아래) + 초상화 `tools/art/sources/ai/nail_normal.png`(생김새). 비율 16:9. 받은 원본은 `tools/art/sources/ai/sprites/nail_idle_walk.png`로.
+```sh
+python3 -c "
+from PIL import Image
+a = Image.open('assets/art/nail.png').convert('RGBA'); b = Image.new('RGBA', (6 * 24, 24), (255, 0, 255, 255))
+for i in range(6): b.alpha_composite(a.crop((i * 16, 0, i * 16 + 16, 16)), (4 + i * 24, 4))   # 칸 사이 8px 틈
+b.resize((b.width * 8, b.height * 8), Image.NEAREST).save('nail_ref_x8.png')"
+```
+> Pixel art sprite sheet of the same mole character as the attached images (the small sprite strip shows pose and proportions, the portrait shows the look). 16×16-pixel sprites drawn big: one game pixel is a hard square 8×8 block — no anti-aliasing, no gradients, no dithering, no soft edges. Flat solid magenta background (#FF00FF), no grid lines, leave clear empty space around every sprite. Top row: idle breathing, 2 frames. Bottom row: walk cycle, 4 frames. Facing right, 3/4 top-down view (top of head and back slightly visible). Light from the top left. Dark plum 1-pixel outline around the silhouette (#2B1D2A). Chibi 2-head proportions, big 2×2 eyes with one white highlight pixel, round pink nose, one blush pixel, no mouth. Feet on the same line in every frame, same body size in every frame. No ground shadow, no text. At most 12 colors.
