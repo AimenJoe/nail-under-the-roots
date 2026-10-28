@@ -44,6 +44,11 @@ SPRITES = {
     "doto": ("doto.png", 0, 8, 4),  # 달리기 바운드 네 칸(0226). 제자리에서 돌리니 앞끝을 맞춘다(`FRONT`)
     # 포포는 걷기 그림이 두 칸뿐 — 사이에 선 칸을 1px 띄워 넣어 네 박자 걸음(디딤·지나감·디딤·지나감)으로.
     "popo": ("popo.png", 0, [2, (0, -1), 3, (0, -1)], None),
+    # 첫 화면 아래 걷는 띠(0228 덧붙임)에서 무작위로 나오는 이웃들 — 걷기 두 칸 사이에 선 칸을 1px 띄워 네 박자로.
+    "susu": ("susu.png", 0, [2, (0, -1), 3, (0, -1)], None),
+    "bori": ("chief.png", 0, [2, (0, -1), 3, (0, -1)], None),
+    "kongi": ("kongi.png", 0, [2, (0, -1), 3, (0, -1)], None),
+    "clover": ("clover.png", 0, [2, (0, -1), 3, (0, -1)], None),
     "rat": ("field_mouse.png", 0, 2, 2),
     "squirrel": ("chipmunk.png", 0, 2, 2),
     "shrew": ("shrew.png", 0, 2, 2),
@@ -61,7 +66,8 @@ def shifted(cell: Image.Image, dx: int) -> Image.Image:
     return out
 
 
-CELLS = {"nail.png": 24, "momo.png": 32, "doto.png": 40, "popo.png": 32, "bat.png": 32}
+CELLS = {"nail.png": 24, "momo.png": 32, "doto.png": 40, "popo.png": 32, "bat.png": 32, "susu.png": 32,
+         "chief.png": 40, "kongi.png": 32, "clover.png": 40}
 
 
 def main() -> None:

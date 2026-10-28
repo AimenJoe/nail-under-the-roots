@@ -103,9 +103,12 @@ p { margin: 0; }
 /* 첫 화면 아래: 나일과 포포가 굴 쪽으로 걸어간다 */
 .parade { position: relative; height: 76px; background: var(--soil); border-bottom: 4px solid var(--soil-3);
   background-image: linear-gradient(var(--soil-3) 0 0); background-size: 100% 4px; background-position: 0 100%; background-repeat: no-repeat; overflow: hidden; }
-.parade .walker { position: absolute; bottom: 4px; left: -60px; animation: frames .64s steps(var(--n)) infinite, walk 26s linear infinite; }
-.parade .w2 { animation-delay: 0s, 1.4s; }
-@keyframes walk { to { left: calc(100% + 60px); } }
+/* 걷는 이들은 site.js가 무작위로 골라 하나씩 내보낸다(0228 덧붙임) — --f 한 칸 시간, --d 건너는 시간, --delay 출발.
+   스크립트가 없으면 HTML의 나일·포포가 계속 걷는다. */
+.parade .walker { position: absolute; bottom: 4px; left: calc(var(--s) * -1);
+  animation: frames calc(var(--n) * var(--f, .16s)) steps(var(--n)) infinite, walk var(--d, 26s) linear var(--delay, 0s) var(--loop, infinite); }
+.parade .w2 { --delay: 1.4s; }
+@keyframes walk { to { left: 100%; } }
 
 /* 층: 내려갈수록 어둡다 */
 .section { position: relative; padding-block: 4.2rem; }

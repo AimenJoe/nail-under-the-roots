@@ -103,3 +103,51 @@
     }, { rootMargin: "200px 0px" }).observe(v);
   });
 })();
+
+(() => {
+  // 첫 화면 아래 걷는 띠(0228 덧붙임): 들를 때마다 이웃 몇이 무작위로 나와 건너가고, 하나가 나가면 다른 이가 들어온다.
+  // 칸 크기(c)의 2배로 그린다. f = 한 칸 시간, d = 건너는 시간(도토는 달리고 모모는 깡충, 보리·수수는 느릿느릿).
+  const box = document.querySelector("[data-parade]");
+  if (!box || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const CAST = [
+    { k: "nail", n: 4, c: 24, f: 0.16, d: 26 },
+    { k: "popo", n: 4, c: 32, f: 0.16, d: 28 },
+    { k: "momo", n: 2, c: 32, f: 0.14, d: 17 },
+    { k: "doto", n: 4, c: 40, f: 0.075, d: 10 },
+    { k: "susu", n: 4, c: 32, f: 0.2, d: 34 },
+    { k: "bori", n: 4, c: 40, f: 0.2, d: 36 },
+    { k: "kongi", n: 4, c: 32, f: 0.16, d: 27 },
+    { k: "clover", n: 4, c: 40, f: 0.16, d: 22 },
+  ];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const out = new Set();
+  const send = (slot) => {
+    const free = CAST.filter((x) => !out.has(x.k));
+    const who = free[Math.floor(Math.random() * free.length)];
+    out.add(who.k);
+    const el = document.createElement("span");
+    el.className = "sprite walker";
+    const st = el.style;
+    st.backgroundImage = `url(${box.dataset.parade}sp_${who.k}.png)`;
+    st.setProperty("--n", who.n);
+    st.setProperty("--s", `${who.c * 2}px`);
+    st.setProperty("--f", `${who.f}s`);
+    const d = who.d * rnd(0.9, 1.15);
+    st.setProperty("--d", `${d.toFixed(1)}s`);
+    st.setProperty("--loop", "1");
+    // 처음 몇은 이미 길 위에 띄엄띄엄 있다(음수 지연 = 중간부터, 길을 칸으로 나눠 한 칸에 하나), 그다음은 잠깐 쉬었다 들어온다.
+    const start = slot === null ? rnd(0.5, 5) : -d * 0.9 * ((slot + rnd(0.2, 0.8)) / count);
+    st.setProperty("--delay", `${start.toFixed(1)}s`);
+    el.addEventListener("animationend", (e) => {
+      if (e.animationName !== "walk") return;
+      el.remove();
+      out.delete(who.k);
+      send(null);
+    });
+    box.append(el);
+  };
+  box.textContent = "";
+  const count = innerWidth < 600 ? 2 : 3;
+  for (let i = 0; i < count; i++) send(i);
+})();
+
