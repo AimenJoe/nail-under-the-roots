@@ -87,20 +87,20 @@ pub(super) fn draw_player_fx(p: &Player, alpha: f32) {
                 );
             }
         }
-        // 강공격 모으기(0161): 발톱 끝에 빛이 모이고, 다 모이면 밝게 맥박친다.
+        // 강공격 모으기(0161): 발톱 끝에 빛이 모이고, 다 모이면 밝게 맥박친다. 발밑 게이지 고리(0202).
         player::State::Charging { time: ct, dir, .. } => {
             let k = (ct / t::HEAVY_CHARGE).clamp(0.0, 1.0);
             let claw = pos + dir * 7.0;
             let pulse = if k >= 1.0 {
                 0.7 + 0.3 * (ct * 20.0).sin()
             } else {
-                k * 0.6
+                0.2 + k * 0.6
             };
             draw_circle(
                 claw.x.round(),
                 claw.y.round(),
-                2.0 + 3.0 * k,
-                Color::new(1.0, 0.95, 0.8, 0.35 * pulse),
+                2.0 + 4.0 * k,
+                Color::new(1.0, 0.95, 0.8, 0.5 * pulse),
             );
             draw_rectangle(
                 claw.x.round(),
@@ -269,6 +269,83 @@ pub(super) fn draw_player_fx(p: &Player, alpha: f32) {
 
 /// 박자 고리와 음표(0174): 스윙이 시작되면 큰 고리가 과녁 고리로 닫히고, 닿는 순간이 박자. 창 안이면 둘 다 밝게,
 /// 창 전에 눌러 기다리는 중이면 호박색. 박자가 지나면 흐려진다. 맞춘 박자 수는 머리 위 음표.
+/// 강공격 모으기 게이지(0202): 발밑 타원이 위에서부터 시계 방향으로 찬다. 다 모이면 한 바퀴가 닫히고,
+/// "딱 맞춘 강타" 창(`HEAVY_PERFECT`) 동안은 굵은 금빛 + 바깥으로 튀는 점 넷 — 지금 떼라. 창이 지나면 가는 흰 고리로 남는다.
+/// 어두운 밑줄을 먼저 깔아 풀밭에서도 어두운 굴에서도 보인다(플레이어 표시라 예고와 달리 밑줄을 둔다).
+/// 모양(차오르는 호 → 닫힌 고리 → 굵기)으로도 읽혀 색만으로 가르지 않는다.
+fn draw_charge_ring(pos: Vec2, ct: f32) {
+    let c = vec2(pos.x.round(), (pos.y + 5.0).round());
+    let (rx, ry) = (10.0, 4.5);
+    let at = |a: f32| c + vec2(a.sin() * rx, -a.cos() * ry);
+    const N: usize = 28;
+    let k = (ct / t::HEAVY_CHARGE).clamp(0.0, 1.0);
+    let over = ct - t::HEAVY_CHARGE;
+    let perfect = (0.0..=t::HEAVY_PERFECT).contains(&over);
+    let seg = |i: usize, w: f32, col: Color| {
+        let a0 = i as f32 / N as f32 * std::f32::consts::TAU;
+        let a1 = (i + 1) as f32 / N as f32 * std::f32::consts::TAU;
+        let (p0, p1) = (at(a0), at(a1));
+        draw_line(p0.x, p0.y, p1.x, p1.y, w, col);
+    };
+    let back = Color::new(0.10, 0.06, 0.10, 0.55);
+    for i in 0..N {
+        seg(i, 2.0, back);
+    }
+    if k < 1.0 {
+        let n = (k * N as f32).floor() as usize;
+        for i in 0..n {
+            seg(i, 2.0, Color::new(1.0, 0.93, 0.75, 1.0));
+        }
+    } else if perfect {
+        let gold = Color::new(1.0, 0.82, 0.30, 1.0);
+        for i in 0..N {
+            seg(i, 2.0, gold);
+        }
+        // 다 찬 순간부터 바깥으로 튀는 점 넷.
+        let s = over / t::HEAVY_PERFECT;
+        for q in 0..4 {
+            let a = q as f32 * std::f32::consts::FRAC_PI_2 + std::f32::consts::FRAC_PI_4;
+            let p = c + vec2(
+                a.sin() * (rx + 2.0 + 4.0 * s),
+                -a.cos() * (ry + 1.0 + 2.0 * s),
+            );
+            draw_rectangle(
+                p.x.round(),
+                p.y.round(),
+                1.0,
+                1.0,
+                Color::new(1.0, 0.95, 0.7, 1.0 - s * 0.6),
+            );
+        }
+    } else {
+        let a = 0.55 + 0.25 * (ct * 8.0).sin();
+        for i in 0..N {
+            seg(i, 1.0, Color::new(1.0, 1.0, 1.0, a));
+        }
+    }
+}
+
+/// 모으기 게이지는 바닥에(스프라이트 밑에) 그린다 — 몸 뒤쪽 호는 몸에 가리고 발 앞쪽 호가 보인다.
+pub(super) fn draw_charge_under(p: &Player, alpha: f32) {
+    if let player::State::Charging { time: ct, .. } = p.state {
+        draw_charge_ring(lerp(p.prev_pos, p.pos, alpha), ct);
+    }
+}
+
+/// 다 모인 강공격을 쥐고 있는 동안 몸에 얹는 흰 실루엣의 투명도(0202). 딱 맞춘 창 동안 가장 밝다. 아니면 0.
+fn charge_glow(p: &Player) -> f32 {
+    match p.state {
+        player::State::Charging { time: ct, .. } if ct >= t::HEAVY_CHARGE && !shadow_pass() => {
+            if ct - t::HEAVY_CHARGE <= t::HEAVY_PERFECT {
+                0.6
+            } else {
+                0.16 + 0.1 * (ct * 8.0).sin()
+            }
+        }
+        _ => 0.0,
+    }
+}
+
 fn draw_beat_cue(p: &Player, pos: Vec2) {
     let (x, y) = (pos.x.round(), pos.y.round());
     if let Some(c) = p.beat_cue() {
@@ -672,6 +749,22 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
             ..Default::default()
         },
     );
+    // 다 모였다(0202): 흰 실루엣 줄을 반투명으로 겹친다.
+    let glow = charge_glow(p);
+    if glow > 0.0 && !flash {
+        draw_texture_ex(
+            tex,
+            (pos.x - 8.0).round(),
+            (pos.y - 9.0).round() + crouch,
+            Color::new(1.0, 1.0, 1.0, glow),
+            DrawTextureParams {
+                source: Some(art::cell(frame, row + art::CRITTER_ROWS)),
+                dest_size: Some(vec2(16.0, 16.0)),
+                flip_x: p.face_left,
+                ..Default::default()
+            },
+        );
+    }
 }
 
 pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
@@ -808,6 +901,22 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
             ..Default::default()
         },
     );
+    // 다 모였다(0202): 흰 실루엣 줄(칸 줄 + 3)을 반투명으로 겹친다 — 쥐고 있는 내내 "준비됨"이 몸에 보이게.
+    let glow = charge_glow(p);
+    if glow > 0.0 && !flash {
+        draw_texture_ex(
+            art.nail_fur(fur),
+            pos.x - 8.0 + jitter,
+            pos.y - 8.0 - pop + crouch,
+            Color::new(1.0, 1.0, 1.0, glow),
+            DrawTextureParams {
+                source: Some(art::cell(col, row + 3)),
+                dest_size: Some(vec2(16.0, 16.0)),
+                flip_x: p.face_left,
+                ..Default::default()
+            },
+        );
+    }
 }
 
 /// 적: 그림(critters.png)이 있으면 종류의 줄에서 상태에 맞는 칸, 없으면 색 원.
