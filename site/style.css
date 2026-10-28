@@ -4,7 +4,7 @@
    움직임(반딧불·걷는 스프라이트)은 prefers-reduced-motion이면 멈춘다. */
 @font-face {
   font-family: "Galmuri11";
-  src: url("fonts/galmuri11-sub.woff2?v=2e9479e2") format("woff2");
+  src: url("fonts/galmuri11-sub.woff2?v=25c71cc4") format("woff2");
   font-display: swap;
 }
 :root {
@@ -92,10 +92,10 @@ p { margin: 0; }
 @keyframes drift { 0% { transform: translate(0, 0); } 33% { transform: translate(var(--x1), var(--y1)); } 66% { transform: translate(var(--x2), var(--y2)); } 100% { transform: translate(0, 0); } }
 @keyframes blink { 0%, 100% { opacity: 0; } 40%, 60% { opacity: .95; } }
 
-/* 스프라이트: 16px 칸을 가로로 이은 띠(sp_*.png)를 steps()로 돌린다. --n 칸 수, --s 한 칸 크기.
+/* 스프라이트: 칸을 가로로 이은 띠(sp_*.png)를 steps()로 돌린다. --n 칸 수, --s 한 칸 크기(기본 = 24칸의 3배, 32·40칸 시트는 inline으로 3·4배).
    그림은 각 요소의 inline background-image로 준다 — url()을 변수(--sp)에 넣으면 페이지가 아니라 이 css 기준으로
    풀려서 en/ 페이지의 ../img/가 사이트 밖을 가리켰다(0181). */
-.sprite { --s: 48px; display: inline-block; width: var(--s); height: var(--s); background-position: 0 0; background-size: calc(var(--n) * var(--s)) var(--s); background-repeat: no-repeat;
+.sprite { --s: 72px; display: inline-block; width: var(--s); height: var(--s); background-position: 0 0; background-size: calc(var(--n) * var(--s)) var(--s); background-repeat: no-repeat;
   image-rendering: pixelated; image-rendering: crisp-edges; animation: frames calc(var(--n) * .16s) steps(var(--n)) infinite; }
 .sprite.big { --s: 96px; }
 @keyframes frames { to { background-position-x: calc(var(--n) * var(--s) * -1); } }
@@ -178,6 +178,8 @@ kbd {
 
 /* 두 캐릭터 */
 .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.duo.trio { grid-template-columns: repeat(3, 1fr); }
+#two .split { margin-top: 1.4rem; }
 .duo article { display: grid; justify-items: center; text-align: center; gap: .6rem; padding: 1.6rem 1.2rem; background: rgba(42, 37, 64, .35); border: 1px solid var(--deep-3); }
 .duo h3 { color: var(--glow); font-size: 1.4rem; }
 .duo p { color: var(--muted); max-width: 22rem; }
@@ -243,7 +245,7 @@ footer a { color: var(--muted); }
   .news li { grid-template-columns: 4.5rem 1fr; }
   .news a { grid-column: 1 / -1; }
   .split, .fight, .zone { grid-template-columns: 1fr; gap: 1.1rem; }
-  .duo { grid-template-columns: 1fr; }
+  .duo, .duo.trio { grid-template-columns: 1fr; }
   .facts { grid-template-columns: 1fr; }
   body { font-size: 16px; }
   .hero { min-height: auto; display: block; }

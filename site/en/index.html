@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://aimenjoe.github.io/nail-under-the-roots/img/i_title.png">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#17130f">
-<link rel="stylesheet" href="../style.css?v=52563194">
+<link rel="stylesheet" href="../style.css?v=473f18f3">
 </head>
 <body>
 <a class="skip" href="#story">Skip to content</a>
@@ -61,7 +61,7 @@
 
   <div class="parade" aria-hidden="true">
     <span class="sprite walker" style="background-image: url(../img/sp_nail.png); --n: 4"></span>
-    <span class="sprite walker w2" style="background-image: url(../img/sp_popo.png); --n: 2"></span>
+    <span class="sprite walker w2" style="background-image: url(../img/sp_popo.png); --n: 2; --s: 96px"></span>
   </div>
 
   <section class="layer-burrow section" id="story" data-depth="story">
@@ -125,7 +125,7 @@
           <div>
             <h3><span class="z-n">3</span>Dark Depths</h3>
             <p>The only light is around Naïl. <b>Bats</b> your burst can't reach, <b>spore caps</b> that puff out clouds, and a <b>ceiling that falls</b> while you fight.</p>
-            <p class="crit"><span class="sprite" style="background-image: url(../img/sp_bat.png); --n: 4" title="Bat"></span><span class="sprite" style="background-image: url(../img/sp_sporecap.png); --n: 2" title="Spore Cap"></span></p>
+            <p class="crit"><span class="sprite" style="background-image: url(../img/sp_bat.png); --n: 4; --s: 96px" title="Bat"></span><span class="sprite" style="background-image: url(../img/sp_sporecap.png); --n: 2" title="Spore Cap"></span></p>
           </div>
         </li>
         <li class="zone">
@@ -145,7 +145,7 @@
       <header class="head">
         <p class="tag">Paths · Camps</p>
         <h2>A new branching path each run, a different camp on each path</h2>
-        <p>Open the path map at camp and pick your next burrow. Burrows are dug fresh every time. There are three camps, each with a hidden nook. Banked glowbugs stay when you fall, and from your second run you start right by the burrow entrance.</p>
+        <p>Open the path map at camp and pick your next burrow. Burrows are dug fresh every time. There are three camps, each with a hidden nook. Past the first camp, every fall winds a root thread; fall again after all three and you're back in the village. Banked glowbugs stay, and from your second run you start right by the burrow entrance.</p>
       </header>
       <div class="gallery">
         <figure class="frame"><img class="px" src="../img/s_camp.png" alt="The first camp, neighbors around a campfire" width="960" height="540" loading="lazy"><figcaption>First camp</figcaption></figure>
@@ -168,7 +168,7 @@
         <li><img class="px" src="../img/p_popo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Raccoon</p><h3>Popo</h3><p>Your guide, and the shopkeeper at camp. Trades goods for seeds.</p></div></li>
         <li><img class="px" src="../img/p_bori.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Field mouse chief</p><h3>Bori</h3><p>The old chief of the field mice, guarding the southern glade.</p></div></li>
         <li><img class="px" src="../img/p_momo.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Rabbit</p><h3>Momo</h3><p>Met three times at the end of the first path. Later, you can take her down yourself.</p></div></li>
-        <li><img class="px" src="../img/p_doto.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Squirrel</p><h3>Doto</h3><p>At the tangled roots where the second path ends. Gives up nothing it buried.</p></div></li>
+        <li><img class="px" src="../img/p_doto.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Squirrel</p><h3>Doto</h3><p>At the tangled roots where the second path ends. Gives up nothing it buried. Help Doto remember, and Doto comes down with you.</p></div></li>
         <li><img class="px" src="../img/p_kongi.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Armadillo</p><h3>Kongi</h3><p>Keeper of the deep door. Curls up so no one can go further down.</p></div></li>
         <li><img class="px" src="../img/p_clover.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mother rabbit</p><h3>Clover</h3><p>Momo's mother. Bound in thread at the back of the old warren, still guarding her babies.</p></div></li>
         <li><img class="px" src="../img/p_halmae.png" alt="" width="88" height="88" loading="lazy"><div><p class="who">Mushroom elder</p><h3>Granny Nuruk</h3><p>Waits at the very bottom, where the threads meet. Cut her knots to free everyone. Later, her cat's cradle sets the difficulty.</p></div></li>
@@ -188,20 +188,31 @@
   <section class="layer-deep section" id="two" data-depth="deep">
     <div class="wrap">
       <header class="head">
-        <p class="tag">Two heroes</p>
-        <h2>Naïl's claws, Momo's hind legs</h2>
+        <p class="tag">Three heroes</p>
+        <h2>Naïl's claws, Momo's hind legs, Doto's acorns</h2>
       </header>
-      <div class="duo">
+      <div class="duo trio">
         <article>
           <span class="sprite big" style="background-image: url(../img/sp_nail.png); --n: 4"></span>
           <h3>Naïl</h3>
           <p>Three-hit claws, burrowing underground, bursting up, the drill.</p>
         </article>
         <article>
-          <span class="sprite big" style="background-image: url(../img/sp_momo.png); --n: 2"></span>
+          <span class="sprite big" style="background-image: url(../img/sp_momo.png); --n: 2; --s: 128px"></span>
           <h3>Momo</h3>
-          <p>Hind-leg kicks, a hop to dodge, three chained stomps. Her own talents and charms.</p>
+          <p>Hind-leg kicks, a hop to dodge, three chained stomps. Hold dodge to run, let go to leap and land on a foe.</p>
         </article>
+        <article>
+          <span class="sprite big" style="background-image: url(../img/sp_doto.png); --n: 2; --s: 160px"></span>
+          <h3>Doto</h3>
+          <p>Acorns from range: a three-throw combo ending in a fan, a charged big acorn, a high hop back, acorns buried as mines. Throw just as a shot arrives to bat it back.</p>
+        </article>
+      </div>
+      <div class="split">
+        <figure class="frame"><img class="px" src="../img/s_doto.png" alt="Doto in a meadow batting an incoming shot back with an acorn, a deflect pop-up above" width="960" height="540" loading="lazy"></figure>
+        <div class="copy">
+          <p>Wake Momo and Doto on their paths and you can pick them on the village root path and take them down. Each hero has their own talents, charms, records and ending lines.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -305,8 +316,8 @@
     <div class="wrap split">
       <div class="copy">
         <p class="tag">Next</p>
-        <h2>Working on v0.5, "Doto and New Clothes"</h2>
-        <p>With v0.4, "The Deep", the path now runs all the way to the bottom. Next: <b>Doto</b>, the acorn-throwing squirrel, as a third playable hero, and new art for everyone. After that, a public demo. Tell us what you think any time via <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">feedback &amp; bug reports</a>.</p>
+        <h2>Getting ready for v0.6, a public demo</h2>
+        <p>v0.5, "Doto and New Clothes", brought in Doto as a third hero and new art for everyone. Next is a public demo: smoothing the first minutes for new players and making it easy to tell us how it went. Until then, tell us what you think any time via <a href="https://github.com/AimenJoe/nail-under-the-roots/issues">feedback &amp; bug reports</a>.</p>
       </div>
       <dl class="facts">
         <div><dt>Genre</dt><dd>Top-down action roguelite</dd></div>
