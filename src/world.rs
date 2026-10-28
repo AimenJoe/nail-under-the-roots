@@ -1055,10 +1055,6 @@ impl World {
                 });
             }
         }
-        // 쓰러졌다: 쥬시 지렁이가 있으면 저절로 먹고 일어난다(목숨).
-        if self.player.events.contains(&player::Event::Die) && self.inv.bag.take(Consumable::Worm) {
-            self.revive();
-        }
         strike
     }
 
@@ -1974,6 +1970,10 @@ impl World {
                         .push(ring(self.player.pos, 4.0, 14.0, 0.2, RED));
                     if self.player.is_alive() {
                         self.juice.audio.play(sfx::Id::Hurt);
+                    } else if self.inv.bag.take(Consumable::Worm) {
+                        // 쓰러졌다: 쥬시 지렁이가 있으면 저절로 먹고 일어난다(목숨). 맞은 그 틱에 — 전에는 플레이어 틱
+                        // (맞기 전 단계)에서 이번 틱의 Die 이벤트를 찾아서, 다음 틱엔 이벤트가 지워져 한 번도 못 일어났다(0200).
+                        self.revive();
                     } else {
                         self.juice.audio.play(sfx::Id::Die);
                         burst(&mut self.juice.fx, self.player.pos, 16, MOLE, 90.0);
@@ -3185,6 +3185,41 @@ mod tests {
     use crate::enemy::{Enemy, Kind};
 
     /// 토끼풀(0165): 발 구르기는 충격파 + 플레이어 둘레에 실 그물, 고치는 발톱이 튕기며 한마디, 실 한 가닥은 받아치면
+    /// 쥬시 지렁이(0200): 들고 쓰러지면 그 틱에 먹고 일어난다. 없으면 쓰러진 그대로.
+    #[test]
+    fn juicy_worm_revives_on_death() {
+        use crate::enemy::Projectile;
+        let hit = |w: &mut World| {
+            let at = w.player.pos;
+            w.projectiles.push(Projectile {
+                pos: at,
+                prev_pos: at,
+                vel: Vec2::ZERO,
+                alive: true,
+                friendly: false,
+            });
+        };
+        let mut w = World::new();
+        w.enemies.clear();
+        w.player.hp = 1;
+        w.player.invuln = 0.0;
+        assert!(w.inv.bag.add(Consumable::Worm));
+        hit(&mut w);
+        w.tick(&Actions::default());
+        assert!(w.player.is_alive(), "지렁이를 먹고 일어난다");
+        assert!(w.player.hp > 1 && w.player.invuln > 0.0);
+        assert!(!w.inv.bag.take(Consumable::Worm), "지렁이는 먹었다");
+        assert!(w.juice.toast.is_some());
+        // 지렁이가 없으면 쓰러진다.
+        let mut w = World::new();
+        w.enemies.clear();
+        w.player.hp = 1;
+        w.player.invuln = 0.0;
+        hit(&mut w);
+        w.tick(&Actions::default());
+        assert!(!w.player.is_alive());
+    }
+
     /// 토끼풀이 멈칫하고 아니면 끌려간다.
     #[test]
     fn clover_thump_drops_webs_cocoons_bounce_and_thread_pulls_or_parries() {
