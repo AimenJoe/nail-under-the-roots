@@ -485,7 +485,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             let chest = Rect::new(w - 34.0, y - 4.0, 16.0, 16.0);
             let open = ph > 1.0;
             let x = 14.0 + (chest.x - 24.0) * (ph / 1.0).min(1.0);
-            props::draw_chest(chest, open, time);
+            props::draw_chest(art.and_then(|a| a.props.as_ref()), chest, open, time);
             nail(
                 art,
                 if ph < 1.0 {
@@ -522,7 +522,12 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 false,
             );
             if ph < 0.6 {
-                props::draw_breakable(crate::room::Breakable::Mound, thing, time);
+                props::draw_breakable(
+                    art.and_then(|a| a.props.as_ref()),
+                    crate::room::Breakable::Mound,
+                    thing,
+                    time,
+                );
             } else {
                 if k < 1.0 {
                     actors::draw_claw_marks(

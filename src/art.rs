@@ -29,6 +29,8 @@ pub struct Art {
     pub chief: Option<Texture2D>,
     /// 누룩 할매(tools/art/halmae_ai.py, 0219): 줄 0 가장 깊은 곳 96칸, 줄 1 마을 40칸. 없으면 코드 그림.
     pub halmae: Option<Texture2D>,
+    /// 소품(tools/art/props_ai.py, 0222): 24칸 여섯(`PROP_*`) — 부술 수 있는 것 넷 + 상자 닫힘·열림. 없으면 코드 그림.
+    pub props: Option<Texture2D>,
     /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 털빛 1~3, 줄 4 돌아온 모모. 땅 단면 전환에서만.
     pub dig: Option<Texture2D>,
     /// 컷씬 일러스트(illust::Illust::ALL 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
@@ -142,6 +144,31 @@ pub fn draw_halmae(tex: &Texture2D, frame: u32, big: bool, feet: Vec2) {
     );
 }
 
+/// props.png(0222): 24×24 칸 한 줄, 발바닥 22. 칸: 0 흙더미, 1 뿌리혹, 2 돌무더기, 3 실뭉치, 4 상자, 5 열린 상자.
+pub const PROP_CELL: f32 = 24.0;
+pub const PROP_FOOT: f32 = 22.0;
+pub const PROP_CHEST: u32 = 4;
+pub const PROP_CHEST_OPEN: u32 = 5;
+
+/// 소품 한 칸을 발바닥 `feet`(가운데)에 그린다.
+pub fn draw_prop(tex: &Texture2D, frame: u32, feet: Vec2) {
+    draw_texture_ex(
+        tex,
+        (feet.x - PROP_CELL / 2.0).round(),
+        (feet.y - PROP_FOOT).round(),
+        WHITE,
+        DrawTextureParams {
+            source: Some(inset(Rect::new(
+                frame as f32 * PROP_CELL,
+                0.0,
+                PROP_CELL,
+                PROP_CELL,
+            ))),
+            ..Default::default()
+        },
+    );
+}
+
 /// 초상화 한 칸(원본 px).
 pub const PORTRAIT: f32 = 88.0;
 /// 초상화 시트 한 줄의 칸 수. 칸이 늘어 한 줄이면 2,048px를 넘는다(오래된 폰의 텍스처 한도) → 12칸씩 줄을 바꾼다.
@@ -203,6 +230,7 @@ impl Art {
                 "art/critters.png",
                 "art/chief.png",
                 "art/halmae.png",
+                "art/props.png",
                 "art/dig.png",
             ]
             .iter()
@@ -247,6 +275,10 @@ impl Art {
         let chief = crate::loading::texture("art/chief.png").await.ok();
         if let Some(c) = &chief {
             c.set_filter(FilterMode::Nearest);
+        }
+        let props = crate::loading::texture("art/props.png").await.ok();
+        if let Some(p) = &props {
+            p.set_filter(FilterMode::Nearest);
         }
         let halmae = crate::loading::texture("art/halmae.png").await.ok();
         if let Some(h) = &halmae {
@@ -300,6 +332,7 @@ impl Art {
             portraits,
             chief,
             halmae,
+            props,
             dig,
             illust,
         })

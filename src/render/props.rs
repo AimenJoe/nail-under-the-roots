@@ -613,7 +613,23 @@ pub(super) fn draw_spring(sp: &world::Spring, time: f32) {
 }
 
 /// 보물 상자(던전 보물방). 열리면 뚜껑이 젖혀지고 안이 빈다.
-pub(super) fn draw_chest(r: Rect, opened: bool, time: f32) {
+/// 보물 상자. 새 그림(`props.png`, 0222)이 있으면 그 칸 + 닫힌 상자의 반짝, 없으면 코드 그림.
+pub(super) fn draw_chest(tex: Option<&Texture2D>, r: Rect, opened: bool, time: f32) {
+    if let Some(t) = tex {
+        let feet = vec2(r.center().x, r.bottom() - 1.0);
+        let frame = if opened {
+            art::PROP_CHEST_OPEN
+        } else {
+            art::PROP_CHEST
+        };
+        art::draw_prop(t, frame, feet);
+        if !opened && ((time * 2.0) as i32) % 2 == 0 {
+            let (sx, sy) = ((feet.x + 5.0).round(), (feet.y - 15.0).round());
+            draw_rectangle(sx, sy, 1.0, 3.0, WHITE);
+            draw_rectangle(sx - 1.0, sy + 1.0, 3.0, 1.0, WHITE);
+        }
+        return;
+    }
     let wood = Color::new(0.55, 0.36, 0.22, 1.0);
     let dark = Color::new(0.36, 0.22, 0.14, 1.0);
     let gold = Color::new(0.95, 0.80, 0.35, 1.0);
@@ -645,11 +661,46 @@ pub(super) fn draw_chest(r: Rect, opened: bool, time: f32) {
 /// 부술 수 있는 것(0175): 칸 하나(발 사각형 `r`) 위에 지대마다 다른 모양. 바닥 그림자 + 둥근 몸통 + 무늬.
 /// 넷이 같은 표시를 나눠 쓴다(0205, 사장 "부술 수 있는 게 티가 안 난다"): 어두운 외곽선(바닥 장식이 아니라 물건),
 /// 밝은 금(깨진다), 2.5초마다 반짝(움직임이 먼저 눈에 든다). 한 번 배우면 지대가 바뀌어도 알아본다.
-pub(super) fn draw_breakable(b: crate::room::Breakable, r: Rect, time: f32) {
+/// 새 그림(`props.png`, 0222)이 있으면 그 칸(외곽선·금이 그림에 있다) + 반짝만 코드로.
+pub(super) fn draw_breakable(
+    tex: Option<&Texture2D>,
+    b: crate::room::Breakable,
+    r: Rect,
+    time: f32,
+) {
     use crate::room::Breakable;
     let c = r.center();
     let (cx, foot) = (c.x.round(), (r.bottom() - 2.0).round());
     draw_ellipse(cx, foot + 1.0, 7.0, 2.5, 0.0, SHADOW_SOFT);
+    let px = |x: f32, y: f32, col: Color| draw_rectangle(x, y, 1.0, 1.0, col);
+    if let Some(t) = tex {
+        let frame = match b {
+            Breakable::Mound => 0,
+            Breakable::Gall => 1,
+            Breakable::RockPile => 2,
+            Breakable::SilkBall => 3,
+        };
+        art::draw_prop(t, frame, vec2(cx, foot + 1.0));
+    } else {
+        draw_breakable_code(b, cx, foot, c, time);
+    }
+    // 반짝: 2.5초마다 0.25초, 자리마다 어긋나게. 몸통 왼쪽 위에 십자(새 그림은 더 커서 두 칸 위).
+    let ph = (time / 2.5 + (c.x * 0.37 + c.y * 0.61).fract()).fract();
+    if ph < 0.1 {
+        let a = 1.0 - (ph / 0.1 - 0.5).abs() * 2.0;
+        let (gx, gy) = (cx - 3.0, foot - if tex.is_some() { 10.0 } else { 8.0 });
+        let w = Color::new(1.0, 1.0, 1.0, a);
+        px(gx, gy, w);
+        px(gx - 1.0, gy, Color::new(1.0, 1.0, 1.0, a * 0.7));
+        px(gx + 1.0, gy, Color::new(1.0, 1.0, 1.0, a * 0.7));
+        px(gx, gy - 1.0, Color::new(1.0, 1.0, 1.0, a * 0.7));
+        px(gx, gy + 1.0, Color::new(1.0, 1.0, 1.0, a * 0.7));
+    }
+}
+
+/// 부술 수 있는 것의 코드 그림(새 그림이 없을 때): 몸통 + 금.
+fn draw_breakable_code(b: crate::room::Breakable, cx: f32, foot: f32, c: Vec2, time: f32) {
+    use crate::room::Breakable;
     let px = |x: f32, y: f32, col: Color| draw_rectangle(x, y, 1.0, 1.0, col);
     // 몸통 둘레 1px 외곽선: 몸통 타원을 한 px 크게 먼저 칠한다.
     let rim =
@@ -731,18 +782,6 @@ pub(super) fn draw_breakable(b: crate::room::Breakable, r: Rect, time: f32) {
     ] {
         px(cx + dx, foot + dy, lit);
         px(cx + dx + 1.0, foot + dy, dark);
-    }
-    // 반짝: 2.5초마다 0.25초, 자리마다 어긋나게. 몸통 왼쪽 위에 십자.
-    let ph = (time / 2.5 + (c.x * 0.37 + c.y * 0.61).fract()).fract();
-    if ph < 0.1 {
-        let a = 1.0 - (ph / 0.1 - 0.5).abs() * 2.0;
-        let (gx, gy) = (cx - 3.0, foot - 8.0);
-        let w = Color::new(1.0, 1.0, 1.0, a);
-        px(gx, gy, w);
-        px(gx - 1.0, gy, Color::new(1.0, 1.0, 1.0, a * 0.7));
-        px(gx + 1.0, gy, Color::new(1.0, 1.0, 1.0, a * 0.7));
-        px(gx, gy - 1.0, Color::new(1.0, 1.0, 1.0, a * 0.7));
-        px(gx, gy + 1.0, Color::new(1.0, 1.0, 1.0, a * 0.7));
     }
 }
 
