@@ -70,9 +70,10 @@ PAW = (198, 102, 120)    # 코(231, 137, 153)보다 한 단 짙게 — 코 바�
 SOLE = (150, 80, 96)
 SHADE = (75, 44, 50)     # 손발이 아닌 검은 점(머리 둘레 그늘) → 짙은 털. 검게 두면 외곽선에 붙어 선이 두 겹으로 굵어 보였다(사장).
 CLAW = (232, 217, 174)
-# 걷기 칸마다 앞발(오른쪽)·뒷발톱(왼쪽)을 반대로 2px 흔든다 — 원본 걷기는 손이 그대로였다(사장).
-# 몸 16px에서 손은 3px쯤이라 2px가 읽히는 최대다(팔 흔드는 나노바나나 시트도 16px로 줄이면 1px 안쪽 차이였다).
-SWING = {"walk_a": 2, "walk_b": 0, "walk_c": -2, "walk_d": 0}
+# 걷기 칸마다 앞발(오른쪽)을 (dx, dy)만큼, 뒷발톱(왼쪽)은 반대로 옆으로 흔든다 — 원본 걷기는 손이 그대로였다(사장).
+# 앞으로 갈 때 1px 들어 올리고 뒤로 1px: 오가는 폭 2px(몸 16px에서 손이 3px쯤이라 읽히는 최대).
+# 옆으로 2px를 그대로 밀면 앞발이 몸에서 떨어져 외곽선을 따로 둘러 공중에 뜬 막대가 됐다(로딩 화면 4배에서 보였다).
+SWING = {"walk_a": (1, -1), "walk_b": (0, 0), "walk_c": (-1, 0), "walk_d": (0, 0)}
 ARC = (192, 145, 108)   # 휘두름 호의 살구 갈색(발톱 크림·주둥이·코와는 RGB 차 합 100 넘게 떨어진다)
 ERASE = {"attack0": [(455, 170, 669, 295)], "attack1": [(255, 317, 335, 604)]}   # 호가 지나가는 네모(시트 좌표)
 
@@ -211,27 +212,39 @@ def paws(sprite):
     return out
 
 
-def swing(sprite, k):
-    """앞발(가운데 오른쪽의 손·발톱, 발 줄 위)은 k, 뒷발톱(왼쪽)은 −k만큼 옆으로. 빈 자리는 몸 쪽 이웃 색, 몸 밖이면 비운다."""
-    if k == 0:
+def swing(sprite, move):
+    """앞발(가운데 오른쪽의 손·발톱, 발 줄 위)은 move = (dx, dy)만큼, 뒷발톱(왼쪽)은 (−dx, 0)만큼 옮긴다.
+    빈 자리는 비운다. 다만 같은 줄에서 몸과 옮긴 손 사이에 낀 빈 자리는 몸 쪽으로 처음 만나는 털 색으로 메운다 —
+    팔이 늘어난 것처럼 붙어 있게(떨어지면 외곽선이 따로 둘러 공중에 뜬다). 손이 떠난 아래 줄은 털로 메우지 않는다."""
+    dx, dy = move
+    if (dx, dy) == (0, 0):
         return sprite
     h, w = sprite.shape[:2]
     rgb = sprite[..., :3].astype(int)
     hand = (sprite[..., 3] > 0) & ((np.abs(rgb - PAW).sum(-1) < 8) | (np.abs(rgb - CLAW).sum(-1) < 8))
     hand[h - 3:] = False
     out = sprite.copy()
-    for side, d in ((np.arange(w) >= w // 2, k), (np.arange(w) < w // 2, -k)):
+    for side, (mx, my) in ((np.arange(w) >= w // 2, (dx, dy)), (np.arange(w) < w // 2, (-dx, 0))):
         m = hand & side[None, :]
         ys, xs = np.nonzero(m)
         px = sprite[ys, xs].copy()
-        inward = -1 if side[-1] else 1          # 몸 쪽(가운데) 방향
-        for y, x in zip(ys, xs):
-            n = x + inward
-            keep = 0 <= n < w and sprite[y, n, 3] and not hand[y, n]
-            out[y, x] = sprite[y, n] if keep else 0
+        out[ys, xs] = 0
+        moved = np.zeros_like(hand)
         for (y, x), c in zip(zip(ys, xs), px):
-            if 0 <= x + d < w:
-                out[y, x + d] = c
+            if 0 <= x + mx < w and 0 <= y + my < h:
+                out[y + my, x + mx] = c
+                moved[y + my, x + mx] = True
+        # 몸 쪽(가운데) 방향: 오른쪽 앞발은 왼쪽(-1), 왼쪽 뒷발톱은 오른쪽(+1)
+        inward = -1 if side[-1] else 1
+        for y, x in zip(ys, xs):
+            if out[y, x, 3]:
+                continue
+            outer = moved[y, x + 1:] if inward < 0 else moved[y, :x]
+            n = x + inward
+            while 0 <= n < w and not out[y, n, 3]:
+                n += inward
+            if outer.any() and 0 <= n < w:
+                out[y, x] = out[y, n]
     return out
 
 
@@ -292,7 +305,7 @@ def build():
     pal = shared_palette([(crops[REF], masks[REF])])
     scale = {g: BODY_H / body_h(crops[g], masks[g]) for g in set(GROUP.values())}
     spr = {k: paws(shrink(crops[k], masks[k], scale[GROUP[k]], pal)) for k in crops}
-    spr = {k: swing(s, SWING.get(k, 0)) for k, s in spr.items()}
+    spr = {k: swing(s, SWING.get(k, (0, 0))) for k, s in spr.items()}
     spr["idle_b"] = breathe(spr["idle_a"])
     src_b = np.asarray(Image.open(SRC_B).convert("RGB")).astype(int)
     b_crops = {k: src_b[y0:y1, x0:x1] for k, (x0, y0, x1, y1) in B_FRAMES.items()}
