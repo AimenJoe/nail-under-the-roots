@@ -90,10 +90,12 @@ impl Player {
                 self.start_heavy(dir, after, time - t::HEAVY_CHARGE <= t::HEAVY_PERFECT);
             } else {
                 // 덜 모으고 뗐다: 아무것도 안 나가고(평타는 이미 나갔다), 콤보는 거기서 이어진다.
+                // 콤보 창은 스윙 끝과 같이 박자 창이 다 닫힐 때까지(0205): 보통 누름(0.1초 남짓)도 활성 구간 뒤까지
+                // 쥐고 있어 여기로 오는데, 무기의 짧은 창(0.3초)만 주면 박자(0.42초) 전에 닫혀 박자에 누른 2타가 1타로 돌아갔다.
                 self.state = State::Free;
                 if after <= self.moveset.last() {
                     self.combo_next = after;
-                    self.combo_timer = self.moveset.combo_window;
+                    self.combo_timer = self.combo_window_after_swing();
                 }
             }
         }

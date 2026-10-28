@@ -1630,6 +1630,71 @@ mod tests {
         }
     }
 
+    /// 무기마다 박자 콤보(사장 "무기마다 리듬 타격 검증, 2타가 제대로 안 나간다"): 박자 한가운데에 누르면 모든 이음이
+    /// 다음 타 + Beat. 사람 손가락은 한 틱이 아니라 0.05~0.2초 누르고 있으니 그 길이마다 본다 — 활성 구간 뒤에도
+    /// 누르고 있으면 모으기로 갔다가 덜 모으고 떼는데, 그때 콤보 창이 박자보다 먼저 닫히면 1타로 돌아갔다.
+    #[test]
+    fn every_weapon_chains_every_hit_on_the_beat_whatever_the_tap_length() {
+        let room = Room::new();
+        for (name, ms) in [
+            ("claws", &moveset::CLAWS),
+            ("sprout", &moveset::SPROUT),
+            ("kicks", &moveset::KICKS),
+            ("stone", &moveset::STONE),
+            ("venom", &moveset::VENOM),
+        ] {
+            // 박자 창 안 어디서 누르든(이른 끝·한가운데·늦은 끝).
+            let edge = t::BEAT_WINDOW - t::TICK_DT * 1.5;
+            for (hold, off) in [1usize, 3, 5, 6, 7, 8, 10, 12, 15]
+                .into_iter()
+                .flat_map(|h| [(h, -edge), (h, 0.0), (h, edge)])
+            {
+                let mut p = Player::new(room.center());
+                p.moveset = ms;
+                let n = ms.hits.len();
+                let mut swings: Vec<(usize, bool)> = vec![];
+                // 첫 타를 누르고, 그 뒤로는 박자 시계가 박자에 닿는 틱에 눌러 `hold`틱 동안 쥔다.
+                let mut held = 0usize;
+                let mut press_next = true;
+                for _ in 0..600 {
+                    // 사람은 박자 고리에 맞춰 누른다(콤보가 살아 있든 아니든).
+                    let due = !press_next && p.beat_clock + t::TICK_DT * 0.5 >= p.beat_at + off;
+                    let start = press_next || (due && held == 0);
+                    if start {
+                        press_next = false;
+                        held = hold;
+                    }
+                    let a = Actions {
+                        attack: start,
+                        attack_held: held > 0,
+                        ..Default::default()
+                    };
+                    held = held.saturating_sub(1);
+                    let (_, ev) = tick(&mut p, &room, &a);
+                    for e in &ev {
+                        if let Event::Swing(i) = e {
+                            swings.push((*i, ev.iter().any(|e| matches!(e, Event::Beat(_)))));
+                        }
+                    }
+                    if swings.len() >= n {
+                        break;
+                    }
+                }
+                let idx: Vec<usize> = swings.iter().map(|s| s.0).collect();
+                assert_eq!(
+                    idx,
+                    (0..n).collect::<Vec<_>>(),
+                    "{name} 쥔 {hold}틱 {off:+.3}초: 타 순서 {swings:?}"
+                );
+                assert!(
+                    swings[1..].iter().all(|s| s.1),
+                    "{name} 쥔 {hold}틱 {off:+.3}초: 박자에 누른 이음은 모두 Beat {swings:?}"
+                );
+                assert!(p.full_beat(n - 1), "{name} 쥔 {hold}틱: 다 맞춘 마무리");
+            }
+        }
+    }
+
     /// 메트로놈(0180): 한 타 뒤 아무것도 안 누르면 박자에 `BeatTick` 한 번. 이른 눌림이 박자에 나가면
     /// 그 틱은 타 소리가 박자라 `BeatTick`이 없다. 콤보가 아닐 때(서 있기만)는 울리지 않는다.
     #[test]
