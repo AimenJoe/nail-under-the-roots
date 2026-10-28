@@ -41,21 +41,15 @@ fn critter(art: Option<&Art>, kind: Kind, frame: u32, at: Vec2, left: bool, tint
     }
 }
 
-/// 돌아온 도토(critters `DOTO_BACK_ROW`, 칸 0·1 서기, 4 웅크림, 5 던지기·뛰기). 그림이 없으면 밤색 동그라미.
+/// 돌아온 도토(`DOTO_BACK_ROW`, 새 그림 시트 — 칸 0·1 서기, 4 겨누기, 5 던지기). 그림이 없으면 밤색 동그라미.
 fn doto(art: Option<&Art>, frame: u32, at: Vec2, lift: f32, left: bool) {
     draw_ellipse(at.x, at.y + 6.0, 5.0, 2.0, 0.0, SHADOW_SOFT);
-    match art.and_then(|a| a.critters.as_ref()) {
-        Some(tex) => draw_texture_ex(
-            tex,
-            (at.x - 8.0).round(),
-            (at.y - 9.0 - lift).round(),
+    match art.and_then(|a| a.critter(frame, art::DOTO_BACK_ROW)) {
+        Some(c) => c.draw(
+            vec2(at.x, (at.y - 9.0 - lift).round() + art::CRITTER_FOOT),
+            Vec2::ONE,
+            left,
             WHITE,
-            DrawTextureParams {
-                source: Some(art::cell(frame, art::DOTO_BACK_ROW)),
-                dest_size: Some(vec2(16.0, 16.0)),
-                flip_x: left,
-                ..Default::default()
-            },
         ),
         None => draw_circle(at.x, at.y - lift, 5.0, Color::new(0.72, 0.38, 0.20, 1.0)),
     }

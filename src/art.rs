@@ -20,9 +20,9 @@ pub struct Art {
     pub light: Texture2D,
     /// 적·이웃(tools/art/critters.py): 16×16, 줄 = species.rs의 sheet_row, 줄 6 라쿤, 줄 7 모모, 줄 8 돌아온 모모, 줄 9 도토, 줄 10 돌아온 도토, 줄 11 수수, 줄 12 콩이, 줄 13 돌아온 콩이, 줄 14~18 땃쥐·고슴도치·두꺼비·박쥐·포자버섯(0146). 아래 CRITTER_ROWS줄은 흰 실루엣.
     pub critters: Option<Texture2D>,
-    /// 모모 새 그림(tools/art/momo_ai.py, 0206 C3): 32×32 칸, 발바닥 `BIG_FOOT`. 줄 0 돌아온 모모, 줄 1 물든 모모,
-    /// 줄 2·3 흰 실루엣. critters 모모 두 줄 대신 쓴다(`Art::critter`). 없으면 critters 16칸.
-    pub momo: Option<Texture2D>,
+    /// 새 그림 시트(`BIG_SHEETS` 순서, 0206 C3): 모모(momo_ai.py)·도토(doto_ai.py). 줄 0 돌아온 모습, 줄 1 물든 모습,
+    /// 줄 2·3 흰 실루엣. critters의 그 두 줄 대신 쓴다(`Art::critter`). 없으면 critters 16칸.
+    pub big: Vec<Option<Texture2D>>,
     /// 대화창 초상화: 88×88 칸, 한 줄 12칸(tools/art/portraits.py). 게임 픽셀의 2배 밀도. 없으면 색 네모.
     pub portraits: Option<Texture2D>,
     /// 들쥐 대장·보리(tools/art/chief.py): 32×32, 줄 0 물든 대장, 줄 1 보리, 줄 2·3 흰 실루엣.
@@ -167,11 +167,11 @@ impl Art {
                 "art/critters.png",
                 "art/chief.png",
                 "art/dig.png",
-                "art/momo.png",
             ]
             .iter()
             .map(|s| s.to_string()),
         );
+        v.extend(BIG_SHEETS.iter().map(|b| b.file.to_string()));
         v.extend(
             crate::illust::Illust::ALL
                 .iter()
@@ -211,9 +211,13 @@ impl Art {
         if let Some(c) = &chief {
             c.set_filter(FilterMode::Nearest);
         }
-        let momo = crate::loading::texture("art/momo.png").await.ok();
-        if let Some(m) = &momo {
-            m.set_filter(FilterMode::Nearest);
+        let mut big = Vec::new();
+        for b in BIG_SHEETS {
+            let t = crate::loading::texture(b.file).await.ok();
+            if let Some(t) = &t {
+                t.set_filter(FilterMode::Nearest);
+            }
+            big.push(t);
         }
         let dig = crate::loading::texture("art/dig.png").await.ok();
         if let Some(d) = &dig {
@@ -251,7 +255,7 @@ impl Art {
             dark: dark_mask(),
             light: light_blob(),
             critters,
-            momo,
+            big,
             portraits,
             chief,
             dig,
@@ -314,10 +318,33 @@ pub fn nail_origin(pos: macroquad::math::Vec2) -> macroquad::math::Vec2 {
     macroquad::math::vec2(pos.x - NAIL_CELL / 2.0, pos.y + 6.0 - NAIL_FOOT)
 }
 
-/// 큰 그림 시트(momo.png, 0206 C3): 32×32 칸, 발바닥 줄(칸 위에서). 몸은 Naïl과 같은 크기, 칸만 넓다 —
-/// 차기·쓰러짐은 몸을 옆으로 뻗어 외곽선까지 28px라 24칸에서는 얼굴이 잘렸다.
-pub const BIG_CELL: f32 = 32.0;
-pub const BIG_FOOT: f32 = 30.0;
+/// 새 그림 시트 하나(0206 C3): critters의 돌아온·물든 두 줄을 대신한다. 몸은 Naïl과 같은 크기, 칸은 가장 길게
+/// 뻗는 칸이 들어가게(모모 차기·쓰러짐 28px → 32칸, 도토 달리기·쓰러짐은 꼬리까지 37px → 40칸).
+pub struct BigSheet {
+    pub file: &'static str,
+    pub back: u32,
+    pub tainted: u32,
+    pub cell: f32,
+    /// 발바닥 줄(칸 위에서).
+    pub foot: f32,
+}
+
+pub const BIG_SHEETS: [BigSheet; 2] = [
+    BigSheet {
+        file: "art/momo.png",
+        back: MOMO_BLOOM_ROW,
+        tainted: MOMO_ROW,
+        cell: 32.0,
+        foot: 30.0,
+    },
+    BigSheet {
+        file: "art/doto.png",
+        back: DOTO_BACK_ROW,
+        tainted: DOTO_ROW,
+        cell: 40.0,
+        foot: 38.0,
+    },
+];
 /// critters 16칸의 발바닥 줄(critters.py "발바닥 y=14").
 pub const CRITTER_FOOT: f32 = 14.0;
 
@@ -349,27 +376,36 @@ impl CritterCell<'_> {
 }
 
 impl Art {
-    /// critters `row`줄 `frame`칸(`row`에 `CRITTER_ROWS`를 더하면 흰 실루엣). 새 그림으로 옮긴 줄(모모 둘, 0206 C3)은
-    /// 그 시트로 — 칸 번호의 뜻은 같다(0·1 서기, 2·3 걷기·깡충, 4 웅크림, 5 공격, 6 맞음; 큰 시트는 7 쓰러짐도).
+    /// 이 critters 줄을 대신하는 새 그림 시트와 그 안의 줄(0 돌아온, 1 물든).
+    fn big_sheet(&self, base: u32) -> Option<(&BigSheet, &Texture2D, u32)> {
+        BIG_SHEETS.iter().zip(&self.big).find_map(|(b, t)| {
+            let r = if base == b.back {
+                0
+            } else if base == b.tainted {
+                1
+            } else {
+                return None;
+            };
+            t.as_ref().map(|t| (b, t, r))
+        })
+    }
+
+    /// critters `row`줄 `frame`칸(`row`에 `CRITTER_ROWS`를 더하면 흰 실루엣). 새 그림으로 옮긴 줄(모모·도토, 0206 C3)은
+    /// 그 시트로 — 칸 번호의 뜻은 같다(0·1 서기, 2·3 걷기·깡충, 4 웅크림·겨누기, 5 공격, 6 맞음; 큰 시트는 7 쓰러짐도).
     pub fn critter(&self, frame: u32, row: u32) -> Option<CritterCell<'_>> {
         let (base, sil) = (row % CRITTER_ROWS, row >= CRITTER_ROWS);
-        let big = match base {
-            MOMO_BLOOM_ROW => Some(0),
-            MOMO_ROW => Some(1),
-            _ => None,
-        };
-        if let (Some(r), Some(tex)) = (big, self.momo.as_ref()) {
+        if let Some((b, tex, r)) = self.big_sheet(base) {
             let r = r + if sil { 2 } else { 0 };
             return Some(CritterCell {
                 tex,
                 src: inset(Rect::new(
-                    frame as f32 * BIG_CELL,
-                    r as f32 * BIG_CELL,
-                    BIG_CELL,
-                    BIG_CELL,
+                    frame as f32 * b.cell,
+                    r as f32 * b.cell,
+                    b.cell,
+                    b.cell,
                 )),
-                size: BIG_CELL,
-                foot: BIG_FOOT,
+                size: b.cell,
+                foot: b.foot,
             });
         }
         self.critters.as_ref().map(|tex| CritterCell {
@@ -380,9 +416,9 @@ impl Art {
         })
     }
 
-    /// 이 줄이 큰 그림 시트에 있나(쓰러짐 칸 7이 있다).
+    /// 이 줄이 새 그림 시트에 있나(쓰러짐 칸 7이 있다).
     pub fn critter_is_big(&self, row: u32) -> bool {
-        self.momo.is_some() && matches!(row % CRITTER_ROWS, MOMO_ROW | MOMO_BLOOM_ROW)
+        self.big_sheet(row % CRITTER_ROWS).is_some()
     }
 }
 
