@@ -273,9 +273,11 @@ pub(super) fn draw_player_fx(p: &Player, alpha: f32) {
 /// "딱 맞춘 강타" 창(`HEAVY_PERFECT`) 동안은 굵은 금빛 + 바깥으로 튀는 점 넷 — 지금 떼라. 창이 지나면 가는 흰 고리로 남는다.
 /// 어두운 밑줄을 먼저 깔아 풀밭에서도 어두운 굴에서도 보인다(플레이어 표시라 예고와 달리 밑줄을 둔다).
 /// 모양(차오르는 호 → 닫힌 고리 → 굵기)으로도 읽혀 색만으로 가르지 않는다.
+/// 고리는 웅크린 발 줄(pos.y + 6~7)에 납작하게 깐다(0208): 예전 자리(가운데 +5, 세로 4.5)는 뒤쪽 호가 발보다 5px 위를
+/// 지나 도토 꼬리와 다리 사이·모모 다리 사이 틈으로 비쳐, 몸 아랫도리를 가로로 자른 것처럼 보였다.
 fn draw_charge_ring(pos: Vec2, ct: f32) {
-    let c = vec2(pos.x.round(), (pos.y + 5.0).round());
-    let (rx, ry) = (10.0, 4.5);
+    let c = vec2(pos.x.round(), (pos.y + 7.0).round());
+    let (rx, ry) = (10.0, 3.5);
     let at = |a: f32| c + vec2(a.sin() * rx, -a.cos() * ry);
     const N: usize = 28;
     let k = (ct / t::HEAVY_CHARGE).clamp(0.0, 1.0);
