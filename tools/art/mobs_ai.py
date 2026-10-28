@@ -76,6 +76,29 @@ MOBS = {
         body_h=16,
         strip=11,
     ),
+    "shrew": dict(
+        frames={"stand": (62, 65, 276, 182), "walk": (389, 65, 635, 185), "crouch": (713, 64, 980, 185),
+                "dart": (8, 343, 333, 462), "hurt": (392, 286, 632, 462), "down": (705, 364, 995, 462)},
+        order=["stand", "stand", "walk", "stand", "crouch", "dart", "hurt", "down"],   # 키 8이라 내쉴 줄이 없다
+        body_h=8,
+        strip=11,
+    ),
+    # 고슴도치: 예고·공격이 가시 공 두 장(구를 때 게임이 칸 4·5를 번갈아 쓴다 — 콩이와 같다).
+    "hedgehog": dict(
+        frames={"stand": (56, 45, 281, 210), "walk": (397, 45, 624, 220), "ball_a": (755, 45, 952, 219),
+                "ball_b": (72, 292, 269, 483), "hurt": (392, 285, 632, 476), "down": (726, 320, 988, 483)},
+        order=["stand", "~stand", "walk", "stand", "ball_a", "ball_b", "hurt", "down"],
+        body_h=12,
+        strip=11,
+    ),
+    # 두꺼비: 공격 칸은 입을 벌린다(혀는 게임이 그린다).
+    "toad": dict(
+        frames={"stand": (58, 49, 312, 216), "walk": (379, 47, 646, 227), "puff": (724, 29, 967, 228),
+                "gape": (58, 271, 298, 469), "hurt": (399, 278, 625, 469), "down": (690, 342, 988, 469)},
+        order=["stand", "~stand", "walk", "stand", "puff", "gape", "hurt", "down"],
+        body_h=11,
+        strip=12,
+    ),
 }
 
 
