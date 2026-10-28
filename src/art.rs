@@ -109,9 +109,9 @@ pub const PORTRAIT: f32 = 88.0;
 pub const PORTRAIT_COLS: u32 = 12;
 
 pub const CELL: f32 = 16.0;
-/// Naïl 시트(nail.png·nail_fur*.png)의 칸(0206): 32×32, 발바닥 줄 `NAIL_FOOT`(칸 위에서). 다른 시트는 `CELL`.
-pub const NAIL_CELL: f32 = 32.0;
-pub const NAIL_FOOT: f32 = 30.0;
+/// Naïl 시트(nail.png·nail_fur*.png)의 칸(0206): 24×24(몸 16px + 뻗은 발톱), 발바닥 줄 `NAIL_FOOT`(칸 위에서). 다른 시트는 `CELL`.
+pub const NAIL_CELL: f32 = 24.0;
+pub const NAIL_FOOT: f32 = 22.0;
 
 /// critters.png에서 실루엣 줄까지의 거리(그림 줄 수).
 pub const CRITTER_ROWS: u32 = 22;

@@ -799,18 +799,18 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
                     },
                 );
             }
-            // 흙더미는 아래서부터 올라온다.
-            // 흙더미는 32칸의 아래 16줄에만 있다(0206).
+            // 흙더미는 아래서부터 올라온다. 흙더미는 칸의 아래 16줄에만 있다(0206).
             let rise = (16.0 * (1.0 - k)).round();
+            let top = art::NAIL_CELL - 16.0;
             draw_texture_ex(
                 art.nail_fur(fur),
                 o.x,
-                o.y + 16.0 + rise,
+                o.y + top + rise,
                 WHITE,
                 DrawTextureParams {
                     source: Some(Rect::new(
                         0.0,
-                        art::NAIL_CELL * 2.0 + 16.0,
+                        art::NAIL_CELL * 2.0 + top,
                         art::NAIL_CELL,
                         16.0 - rise,
                     )),
@@ -881,7 +881,7 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
         WHITE
     };
     if pop > 0.0 {
-        draw_ellipse(pos.x, pos.y + 6.0, 10.0 - pop * 0.25, 3.0, 0.0, SHADOW_SOFT);
+        draw_ellipse(pos.x, pos.y + 6.0, 7.0 - pop * 0.25, 2.5, 0.0, SHADOW_SOFT);
     }
     // 다 모이면 떨린다(0161).
     let jitter = match p.state {

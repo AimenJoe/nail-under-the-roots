@@ -157,20 +157,7 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
         player::State::Burrow { .. } | player::State::Dead
     );
     if standing && ground {
-        // 32칸 Naïl(0206)은 발이 넓다. 모모·도토(16칸)는 그대로.
-        let rx = if w.player.kit == crate::equipment::Character::Mole {
-            10.0
-        } else {
-            6.0
-        };
-        draw_ellipse(
-            pp.x,
-            pp.y + 6.0,
-            rx,
-            if rx > 6.0 { 2.8 } else { 2.0 },
-            0.0,
-            SHADOW_SOFT,
-        );
+        draw_ellipse(pp.x, pp.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
         draw_player_halo(pp, w.time);
     }
     if !ground {

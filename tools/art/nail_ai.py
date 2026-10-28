@@ -32,9 +32,9 @@ sys.path.insert(0, str(HERE))
 import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림과 털빛 표(FURS)를 같이 쓴다
 
 SRC = HERE / "sources" / "ai" / "sprites" / "nail_s1_v2.png"   # 시안 1 몸 + 둥근 시트의 눈·볼(0206, ✦는 지움)
-CELL = 32
-FOOT = 30          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(16칸 시절 그대로).
-BODY_H = 28        # 기준 칸의 몸 키(px)
+CELL = 24          # 몸 16px + 뻗은 발톱이 들어가는 칸(0206: 32칸·몸 28은 월드에 비해 컸다)
+FOOT = 22          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(16칸 시절 그대로).
+BODY_H = 16        # 기준 칸의 몸 키(px) — 타일·들쥐와 같은 크기(사장: 28은 4배 넓이라 컸다)
 NCOL = 20
 OUTLINE = (43, 29, 42)
 
@@ -193,7 +193,7 @@ def seat(sprite, dx=0, dy=0):
 
 
 def small(grid_text):
-    """16칸 그림(흙더미·그림자)을 32칸 아래 가운데에."""
+    """16칸 그림(흙더미·그림자)을 칸 아래 가운데에."""
     rows = legacy.outline(legacy.grid(grid_text))
     cell = np.zeros((CELL, CELL, 4), np.uint8)
     for y, r in enumerate(rows):
@@ -202,7 +202,7 @@ def small(grid_text):
                 continue
             c = legacy.P[ch]
             c = c if len(c) == 4 else c + (255,)
-            cell[CELL - 16 + y, 8 + x] = c
+            cell[CELL - 16 + y, (CELL - 16) // 2 + x] = c
     return cell
 
 
