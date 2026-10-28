@@ -94,10 +94,59 @@ def small(grid_text):
     return cell
 
 
+# 눈(0206 고침, 사장 "걷는 애니메이션, 눈이 바뀌는 부분 이상하네"): 원본 걷기 넷은 칸마다 눈을 조금씩 다르게 그렸다
+# (까만 두 점 / 번진 보라 / 흰 빛점 / 가로 두 점) — 1배에서 걸을 때 눈이 깜빡이듯 바뀌었다. 서기 칸의 눈(까만 두 점 +
+# 왼쪽 아래 남빛 한 점)을 걷기 칸마다 코(분홍)를 기준으로 같은 자리에 찍는다.
+EYE_COLORS = {(20, 9, 25), (64, 42, 81), (100, 83, 128), (255, 255, 255)}
+PUPIL = (20, 9, 25)
+NOSE = (231, 137, 153)
+
+
+def _is_eye(cell, y, x):
+    return cell[y, x, 3] > 0 and tuple(int(v) for v in cell[y, x, :3]) in EYE_COLORS
+
+
+def _pupil(cell):
+    """눈동자(가장 짙은 점) 중 가장 위·왼쪽 — 얼굴 기준점. 코 분홍 왼쪽 6칸 안, 코 줄 위아래 3줄 안에서 찾는다
+    (코 모양은 칸마다 조금씩 달라 기준으로 쓰면 눈이 둘이 됐다)."""
+    ys, xs = np.nonzero(np.all(cell[..., :3] == NOSE, axis=-1) & (cell[..., 3] > 0))
+    ny, nx = int(ys.min()), int(xs.min())
+    pts = [(y, x) for y in range(ny - 3, ny + 2) for x in range(nx - 6, nx)
+           if cell[y, x, 3] > 0 and tuple(int(v) for v in cell[y, x, :3]) == PUPIL]
+    return min(pts)
+
+
+def same_eye(cell, ref):
+    """`ref`(서기 칸)의 눈을 `cell`의 눈동자 자리에 맞춰 찍는다. 원래 눈 점(빛점·번진 보라 포함)은 둘레 털색으로 지운다."""
+    ry, rx = _pupil(ref)
+    cy, cx = _pupil(cell)
+    dy, dx = cy - ry, cx - rx
+    eye = [(y, x) for y in range(ry - 1, ry + 3) for x in range(rx - 2, rx + 2) if _is_eye(ref, y, x)]
+    out = cell.copy()
+    y0, y1 = min(y for y, _ in eye) + dy - 1, max(y for y, _ in eye) + dy + 1
+    x0, x1 = min(x for _, x in eye) + dx - 1, max(x for _, x in eye) + dx + 1
+    fur = {}
+    for y in range(y0, y1 + 1):
+        for x in range(x0, x1 + 1):
+            if cell[y, x, 3] > 0 and not _is_eye(cell, y, x):
+                k = tuple(int(v) for v in cell[y, x])
+                fur[k] = fur.get(k, 0) + 1
+    fill = np.array(max(fur, key=fur.get), np.uint8)
+    for y in range(y0, y1 + 1):
+        for x in range(x0, x1 + 1):
+            if _is_eye(cell, y, x):
+                out[y, x] = fill
+    for y, x in eye:
+        out[y + dy, x + dx] = ref[y, x]
+    return out
+
+
 def build():
     spr = convert(SPEC)
+    idle = seat(spr["idle_a"], CELL, FOOT)
     rows = [
-        [seat(spr[k], CELL, FOOT) for k in ("idle_a", "idle_b", "walk_a", "walk_b", "walk_c", "walk_d")],
+        [idle, seat(spr["idle_b"], CELL, FOOT)]
+        + [same_eye(seat(spr[k], CELL, FOOT), idle) for k in ("walk_a", "walk_b", "walk_c", "walk_d")],
         # 동작 칸은 몸통 털의 가운데를 서기 칸에 맞춘다(발톱을 뻗어도 몸이 옆으로 뛰지 않게).
         [seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT)
          for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],

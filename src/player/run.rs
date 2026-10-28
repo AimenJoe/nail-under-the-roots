@@ -86,14 +86,23 @@ impl Player {
         self.pos += dir * (dist / t::JUMP_TIME) * (time.min(t::JUMP_TIME) - was);
         let mut thrown = thrown;
         let doto = self.kit.def().dodge == crate::characters::Dodge::Leap;
-        if doto && !thrown && self.armed && self.no_attack <= 0.0 && self.attack_buf > 0.0 {
-            let aim = c.a.aim.normalize_or(self.facing);
-            self.facing = aim;
-            self.swing_id += 1;
-            self.attack_buf = 0.0;
-            self.throw_shots(self.moveset.hits[0].throw, aim, self.hit_strike(0, aim));
-            self.events.push(Event::Swing(0));
-            thrown = true;
+        // 도토(0212, 사장 "가장 가까운 적에게 쏴야 될 듯, 아니면 메리트가 없어"): 공중 꼭대기에서 저절로, 닿는 거리 안의
+        // 가장 가까운 적에게 셋째 타(부채꼴 셋)를 한 번. 꼭대기 전에 공격을 누르면 그때(적이 없으면 겨눈 쪽으로).
+        if doto && !thrown && self.armed && self.no_attack <= 0.0 {
+            let pressed = self.attack_buf > 0.0;
+            let apex = was < t::JUMP_TIME * 0.5 && time >= t::JUMP_TIME * 0.5;
+            let fan = self.moveset.hits.len() - 1;
+            let aim = self
+                .air_target(fan)
+                .or_else(|| pressed.then(|| c.a.aim.normalize_or(self.facing)));
+            if let (true, Some(aim)) = (pressed || apex, aim) {
+                self.facing = aim;
+                self.swing_id += 1;
+                self.attack_buf = 0.0;
+                self.throw_shots(self.moveset.hits[fan].throw, aim, self.hit_strike(fan, aim));
+                self.events.push(Event::Swing(fan));
+                thrown = true;
+            }
         }
         if time < t::JUMP_TIME {
             self.state = State::Jump {
@@ -109,6 +118,20 @@ impl Player {
         let stomp = !doto;
         self.events.push(Event::JumpLand { stomp });
         stomp.then(|| self.jump_stomp())
+    }
+
+    /// 공중 던지기가 겨눌 쪽(0212): 그 타의 도토리가 닿는 거리 안에서 가장 가까운 적. 없으면 None.
+    fn air_target(&self, idx: usize) -> Option<Vec2> {
+        let crate::moveset::Throw::Shot { reach, .. } = self.moveset.hits[idx].throw else {
+            return None;
+        };
+        let reach = reach * self.stats.throw_reach;
+        self.targets
+            .iter()
+            .map(|q| *q - self.pos)
+            .filter(|d| d.length() <= reach && d.length() > 0.5)
+            .min_by(|a, b| a.length().total_cmp(&b.length()))
+            .map(|d| d.normalize())
     }
 
     /// 모모 멀리뛰기 착지 밟기 반지름(0209). 재주 발 구르기(0142)를 골랐으면 더 넓다. 월드의 고리도 이 값.
@@ -244,7 +267,7 @@ mod tests {
         assert!(p.burrow_cd > 0.0);
     }
 
-    /// 모모는 멀리뛰기 착지에 둘레를 밟는다(발 구르기 재주면 더 넓고 +1). 도토는 공중에서 한 번만 던진다.
+    /// 모모는 멀리뛰기 착지에 둘레를 밟는다(발 구르기 재주면 더 넓고 +1). 도토는 공중에서 가장 가까운 적에게 한 번(0212).
     #[test]
     fn momo_stomps_and_doto_throws_once_in_the_air() {
         let (mut p, room) = player(Character::Momo);
@@ -263,31 +286,48 @@ mod tests {
         );
         assert_eq!(big.damage, t::JUMP_STOMP_DAMAGE + 1 + p.stats.damage);
 
-        let (mut p, room) = player(Character::Doto);
-        p.update(&act(true, true, false), &room, t::TICK_DT);
-        while !matches!(p.state, State::Run { .. }) {
-            p.update(&act(false, true, false), &room, t::TICK_DT);
-        }
-        for _ in 0..30 {
-            p.update(&act(false, true, false), &room, t::TICK_DT);
-        }
-        p.update(&Actions::default(), &room, t::TICK_DT);
-        assert!(matches!(p.state, State::Jump { .. }));
-        let mut shots = 0;
-        while p.state != State::Free {
-            let a = Actions {
-                attack: true,
-                ..Default::default()
-            };
-            p.update(&a, &room, t::TICK_DT);
-            shots += p
-                .spawns
-                .iter()
-                .filter(|s| matches!(s, Spawn::Shot { .. }))
-                .count();
-            assert!(p.is_invulnerable() || p.state == State::Free);
-        }
-        assert_eq!(shots, 1, "공중에서 한 번");
+        // 도토(0212): 누르고 있으면(적 없음) 겨눈 쪽으로 부채꼴 셋 한 번. 안 눌러도 적이 닿는 거리면 꼭대기에서 저절로 그 적에게.
+        let air = |targets: Vec<Vec2>, press: bool| {
+            let (mut p, room) = player(Character::Doto);
+            p.update(&act(true, true, false), &room, t::TICK_DT);
+            while !matches!(p.state, State::Run { .. }) {
+                p.update(&act(false, true, false), &room, t::TICK_DT);
+            }
+            for _ in 0..30 {
+                p.update(&act(false, true, false), &room, t::TICK_DT);
+            }
+            p.update(&Actions::default(), &room, t::TICK_DT);
+            assert!(matches!(p.state, State::Jump { .. }));
+            let mut shots = Vec::new();
+            while p.state != State::Free {
+                p.targets = targets.clone();
+                let a = Actions {
+                    attack: press,
+                    ..Default::default()
+                };
+                p.update(&a, &room, t::TICK_DT);
+                for s in &p.spawns {
+                    if let Spawn::Shot { vel, .. } = s {
+                        shots.push((p.pos, *vel));
+                    }
+                }
+                assert!(p.is_invulnerable() || p.state == State::Free);
+            }
+            shots
+        };
+        assert_eq!(air(vec![], true).len(), 3, "누르면 한 번(부채꼴 셋)");
+        assert!(
+            air(vec![], false).is_empty(),
+            "적도 누름도 없으면 안 던진다"
+        );
+        let foe = vec2(24.0 + 200.0, 60.0);
+        let shots = air(vec![foe], false);
+        assert_eq!(shots.len(), 3, "꼭대기에서 저절로 한 번");
+        let (from, mid) = (shots[1].0, shots[1].1);
+        assert!(
+            mid.normalize().dot((foe - from).normalize()) > 0.99,
+            "가장 가까운 적 쪽으로"
+        );
     }
 
     /// 달리다 공격하면 그 자리에서 1타. Naïl은 달리지 않는다(쥐기는 땅파기).
