@@ -28,22 +28,22 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림과 털빛 표(FURS)를 같이 쓴다
 
-SRC = HERE / "sources" / "ai" / "sprites" / "nail_s1_v1.png"   # 실루엣 시안 1로 받은 시트(0206, ✦는 지움)
+SRC = HERE / "sources" / "ai" / "sprites" / "nail_s1_v2.png"   # 시안 1 몸 + 둥근 시트의 눈·볼(0206, ✦는 지움)
 CELL = 32
 FOOT = 30          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(16칸 시절 그대로).
 BODY_H = 28        # 기준 칸의 몸 키(px)
 NCOL = 20
 OUTLINE = (43, 29, 42)
 
-# 원본 칸(시트 좌표 x0, y0, x1, y1). 원본은 줄마다 그린 크기가 다르다(윗줄 블록 8px, 아랫줄 4px) →
+# 원본 칸(시트 좌표 x0, y0, x1, y1). 원본은 줄마다 그린 크기가 다르다(서기 칸이 걷기 칸보다 크다) →
 # 배율은 줄(무리)마다 그 무리의 첫 칸 몸 키로 맞춘다(칸마다 맞추면 걷기의 들썩임이 사라진다).
-SRC_FRAMES = {
-    "idle_a": (40, 56, 488, 424),
-    "idle_b": (536, 56, 968, 424),
-    "walk_a": (20, 504, 260, 736),
-    "walk_b": (272, 504, 508, 736),
-    "walk_c": (508, 504, 752, 736),
-    "walk_d": (760, 504, 1000, 736),
+SRC_FRAMES = {               # 원본의 발밑 보라 줄(윗줄 y 386~391, 아랫줄 661~666)은 칸 밖으로 뺀다
+    "idle_a": (39, 7, 463, 385),
+    "idle_b": (554, 17, 982, 385),
+    "walk_a": (6, 419, 247, 660),
+    "walk_b": (265, 419, 499, 660),
+    "walk_c": (523, 419, 754, 660),
+    "walk_d": (777, 419, 1013, 660),
 }
 GROUP = {"idle_a": "idle_a", "idle_b": "idle_a", "walk_a": "walk_a", "walk_b": "walk_a", "walk_c": "walk_a", "walk_d": "walk_a"}
 REF = "idle_a"
