@@ -4,7 +4,7 @@
    움직임(반딧불·걷는 스프라이트)은 prefers-reduced-motion이면 멈춘다. */
 @font-face {
   font-family: "Galmuri11";
-  src: url("fonts/galmuri11-sub.woff2?v=e2adf3fa") format("woff2");
+  src: url("fonts/galmuri11-sub.woff2?v=81dcd195") format("woff2");
   font-display: swap;
 }
 :root {
