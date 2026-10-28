@@ -34,8 +34,8 @@ PORTRAITS = {
 }
 # 스포일러가 없는 일러스트만(타이틀 바탕·오프닝의 엄마 굴).
 ILLUSTS = ["title", "mother_burrow"]
-# 페이지에서 걷는 스프라이트(0155): (시트, 줄, 첫 칸, 칸 수). 16×16 칸을 가로 띠로 잘라 CSS steps()로 돌린다.
-# nail.png 줄 0 = 서 있기 2 + 걷기 4, critters.png는 tools/art/critters.py 머리말의 줄 번호.
+# 페이지에서 걷는 스프라이트(0155): (시트, 줄, 첫 칸, 칸 수). 정사각 칸을 가로 띠로 잘라 CSS steps()로 돌린다.
+# 칸은 16px, nail.png만 24px(art::NAIL_CELL, 0206). nail.png 줄 0 = 서 있기 2 + 걷기 4, critters.png는 tools/art/critters.py 머리말의 줄 번호.
 SPRITES = {
     "nail": ("nail.png", 0, 2, 4),
     "momo": ("critters.png", 8, 2, 2),
@@ -48,6 +48,7 @@ SPRITES = {
     "sporecap": ("critters.png", 18, 0, 2),
     "popo": ("critters.png", 6, 2, 2),
 }
+CELLS = {"nail.png": 24}
 
 
 def main() -> None:
@@ -60,9 +61,11 @@ def main() -> None:
         shutil.copyfile(ART / "illust" / f"{name}.png", OUT / f"i_{name}.png")
     for name, (sheet_name, row, first, n) in SPRITES.items():
         sh = Image.open(ART / sheet_name).convert("RGBA")
-        sh.crop((first * 16, row * 16, (first + n) * 16, row * 16 + 16)).save(OUT / f"sp_{name}.png", optimize=True)
-    # 파비콘: 나일 스프라이트 첫 칸(16×16).
-    Image.open(ART / "nail.png").convert("RGBA").crop((0, 0, 16, 16)).save(OUT / "favicon.png")
+        c = CELLS.get(sheet_name, 16)
+        sh.crop((first * c, row * c, (first + n) * c, row * c + c)).save(OUT / f"sp_{name}.png", optimize=True)
+    # 파비콘: 나일 스프라이트 첫 칸.
+    c = CELLS["nail.png"]
+    Image.open(ART / "nail.png").convert("RGBA").crop((0, 0, c, c)).save(OUT / "favicon.png")
     subset_font()
     bust_cache()
 
