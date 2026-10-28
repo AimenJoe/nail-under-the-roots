@@ -318,7 +318,7 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
                     draw_critter_at(art, art::RACCOON_ROW, n.pos, left, false, w.time)
                 }
                 world::Who::Bori => draw_bori_at(art, n.pos, left, false, w.time),
-                world::Who::Halmae => draw_halmae_at(n.pos, w.time),
+                world::Who::Halmae => draw_halmae_at(art, n.pos, w.time),
                 world::Who::Momo => {
                     let on_seat = n.pos - vec2(0.0, 7.0);
                     draw_critter_at(art, art::MOMO_BLOOM_ROW, on_seat, left, false, w.time);

@@ -27,6 +27,8 @@ pub struct Art {
     pub portraits: Option<Texture2D>,
     /// 들쥐 대장·보리(tools/art/bori_ai.py, 0216): 40×40(발바닥 38), 줄 0 돌아온 보리, 줄 1 물든 대장, 줄 2·3 흰 실루엣.
     pub chief: Option<Texture2D>,
+    /// 누룩 할매(tools/art/halmae_ai.py, 0219): 줄 0 가장 깊은 곳 96칸, 줄 1 마을 40칸. 없으면 코드 그림.
+    pub halmae: Option<Texture2D>,
     /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 털빛 1~3, 줄 4 돌아온 모모. 땅 단면 전환에서만.
     pub dig: Option<Texture2D>,
     /// 컷씬 일러스트(illust::Illust::ALL 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
@@ -109,6 +111,37 @@ pub fn chief_cell(col: u32, row: u32) -> Rect {
     ))
 }
 
+/// halmae.png(0219): 원본 한 장을 두 크기로. 줄 0(y 0~95) 96×96 칸 여섯 — 가장 깊은 곳, 줄 1(y 96~135) 40×40 칸
+/// 여섯 — 마을 이웃. 칸 뜻은 두 줄이 같다.
+pub const HALMAE_BIG: f32 = 96.0;
+pub const HALMAE_BIG_FOOT: f32 = 94.0;
+pub const HALMAE_SMALL: f32 = 40.0;
+pub const HALMAE_SMALL_FOOT: f32 = 38.0;
+/// 칸: 0·1 숨(들숨·날숨), 2 당기기, 3 움찔(매듭이 깎일 때), 4 놓아주기(눈을 뜬다), 5 기쁨.
+pub const HALMAE_PULL: u32 = 2;
+pub const HALMAE_FLINCH: u32 = 3;
+pub const HALMAE_RELEASE: u32 = 4;
+pub const HALMAE_HAPPY: u32 = 5;
+
+/// 할매 한 칸을 발바닥 `feet`(가운데)에 그린다. `big`이면 가장 깊은 곳 크기, 아니면 마을 크기.
+pub fn draw_halmae(tex: &Texture2D, frame: u32, big: bool, feet: Vec2) {
+    let (cell, foot, y) = if big {
+        (HALMAE_BIG, HALMAE_BIG_FOOT, 0.0)
+    } else {
+        (HALMAE_SMALL, HALMAE_SMALL_FOOT, HALMAE_BIG)
+    };
+    draw_texture_ex(
+        tex,
+        (feet.x - cell / 2.0).round(),
+        (feet.y - foot).round(),
+        WHITE,
+        DrawTextureParams {
+            source: Some(inset(Rect::new(frame as f32 * cell, y, cell, cell))),
+            ..Default::default()
+        },
+    );
+}
+
 /// 초상화 한 칸(원본 px).
 pub const PORTRAIT: f32 = 88.0;
 /// 초상화 시트 한 줄의 칸 수. 칸이 늘어 한 줄이면 2,048px를 넘는다(오래된 폰의 텍스처 한도) → 12칸씩 줄을 바꾼다.
@@ -169,6 +202,7 @@ impl Art {
                 "art/portraits.png",
                 "art/critters.png",
                 "art/chief.png",
+                "art/halmae.png",
                 "art/dig.png",
             ]
             .iter()
@@ -213,6 +247,10 @@ impl Art {
         let chief = crate::loading::texture("art/chief.png").await.ok();
         if let Some(c) = &chief {
             c.set_filter(FilterMode::Nearest);
+        }
+        let halmae = crate::loading::texture("art/halmae.png").await.ok();
+        if let Some(h) = &halmae {
+            h.set_filter(FilterMode::Nearest);
         }
         let mut big = Vec::new();
         for b in BIG_SHEETS {
@@ -261,6 +299,7 @@ impl Art {
             big,
             portraits,
             chief,
+            halmae,
             dig,
             illust,
         })

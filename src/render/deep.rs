@@ -4,7 +4,7 @@ use super::*;
 
 /// 가장 깊은 곳(0162): 할매(가운데의 큰 균사 더미, 감은 눈, 작은 웃음) · 매듭 셋 · 할매와 매듭을 잇는 실 ·
 /// 당기는 실(뻗을 때·감았을 때). 바닥 높이에 그린다(Naïl은 늘 아래쪽이라 앞에 온다).
-pub(super) fn draw_deep(d: &world::Deep, w: &World, alpha: f32) {
+pub(super) fn draw_deep(art: &Art, d: &world::Deep, w: &World, alpha: f32) {
     let t = w.time;
     let c = d.center;
     // 실: 가운데에서 안 끊긴 매듭으로, 물결치는 보라 선 + 흰 점.
@@ -59,6 +59,25 @@ pub(super) fn draw_deep(d: &world::Deep, w: &World, alpha: f32) {
         Color::new(0.85, 0.80, 1.0, 0.08 * glow),
     );
     draw_ellipse(c.x, c.y + 12.0, 50.0 * br, 16.0, 0.0, SHADOW_SOFT);
+    if let Some(tex) = &art.halmae {
+        // 새 그림(0219): 숨 두 칸, 당기기·매듭이 깎일 때·놓아줄 때(눈을 뜬다 → 다 놓으면 웃는다)는 그 칸.
+        let frame = if rel >= 1.0 && d.done_t.unwrap_or(0.0) > 2.4 {
+            art::HALMAE_HAPPY
+        } else if rel > 0.6 {
+            art::HALMAE_RELEASE
+        } else if d.knots.iter().any(|k| k.shake > 0.0) {
+            art::HALMAE_FLINCH
+        } else if d
+            .pull
+            .is_some_and(|p| p.time < t::DEEP_PULL_WINDUP + t::DEEP_PULL_TIME)
+        {
+            art::HALMAE_PULL
+        } else {
+            ((t * 0.9) as u32) % 2
+        };
+        art::draw_halmae(tex, frame, true, vec2(c.x, c.y + 28.0));
+        return;
+    }
     draw_ellipse(
         c.x,
         c.y + 2.0,

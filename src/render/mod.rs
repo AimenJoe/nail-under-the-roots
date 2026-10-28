@@ -345,7 +345,7 @@ impl Renderer {
                 draw_cocoon(*c, w.time);
             }
             if let Some(d) = &w.deep {
-                draw_deep(d, w, alpha);
+                draw_deep(art, d, w, alpha);
             }
             self.draw_sun_shadows(art, w, alpha);
             draw_drill_trail(Some(art), &w.player, alpha);
