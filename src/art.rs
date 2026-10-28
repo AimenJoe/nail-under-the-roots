@@ -36,7 +36,7 @@ pub struct Art {
     pub halmae: Option<Texture2D>,
     /// 소품(tools/art/props_ai.py, 0222): 24칸 여섯(`PROP_*`) — 부술 수 있는 것 넷 + 상자 닫힘·열림. 없으면 코드 그림.
     pub props: Option<Texture2D>,
-    /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸 다섯(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리. 없으면 팩·코드 그림.
+    /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸 여섯(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리·뿌리 길 입구. 없으면 팩·코드 그림.
     pub hub: Option<Texture2D>,
     /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 털빛 1~3, 줄 4 돌아온 모모. 땅 단면 전환에서만.
     pub dig: Option<Texture2D>,
@@ -163,6 +163,8 @@ pub const HUB_FIREPIT: u32 = 1;
 pub const HUB_STUMP: u32 = 2;
 pub const HUB_BOULDER: u32 = 3;
 pub const HUB_LOG: u32 = 4;
+/// 뿌리 길 입구(팻말 + 첫 구멍). 구멍 가운데 = 발 + (5, -9).
+pub const HUB_GATE: u32 = 5;
 
 /// 마을·쉼터 물건 한 칸을 발바닥 `feet`(가운데)에 그린다.
 pub fn draw_hub(tex: &Texture2D, frame: u32, feet: Vec2, tint: Color) {

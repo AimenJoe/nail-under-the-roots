@@ -237,7 +237,13 @@ pub(super) fn draw_root_gate(
 
 /// 격자 방(필드·던전) 그림: 구운 지도(terrain.rs, 0062)의 보이는 부분 + 매 프레임 바뀌는 칸.
 /// 특별한 칸: 문(열림 = 바닥, 잠김 = 나무 울타리(팩 없으면 물든 뿌리) + 보라 실, 0094·0097), 굴 입구, 출구, 저장 지점(빛나는 버섯 고리).
-pub(super) fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D, sheet: Option<&Texture2D>) {
+pub(super) fn draw_grid_art(
+    w: &World,
+    cam: Vec2,
+    baked: &Texture2D,
+    sheet: Option<&Texture2D>,
+    hub: Option<&Texture2D>,
+) {
     let Some(g) = &w.room.grid else { return };
     let view = Rect::new(cam.x.floor() - 1.0, cam.y.floor() - 1.0, RW + 3.0, RH + 3.0);
     let bounds = Rect::new(0.0, 0.0, baked.width(), baked.height());
@@ -289,7 +295,21 @@ pub(super) fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D, sheet: Opti
                 // 출구(0159): 길의 굴에서는 더 깊이 파 내려가는 구멍, 필드의 옛 굴에서는 올라가는 구멍.
                 Cell::Exit => draw_exit(p, w.time, w.adv.node.is_some()),
                 Cell::Gate => {
-                    // 뿌리 길: 뿌리가 감싼 큰 구멍 + 팻말.
+                    let pulse = 0.4 + 0.3 * (w.time * 2.0).sin().abs();
+                    // 뿌리 길: 그림이 있으면 팻말 + 첫 구멍(hub 칸 5, 0224 — 구멍 가운데가 칸 가운데 아래 3px).
+                    if let Some(h) = hub {
+                        art::draw_hub(h, art::HUB_GATE, p + vec2(-5.0, 12.0), WHITE);
+                        draw_ellipse(
+                            p.x,
+                            p.y + 3.0,
+                            4.0,
+                            1.5,
+                            0.0,
+                            Color::new(0.7, 0.9, 1.0, pulse * 0.4),
+                        );
+                        continue;
+                    }
+                    // 그림이 없으면 코드로: 뿌리가 감싼 큰 구멍 + 팻말.
                     let root = Color::new(0.42, 0.30, 0.24, 1.0);
                     draw_ellipse(p.x, p.y + 2.0, 15.0, 8.0, 0.0, OUTLINE);
                     draw_ellipse(p.x, p.y + 2.0, 13.0, 6.5, 0.0, world::DIRT);
@@ -306,7 +326,6 @@ pub(super) fn draw_grid_art(w: &World, cam: Vec2, baked: &Texture2D, sheet: Opti
                         let q = p + vec2(a.cos() * 13.0, 2.0 - a.sin() * 6.5);
                         draw_line(q.x, q.y, q.x + a.cos() * 4.0, q.y - 3.0, 2.0, root);
                     }
-                    let pulse = 0.4 + 0.3 * (w.time * 2.0).sin().abs();
                     draw_ellipse(
                         p.x,
                         p.y + 3.0,

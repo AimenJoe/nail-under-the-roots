@@ -331,7 +331,7 @@ impl Renderer {
                     self.terrain.truncate(TERRAIN_KEEP);
                 }
                 let sheet = art.sunny.as_ref().map(|s| &s.sheet);
-                draw_grid_art(w, cam, &self.terrain[0].1, sheet);
+                draw_grid_art(w, cam, &self.terrain[0].1, sheet, art.hub.as_ref());
             } else {
                 draw_room_art(art, w);
             }
