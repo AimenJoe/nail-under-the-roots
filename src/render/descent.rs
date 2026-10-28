@@ -68,6 +68,15 @@ pub(super) fn draw_descent(
     }
     let a = cover;
     let px = DESCENT_PX_PER_M;
+    // 판 굴 쪽인가: 내려가면 Naïl 위, 올라오면(0204) Naïl 아래. `m`px만큼 Naïl 쪽으로 넓힌다.
+    let up = d.up;
+    let dug = |y: f32, m: f32| {
+        if up {
+            y > DESCENT_DIG_Y - m
+        } else {
+            y < DESCENT_DIG_Y + m
+        }
+    };
     // 화면 맨 위 줄의 절대 깊이(px). 정수로 굴려 도트가 떨리지 않게.
     let top = (d.depth_m * px - DESCENT_DIG_Y).round();
     // 지층: 4m 띠마다 색이 조금씩 다르고, 8px 기둥마다 경계가 물결친다. 2px 줄 단위.
@@ -125,7 +134,7 @@ pub(super) fn draw_descent(
             }
             let cx = c as f32 * big + 6.0 + (hash01(id, 32) * 20.0).floor();
             let cy = by as f32 * big + 6.0 + (hash01(id, 33) * 20.0).floor() - top;
-            if (cx - 160.0).abs() < 16.0 && cy < DESCENT_DIG_Y + 8.0 {
+            if (cx - 160.0).abs() < 16.0 && dug(cy, 8.0) {
                 continue;
             }
             let rr = 3.0 + (hash01(id, 34) * 3.0).floor();
@@ -186,7 +195,7 @@ pub(super) fn draw_descent(
         let ph = hash01(id, 46) * 6.0;
         let mut x = x0;
         while x < x0 + len {
-            if (x - 160.0).abs() > 7.0 || y0 > DESCENT_DIG_Y + 6.0 {
+            if (x - 160.0).abs() > 7.0 || !dug(y0, 6.0) {
                 let yy = (y0 + ((x - x0) * 0.08 + ph).sin() * 3.0).round();
                 draw_rectangle(x, yy, 1.0, thick, rc);
                 draw_rectangle(x, yy + thick, 1.0, 1.0, shade(rc, 0.6, a));
@@ -218,7 +227,7 @@ pub(super) fn draw_descent(
         for c in 0..cols {
             let x0 = c as f32 * cell;
             // 가운데 굴(파 온 길)에는 장식을 두지 않는다.
-            if (x0 + 4.0 - 160.0).abs() < 16.0 && y0 < DESCENT_DIG_Y {
+            if (x0 + 4.0 - 160.0).abs() < 16.0 && dug(y0, 0.0) {
                 continue;
             }
             let id = (cy as u32).wrapping_mul(97) ^ c as u32;
@@ -276,31 +285,45 @@ pub(super) fn draw_descent(
             }
         }
     }
-    // 파 온 굴: Naïl 위로 어두운 기둥, 가장자리 한 줄은 더 어둡다.
+    // 파 온 굴: Naïl 위로(올라오면 아래로) 어두운 기둥, 가장자리 한 줄은 더 어둡다.
     let tw = 18.0;
     let tx = 160.0 - tw / 2.0;
-    let ty = (-top).max(0.0);
-    if ty < DESCENT_DIG_Y {
-        let h = DESCENT_DIG_Y - ty + 4.0;
+    let ty = if up {
+        DESCENT_DIG_Y - 4.0
+    } else {
+        (-top).max(0.0)
+    };
+    let bottom = if up { RH } else { DESCENT_DIG_Y + 4.0 };
+    if ty < bottom {
+        let h = bottom - ty;
         let soil = strata_color(d.depth_m);
         draw_rectangle(tx, ty, tw, h, shade(soil, 0.42, a));
         draw_rectangle(tx - 1.0, ty, 1.0, h, shade(soil, 0.65, a));
         draw_rectangle(tx + tw, ty, 1.0, h, shade(soil, 0.65, a));
-        // 굴 벽에서 떨어지는 부스러기(위로 흘러간다 = 내려가는 중).
+        // 굴 벽에서 떨어지는 부스러기(위로 흘러간다 = 내려가는 중, 아래로 떨어진다 = 올라오는 중).
         for i in 0..10u32 {
             let ph = (clock * 1.3 + hash01(i, 21)).fract();
             let bx = tx + 1.0 + (hash01(i, 22) * (tw - 2.0)).floor();
-            let by = DESCENT_DIG_Y - ph * (DESCENT_DIG_Y - ty);
+            let by = if up {
+                DESCENT_DIG_Y + ph * (RH - DESCENT_DIG_Y)
+            } else {
+                DESCENT_DIG_Y - ph * (DESCENT_DIG_Y - ty)
+            };
             draw_rectangle(bx, by.round(), 1.0, 1.0, shade(soil, 1.3, a * 0.8));
         }
     }
-    // 앞쪽으로 튀는 흙(머리 아래, 좌우로).
+    // 앞쪽으로 튀는 흙(머리 쪽 — 내려가면 아래, 올라오면 위 — 좌우로).
     let soil = strata_color(d.depth_m + 2.0);
     for i in 0..8u32 {
         let ph = (clock * 2.6 + i as f32 / 8.0).fract();
         let side = if i % 2 == 0 { -1.0 } else { 1.0 };
         let sx = 160.0 + side * (3.0 + ph * (6.0 + 6.0 * hash01(i, 23)));
         let sy = DESCENT_DIG_Y + 18.0 - ph * 10.0 + ph * ph * 12.0;
+        let sy = if up {
+            2.0 * (DESCENT_DIG_Y + 6.0) - sy
+        } else {
+            sy
+        };
         draw_rectangle(
             sx.round(),
             sy.round(),
@@ -346,6 +369,8 @@ pub(super) fn draw_descent(
             DrawTextureParams {
                 source: Some(Rect::new(col as f32 * 32.0, row as f32 * 32.0, 32.0, 32.0)),
                 dest_size: Some(vec2(32.0, 32.0)),
+                // 올라올 때는 머리가 위(땅 쪽)로.
+                flip_y: up,
                 ..Default::default()
             },
         );

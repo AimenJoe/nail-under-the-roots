@@ -53,6 +53,8 @@ pub enum Transition {
     EnterNode,
     /// 가장 깊은 곳으로(마지막 길의 보스 출구, 0162). 내려가는 전환.
     EnterDeep,
+    /// 엔딩 뒤 가장 깊은 곳에서 마을로 올라온다(0204). 장소는 이미 마을이라 바꾸지 않고, 단면이 거꾸로 흐른다.
+    Ascend,
 }
 
 impl Transition {
@@ -64,9 +66,16 @@ impl Transition {
         )
     }
 
-    /// 어두워지는(=밝아지는) 반의 길이.
+    /// 검정 대신 지층 단면을 보이는 전환: 내려가기와 올라오기(0204).
+    pub fn strata(self) -> bool {
+        self.descends() || self == Transition::Ascend
+    }
+
+    /// 어두워지는(=밝아지는) 반의 길이. 올라오기는 가장 깊은 곳에서 땅 위까지라 더 길다.
     pub fn half(self) -> f32 {
-        if self.descends() {
+        if self == Transition::Ascend {
+            t::ASCENT_HALF
+        } else if self.descends() {
             t::DESCENT_HALF
         } else {
             t::FADE_HALF
@@ -81,6 +90,8 @@ pub struct Descent {
     pub depth_m: f32,
     /// 단면이 월드를 덮는 정도(0..1). 처음·끝에서 월드와 섞인다.
     pub cover: f32,
+    /// 올라오는 중(0204): 판 굴이 아래에 있고, Naïl은 머리가 위.
+    pub up: bool,
 }
 
 /// 필드 공터의 보스(들쥐 대장).
@@ -509,7 +520,14 @@ impl World {
             self.swap_place(&mut f);
             self.juice.audio.play(sfx::Id::Emerge);
         }
-        self.adv.fade = if f.t >= half * 2.0 { None } else { Some(f) };
+        self.adv.fade = if f.t >= half * 2.0 {
+            if f.kind == Transition::Ascend {
+                self.surface_burst();
+            }
+            None
+        } else {
+            Some(f)
+        };
         self.adv.prev_cam = self.adv.cam;
         true
     }
@@ -531,6 +549,7 @@ impl World {
             Transition::EnterCamp => self.enter_camp(),
             Transition::EnterNode => self.enter_node(),
             Transition::EnterDeep => self.enter_deep(),
+            Transition::Ascend => {}
         }
         f.to_m = self.depth_m();
         if f.kind.descends() && self.adv.shown_biome != Some(self.biome) {
@@ -721,7 +740,7 @@ impl World {
     /// 화면을 덮는 검정(0..1). 렌더가 월드 위에 그린다. 내려가는 전환은 검정 대신 `descent`.
     pub fn fade_alpha(&self) -> f32 {
         match self.adv.fade {
-            Some(f) if !f.kind.descends() => {
+            Some(f) if !f.kind.strata() => {
                 let k = f.t / f.kind.half();
                 if k < 1.0 {
                     k
@@ -735,16 +754,34 @@ impl World {
 
     /// 내려가는 전환 중이면 지층 단면의 모습(0156).
     pub fn descent(&self) -> Option<Descent> {
-        let f = self.adv.fade.filter(|f| f.kind.descends())?;
+        let f = self.adv.fade.filter(|f| f.kind.strata())?;
         let k = (f.t / (f.kind.half() * 2.0)).clamp(0.0, 1.0);
+        let up = f.kind == Transition::Ascend;
         // 처음 0.2·끝 0.2 동안 월드와 섞인다. 깊이는 가운데 0.15~0.85에서 떠난 곳 → 닿을 곳.
-        let cover = (k / 0.2).min((1.0 - k) / 0.2).clamp(0.0, 1.0);
+        // 올라오기는 엔딩의 검정 다음이라 처음부터 다 덮고, 끝에서만 마을과 섞인다.
+        let cover = if up {
+            ((1.0 - k) / 0.2).clamp(0.0, 1.0)
+        } else {
+            (k / 0.2).min((1.0 - k) / 0.2).clamp(0.0, 1.0)
+        };
         let m = ((k - 0.15) / 0.7).clamp(0.0, 1.0);
         let m = m * m * (3.0 - 2.0 * m);
         Some(Descent {
             depth_m: f.from_m as f32 + (f.to_m as f32 - f.from_m as f32) * m,
             cover,
+            up,
         })
+    }
+
+    /// 엔딩 뒤 마을에 들어설 때(0204): 가장 깊은 곳에서 땅 위까지 올라오는 단면을 보이고, 끝나면 뿌리 길 곁에서 튀어나온다.
+    pub fn start_ascent(&mut self) {
+        self.adv.fade = Some(Fade {
+            kind: Transition::Ascend,
+            t: 0.0,
+            swapped: true,
+            from_m: depth::DEEPEST_M,
+            to_m: self.depth_m(),
+        });
     }
 
     /// 앱이 부른다: 쓰러진 뒤 확인을 누르면 저장 지점으로(모험일 때).
@@ -1354,6 +1391,33 @@ mod tests {
     use super::*;
 
     /// 내려가는 전환(0156): 검정 대신 단면이 덮고, 깊이가 쉼터 → 고른 굴로 늘어난다. 새 지대에서만 이름 카드.
+    #[test]
+    fn ascent_climbs_from_deepest_to_village_and_bursts_out() {
+        // 엔딩 뒤 마을(0204): 장소는 그대로, 단면이 가장 깊은 곳 → 땅 위로, 처음부터 다 덮고, 끝에 흙이 터진다.
+        let mut w = World::village(crate::village::State::default());
+        let start = w.player.pos;
+        w.start_ascent();
+        let d = w.descent().expect("단면");
+        assert!(
+            d.up && d.cover > 0.99,
+            "엔딩의 검정 다음이라 처음부터 덮는다"
+        );
+        assert_eq!(d.depth_m, depth::DEEPEST_M as f32);
+        assert_eq!(w.fade_alpha(), 0.0, "검정 덮개 대신 단면");
+        let mut last = d.depth_m;
+        while w.adv.fade.is_some() {
+            assert!(w.adventure_pre(), "올라오는 동안 로직은 멈춘다");
+            if let Some(d) = w.descent() {
+                assert!(d.depth_m <= last + 1e-3, "깊이는 줄기만 한다");
+                last = d.depth_m;
+            }
+        }
+        assert_eq!(last, 0.0, "땅 위까지");
+        assert_eq!(w.adv.place, Place::Village);
+        assert_eq!(w.player.pos, start, "뿌리 길 곁 그 자리로 튀어나온다");
+        assert!(!w.juice.fx.is_empty(), "흙이 터진다");
+    }
+
     #[test]
     fn descent_goes_deeper_and_names_new_zones() {
         let mut w = World::camp_start(1);
