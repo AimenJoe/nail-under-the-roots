@@ -376,28 +376,57 @@ fn draw_buried_at(pos: Vec2, age: f32, fuse: f32, r: f32, ours: bool, time: f32)
     );
 }
 
-/// 공격 예고(0183 → 0184 → 0185 → 0186): 맞을 자리를 **면**으로. 면 전체는 옅게(`TELE_BASE_A`) 깔리고, 테두리(`TELE_RING`
-/// 폭의 띠)와 그 안에서 자라는 채움은 **같은 색·같은 투명도**(`TELE_A`)라 채움이 테두리 안쪽에 닿으면 한 덩어리가 된다 —
+/// 공격 예고(0183 → 0184 → 0185 → 0186): 맞을 자리를 **면**으로. 면 전체는 옅게(`TeleInk::base_a`) 깔리고, 테두리(`TELE_RING`
+/// 폭의 띠)와 그 안에서 자라는 채움은 **같은 색·같은 투명도**(`TeleInk::a`)라 채움이 테두리 안쪽에 닿으면 한 덩어리가 된다 —
 /// **그 순간이 공격**. 원은 가운데부터 바깥으로, 띠는 끝까지 깔린 가운데 줄에서 양옆으로 폭이 넓어진다(0185).
 /// 테두리와 채움은 겹쳐 그리지 않는다(반투명이 겹치면 그 자리만 진해져 다른 색으로 보인다, 0186): 테두리는 겹치지 않는
 /// 삼각형으로 짓고, 채움은 테두리 안쪽까지만. 어두운 밑띠도 뺐다 — 그게 "외곽선"으로 읽혀 채움과 색이 달라 보였다(사장, 0186).
-/// 색은 붉은 계열 하나(`TELE_RGB`, 0187). 못 받아치는 것(둘레)은 가운데 X(0160, X만 어두운 같은 색).
-/// 투명도는 은은하게(0192 → 0196): 어두운 바닥에서 튀지 않을 만큼 — 읽히는 것은 밝기보다 붉은 색조와 테두리 모양이다.
-pub(super) const TELE_A: f32 = 0.25;
-pub(super) const TELE_BASE_A: f32 = 0.03;
+/// 색은 붉은 계열 하나(0187). 못 받아치는 것(둘레)은 가운데 X(0160, X만 어두운 같은 색).
+/// 투명도는 은은하게(0192 → 0196). 밝은 바닥(들판·뿌리)에서만 짙은 빨강으로 바꾼다(0197): 밝은 빨강을 얹으면 풀밭과
+/// 밝기가 같아져 흑백·색약 화면에서 사라졌다(대비 1.03~1.10). 짙은 빨강은 바닥을 살짝 어둡게 해 1.26~1.40.
+/// 어두운 바닥(심층·흰 실 굴)은 원래 빨강 그대로 — 이미 1.4쯤이고, 더 밝은 분홍은 색 차이(ΔE)가 반으로 줄어 더 흐렸다.
+#[derive(Clone, Copy)]
+pub(super) struct TeleInk {
+    pub rgb: (f32, f32, f32),
+    /// 테두리 = 다 찬 채움.
+    pub a: f32,
+    /// 빈 안쪽.
+    pub base_a: f32,
+}
+/// 밝은 바닥: 짙은 빨강.
+pub(super) const TELE_INK_SHADE: TeleInk = TeleInk {
+    rgb: (0.55, 0.10, 0.12),
+    a: 0.25,
+    base_a: 0.03,
+};
+/// 어두운 바닥: 원래 빨강(0196, 안내 그림의 어두운 판에도).
+pub(super) const TELE_INK_GLOW: TeleInk = TeleInk {
+    rgb: (1.0, 0.32, 0.36),
+    a: 0.25,
+    base_a: 0.03,
+};
+thread_local! {
+    /// 이번 그리기의 잉크(`draw_telegraphs`가 지대로 정한다). 안내 그림은 원래 빨강.
+    static TELE_INK: std::cell::Cell<TeleInk> = const { std::cell::Cell::new(TELE_INK_GLOW) };
+}
+/// 지대 → 잉크(0197).
+pub(super) fn tele_ink_for(b: crate::biome::Biome) -> TeleInk {
+    use crate::biome::Biome;
+    match b {
+        Biome::Meadow | Biome::Roots => TELE_INK_SHADE,
+        Biome::Deep | Biome::Silk => TELE_INK_GLOW,
+    }
+}
 /// 테두리 띠의 폭(px).
 const TELE_RING: f32 = 2.0;
-/// 예고 색은 하나, 붉은 계열(0187, 사장): 황금 띠는 풀밭 초록과 섞여 흐렸다. 받아칠 수 있는지는 색이 아니라 모양으로
-/// 가른다 — 곧게 오는 띠는 받아칠 수 있고, 가운데 X가 있는 원은 피해야 한다(0160의 뜻은 그대로).
-pub(super) const TELE_RGB: (f32, f32, f32) = (1.0, 0.32, 0.36);
 const TELE_MARK_SHADE: f32 = 0.42;
 const TELE_MARK_A: f32 = 0.5;
 
 /// 테두리(= 다 찬 채움)·바탕의 색.
 fn tele_colors() -> (Color, Color) {
-    let rgb = TELE_RGB;
-    let c = |a| Color::new(rgb.0, rgb.1, rgb.2, a);
-    (c(TELE_A), c(TELE_BASE_A))
+    let ink = TELE_INK.with(|c| c.get());
+    let c = |a| Color::new(ink.rgb.0, ink.rgb.1, ink.rgb.2, a);
+    (c(ink.a), c(ink.base_a))
 }
 
 /// 띠의 바깥 둘레(뒤 왼쪽 → 앞 왼쪽 → 화살촉 → 앞 오른쪽 → 뒤 오른쪽). 반폭 `half`, 뒤끝을 `back`만큼 앞으로,
@@ -512,6 +541,7 @@ fn draw_aim_lane(w: &World, pos: Vec2, facing: Vec2, radius: f32, reach: f32, k:
 /// - 뛰기(웅크림·체공)·포자·발 구르기·돌: 내려앉을·덮을 자리의 원, 체공 중엔 가득.
 pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
     use crate::species::Behavior;
+    TELE_INK.with(|c| c.set(tele_ink_for(w.biome)));
     // 무너지는 천장(0147): 떨어질 자리에 그림자가 커지고, 원 안쪽이 진해진다.
     for r in &w.hazards.rocks {
         let k = crate::enemy::tele_progress(r.time, t::ROCK_FALL);
@@ -591,6 +621,7 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
         let k = crate::enemy::tele_progress(p.time, t::DEEP_PULL_WINDUP);
         draw_tele_lane(c, c + p.dir * p.len, 2.5, k);
     }
+    TELE_INK.with(|c| c.set(TELE_INK_GLOW));
 }
 
 /// 가시뿌리 덤불(0147·0149): 칸 가운데 낮은 덤불, 붉게 물든 가시가 사방으로 뻗는다. 발밑에 어두운 핏빛 얼룩이 숨 쉬고,
