@@ -794,5 +794,5 @@ pub static DE: Strings = Strings {
     h_doto: "Mit Doto kämpfen",
     h_doto_d: "Doto kämpft aus der Ferne. Der Angriff wirft Eicheln — der dritte Wurf als Fächer aus drei. Halten und loslassen: eine große Eichel platzt beim Aufprall. Der Rücksprung behält das Ziel im Blick. Bei voller Leiste vergräbst du Eicheln vor dir — sie platzen bald und treffen nur Gegner. Die werfende Hand schlägt Heranfliegendes zurück.",
     h_run: "Rennen und Weitsprung",
-    h_run_d: "Momo und Doto: Halte die Grabtaste weiter, dann rennst du los, sobald Hüpfer oder Rücksprung landen. Beim Rennen zeigt eine Markierung vorn am Boden, wo du landest — richte dich aus und lass los, um genau dorthin zu springen; in der Luft trifft dich nichts. Momo stampft bei der Landung den markierten Kreis; Doto wirft in der Luft von selbst drei auf den nächsten Gegner. Greif im Rennen an, um sofort zuzuschlagen.",
+    h_run_d: "Momo und Doto: Halte die Grabtaste weiter, dann rennst du los, sobald Hüpfer oder Rücksprung landen. Beim Rennen zeigt eine Markierung vorn am Boden, wo du landest — richte dich aus und lass los, um genau dorthin zu springen; in der Luft trifft dich nichts. Momos Markierung rastet auf einem Gegner vorn ein, und sie stampft ihn bei der Landung; Doto wirft in der Luft von selbst drei auf den nächsten Gegner. Greif im Rennen an, um sofort zuzuschlagen.",
 };

@@ -334,16 +334,17 @@ pub(super) fn draw_charge_under(p: &Player, alpha: f32) {
     }
 }
 
-/// 멀리뛰기 조준(0211): 모모·도토가 달리는 동안 내려앉을 자리를 바닥에(스프라이트 밑에). 거리는 늘 `JUMP_DIST`,
+/// 멀리뛰기 조준(0211): 모모·도토가 달리는 동안 내려앉을 자리를 바닥에(스프라이트 밑에). 거리는 `JUMP_DIST`(모모는 앞쪽 적에게 붙으면 그 적까지, 0213),
 /// 벽에 막히면 막히는 자리까지. 모모는 밟기 둘레(타격과 같은 반지름), 도토는 작은 고리. 아직 덜 달렸으면(떼도 안 뛴다)
 /// 흐린 고리만, 뛸 수 있으면 밝게 숨 쉬고 가는 길에 점. 어두운 밑줄을 깔아 풀밭·굴 어디서나 보인다(모으기 고리와 같은 약속).
 pub(super) fn draw_jump_aim(w: &World, alpha: f32) {
     let p = &w.player;
-    let Some((dir, ready)) = p.jump_aim() else {
+    let Some((to, ready, locked)) = p.jump_aim() else {
         return;
     };
     let from = lerp(p.prev_pos, p.pos, alpha);
-    let reach = w.room.ray_len(from, dir, p.radius(), t::JUMP_DIST);
+    let dir = to.normalize_or(p.facing);
+    let reach = w.room.ray_len(from, dir, p.radius(), to.length());
     let to = from + dir * reach;
     let feet = vec2(0.0, 6.0);
     let stomp = w.character == crate::equipment::Character::Momo;
@@ -358,7 +359,28 @@ pub(super) fn draw_jump_aim(w: &World, alpha: f32) {
     let back = Color::new(0.10, 0.06, 0.10, 0.55 * a);
     let c = (to + feet).round();
     draw_circle_lines(c.x, c.y, r, 2.5, back);
-    draw_circle_lines(c.x, c.y, r, 1.0, col);
+    draw_circle_lines(c.x, c.y, r, if locked { 2.0 } else { 1.0 }, col);
+    if locked {
+        // 적에게 붙었다(0213): 고리 바깥 네 귀퉁이 꺾쇠가 안으로 조여 든다.
+        let k = r + 3.0 + 2.0 * (1.0 - pulse);
+        for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+            let q = c + vec2(sx * k * 0.75, sy * k * 0.75);
+            draw_rectangle(
+                q.x.round() - if sx < 0.0 { 0.0 } else { 2.0 },
+                q.y.round(),
+                3.0,
+                1.0,
+                col,
+            );
+            draw_rectangle(
+                q.x.round(),
+                q.y.round() - if sy < 0.0 { 0.0 } else { 2.0 },
+                1.0,
+                3.0,
+                col,
+            );
+        }
+    }
     if !ready {
         return;
     }

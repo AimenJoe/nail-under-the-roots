@@ -48,24 +48,49 @@ impl Player {
         None
     }
 
-    /// 달리는 동안 멀리뛰기 조준(0211): (뛸 쪽, 지금 떼면 뛰는가). 렌더가 내려앉을 자리를 바닥에 그린다.
-    /// 거리는 늘 `JUMP_DIST` — 벽에 막히는 만큼은 그리는 쪽이 줄인다.
-    pub fn jump_aim(&self) -> Option<(Vec2, bool)> {
-        match self.state {
-            State::Run { time } => Some((self.facing, time >= t::RUN_MIN)),
-            _ => None,
+    /// 달리는 동안 멀리뛰기 조준(0211·0213): (내려앉을 자리까지의 벡터, 지금 떼면 뛰는가, 적에게 붙었나).
+    /// 렌더가 바닥에 그린다. 붙지 않으면 달리는 쪽으로 `JUMP_DIST` — 벽에 막히는 만큼은 그리는 쪽이 줄인다.
+    pub fn jump_aim(&self) -> Option<(Vec2, bool, bool)> {
+        let State::Run { time } = self.state else {
+            return None;
+        };
+        let ready = time >= t::RUN_MIN;
+        Some(match self.jump_lock() {
+            Some(d) => (d, ready, true),
+            None => (self.facing * t::JUMP_DIST, ready, false),
+        })
+    }
+
+    /// 모모 멀리뛰기가 붙을 적(0213, 사장 "아직도 조준이 너무 어려움"): 84px 앞 표시는 스틱을 조금만 틀어도 크게 휘고,
+    /// 빠르게 달리며 떼는 순간까지 맞춰야 했다. 달리는 쪽 부채꼴 안의 적에게 표시가 붙는다(드릴 조준 0139와 같은 생각).
+    /// 도토는 붙지 않는다 — 적 위로 내려앉으면 위험하고, 공중 던지기가 이미 가장 가까운 적을 겨눈다(0212).
+    fn jump_lock(&self) -> Option<Vec2> {
+        if self.kit.def().dodge != crate::characters::Dodge::Hop {
+            return None;
         }
+        let plain = self.facing * t::JUMP_DIST;
+        self.targets
+            .iter()
+            .map(|q| *q - self.pos)
+            .filter(|d| {
+                let l = d.length();
+                (t::JUMP_LOCK_MIN..=t::JUMP_LOCK_MAX).contains(&l)
+                    && d.normalize().dot(self.facing) >= t::JUMP_LOCK_COS
+            })
+            .min_by(|a, b| (*a - plain).length().total_cmp(&(*b - plain).length()))
     }
 
     fn start_jump(&mut self) {
+        let to = self.jump_lock().unwrap_or(self.facing * t::JUMP_DIST);
         self.attack_buf = 0.0;
         self.dodge_buf = 0.0;
         self.combo_timer = 0.0;
         self.vel = Vec2::ZERO;
+        self.facing = to.normalize_or(self.facing);
         self.state = State::Jump {
             time: 0.0,
             dir: self.facing,
-            dist: t::JUMP_DIST,
+            dist: to.length(),
             thrown: false,
         };
         self.events.push(Event::Hop);
@@ -199,9 +224,9 @@ mod tests {
             p.update(&act(false, true, false), room, t::TICK_DT);
             ran += t::TICK_DT;
         }
-        if let Some((dir, ready)) = p.jump_aim() {
+        if let Some((to, ready, _)) = p.jump_aim() {
             assert_eq!(ready, ran >= t::RUN_MIN, "조준 자리는 뛸 수 있을 때 밝다");
-            assert_eq!(dir, vec2(1.0, 0.0));
+            assert_eq!(to.normalize(), vec2(1.0, 0.0));
         }
         let x0 = p.pos.x;
         let (mut strikes, mut events) = (Vec::new(), Vec::new());
@@ -247,7 +272,7 @@ mod tests {
         assert_eq!(p.burrow_cd, 0.0, "대기는 멀리뛰기 뒤에");
         assert_eq!(
             p.jump_aim(),
-            Some((vec2(1.0, 0.0), false)),
+            Some((vec2(t::JUMP_DIST, 0.0), false, false)),
             "아직 덜 달렸다"
         );
         let x = p.pos.x;
@@ -328,6 +353,47 @@ mod tests {
             mid.normalize().dot((foe - from).normalize()) > 0.99,
             "가장 가까운 적 쪽으로"
         );
+    }
+
+    /// 모모 멀리뛰기 조준 붙기(0213): 달리는 쪽 부채꼴 안의 적에게 표시가 붙고, 떼면 그 적 위로 내려앉아 밟는다.
+    /// 뒤의 적·너무 먼 적은 붙지 않는다. 도토는 붙지 않는다.
+    #[test]
+    fn momo_jump_locks_onto_the_foe_ahead() {
+        let run_and = |kit: Character, foe: Vec2| {
+            let (mut p, room) = player(kit);
+            p.update(&act(true, true, false), &room, t::TICK_DT);
+            while !matches!(p.state, State::Run { .. }) {
+                p.update(&act(false, true, false), &room, t::TICK_DT);
+            }
+            for _ in 0..15 {
+                p.update(&act(false, true, false), &room, t::TICK_DT);
+            }
+            // 적은 지금 자리 기준으로 둔다(달려온 만큼 앞으로).
+            let at = p.pos + foe;
+            p.targets = vec![at];
+            let aim = p.jump_aim().unwrap();
+            for _ in 0..60 {
+                p.targets = vec![at];
+                p.update(&Actions::default(), &room, t::TICK_DT);
+                if p.state == State::Free {
+                    break;
+                }
+            }
+            (aim, p.pos, at)
+        };
+        // 앞쪽 비스듬히 50px: 붙고, 그 자리에 내려앉는다.
+        let ((to, _, locked), landed, at) = run_and(Character::Momo, vec2(40.0, -30.0));
+        assert!(locked && (to - vec2(40.0, -30.0)).length() < 0.01);
+        assert!((landed - at).length() < 1.5, "{landed} vs {at}");
+        // 뒤쪽·너무 먼 적은 붙지 않는다.
+        assert!(!run_and(Character::Momo, vec2(-40.0, 0.0)).0 .2);
+        assert!(
+            !run_and(Character::Momo, vec2(t::JUMP_LOCK_MAX + 20.0, 0.0))
+                .0
+                 .2
+        );
+        // 도토는 붙지 않는다.
+        assert!(!run_and(Character::Doto, vec2(40.0, 0.0)).0 .2);
     }
 
     /// 달리다 공격하면 그 자리에서 1타. Naïl은 달리지 않는다(쥐기는 땅파기).
