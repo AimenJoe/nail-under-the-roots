@@ -210,12 +210,12 @@ pub const SHOVE_KNOCK: f32 = 150.0;
 pub const SHOVE_BOSS: f32 = 0.35;
 pub const RUN_MIN: f32 = 0.2;
 pub const JUMP_TIME: f32 = 0.42;
-pub const JUMP_DIST: f32 = 84.0;
+pub const JUMP_DIST: f32 = 72.0;
 /// 모모 멀리뛰기 조준 붙기(0213): 달리는 쪽 부채꼴(코사인 `JUMP_LOCK_COS` ≈ 50°) 안, `JUMP_LOCK_MIN`~`JUMP_LOCK_MAX` 거리의
 /// 적이 있으면 내려앉을 자리가 그 적에게 붙는다(여럿이면 원래 자리에서 가장 가까운 적). 떼면 그 적 위로 뛴다.
 pub const JUMP_LOCK_COS: f32 = 0.64;
 pub const JUMP_LOCK_MIN: f32 = 20.0;
-pub const JUMP_LOCK_MAX: f32 = 120.0;
+pub const JUMP_LOCK_MAX: f32 = 104.0;
 pub const JUMP_HEIGHT: f32 = 18.0;
 pub const JUMP_STOMP_RADIUS: f32 = 22.0;
 pub const JUMP_STOMP_DAMAGE: i32 = 2;
