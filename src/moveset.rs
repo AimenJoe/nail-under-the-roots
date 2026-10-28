@@ -29,6 +29,24 @@ pub struct Hit {
     pub dodge_cancel_after: f32,
     /// 맞은 적에게 거는 독(초). 0 = 없음. 독은 POISON_TICK마다 1씩 깎는다.
     pub poison: f32,
+    /// 던지기(도토, 0195): 활성 구간 첫 틱에 탄을 낸다. `range`는 그때 손앞의 짧은 판정(받아치기·탄 베기)만 —
+    /// 적은 손으로 때리지 않고 탄이 맞힌다. `Throw::None`이면 보통 근접 타.
+    pub throw: Throw,
+}
+
+/// 던지는 탄(0195). 한 번에 `count`개를 `spread`(라디안) 간격의 부채꼴로. 탄은 `reach`(px)를 날면 떨어진다.
+/// `splash` > 0이면 맞거나 떨어진 자리에서 그 반지름만큼 둘레를 친다(큰 도토리).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Throw {
+    None,
+    Shot {
+        count: u8,
+        spread: f32,
+        speed: f32,
+        reach: f32,
+        radius: f32,
+        splash: f32,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -77,6 +95,23 @@ pub fn heavy_of(last: Hit) -> Hit {
         lunge: last.lunge + 10.0,
         dodge_cancel_after: HEAVY_ACTIVE_START + (last.active.1 - last.active.0) + 0.03,
         poison: last.poison,
+        // 던지는 무기의 강타는 큰 도토리 하나(0195): 느리고 크게 날아가 맞은 자리에서 튄다.
+        throw: match last.throw {
+            Throw::None => Throw::None,
+            Throw::Shot {
+                speed,
+                reach,
+                radius,
+                ..
+            } => Throw::Shot {
+                count: 1,
+                spread: 0.0,
+                speed: speed * t::BIG_ACORN_SPEED,
+                reach: reach * t::BIG_ACORN_REACH,
+                radius: radius * t::BIG_ACORN_SIZE,
+                splash: t::BIG_ACORN_SPLASH,
+            },
+        },
     }
 }
 
@@ -93,6 +128,7 @@ const BASE: Hit = Hit {
     lunge: t::CLAW_LUNGE,
     dodge_cancel_after: 0.0,
     poison: 0.0,
+    throw: Throw::None,
 };
 
 const fn claw(i: usize) -> Hit {
@@ -212,6 +248,65 @@ pub static KICKS: Moveset = Moveset {
     combo_window: 0.30,
     move_factor: 0.5,
     mark: Color::new(1.0, 0.82, 0.88, 1.0),
+};
+
+/// 도토의 던지기(0195): 1·2타는 곧게 하나, 3타는 부채꼴 셋. 손앞의 짧은 판정(`range`)은 받아치기용.
+/// 던지는 동안 잘 걷는다(멀리서 싸우는 몸짓). 1·2타는 가볍고(피해 1), 가까운 적은 뒤로 뛰기로 떼어 낸다.
+const fn acorn(count: u8, spread: f32) -> Throw {
+    Throw::Shot {
+        count,
+        spread,
+        speed: t::ACORN_SPEED,
+        reach: t::ACORN_REACH,
+        radius: t::ACORN_RADIUS,
+        splash: 0.0,
+    }
+}
+
+pub static ACORNS: Moveset = Moveset {
+    hits: &[
+        Hit {
+            swing: 0.15,
+            active: (0.04, 0.10),
+            knockback: 50.0,
+            stun: 0.12,
+            hitstop: 0.04,
+            shake: 0.06,
+            range: t::ACORN_HAND,
+            lunge: 0.0,
+            throw: acorn(1, 0.0),
+            ..BASE
+        },
+        Hit {
+            swing: 0.15,
+            active: (0.04, 0.10),
+            knockback: 55.0,
+            stun: 0.12,
+            hitstop: 0.04,
+            shake: 0.06,
+            range: t::ACORN_HAND,
+            lunge: 0.0,
+            throw: acorn(1, 0.0),
+            ..BASE
+        },
+        Hit {
+            swing: 0.24,
+            active: (0.07, 0.14),
+            recovery: 0.10,
+            knockback: 120.0,
+            stun: 0.25,
+            hitstop: 0.07,
+            shake: 0.22,
+            range: t::ACORN_HAND,
+            lunge: 0.0,
+            dodge_cancel_after: 0.14,
+            throw: acorn(3, t::ACORN_FAN_SPREAD),
+            ..BASE
+        },
+    ],
+    combo_window: 0.32,
+    move_factor: 0.65,
+    mark: Color::new(0.86, 0.62, 0.32, 1.0),
 };
 
 /// 바위 발톱(무거움): 2타. 느리고 넓고, 활성 구간이 끝나야 굴파기로 끊는다.

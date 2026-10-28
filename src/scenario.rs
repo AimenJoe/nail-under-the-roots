@@ -55,6 +55,10 @@ pub enum Scenario {
     AllSpecies,
     /// 새 졸개 다섯(0146): 땃쥐·고슴도치·두꺼비·박쥐·포자버섯, 어두운 심층에서.
     NewMobs,
+    /// 도토로 싸우기(0195): 아레나 웨이브, 플레이어는 도토(도토리 들고).
+    DotoArena,
+    /// 도토로 새 졸개 다섯(0195): 박쥐·고슴도치(등딱지)·두꺼비 혀를 멀리서.
+    DotoMobs,
     /// 실타래 칸 굴(0147): 방 셋, 끝방에 엘리트. 지대가 장애물을 정한다(뿌리 = 가시 덤불, 심층 = 무너지는 천장).
     Tangle(Biome),
     /// 튜토리얼 보스: 필드 공터 앞에서, 문은 열려 있다(docs/decisions/0032).
@@ -83,7 +87,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 38] = [
+pub const LIST: [Entry; 40] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -274,6 +278,16 @@ pub const LIST: [Entry; 38] = [
         desc: "흙더미·뿌리혹·돌무더기·실뭉치. 쳐서 깨면 운에 따라 씨앗·산딸기·반딧불·지렁이(0177).",
         scenario: Scenario::Breakables,
     },
+    Entry {
+        name: "도토: 아레나",
+        desc: "도토로 웨이브(0195). 던지기 3타·강타(큰 도토리)·뒤로 뛰기·묻기(게이지 가득). 받아치기는 던지는 순간.",
+        scenario: Scenario::DotoArena,
+    },
+    Entry {
+        name: "도토: 새 졸개",
+        desc: "도토로 새 졸개 다섯(어두운 심층). 박쥐도 도토리는 닿는다. 고슴도치 가시는 큰 도토리·묻은 도토리로.",
+        scenario: Scenario::DotoMobs,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -419,7 +433,7 @@ pub fn build(s: Scenario) -> World {
             w.enter_tangle_now(b);
             w
         }
-        Scenario::Arena => World::new(),
+        Scenario::Arena | Scenario::DotoArena => World::new(),
         Scenario::Empty
         | Scenario::CutsceneOnly
         | Scenario::StoryPreview
@@ -470,7 +484,7 @@ pub fn build(s: Scenario) -> World {
             }
             w
         }
-        Scenario::NewMobs => {
+        Scenario::NewMobs | Scenario::DotoMobs => {
             let mut w = World::empty();
             w.biome = Biome::Deep;
             let mobs = [

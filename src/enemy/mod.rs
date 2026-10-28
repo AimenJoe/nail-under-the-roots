@@ -573,6 +573,8 @@ impl Enemy {
             || !s.shape.overlaps_circle(self.pos, self.radius())
             // 나는 박쥐에는 솟구치기가 닿지 않는다(0146).
             || (self.flying() && s.kind == StrikeKind::Emerge)
+            // 도토의 던지는 손은 적을 때리지 않는다 — 탄이 맞힌다(0195).
+            || s.kind == StrikeKind::Toss
         {
             return Struck::Miss;
         }

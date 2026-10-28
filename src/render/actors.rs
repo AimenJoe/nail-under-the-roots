@@ -414,6 +414,28 @@ pub(super) fn draw_projectile(p: &enemy::Projectile, alpha: f32) {
     draw_circle_lines(pos.x, pos.y, p.radius() + 0.5, 1.0, world::PROJECTILE);
 }
 
+/// 도토가 던진 도토리(0195): 적의 도토리와 같은 그림, 큰 도토리는 두 배 크기. 날아가며 돈다.
+pub(super) fn draw_shot(s: &world::toss::Shot, alpha: f32) {
+    let pos = lerp(s.prev, s.pos, alpha);
+    let spin = (pos.x + pos.y) * 0.25;
+    if s.splash > 0.0 {
+        let p = pos.round();
+        draw_circle(p.x, p.y, 4.5, OUTLINE);
+        draw_circle(p.x, p.y + 0.5, 3.8, Color::new(0.82, 0.56, 0.30, 1.0));
+        let up = Vec2::from_angle(spin - std::f32::consts::FRAC_PI_2);
+        let cap = (p + up * 2.5).round();
+        draw_rectangle(
+            cap.x - 3.0,
+            cap.y - 1.5,
+            6.0,
+            3.0,
+            Color::new(0.42, 0.28, 0.18, 1.0),
+        );
+    } else {
+        draw_acorn(pos, spin);
+    }
+}
+
 // ---- 그림 에셋 경로 -----------------------------------------------------------
 
 /// 돌아온 보리(chief.png 줄 1, 32×32). 발이 `pos.y + 6` 근처.
@@ -597,9 +619,10 @@ pub fn draw_worm(p: Vec2, ph: f32, k: f32) {
 pub(super) const OUTLINE: Color = Color::new(0.17, 0.11, 0.16, 1.0);
 
 /// Naïl 스프라이트. 상태 → 칸, 좌우 반전, 피격 플래시는 흰 실루엣 줄.
-/// 모모를 플레이어로(0056): 돌아온 모모 줄(critters MOMO_BLOOM_ROW). 칸 0·1 서기, 2·3 걷기, 4 웅크림, 5 차기·뛰기, 6 맞음.
+/// 모모·도토를 플레이어로(0056·0195): 돌아온 모습 줄(critters `MOMO_BLOOM_ROW`·`DOTO_BACK_ROW`, 임시 그림 — 0191 C).
+/// 칸 0·1 서기, 2·3 걷기, 4 웅크림, 5 차기·뛰기·던지기, 6 맞음.
 /// 뛸 때는 그림만 높이만큼 위로(그림자는 바닥에 남아 착지 자리를 보인다).
-pub(super) fn draw_momo_player(art: &Art, p: &Player, alpha: f32, time: f32) {
+pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time: f32) {
     let Some(tex) = art.critters.as_ref() else {
         return;
     };
@@ -607,7 +630,9 @@ pub(super) fn draw_momo_player(art: &Art, p: &Player, alpha: f32, time: f32) {
     let moving = (p.pos - p.prev_pos).length() > 0.05;
     let frame = match p.state {
         player::State::Dead => 6,
-        player::State::Hop { time: ht, .. } | player::State::Chain { time: ht, .. } => {
+        player::State::Hop { time: ht, .. }
+        | player::State::Leap { time: ht, .. }
+        | player::State::Chain { time: ht, .. } => {
             if ht < 0.05 {
                 4
             } else {
@@ -622,7 +647,7 @@ pub(super) fn draw_momo_player(art: &Art, p: &Player, alpha: f32, time: f32) {
         _ => ((time * 2.0) as u32) % 2,
     };
     let flash = p.flash > 0.0;
-    let row = art::MOMO_BLOOM_ROW + if flash { art::CRITTER_ROWS } else { 0 };
+    let row = row + if flash { art::CRITTER_ROWS } else { 0 };
     let blink = p.invuln > 0.0 && ((time * 24.0) as i32) % 2 == 0 && !flash;
     let tint = if blink {
         Color::new(1.0, 1.0, 1.0, 0.35)
@@ -650,9 +675,14 @@ pub(super) fn draw_momo_player(art: &Art, p: &Player, alpha: f32, time: f32) {
 }
 
 pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
-    if p.kit == crate::equipment::Character::Momo {
-        draw_momo_player(art, p, alpha, time);
-        return;
+    match p.kit {
+        crate::equipment::Character::Momo => {
+            return draw_kin_player(art, p, art::MOMO_BLOOM_ROW, alpha, time)
+        }
+        crate::equipment::Character::Doto => {
+            return draw_kin_player(art, p, art::DOTO_BACK_ROW, alpha, time)
+        }
+        crate::equipment::Character::Mole => {}
     }
     let pos = lerp(p.prev_pos, p.pos, alpha);
     let moving = (p.pos - p.prev_pos).length() > 0.05;

@@ -2,7 +2,7 @@
 이 파일이 원본이고 assets/art/dig.png는 산출물이다(직접 그린 그림, 프로젝트 소유).
 
 실행: python3 tools/art/dig.py [출력 경로]   (기본 assets/art/dig.png)
-줄 0 Naïl 기본 털, 줄 1~3 털빛 1~3(nail.py FURS), 줄 4 돌아온 모모.
+줄 0 Naïl 기본 털, 줄 1~3 털빛 1~3(nail.py FURS), 줄 4 돌아온 모모, 줄 5 돌아온 도토(0195, 임시: 모모의 몸 + 청설모 털빛·큰 꼬리·갓).
 칸 0~5 긁기 한 번(초당 12칸), 6 고개 들어 카메라 보기, 7 윙크, 8~15 몸통 축으로 한 바퀴(코르크 마개처럼 돌며 내려감).
 장면 순서(render.rs `dig_col`): 파다가 → 우리를 보고 윙크 → 뱅글뱅글 돌며 내려간다(사장 제안 2026-10-27).
 
@@ -363,6 +363,39 @@ def momo_spin(k):
     return outline(g)
 
 
+# 도토(0195, 임시 — 0191 C에서 다시 그린다): 모모의 몸에 청설모 털빛. 솜꼬리 대신 등 위로 큰 꼬리, 귀 끝에 술,
+# 꽃 자리에는 도토리 갓(F 갓, Y 알).
+DOTO = dict(MOMO, **{
+    'd': (120, 54, 34), 'b': (172, 84, 46), 'h': (214, 126, 72), 'l': (238, 204, 164),
+    'p': (226, 150, 120), 'q': (176, 96, 80), 'c': (226, 140, 84), 'C': (190, 104, 60),
+    'F': (104, 70, 44), 'Y': (204, 146, 76),
+})
+BUSH = [".ccc.", "ccccc", "ccCcc", "cccCc", ".ccc."]
+
+
+def doto_tail(g, dy=0):
+    put(g, 13, 0 + dy, BUSH)
+    return g
+
+
+def doto_frame(i):
+    g = momo_frame(i)
+    g = [[ch if ch != 'o' else '.' for ch in row] for row in g]
+    return outline(doto_tail(g))
+
+
+def doto_look(wink):
+    g = momo_look(wink)
+    g = [[ch if ch != 'o' else '.' for ch in row] for row in g]
+    return outline(doto_tail(g))
+
+
+def doto_spin(k):
+    g = momo_spin(k)
+    g = [[ch if ch != 'o' else '.' for ch in row] for row in g]
+    return outline(doto_tail(g))
+
+
 def paint(img, ox, oy, g, pal):
     for y in range(S):
         for x in range(S):
@@ -375,7 +408,7 @@ def sheet():
     sys.path.insert(0, __file__.rsplit('/', 1)[0])
     from nail import FURS
     rows = [NAIL] + [dict(NAIL, **FURS[k]) for k in (1, 2, 3)]
-    img = Image.new('RGBA', (S * 16, S * 5), (0, 0, 0, 0))
+    img = Image.new('RGBA', (S * 16, S * 6), (0, 0, 0, 0))
     frames = [nail_frame(i) for i in range(6)] + [nail_look(False), nail_look(True)] + [nail_spin(k) for k in range(8)]
     for r, pal in enumerate(rows):
         for i, g in enumerate(frames):
@@ -383,6 +416,9 @@ def sheet():
     mframes = [momo_frame(i) for i in range(6)] + [momo_look(False), momo_look(True)] + [momo_spin(k) for k in range(8)]
     for i, g in enumerate(mframes):
         paint(img, i * S, 4 * S, g, MOMO)
+    dframes = [doto_frame(i) for i in range(6)] + [doto_look(False), doto_look(True)] + [doto_spin(k) for k in range(8)]
+    for i, g in enumerate(dframes):
+        paint(img, i * S, 5 * S, g, DOTO)
     return img
 
 

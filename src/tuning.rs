@@ -592,6 +592,45 @@ pub const DOTO_MINE_SPREAD: f32 = 34.0;
 /// 묻힌 도토리: 터지기까지(흙이 부풀며 고리가 좁혀 온다), 터지는 둘레. 발톱으로 미리 파내면 안 터진다.
 pub const DOTO_MINE_FUSE: f32 = 1.3;
 pub const DOTO_MINE_RADIUS: f32 = 14.0;
+
+// ---- 플레이어블 도토(0195) ----
+/// 던진 도토리: 속도(px/s), 나는 거리(px), 반지름(px), 3타 부채꼴 간격(라디안). 사거리 약 110px(0191 B1).
+pub const ACORN_SPEED: f32 = 280.0;
+pub const ACORN_REACH: f32 = 112.0;
+pub const ACORN_RADIUS: f32 = 3.0;
+pub const ACORN_FAN_SPREAD: f32 = 0.26;
+/// 던지는 손앞의 짧은 판정(받아치기·탄 베기, px).
+pub const ACORN_HAND: f32 = 13.0;
+/// 강타 = 큰 도토리: 속도·거리·크기 배율, 튀는 둘레 반지름(px).
+pub const BIG_ACORN_SPEED: f32 = 0.65;
+pub const BIG_ACORN_REACH: f32 = 1.15;
+pub const BIG_ACORN_SIZE: f32 = 1.8;
+pub const BIG_ACORN_SPLASH: f32 = 22.0;
+/// 뒤로 뛰기(회피): 시간·거리·높이. 서 있으면 겨눈 쪽 반대로, 움직이면 그쪽으로. 공중에서는 안 맞는다.
+pub const BACKLEAP_TIME: f32 = 0.32;
+pub const BACKLEAP_DIST: f32 = 62.0;
+pub const BACKLEAP_HEIGHT: f32 = 12.0;
+/// 도토리 묻기(특기): 앞쪽 셋, 거리(px)·부채꼴 간격, 터지기까지(초), 둘레(px), 피해, 넉백, 경직, 묻는 동작 시간.
+pub const BURY_COUNT: usize = 3;
+pub const BURY_AHEAD: f32 = 34.0;
+pub const BURY_SPREAD: f32 = 0.55;
+pub const BURY_FUSE: f32 = 1.3;
+pub const BURY_RADIUS: f32 = 18.0;
+pub const BURY_DAMAGE: i32 = 3;
+pub const BURY_KNOCKBACK: f32 = 200.0;
+pub const BURY_STUN: f32 = 0.6;
+pub const BURY_RECOVER: f32 = 0.22;
+/// 도토의 재주(0195). 자리 1: A 떨구고 뛰기(대기 배율, 떨군 도토리의 터지기까지·피해) / B 가벼운 발(거리 배율·대기 배율).
+pub const TAL_DROP_CD: f32 = 1.25;
+pub const TAL_DROP_FUSE: f32 = 0.8;
+pub const TAL_DROP_DAMAGE: i32 = 2;
+pub const TAL_LIGHT_DIST: f32 = 0.7;
+pub const TAL_LIGHT_CD: f32 = 0.7;
+/// 자리 3: A 한가득(묻는 수·게이지 배율) / B 빨리 터지기(터지기까지·둘레).
+pub const TAL_HEAP_COUNT: usize = 5;
+pub const TAL_HEAP_SP: f32 = 0.8;
+pub const TAL_QUICK_FUSE: f32 = 0.6;
+pub const TAL_QUICK_RADIUS: f32 = 13.0;
 // ---- 콩이(셋째 길의 보스, docs/decisions/0054) -----------------------------------------
 /// 구르기: 벽에 몇 번 튕기나(체력이 반 아래면 더). 튕길 때 플레이어 쪽으로 이만큼 꺾는다.
 pub const KONGI_BOUNCES: u32 = 2;

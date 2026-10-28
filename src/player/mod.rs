@@ -20,7 +20,10 @@ use crate::tuning as t;
 // 0170 R9: 상태 함수를 셋으로 나눴다 — 발톱(attack), 굴파기·드릴(burrow), 모모의 뛰기(momo). 본문은 그대로.
 mod attack;
 mod burrow;
+mod doto;
 mod momo;
+
+pub use doto::Spawn;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum State {
@@ -68,6 +71,11 @@ pub enum State {
     },
     /// 모모의 깡충(회피): `dir`로 HOP_DIST만큼 뛴다. 공중에서는 안 맞는다.
     Hop {
+        time: f32,
+        dir: Vec2,
+    },
+    /// 도토의 뒤로 뛰기(회피, 0195): `dir`로 `leap_dist`만큼. 공중에서는 안 맞는다. 겨눈 쪽은 그대로.
+    Leap {
         time: f32,
         dir: Vec2,
     },
@@ -136,6 +144,8 @@ pub enum Event {
     Land(bool),
     /// 모모 깡충 착지 밟기(재주 발 구르기, 0142).
     Stamp,
+    /// 도토가 도토리를 묻었다(0195).
+    Bury,
 }
 
 pub struct Player {
@@ -168,6 +178,8 @@ pub struct Player {
     /// 줄인 피해의 소수 부분을 모아 둔다(체력은 정수라 1이 차면 그때 깎는다).
     dmg_acc: f32,
     pub events: Vec<Event>,
+    /// 이번 틱에 월드에 내놓는 탄·묻은 도토리(도토, 0195). 월드가 비운다.
+    pub spawns: Vec<Spawn>,
     /// 드릴 겨누기용 적 자리(월드가 틱마다 채운다, 맞을 수 있는 적만). 시동 중 방향을 맞추는 데만 쓴다(0139).
     pub targets: Vec<Vec2>,
     /// 흰 실 그물(0165)에 걸려 있다: 월드가 틱마다 정한다. 걷는 속도 `WEB_SLOW`배.
@@ -241,6 +253,7 @@ impl Player {
             resist: 0.0,
             dmg_acc: 0.0,
             events: Vec::new(),
+            spawns: Vec::new(),
             targets: Vec::new(),
             slow: false,
             threat: false,
@@ -323,7 +336,7 @@ impl Player {
             || self.is_burrowed()
             || matches!(
                 self.state,
-                State::Drill { .. } | State::Hop { .. } | State::Chain { .. }
+                State::Drill { .. } | State::Hop { .. } | State::Leap { .. } | State::Chain { .. }
             )
             || !self.is_alive()
     }
@@ -332,6 +345,7 @@ impl Player {
     pub fn height(&self) -> f32 {
         let (time, dur, h) = match self.state {
             State::Hop { time, .. } => (time, t::HOP_TIME, t::HOP_HEIGHT),
+            State::Leap { time, .. } => (time, t::BACKLEAP_TIME, t::BACKLEAP_HEIGHT),
             State::Chain { time, .. } => (time, t::CHAIN_HOP_TIME, t::CHAIN_HOP_HEIGHT),
             _ => return 0.0,
         };
@@ -339,19 +353,21 @@ impl Player {
         4.0 * h * k * (1.0 - k)
     }
 
-    /// 회피 시작(캐릭터마다): 굴파기 / 깡충.
+    /// 회피 시작(캐릭터마다): 굴파기 / 깡충 / 뒤로 뛰기.
     fn start_dodge(&mut self, move_dir: Vec2) {
         match self.kit.def().dodge {
             crate::characters::Dodge::Hop => self.start_hop(move_dir),
             crate::characters::Dodge::Burrow => self.start_burrow(),
+            crate::characters::Dodge::Leap => self.start_leap(move_dir),
         }
     }
 
-    /// 특기 시작(캐릭터마다): 드릴 / 이어 뛰기.
+    /// 특기 시작(캐릭터마다): 드릴 / 이어 뛰기 / 도토리 묻기.
     fn start_special(&mut self, move_dir: Vec2) {
         match self.kit.def().special {
             crate::characters::Special::Chain => self.start_chain(move_dir),
             crate::characters::Special::Drill => self.start_drill(move_dir),
+            crate::characters::Special::Bury => self.start_bury(move_dir),
         }
     }
 
@@ -605,6 +621,7 @@ impl Player {
 
     pub fn update(&mut self, a: &Actions, room: &Room, dt: f32) -> Option<Strike> {
         self.events.clear();
+        self.spawns.clear();
         self.prev_pos = self.pos;
         self.buffer(a);
 
@@ -655,6 +672,7 @@ impl Player {
             } => strike = self.tick_heavy(&c, time, dir, after, perfect),
             State::Burrow { time: was } => strike = self.tick_burrow(&c, was),
             State::Hop { time, dir } => strike = self.tick_hop(&c, time, dir),
+            State::Leap { time, dir } => strike = self.tick_leap(&c, time, dir),
             State::Chain { left, time, dir } => strike = self.tick_chain(&c, left, time, dir),
             State::Emerge { time, charge } => strike = self.tick_emerge(&c, time, charge),
             State::Drill {
@@ -840,7 +858,10 @@ mod tests {
             let mut p = Player::new(room.center());
             p.kit = crate::equipment::Character::Momo;
             p.moveset = &moveset::KICKS;
-            p.talents = crate::talents::Talents { pick, momo: true };
+            p.talents = crate::talents::Talents {
+                pick,
+                who: crate::equipment::Character::Momo,
+            };
             p
         };
         // 발 구르기: 착지 한 번에 밟기 하나(반지름 TAL_STAMP_RADIUS).

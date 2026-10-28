@@ -10,6 +10,8 @@ pub(super) enum Drawable {
     Player,
     Enemy(usize),
     Projectile(usize),
+    /// 도토가 던진 도토리(0195).
+    Shot(usize),
     Npc,
     Neighbor(usize),
     /// 마을(0045): 큰 나무(자리, 잎 단계), 꾸미기(번호, 자리).
@@ -125,6 +127,9 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
     for m in w.hazards.mines.iter().filter(|_| ground) {
         draw_mine(m, w.time);
     }
+    for b in w.toss.buried.iter().filter(|_| ground) {
+        draw_buried(b, w.time);
+    }
     for c in w.hazards.clouds.iter().filter(|_| ground) {
         draw_cloud(c, w.time);
     }
@@ -141,6 +146,11 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
         let q = lerp(p.prev_pos, p.pos, alpha);
         list.push((q.y + 3.0, Drawable::Projectile(i)));
         draw_ellipse(q.x, q.y + 6.0, 2.5, 1.2, 0.0, SHADOW_SOFT);
+    }
+    for (i, s) in w.toss.shots.iter().enumerate().filter(|_| ground) {
+        let q = lerp(s.prev, s.pos, alpha);
+        list.push((q.y + 3.0, Drawable::Shot(i)));
+        draw_ellipse(q.x, q.y + 6.0, s.radius * 0.8, 1.2, 0.0, SHADOW_SOFT);
     }
     let standing = !matches!(
         w.player.state,
@@ -274,6 +284,7 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                 w.juice.feel.hitstop,
             ),
             Drawable::Projectile(i) => draw_projectile(&w.projectiles[i], alpha),
+            Drawable::Shot(i) => draw_shot(&w.toss.shots[i], alpha),
             Drawable::Npc => {
                 if let (Some(n), Some(tex)) = (&w.npc, art.critters.as_ref()) {
                     let q = lerp(n.prev_pos, n.pos, alpha);
@@ -367,6 +378,7 @@ pub(super) fn drawable_x(w: &World, alpha: f32, d: &Drawable) -> f32 {
         Drawable::Player => lerp(w.player.prev_pos, w.player.pos, alpha).x,
         Drawable::Enemy(i) => lerp(w.enemies[i].prev_pos, w.enemies[i].pos, alpha).x,
         Drawable::Projectile(i) => lerp(w.projectiles[i].prev_pos, w.projectiles[i].pos, alpha).x,
+        Drawable::Shot(i) => lerp(w.toss.shots[i].prev, w.toss.shots[i].pos, alpha).x,
         Drawable::Npc => w
             .npc
             .as_ref()

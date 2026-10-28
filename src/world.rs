@@ -16,6 +16,9 @@ use crate::room::{PropKind, Room};
 use crate::sfx;
 use crate::tuning as t;
 
+pub mod toss;
+pub use toss::Toss;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Debug {
     pub overlay: bool,
@@ -527,6 +530,8 @@ pub struct World {
     pub juice: Juice,
     pub enemies: Vec<Enemy>,
     pub projectiles: Vec<Projectile>,
+    /// 도토가 던진 도토리·묻은 도토리(0195). 적의 탄과 따로.
+    pub toss: Toss,
     pub pickups: Vec<Pickup>,
     /// 바닥의 반딧불·산딸기.
     pub loot: Vec<Loot>,
@@ -617,6 +622,7 @@ impl World {
             juice: Juice::default(),
             enemies: Vec::new(),
             projectiles: Vec::new(),
+            toss: Toss::default(),
             pickups: Vec::new(),
             loot: Vec::new(),
             seen: Vec::new(),
@@ -744,6 +750,7 @@ impl World {
         self.summon_mice(summon);
         self.bury_mines(bury);
         let popped = self.tick_mines_and_projectiles(dt, frozen, &mut deaths);
+        self.tick_toss(dt, frozen, &mut deaths);
         // 3. 플레이어 공격 → 적·투사체
         self.apply_strike(strike, &mut deaths);
         self.settle_deaths(deaths);
@@ -788,12 +795,11 @@ impl World {
         let strike = self.player.update(a, &self.room, dt);
         self.last_strike = strike;
         self.deep_tick(dt);
-        if let Some(s) = &strike {
-            self.deep_hit(s);
-            self.web_cut(s);
-            self.cocoon_hit(s);
-            self.prop_break(s);
+        // 도토의 던지는 손(`Toss`)은 받아치기만 — 매듭·그물·고치·부술 것에는 탄이 닿는다(0195).
+        if let Some(s) = strike.filter(|s| s.kind != crate::combat::StrikeKind::Toss) {
+            self.touch_world(&s);
         }
+        self.take_spawns();
         // 땅속에서 힘을 모으는 동안(0158) 땅이 운다: 힘에 비례해 흔들리고 흙알이 튄다.
         if self.player.is_burrowed() {
             let charge = self.player.burrow_charge();
@@ -1007,6 +1013,12 @@ impl World {
                         .fx
                         .push(ring(p, 2.0, t::TAL_STAMP_RADIUS, 0.18, PETAL));
                     burst(&mut self.juice.fx, p, 5, DIRT, 70.0);
+                }
+                player::Event::Bury => {
+                    // 도토리 묻기(0195): 흙이 튀고 묻는 소리.
+                    self.juice.audio.play(sfx::Id::Burrow);
+                    let p = self.player.pos + self.player.facing * 10.0;
+                    clods(&mut self.juice.fx, p, 8, DIRT, 70.0);
                 }
                 player::Event::Hurt | player::Event::Die | player::Event::Parry => {}
             }
@@ -1626,7 +1638,22 @@ impl World {
     fn apply_strike(&mut self, strike: Option<Strike>, deaths: &mut Vec<(Vec2, Kind)>) {
         // 3. 플레이어 공격 → 적·투사체
         if let Some(s) = strike {
-            let origin = self.player.pos;
+            let (origin, facing) = (self.player.pos, self.player.facing);
+            self.resolve_strike(s, origin, facing, false, deaths);
+        }
+    }
+
+    /// 타격 하나를 적에게(0195로 갈라 냄): `origin`에서 밀어낸다(원형이면 `facing`). `ranged`면 도토의 탄·터짐 —
+    /// 플레이어는 튕기거나 멈추지 않고, 손 타격만의 것(받아치기·탄 베기·도토리 파내기)은 없다.
+    fn resolve_strike(
+        &mut self,
+        s: Strike,
+        origin: Vec2,
+        facing: Vec2,
+        ranged: bool,
+        deaths: &mut Vec<(Vec2, Kind)>,
+    ) {
+        {
             let mut shell_from = None;
             let mut broke_at = None;
             let mut hit_any = false;
@@ -1634,7 +1661,7 @@ impl World {
             let mut impact_at = None;
             for e in &mut self.enemies {
                 // 닿나·튕기나·얼마나 밀리나는 적이 정한다(0170 R10). 월드는 결과로 연출·통계만.
-                let dir = match e.receive(&s, origin, self.player.facing) {
+                let dir = match e.receive(&s, origin, facing) {
                     enemy::Struck::Miss => continue,
                     enemy::Struck::Deflected => {
                         shell_from = Some((e.pos, e.kind));
@@ -1691,7 +1718,7 @@ impl World {
                     );
                 }
             }
-            if hit_any {
+            if hit_any && !ranged {
                 // 맞히면 전진이 멈춘다(0168): 빗나감과 맞힘이 손에서 다르다.
                 self.player.vel = Vec2::ZERO;
             }
@@ -1713,8 +1740,10 @@ impl World {
                 );
             }
             if let Some((from, kind)) = shell_from {
-                self.player
-                    .recoil(from, t::KONGI_RECOIL, t::KONGI_RECOIL_LOCK);
+                if !ranged {
+                    self.player
+                        .recoil(from, t::KONGI_RECOIL, t::KONGI_RECOIL_LOCK);
+                }
                 self.juice.audio.play(sfx::Id::WallHit);
                 self.juice.feel.add_hitstop(t::PARRY_HITSTOP * 0.6);
                 self.juice.feel.add_trauma(0.2);
@@ -1737,8 +1766,10 @@ impl World {
                 burst(&mut self.juice.fx, at, 14, SHELL, 130.0);
                 self.juice.toast = Some((|s| s.toast_guard_break, 2.0));
             }
-            self.strike_projectiles(&s);
-            self.dig_mines(&s);
+            if !ranged {
+                self.strike_projectiles(&s);
+                self.dig_mines(&s);
+            }
         }
     }
 

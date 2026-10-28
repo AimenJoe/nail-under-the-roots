@@ -8,18 +8,20 @@ use crate::i18n::Tr;
 use crate::profile::{key, Profile};
 use crate::talents::Talent;
 
-/// 회피 종류: 굴파기(땅속으로, 떼면 솟구친다) / 깡충(공중 무적).
+/// 회피 종류: 굴파기(땅속으로, 떼면 솟구친다) / 깡충(공중 무적) / 뒤로 뛰기(공중 무적, 서 있으면 겨눈 쪽 반대로, 0195).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Dodge {
     Burrow,
     Hop,
+    Leap,
 }
 
-/// 특기 종류: 드릴(화면 길이 돌진) / 이어 뛰기(세 번 찍기).
+/// 특기 종류: 드릴(화면 길이 돌진) / 이어 뛰기(세 번 찍기) / 도토리 묻기(앞쪽에 셋, 잠시 뒤 터진다, 0195).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Special {
     Drill,
     Chain,
+    Bury,
 }
 
 /// 터치 버튼의 픽토그램(0172). 렌더(`render/hud.rs`)가 선으로 그린다.
@@ -37,6 +39,12 @@ pub enum Icon {
     Drill,
     /// 세 번 뛰기(이어 뛰기).
     Chain,
+    /// 도토리(도토의 던지기, 0195).
+    Acorn,
+    /// 뒤로 굽은 화살표(뒤로 뛰기).
+    Leap,
+    /// 흙 위 도토리 셋(도토리 묻기).
+    Bury,
     /// 산딸기(아이템).
     Berry,
     /// ◀▶(아이템 넘기기).
@@ -75,7 +83,7 @@ pub struct CharacterDef {
     pub touch: [Icon; 3],
 }
 
-pub static ALL: [CharacterDef; 2] = [
+pub static ALL: [CharacterDef; 3] = [
     CharacterDef {
         id: Character::Mole,
         code: 0,
@@ -118,6 +126,28 @@ pub static ALL: [CharacterDef; 2] = [
         toast_web: |s| s.toast_web_momo,
         dig_row: Some(4),
         touch: [Icon::Paw, Icon::Hop, Icon::Chain],
+    },
+    // 돌아온 도토(0052) → 플레이어블(0195): 도토리 던지기 3타, 뒤로 뛰기, 도토리 묻기. 멀리서 던지고 물러나는 동사.
+    CharacterDef {
+        id: Character::Doto,
+        code: 2,
+        name: |s| s.name_doto,
+        unlock: Some(key::DOTO_MEMORY),
+        weapon_kind: WeaponKind::Acorn,
+        gauge: Gauge::Acorn,
+        starting_weapon: crate::equipment::ACORN,
+        dodge: Dodge::Leap,
+        special: Special::Bury,
+        talents: &crate::talents::DOTO_TABLE,
+        talent_keys: ["leap", "parry", "bury", "eat"],
+        portrait: |_| Portrait::DOTO,
+        pick_text: |s| s.pick_doto,
+        stat_dodge_cd: |s| s.stat_leap_cd,
+        toast_shell: |s| s.toast_shell_doto,
+        toast_thorn: |s| s.toast_thorn_doto,
+        toast_web: |s| s.toast_web_doto,
+        dig_row: Some(5),
+        touch: [Icon::Acorn, Icon::Leap, Icon::Bury],
     },
 ];
 
@@ -170,7 +200,11 @@ mod tests {
             Character::Momo.def().talent_keys,
             ["hop", "parry", "chain", "eat"]
         );
+        assert_eq!(
+            Character::Doto.def().talent_keys,
+            ["leap", "parry", "bury", "eat"]
+        );
         let p = Profile::default();
-        assert_eq!(available(&p).count(), 1, "모모는 돌아온 뒤에만");
+        assert_eq!(available(&p).count(), 1, "모모·도토는 돌아온 뒤에만");
     }
 }

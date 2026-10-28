@@ -819,10 +819,11 @@ impl App {
         // 캐릭터(0056): 런(첫 시작·오늘의 굴·실의 꿈)은 뿌리 길에서 고른 캐릭터, 그 밖(마을·개발)은 Naïl.
         // 고른 캐릭터(0056): 보통 런·오늘의 굴, 개발의 가장 깊은 곳(모모 끝 장면 보기).
         // 실의 꿈은 Naïl만: 꿈 목록에 모모가 있다.
-        let ch = if matches!(s, Scenario::Normal | Scenario::Daily | Scenario::Deepest) {
-            self.picked()
-        } else {
-            Character::Mole
+        let ch = match s {
+            Scenario::Normal | Scenario::Daily | Scenario::Deepest => self.picked(),
+            // 개발: 도토로 싸워 보기(0195).
+            Scenario::DotoArena | Scenario::DotoMobs => Character::Doto,
+            _ => Character::Mole,
         };
         self.world.character = ch;
         self.world.player.kit = ch;

@@ -390,6 +390,30 @@ fn draw_touch_icon(icon: Icon, c: Vec2, r: f32, col: Color) {
                 arc(c.x + x * s, c.y + y * s, rad * s, 180.0, 180.0);
             }
         }
+        // 도토(0195): 도토리(모자 + 알), 뒤로 굽은 화살표, 흙 위 도토리 셋.
+        Icon::Acorn => {
+            draw_circle_lines(c.x, c.y + s * 0.2, s * 0.6, w, col);
+            arc(c.x, c.y - s * 0.25, s * 0.7, 180.0, 180.0);
+            line(c + vec2(-s * 0.7, -s * 0.25), c + vec2(s * 0.7, -s * 0.25));
+            line(c + vec2(0.0, -s * 0.95), c + vec2(s * 0.2, -s * 1.2));
+        }
+        Icon::Leap => {
+            let base = c + vec2(0.0, s * 0.45);
+            arc(base.x, base.y, s * 0.9, 180.0, 180.0);
+            let tip = base + vec2(-s * 0.9, s * 0.15);
+            line(tip, tip + vec2(s * 0.4, -s * 0.35));
+            line(tip, tip + vec2(-s * 0.35, -s * 0.4));
+            line(c + vec2(-s * 1.0, s * 0.95), c + vec2(s * 1.0, s * 0.95));
+        }
+        Icon::Bury => {
+            line(c + vec2(-s * 1.0, s * 0.6), c + vec2(s * 1.0, s * 0.6));
+            for x in [-0.6, 0.0, 0.6] {
+                draw_circle_lines(c.x + x * s, c.y + s * 0.15, s * 0.28, w, col);
+            }
+            line(c + vec2(0.0, -s * 0.4), c + vec2(0.0, -s * 1.0));
+            line(c + vec2(0.0, -s * 0.4), c + vec2(-s * 0.3, -s * 0.7));
+            line(c + vec2(0.0, -s * 0.4), c + vec2(s * 0.3, -s * 0.7));
+        }
         Icon::Berry => {
             let o = c + vec2(0.0, s * 0.25);
             draw_circle_lines(o.x, o.y, s * 0.6, w, col);
@@ -438,6 +462,8 @@ pub(super) fn draw_hitboxes(w: &World, alpha: f32) {
             StrikeKind::Drill => SKYBLUE,
             StrikeKind::DrillWall => RED,
             StrikeKind::Stomp => PINK,
+            StrikeKind::Toss => LIGHTGRAY,
+            StrikeKind::Burst => BROWN,
         };
         match s.shape {
             Shape::Circle { center, r } => draw_circle_lines(center.x, center.y, r, 1.0, col),
@@ -634,6 +660,7 @@ pub(super) fn short_state(s: &player::State) -> &'static str {
         player::State::Recover { .. } => "recover",
         player::State::Eat { .. } => "eat",
         player::State::Hop { .. } => "hop",
+        player::State::Leap { .. } => "leap",
         player::State::Chain { .. } => "chain",
         player::State::Dead => "dead",
     }

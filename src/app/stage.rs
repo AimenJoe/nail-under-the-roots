@@ -1273,7 +1273,7 @@ impl App {
         use crate::talents::{key_awake, key_pick, Talents, SLOTS};
         let ch = self.world.character;
         let mut k = Talents {
-            momo: ch == Character::Momo,
+            who: ch,
             ..Talents::default()
         };
         for (i, slot) in SLOTS.iter().enumerate() {

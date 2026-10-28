@@ -10,17 +10,22 @@ use macroquad::color::Color;
 use crate::i18n::Tr;
 use crate::moveset::{self, Moveset};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Character {
+    #[default]
     Mole,
     /// 돌아온 모모(0046) → 플레이어블(0056): 발차기 3연타, 회피 = 깡충(공중 무적), 특기 = 이어 뛰기(기 게이지).
     Momo,
+    /// 돌아온 도토(0052) → 플레이어블(0195): 도토리 던지기 3타, 회피 = 뒤로 뛰기(공중 무적), 특기 = 도토리 묻기.
+    Doto,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WeaponKind {
     Claw,
     Kick,
+    /// 도토의 던지는 도토리(0195).
+    Acorn,
 }
 
 impl Character {
@@ -48,6 +53,8 @@ impl Character {
 pub enum Gauge {
     Rage,
     Ki,
+    /// 도토(0195): 볼주머니에 모은 도토리.
+    Acorn,
 }
 
 impl Gauge {
@@ -55,6 +62,7 @@ impl Gauge {
         match self {
             Gauge::Rage => |s| s.gauge_rage,
             Gauge::Ki => |s| s.gauge_ki,
+            Gauge::Acorn => |s| s.gauge_acorn,
         }
     }
 
@@ -62,6 +70,7 @@ impl Gauge {
         match self {
             Gauge::Rage => Color::new(1.0, 0.55, 0.22, 1.0),
             Gauge::Ki => Color::new(0.45, 0.80, 1.0, 1.0),
+            Gauge::Acorn => Color::new(0.90, 0.66, 0.30, 1.0),
         }
     }
 }
@@ -81,8 +90,10 @@ pub const SPROUT_CLAW: usize = 0;
 pub const STONE_CLAW: usize = 2;
 /// 독 발톱(큰 나무에서 깨운다, 0052).
 pub const VENOM_CLAW: usize = 3;
+/// 도토의 도토리(0195).
+pub const ACORN: usize = 5;
 
-pub static WEAPONS: [Weapon; 5] = [
+pub static WEAPONS: [Weapon; 6] = [
     Weapon {
         name: |s| s.w_sprout,
         desc: |s| s.w_sprout_desc,
@@ -117,6 +128,13 @@ pub static WEAPONS: [Weapon; 5] = [
         kind: WeaponKind::Kick,
         moveset: &moveset::KICKS,
         color: Color::new(1.0, 0.80, 0.86, 1.0),
+    },
+    Weapon {
+        name: |s| s.w_acorn,
+        desc: |s| s.w_acorn_desc,
+        kind: WeaponKind::Acorn,
+        moveset: &moveset::ACORNS,
+        color: Color::new(0.86, 0.62, 0.32, 1.0),
     },
 ];
 
@@ -392,7 +410,7 @@ mod tests {
     /// 캐릭터의 첫 무기는 그 캐릭터가 쓰는 종류다(0056).
     #[test]
     fn starting_weapon_matches_character() {
-        for ch in [Character::Mole, Character::Momo] {
+        for ch in [Character::Mole, Character::Momo, Character::Doto] {
             assert_eq!(WEAPONS[ch.starting_weapon()].kind, ch.weapon_kind());
         }
     }

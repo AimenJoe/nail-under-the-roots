@@ -25,6 +25,10 @@ impl Player {
         if time >= a0 && time - sdt < a1 {
             strike = Some(self.claw_strike(idx, dir));
         }
+        // 던지는 타(0195): 활성 구간 첫 틱에 탄. 손앞의 판정(`claw_strike`)은 받아치기·탄 베기만.
+        if hit.throw != crate::moveset::Throw::None && time >= a0 && time - sdt < a0.max(1e-6) {
+            self.throw_shots(hit.throw, dir, self.hit_strike(idx, dir));
+        }
         self.pos += move_dir * self.speed() * ms.move_factor * dt;
         self.state = State::Attack { idx, time, dir };
 
@@ -120,6 +124,14 @@ impl Player {
         let (a0, a1) = hit.active;
         if time >= a0 && time - sdt < a1 {
             strike = Some(self.heavy_strike(dir, perfect));
+        }
+        // 던지는 무기의 강타 = 큰 도토리(0195).
+        if hit.throw != crate::moveset::Throw::None && time >= a0 && time - sdt < a0.max(1e-6) {
+            let s = Strike {
+                kind: StrikeKind::Heavy,
+                ..self.heavy_strike(dir, perfect)
+            };
+            self.throw_shots(hit.throw, dir, s);
         }
         self.pos += move_dir * self.speed() * ms.move_factor * dt;
         self.state = State::Heavy {
@@ -226,7 +238,21 @@ impl Player {
         idx == self.moveset.last() && self.combo_beats >= self.moveset.last()
     }
 
+    /// 이번 틱의 손 타격. 던지는 타면 손앞의 짧은 판정(`Toss`: 적은 안 맞고 받아치기·탄 베기만, 0195).
     pub(super) fn claw_strike(&self, idx: usize, dir: Vec2) -> Strike {
+        let s = self.hit_strike(idx, dir);
+        if self.moveset.hits[idx].throw == crate::moveset::Throw::None {
+            s
+        } else {
+            Strike {
+                kind: StrikeKind::Toss,
+                ..s
+            }
+        }
+    }
+
+    /// 그 타의 수치로 만든 타격(근접 타 그대로, 던지는 타면 탄이 맞힐 때 쓴다).
+    pub(super) fn hit_strike(&self, idx: usize, dir: Vec2) -> Strike {
         let h = self.moveset.hits[idx];
         Strike {
             id: self.swing_id,
@@ -303,7 +329,12 @@ impl Player {
         let bonus = if perfect { 1 } else { 0 };
         Strike {
             id: self.swing_id,
-            kind: StrikeKind::Heavy,
+            // 던지는 무기의 강타는 손에서 받아치기만, 큰 도토리가 맞힌다(0195).
+            kind: if h.throw == crate::moveset::Throw::None {
+                StrikeKind::Heavy
+            } else {
+                StrikeKind::Toss
+            },
             shape: Shape::Sector {
                 origin: self.pos + dir * 2.0,
                 dir,

@@ -428,6 +428,8 @@ strings! {
     w_kick, w_kick_desc, toast_shell_momo, stat_hop_cd, pick_title, pick_nail, pick_momo, pick_clears, pick_hint, mend_1, mend_2, mend_3, mend_4, run_momo, seat_momo, halmae_petal, jg_momo_deep, jg_momo_deep_d,
     // 안내 화면(docs/decisions/0178)
     pm_help, h_move, h_move_d, h_combo, h_combo_d, h_heavy, h_heavy_d, h_burrow, h_burrow_d, h_parry, h_parry_d, h_special, h_special_d, h_eat, h_eat_d, h_enemy, h_enemy_d, h_loot, h_loot_d, h_camp, h_camp_d, h_gear, h_gear_d, h_break, h_break_d, h_village, h_village_d,
+    // 플레이어블 도토(0195)
+    pick_doto, stat_leap_cd, toast_shell_doto, toast_thorn_doto, toast_web_doto, gauge_acorn, w_acorn, w_acorn_desc, tal_leap, tal_leap_a, tal_leap_a_desc, tal_leap_b, tal_leap_b_desc, tal_bury, tal_bury_a, tal_bury_a_desc, tal_bury_b, tal_bury_b_desc,
 }
 
 #[cfg(test)]

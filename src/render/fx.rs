@@ -331,14 +331,23 @@ pub(super) fn draw_wilted_petals(w: &World, cam: Vec2) {
 
 /// 도토가 묻은 도토리(0052): 흙 둔덕 + 삐죽 나온 갓. 터질 둘레를 고리로 보이고, 고리가 좁혀 오다 끝에선 깜박인다.
 pub(super) fn draw_mine(m: &world::Mine, time: f32) {
-    let k = (m.time / m.fuse.max(0.01)).clamp(0.0, 1.0);
-    let (x, y) = (m.pos.x.round(), m.pos.y.round());
-    let r = t::DOTO_MINE_RADIUS;
+    draw_buried_at(m.pos, m.time, m.fuse, t::DOTO_MINE_RADIUS, false, time);
+}
+
+/// 플레이어 도토가 묻은 도토리(0195): 같은 그림, 고리는 따뜻한 금빛(적의 붉은 것과 다르다 — 내 것은 안 아프다).
+pub(super) fn draw_buried(b: &world::toss::Buried, time: f32) {
+    draw_buried_at(b.pos, b.time, b.fuse, b.radius, true, time);
+}
+
+fn draw_buried_at(pos: Vec2, age: f32, fuse: f32, r: f32, ours: bool, time: f32) {
+    let k = (age / fuse.max(0.01)).clamp(0.0, 1.0);
+    let (x, y) = (pos.x.round(), pos.y.round());
     let late = k > 0.7 && ((time * 16.0) as i32) % 2 == 0;
-    let c = if late {
-        Color::new(1.0, 0.85, 0.4, 0.85)
-    } else {
-        Color::new(1.0, 0.55, 0.4, 0.3 + 0.4 * k)
+    let c = match (ours, late) {
+        (false, true) => Color::new(1.0, 0.85, 0.4, 0.85),
+        (false, false) => Color::new(1.0, 0.55, 0.4, 0.3 + 0.4 * k),
+        (true, true) => Color::new(1.0, 0.95, 0.7, 0.8),
+        (true, false) => Color::new(0.95, 0.78, 0.42, 0.25 + 0.35 * k),
     };
     draw_circle_lines(x, y, r, 1.0, c);
     draw_circle_lines(x, y, (r * (1.0 - k)).max(2.0), 1.0, c);

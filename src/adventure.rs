@@ -832,6 +832,7 @@ impl World {
             self.loot.clear();
         }
         self.projectiles.clear();
+        self.toss.clear();
         self.hazards.clouds.clear();
         self.hazards.rocks.clear();
         self.player.pos = d.start_pos();
@@ -856,6 +857,7 @@ impl World {
             self.biome = s.biome;
         }
         self.projectiles.clear();
+        self.toss.clear();
         self.hazards.clouds.clear();
         self.hazards.rocks.clear();
         self.adv.dungeon = None;
@@ -874,6 +876,7 @@ impl World {
         self.enemies.clear();
         self.loot.clear();
         self.projectiles.clear();
+        self.toss.clear();
         self.hazards.clouds.clear();
         self.hazards.rocks.clear();
         self.hazards.mines.clear();
@@ -920,6 +923,7 @@ impl World {
         self.enemies.clear();
         self.loot.clear();
         self.projectiles.clear();
+        self.toss.clear();
         self.hazards.clouds.clear();
         self.hazards.rocks.clear();
         self.npc = None;
