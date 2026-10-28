@@ -189,16 +189,12 @@ mod device_tests {
             }
         }
         assert!(c.is_done());
-        assert_eq!(w.story.petals().len(), 2, "선 자리 + 보리 공터 앞 길(0190)");
-        let at = w.story.petals()[0];
+        // 줍는 꽃잎은 보리 공터 앞 길의 하나뿐(0194): 모모가 선 자리(첫 발톱 옆)에는 흩날리기만 한다.
+        assert_eq!(w.story.petals(), &[crate::field::petal_road()][..]);
         assert!(!w.petal_tick(), "멀리서는 안 줍는다");
-        w.player.pos = at;
-        assert!(w.petal_tick(), "밟으면 줍는다");
-        assert!(w.story.petal_found() && w.story.petals().len() == 1);
-        assert_eq!(w.story.petals()[0], crate::field::petal_road());
         w.player.pos = crate::field::petal_road();
-        assert!(w.petal_tick(), "길의 꽃잎도 줍는다");
-        assert!(w.story.petals().is_empty());
+        assert!(w.petal_tick(), "길에서 밟으면 줍는다");
+        assert!(w.story.petal_found() && w.story.petals().is_empty());
         assert!(w
             .adv
             .events
@@ -694,9 +690,9 @@ impl Cutscene {
                     };
                 }
                 Step::Hush(on) => w.juice.hush = on,
-                // 남는 것(0164): 건너뛰어도 시든 꽃잎은 자리에 둔다(이펙트는 없이).
+                // 남는 것(0164): 건너뛰어도 길의 시든 꽃잎은 둔다(이펙트는 없이). 선 자리(`Leave`)는 흩날리기뿐이라 없다(0194).
                 Step::Cue {
-                    cue: Cue::Leave | Cue::Trail,
+                    cue: Cue::Trail,
                     at,
                 } => w.story.add_petal(at),
                 _ => {}

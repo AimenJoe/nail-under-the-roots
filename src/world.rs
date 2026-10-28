@@ -117,9 +117,10 @@ pub enum Cue {
     Wrap,
     /// 어둠 속 눈빛(0164): 보라 빛 두 점이 천천히 깜빡인다(나타나기 전).
     Eyes,
-    /// 떠난 자리에 시든 꽃잎 하나를 남긴다(0164): `Story::petals`. 밟으면 토스트 + 도감 '???'.
+    /// 떠난 자리에 꽃잎이 흩날린다(0164). 주울 꽃잎은 남기지 않는다 — 첫 발톱 바로 옆이라 길의 꽃잎과 겹쳤다(0194).
     Leave,
-    /// 길에 시든 꽃잎 하나(0190): 이펙트 없이 `at`에 — 모모가 지나간 자국(보리 공터 앞 길, `field::PETAL_ROAD`).
+    /// 길에 시든 꽃잎 하나(0190): 이펙트 없이 `at`에 — 모모가 지나간 자국(보리 공터 앞 길, `field::petal_road`).
+    /// 밟으면 토스트 + 도감 '???'. 오프닝의 줍는 꽃잎은 이것 하나(0194).
     Trail,
     /// 아기들의 고치가 풀린다(0165): 고치마다 실이 풀리고 반짝임·분홍 꽃잎, 고치가 없어진다.
     Hatch,
@@ -2278,7 +2279,6 @@ impl World {
             }
             Cue::Trail => self.story.petals.push(at),
             Cue::Leave => {
-                self.story.petals.push(at);
                 petals(
                     &mut self.juice.fx,
                     at,
@@ -2570,11 +2570,11 @@ impl World {
             return false;
         };
         let at = self.story.petals.remove(i);
-        // 처음 주운 꽃잎은 "누구의 것일까", 그다음은 "이 길로 갔다"(0190).
+        // 처음 주운 꽃잎은 "분홍빛 + 이 길로 갔다", 예전에 주운 적이 있으면 "또 … 이 길로"(0190 → 0194).
         let first = !self.story.petal_found;
         self.story.petal_found = true;
         self.juice.toast = Some(if first {
-            (|s| s.toast_petal, 3.0)
+            (|s| s.toast_petal, 4.0)
         } else {
             (|s| s.toast_petal_trail, 3.0)
         });

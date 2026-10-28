@@ -224,7 +224,7 @@ pub static EN: Strings = Strings {
     popo_hi2: "Going down below the roots? Then let me teach you how to fight first. One step at a time!",
     popo_hi0: "…That kid just now. I know her. She never used to be like that.",
     op_stop: "…No.",
-    toast_petal: "A wilted petal. A little pink is still left in it.",
+    toast_petal: "A wilted petal. A little pink is still left in it. Someone went down this way.",
     toast_petal_trail: "Another wilted petal. Someone went down this way.",
     best_petal: "The one who left a wilted petal and went away. Who was she?",
     popo_pickup: "See that shiny thing? Those are your claws. Go pick them up.",

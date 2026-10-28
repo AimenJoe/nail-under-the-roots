@@ -224,7 +224,7 @@ pub static PL: Strings = Strings {
     popo_hi2: "Schodzisz pod korzenie? To najpierw nauczę cię walczyć. Krok po kroku!",
     popo_hi0: "…Tę małą sprzed chwili znam. Kiedyś taka nie była.",
     op_stop: "…Nie.",
-    toast_petal: "Zwiędły płatek. Została w nim jeszcze odrobina różu.",
+    toast_petal: "Zwiędły płatek. Została w nim jeszcze odrobina różu. Ktoś zszedł tą drogą.",
     toast_petal_trail: "Kolejny zwiędły płatek. Ktoś zszedł tą drogą.",
     best_petal: "Ta, która zostawiła zwiędły płatek i odeszła. Kim była?",
     popo_pickup: "Widzisz to błyszczące? To twoje pazury. Idź je podnieść.",

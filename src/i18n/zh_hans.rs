@@ -224,7 +224,7 @@ pub static ZH_HANS: Strings = Strings {
     popo_hi2: "要去树根下面？那我先教你怎么活动身体。一步一步来！",
     popo_hi0: "……刚才那孩子，我认识。她以前不是这样的。",
     op_stop: "……不行。",
-    toast_petal: "枯萎的花瓣。还留着一点粉色。",
+    toast_petal: "枯萎的花瓣。还留着一点粉色。好像有谁从这条路走下去了。",
     toast_petal_trail: "又是一片枯萎的花瓣。好像有谁从这条路走下去了。",
     best_petal: "留下枯萎花瓣就走的孩子。会是谁呢。",
     popo_pickup: "看到那个发光的东西了吗？那是你的爪子。去捡起来吧。",

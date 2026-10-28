@@ -224,7 +224,7 @@ pub static ZH_HANT: Strings = Strings {
     popo_hi2: "要去樹根下面？那我先教你怎麼活動身體。一步一步來！",
     popo_hi0: "……剛才那孩子，我認識。她以前不是這樣的。",
     op_stop: "……不行。",
-    toast_petal: "枯萎的花瓣。還留著一點粉色。",
+    toast_petal: "枯萎的花瓣。還留著一點粉色。好像有誰從這條路走下去了。",
     toast_petal_trail: "又是一片枯萎的花瓣。好像有誰從這條路走下去了。",
     best_petal: "留下枯萎花瓣就走的孩子。會是誰呢。",
     popo_pickup: "看到那個發光的東西了嗎？那是你的爪子。去撿起來吧。",

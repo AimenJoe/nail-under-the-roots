@@ -224,7 +224,7 @@ pub static PT_BR: Strings = Strings {
     popo_hi2: "Vai descer para baixo das raízes? Então primeiro deixa eu te ensinar a lutar. Um passo de cada vez!",
     popo_hi0: "…Aquela pequena de agora, eu conheço. Ela não era assim antes.",
     op_stop: "…Não.",
-    toast_petal: "Uma pétala murcha. Ainda tem um pouquinho de rosa.",
+    toast_petal: "Uma pétala murcha. Ainda tem um pouquinho de rosa. Alguém desceu por este caminho.",
     toast_petal_trail: "Outra pétala murcha. Alguém desceu por este caminho.",
     best_petal: "Quem deixou uma pétala murcha e foi embora. Quem seria ela?",
     popo_pickup: "Tá vendo aquela coisa brilhante? São as suas garras. Vai lá pegar.",
