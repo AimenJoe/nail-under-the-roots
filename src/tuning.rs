@@ -129,8 +129,9 @@ pub const BEAT_PIP_SHOW: f32 = 0.9;
 /// 박자에 맞춰 나간 타는 조금 더 세게 느껴진다(0168, 사장 "내 아이디어도 차용"): 멈춤·흔들림·카메라 킥 덤.
 pub const BEAT_HITSTOP_BONUS: f32 = 0.02;
 pub const BEAT_SHAKE_BONUS: f32 = 0.05;
-/// 콤보의 모든 이음이 박자였으면 마무리 타 넉백 배율.
+/// 콤보의 모든 이음이 박자였으면 마무리 타 넉백 배율 + 피해 덤(0189, 사장: 다 맞춘 보상이 손에 잡히게 — 딱 맞춘 강타와 같은 +1).
 pub const FULL_BEAT_KNOCK: f32 = 1.25;
+pub const FULL_BEAT_DAMAGE: i32 = 1;
 /// 다 모인 뒤 이만큼(초) 안에 떼면 "딱 맞춘 강타"(0168): 피해 +1, 더 긴 멈춤·큰 킥.
 pub const HEAVY_PERFECT: f32 = 0.15;
 pub const HEAVY_PERFECT_DAMAGE: i32 = 1;
@@ -339,7 +340,12 @@ pub const PARRY_WINDOW: f32 = 0.12;
 pub const PARRY_FRONT: f32 = 0.2;
 /// 패링 창이 열린 순간부터 다음 창이 열릴 수 있기까지(docs/decisions/0038). 연타로 창을 이어 붙이지 못하게.
 /// 성공하면 바로 다시 열 수 있다(여럿을 연달아 튕겨내는 건 보상).
-pub const PARRY_COOLDOWN: f32 = 0.45;
+/// 0.45 → 0.3(0189): 박자(0.42초)마다 휘두르면 두 번에 한 번은 창이 안 열렸다. 연타는 박자 스냅이 이미 막는다.
+pub const PARRY_COOLDOWN: f32 = 0.3;
+/// 받아칠 위협이 이 거리(px) 안에 있으면(돌진 중인 적·다 차 가는 예고·날아오는 탄) 박자 스냅을 건너뛴다(0189).
+pub const PARRY_THREAT_R: f32 = 90.0;
+/// 예고가 이만큼 찼으면 위협.
+pub const PARRY_THREAT_TELE: f32 = 0.6;
 pub const PARRY_SP: f32 = 4.0;
 pub const PARRY_HITSTOP: f32 = 0.12;
 pub const PARRY_SHAKE: f32 = 0.35;

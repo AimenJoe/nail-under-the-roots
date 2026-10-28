@@ -729,7 +729,7 @@ pub static EN: Strings = Strings {
     h_move: "Moving and aiming",
     h_move_d: "Walk with the stick or arrow keys. Tilt the stick a little to walk slowly. The right stick only aims (the special goes that way too). In menus, pick with up/down and enter with confirm.",
     h_combo: "Claw combo and the beat",
-    h_combo_d: "Press attack and a swing comes out at once. The ring around you closes onto the target ring: the moment it lands is the beat. Press then and the next swing comes out right there and hits harder (chime, notes over your head). Press early and it waits for the beat; press late and the combo still continues. Each beat clicks and flashes the target ring: press on the click.",
+    h_combo_d: "Press attack and a swing comes out at once. The ring around you closes onto the target ring: the moment it lands is the beat. Press then and the next swing comes out right there and hits harder (chime, notes over your head). Press early and it waits for the beat; press late and the combo still continues. Each beat clicks and flashes the target ring: press on the click. Hit every beat of a combo and the finisher deals +1 damage and shoves farther.",
     h_heavy: "Heavy strike",
     h_heavy_d: "After a swing, keep holding attack and light gathers in your claws. When they glow, release: a hard hit that shoves far, slamming into walls. Release right as they glow for a perfect heavy (+1 damage). It also breaks shells and spines.",
     h_burrow: "Burrow and emerge",

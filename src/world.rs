@@ -752,6 +752,20 @@ impl World {
         self.tick_waves(dt);
     }
 
+    /// 받아칠 위협이 가까운가(0189): 돌진 중인 적, 다 차 가는 예고, 날아오는 탄이 `PARRY_THREAT_R` 안에.
+    fn parry_threat(&self) -> bool {
+        let p = self.player.pos;
+        let near = |q: Vec2| q.distance_squared(p) < t::PARRY_THREAT_R * t::PARRY_THREAT_R;
+        self.enemies.iter().any(|e| {
+            e.alive
+                && near(e.pos)
+                && (e.parryable() || e.telegraph().is_some_and(|k| k >= t::PARRY_THREAT_TELE))
+        }) || self
+            .projectiles
+            .iter()
+            .any(|b| b.alive && !b.friendly && near(b.pos) && b.vel.dot(p - b.pos) > 0.0)
+    }
+
     /// 1. 플레이어: 입력·공격·먹기, 플레이어 이벤트의 소리·효과. 이번 틱의 공격 판정을 돌려준다.
     fn tick_player(&mut self, a: &Actions, dt: f32) -> Option<Strike> {
         // 1. 플레이어. 드릴 겨누기용으로 맞을 수 있는 적 자리를 넘긴다(0139).
@@ -763,6 +777,7 @@ impl World {
                 .map(|e| e.pos),
         );
         self.web_tick();
+        self.player.threat = self.parry_threat();
         let strike = self.player.update(a, &self.room, dt);
         self.last_strike = strike;
         self.deep_tick(dt);

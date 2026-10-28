@@ -729,7 +729,7 @@ pub static ES: Strings = Strings {
     h_move: "Moverse y apuntar",
     h_move_d: "Camina con el stick o las flechas. Inclina poco el stick para andar despacio. El stick derecho solo apunta (el especial sale hacia allí). En los menús, elige con arriba/abajo y entra con confirmar.",
     h_combo: "Combo de garras y el ritmo",
-    h_combo_d: "Pulsa atacar y el golpe sale al instante. El anillo que te rodea se cierra sobre el anillo objetivo: el momento en que lo toca es el tiempo. Pulsa entonces y el siguiente golpe sale ahí mismo, más fuerte (campanilla, notas sobre la cabeza). Si te adelantas, espera al tiempo; si te retrasas, el combo sigue igual. Cada tiempo hace un clic y enciende el anillo objetivo: pulsa con el clic.",
+    h_combo_d: "Pulsa atacar y el golpe sale al instante. El anillo que te rodea se cierra sobre el anillo objetivo: el momento en que lo toca es el tiempo. Pulsa entonces y el siguiente golpe sale ahí mismo, más fuerte (campanilla, notas sobre la cabeza). Si te adelantas, espera al tiempo; si te retrasas, el combo sigue igual. Cada tiempo hace un clic y enciende el anillo objetivo: pulsa con el clic. Acierta todos los tiempos de un combo y el golpe final hace +1 de daño y empuja más lejos.",
     h_heavy: "Golpe fuerte",
     h_heavy_d: "Tras un golpe, mantén atacar y la luz se junta en las garras. Cuando brillen, suelta: un golpe duro que empuja lejos y estampa contra la pared. Suelta justo al brillar para un golpe fuerte perfecto (+1 daño). También abre caparazones y púas.",
     h_burrow: "Excavar y emerger",

@@ -56,10 +56,17 @@ impl Moveset {
 /// 강공격 수치(0161 → 0168): 마지막 타에서 — 피해는 마지막 타 + 1(3 이상), 반지름 1.3배, 넉백 1.7배(벽 쿵이 노림수가 된다),
 /// 경직 +0.5, 멈춤·흔들림 한 단 위, 스윙·후딜레이 조금 더 길고, 활성 구간이 끝나야 굴파기로 끊는다. 무기마다 따로 적지 않는다.
 /// 같은 시간의 콤보(피해 4)보다 약하면 아무도 안 쓴다(0166).
+/// 강타 활성 시작(초): 0 — 뗀 다음 틱에 판정(0189).
+const HEAVY_ACTIVE_START: f32 = 0.0;
+
 pub fn heavy_of(last: Hit) -> Hit {
     Hit {
         swing: last.swing + 0.06,
-        active: (last.active.0 + 0.02, last.active.1 + 0.05),
+        // 떼는 순간 나간다(0189): 모으기가 이미 준비 동작이라, 마무리 타의 0.05초 준비를 또 기다리면 늦게 느껴졌다.
+        active: (
+            HEAVY_ACTIVE_START,
+            HEAVY_ACTIVE_START + (last.active.1 - last.active.0) + 0.03,
+        ),
         recovery: last.recovery + 0.08,
         damage: (last.damage + 1).max(3),
         knockback: last.knockback * 1.7,
@@ -68,7 +75,7 @@ pub fn heavy_of(last: Hit) -> Hit {
         shake: last.shake + 0.2,
         range: last.range * 1.3,
         lunge: last.lunge + 10.0,
-        dodge_cancel_after: last.active.1 + 0.05,
+        dodge_cancel_after: HEAVY_ACTIVE_START + (last.active.1 - last.active.0) + 0.03,
         poison: last.poison,
     }
 }

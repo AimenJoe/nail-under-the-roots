@@ -172,6 +172,9 @@ pub struct Player {
     pub targets: Vec<Vec2>,
     /// 흰 실 그물(0165)에 걸려 있다: 월드가 틱마다 정한다. 걷는 속도 `WEB_SLOW`배.
     pub slow: bool,
+    /// 받아칠 위협이 가까이 있다(0189): 월드가 틱마다 정한다. 그러면 창 전에 눌러 둔 타도 박자를 기다리지 않는다
+    /// (박자 스냅이 받아치기를 늦추면 안 된다).
+    pub threat: bool,
     /// 시동 중 겨눈 적(그리기용 표시). 없으면 입력 방향 그대로.
     pub drill_lock: Option<Vec2>,
     /// 콤보 표. 무기·캐릭터에 따라 바뀐다(moveset.rs).
@@ -240,6 +243,7 @@ impl Player {
             events: Vec::new(),
             targets: Vec::new(),
             slow: false,
+            threat: false,
             drill_lock: None,
             moveset: &moveset::CLAWS,
             face_left: false,
@@ -572,10 +576,11 @@ impl Player {
     }
 
     /// 눌러 둔 다음 타가 지금 나갈 때인가(0174): 박자 창 안에서 누른 것은 바로, 창 전에 누른 것은 박자에.
+    /// 받아칠 위협이 가까우면 창 전에 누른 것도 바로(0189, 덤은 없다).
     pub(super) fn queue_due(&self) -> bool {
         match self.queued {
             Some(Queued::Beat) => true,
-            Some(Queued::Early) => self.beat_clock >= self.beat_at,
+            Some(Queued::Early) => self.threat || self.beat_clock >= self.beat_at,
             None => false,
         }
     }
@@ -1293,14 +1298,20 @@ mod tests {
         ));
         assert!(p.parry_heavy(), "강공격 첫머리는 둘레 공격도 받아친다");
         let mut strike = None;
+        let mut after_release = 0;
         for _ in 0..60 {
             let (s, _) = tick(&mut p, &room, &release);
+            after_release += 1;
             if s.is_some() {
                 strike = s;
                 break;
             }
         }
         let s = strike.expect("강공격 판정");
+        assert!(
+            after_release <= 1,
+            "떼고 바로 나간다(0189): {after_release}틱 뒤"
+        );
         assert_eq!(s.kind, StrikeKind::Heavy);
         assert!(s.finisher);
         let heavy = p.moveset.heavy();
@@ -1453,6 +1464,44 @@ mod tests {
             beat_fin.knockback,
             mashed[2].knockback
         );
+        assert_eq!(
+            beat_fin.damage,
+            mashed[2].damage + t::FULL_BEAT_DAMAGE,
+            "이음을 다 맞춘 마무리 타는 피해 +1(0189)"
+        );
+    }
+
+    #[test]
+    fn a_nearby_threat_lets_an_early_press_out_at_once() {
+        // 받아칠 위협이 가까우면(0189) 창 전에 누른 타도 박자를 기다리지 않는다 — 받아치기가 늦어지면 안 된다.
+        let room = Room::new();
+        let tap = Actions {
+            attack: true,
+            ..Default::default()
+        };
+        let none = Actions::default();
+        let mut p = Player::new(room.center());
+        tick(&mut p, &room, &tap);
+        // 스윙이 끝나 설 때까지.
+        let mut n = 0;
+        while matches!(p.state, State::Attack { .. }) && n < 100 {
+            tick(&mut p, &room, &none);
+            n += 1;
+        }
+        p.parry_cd = 0.0;
+        // 창 전: 위협이 없으면 기다린다.
+        let (_, ev) = tick(&mut p, &room, &tap);
+        assert!(
+            !ev.contains(&Event::Swing(1)),
+            "위협이 없으면 박자에: {ev:?}"
+        );
+        assert!(p.beat_cue().is_some_and(|c| c.waiting));
+        // 위협이 오면 바로 나가고 받아치기 창이 열린다. 덤은 없다.
+        p.threat = true;
+        let (_, ev) = tick(&mut p, &room, &none);
+        assert!(ev.contains(&Event::Swing(1)), "위협이면 바로: {ev:?}");
+        assert!(!ev.iter().any(|e| matches!(e, Event::Beat(_))));
+        assert!(p.parry_dir().is_some(), "받아치기 창이 열린다");
     }
 
     /// 박자 콤보(0174): 다음 타의 박자는 스윙 시작 `BEAT_PERIOD` 뒤. 창(±`BEAT_WINDOW`) 안에서 누르면 그 자리에서

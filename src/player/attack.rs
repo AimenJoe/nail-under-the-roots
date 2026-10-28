@@ -221,6 +221,11 @@ impl Player {
         self.beat_at = t::BEAT_PERIOD.max(hit.swing + hit.recovery);
     }
 
+    /// 콤보의 이음을 모두 박자에 맞춘 마무리 타인가(0168·0189): 넉백 `FULL_BEAT_KNOCK`배 + 피해 `FULL_BEAT_DAMAGE`.
+    pub(super) fn full_beat(&self, idx: usize) -> bool {
+        idx == self.moveset.last() && self.combo_beats >= self.moveset.last()
+    }
+
     pub(super) fn claw_strike(&self, idx: usize, dir: Vec2) -> Strike {
         let h = self.moveset.hits[idx];
         Strike {
@@ -231,10 +236,16 @@ impl Player {
                 dir,
                 r: h.range,
             },
-            damage: h.damage + self.stats.damage,
+            damage: h.damage
+                + self.stats.damage
+                + if self.full_beat(idx) {
+                    t::FULL_BEAT_DAMAGE
+                } else {
+                    0
+                },
             knockback: if idx == self.moveset.last() {
                 // 콤보의 이음을 모두 박자에 맞췄으면 마무리 타가 더 멀리 민다(0168).
-                let full = if self.combo_beats >= self.moveset.last() {
+                let full = if self.full_beat(idx) {
                     t::FULL_BEAT_KNOCK
                 } else {
                     1.0
