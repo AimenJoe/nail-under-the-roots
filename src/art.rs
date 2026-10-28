@@ -373,7 +373,7 @@ pub struct BigSheet {
     pub foot: f32,
 }
 
-pub const BIG_SHEETS: [BigSheet; 5] = [
+pub const BIG_SHEETS: [BigSheet; 6] = [
     BigSheet {
         file: "art/momo.png",
         back: MOMO_BLOOM_ROW,
@@ -405,6 +405,13 @@ pub const BIG_SHEETS: [BigSheet; 5] = [
     BigSheet {
         file: "art/popo.png",
         back: RACCOON_ROW,
+        tainted: None,
+        cell: 32.0,
+        foot: 30.0,
+    },
+    BigSheet {
+        file: "art/susu.png",
+        back: SUSU_ROW,
         tainted: None,
         cell: 32.0,
         foot: 30.0,
