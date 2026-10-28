@@ -42,13 +42,12 @@ OUTLINE = (43, 29, 42)
 # 배율은 줄(무리)마다 그 무리의 첫 칸 몸 키로 맞춘다(칸마다 맞추면 걷기의 들썩임이 사라진다).
 SRC_FRAMES = {               # 원본의 발밑 보라 줄(윗줄 y 386~391, 아랫줄 661~666)은 칸 밖으로 뺀다
     "idle_a": (39, 7, 463, 385),
-    "idle_b": (554, 17, 982, 385),
     "walk_a": (6, 419, 247, 660),
     "walk_b": (265, 419, 499, 660),
     "walk_c": (523, 419, 754, 660),
     "walk_d": (777, 419, 1013, 660),
 }
-GROUP = {"idle_a": "idle_a", "idle_b": "idle_a", "walk_a": "walk_a", "walk_b": "walk_a", "walk_c": "walk_a", "walk_d": "walk_a"}
+GROUP = {"idle_a": "idle_a", "walk_a": "walk_a", "walk_b": "walk_a", "walk_c": "walk_a", "walk_d": "walk_a"}
 REF = "idle_a"
 
 # 시트 B(동작): 눈 크기가 아홉 칸 모두 같아(같은 배율로 그렸다) 배율 하나 — 똑바로 선 들기 A 칸의 몸 키를 BODY_H로.
@@ -69,6 +68,7 @@ B_REF = "windup0"
 LIMB = (32, 24, 35)      # 원본 검은 손발이 색표에서 받은 색(눈 (20, 9, 25)과는 RGB 차 합 37)
 PAW = (198, 102, 120)    # 코(231, 137, 153)보다 한 단 짙게 — 코 바로 아래 앞발과 섞이지 않게
 SOLE = (150, 80, 96)
+SHADE = (75, 44, 50)     # 손발이 아닌 검은 점(머리 둘레 그늘) → 짙은 털. 검게 두면 외곽선에 붙어 선이 두 겹으로 굵어 보였다(사장).
 CLAW = (232, 217, 174)
 # 걷기 칸마다 앞발(오른쪽)·뒷발톱(왼쪽)을 반대로 2px 흔든다 — 원본 걷기는 손이 그대로였다(사장).
 # 몸 16px에서 손은 3px쯤이라 2px가 읽히는 최대다(팔 흔드는 나노바나나 시트도 16px로 줄이면 1px 안쪽 차이였다).
@@ -202,7 +202,9 @@ def paws(sprite):
             near |= np.roll(np.roll(claw, dy, 0), dx, 1)
     seeds = near.copy()
     seeds[h - 3:] = True
-    on = grow(on, seeds & on)
+    limb = grow(on, seeds & on)
+    out[on & ~limb, :3] = SHADE
+    on = limb
     rows = np.arange(h)[:, None] >= h - 3
     out[on & rows, :3] = SOLE
     out[on & ~rows, :3] = PAW
@@ -231,6 +233,15 @@ def swing(sprite, k):
             if 0 <= x + d < w:
                 out[y, x + d] = c
     return out
+
+
+def breathe(sprite):
+    """숨 들이쉰 서기 칸 → 내쉰 칸: 아랫몸에서 바로 아래 줄과 가장 닮은 줄 하나를 빼 1px 낮춘다(눈·코·발은 그대로).
+    원본의 서기 두 칸은 따로 그린 그림이라 머리 모양·손 자리가 달라 숨쉬기가 툭툭 끊겼다(사장)."""
+    h = sprite.shape[0]
+    rows = range(h // 2, h - 4)
+    drop = min(rows, key=lambda r: int((sprite[r] != sprite[r + 1]).any(-1).sum()))
+    return np.concatenate([sprite[:drop], sprite[drop + 1:]])
 
 
 def is_fur(key):
@@ -282,6 +293,7 @@ def build():
     scale = {g: BODY_H / body_h(crops[g], masks[g]) for g in set(GROUP.values())}
     spr = {k: paws(shrink(crops[k], masks[k], scale[GROUP[k]], pal)) for k in crops}
     spr = {k: swing(s, SWING.get(k, 0)) for k, s in spr.items()}
+    spr["idle_b"] = breathe(spr["idle_a"])
     src_b = np.asarray(Image.open(SRC_B).convert("RGB")).astype(int)
     b_crops = {k: src_b[y0:y1, x0:x1] for k, (x0, y0, x1, y1) in B_FRAMES.items()}
     b_masks = {}
