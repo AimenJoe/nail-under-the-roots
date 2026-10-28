@@ -643,12 +643,27 @@ pub(super) fn draw_chest(r: Rect, opened: bool, time: f32) {
 /// 쉼터 모닥불: 돌 둘레 + 장작 + 흔들리는 불꽃 + 바닥 빛.
 /// 모닥불의 돌만(불꽃·빛 없이): 그림자 패스용(0105). 그림 자리는 `draw_campfire_sunny`·`draw_campfire`와 같다.
 /// 부술 수 있는 것(0175): 칸 하나(발 사각형 `r`) 위에 지대마다 다른 모양. 바닥 그림자 + 둥근 몸통 + 무늬.
+/// 넷이 같은 표시를 나눠 쓴다(0205, 사장 "부술 수 있는 게 티가 안 난다"): 어두운 외곽선(바닥 장식이 아니라 물건),
+/// 밝은 금(깨진다), 2.5초마다 반짝(움직임이 먼저 눈에 든다). 한 번 배우면 지대가 바뀌어도 알아본다.
 pub(super) fn draw_breakable(b: crate::room::Breakable, r: Rect, time: f32) {
     use crate::room::Breakable;
     let c = r.center();
     let (cx, foot) = (c.x.round(), (r.bottom() - 2.0).round());
     draw_ellipse(cx, foot + 1.0, 7.0, 2.5, 0.0, SHADOW_SOFT);
     let px = |x: f32, y: f32, col: Color| draw_rectangle(x, y, 1.0, 1.0, col);
+    // 몸통 둘레 1px 외곽선: 몸통 타원을 한 px 크게 먼저 칠한다.
+    let rim =
+        |x: f32, y: f32, rx: f32, ry: f32| draw_ellipse(x, y, rx + 1.0, ry + 1.0, 0.0, OUTLINE);
+    match b {
+        Breakable::Mound => rim(cx, foot - 3.0, 6.5, 4.5),
+        Breakable::Gall => rim(cx, foot - 4.0, 5.7, 5.5),
+        Breakable::RockPile => {
+            rim(cx - 3.0, foot - 2.0, 3.5, 2.5);
+            rim(cx + 3.0, foot - 2.0, 3.5, 2.5);
+            rim(cx, foot - 5.5, 3.5, 3.0);
+        }
+        Breakable::SilkBall => rim(cx, foot - 4.5, 5.5, 5.0),
+    }
     match b {
         Breakable::Mound => {
             // 흙더미: 갈색 둔덕, 위는 밝고 아래는 어둡다. 조약돌 둘.
@@ -701,6 +716,33 @@ pub(super) fn draw_breakable(b: crate::room::Breakable, r: Rect, time: f32) {
             draw_line(cx - 3.0, foot - 8.0, cx + 2.0, foot - 1.0, 1.0, thread);
             px(cx + 5.0, foot - 2.0, thread);
         }
+    }
+    // 금: 위에서 아래로 갈지자, 밝은 줄 + 오른쪽 그늘 한 점씩(갈라진 틈).
+    let (lit, dark) = (
+        Color::new(1.0, 0.95, 0.82, 0.95),
+        Color::new(0.12, 0.08, 0.10, 0.75),
+    );
+    for (dx, dy) in [
+        (1.0, -7.0),
+        (0.0, -6.0),
+        (1.0, -5.0),
+        (2.0, -4.0),
+        (1.0, -3.0),
+    ] {
+        px(cx + dx, foot + dy, lit);
+        px(cx + dx + 1.0, foot + dy, dark);
+    }
+    // 반짝: 2.5초마다 0.25초, 자리마다 어긋나게. 몸통 왼쪽 위에 십자.
+    let ph = (time / 2.5 + (c.x * 0.37 + c.y * 0.61).fract()).fract();
+    if ph < 0.1 {
+        let a = 1.0 - (ph / 0.1 - 0.5).abs() * 2.0;
+        let (gx, gy) = (cx - 3.0, foot - 8.0);
+        let w = Color::new(1.0, 1.0, 1.0, a);
+        px(gx, gy, w);
+        px(gx - 1.0, gy, Color::new(1.0, 1.0, 1.0, a * 0.7));
+        px(gx + 1.0, gy, Color::new(1.0, 1.0, 1.0, a * 0.7));
+        px(gx, gy - 1.0, Color::new(1.0, 1.0, 1.0, a * 0.7));
+        px(gx, gy + 1.0, Color::new(1.0, 1.0, 1.0, a * 0.7));
     }
 }
 
