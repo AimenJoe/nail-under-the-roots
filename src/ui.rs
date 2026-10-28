@@ -535,8 +535,95 @@ pub fn glyph_plan(size: f32, scale: f32, dpi: f32) -> (u16, f32) {
     ((size * scale) as u16, 1.0)
 }
 
+/// 굴리는 목록의 창(0199): 보이는 첫 줄을 기억한다. 키·패드 커서는 창이 따라가고(`window`), 손가락 끌기·휠·▲▼는
+/// 창을 직접 옮기고 커서를 창 안으로 데려온다(`scroll`). 전에는 화면마다 "커서가 맨 아래 줄"이라고 보고 창을 커서에서
+/// 계산해서, 터치로는 가려진 줄을 볼 수 없었다.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ListView {
+    pub first: usize,
+    /// 지난번 그릴 때 들어간 줄 수와 줄 높이(논리 px).
+    fits: usize,
+    row_h: f32,
+    /// 줄 하나가 안 된 끌기 거리(논리 px).
+    acc: f32,
+}
+
+impl ListView {
+    /// 그릴 때: 이번에 들어가는 줄 수·줄 높이를 적고, 커서가 창 밖이면 창을 옮긴다. 보이는 첫 줄.
+    pub fn window(&mut self, cursor: usize, n: usize, fits: usize, row_h: f32) -> usize {
+        self.fits = fits.max(1);
+        self.row_h = row_h;
+        if cursor < self.first {
+            self.first = cursor;
+        }
+        if cursor >= self.first + self.fits {
+            self.first = cursor + 1 - self.fits;
+        }
+        self.first = self.first.min(n.saturating_sub(self.fits));
+        self.first
+    }
+
+    /// 끌기(논리 px, 위로 끌면 +)와 칸(휠·▲▼, 아래로 +)만큼 창을 옮기고 커서를 창 안에 둔다. 창이 움직였으면 참.
+    pub fn scroll(&mut self, (drag, steps): (f32, i32), cursor: &mut usize, n: usize) -> bool {
+        let row_h = self.row_h.max(1.0);
+        // 방향을 바꾸면 남은 거리는 버린다(반대로 끄는 첫 줄이 늦게 오지 않게).
+        if self.acc * drag < 0.0 {
+            self.acc = 0.0;
+        }
+        self.acc += drag;
+        let mut rows = steps;
+        while self.acc >= row_h {
+            self.acc -= row_h;
+            rows += 1;
+        }
+        while self.acc <= -row_h {
+            self.acc += row_h;
+            rows -= 1;
+        }
+        if rows == 0 || n == 0 {
+            return false;
+        }
+        let fits = self.fits.max(1);
+        let max_first = n.saturating_sub(fits) as i32;
+        let first = (self.first as i32 + rows).clamp(0, max_first) as usize;
+        let moved = first != self.first;
+        self.first = first;
+        *cursor = (*cursor).clamp(first, (first + fits - 1).min(n - 1));
+        moved
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::ListView;
+
+    /// 끌어 굴리기(0199): 줄 높이만큼 끌면 한 줄, 끝에서 멈추고, 커서는 창 안으로 온다. 키 커서는 창이 따라간다.
+    #[test]
+    fn list_view_scrolls_by_drag_and_follows_cursor() {
+        let mut v = ListView::default();
+        let mut cur = 0;
+        assert_eq!(v.window(cur, 10, 4, 12.0), 0);
+        assert!(
+            !v.scroll((8.0, 0), &mut cur, 10),
+            "줄 하나가 안 되면 그대로"
+        );
+        assert!(v.scroll((8.0, 0), &mut cur, 10));
+        assert_eq!(
+            (v.first, cur),
+            (1, 1),
+            "모자란 것은 쌓인다, 커서는 창 맨 위로"
+        );
+        assert!(v.scroll((0.0, 99), &mut cur, 10));
+        assert_eq!((v.first, cur), (6, 6), "끝(10 - 4)에서 멈춘다");
+        assert!(!v.scroll((0.0, 1), &mut cur, 10));
+        assert!(v.scroll((-24.0, 0), &mut cur, 10));
+        assert_eq!(v.first, 4);
+        // 키로 커서를 올리면 창이 따라 올라간다(창 위에 둔 채로, 예전처럼 커서가 맨 아래로 가지 않는다).
+        assert_eq!(v.window(2, 10, 4, 12.0), 2);
+        assert_eq!(v.window(9, 10, 4, 12.0), 6);
+        assert_eq!(v.window(9, 3, 4, 12.0), 0, "다 들어가면 0");
+    }
+
     use super::*;
 
     /// 키캡 조각(0153): 표식 사이가 키, 잘려 닫는 표식이 없으면 끝까지 키.

@@ -188,6 +188,8 @@ impl App {
                     self.journal_cursor = (self.journal_cursor + 1) % n;
                 }
                 let mut take = a.confirm;
+                self.journal_view
+                    .scroll(self.scroll_in, &mut self.journal_cursor, n);
                 if let Some(Hit::JournalItem(i)) = tap_hit {
                     // 고른 칸을 한 번 더 누르면 받는다.
                     take = i == self.journal_cursor;
@@ -206,6 +208,9 @@ impl App {
                 if a.down || tap_hit == Some(Hit::StatusScroll(1)) {
                     step = STATUS_LINE;
                 }
+                // 끌기는 그만큼, 휠·▲▼는 한 줄씩(0199).
+                let (drag, steps) = self.scroll_in;
+                step += drag + steps as f32 * STATUS_LINE;
                 self.status_scroll = (self.status_scroll + step).clamp(0.0, self.status_max);
             }
             4 => {
@@ -216,6 +221,8 @@ impl App {
                 if a.down {
                     self.bestiary_cursor = (self.bestiary_cursor + 1) % n;
                 }
+                self.bestiary_view
+                    .scroll(self.scroll_in, &mut self.bestiary_cursor, n);
                 if let Some(Hit::BestiaryItem(i)) = tap_hit {
                     self.bestiary_cursor = i;
                 }
@@ -478,26 +485,23 @@ impl App {
             .fold(74.0, f32::max)
             .min(100.0);
         let first = self
-            .bestiary_cursor
-            .saturating_sub(fits - 1)
-            .min(BESTIARY.len().saturating_sub(fits));
+            .bestiary_view
+            .window(self.bestiary_cursor, BESTIARY.len(), fits, row_h);
+        let ax = c.x + list_w - arrow_w;
         if first > 0 {
-            ui.text(
-                "▲",
-                c.x + list_w - arrow_w,
-                c.y + 1.0,
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
+            ui.text("▲", ax, c.y + 1.0, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(ax - 3.0, c.y - 1.0, arrow_w + 6.0, row_h + 2.0),
+                Hit::Scroll(-1),
+            ));
         }
         if first + fits < BESTIARY.len() {
-            ui.text(
-                "▼",
-                c.x + list_w - arrow_w,
-                c.y + (fits - 1) as f32 * row_h + 1.0,
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
+            let y = c.y + (fits - 1) as f32 * row_h + 1.0;
+            ui.text("▼", ax, y, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(ax - 3.0, y - 2.0, arrow_w + 6.0, row_h + 2.0),
+                Hit::Scroll(1),
+            ));
         }
         for (i, k) in BESTIARY.iter().enumerate().skip(first).take(fits) {
             let r = Rect::new(c.x, c.y + (i - first) as f32 * row_h, list_w, row_h - 1.0);
@@ -800,26 +804,13 @@ impl App {
         let top = c.y + 15.0;
         let row_h = FONT_PX + 4.0;
         let rows = (((c.bottom() - top) / row_h).floor() as usize).max(1);
-        if self.journal_cursor < self.journal_scroll {
-            self.journal_scroll = self.journal_cursor;
-        }
-        if self.journal_cursor >= self.journal_scroll + rows {
-            self.journal_scroll = self.journal_cursor + 1 - rows;
-        }
+        let first = self
+            .journal_view
+            .window(self.journal_cursor, goals.len(), rows, row_h);
         let bar_bg = Color::new(0.22, 0.17, 0.24, 1.0);
         let bar_w = 24.0;
-        for (k, g) in goals
-            .iter()
-            .enumerate()
-            .skip(self.journal_scroll)
-            .take(rows)
-        {
-            let r = Rect::new(
-                c.x,
-                top + (k - self.journal_scroll) as f32 * row_h,
-                list_w,
-                row_h,
-            );
+        for (k, g) in goals.iter().enumerate().skip(first).take(rows) {
+            let r = Rect::new(c.x, top + (k - first) as f32 * row_h, list_w, row_h);
             let selected = k == self.journal_cursor;
             let claimed = g.claimed(p);
             let ready = g.ready(p);
@@ -876,11 +867,23 @@ impl App {
             self.hits.push((r, Hit::JournalItem(k)));
         }
         // 목록이 더 있으면 ▲▼.
-        if self.journal_scroll > 0 {
+        if first > 0 {
             ui.text_right("▲", c.x + list_w, top - 11.0, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(c.x + list_w - 16.0, top - 14.0, 20.0, 14.0),
+                Hit::Scroll(-1),
+            ));
         }
-        if self.journal_scroll + rows < goals.len() {
+        if first + rows < goals.len() {
             ui.text_right("▼", c.x + list_w, c.bottom() - 4.0, FONT_PX, ui::TEXT_DIM);
+            // 마지막 줄 칸과 겹친다: 앞에 넣어 ▼가 이긴다.
+            self.hits.insert(
+                0,
+                (
+                    Rect::new(c.x + list_w - 16.0, c.bottom() - 6.0, 20.0, 14.0),
+                    Hit::Scroll(1),
+                ),
+            );
         }
         // 오른쪽: 고른 목표.
         let g = goals[self.journal_cursor];

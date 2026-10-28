@@ -25,6 +25,8 @@ impl App {
             flip = i == self.help_cursor;
             self.help_cursor = i;
         }
+        self.help_view
+            .scroll(self.scroll_in, &mut self.help_cursor, n);
         if self.help_cursor != was {
             self.help_page = 0;
             self.sfx.play(crate::sfx::Id::UiMove);
@@ -49,20 +51,24 @@ impl App {
             .fold(80.0, f32::max)
             .min(118.0);
         let first = self
-            .help_cursor
-            .saturating_sub(fits - 1)
-            .min(TOPICS.len().saturating_sub(fits));
+            .help_view
+            .window(self.help_cursor, TOPICS.len(), fits, row_h);
+        let ax = c.x + list_w - arrow_w;
+        // ▲▼는 누르면 한 칸 굴린다(0199). 목록 칸보다 먼저 넣어 그 자리를 이긴다.
         if first > 0 {
-            ui.text("▲", c.x + list_w - arrow_w, c.y, FONT_PX, ui::TEXT_DIM);
+            ui.text("▲", ax, c.y, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(ax - 3.0, c.y - 2.0, arrow_w + 6.0, row_h + 2.0),
+                Hit::Scroll(-1),
+            ));
         }
         if first + fits < TOPICS.len() {
-            ui.text(
-                "▼",
-                c.x + list_w - arrow_w,
-                c.y + (fits - 1) as f32 * row_h,
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
+            let y = c.y + (fits - 1) as f32 * row_h;
+            ui.text("▼", ax, y, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(ax - 3.0, y - 2.0, arrow_w + 6.0, row_h + 2.0),
+                Hit::Scroll(1),
+            ));
         }
         for (i, t) in TOPICS.iter().enumerate().skip(first).take(fits) {
             let r = Rect::new(c.x, c.y + (i - first) as f32 * row_h, list_w, row_h - 1.0);

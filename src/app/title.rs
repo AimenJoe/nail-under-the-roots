@@ -184,9 +184,8 @@ impl App {
         const VISIBLE: usize = 7;
         let n = scenario::LIST.len();
         let first = self
-            .dev_cursor
-            .saturating_sub(VISIBLE - 1)
-            .min(n.saturating_sub(VISIBLE));
+            .dev_view
+            .window(self.dev_cursor, n, VISIBLE, FONT_PX + 4.0);
         let names: Vec<&str> = scenario::LIST
             .iter()
             .skip(first)

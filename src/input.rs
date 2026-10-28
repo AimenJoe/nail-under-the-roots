@@ -453,8 +453,12 @@ pub struct Actions {
     pub right: bool,
     pub toggle_debug: bool,
     pub toggle_hitboxes: bool,
-    /// 이번 프레임의 탭/클릭 위치(화면 논리 px). 메뉴 모드의 터치와 마우스 왼쪽 클릭.
+    /// 이번 프레임의 탭/클릭 위치(화면 논리 px). 메뉴 모드의 터치(손가락을 움직이지 않고 뗐을 때)와 마우스 왼쪽 클릭.
     pub tap: Option<Vec2>,
+    /// 메뉴에서 손가락으로 끌어 올린 거리(화면 논리 px, 위로 끌면 +: 아래 줄이 드러난다, 0199).
+    pub drag: f32,
+    /// 마우스 휠 칸(아래로 굴리면 +).
+    pub wheel: i32,
 }
 
 impl Actions {
@@ -481,6 +485,8 @@ impl Actions {
         if self.tap.is_none() {
             self.tap = o.tap;
         }
+        self.drag += o.drag;
+        self.wheel += o.wheel;
     }
 }
 
@@ -527,6 +533,16 @@ struct TouchState {
     atk: Option<u64>,
     /// 이번 프레임에 화면에 손가락이 있었다(버튼·스틱이 아니어도). 장치 = 터치로 본다(0036·0172).
     active: bool,
+    /// 메뉴 모드에서 짚은 손가락(0199): 움직이지 않고 떼면 탭, 움직이면 끌어 굴리기.
+    menu: Option<MenuFinger>,
+}
+
+#[derive(Clone, Copy)]
+struct MenuFinger {
+    id: u64,
+    start: Vec2,
+    last: Vec2,
+    dragging: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -635,6 +651,8 @@ fn layout_for(w: f32, h: f32) -> TouchOverlay {
 
 impl Input {
     pub fn new() -> Self {
+        // 터치를 마우스로 흉내 내지 않는다: 메뉴의 탭·끌기는 read_touch가 맡는다(0199).
+        simulate_mouse_with_touch(false);
         set_device(initial_device());
         Self {
             #[cfg(not(target_os = "android"))]
@@ -654,6 +672,7 @@ impl Input {
         if self.menu_mode != on {
             self.menu_mode = on;
             self.touch.stick = None;
+            self.touch.menu = None;
         }
     }
 
@@ -752,7 +771,11 @@ impl Input {
         let mut a = Actions::default();
         let touches = touches();
         self.touch.active = !touches.is_empty();
-        if touches.is_empty() && self.touch.stick.is_none() && self.touch.known.is_empty() {
+        if touches.is_empty()
+            && self.touch.stick.is_none()
+            && self.touch.known.is_empty()
+            && self.touch.menu.is_none()
+        {
             return a;
         }
         let layout = touch_layout();
@@ -776,7 +799,17 @@ impl Input {
                     self.touch.known.push(t.id);
                 }
                 if self.menu_mode {
-                    a.tap = Some(t.position);
+                    // 한 프레임 안에 짚고 뗀 짧은 탭은 바로, 아니면 뗄 때 정한다(끌었으면 탭이 아니다, 0199).
+                    if ended {
+                        a.tap = Some(t.position);
+                    } else if self.touch.menu.is_none() {
+                        self.touch.menu = Some(MenuFinger {
+                            id: t.id,
+                            start: t.position,
+                            last: t.position,
+                            dragging: false,
+                        });
+                    }
                 } else if let Some(b) = layout
                     .buttons
                     .iter()
@@ -814,6 +847,25 @@ impl Input {
                     s.pos = t.position;
                 }
             }
+            if let Some(m) = self.touch.menu.as_mut() {
+                if m.id == t.id {
+                    // 화면 높이의 3%를 넘게 움직이면 끌기로 본다(손가락 떨림은 탭).
+                    if !m.dragging && (t.position - m.start).length() > screen_height() * 0.03 {
+                        m.dragging = true;
+                        a.drag += m.start.y - t.position.y;
+                        m.last = t.position;
+                    } else if m.dragging {
+                        a.drag += m.last.y - t.position.y;
+                        m.last = t.position;
+                    }
+                    if ended {
+                        if !m.dragging {
+                            a.tap = Some(m.start);
+                        }
+                        self.touch.menu = None;
+                    }
+                }
+            }
             if ended {
                 self.touch.known.retain(|id| *id != t.id);
                 if self.touch.dig == Some(t.id) {
@@ -844,6 +896,11 @@ impl Input {
         if let Some(id) = self.touch.atk {
             if !touches.iter().any(|t| t.id == id) {
                 self.touch.atk = None;
+            }
+        }
+        if let Some(m) = self.touch.menu {
+            if !touches.iter().any(|t| t.id == m.id) {
+                self.touch.menu = None;
             }
         }
         a.dodge_held = self.touch.dig.is_some();
@@ -1041,12 +1098,17 @@ fn any_edge(a: &Actions) -> bool {
         || a.tab_next
 }
 
-/// 마우스는 보조: 왼쪽 클릭을 탭으로.
+/// 마우스는 보조: 왼쪽 클릭을 탭으로, 휠을 칸으로. 터치가 흉내 내는 가짜 마우스는 앱이 꺼 둔다
+/// (`simulate_mouse_with_touch(false)`, 0199) — 켜 두면 손가락을 짚는 순간 클릭이 되어 끌기가 탭이 된다.
 fn read_mouse() -> Actions {
     let mut a = Actions::default();
     if is_mouse_button_pressed(MouseButton::Left) {
         let (x, y) = mouse_position();
         a.tap = Some(vec2(x, y));
+    }
+    let (_, wy) = mouse_wheel();
+    if wy != 0.0 {
+        a.wheel = if wy < 0.0 { 1 } else { -1 };
     }
     a
 }
