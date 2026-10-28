@@ -789,4 +789,6 @@ pub static DE: Strings = Strings {
     h_village_d: "Zwischen den Abstiegen kehrst du ins Dorf zurück. Wecke am Großen Baum Talente mit Glühwürmchen, erhöhe mit Knoten die Schwierigkeit und kämpfe in Fadenträumen erneut gegen Bosse. Erfüllte Tagebuchziele (im Pausenmenü) bringen Belohnungen.",
     h_doto: "Mit Doto kämpfen",
     h_doto_d: "Doto kämpft aus der Ferne. Der Angriff wirft Eicheln — der dritte Wurf als Fächer aus drei. Halten und loslassen: eine große Eichel platzt beim Aufprall. Der Rücksprung behält das Ziel im Blick. Bei voller Leiste vergräbst du Eicheln vor dir — sie platzen bald und treffen nur Gegner. Die werfende Hand schlägt Heranfliegendes zurück.",
+    h_run: "Rennen und Weitsprung",
+    h_run_d: "Momo und Doto: Halte die Grabtaste weiter, dann rennst du los, sobald Hüpfer oder Rücksprung landen. Lass los für einen Weitsprung — je länger der Anlauf, desto weiter, und in der Luft trifft dich nichts. Momo stampft bei der Landung ringsum; Doto kann in der Luft einmal werfen. Greif im Rennen an, um sofort zuzuschlagen.",
 };

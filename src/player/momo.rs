@@ -10,13 +10,12 @@ impl Player {
         let time = time + dt;
         self.pos += dir * (self.talents.hop_dist() / t::HOP_TIME) * dt;
         if time >= t::HOP_TIME {
-            self.burrow_cd = self.burrow_cd_full();
             self.events.push(Event::Land(false));
             if self.talents.hop_stamp() {
                 strike = Some(self.stamp_strike());
                 self.events.push(Event::Stamp);
             }
-            self.state = State::Free;
+            self.land_dodge(c);
         } else {
             self.state = State::Hop { time, dir };
         }

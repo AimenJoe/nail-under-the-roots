@@ -194,6 +194,19 @@ pub const BURROW_COOLDOWN: f32 = 0.6;
 pub const HOP_TIME: f32 = 0.34;
 pub const HOP_DIST: f32 = 56.0;
 pub const HOP_HEIGHT: f32 = 10.0;
+/// 달리기·멀리뛰기(0209, 모모·도토): 회피를 쥔 채 내려앉으면 걷기의 `RUN_SPEED`배로 달린다. 움직인 시간이 도움닫기 —
+/// `RUN_MIN`보다 짧게 달리고 떼면 그냥 서고(대기만 돈다), 그 뒤로 `RUN_BUILD`까지 멀리뛰기 거리가 자란다.
+/// 멀리뛰기는 공중 무적(`JUMP_TIME`), 모모는 내려앉으며 둘레를 밟는다(재주 발 구르기면 `JUMP_STOMP_TALENT`배 넓고 +1).
+pub const RUN_SPEED: f32 = 1.5;
+pub const RUN_MIN: f32 = 0.2;
+pub const RUN_BUILD: f32 = 0.7;
+pub const JUMP_TIME: f32 = 0.42;
+pub const JUMP_DIST_MIN: f32 = 64.0;
+pub const JUMP_DIST_MAX: f32 = 100.0;
+pub const JUMP_HEIGHT: f32 = 18.0;
+pub const JUMP_STOMP_RADIUS: f32 = 22.0;
+pub const JUMP_STOMP_DAMAGE: i32 = 2;
+pub const JUMP_STOMP_TALENT: f32 = 1.3;
 /// 모모의 특기 이어 뛰기(0056): 기 게이지를 다 써서 세 번 뛴다. 뛸 때마다 입력 쪽으로 다시 겨누고, 착지마다 둘레에 피해.
 pub const CHAIN_HOPS: u32 = 3;
 pub const CHAIN_HOP_TIME: f32 = 0.30;

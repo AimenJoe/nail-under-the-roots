@@ -789,4 +789,6 @@ pub static PT_BR: Strings = Strings {
     h_village_d: "Entre as descidas você volta à vila. Desperte talentos na Grande Árvore com vaga-lumes, aumente a dificuldade com os nós e enfrente de novo os chefes nos sonhos de fio. Cumprir as metas do diário (no menu de pausa) dá recompensas.",
     h_doto: "Lutando com o Doto",
     h_doto_d: "O Doto luta de longe. O ataque atira bolotas — a terceira sai em leque de três. Segure e solte para uma bolota grande que explode onde cai. O salto para trás mantém a mira. Com a barra cheia, enterra bolotas à frente — explodem logo e só ferem inimigos. A mão do arremesso rebate o que vier voando.",
+    h_run: "Correr e salto longo",
+    h_run_d: "Momo e Doto: continue segurando o botão de cavar e você corre depois que o pulo ou o salto para trás aterrissa. Solte para saltar longe — quanto mais correr, mais longe, e nada te acerta no ar. Momo pisoteia ao redor ao aterrissar; o Doto pode arremessar uma vez no ar. Ataque correndo para golpear na hora.",
 };

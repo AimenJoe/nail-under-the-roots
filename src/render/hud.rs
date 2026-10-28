@@ -662,6 +662,8 @@ pub(super) fn short_state(s: &player::State) -> &'static str {
         player::State::Hop { .. } => "hop",
         player::State::Leap { .. } => "leap",
         player::State::Chain { .. } => "chain",
+        player::State::Run { .. } => "run",
+        player::State::Jump { .. } => "jump",
         player::State::Dead => "dead",
     }
 }

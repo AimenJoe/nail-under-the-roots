@@ -28,9 +28,11 @@ pub enum Pic {
     Village,
     /// 도토로 싸우기(0195): 던지기 셋·부채꼴, 뒤로 뛰기, 묻은 도토리.
     Doto,
+    /// 달리기·멀리뛰기(0209): 모모가 깡충 → 달리기 → 멀리뛰기 착지 밟기.
+    Run,
 }
 
-pub const TOPICS: [Topic; 14] = [
+pub const TOPICS: [Topic; 15] = [
     Topic {
         title: |s| s.h_move,
         body: |s| s.h_move_d,
@@ -101,5 +103,11 @@ pub const TOPICS: [Topic; 14] = [
         title: |s| s.h_doto,
         body: |s| s.h_doto_d,
         pic: Pic::Doto,
+    },
+    // 모모·도토는 회피를 쥐면 달리고 떼면 멀리 뛴다(0209).
+    Topic {
+        title: |s| s.h_run,
+        body: |s| s.h_run_d,
+        pic: Pic::Run,
     },
 ];

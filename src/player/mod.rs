@@ -22,6 +22,7 @@ mod attack;
 mod burrow;
 mod doto;
 mod momo;
+mod run;
 
 pub use doto::Spawn;
 
@@ -78,6 +79,19 @@ pub enum State {
     Leap {
         time: f32,
         dir: Vec2,
+    },
+    /// 달리기(0209, 모모·도토): 깡충·뒤로 뛰기가 내려앉았는데 회피를 아직 쥐고 있으면. `time` = 달린 시간(도움닫기).
+    /// 떼면 `Jump`(짧게 달렸으면 그냥 선다), 공격을 누르면 그 자리에서 평타. 공중이 아니라 맞는다.
+    Run {
+        time: f32,
+    },
+    /// 멀리뛰기(0209): 달리다 떼면. `dist`는 도움닫기만큼 멀다. 공중에서는 안 맞는다.
+    /// 모모는 내려앉으며 둘레를 밟고, 도토는 공중에서 한 번 던질 수 있다(`thrown` = 이미 던졌다).
+    Jump {
+        time: f32,
+        dir: Vec2,
+        dist: f32,
+        thrown: bool,
     },
     /// 모모의 이어 뛰기(특기): 남은 뛰기 수, 이번 뛰기 시간·방향. 착지마다 둘레에 피해.
     Chain {
@@ -144,6 +158,10 @@ pub enum Event {
     Land(bool),
     /// 모모 깡충 착지 밟기(재주 발 구르기, 0142).
     Stamp,
+    /// 멀리뛰기 착지(0209). `stomp` = 모모의 밟기(둘레 `jump_stomp_radius`).
+    JumpLand {
+        stomp: bool,
+    },
     /// 도토가 도토리를 묻었다(0195).
     Bury,
 }
@@ -299,7 +317,11 @@ impl Player {
     pub fn on_foot(&self) -> bool {
         matches!(
             self.state,
-            State::Free | State::Attack { .. } | State::Charging { .. } | State::Heavy { .. }
+            State::Free
+                | State::Attack { .. }
+                | State::Charging { .. }
+                | State::Heavy { .. }
+                | State::Run { .. }
         )
     }
 
@@ -336,7 +358,11 @@ impl Player {
             || self.is_burrowed()
             || matches!(
                 self.state,
-                State::Drill { .. } | State::Hop { .. } | State::Leap { .. } | State::Chain { .. }
+                State::Drill { .. }
+                    | State::Hop { .. }
+                    | State::Leap { .. }
+                    | State::Chain { .. }
+                    | State::Jump { .. }
             )
             || !self.is_alive()
     }
@@ -347,6 +373,7 @@ impl Player {
             State::Hop { time, .. } => (time, t::HOP_TIME, t::HOP_HEIGHT),
             State::Leap { time, .. } => (time, t::BACKLEAP_TIME, t::BACKLEAP_HEIGHT),
             State::Chain { time, .. } => (time, t::CHAIN_HOP_TIME, t::CHAIN_HOP_HEIGHT),
+            State::Jump { time, .. } => (time, t::JUMP_TIME, t::JUMP_HEIGHT),
             _ => return 0.0,
         };
         let k = (time / dur).clamp(0.0, 1.0);
@@ -674,6 +701,13 @@ impl Player {
             State::Hop { time, dir } => strike = self.tick_hop(&c, time, dir),
             State::Leap { time, dir } => strike = self.tick_leap(&c, time, dir),
             State::Chain { left, time, dir } => strike = self.tick_chain(&c, left, time, dir),
+            State::Run { time } => strike = self.tick_run(&c, time),
+            State::Jump {
+                time,
+                dir,
+                dist,
+                thrown,
+            } => strike = self.tick_jump(&c, time, dir, dist, thrown),
             State::Emerge { time, charge } => strike = self.tick_emerge(&c, time, charge),
             State::Drill {
                 time,

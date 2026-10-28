@@ -43,8 +43,17 @@ fn critter(art: Option<&Art>, kind: Kind, frame: u32, at: Vec2, left: bool, tint
 
 /// 돌아온 도토(`DOTO_BACK_ROW`, 새 그림 시트 — 칸 0·1 서기, 4 겨누기, 5 던지기). 그림이 없으면 밤색 동그라미.
 fn doto(art: Option<&Art>, frame: u32, at: Vec2, lift: f32, left: bool) {
+    kin(art, art::DOTO_BACK_ROW, frame, at, lift, left);
+}
+
+fn momo(art: Option<&Art>, frame: u32, at: Vec2, lift: f32, left: bool) {
+    kin(art, art::MOMO_BLOOM_ROW, frame, at, lift, left);
+}
+
+/// 고를 수 있는 이웃(모모·도토)을 플레이어 그리기와 같은 발 자리로. `lift` = 뛰는 높이(그림자는 바닥에).
+fn kin(art: Option<&Art>, row: u32, frame: u32, at: Vec2, lift: f32, left: bool) {
     draw_ellipse(at.x, at.y + 6.0, 5.0, 2.0, 0.0, SHADOW_SOFT);
-    match art.and_then(|a| a.critter(frame, art::DOTO_BACK_ROW)) {
+    match art.and_then(|a| a.critter(frame, row)) {
         Some(c) => c.draw(
             vec2(at.x, (at.y - 9.0 - lift).round() + art::CRITTER_FOOT),
             Vec2::ONE,
@@ -617,6 +626,48 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                     Kind::FieldMouse,
                     6,
                     vec2(mid + 4.0 * k, y - 5.0 * k),
+                    true,
+                    WHITE,
+                );
+            }
+        }
+        Pic::Run => {
+            // 모모가 깡충 → 쥔 채 달리고 → 떼면 멀리 뛰어 생쥐 곁에 내려앉으며 밟는다(0209).
+            let ph = time % 2.8;
+            let start = 12.0;
+            let run_end = mid - 6.0;
+            let land = w - 36.0;
+            let mouse = vec2(w - 18.0, y);
+            let arc = |k: f32, h: f32| (k * std::f32::consts::PI).sin() * h;
+            if ph < 0.35 {
+                let k = ph / 0.35;
+                momo(art, 3, vec2(start + 12.0 * k, y), arc(k, 7.0), false);
+                critter(art, Kind::FieldMouse, 0, mouse, true, WHITE);
+            } else if ph < 1.25 {
+                let k = (ph - 0.35) / 0.9;
+                let x = start + 12.0 + (run_end - start - 12.0) * k;
+                momo(art, 2 + ((time * 16.0) as u32) % 2, vec2(x, y), 0.0, false);
+                critter(art, Kind::FieldMouse, 0, mouse, true, WHITE);
+            } else if ph < 1.75 {
+                let k = (ph - 1.25) / 0.5;
+                let x = run_end + (land - run_end) * k;
+                momo(art, 3, vec2(x, y), arc(k, 12.0), false);
+                critter(art, Kind::FieldMouse, 0, mouse, true, WHITE);
+            } else {
+                let k = ((ph - 1.75) / 0.4).min(1.0);
+                momo(art, 0, vec2(land, y), 0.0, false);
+                draw_circle_lines(
+                    land,
+                    y + 3.0,
+                    4.0 + 14.0 * k,
+                    1.5,
+                    Color::new(1.0, 0.85, 0.9, 1.0 - k),
+                );
+                critter(
+                    art,
+                    Kind::FieldMouse,
+                    6,
+                    mouse + vec2(6.0 * k, 0.0),
                     true,
                     WHITE,
                 );

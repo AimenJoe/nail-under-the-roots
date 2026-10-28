@@ -1017,6 +1017,28 @@ impl World {
                         .push(ring(p, 2.0, t::TAL_STAMP_RADIUS, 0.18, PETAL));
                     burst(&mut self.juice.fx, p, 5, DIRT, 70.0);
                 }
+                // 멀리뛰기 착지(0209): 모모는 밟기 고리(반지름 = 타격) + 흔들림, 도토는 흙먼지만.
+                player::Event::JumpLand { stomp } => {
+                    let p = self.player.pos;
+                    if *stomp {
+                        let r = self.player.jump_stomp_radius();
+                        self.juice.audio.play(sfx::Id::WallHit);
+                        self.juice.feel.add_trauma(0.18);
+                        self.juice.fx.push(ring(p, 3.0, r + 3.0, 0.22, PETAL));
+                        self.juice.fx.push(ring(p, 2.0, r, 0.18, DIRT));
+                        burst(&mut self.juice.fx, p, 9, DIRT, 95.0);
+                    } else {
+                        self.juice.fx.push(ring(p, 2.0, 11.0, 0.16, DIRT));
+                    }
+                    puff(
+                        &mut self.juice.fx,
+                        p + vec2(0.0, 4.0),
+                        4,
+                        self.biome.dust(),
+                        5.0,
+                        0.4,
+                    );
+                }
                 player::Event::Bury => {
                     // 도토리 묻기(0195): 흙이 튀고 묻는 소리.
                     self.juice.audio.play(sfx::Id::Burrow);

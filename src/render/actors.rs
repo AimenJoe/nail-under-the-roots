@@ -700,7 +700,7 @@ pub(super) const OUTLINE: Color = Color::new(0.17, 0.11, 0.16, 1.0);
 /// Naïl 스프라이트. 상태 → 칸, 좌우 반전, 피격 플래시는 흰 실루엣 줄.
 /// 모모·도토를 플레이어로(0056·0195): 돌아온 모습 줄(critters `MOMO_BLOOM_ROW`·`DOTO_BACK_ROW`).
 /// 칸 0·1 서기, 2·3 걷기, 4 웅크림, 5 차기·뛰기·던지기, 6 맞음. 모모는 새 그림 시트(0206 C3)라 쓰러짐(7)과
-/// 공중 칸(3 뜀)이 따로 있다 — 깡충·멀리뛰기는 뜀, 이어 뛰기(공격)는 차기.
+/// 공중 칸(3 뜀)이 따로 있다 — 깡충·뒤로 뛰기·멀리뛰기(0209)는 뜀, 이어 뛰기(공격)는 차기. 달리기는 걷기 칸을 빠르게.
 /// 뛸 때는 그림만 높이만큼 위로(그림자는 바닥에 남아 착지 자리를 보인다).
 pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time: f32) {
     let big = art.critter_is_big(row);
@@ -730,6 +730,17 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
                 5
             }
         }
+        // 멀리뛰기(0209): 도토가 공중에서 던졌으면 던지기 칸.
+        player::State::Jump { thrown: true, .. } => 5,
+        player::State::Jump { .. } => {
+            if big {
+                3
+            } else {
+                5
+            }
+        }
+        // 달리기: 걷기 두 칸을 빠르게.
+        player::State::Run { .. } if moving => 2 + ((time * 16.0) as u32) % 2,
         player::State::Attack { .. } | player::State::Heavy { .. } => 5,
         player::State::Charging { .. } => 5,
         player::State::Recover { .. } => 4,

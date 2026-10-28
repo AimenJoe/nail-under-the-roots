@@ -83,9 +83,8 @@ impl Player {
         self.pos +=
             dir * (self.talents.leap_dist() * self.stats.leap_mul / t::BACKLEAP_TIME) * c.dt;
         if time >= t::BACKLEAP_TIME {
-            self.burrow_cd = self.burrow_cd_full();
             self.events.push(Event::Land(false));
-            self.state = State::Free;
+            self.land_dodge(c);
         } else {
             self.state = State::Leap { time, dir };
         }

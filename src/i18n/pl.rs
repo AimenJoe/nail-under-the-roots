@@ -789,4 +789,6 @@ pub static PL: Strings = Strings {
     h_village_d: "Między zejściami wracasz do wioski. Budź talenty przy Wielkim Drzewie świetlikami, podnoś trudność supłami i walcz ponownie z bossami w snach z nici. Spełnione cele dziennika (w menu pauzy) dają nagrody.",
     h_doto: "Walka jako Doto",
     h_doto_d: "Doto walczy z daleka. Atak rzuca żołędziami — trzeci rzut wachlarzem trzech. Przytrzymaj i puść: duży żołądź pęka tam, gdzie spadnie. Odskok zachowuje celownik. Z pełnym paskiem zakopujesz żołędzie przed sobą — wkrótce pękają i ranią tylko wrogów. Ręka w rzucie odbija to, co leci w ciebie.",
+    h_run: "Bieg i skok w dal",
+    h_run_d: "Momo i Doto: trzymaj dalej przycisk kopania, a po skoku lub odskoku zaczniesz biec. Puść, by skoczyć daleko — im dłuższy rozbieg, tym dalej, a w powietrzu nic cię nie trafi. Momo przy lądowaniu tupie wokół siebie; Doto może raz rzucić w powietrzu. Atakuj w biegu, by uderzyć od razu.",
 };

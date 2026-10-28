@@ -789,4 +789,6 @@ pub static ES: Strings = Strings {
     h_village_d: "Entre bajadas vuelves a la aldea. Despierta talentos en el Gran Árbol con luciérnagas, sube la dificultad con los nudos y vuelve a luchar contra los jefes en los sueños de hilo. Cumplir las metas del diario (menú de pausa) da recompensas.",
     h_doto: "Luchar con Doto",
     h_doto_d: "Doto lucha de lejos. El ataque lanza bellotas — la tercera en abanico de tres. Mantén y suelta para una bellota grande que estalla al caer. El salto atrás mantiene la mira. Con la barra llena, entierra bellotas delante — estallan pronto y solo dañan a enemigos. La mano que lanza devuelve lo que vuela hacia ti.",
+    h_run: "Correr y salto largo",
+    h_run_d: "Momo y Doto: mantén el botón de excavar y correrás cuando el salto o el salto atrás aterrice. Suelta para saltar lejos — cuanto más corras, más lejos, y en el aire nada te alcanza. Momo pisotea a su alrededor al caer; Doto puede lanzar una vez en el aire. Ataca corriendo para golpear al instante.",
 };

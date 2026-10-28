@@ -789,4 +789,6 @@ pub static FR: Strings = Strings {
     h_village_d: "Entre deux descentes tu reviens au village. Éveille des talents au Grand Arbre avec des lucioles, monte la difficulté avec les nœuds et affronte à nouveau les boss dans les rêves de fil. Remplir les objectifs du journal (menu pause) donne des récompenses.",
     h_doto: "Combattre avec Doto",
     h_doto_d: "Doto combat à distance. L'attaque lance des glands — le troisième en éventail de trois. Maintiens puis relâche pour un gros gland qui éclate à l'impact. Le bond en arrière garde ta visée. Jauge pleine, enterre des glands devant toi — ils éclatent vite et ne touchent que les ennemis. La main qui lance renvoie ce qui vole vers toi.",
+    h_run: "Course et saut en longueur",
+    h_run_d: "Momo et Doto : garde le bouton creuser enfoncé et tu cours une fois le saut ou le bond en arrière retombé. Relâche pour sauter loin — plus la course est longue, plus c'est loin, et rien ne te touche en l'air. Momo piétine autour d'elle en retombant ; Doto peut lancer une fois en l'air. Attaque en courant pour frapper aussitôt.",
 };
