@@ -741,7 +741,7 @@ pub static FR: Strings = Strings {
     h_eat: "Manger",
     h_eat_d: "Le bouton objet mange une framboise (1 cœur) ou un ver (vie pleine). Avec un ver dans le sac, si tu tombes, tu le manges tout seul et tu te relèves. Choisis la case du sac avec gauche/droite. En mangeant, tu marches lentement.",
     h_enemy: "Lire les signes des ennemis",
-    h_enemy_d: "Un ennemi qui tremble et rougit se prépare. Le sol montre la zone que l'attaque va toucher : le bord est franc dès le début, et l'intérieur fonce jusqu'à prendre la couleur du bord, et c'est à cet instant que l'attaque frappe. Doré : on peut parer (charges, lancers, langues) ; cramoisi avec un X au milieu : à esquiver (bonds, spores, piétinements). Le bestiaire donne une astuce par espèce.",
+    h_enemy_d: "Un ennemi qui tremble et rougit se prépare. Le sol montre la zone que l'attaque va toucher, avec un bord franc, et une couleur plus foncée y grandit : de l'ennemi vers la pointe pour les bandes, du centre vers l'extérieur pour les cercles. L'attaque frappe à l'instant où la couleur atteint le bord. Doré : on peut parer (charges, lancers, langues) ; cramoisi avec un X au milieu : à esquiver (bonds, spores, piétinements). Le bestiaire donne une astuce par espèce.",
     h_loot: "Lucioles et graines",
     h_loot_d: "Les lucioles tombent des ennemis vaincus. Dépense-les au Grand Arbre du village pour éveiller des talents (tu en perds un peu en tombant). Les graines sont la monnaie de la boutique (jamais perdues). Manger un cœur de racine donne +1 cœur max.",
     h_camp: "Camps et carte du chemin",

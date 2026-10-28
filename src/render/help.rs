@@ -108,9 +108,9 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             }
         }
         Pic::Combo => {
-            // 1·2·3타가 박자(0.25초)마다. 몸의 고리가 과녁으로 닫히고 닿는 순간 번쩍 + 똑, 그때 친다.
-            let ph = time % 1.25;
+            // 1·2·3타가 박자(`BEAT_PERIOD`)마다, 끝에 쉼 0.5초. 몸의 고리가 과녁으로 닫히고 닿는 순간 번쩍 + 똑, 그때 친다.
             let p = t::BEAT_PERIOD;
+            let ph = time % (3.0 * p + 0.5);
             let at = vec2(mid - 10.0, y);
             critter(art, Kind::Dummy, 0, at + vec2(18.0, 0.0), true, WHITE);
             let i = (ph / p) as usize;

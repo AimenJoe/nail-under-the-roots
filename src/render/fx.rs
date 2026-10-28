@@ -367,30 +367,25 @@ pub(super) fn draw_mine(m: &world::Mine, time: f32) {
     );
 }
 
-/// 공격 예고(0183): 맞을 자리를 **면**으로. 테두리는 처음부터 진하고(`TELE_EDGE_A`), 안쪽 채움이 옅은 데서
-/// 점점 진해져(`TELE_FILL_A0` → `TELE_EDGE_A`) **테두리와 같은 색이 되는 순간이 공격**이다. 선(점선·흰 줄)은 몸에
-/// 가려지기 쉬워 쓰지 않는다. 받아칠 수 있는 것(곧게 오는 돌진·던지기·혀)은 황금, 못 받아치는 것(둘레)은 진홍 + 가운데 X(0160).
+/// 공격 예고(0183 → 0184): 맞을 자리를 **면**으로. 테두리는 처음부터 진하고(`TELE_EDGE_A`), 면 전체는 옅게(`TELE_BASE_A`)
+/// 깔린다. 그 안에서 진한 채움(`TELE_GROW_A`)이 **자라** — 띠는 적 쪽부터 끝으로, 원은 가운데부터 바깥으로 — **테두리에 닿는
+/// 순간이 공격**이다. 진하기만 오르는 채움(0183)은 끝에 갈수록 차이가 안 보여 "끝"이 없었다: 움직이는 앞이 멈춘 테두리에 닿는
+/// 것은 한 번에 일어나는 일이고, 앞이 일정한 빠르기로 오니 닿을 때를 미리 잴 수 있다. 앞에 선은 두지 않는다(가려진다).
+/// 받아칠 수 있는 것(곧게 오는 돌진·던지기·혀)은 황금, 못 받아치는 것(둘레)은 진홍 + 가운데 X(0160).
 /// 테두리 밑의 어두운 밑띠는 밝은 풀밭·색약·흑백에서도 모양이 남게(0150).
-pub(super) const TELE_EDGE_A: f32 = 0.7;
-pub(super) const TELE_FILL_A0: f32 = 0.06;
+pub(super) const TELE_EDGE_A: f32 = 0.75;
+pub(super) const TELE_BASE_A: f32 = 0.1;
+pub(super) const TELE_GROW_A: f32 = 0.5;
 /// 못 튕겨내는 공격(둘레: 내려앉기·포자·돌·발 구르기): 진홍.
 pub(super) const TELEGRAPH_EDGE_RGB: (f32, f32, f32) = (1.0, 0.32, 0.36);
 /// 튕겨낼 수 있는 공격(곧게 오는 것: 돌진·던지기·혀·당기기): 황금. 진홍보다 밝아 색약·흑백에서도 갈린다(0160).
 pub(super) const PARRY_EDGE_RGB: (f32, f32, f32) = (1.0, 0.88, 0.45);
 const RIM: Color = Color::new(0.1, 0.04, 0.03, 0.5);
 
-/// 테두리 색·채움 색(진행 `k` 0..1, 1에서 같아진다).
-pub(super) fn tele_colors(rgb: (f32, f32, f32), k: f32) -> (Color, Color) {
-    let k = k.clamp(0.0, 1.0);
-    (
-        Color::new(rgb.0, rgb.1, rgb.2, TELE_EDGE_A),
-        Color::new(
-            rgb.0,
-            rgb.1,
-            rgb.2,
-            TELE_FILL_A0 + (TELE_EDGE_A - TELE_FILL_A0) * k,
-        ),
-    )
+/// 테두리·바탕·자라는 채움의 색.
+fn tele_colors(rgb: (f32, f32, f32)) -> (Color, Color, Color) {
+    let c = |a| Color::new(rgb.0, rgb.1, rgb.2, a);
+    (c(TELE_EDGE_A), c(TELE_BASE_A), c(TELE_GROW_A))
 }
 
 fn rim_line(p: Vec2, q: Vec2, edge: Color) {
@@ -398,15 +393,37 @@ fn rim_line(p: Vec2, q: Vec2, edge: Color) {
     draw_line(p.x, p.y, q.x, q.y, 1.0, edge);
 }
 
-/// 곧게 오는 공격의 면(0183): `a`에서 `b`까지 반폭 `half`의 띠 + 끝의 화살촉. 돌진 띠·던지기·혀·실 가닥·할매 당기기.
+/// 띠 `a`→`b`(반폭 `half`) + 끝 화살촉을, 적 쪽부터 길이 비율 `k`(0..1)만큼 칠한다.
+fn fill_lane(a: Vec2, b: Vec2, half: f32, k: f32, col: Color) {
+    let dir = (b - a).normalize_or(vec2(1.0, 0.0));
+    let side = vec2(-dir.y, dir.x) * half;
+    let body = (b - a).length();
+    let tip = half + 2.0;
+    let g = (body + tip) * k.clamp(0.0, 1.0);
+    if g <= 0.0 {
+        return;
+    }
+    let m = a + dir * g.min(body);
+    draw_triangle(a + side, a - side, m + side, col);
+    draw_triangle(a - side, m - side, m + side, col);
+    if g > body {
+        let d = (g - body).min(tip);
+        let p = b + dir * d;
+        let s2 = side * (1.0 - d / tip);
+        draw_triangle(b + side, b - side, p + s2, col);
+        draw_triangle(b - side, p - s2, p + s2, col);
+    }
+}
+
+/// 곧게 오는 공격의 면(0183·0184): `a`에서 `b`까지 반폭 `half`의 띠 + 끝의 화살촉. 진한 채움이 적 쪽부터 자라 화살촉 끝에
+/// 닿으면 공격. 돌진 띠·던지기·혀·실 가닥·할매 당기기.
 pub(super) fn draw_tele_lane(a: Vec2, b: Vec2, half: f32, rgb: (f32, f32, f32), k: f32) {
-    let (edge, fill) = tele_colors(rgb, k);
+    let (edge, base, grow) = tele_colors(rgb);
     let dir = (b - a).normalize_or(vec2(1.0, 0.0));
     let side = vec2(-dir.y, dir.x) * half;
     let tip = b + dir * (half + 2.0);
-    draw_triangle(a + side, a - side, b + side, fill);
-    draw_triangle(a - side, b - side, b + side, fill);
-    draw_triangle(b + side, b - side, tip, fill);
+    fill_lane(a, b, half, 1.0, base);
+    fill_lane(a, b, half, k, grow);
     rim_line(a + side, b + side, edge);
     rim_line(a - side, b - side, edge);
     rim_line(a + side, a - side, edge);
@@ -414,10 +431,15 @@ pub(super) fn draw_tele_lane(a: Vec2, b: Vec2, half: f32, rgb: (f32, f32, f32), 
     rim_line(b - side, tip, edge);
 }
 
-/// 둘레 공격의 면(0183): 반지름 `r` 원 + 진한 테두리 + 가운데 X(못 받아친다). 내려앉기·포자·발 구르기·떨어지는 돌.
+/// 둘레 공격의 면(0183·0184): 반지름 `r` 원 + 진한 테두리 + 가운데 X(못 받아친다). 진한 원이 가운데부터 자라 테두리에
+/// 닿으면 공격. 내려앉기·포자·발 구르기·떨어지는 돌.
 pub(super) fn draw_tele_disk(at: Vec2, r: f32, rgb: (f32, f32, f32), k: f32) {
-    let (edge, fill) = tele_colors(rgb, k);
-    draw_circle(at.x, at.y, r, fill);
+    let (edge, base, grow) = tele_colors(rgb);
+    draw_circle(at.x, at.y, r, base);
+    let g = r * k.clamp(0.0, 1.0);
+    if g > 0.5 {
+        draw_circle(at.x, at.y, g, grow);
+    }
     draw_circle_lines(at.x, at.y, r, 3.0, RIM);
     draw_circle_lines(at.x, at.y, r, 1.0, edge);
     draw_no_parry_mark(at, edge);

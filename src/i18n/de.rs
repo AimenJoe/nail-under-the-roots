@@ -741,7 +741,7 @@ pub static DE: Strings = Strings {
     h_eat: "Essen",
     h_eat_d: "Die Gegenstandstaste isst eine Himbeere (1 Herz) oder einen Wurm (volle Energie). Trägst du einen Wurm und fällst, isst du ihn von selbst und stehst wieder auf. Das Taschenfach wählst du mit links/rechts. Beim Essen gehst du langsam.",
     h_enemy: "Gegner-Ankündigungen lesen",
-    h_enemy_d: "Ein Gegner, der zittert und rot wird, holt aus. Der Boden zeigt die Fläche, die der Angriff trifft: Der Rand ist von Anfang an kräftig, das Innere wird dunkler, bis es die Farbe des Rands hat, und in dem Moment trifft der Angriff. Gold kann man abwehren (Ansturm, Würfe, Zungen); Karmesinrot mit einem X in der Mitte: ausweichen (Sprünge, Sporen, Stampfen). Das Bestiarium hat Tipps zu jeder Art.",
+    h_enemy_d: "Ein Gegner, der zittert und rot wird, holt aus. Der Boden zeigt die Fläche, die der Angriff trifft, mit kräftigem Rand, und darin wächst eine dunklere Füllung: bei Bahnen vom Gegner zur Spitze, bei Kreisen von der Mitte nach außen. Der Angriff trifft in dem Moment, in dem die Füllung den Rand erreicht. Gold kann man abwehren (Ansturm, Würfe, Zungen); Karmesinrot mit einem X in der Mitte: ausweichen (Sprünge, Sporen, Stampfen). Das Bestiarium hat Tipps zu jeder Art.",
     h_loot: "Glühwürmchen und Samen",
     h_loot_d: "Glühwürmchen fallen von besiegten Gegnern. Gib sie am Großen Baum im Dorf aus, um Talente zu wecken (beim Fallen verlierst du ein paar). Samen sind das Geld für den Laden (gehen nie verloren). Ein Wurzelherz zu essen gibt +1 Herz maximal.",
     h_camp: "Lager und Wegkarte",
