@@ -37,11 +37,13 @@ ILLUSTS = ["title", "mother_burrow"]
 # 페이지에서 걷는 스프라이트(0155): (시트, 줄, 첫 칸, 칸 수). 정사각 칸을 가로 띠로 잘라 CSS steps()로 돌린다.
 # v0.5.0 새 그림(0206~0221): 시트마다 칸 크기가 다르다(`CELLS`, art::BIG_SHEETS와 같은 값). 줄 0, 칸 2·3 = 걷기
 # (나일은 nail.png 줄 0 = 서 있기 2 + 걷기 4, 박쥐는 0~3 날갯짓). 페이지는 칸 크기의 2배(--s)로 그린다.
+# (첫 칸, 칸 수) 대신 칸 번호 목록도 된다(칸 수 자리는 None) — (번호, dy)면 그 칸을 dy px 옮긴다.
 SPRITES = {
     "nail": ("nail.png", 0, 2, 4),
     "momo": ("momo.png", 0, 2, 2),
-    "doto": ("doto.png", 0, 8, 4),  # 달리기 바운드 네 칸(0226)
-    "popo": ("popo.png", 0, 2, 2),
+    "doto": ("doto.png", 0, 8, 4),  # 달리기 바운드 네 칸(0226). 제자리에서 돌리니 앞끝을 맞춘다(`FRONT`)
+    # 포포는 걷기 그림이 두 칸뿐 — 사이에 선 칸을 1px 띄워 넣어 네 박자 걸음(디딤·지나감·디딤·지나감)으로.
+    "popo": ("popo.png", 0, [2, (0, -1), 3, (0, -1)], None),
     "rat": ("field_mouse.png", 0, 2, 2),
     "squirrel": ("chipmunk.png", 0, 2, 2),
     "shrew": ("shrew.png", 0, 2, 2),
@@ -50,6 +52,15 @@ SPRITES = {
     "bat": ("bat.png", 0, 0, 4),
     "sporecap": ("spore.png", 0, 2, 2),
 }
+FRONT = {"doto"}
+
+
+def shifted(cell: Image.Image, dx: int) -> Image.Image:
+    out = Image.new("RGBA", cell.size)
+    out.paste(cell, (dx, 0))
+    return out
+
+
 CELLS = {"nail.png": 24, "momo.png": 32, "doto.png": 40, "popo.png": 32, "bat.png": 32}
 
 
@@ -64,7 +75,21 @@ def main() -> None:
     for name, (sheet_name, row, first, n) in SPRITES.items():
         sh = Image.open(ART / sheet_name).convert("RGBA")
         c = CELLS.get(sheet_name, 24)
-        sh.crop((first * c, row * c, (first + n) * c, row * c + c)).save(OUT / f"sp_{name}.png", optimize=True)
+        frames = first if isinstance(first, list) else list(range(first, first + n))
+        cells = []
+        for f in frames:
+            i, dy = f if isinstance(f, tuple) else (f, 0)
+            cell = Image.new("RGBA", (c, c))
+            cell.paste(sh.crop((i * c, row * c, i * c + c, row * c + c)), (0, dy))
+            cells.append(cell)
+        if name in FRONT:
+            # 앞끝(오른쪽 끝)을 가장 앞선 칸에 맞춘다 — 제자리 띠에서 머리가 앞뒤로 미끄러지지 않게.
+            front = max(cl.getbbox()[2] for cl in cells)
+            cells = [shifted(cl, front - cl.getbbox()[2]) for cl in cells]
+        strip = Image.new("RGBA", (c * len(cells), c))
+        for k, cl in enumerate(cells):
+            strip.paste(cl, (k * c, 0))
+        strip.save(OUT / f"sp_{name}.png", optimize=True)
     # 파비콘: 나일 스프라이트 첫 칸.
     c = CELLS["nail.png"]
     Image.open(ART / "nail.png").convert("RGBA").crop((0, 0, c, c)).save(OUT / "favicon.png")

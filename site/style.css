@@ -92,11 +92,11 @@ p { margin: 0; }
 @keyframes drift { 0% { transform: translate(0, 0); } 33% { transform: translate(var(--x1), var(--y1)); } 66% { transform: translate(var(--x2), var(--y2)); } 100% { transform: translate(0, 0); } }
 @keyframes blink { 0%, 100% { opacity: 0; } 40%, 60% { opacity: .95; } }
 
-/* 스프라이트: 칸을 가로로 이은 띠(sp_*.png)를 steps()로 돌린다. --n 칸 수, --s 한 칸 크기(기본 = 24칸의 3배, 32·40칸 시트는 inline으로 3·4배).
+/* 스프라이트: 칸을 가로로 이은 띠(sp_*.png)를 steps()로 돌린다. --n 칸 수, --f 한 칸 시간(기본 .16s), --s 한 칸 크기(기본 = 24칸의 3배, 32·40칸 시트는 inline으로 3·4배).
    그림은 각 요소의 inline background-image로 준다 — url()을 변수(--sp)에 넣으면 페이지가 아니라 이 css 기준으로
    풀려서 en/ 페이지의 ../img/가 사이트 밖을 가리켰다(0181). */
 .sprite { --s: 72px; display: inline-block; width: var(--s); height: var(--s); background-position: 0 0; background-size: calc(var(--n) * var(--s)) var(--s); background-repeat: no-repeat;
-  image-rendering: pixelated; image-rendering: crisp-edges; animation: frames calc(var(--n) * .16s) steps(var(--n)) infinite; }
+  image-rendering: pixelated; image-rendering: crisp-edges; animation: frames calc(var(--n) * var(--f, .16s)) steps(var(--n)) infinite; }
 .sprite.big { --s: 96px; }
 @keyframes frames { to { background-position-x: calc(var(--n) * var(--s) * -1); } }
 
