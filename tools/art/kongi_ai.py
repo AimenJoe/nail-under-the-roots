@@ -15,6 +15,7 @@
 """
 import colorsys
 import sys
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -49,6 +50,7 @@ TAINT_SHELL = [(44, 50, 60), (66, 76, 88), (92, 104, 116), (122, 134, 146), (160
 TAINT_OUTLINE = (24, 18, 32)
 EYE_BLUE = [(40, 90, 140), (120, 190, 240), (210, 240, 255)]
 THREAD = [(96, 52, 160), (168, 110, 230)]
+BAND_INK = (92, 70, 50)          # 원본 띠의 갈색(서기 칸 팔레트에서 가장 가까운 색을 쓴다)
 
 
 def lum(c):
@@ -115,10 +117,10 @@ def thread(cell):
 
 
 def bands(cell, box, pal):
-    """등딱지 띠를 원본에서 다시 옮긴다. 띠는 원본에서 4px 굵기의 갈색 줄이라 칸 배율(블록 9~11px)로 줄이면 흩어진 점이나
-    민무늬가 된다(서기 칸은 점 몇 개, 공 A는 민무늬) — 콩이의 표지가 사라진다. 원본의 띠 점(밝기 50~125의 갈색: 붉은 기가
-    푸른 기보다 25 넘게 많다)을 몸의 테두리 상자끼리 맞춰 옮기고, 칸에서 등딱지 쪽 점(분홍이 아닌 것, 외곽선 아님)에만
-    칠한다. 띠 색 = 서기 칸 팔레트에서 가장 가까운 색(공 A 칸에는 바탕색 하나뿐이라 제 칸에서 고르면 안 보인다)."""
+    """공의 띠를 원본에서 다시 옮긴다. 띠는 원본에서 4px 굵기의 갈색 줄이라 공 배율(블록 약 11px)로 줄이면 사라진다(공 A는
+    민무늬가 됐다). 원본의 띠 점(밝기 50~125의 갈색: 붉은 기가 푸른 기보다 25 넘게 많다)을 몸의 테두리 상자끼리 맞춰 옮기고,
+    외곽선 안쪽에만 칠한다. 띠 색 = 서기 칸 팔레트에서 가장 가까운 색(공 A 칸에는 바탕색 하나뿐이라 제 칸에서 고르면 안
+    보인다). 공의 띠는 원본도 곧은 줄(세로·비스듬)이라 그대로 옮긴다 — 서기 칸은 `arcs`."""
     src = np.asarray(Image.open(SRC).convert("RGB")).astype(int)
     x0, y0, x1, y1 = box
     r = src[y0:y1, x0:x1]
@@ -144,11 +146,53 @@ def bands(cell, box, pal):
         key = tuple(int(v) for v in cell[y, x, :3])
         if not on[y, x] or key == OUTLINE:
             continue
-        h, _, _ = colorsys.rgb_to_hls(*(v / 255 for v in key))
-        if h < 0.07 or h > 0.85:                                # 분홍 살갗(머리·발)은 그대로
-            continue
         out[y, x, :3] = ink
     return out
+
+
+BAND_AT = (0.18, 0.48, 0.8)     # 등딱지 가운데 줄에서 꼬리 쪽 테두리(0) ~ 머리 쪽 끝(1) 사이 띠 자리
+BAND_BOW = 1.5                  # 띠 양 끝이 머리 쪽으로 휘는 폭(px). 띠 사이가 3px이라 2면 이웃 띠와 엉킨다
+
+
+def arcs(cell, ink):
+    """서기 칸의 등딱지 띠: 원본에서 옮기면(`bands`처럼) 띠가 흩어지거나 거의 곧은 세로줄로 남는다 — 원본의 띠도 높이 약
+    100px에 10px만 휘어 게임 크기(띠 높이 10px)에선 1px 꺾임도 안 된다(사장: "띠가 곡선이 아닌 직선처럼 보인다"). 그래서
+    줄인 칸에 띠를 새로 긋는다: 등딱지(분홍·외곽선이 아닌 가장 많은 색) 가운데 줄에서 `BAND_AT` 자리마다, 그 세로 칸의
+    등딱지 위~아래를 따라 원본과 같은 "(" 모양(가운데가 꼬리 쪽으로 불룩, 양 끝이 머리 쪽으로 `BAND_BOW`px)으로.
+    칸마다 같은 자리라 서기·걷기를 오갈 때 띠 수가 바뀌어 깜빡이지 않는다. 줄이며 생긴 띠 색 점은 먼저 등딱지 색으로 덮는다
+    (줄마다 꼬리 쪽 맨 끝 점 = 테두리 그늘은 둔다)."""
+    out = cell.copy()
+    on = cell[..., 3] > 0
+    rgb = cell[..., :3].astype(int)
+    count = Counter(tuple(int(v) for v in rgb[y, x]) for y, x in zip(*np.nonzero(on)))
+    shell = max((c for c in count if c not in (OUTLINE, ink) and not pinkish(c)), key=lambda c: count[c])
+    S = on & (np.all(rgb == shell, -1) | np.all(rgb == ink, -1))
+    ys = np.nonzero(S.any(1))[0]
+    for y in ys:
+        row = np.nonzero(S[y])[0]
+        for x in row[1:]:
+            if tuple(int(v) for v in rgb[y, x]) == ink:
+                out[y, x, :3] = shell
+    mid = int(ys.min() + (ys.max() - ys.min()) * 0.5)
+    row = np.nonzero(S[mid])[0]
+    for f in BAND_AT:
+        xm = int(round(row.min() + (row.max() - row.min()) * f))
+        col = np.nonzero(S[:, xm])[0]
+        top = bot = int(col.min())
+        while bot + 1 < S.shape[0] and S[bot + 1, xm]:
+            bot += 1
+        half = max(1, (bot - top) / 2)
+        for y in range(top, bot + 1):
+            t = (y - (top + bot) / 2) / half
+            x = int(round(xm + BAND_BOW * t * t))
+            if S[y, x]:
+                out[y, x, :3] = ink
+    return out
+
+
+def pinkish(c):
+    h, _, _ = colorsys.rgb_to_hls(*(v / 255 for v in c))
+    return h < 0.07 or h > 0.85
 
 
 def build():
@@ -157,8 +201,11 @@ def build():
     cells = {k: seat(spr[k], CELL, FOOT) for k in ORDER}
     stand = cells["idle_a"]
     pal = {tuple(int(v) for v in p[:3]) for p in stand[stand[..., 3] > 0]} - {OUTLINE}
-    for k, box in zip(STAND + BALL, STAND_BOXES + BALL_BOXES):
+    for k, box in zip(BALL, BALL_BOXES):
         cells[k] = bands(cells[k], box, pal)
+    ink = min(pal, key=lambda c: sum((a - b) ** 2 for a, b in zip(c, BAND_INK)))
+    for k in STAND:
+        cells[k] = arcs(cells[k], ink)
     sheet = np.zeros((CELL * 4, CELL * len(ORDER), 4), np.uint8)
     for c, k in enumerate(ORDER):
         for r, cell in enumerate((cells[k], thread(taint(cells[k])))):
