@@ -649,4 +649,18 @@ mod tests {
         w.player.gain_sp(false);
         assert!((w.player.sp - off * t::PETAL_BEAT_SP).abs() < 1e-4);
     }
+
+    /// 터치 공격 버튼의 대기(2026-10-29): 휘두르는 동안 0에서 차오르고, 다 휘두르면 1.
+    #[test]
+    fn attack_button_refills_over_the_swing() {
+        let mut w = doto();
+        assert_eq!(w.player.attack_ready(), 1.0);
+        w.tick(&press());
+        let first = w.player.attack_ready();
+        assert!(first < 0.5, "{first}");
+        w.tick(&Actions::default());
+        assert!(w.player.attack_ready() > first, "차오른다");
+        run(&mut w, &Actions::default(), 40);
+        assert_eq!(w.player.attack_ready(), 1.0);
+    }
 }

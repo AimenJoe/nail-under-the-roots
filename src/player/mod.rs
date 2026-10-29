@@ -471,6 +471,23 @@ impl Player {
         self.sp >= t::SP_MAX
     }
 
+    /// 공격 버튼의 대기(터치, 0..1, 1 = 바로 칠 수 있음): 휘두르는 동안(스윙 + 후딜레이)·강공격·후딜레이에 차오른다.
+    pub fn attack_ready(&self) -> f32 {
+        let k = match self.state {
+            State::Attack { idx, time, .. } => {
+                let h = self.moveset.hits[idx];
+                time / (h.swing + h.recovery).max(0.01)
+            }
+            State::Heavy { time, .. } => {
+                let h = self.moveset.heavy();
+                time / (h.swing + h.recovery).max(0.01)
+            }
+            State::Recover { .. } => 0.0,
+            _ => 1.0,
+        };
+        k.clamp(0.0, 1.0)
+    }
+
     /// 박자 창(±초). 무기마다 배율(꽃잎 발목끈은 넓다), 큰 나무 "박자 귀"(0246).
     pub fn beat_window(&self) -> f32 {
         t::BEAT_WINDOW * self.moveset.beat_window * self.stats.beat

@@ -578,12 +578,20 @@ pub struct TouchButton {
     pub kind: TouchKind,
     /// 다시 쓸 수 있기까지의 진행(1 = 지금 쓸 수 있음). 앱이 월드의 대기를 넣는다(docs/decisions/0038).
     pub ready: f32,
+    /// 대기와 별개로 지금 쓸 수 없다(고른 아이템이 없다). 그림을 옅게.
+    pub dim: bool,
 }
 
-/// `TouchOverlay::buttons`에서 대기를 보여 주는 칸.
-pub const TOUCH_DIG: usize = 1;
-pub const TOUCH_SP: usize = 4;
-pub const TOUCH_ITEM: usize = 5;
+impl TouchOverlay {
+    /// 그 일을 하는 버튼. 칸 번호로 고르면 배치 순서를 바꿀 때 어긋난다(아이템 대기가 넘기기 버튼에, 필살기 게이지가
+    /// 아이템 버튼에 그려졌다 — 사장 2026-10-29).
+    pub fn button_mut(&mut self, kind: TouchKind) -> &mut TouchButton {
+        self.buttons
+            .iter_mut()
+            .find(|b| b.kind == kind)
+            .expect("터치 버튼은 일마다 하나")
+    }
+}
 
 /// 버튼 배치(논리 px). 화면 짧은 변 기준으로 손가락 크기에 맞춘다.
 fn touch_layout() -> TouchOverlay {
@@ -613,24 +621,28 @@ fn layout_for(w: f32, h: f32) -> TouchOverlay {
                 radius: atk_r,
                 kind: TouchKind::Attack,
                 ready: 1.0,
+                dim: false,
             },
             TouchButton {
                 center: dig,
                 radius: dig_r,
                 kind: TouchKind::Dodge,
                 ready: 1.0,
+                dim: false,
             },
             TouchButton {
                 center: vec2(r * 1.2, r * 1.2),
                 radius: r * 0.75,
                 kind: TouchKind::Menu,
                 ready: 1.0,
+                dim: false,
             },
             TouchButton {
                 center: sp,
                 radius: sp_r,
                 kind: TouchKind::Special,
                 ready: 1.0,
+                dim: false,
             },
             TouchButton {
                 // 아이템: 굴파기와 필살기 사이, 왼쪽 위 대각선.
@@ -638,12 +650,14 @@ fn layout_for(w: f32, h: f32) -> TouchOverlay {
                 radius: r * 0.8,
                 kind: TouchKind::Item,
                 ready: 1.0,
+                dim: false,
             },
             TouchButton {
                 center: vec2(dig.x - r * 2.0, sp.y - r * 0.2),
                 radius: r * 0.55,
                 kind: TouchKind::ItemSwitch,
                 ready: 1.0,
+                dim: false,
             },
         ],
     }
@@ -1300,6 +1314,24 @@ mod tests {
     }
 
     /// 터치 버튼: 공격이 가장 크고, 버튼끼리(그린 동그라미) 겹치지 않고 화면 안에 있다. 가로·세로 폰, 태블릿.
+    /// 일마다 버튼은 하나(앱이 `button_mut(kind)`로 대기를 넣는다 — 칸 번호로 넣다 아이템·필살기가 어긋났다, 2026-10-29).
+    #[test]
+    fn every_touch_kind_has_exactly_one_button() {
+        let mut l = layout_for(844.0, 390.0);
+        for k in [
+            TouchKind::Attack,
+            TouchKind::Dodge,
+            TouchKind::Menu,
+            TouchKind::Special,
+            TouchKind::Item,
+            TouchKind::ItemSwitch,
+        ] {
+            assert_eq!(l.buttons.iter().filter(|b| b.kind == k).count(), 1, "{k:?}");
+            l.button_mut(k).ready = 0.5;
+        }
+        assert!(l.buttons.iter().all(|b| b.ready == 0.5));
+    }
+
     #[test]
     fn touch_buttons_attack_biggest_no_overlap() {
         for (w, h) in [

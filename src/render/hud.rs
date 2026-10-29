@@ -300,8 +300,9 @@ pub(super) fn draw_title_background() {
     draw_rectangle(0.0, t::VIEW_H - 8.0, t::VIEW_W, 8.0, WALL_COLOR);
 }
 
-/// 터치 조작 오버레이(실제 해상도). 지금 장치가 터치일 때만(0172). 버튼 그림은 캐릭터 표에서.
-pub fn draw_touch_overlay(t: &TouchOverlay, ch: &CharacterDef) {
+/// 터치 조작 오버레이(실제 해상도). 지금 장치가 터치일 때만(0172). 버튼 그림은 캐릭터 표에서, 아이템 버튼은 지금 고른
+/// 아이템(`item`, 산딸기·지렁이). 다시 쓸 때까지는 테두리가 시계 방향으로 차오르고 그림이 옅다 — 모든 행동이 같은 꼴.
+pub fn draw_touch_overlay(t: &TouchOverlay, ch: &CharacterDef, item: Icon) {
     let line = Color::new(1.0, 1.0, 1.0, 0.35);
     let fill = Color::new(1.0, 1.0, 1.0, 0.12);
     if let Some((origin, pos)) = t.stick {
@@ -331,12 +332,13 @@ pub fn draw_touch_overlay(t: &TouchOverlay, ch: &CharacterDef) {
         } else {
             draw_circle_lines(b.center.x, b.center.y, b.radius, 2.0, line);
         }
-        let line = if ready < 1.0 { faint } else { line };
+        // 쓸 수 없으면(대기 중·게이지가 덜 찼다·아이템이 없다) 그림을 옅게.
+        let line = if ready < 1.0 || b.dim { faint } else { line };
         let icon = match b.kind {
             TouchKind::Attack => ch.touch[0],
             TouchKind::Dodge => ch.touch[1],
             TouchKind::Special => ch.touch[2],
-            TouchKind::Item => Icon::Berry,
+            TouchKind::Item => item,
             TouchKind::ItemSwitch => Icon::Switch,
             TouchKind::Menu => Icon::Menu,
         };
@@ -518,6 +520,20 @@ fn icon_mask(icon: Icon) -> [&'static str; 12] {
             "..########..",
             "...######...",
             "....####....",
+            "............",
+        ],
+        Icon::Worm => [
+            "............",
+            "............",
+            ".......###..",
+            "......#####.",
+            "......##.##.",
+            ".....##.....",
+            "....##......",
+            "...##...##..",
+            "..###..###..",
+            "..########..",
+            "...######...",
             "............",
         ],
         Icon::Switch => [
@@ -839,6 +855,7 @@ mod touch_icon_tests {
             Icon::Leap,
             Icon::Bury,
             Icon::Berry,
+            Icon::Worm,
             Icon::Switch,
             Icon::Menu,
         ] {

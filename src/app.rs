@@ -1587,13 +1587,22 @@ impl App {
             }
         }
         if let Some(mut o) = self.input.overlay() {
+            use crate::input::TouchKind;
             let p = &self.world.player;
+            let bag = &self.world.inv.bag;
             let burrow = crate::tuning::BURROW_COOLDOWN * p.stats.burrow_cd;
-            o.buttons[crate::input::TOUCH_DIG].ready = 1.0 - p.burrow_cd / burrow;
-            o.buttons[crate::input::TOUCH_SP].ready = p.sp / crate::tuning::SP_MAX;
-            o.buttons[crate::input::TOUCH_ITEM].ready =
-                1.0 - p.item_cd / (crate::tuning::ITEM_COOLDOWN * p.eat_cd_mul);
-            render::draw_touch_overlay(&o, self.world.character.def());
+            // 모든 행동에 대기 표시(사장 2026-10-29): 공격은 휘두르는 동안, 회피는 대기, 필살기는 게이지, 아이템은 먹은 뒤 대기.
+            o.button_mut(TouchKind::Attack).ready = p.attack_ready();
+            o.button_mut(TouchKind::Dodge).ready = 1.0 - p.burrow_cd / burrow;
+            o.button_mut(TouchKind::Special).ready = p.sp / crate::tuning::SP_MAX;
+            let item = o.button_mut(TouchKind::Item);
+            item.ready = 1.0 - p.item_cd / (crate::tuning::ITEM_COOLDOWN * p.eat_cd_mul);
+            item.dim = bag.count(bag.selected) == 0;
+            let icon = match bag.selected {
+                crate::items::Consumable::Berry => crate::characters::Icon::Berry,
+                crate::items::Consumable::Worm => crate::characters::Icon::Worm,
+            };
+            render::draw_touch_overlay(&o, self.world.character.def(), icon);
         }
     }
 
