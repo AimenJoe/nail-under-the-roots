@@ -1060,8 +1060,9 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
         }
     }
     let moving = (e.pos - e.prev_pos).length() > 0.05;
-    let steps = time * 8.0 + e.pos.x * 0.05;
-    let walk = steps as u32 % 2;
+    let walk = (time * 8.0 + e.pos.x * 0.05) as u32 % 2;
+    // 걸음 = 걸어온 길 ÷ 보폭(몸 반지름에 비례, 0241). 시계로 넘기면 느린 보스(콩이 30px/s)도 초당 16칸이라 몸만 떨렸다.
+    let steps = e.walked / (e.radius() * t::WALK_STEP_PER_RADIUS);
     let mut frame = if moving {
         // 걷기 네 칸이 있는 시트(0229)는 그것을 — 대장은 chief.png, 그 밖은 critters 줄.
         match art {

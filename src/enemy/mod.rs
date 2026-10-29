@@ -131,6 +131,8 @@ pub struct Enemy {
     pub kind: Kind,
     pub pos: Vec2,
     pub prev_pos: Vec2,
+    /// 걸어온 길이(px, 그림 전용): 걷기 칸을 시계가 아니라 걸음으로 넘긴다(0241).
+    pub walked: f32,
     pub vel: Vec2,
     pub hp: i32,
     /// 처음 체력(실뜨기가 바꾼다). 막대·반 아래 판정은 이걸 본다.
@@ -249,6 +251,7 @@ impl Enemy {
             kind,
             pos,
             prev_pos: pos,
+            walked: 0.0,
             vel: Vec2::ZERO,
             hp,
             max_hp: hp,

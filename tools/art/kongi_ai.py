@@ -219,7 +219,7 @@ def build():
         cells[k] = arcs(cells[k], ink)
     # 걷기는 첫 칸 하나에서 발만 딛게(0241): 원본 네 칸은 등딱지 크기·머리 높이·눈이 칸마다 달라 걸을 때 몸이 끓었다.
     # 두 칸 걷기(walk_a·b)도 같은 순환의 두 디딤 칸으로.
-    steps = step_cycle(cells[walk_ai.NAMES[0]], FOOT - 2)
+    steps = step_cycle(cells[walk_ai.NAMES[0]], FOOT - 2, reach=2)
     cells.update(zip(walk_ai.NAMES, steps))
     cells["walk_a"], cells["walk_b"] = steps[0], steps[2]
     return sheet4([(cells[k], thread(taint(cells[k]))) for k in ORDER])

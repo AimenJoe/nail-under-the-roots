@@ -1358,6 +1358,7 @@ impl World {
                 &mut self.projectiles,
                 &mut self.enemy_events,
             );
+            e.walked += (e.pos - e.prev_pos).length();
         }
         // 이웃: 따라갈 곳이 있으면 천천히 걸어간다(가까우면 멈춤).
         if let Some(n) = self.npc.as_mut() {
