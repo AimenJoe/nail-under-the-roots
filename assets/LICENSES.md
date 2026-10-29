@@ -35,7 +35,7 @@
 | 대상 | 라이선스 | 상업 사용 | 지킬 것 |
 |---|---|---|---|
 | 직접 그린 그림(`art/`의 스프라이트·타일·`title_fog`)·합성 효과음(`src/sfx.rs`)·코드 | © 2026 Beardworks | 가능 | — |
-| 나노바나나 생성 그림(초상화 칸 4 말고 모두·컷씬 일러스트·타이틀 바탕) | Google 생성형 AI 이용 약관(Claude가 원문을 확인하지 못함) | 확인 필요 | SynthID·C2PA를 남긴다(0138). 상업 출시 전에 약관을 확인한다 |
+| 나노바나나 생성 그림(초상화 칸 4 말고 모두·컷씬 일러스트·타이틀 바탕) | **Gemini 앱(무료)**으로 생성(사장, 2026-10-29) → Google 서비스 약관(2026-07-30판, 원문 확인): Google은 생성물 소유권을 주장하지 않는다. 금지: 생성형 AI 콘텐츠를 사람이 만든 것처럼 오인하게 하기, AI 생성물로 머신러닝 모델 만들기 | 상업 사용 가능(약관상). AI 결과물 자체는 저작권 보호가 약하다(0231) | SynthID·C2PA를 남긴다(0138). Steam AI 공개(Pre-Generated)를 구체적으로(0232) |
 | Kenney 효과음·Aureolus_Omicron·Cleyton Kauffman·fluffclipse·Kistol 음악(`sfx/`·`music/`) | CC0 1.0 | 가능 | 법적으로 지킬 것 없음. 크레딧은 고마움으로 남긴다(`THIRD_PARTY_LICENSES.txt`의 소리·음악 칸, 게임 크레딧 화면이 생기면 거기에도) |
 | Galmuri11 Condensed | SIL OFL 1.1 | 가능(게임에 넣어 판매 가능) | 폰트 파일만 따로 팔지 않는다. OFL 원문과 저작권 고지를 함께 배포 |
 | Ark Pixel 서브셋(NailCJK) | SIL OFL 1.1 | 가능 | 위와 같음. 수정본이라 원래 이름(Ark Pixel)을 폰트 이름으로 쓰지 않는다 |
@@ -54,7 +54,7 @@
 | Kenney 효과음(CC0) | 의무 아님(부탁: "Support us by crediting Kenney or www.kenney.nl (this is not mandatory)") | — | 팩 안 `License.txt` |
 | Aureolus_Omicron·fluffclipse·Kistol·Cleyton Kauffman 음악(CC0) | 의무 아님 | — | 위 음악 행 |
 | Sunnyside World | 의무 아님("Credit is not necessary, but always appreciated.") | — | 아래 원문(2026-10-25). 오늘은 itch.io가 세션 네트워크에서 막혀 다시 보지 못했다 |
-| 나노바나나 그림(Google) | 약관에 표기 의무 없음(2차 출처) | SynthID·C2PA를 지우지 않는다(0138) | Google이 생성물의 소유권을 주장하지 않는다는 조항(검색 요약·뉴스로만 확인, 원문 페이지는 세션 네트워크에서 막힘). 상업 출시 전에 원문 확인 |
+| 나노바나나 그림(Google, Gemini 앱 무료) | 약관에 표기 의무는 없지만 사람이 만든 것처럼 오인하게 하면 안 된다(Google 서비스 약관 2026-07-30판, 원문 확인) | SynthID·C2PA를 지우지 않는다(0138) | 크레딧·상점·공식 페이지에 생성 그림임을 밝힌다(0232) |
 | Met·rawpixel·Wikimedia 그림(CC0·퍼블릭 도메인) | 의무 아님 | — | 지금은 게임 그림에 쓰이지 않는다(나노바나나로 바뀜) |
 
 - 고마움 크레딧은 `tools/licenses.py`가 `THIRD_PARTY_LICENSES.txt` 머리에 싣는다. 게임 안 크레딧·라이선스 화면은 아직 없다: 웹은 `/THIRD_PARTY_LICENSES.txt`로 열 수 있지만 APK·iOS는 파일이 앱 안에만 있다. 스토어 출시 전에 설정에 "크레딧" 화면을 두는 것이 좋다(관례).
