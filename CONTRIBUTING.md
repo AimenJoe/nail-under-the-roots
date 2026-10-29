@@ -24,7 +24,7 @@ CI(`deploy-web.yml`)는 fmt·clippy·test·wasm 빌드를 다시 돈다. 로컬�
 
 ## 무엇을 어디에 쓰나
 - **수치**는 `src/tuning.rs` 한 곳. 플레이어 코드에 타별 숫자를 직접 쓰지 않는다.
-- **표로 끝나는 것**은 표에: 콤보 `moveset.rs`, 적 `species.rs`, 장비·장신구 `equipment.rs`, 재주 `talents.rs`, 저널 `journal.rs`, 런 사이 한마디 `story.rs`, 개발 시나리오 `scenario.rs`, 그림 줄 `art.rs`, 소리 `sfx.rs`·`tools/audio/make_audio.py`(단계 `kenney`·`music`·`oga`, 0234), 어디서 어느 곡·환경음인지 `App::music_track` 한 곳(0234), **길의 주인(보스) `bosses.rs`**, **플레이어블 캐릭터 `characters.rs`**(0170).
+- **표로 끝나는 것**은 표에: 콤보 `moveset.rs`, 적 `species.rs`, 장비·장신구 `equipment.rs`, 재주 `talents.rs`, 저널 `journal.rs`, 런 사이 한마디 `story.rs`, 개발 시나리오 `scenario.rs`, 그림 줄 `art.rs`, 소리 `sfx.rs`·`tools/audio/make_audio.py`(단계 `kenney`·`music`·`oga`, 0234), 어디서 어느 곡·환경음인지 `music::choose` 한 곳(0234·0235 R21), **길의 주인(보스) `bosses.rs`**, **플레이어블 캐릭터 `characters.rs`**(0170).
 - **종 규칙은 적 안에**: "맞으면 무슨 일"(튕김·열림·독·벽 쿵)은 `Enemy::receive`, 닿는 판정(혀·등딱지·날기)은 `Enemy`의 메서드. `world.rs`에 종 이름으로 if를 더하지 않는다(0170 R10). 이야기 깃발은 `World::story`의 메서드로만 바꾼다(앱은 `StorySeed`·`Story::beat`, 0170 R11).
 - **플레이어가 보는 글**은 `src/i18n/<언어>.rs`에만(키는 `src/i18n/mod.rs`의 `Strings`), **열한 언어 전부**(한국어·영어·일본어·중국어 간체·브라질 포르투갈어·프랑스어·스페인어·독일어·러시아어·중국어 번체·폴란드어, 이 순서). 직접 번역한다(기계 번역은 사장이 말할 때만). 일본어·중국어 글을 바꿨으면 `python3 tools/fonts/build_cjk.py <ark-pixel-font> <Cubic_11.woff2>`로 폰트를 다시 만든다 — `cargo test`가 빠진 글자를 잡는다.
 - **흐름**(어디서 시작하나·쓰러지면 어디로·전환 뒤에 무엇을)은 `app/flow.rs`·`app/after.rs`에서 정하고 시험을 더한다. `App`에는 결정을 실행하는 코드만(0230 R15).

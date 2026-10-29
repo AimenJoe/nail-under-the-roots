@@ -110,6 +110,44 @@ enum Scene {
     Slots,
 }
 
+/// 장면이 무엇 위에 떠 있나(0235 R21): 월드를 그리는지, 타이틀 바탕을 그리는지, 타이틀 곡인지가 이것 하나로 갈린다.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Layer {
+    /// 타이틀 쪽, 제 바탕을 스스로 그린다(첫 화면·앨범). 타이틀 곡.
+    Title,
+    /// 타이틀 쪽, 타이틀 바탕 그림 위(0083). 타이틀 곡.
+    TitleArt,
+    /// 게임 월드 위(창이면 월드를 뒤에 그린다). 장소의 곡.
+    World,
+}
+
+impl Scene {
+    /// `_` 없이 모든 장면을 적는다 — 새 장면을 더하면 컴파일러가 여기를 묻는다(예전에는 세 `matches!` 목록이라
+    /// 빠뜨려도 컴파일됐다. 라이선스 화면 때 셋 모두에 손으로 넣었다).
+    fn layer(self) -> Layer {
+        match self {
+            Scene::Intro | Scene::Album => Layer::Title,
+            Scene::Title | Scene::Slots | Scene::Dev => Layer::TitleArt,
+            Scene::Settings { back } | Scene::Controls { back } | Scene::Licenses { back } => {
+                match back {
+                    Back::Title => Layer::TitleArt,
+                    Back::Pause => Layer::World,
+                }
+            }
+            Scene::Cutscene
+            | Scene::Game
+            | Scene::Pause
+            | Scene::Route
+            | Scene::Shop
+            | Scene::KnotPick
+            | Scene::Decor
+            | Scene::Tree
+            | Scene::DreamPick
+            | Scene::CharPick => Layer::World,
+        }
+    }
+}
+
 /// 컷씬이 끝난 뒤 갈 곳.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum AfterCut {
@@ -524,83 +562,24 @@ impl App {
         }
     }
 
-    /// 지금 들려야 할 곡·환경음과 낮출지(0081·0234). 타이틀 쪽 화면은 타이틀 곡, 게임은 장소·환경, 보스와 싸우는 동안은
-    /// 보스 곡(깨어나면 2단계 곡). 대사(컷씬)·일시정지·가게 같은 창이 떠 있으면 음악을 낮춘다.
-    ///
-    /// 장소마다 옛 곡과 새 곡을 둘 다 쓴다(사장 2026-10-29 "기존 것도 좋으니 둘 다"): 나눌 까닭이 있는 곳은 때로 가르고
-    /// (필드 길 ↔ 꽃 핀 굴, 쉼터 ↔ 마지막 쉼터, 보스 1단계 ↔ 2단계), 같은 곳은 런마다 번갈아 든다(`alt`, 타이틀·마을·굴).
-    fn music_track(
-        &self,
-    ) -> (
-        Option<crate::music::Track>,
-        Option<crate::music::Track>,
-        bool,
-    ) {
-        use crate::adventure::Place;
-        use crate::biome::Biome;
-        use crate::music::Track;
-        // 런마다 번갈아(새 곡부터): 지난 런 수가 짝수면 새 곡.
-        let alt = self
-            .profile
-            .count(crate::profile::key::RUNS)
-            .is_multiple_of(2);
-        let pick = |new: Track, old: Track| if alt { new } else { old };
-        let title = matches!(
-            self.scene,
-            Scene::Intro | Scene::Title | Scene::Slots | Scene::Album | Scene::Dev
-        ) || matches!(
-            self.scene,
-            Scene::Settings { back: Back::Title }
-                | Scene::Controls { back: Back::Title }
-                | Scene::Licenses { back: Back::Title }
-        );
-        if title {
-            return (Some(pick(Track::TitleLight, Track::Title)), None, false);
-        }
+    /// 지금 들려야 할 곡·환경음과 낮출지. 규칙은 `music::choose`(시험이 있다), 여기서는 보는 것만 모은다(0235 R21).
+    fn music_track(&self) -> crate::music::Choice {
         let w = &self.world;
-        let ducked = self.scene != Scene::Game;
-        let amb = match w.adv.place {
-            Place::Village | Place::Field => Some(Track::AmbMeadow),
-            Place::Camp => Some(Track::AmbCave),
-            Place::Deep => Some(Track::AmbDeep),
-            Place::Dungeon => Some(match w.biome {
-                Biome::Meadow => Track::AmbMeadow,
-                Biome::Roots | Biome::Silk => Track::AmbCave,
-                Biome::Deep => Track::AmbDeep,
-            }),
-            Place::Arena => None,
-        };
-        // 컷씬이 음악을 내렸다(0159): 보스 곡도 아직. 장면이 풀면(Hush(false)) 바로 보스 곡. 환경음은 남는다.
-        if w.juice.hush && self.scene == Scene::Cutscene {
-            return (None, amb, false);
-        }
-        let deep_fight = w.deep.as_ref().is_some_and(|d| d.done_t.is_none());
-        let boss = self.dream.is_some() || w.enemies.iter().any(|e| e.is_boss() && !e.asleep);
-        let track = if deep_fight {
-            Track::Final
-        } else if boss {
-            if w.enemies.iter().any(|e| e.is_boss() && e.roused) {
-                Track::BossRise
-            } else {
-                Track::Boss
-            }
-        } else {
-            match w.adv.place {
-                Place::Village => pick(Track::VillageSprings, Track::Village),
-                Place::Camp if w.adv.stage >= crate::tuning::FINAL_STAGE => Track::Camp,
-                Place::Camp => Track::CampCalm,
-                // 할매를 놓아준 뒤(엔딩).
-                Place::Deep => Track::Ending,
-                Place::Field => Track::FieldOverworld,
-                Place::Dungeon | Place::Arena => match w.biome {
-                    Biome::Meadow => Track::Field,
-                    Biome::Roots => pick(Track::RootsExplorer, Track::Roots),
-                    Biome::Deep => pick(Track::DeepPool, Track::Deep),
-                    Biome::Silk => Track::Silk,
-                },
-            }
-        };
-        (Some(track), amb, ducked)
+        crate::music::choose(&crate::music::Listen {
+            title: self.scene.layer() != Layer::World,
+            alt: self
+                .profile
+                .count(crate::profile::key::RUNS)
+                .is_multiple_of(2),
+            place: w.adv.place,
+            biome: w.biome,
+            stage: w.adv.stage,
+            menu: self.scene != Scene::Game,
+            hushed: w.juice.hush && self.scene == Scene::Cutscene,
+            deep_fight: w.deep.as_ref().is_some_and(|d| d.done_t.is_none()),
+            boss: self.dream.is_some() || w.enemies.iter().any(|e| e.is_boss() && !e.asleep),
+            roused: w.enemies.iter().any(|e| e.is_boss() && e.roused),
+        })
     }
 
     /// 기록을 저장한다. 이번 런에서 만난 이웃도 함께 남긴다.
@@ -662,9 +641,9 @@ impl App {
         } else {
             (self.letterbox - step).max(target)
         };
-        let (track, amb, ducked) = self.music_track();
-        self.music.update(track, ducked, dt);
-        self.amb.update(amb, ducked, dt);
+        let heard = self.music_track();
+        self.music.update(heard.music, heard.ducked, dt);
+        self.amb.update(heard.ambience, heard.ducked, dt);
         match self.scene {
             Scene::Game => {
                 let heard = self.sfx.played();
@@ -1401,22 +1380,7 @@ impl App {
     }
 
     fn draw(&mut self) {
-        let in_world = matches!(
-            self.scene,
-            Scene::Game
-                | Scene::Pause
-                | Scene::Cutscene
-                | Scene::Route
-                | Scene::Shop
-                | Scene::KnotPick
-                | Scene::Decor
-                | Scene::Tree
-                | Scene::DreamPick
-                | Scene::CharPick
-                | Scene::Settings { back: Back::Pause }
-                | Scene::Controls { back: Back::Pause }
-                | Scene::Licenses { back: Back::Pause }
-        );
+        let in_world = self.scene.layer() == Layer::World;
         let alpha = if self.scene == Scene::Game {
             self.acc / t::TICK_DT
         } else {
@@ -1454,13 +1418,7 @@ impl App {
         self.hits.clear();
         self.last_ui = (ui.scale, ui.ox, ui.oy);
         // 타이틀과 타이틀에서 여는 창은 같은 바탕 그림(0083).
-        let title_bg = matches!(self.scene, Scene::Title | Scene::Slots | Scene::Dev)
-            || matches!(
-                self.scene,
-                Scene::Settings { back: Back::Title }
-                    | Scene::Controls { back: Back::Title }
-                    | Scene::Licenses { back: Back::Title }
-            );
+        let title_bg = self.scene.layer() == Layer::TitleArt;
         if title_bg {
             self.renderer.draw_title_art(&ui, get_time() as f32);
         }

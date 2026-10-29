@@ -14,8 +14,8 @@ use macroquad::audio::{
 };
 use macroquad::experimental::coroutines::{start_coroutine, Coroutine};
 
-/// 어디의 곡인가. 같은 곡이 여러 장소에 걸릴 수 있다(`App::music_track`). 장소마다 옛 곡과 사장이 고른 새 곡(0234)을
-/// 둘 다 쓴다 — 어떤 때 어느 곡인지는 `App::music_track` 한 곳.
+/// 어디의 곡인가. 같은 곡이 여러 장소에 걸릴 수 있다. 장소마다 옛 곡과 사장이 고른 새 곡(0234)을
+/// 둘 다 쓴다 — 어떤 때 어느 곡인지는 `choose` 한 곳.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Track {
     /// 옛 곡(0154): 서곡 · 마을 · 필드 칩튠 · 눈 오는 쉼터 · 굴 칩튠 · 신비의 사당 · 싸움 2.
@@ -76,6 +76,102 @@ impl Track {
     /// 타이틀 쪽 곡(이때는 보스 곡을 미리 읽지 않는다).
     fn is_title(self) -> bool {
         matches!(self, Track::Title | Track::TitleLight)
+    }
+}
+
+/// 곡을 고를 때 보는 것(0235 R21). 앱이 장면·월드·기록에서 한 번 채우고, 고르는 규칙은 `choose` 한 곳(시험이 있다).
+#[derive(Clone, Copy, Debug)]
+pub struct Listen {
+    /// 타이틀 쪽 화면(타이틀·슬롯·앨범·타이틀에서 연 설정 …).
+    pub title: bool,
+    /// 런마다 번갈아: 지난 런 수가 짝수면 참(새 곡부터).
+    pub alt: bool,
+    pub place: crate::adventure::Place,
+    pub biome: crate::biome::Biome,
+    pub stage: u32,
+    /// 게임이 아닌 창(대사·일시정지·가게 …)이 떠 있다 → 음악을 낮춘다.
+    pub menu: bool,
+    /// 컷씬이 음악을 내렸다(`Step::Hush`, 0159).
+    pub hushed: bool,
+    /// 가장 깊은 곳에서 아직 매듭을 다 끊지 않았다.
+    pub deep_fight: bool,
+    /// 깨어 있는 보스가 있다(실의 꿈이면 늘).
+    pub boss: bool,
+    /// 그 보스가 2단계로 깨어났다(0233).
+    pub roused: bool,
+}
+
+/// 고른 결과: 곡·환경음(`Music::ambience`)·낮출지.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Choice {
+    pub music: Option<Track>,
+    pub ambience: Option<Track>,
+    pub ducked: bool,
+}
+
+/// 지금 들려야 할 곡·환경음과 낮출지(0081·0234). 타이틀 쪽 화면은 타이틀 곡, 게임은 장소·환경, 보스와 싸우는 동안은
+/// 보스 곡(깨어나면 2단계 곡). 대사(컷씬)·일시정지·가게 같은 창이 떠 있으면 음악을 낮춘다.
+///
+/// 장소마다 옛 곡과 새 곡을 둘 다 쓴다(사장 2026-10-29 "기존 것도 좋으니 둘 다"): 나눌 까닭이 있는 곳은 때로 가르고
+/// (필드 길 ↔ 꽃 핀 굴, 쉼터 ↔ 마지막 쉼터, 보스 1단계 ↔ 2단계), 같은 곳은 런마다 번갈아 든다(`alt`, 타이틀·마을·굴).
+pub fn choose(l: &Listen) -> Choice {
+    use crate::adventure::Place;
+    use crate::biome::Biome;
+    let pick = |new: Track, old: Track| if l.alt { new } else { old };
+    if l.title {
+        return Choice {
+            music: Some(pick(Track::TitleLight, Track::Title)),
+            ambience: None,
+            ducked: false,
+        };
+    }
+    let ambience = match l.place {
+        Place::Village | Place::Field => Some(Track::AmbMeadow),
+        Place::Camp => Some(Track::AmbCave),
+        Place::Deep => Some(Track::AmbDeep),
+        Place::Dungeon => Some(match l.biome {
+            Biome::Meadow => Track::AmbMeadow,
+            Biome::Roots | Biome::Silk => Track::AmbCave,
+            Biome::Deep => Track::AmbDeep,
+        }),
+        Place::Arena => None,
+    };
+    // 컷씬이 음악을 내렸다(0159): 보스 곡도 아직. 장면이 풀면(Hush(false)) 바로 보스 곡. 환경음은 남는다.
+    if l.hushed {
+        return Choice {
+            music: None,
+            ambience,
+            ducked: false,
+        };
+    }
+    let music = if l.deep_fight {
+        Track::Final
+    } else if l.boss {
+        if l.roused {
+            Track::BossRise
+        } else {
+            Track::Boss
+        }
+    } else {
+        match l.place {
+            Place::Village => pick(Track::VillageSprings, Track::Village),
+            Place::Camp if l.stage >= crate::tuning::FINAL_STAGE => Track::Camp,
+            Place::Camp => Track::CampCalm,
+            // 할매를 놓아준 뒤(엔딩).
+            Place::Deep => Track::Ending,
+            Place::Field => Track::FieldOverworld,
+            Place::Dungeon | Place::Arena => match l.biome {
+                Biome::Meadow => Track::Field,
+                Biome::Roots => pick(Track::RootsExplorer, Track::Roots),
+                Biome::Deep => pick(Track::DeepPool, Track::Deep),
+                Biome::Silk => Track::Silk,
+            },
+        }
+    };
+    Choice {
+        music: Some(music),
+        ambience,
+        ducked: l.menu,
     }
 }
 
@@ -293,6 +389,123 @@ impl Music {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn game(place: crate::adventure::Place, biome: crate::biome::Biome) -> Listen {
+        Listen {
+            title: false,
+            alt: true,
+            place,
+            biome,
+            stage: 1,
+            menu: false,
+            hushed: false,
+            deep_fight: false,
+            boss: false,
+            roused: false,
+        }
+    }
+
+    /// 타이틀·마을·뿌리 굴·심층 굴은 런마다 옛 곡과 새 곡이 번갈아, 타이틀 쪽에는 환경음이 없다(0234).
+    #[test]
+    fn same_place_alternates_by_run() {
+        use crate::adventure::Place;
+        use crate::biome::Biome;
+        let mut title = game(Place::Village, Biome::Meadow);
+        title.title = true;
+        assert_eq!(choose(&title).music, Some(Track::TitleLight));
+        assert_eq!(choose(&title).ambience, None);
+        title.alt = false;
+        assert_eq!(choose(&title).music, Some(Track::Title));
+        for (place, biome, new, old) in [
+            (
+                Place::Village,
+                Biome::Meadow,
+                Track::VillageSprings,
+                Track::Village,
+            ),
+            (
+                Place::Dungeon,
+                Biome::Roots,
+                Track::RootsExplorer,
+                Track::Roots,
+            ),
+            (Place::Dungeon, Biome::Deep, Track::DeepPool, Track::Deep),
+        ] {
+            let mut l = game(place, biome);
+            assert_eq!(choose(&l).music, Some(new));
+            l.alt = false;
+            assert_eq!(choose(&l).music, Some(old));
+        }
+    }
+
+    /// 상황으로 가르는 곳: 들길 ↔ 꽃 핀 굴, 첫·둘째 쉼터 ↔ 마지막 쉼터. 번갈아 들지 않는다.
+    #[test]
+    fn split_places_ignore_alternation() {
+        use crate::adventure::Place;
+        use crate::biome::Biome;
+        for alt in [true, false] {
+            let mut l = game(Place::Field, Biome::Meadow);
+            l.alt = alt;
+            assert_eq!(choose(&l).music, Some(Track::FieldOverworld));
+            l.place = Place::Dungeon;
+            assert_eq!(choose(&l).music, Some(Track::Field));
+            l.place = Place::Camp;
+            assert_eq!(choose(&l).music, Some(Track::CampCalm));
+            l.stage = crate::tuning::FINAL_STAGE;
+            assert_eq!(choose(&l).music, Some(Track::Camp));
+        }
+    }
+
+    /// 보스: 1단계 곡 → 깨어나면 2단계 곡, 가장 깊은 곳은 제 곡이 이긴다. 컷씬이 내리면 곡은 없고 환경음은 남는다.
+    #[test]
+    fn boss_phase_and_hush() {
+        use crate::adventure::Place;
+        use crate::biome::Biome;
+        let mut l = game(Place::Dungeon, Biome::Roots);
+        l.boss = true;
+        assert_eq!(choose(&l).music, Some(Track::Boss));
+        l.roused = true;
+        assert_eq!(choose(&l).music, Some(Track::BossRise));
+        l.hushed = true;
+        assert_eq!(
+            choose(&l),
+            Choice {
+                music: None,
+                ambience: Some(Track::AmbCave),
+                ducked: false
+            }
+        );
+        let mut deep = game(Place::Deep, Biome::Deep);
+        deep.deep_fight = true;
+        deep.boss = true;
+        assert_eq!(choose(&deep).music, Some(Track::Final));
+        deep.deep_fight = false;
+        deep.boss = false;
+        assert_eq!(choose(&deep).music, Some(Track::Ending));
+    }
+
+    /// 환경음은 장소·지대를 따르고 실의 꿈(투기장)에는 없다. 창이 떠 있으면 낮춘다.
+    #[test]
+    fn ambience_and_ducking() {
+        use crate::adventure::Place;
+        use crate::biome::Biome;
+        for (place, biome, amb) in [
+            (Place::Village, Biome::Meadow, Some(Track::AmbMeadow)),
+            (Place::Field, Biome::Meadow, Some(Track::AmbMeadow)),
+            (Place::Camp, Biome::Meadow, Some(Track::AmbCave)),
+            (Place::Dungeon, Biome::Meadow, Some(Track::AmbMeadow)),
+            (Place::Dungeon, Biome::Silk, Some(Track::AmbCave)),
+            (Place::Dungeon, Biome::Deep, Some(Track::AmbDeep)),
+            (Place::Deep, Biome::Deep, Some(Track::AmbDeep)),
+            (Place::Arena, Biome::Roots, None),
+        ] {
+            let mut l = game(place, biome);
+            assert_eq!(choose(&l).ambience, amb, "{place:?} {biome:?}");
+            assert!(!choose(&l).ducked);
+            l.menu = true;
+            assert!(choose(&l).ducked);
+        }
+    }
 
     /// 표의 곡마다 두 파일(웹 mp3·네이티브 ogg)이 있다 — 없으면 웹 콘솔에 404, 네이티브는 조용히 빈다.
     #[test]
