@@ -7,78 +7,36 @@ use super::{App, Hit, Scene};
 use crate::equipment::Character;
 use crate::i18n::{self, fill, tr, Tr};
 use crate::input::{Actions, Verb};
-use crate::talents::BRANCHES;
+use crate::talents::{TreeView, BRANCHES};
 use crate::ui::{self, Ui, FONT_PX};
 
 impl App {
-    /// 기록 → 이번 런에 낄 재주(깨운 갈래만, 지금 캐릭터의 표, 0142).
+    /// 그 캐릭터의 큰 나무(기록으로 본 셈, 0248 R28 — 계산은 `talents::TreeView`, 여기는 그리기·입력만).
+    fn tree_view(&self, ch: Character) -> TreeView<'_> {
+        TreeView {
+            p: &self.profile,
+            ch,
+        }
+    }
+
+    /// 기록 → 이번 런에 낄 재주(지금 캐릭터).
     pub(super) fn talents(&self) -> crate::talents::Talents {
-        use crate::talents::{key_awake, key_pick, Talents, SLOTS};
-        let ch = self.world.character;
-        let mut k = Talents {
-            who: ch,
-            ..Talents::default()
-        };
-        for (i, slot) in SLOTS.iter().enumerate() {
-            let side = self.profile.count(&key_pick(ch, *slot)).min(2) as u8;
-            if side > 0 && self.profile.flag(&key_awake(ch, *slot, side as usize - 1)) {
-                k.pick[i] = side;
-            }
-        }
-        // 갈래 셋 × 깊이 여덟의 덤(0246): 깨운 것은 늘 켜진다.
-        for (b, (_, nodes)) in crate::talents::BRANCHES.iter().enumerate() {
-            for (d, n) in nodes.iter().enumerate() {
-                if let crate::talents::Node::Plus(boon) = n {
-                    if self.profile.flag(&crate::talents::key_plus(ch, b, d)) {
-                        k.boons[boon.index()] += 1;
-                    }
-                }
-            }
-        }
-        // 고유 재주(0247): 캐릭터마다 한 칸, 같은 자리.
-        k.sig = self.profile.flag(ch.def().signature.key());
-        k
+        self.tree_view(self.world.character).talents()
     }
 
-    /// 큰 나무 한 칸이 깨었나(고르기 칸은 어느 갈래든, 0246).
     fn node_awake(&self, ch: Character, branch: usize, depth: usize) -> bool {
-        use crate::talents::{key_awake, key_plus, Node, BRANCHES};
-        match BRANCHES[branch].1[depth] {
-            Node::Pick(slot) => (0..2).any(|side| self.profile.flag(&key_awake(ch, slot, side))),
-            Node::Plus(_) => self.profile.flag(&key_plus(ch, branch, depth)),
-            Node::Sig => self.profile.flag(ch.def().signature.key()),
-        }
+        self.tree_view(ch).awake(branch, depth)
     }
 
-    /// 깨울 때 세우는 기록 깃발(덤·고유 재주 칸). 고르기 칸은 쪽마다 따로라 없음.
-    fn node_key(ch: Character, branch: usize, depth: usize) -> Option<String> {
-        use crate::talents::{key_plus, Node, BRANCHES};
-        match BRANCHES[branch].1[depth] {
-            Node::Pick(_) => None,
-            Node::Plus(_) => Some(key_plus(ch, branch, depth)),
-            Node::Sig => Some(ch.def().signature.key().to_string()),
-        }
-    }
-
-    /// 지금 깨울 수 있는 깊이인가: 맨 앞이거나 앞 칸이 깨었다(0246).
     fn node_open(&self, ch: Character, branch: usize, depth: usize) -> bool {
-        depth == 0 || self.node_awake(ch, branch, depth - 1)
+        self.tree_view(ch).open(branch, depth)
     }
 
-    /// 갈래 한 줄의 칸들: (깊이, 갈래 A/B). 고르기 칸은 두 칸, 덤은 한 칸.
     fn tree_cells(branch: usize) -> Vec<(usize, usize)> {
-        use crate::talents::{Node, BRANCHES};
-        let mut v = Vec::new();
-        for (d, n) in BRANCHES[branch].1.iter().enumerate() {
-            match n {
-                Node::Pick(_) => v.extend([(d, 0), (d, 1)]),
-                Node::Plus(_) | Node::Sig => v.push((d, 0)),
-            }
-        }
-        v
+        TreeView::cells(branch)
     }
 
-    /// 그 칸의 값과 이름·설명(0246).
+    /// 그 칸의 값과 이름(같은 덤의 둘째부터 II·III)·설명·깨었나.
     fn tree_node(
         &self,
         ch: Character,
@@ -86,40 +44,12 @@ impl App {
         depth: usize,
         side: usize,
     ) -> (u32, String, Tr, bool) {
-        use crate::talents::{key_awake, plus_cost, plus_rank, table, Node, BRANCHES};
-        match BRANCHES[branch].1[depth] {
-            Node::Pick(slot) => {
-                let tal = &table(ch)[slot.index()].1[side];
-                (
-                    tal.cost,
-                    tr(tal.name).to_string(),
-                    tal.desc,
-                    self.profile.flag(&key_awake(ch, slot, side)),
-                )
-            }
-            Node::Plus(b) => {
-                let rank = plus_rank(branch, depth);
-                let name = match rank {
-                    0 => tr(b.name()).to_string(),
-                    n => format!("{} {}", tr(b.name()), ["II", "III", "IV"][(n - 1).min(2)]),
-                };
-                (
-                    plus_cost(depth),
-                    name,
-                    b.desc(),
-                    self.node_awake(ch, branch, depth),
-                )
-            }
-            Node::Sig => {
-                let sig = ch.def().signature;
-                (
-                    plus_cost(depth),
-                    tr(sig.name()).to_string(),
-                    sig.desc(),
-                    self.node_awake(ch, branch, depth),
-                )
-            }
-        }
+        let n = self.tree_view(ch).node(branch, depth, side);
+        let name = match n.rank {
+            0 => tr(n.name).to_string(),
+            r => format!("{} {}", tr(n.name), ["II", "III", "IV"][(r - 1).min(2)]),
+        };
+        (n.cost, name, n.desc, n.awake)
     }
 
     /// 큰 나무에 탭이 있나: 고를 수 있는 캐릭터가 둘 이상이면 Naïl/모모/도토(0142·0195).
@@ -134,18 +64,12 @@ impl App {
             .collect()
     }
 
-    /// 맡긴 반딧불로 지금 깨울 수 있는 재주 칸이 있나. 나무 밑동 빛·HUD가 본다(0061).
+    /// 맡긴 반딧불로 지금 깨울 수 있는 재주 칸이 있나(어느 캐릭터든). 나무 밑동 빛·HUD가 본다(0061).
     pub(super) fn tree_affordable(&self) -> bool {
-        use crate::talents::KEY_LIGHT;
-        let have = self.profile.count(KEY_LIGHT);
-        self.tree_chars().iter().any(|&ch| {
-            (0..BRANCHES.len()).any(|b| {
-                Self::tree_cells(b).into_iter().any(|(d, side)| {
-                    let (cost, _, _, awake) = self.tree_node(ch, b, d, side);
-                    !awake && self.node_open(ch, b, d) && cost <= have
-                })
-            })
-        })
+        let have = self.profile.count(crate::talents::KEY_LIGHT);
+        self.tree_chars()
+            .iter()
+            .any(|&ch| self.tree_view(ch).affordable(have))
     }
 
     /// 큰 나무의 줄 수(갈래 셋 — 모든 캐릭터 같은 꼴, 0247).
@@ -153,72 +77,31 @@ impl App {
         BRANCHES.len()
     }
 
-    /// 그 줄의 칸 수.
     fn tree_width(row: usize) -> usize {
-        Self::tree_cells(row).len()
+        TreeView::width(row)
     }
 
-    /// 그 칸(줄·칸 번호)을 깨웠나. 고르기 칸은 그 쪽을.
     fn tree_cell_awake(&self, ch: Character, row: usize, cell: usize) -> bool {
-        let cells = Self::tree_cells(row);
-        let (d, side) = cells[cell.min(cells.len() - 1)];
-        self.tree_node(ch, row, d, side).3
+        self.tree_view(ch).cell_awake(row, cell)
     }
 
-    /// 목표 칸(0247): 기록 `tree_goal.<캐릭터>` = 줄 × 16 + 칸 + 1(0 = 없음). 없는 칸이면 없음.
     pub(super) fn tree_goal(&self, ch: Character) -> Option<(usize, usize)> {
-        let v = self.profile.count(&goal_key(ch));
-        if v == 0 {
-            return None;
-        }
-        let (r, c) = (((v - 1) / 16) as usize, ((v - 1) % 16) as usize);
-        (r < self.tree_rows() && c < Self::tree_width(r)).then_some((r, c))
+        self.tree_view(ch).goal()
     }
 
     fn set_tree_goal(&mut self, ch: Character, goal: Option<(usize, usize)>) {
-        let v = goal.map_or(0, |(r, c)| (r * 16 + c + 1) as u32);
-        self.profile.set_count(&goal_key(ch), v);
+        self.profile.set_count(
+            &crate::talents::goal_key(ch),
+            crate::talents::goal_code(goal),
+        );
     }
 
-    /// 그 칸까지 아직 안 깬 칸 수와 드는 반딧불(0247). 지나가는 고르기 깊이는 싼 쪽, 그 칸이면 그 쪽.
     pub(super) fn tree_path(&self, ch: Character, row: usize, cell: usize) -> (usize, u32) {
-        let cells = Self::tree_cells(row);
-        let (d, side) = cells[cell.min(cells.len() - 1)];
-        let (mut n, mut cost) = (0, 0);
-        for k in 0..=d {
-            if k == d {
-                let (c, _, _, awake) = self.tree_node(ch, row, d, side);
-                if !awake {
-                    n += 1;
-                    cost += c;
-                }
-            } else if !self.node_awake(ch, row, k) {
-                n += 1;
-                cost += cells
-                    .iter()
-                    .filter(|(cd, _)| *cd == k)
-                    .map(|&(_, sd)| self.tree_node(ch, row, k, sd).0)
-                    .min()
-                    .unwrap_or(0);
-            }
-        }
-        (n, cost)
+        self.tree_view(ch).path(row, cell)
     }
 
-    /// 칸이 목표(또는 고른 칸)까지 가는 길 위에 있나: 같은 갈래, 그 깊이 이하, 아직 안 깸.
     fn tree_on_path(&self, ch: Character, row: usize, cell: usize, target: (usize, usize)) -> bool {
-        let (tr_, tc) = target;
-        if row != tr_ {
-            return false;
-        }
-        let cells = Self::tree_cells(row);
-        let (d, _) = cells[cell.min(cells.len() - 1)];
-        let (td, _) = cells[tc.min(cells.len() - 1)];
-        if d > td || self.tree_cell_awake(ch, row, cell) {
-            return false;
-        }
-        // 그 깊이의 고르기 짝 중 하나가 깼으면 지나간 깊이다. 목표 칸 자신은 늘 길.
-        cell == tc || (d < td && !self.node_awake(ch, row, d))
+        self.tree_view(ch).on_path(row, cell, target)
     }
 
     /// 목표 한 줄(일시정지 상태 탭): "목표 이름: 반딧불 가진 것/드는 것". 목표가 없거나 다 깼으면 없음.
@@ -326,7 +209,7 @@ impl App {
                 }
                 Node::Plus(_) | Node::Sig => {
                     self.profile.set_count(KEY_LIGHT, have - cost);
-                    if let Some(k) = Self::node_key(ch, row, depth) {
+                    if let Some(k) = self.tree_view(ch).key(row, depth) {
                         self.profile.set(&k);
                     }
                     self.shop_msg = Some((|s| s.tree_awake, 2.5));
@@ -702,11 +585,6 @@ impl App {
         }
         ui.hint_strip(&hint, panel, panel.w - 8.0);
     }
-}
-
-/// 목표 칸의 기록 키(0247, 캐릭터마다).
-fn goal_key(ch: Character) -> String {
-    format!("tree_goal.{ch:?}")
 }
 
 /// 금빛: 목표 칸·거기까지 깨울 길(0247).
