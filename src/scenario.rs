@@ -722,3 +722,25 @@ mod tests {
         assert!(w.time >= t::TICK_DT);
     }
 }
+#[cfg(all(test, feature = "clip"))]
+mod pilot_probe {
+    use super::*;
+    #[test]
+    fn hall_autopilot_stays_in_view() {
+        for run in 0..6 {
+            let mut w = build(Scenario::Hall(crate::equipment::Character::Mole));
+            let mut p = crate::autopilot::Pilot::default();
+            for n in 0..3600 {
+                let a = p.act(&w, crate::input::Actions::default(), crate::tuning::TICK_DT);
+                w.tick(&a);
+                let d = w.adv.dungeon.as_ref().unwrap();
+                let ok = w.adv.cam.is_finite() && d.room(w.adv.current_room).is_some();
+                let inside = d.area(w.adv.current_room).contains(w.player.pos);
+                if !ok || !inside {
+                    panic!("run {run} tick {n}: cam {:?} room {:?} pos {:?} area {:?} place {:?} fade?",
+                        w.adv.cam, w.adv.current_room, w.player.pos, d.area(w.adv.current_room), w.adv.place);
+                }
+            }
+        }
+    }
+}

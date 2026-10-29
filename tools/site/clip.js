@@ -8,7 +8,8 @@
 //    dist/를 복사해 wasm만 바꿔 넣고 ROOT=<그 폴더>로 준다(dist/의 운영·개발판 wasm은 건드리지 않는다).
 // 2) 장면마다 하나씩(여럿을 한꺼번에 돌리면 swiftshader가 서로 느려져 메뉴 키를 놓친다):
 //      ROOT=… node tools/site/clip.js <out> <개발 시나리오 번호> <초> <nail|run|walk> [포트]
-//    번호는 src/scenario.rs `LIST` 순서(22 웨이브 3부터, 41 모모: 아레나, 39 도토: 아레나). WAIT=<ms>는 장면이 뜨기를 기다리는 시간.
+//    번호는 src/scenario.rs `LIST` 순서(22 웨이브 3부터, 41 모모: 아레나, 39 도토: 아레나, 45~47 넓은 방). WAIT=<ms>는 장면이 뜨기를 기다리는 시간 —
+//    clip 빌드는 시계를 걸기 전 실시간이 3초를 넘으면 화면이 검게 남는 일이 있어(0244) WAIT=600쯤으로 짧게 둔다. 말풍선은 SKIP=<초>로 넘긴다.
 // 3) 고른 칸을 이어 붙여(r_0000.png…) H.264로 — crf 16·tune animation이면 3배 확대 도트가 원본과 거의 같다:
 //      ffmpeg -framerate 30 -i r_%04d.png -c:v libx264 -preset slow -tune animation -crf 16 -pix_fmt yuv420p -movflags +faststart site/img/play.mp4
 //    첫 칸은 site/img/play_poster.png로.
@@ -44,6 +45,8 @@ function keysAt(n) {
     else if (u < 2.8) { const v = (u - 1.3) % 0.42; if (v < 0.07) s.add('j'); }
   } else if (plan === 'auto') {
     // 손은 놓고 자동 조종(`--features clip`의 autopilot, 0228)이 친다.
+    // SKIP=<초>면 그동안 0.4초마다 Enter(보스 만남 말풍선 넘기기) — 그 칸은 잘라 낸다.
+    if (t < +(process.env.SKIP || 0) && (n % 12) < 2) s.add('Enter');
   } else if (plan === 'walk') {
     const c = Math.floor(t / 2.0), u = t % 2.0;
     if (u < 1.6) s.add(['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'][c % 4]);
