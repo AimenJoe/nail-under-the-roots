@@ -564,10 +564,17 @@ fn pic_enemy(c: PicCtx) {
     }
 }
 
-/// 안내 그림의 줍는 것(반딧불·씨앗·뿌리 심장)은 게임 시계의 이 배로 — 크게 키워 혼자 보이니 게임 빠르기(날갯짓·둥실·고리)가
-/// 너무 바빠 보였다(사장 "안내의 반딧불과 씨앗 애니메이션 속도가 너무 빠름").
-/// 0.4로도 "아직도 깜빡이는 게 빠르다"(사장 2026-10-29) — 반딧불 날개가 0.4초마다 켜졌다 꺼졌다. 0.2로 한 번 더.
-const LOOT_PACE: f32 = 0.2;
+/// 안내 그림의 줍는 것(반딧불·씨앗·뿌리 심장)은 게임 시계의 이 배로 — 크게 키워 혼자 보이니 게임 빠르기가 바빠 보인다.
+const LOOT_PACE: f32 = 0.4;
+
+/// 안내 그림에 놓을 줍는 것. `Loot::place`는 날갯짓·빛·반짝임의 박자(`phase`)를 무작위로 뽑는데, 그림은 프레임마다 새로
+/// 만드니 박자가 매 프레임 바뀌어 초당 60번 깜빡였다(사장 "아직도 굉장히 빠르다" — 빠르기를 0.4 → 0.2로 늦춰도 그대로였던
+/// 까닭). 박자를 고정한다.
+fn still_loot(kind: loot::LootKind, at: Vec2, phase: f32) -> loot::Loot {
+    let mut l = loot::Loot::place(kind, at);
+    l.phase = phase;
+    l
+}
 
 fn pic_loot(c: PicCtx) {
     let PicCtx { w, time, y, .. } = c;
@@ -581,7 +588,7 @@ fn pic_loot(c: PicCtx) {
     .into_iter()
     .enumerate()
     {
-        let l = loot::Loot::place(k, vec2(xs[i], y));
+        let l = still_loot(k, vec2(xs[i], y), i as f32 * 0.31);
         props::draw_loot(&l, 1.0, time * LOOT_PACE, false);
     }
 }
@@ -858,7 +865,7 @@ fn pic_village(c: PicCtx) {
         let p = vec2(24.0, y - 4.0)
             + (vec2(tx, y - 18.0) - vec2(24.0, y - 4.0)) * k
             + vec2(0.0, -(k * std::f32::consts::PI).sin() * 8.0);
-        let l = loot::Loot::place(loot::LootKind::Glowbug, p);
+        let l = still_loot(loot::LootKind::Glowbug, p, i as f32 * 0.23);
         props::draw_loot(&l, 1.0, time * LOOT_PACE, false);
     }
 }
