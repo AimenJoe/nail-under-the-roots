@@ -8,7 +8,7 @@ impl Player {
         let dt = c.dt;
         let mut strike = None;
         let time = time + dt;
-        self.pos += dir * (self.talents.hop_dist() / t::HOP_TIME) * dt;
+        self.pos += dir * (self.talents.hop_dist() * self.stats.leap_mul / t::HOP_TIME) * dt;
         if time >= t::HOP_TIME {
             self.events.push(Event::Land(false));
             // 착지: 재주 발 구르기면 밟기(피해 1), 아니면 밀치기만(0214).
@@ -104,13 +104,14 @@ impl Player {
                 center: self.pos,
                 r: self.chain_radius(),
             },
-            damage: t::CHAIN_DAMAGE + self.stats.damage,
+            damage: t::CHAIN_DAMAGE + self.stats.damage + self.stats.stomp,
             knockback: t::CHAIN_KNOCKBACK,
             stun: self.talents.chain_stun(),
             hitstop: t::CHAIN_HITSTOP,
             shake: t::CHAIN_SHAKE,
             finisher: false,
             poison: 0.0,
+            crush: false,
         }
     }
 

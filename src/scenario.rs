@@ -149,8 +149,8 @@ pub const LIST: [Entry; 48] = [
         scenario: Scenario::Tutorial,
     },
     Entry {
-        name: "발톱 4종 비교",
-        desc: "새싹·두더지·바위·독 발톱이 가방에. 메뉴 → 가방에서 확인으로 바꿔 낀다.",
+        name: "무기 비교",
+        desc: "고른 캐릭터의 무기가 다 가방에(Naïl 발톱 넷, 모모·도토 넷씩, 0246), 빈 방에 허수아비 셋. 메뉴 → 가방에서 확인으로 바꿔 낀다.",
         scenario: Scenario::AllClaws,
     },
     Entry {
@@ -506,7 +506,20 @@ pub fn build(s: Scenario) -> World {
         | Scenario::Village
         | Scenario::Ascent
         | Scenario::Tutorial => World::empty(),
-        Scenario::AllClaws => World::new(),
+        // 무기 비교(0246): 빈 방 + 오른쪽에 허수아비 셋(쓰러지지 않는다) — 탄·가시·조각을 그대로 본다.
+        Scenario::AllClaws => {
+            let mut w = World::empty();
+            let c = w.room.center();
+            for (i, dy) in [-20.0, 0.0, 20.0].into_iter().enumerate() {
+                w.spawn_mob(Kind::Dummy, c + vec2(60.0 + i as f32 * 12.0, dy));
+            }
+            for e in &mut w.enemies {
+                e.max_hp = 999;
+                e.hp = 999;
+            }
+            w.player.pos = c - vec2(40.0, 0.0);
+            w
+        }
         Scenario::Breakables => {
             use crate::room::{Breakable, Prop, PropKind};
             let mut w = World::empty();

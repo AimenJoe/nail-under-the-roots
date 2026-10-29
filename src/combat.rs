@@ -65,6 +65,8 @@ pub enum StrikeKind {
     Burst,
     /// 회피의 밀치기(0214): 모모 깡충 착지·도토 뒤로 뛰기 도약. 피해·경직·번쩍 없이 밀기만 — 적의 공격(예고)은 끊지 않는다.
     Shove,
+    /// 가시 덤불이 찌름(0246): 피해 작게, 등딱지에는 튕긴다.
+    Prick,
 }
 
 /// 플레이어가 이번 틱에 휘두르는 공격 하나.
@@ -83,6 +85,8 @@ pub struct Strike {
     pub finisher: bool,
     /// 맞은 적에게 거는 독(초).
     pub poison: f32,
+    /// 등딱지에 튕기지 않고 연다(조약돌 덧신 마무리, 0246).
+    pub crush: bool,
 }
 
 impl Strike {

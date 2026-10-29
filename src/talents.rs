@@ -5,8 +5,12 @@
 //! 수치는 이미 있는 것(tuning)에 배율·값을 얹는다. 플레이어·월드는 `Talents`만 본다.
 //! 모모(0142)는 자리 1·3이 모모 것(깡충·이어 뛰기, `MOMO_TABLE`·키 `talent.hop.*`·`talent.chain.*`), 2·4는 함께.
 //! 도토(0195)도 같다(뒤로 뛰기·도토리 묻기, `DOTO_TABLE`·키 `talent.leap.*`·`talent.bury.*`).
+//!
+//! 0246(사장: "재주는 3개 분기 8개 깊이"): 캐릭터마다 갈래 셋(뿌리 = 몸, 가지 = 싸움, 잎 = 길) × 깊이 여덟. 앞 칸을 깨워야
+//! 다음 칸을 깨운다. 갈래마다 한 칸은 위의 두 갈래 고르기(`Node::Pick`, 키·고른 것 그대로) — 나머지는 깨우면 늘 켜지는
+//! 덤(`Node::Plus(Boon)`, 키 `tree.<캐릭터>.<갈래>.<깊이>`). 덤은 `Mods`로 장신구와 같은 길(`Stats::compute`)을 탄다.
 
-use crate::equipment::Character;
+use crate::equipment::{Character, Mods, NO_MODS};
 use crate::i18n::Tr;
 use crate::tuning as t;
 
@@ -152,6 +156,13 @@ pub fn all_awake_keys() -> Vec<String> {
                 }
             }
         }
+        for (b, (_, nodes)) in BRANCHES.iter().enumerate() {
+            for (d, n) in nodes.iter().enumerate() {
+                if matches!(n, Node::Plus(_)) {
+                    keys.push(key_plus(ch, b, d));
+                }
+            }
+        }
     }
     keys
 }
@@ -162,9 +173,22 @@ pub const KEY_LIGHT: &str = "glowbugs_banked";
 pub struct Talents {
     pub pick: [u8; 4],
     pub who: Character,
+    /// 깨운 덤의 수(`Boon` 순서, 0246).
+    pub boons: [u8; BOONS.len()],
 }
 
 impl Talents {
+    /// 깨운 덤을 모은 보정(0246). `Stats::compute`가 장신구와 함께 더한다.
+    pub fn mods(&self) -> Mods {
+        let mut m = NO_MODS;
+        for (b, &n) in BOONS.iter().zip(self.boons.iter()) {
+            for _ in 0..n {
+                b.apply(&mut m);
+            }
+        }
+        m
+    }
+
     fn side(self, slot: Slot) -> u8 {
         self.pick[slot.index()]
     }
@@ -345,6 +369,195 @@ impl Talents {
     }
 }
 
+// ---- 큰 나무 갈래 셋 × 깊이 여덟(0246) -----------------------------------------
+
+/// 깨우면 늘 켜지는 덤. 수치는 `apply`(장신구와 같은 `Mods`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Boon {
+    /// 최대 체력 +1.
+    Hp,
+    /// 산딸기 회복 +1.
+    Berry,
+    /// 맞힌 적이 조금 더 오래 멈춘다(+0.1초).
+    Stun,
+    /// 실뿌리 하나 더(0210).
+    Lives,
+    /// 마무리 타가 20% 더 멀리 민다.
+    Knock,
+    /// 공격 8% 빨리.
+    Haste,
+    /// 박자 창 25% 넓게.
+    Beat,
+    /// 강공격 모으기 20% 빨리.
+    Charge,
+    /// 게이지 15% 빨리.
+    Ki,
+    /// 모든 타 피해 +1.
+    Edge,
+    /// 걷기 6% 빨리.
+    Speed,
+    /// 회피 대기 12% 짧게.
+    Dodge,
+    /// 쉼터 가게 값 15% 싸게.
+    Bargain,
+    /// 장신구 칸 +1.
+    Charm,
+}
+
+pub const BOONS: [Boon; 14] = [
+    Boon::Hp,
+    Boon::Berry,
+    Boon::Stun,
+    Boon::Lives,
+    Boon::Knock,
+    Boon::Haste,
+    Boon::Beat,
+    Boon::Charge,
+    Boon::Ki,
+    Boon::Edge,
+    Boon::Speed,
+    Boon::Dodge,
+    Boon::Bargain,
+    Boon::Charm,
+];
+
+impl Boon {
+    pub fn index(self) -> usize {
+        BOONS.iter().position(|b| *b == self).unwrap_or(0)
+    }
+
+    fn apply(self, m: &mut Mods) {
+        match self {
+            Boon::Hp => m.max_hp += 1,
+            Boon::Berry => m.berry_heal += 1,
+            Boon::Stun => m.stun += t::TREE_STUN,
+            Boon::Lives => m.lives += 1,
+            Boon::Knock => m.finisher_knockback *= t::TREE_KNOCK,
+            Boon::Haste => m.attack_speed *= t::TREE_HASTE,
+            Boon::Beat => m.beat *= t::TREE_BEAT,
+            Boon::Charge => m.charge *= t::TREE_CHARGE,
+            Boon::Ki => m.sp_gain *= t::TREE_KI,
+            Boon::Edge => m.damage += 1,
+            Boon::Speed => m.speed *= t::TREE_SPEED,
+            Boon::Dodge => m.burrow_cd *= t::TREE_DODGE,
+            Boon::Bargain => m.bargain *= t::TREE_BARGAIN,
+            Boon::Charm => m.charm_slots += 1,
+        }
+    }
+
+    pub fn name(self) -> Tr {
+        match self {
+            Boon::Hp => |s| s.bn_hp,
+            Boon::Berry => |s| s.bn_berry,
+            Boon::Stun => |s| s.bn_stun,
+            Boon::Lives => |s| s.bn_lives,
+            Boon::Knock => |s| s.bn_knock,
+            Boon::Haste => |s| s.bn_haste,
+            Boon::Beat => |s| s.bn_beat,
+            Boon::Charge => |s| s.bn_charge,
+            Boon::Ki => |s| s.bn_ki,
+            Boon::Edge => |s| s.bn_edge,
+            Boon::Speed => |s| s.bn_speed,
+            Boon::Dodge => |s| s.bn_dodge,
+            Boon::Bargain => |s| s.bn_bargain,
+            Boon::Charm => |s| s.bn_charm,
+        }
+    }
+
+    pub fn desc(self) -> Tr {
+        match self {
+            Boon::Hp => |s| s.bn_hp_d,
+            Boon::Berry => |s| s.bn_berry_d,
+            Boon::Stun => |s| s.bn_stun_d,
+            Boon::Lives => |s| s.bn_lives_d,
+            Boon::Knock => |s| s.bn_knock_d,
+            Boon::Haste => |s| s.bn_haste_d,
+            Boon::Beat => |s| s.bn_beat_d,
+            Boon::Charge => |s| s.bn_charge_d,
+            Boon::Ki => |s| s.bn_ki_d,
+            Boon::Edge => |s| s.bn_edge_d,
+            Boon::Speed => |s| s.bn_speed_d,
+            Boon::Dodge => |s| s.bn_dodge_d,
+            Boon::Bargain => |s| s.bn_bargain_d,
+            Boon::Charm => |s| s.bn_charm_d,
+        }
+    }
+}
+
+/// 갈래의 한 칸.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Node {
+    /// 두 갈래 고르기(위의 자리, 그 캐릭터의 표).
+    Pick(Slot),
+    Plus(Boon),
+}
+
+pub const DEPTH: usize = 8;
+
+/// 갈래 셋(모든 캐릭터 같은 꼴, 고르기 칸만 그 캐릭터의 표). 이름은 큰 나무의 뿌리·가지·잎.
+pub const BRANCHES: [(Tr, [Node; DEPTH]); 3] = [
+    (
+        |s| s.tb_root,
+        [
+            Node::Pick(Slot::Parry),
+            Node::Plus(Boon::Hp),
+            Node::Pick(Slot::Eat),
+            Node::Plus(Boon::Berry),
+            Node::Plus(Boon::Hp),
+            Node::Plus(Boon::Stun),
+            Node::Plus(Boon::Lives),
+            Node::Plus(Boon::Hp),
+        ],
+    ),
+    (
+        |s| s.tb_branch,
+        [
+            Node::Pick(Slot::Drill),
+            Node::Plus(Boon::Knock),
+            Node::Plus(Boon::Haste),
+            Node::Plus(Boon::Beat),
+            Node::Plus(Boon::Charge),
+            Node::Plus(Boon::Ki),
+            Node::Plus(Boon::Haste),
+            Node::Plus(Boon::Edge),
+        ],
+    ),
+    (
+        |s| s.tb_leaf,
+        [
+            Node::Pick(Slot::Burrow),
+            Node::Plus(Boon::Speed),
+            Node::Plus(Boon::Dodge),
+            Node::Plus(Boon::Bargain),
+            Node::Plus(Boon::Speed),
+            Node::Plus(Boon::Dodge),
+            Node::Plus(Boon::Bargain),
+            Node::Plus(Boon::Charm),
+        ],
+    ),
+];
+
+/// 덤 칸의 값(반딧불): 깊을수록 비싸다. 고르기 칸은 제 표의 값.
+pub const fn plus_cost(depth: usize) -> u32 {
+    t::TREE_COST[depth] * t::TALENT_PRICE_MUL
+}
+
+/// 덤 칸의 기록 키(바꾸지 않는다, 0041).
+pub fn key_plus(ch: Character, branch: usize, depth: usize) -> String {
+    format!("tree.{ch:?}.{branch}.{depth}")
+}
+
+/// 같은 갈래 앞쪽에 같은 덤이 몇 번 나왔나(이름 뒤 II·III).
+pub fn plus_rank(branch: usize, depth: usize) -> usize {
+    let Node::Plus(b) = BRANCHES[branch].1[depth] else {
+        return 0;
+    };
+    BRANCHES[branch].1[..depth]
+        .iter()
+        .filter(|n| **n == Node::Plus(b))
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462,6 +675,51 @@ mod tests {
         assert_eq!(key_pick(Character::Momo, Slot::Parry), "talent_pick.parry");
         assert_eq!(key_awake(Character::Doto, Slot::Burrow, 1), "talent.leap.b");
         assert_eq!(key_pick(Character::Doto, Slot::Drill), "talent_pick.bury");
-        assert_eq!(all_awake_keys().len(), 16);
+        assert_eq!(all_awake_keys().len(), 16 + 3 * 20);
+        assert_eq!(key_plus(Character::Doto, 2, 7), "tree.Doto.2.7");
+    }
+
+    /// 큰 나무(0246): 갈래 셋 × 깊이 여덟, 옛 고르기 자리 넷이 한 번씩, 덤 값은 깊을수록 오른다.
+    #[test]
+    fn three_branches_eight_deep_keep_the_old_picks() {
+        for (_, nodes) in BRANCHES.iter() {
+            assert_eq!(nodes.len(), DEPTH);
+            assert!(
+                matches!(nodes[0], Node::Pick(_)),
+                "갈래 첫 칸은 고르기(옛 깨움이 바로 이어진다)"
+            );
+        }
+        for slot in SLOTS {
+            let n = BRANCHES
+                .iter()
+                .flat_map(|(_, nodes)| nodes.iter())
+                .filter(|n| **n == Node::Pick(slot))
+                .count();
+            assert_eq!(n, 1, "{slot:?}");
+        }
+        for d in 2..DEPTH {
+            assert!(plus_cost(d) > plus_cost(d - 1));
+        }
+        assert_eq!(plus_rank(0, 4), 1, "뿌리의 둘째 질긴 가죽 = II");
+        assert_eq!(plus_rank(0, 7), 2);
+    }
+
+    /// 깨운 덤은 `Mods`로 모인다: 체력은 더하기, 배율은 곱.
+    #[test]
+    fn boons_add_up_into_mods() {
+        let mut k = Talents::default();
+        assert_eq!(
+            crate::equipment::Stats::compute(&[], 0, &k.mods()),
+            crate::equipment::Stats::BASE
+        );
+        k.boons[Boon::Hp.index()] = 3;
+        k.boons[Boon::Haste.index()] = 2;
+        k.boons[Boon::Charm.index()] = 1;
+        let m = k.mods();
+        assert_eq!(m.max_hp, 3);
+        assert!((m.attack_speed - t::TREE_HASTE * t::TREE_HASTE).abs() < 1e-5);
+        let st = crate::equipment::Stats::compute(&[], 0, &m);
+        assert_eq!(st.charm_slots(), crate::equipment::CHARM_SLOTS + 1);
+        assert_eq!(st.max_hp, t::PLAYER_HP + 3);
     }
 }

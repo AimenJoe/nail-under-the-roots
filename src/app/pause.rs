@@ -34,6 +34,36 @@ pub(super) fn draw_claw_icon(ui: &Ui, r: Rect, color: Color) {
     ui.rect(Rect::new(r.x + 5.0, r.y + 15.0, 12.0, 2.0), dark);
 }
 
+/// 가방 칸의 무기 아이콘: 종류마다 꼴이 다르다(0246) — 발톱은 세 갈래, 뒷발 무기는 발목에 감는 띠, 던지는 것은 열매.
+pub(super) fn draw_weapon_icon(ui: &Ui, r: Rect, w: usize) {
+    use crate::equipment::WeaponKind;
+    let wp = &WEAPONS[w];
+    let color = wp.color;
+    let dark = Color::new(color.r * 0.6, color.g * 0.6, color.b * 0.6, 1.0);
+    match wp.kind {
+        WeaponKind::Claw => draw_claw_icon(ui, r, color),
+        WeaponKind::Kick => {
+            // 발목 띠: 둥글게 감은 고리 + 매듭 술.
+            ui.rect(Rect::new(r.x + 5.0, r.y + 8.0, 12.0, 6.0), dark);
+            ui.rect(Rect::new(r.x + 6.0, r.y + 9.0, 10.0, 4.0), color);
+            ui.rect(Rect::new(r.x + 8.0, r.y + 10.0, 6.0, 2.0), ui::PANEL_LIGHT);
+            ui.rect(Rect::new(r.x + 15.0, r.y + 14.0, 2.0, 4.0), dark);
+            ui.rect(Rect::new(r.x + 12.0, r.y + 14.0, 2.0, 3.0), color);
+        }
+        WeaponKind::Acorn => {
+            // 열매: 둥근 몸 + 갓(어두운 띠).
+            ui.rect(Rect::new(r.x + 7.0, r.y + 8.0, 8.0, 9.0), dark);
+            ui.rect(Rect::new(r.x + 8.0, r.y + 9.0, 6.0, 7.0), color);
+            ui.rect(Rect::new(r.x + 6.0, r.y + 6.0, 10.0, 3.0), dark);
+            ui.rect(Rect::new(r.x + 10.0, r.y + 4.0, 2.0, 2.0), dark);
+            ui.rect(
+                Rect::new(r.x + 9.0, r.y + 10.0, 2.0, 2.0),
+                Color::new(1.0, 1.0, 1.0, 0.6),
+            );
+        }
+    }
+}
+
 /// 가방 칸의 장신구 아이콘: 끈에 매단 둥근 돌.
 pub(super) fn draw_charm_icon(ui: &Ui, r: Rect, color: Color) {
     let dark = Color::new(color.r * 0.6, color.g * 0.6, color.b * 0.6, 1.0);
@@ -171,7 +201,7 @@ impl App {
                             if let Some(i) = charms.iter().position(|x| *x == c) {
                                 charms.remove(i);
                             } else {
-                                if charms.len() >= CHARM_SLOTS {
+                                if charms.len() >= self.world.player.stats.charm_slots() {
                                     charms.remove(0);
                                 }
                                 charms.push(c);
@@ -653,7 +683,7 @@ impl App {
             );
             match item {
                 Some(Item::Weapon(w)) => {
-                    draw_claw_icon(ui, r, WEAPONS[*w].color);
+                    draw_weapon_icon(ui, r, *w);
                     if self.inventory.equipped == Some(*w) {
                         ui.text("E", r.x + 2.0, r.y + 1.0, FONT_PX, ui::ACCENT);
                     }
@@ -705,7 +735,13 @@ impl App {
                     y += 14.0;
                 }
                 ui.text(
-                    &fill(s.charm_slots, &[&self.world.inv.charms.len(), &CHARM_SLOTS]),
+                    &fill(
+                        s.charm_slots,
+                        &[
+                            &self.world.inv.charms.len(),
+                            &self.world.player.stats.charm_slots(),
+                        ],
+                    ),
                     desc_x,
                     y + 4.0,
                     FONT_PX,
@@ -913,6 +949,7 @@ impl App {
             Reward::Decor(i) => fill(s.r_decor, &[&tr(crate::village::decor_name(i))]),
             Reward::Fur(n) => tr(crate::journal::fur_name(n)).to_string(),
             Reward::Charm(i) => fill(s.r_charm, &[&tr(crate::equipment::CHARMS[i].name)]),
+            Reward::Weapon(i) => fill(s.r_weapon, &[&tr(crate::equipment::WEAPONS[i].name)]),
         };
         let what = fill(s.j_reward, &[&what]);
         // 아래에서부터 쌓는다: 상태(받기 상자 / 어디 있나 두 줄 / 진행 막대) 위에 보상(아이콘 + 두 줄까지), 남은 자리에 설명(세 줄까지).
@@ -1188,6 +1225,12 @@ fn draw_reward_icon(ui: &Ui, r: crate::journal::Reward, x: f32, y: f32) {
                 crate::equipment::CHARMS[i].color,
             );
             ui.rect_lines(Rect::new(x, y, 7.0, 7.0), ui::BORDER);
+        }
+        Reward::Weapon(i) => {
+            // 무기는 세로 막대 둘(발톱 아이콘을 줄인 꼴).
+            let c = crate::equipment::WEAPONS[i].color;
+            ui.rect(Rect::new(x + 1.0, y + 1.0, 2.0, 5.0), c);
+            ui.rect(Rect::new(x + 4.0, y + 2.0, 2.0, 5.0), c);
         }
     }
 }

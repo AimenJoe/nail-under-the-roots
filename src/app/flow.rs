@@ -17,6 +17,8 @@ pub fn character(s: Scenario, picked: Character) -> Character {
         Scenario::DotoArena | Scenario::DotoMobs => Character::Doto,
         Scenario::MomoArena => Character::Momo,
         Scenario::Hall(c) => c,
+        // 개발 "무기 비교"(0246): 고른 캐릭터의 무기를 다 들고.
+        Scenario::AllClaws => picked,
         _ => Character::Mole,
     }
 }

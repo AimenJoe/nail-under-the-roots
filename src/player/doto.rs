@@ -14,8 +14,13 @@ pub enum Spawn {
         reach: f32,
         radius: f32,
         splash: f32,
+        bounce: u8,
+        split: u8,
+        thorns: bool,
         strike: Strike,
     },
+    /// 가시 덤불(가시덩굴 각반·밤송이, 0246): 잠시 남아 밟은 적을 찌른다.
+    Thorns { at: Vec2 },
     /// 묻은 도토리 하나: `fuse`초 뒤 `radius` 둘레를 친다(적만).
     Bury {
         at: Vec2,
@@ -35,6 +40,9 @@ impl Player {
             reach,
             radius,
             splash,
+            bounce,
+            split,
+            thorns,
         } = throw
         else {
             return;
@@ -49,9 +57,19 @@ impl Player {
                 reach: reach * self.stats.throw_reach,
                 radius,
                 splash: splash * self.stats.blast,
+                bounce,
+                split,
+                thorns,
                 strike,
             });
         }
+    }
+
+    /// 발 앞에 가시 덤불(0246).
+    pub(super) fn leave_thorns(&mut self, dir: Vec2, range: f32) {
+        self.spawns.push(Spawn::Thorns {
+            at: self.pos + dir * (range * 0.8),
+        });
     }
 
     /// 뒤로 뛰기(0195): 움직이고 있으면 그쪽으로, 서 있으면 겨눈 쪽 반대로. 겨눈 쪽(`facing`)은 그대로 — 물러나며 겨눈다.
@@ -105,7 +123,7 @@ impl Player {
         self.combo_timer = 0.0;
         self.vel = Vec2::ZERO;
         self.facing = dir;
-        let n = self.talents.bury_count();
+        let n = (self.talents.bury_count() as i32 + self.stats.bury).max(1) as usize;
         for i in 0..n {
             let k = i as f32 - (n - 1) as f32 * 0.5;
             let d = Vec2::from_angle(k * t::BURY_SPREAD).rotate(dir);

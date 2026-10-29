@@ -29,6 +29,10 @@ impl Player {
         if hit.throw != crate::moveset::Throw::None && time >= a0 && time - sdt < a0.max(1e-6) {
             self.throw_shots(hit.throw, dir, self.hit_strike(idx, dir));
         }
+        // 가시 덤불을 남기는 차기(가시덩굴 각반, 0246): 활성 구간 첫 틱에 발 앞에.
+        if hit.thorns && time >= a0 && time - sdt < a0.max(1e-6) {
+            self.leave_thorns(dir, hit.range);
+        }
         self.pos += move_dir * self.speed() * ms.move_factor * dt;
         self.state = State::Attack { idx, time, dir };
 
@@ -81,7 +85,7 @@ impl Player {
         let dir = want.normalize_or(dir);
         self.facing = dir;
         self.pos += move_dir * self.speed() * t::HEAVY_MOVE_FACTOR * dt;
-        if was < t::HEAVY_CHARGE && time >= t::HEAVY_CHARGE {
+        if was < self.charge_time() && time >= self.charge_time() {
             self.events.push(Event::HeavyReady);
         }
         self.state = State::Charging { time, dir, after };
@@ -90,8 +94,8 @@ impl Player {
         } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
             self.start_dodge(move_dir);
         } else if !a.attack_held {
-            if time >= t::HEAVY_CHARGE {
-                self.start_heavy(dir, after, time - t::HEAVY_CHARGE <= t::HEAVY_PERFECT);
+            if time >= self.charge_time() {
+                self.start_heavy(dir, after, time - self.charge_time() <= t::HEAVY_PERFECT);
             } else {
                 // 덜 모으고 뗐다: 아무것도 안 나가고(평타는 이미 나갔다), 콤보는 거기서 이어진다.
                 // 콤보 창은 스윙 끝과 같이 박자 창이 다 닫힐 때까지(0205): 보통 누름(0.1초 남짓)도 활성 구간 뒤까지
@@ -134,6 +138,13 @@ impl Player {
                 ..self.heavy_strike(dir, perfect)
             };
             self.throw_shots(hit.throw, dir, s);
+        }
+        if hit.thorns
+            && hit.throw == crate::moveset::Throw::None
+            && time >= a0
+            && time - sdt < a0.max(1e-6)
+        {
+            self.leave_thorns(dir, hit.range);
         }
         self.pos += move_dir * self.speed() * ms.move_factor * dt;
         self.state = State::Heavy {
@@ -226,7 +237,7 @@ impl Player {
         let until_beat = (self.beat_at - self.beat_clock) / self.stats.attack_speed.max(0.1);
         self.moveset
             .combo_window
-            .max(until_beat + 2.0 * t::BEAT_WINDOW)
+            .max(until_beat + 2.0 * self.beat_window())
     }
 
     /// 박자 시계를 되감고 다음 타의 박자를 정한다(0174): 스윙 시작부터 `BEAT_PERIOD`, 스윙·후딜레이가 더 길면 그 끝.
@@ -282,7 +293,7 @@ impl Player {
             } else {
                 h.knockback
             },
-            stun: h.stun,
+            stun: h.stun + self.stats.stun,
             // 박자에 맞춘 타는 멈춤·흔들림이 조금 더(0168).
             hitstop: h.hitstop
                 + if self.on_beat {
@@ -298,6 +309,7 @@ impl Player {
                 },
             finisher: idx == self.moveset.last(),
             poison: h.poison,
+            crush: h.crush,
         }
     }
 
@@ -344,11 +356,12 @@ impl Player {
             },
             damage: h.damage + self.stats.damage + bonus * t::HEAVY_PERFECT_DAMAGE,
             knockback: h.knockback * self.stats.finisher_knockback,
-            stun: h.stun,
+            stun: h.stun + self.stats.stun,
             hitstop: h.hitstop + bonus as f32 * t::HEAVY_PERFECT_HITSTOP,
             shake: h.shake,
             finisher: true,
             poison: h.poison,
+            crush: h.crush,
         }
     }
 }

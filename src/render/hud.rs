@@ -575,6 +575,7 @@ pub(super) fn draw_hitboxes(w: &World, alpha: f32) {
             StrikeKind::Toss => LIGHTGRAY,
             StrikeKind::Burst => BROWN,
             StrikeKind::Shove => WHITE,
+            StrikeKind::Prick => GREEN,
         };
         match s.shape {
             Shape::Circle { center, r } => draw_circle_lines(center.x, center.y, r, 1.0, col),
@@ -620,7 +621,7 @@ pub(super) fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
         let y = if sheet.is_some() { 12.0 } else { 10.0 };
         hud_plate(
             ui,
-            Rect::new(1.0, y - 2.0, 3.0 + t::RUN_LIVES as f32 * 9.0, 8.0),
+            Rect::new(1.0, y - 2.0, 3.0 + w.run_lives() as f32 * 9.0, 8.0),
         );
         // 물결 모양 실뿌리 한 가닥(6×3).
         const WAVE: [(f32, f32); 6] = [
@@ -633,7 +634,7 @@ pub(super) fn draw_hud_bars(ui: &Ui, w: &World, sheet: Option<&Texture2D>) {
         ];
         // 런을 끝내는 쓰러짐(셋째)이면 쓰러진 동안 셋째도 감긴 것으로.
         let wound = w.adv.falls + u32::from(!w.player.is_alive() && w.run_over());
-        for i in 0..t::RUN_LIVES {
+        for i in 0..w.run_lives() {
             let x = 4.0 + i as f32 * 9.0;
             let (fill, edge) = if i < wound {
                 (

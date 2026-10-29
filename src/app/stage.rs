@@ -27,6 +27,8 @@ pub(super) enum Ware {
     Heart,
     /// 아직 없는 장신구 하나(equipment::CHARMS 번호).
     Charm(usize),
+    /// 길에서 찾는 무기(0246, WEAPONS 번호): 이 캐릭터 것 중 아직 없는 것.
+    Weapon(usize),
 }
 
 impl Ware {
@@ -36,6 +38,7 @@ impl Ware {
             Ware::Worm => t::PRICE_WORM,
             Ware::Heart => t::PRICE_HEART,
             Ware::Charm(_) => t::PRICE_CHARM,
+            Ware::Weapon(_) => t::PRICE_WEAPON,
         }
     }
 
@@ -45,6 +48,7 @@ impl Ware {
             Ware::Worm => |s| s.it_worm,
             Ware::Heart => |s| s.shop_heart,
             Ware::Charm(c) => CHARMS[c].name,
+            Ware::Weapon(w) => crate::equipment::WEAPONS[w].name,
         }
     }
 
@@ -54,6 +58,7 @@ impl Ware {
             Ware::Worm => |s| s.it_worm_desc,
             Ware::Heart => |s| s.shop_heart_desc,
             Ware::Charm(c) => CHARMS[c].desc,
+            Ware::Weapon(w) => crate::equipment::WEAPONS[w].desc,
         }
     }
 }
@@ -465,6 +470,17 @@ impl App {
                 // Speaker::Nail = 이번 런의 플레이어 배우(모모 런이면 모모).
                 self.play(cutscene::talk(&self.world, &[(Speaker::Nail, line, face)]));
             }
+            // 수수가 도토에게 호두를 다듬어 준다(0246). 받은 건 기록에 남는다(`take_gifts`).
+            Interact::Talk(Who::Susu)
+                if self.world.character == crate::equipment::Character::Doto
+                    && !self.owns_weapon(crate::equipment::WALNUT) =>
+            {
+                self.play(cutscene::talk_give(
+                    &self.world,
+                    &[(Speaker::Susu, |s| s.susu_walnut, Face::Happy)],
+                    crate::equipment::WALNUT,
+                ));
+            }
             // 수수: 처음엔 새싹 발톱을 만들어 준다(0053). 개발 시나리오는 기록 없이 이번 런에만.
             Interact::Talk(Who::Susu)
                 if !self.profile.flag(crate::profile::key::SPROUT)
@@ -483,6 +499,17 @@ impl App {
                 self.play(cutscene::talk(
                     &self.world,
                     &[(Speaker::Susu, text, Face::Happy)],
+                ));
+            }
+            // 콩이가 모모에게 조약돌 덧신을 만들어 준다(0246).
+            Interact::Talk(Who::Kongi)
+                if self.world.character == crate::equipment::Character::Momo
+                    && !self.owns_weapon(crate::equipment::PEBBLE) =>
+            {
+                self.play(cutscene::talk_give(
+                    &self.world,
+                    &[(Speaker::Kongi, |s| s.kongi_pebble, Face::Happy)],
+                    crate::equipment::PEBBLE,
                 ));
             }
             Interact::Talk(Who::Kongi) => {
@@ -801,6 +828,9 @@ impl App {
         if !missing.is_empty() {
             v.push(Ware::Charm(missing[w.adv.stage as usize % missing.len()]));
         }
+        if let Some(&wp) = w.inv.road_weapons.first() {
+            v.push(Ware::Weapon(wp));
+        }
         v
     }
 
@@ -870,22 +900,28 @@ impl App {
         }
     }
 
+    /// 물건 값: 실뜨기 배율 × 큰 나무 "흥정"(0246).
+    fn ware_cost(&self, ware: Ware) -> u32 {
+        let p = self.world.knots.price(ware.price());
+        ((p as f32 * self.world.player.stats.bargain).round() as u32).max(1)
+    }
+
     /// 지금 이 물건을 살 수 없는 이유(포포의 말). 살 수 있으면 None.
     fn cant_buy(&self, ware: Ware) -> Option<Tr> {
         let w = &self.world;
-        if w.inv.seeds < self.world.knots.price(ware.price()) {
+        if w.inv.seeds < self.ware_cost(ware) {
             return Some(|s| s.shop_poor);
         }
         let full = match ware {
             Ware::Berry => !w.inv.bag.has_room(Consumable::Berry),
             Ware::Worm => !w.inv.bag.has_room(Consumable::Worm),
-            Ware::Heart | Ware::Charm(_) => false,
+            Ware::Heart | Ware::Charm(_) | Ware::Weapon(_) => false,
         };
         full.then_some(|s| s.shop_full)
     }
 
     fn buy(&mut self, ware: Ware) {
-        let price = self.world.knots.price(ware.price());
+        let price = self.ware_cost(ware);
         let w = &mut self.world;
         let msg: Tr = if w.inv.seeds < price {
             self.sfx.play(crate::sfx::Id::Deny);
@@ -914,6 +950,11 @@ impl App {
                 Ware::Charm(c) => {
                     w.inv.charms_found.push(c);
                     w.inv.gifts.push(Gift::Charm(c));
+                    true
+                }
+                Ware::Weapon(wp) => {
+                    w.inv.road_weapons.retain(|&x| x != wp);
+                    w.inv.gifts.push(Gift::Weapon(wp));
                     true
                 }
             };
@@ -945,7 +986,8 @@ impl App {
             ui::TEXT,
         );
         // 포포 초상화 + 인사(또는 방금 한 일)
-        let face = Rect::new(panel.x + 6.0, panel.y + 22.0, 44.0, 44.0);
+        // 길 무기(0246)까지 물건이 다섯이 되면 넘쳐서 초상화 칸을 44 → 36으로(인사 세 줄 = 36px).
+        let face = Rect::new(panel.x + 6.0, panel.y + 22.0, 36.0, 36.0);
         ui.rect(face, ui::PANEL_LIGHT);
         let happy = self.shop_msg.is_some_and(|(m, _)| tr(m) == s.shop_thanks);
         let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
@@ -962,8 +1004,12 @@ impl App {
         }
         // 물건 줄: 이름 … 값
         let wares = self.wares();
-        let list_y = face.bottom() + 6.0;
-        let row_h = FONT_PX + 3.0;
+        let list_y = face.bottom() + 4.0;
+        let row_h = if wares.len() > 4 {
+            FONT_PX + 2.0
+        } else {
+            FONT_PX + 3.0
+        };
         for (i, ware) in wares.iter().enumerate() {
             let r = Rect::new(
                 panel.x + 6.0,
@@ -977,13 +1023,13 @@ impl App {
                 ui.rect(r, ui::PANEL_LIGHT);
                 ui.text("▶", r.x + 2.0, ui::mid_y(r), FONT_PX, ui::ACCENT);
             }
-            let afford = self.world.inv.seeds >= self.world.knots.price(ware.price());
+            let afford = self.world.inv.seeds >= self.ware_cost(*ware);
             let c = match (on, afford) {
                 (_, false) => ui::TEXT_DIM,
                 (true, true) => ui::TEXT,
                 (false, true) => Color::new(0.78, 0.72, 0.64, 1.0),
             };
-            let price = fill(s.shop_price, &[&self.world.knots.price(ware.price())]);
+            let price = fill(s.shop_price, &[&self.ware_cost(*ware)]);
             let pw = ui.text_w(&price, FONT_PX);
             let name = ui.fit(tr(ware.name()), r.w - pw - 26.0, FONT_PX);
             ui.text(&name, r.x + 14.0, ui::mid_y(r), FONT_PX, c);
@@ -1024,10 +1070,7 @@ impl App {
         ui.rect(panel, ui::DIM_OVERLAY);
         let b = Rect::new(panel.x + 26.0, panel.y + 44.0, panel.w - 52.0, 62.0);
         ui.panel(b, None);
-        let q = fill(
-            s.shop_confirm,
-            &[&tr(ware.name()), &self.world.knots.price(ware.price())],
-        );
+        let q = fill(s.shop_confirm, &[&tr(ware.name()), &self.ware_cost(ware)]);
         for (k, l) in ui::wrap(ui, &q, b.w - 12.0, FONT_PX)
             .iter()
             .take(2)
@@ -1218,7 +1261,8 @@ impl App {
             FONT_PX,
             ui::TEXT,
         );
-        let face = Rect::new(panel.x + 6.0, panel.y + 22.0, 44.0, 44.0);
+        // 길 무기(0246)까지 물건이 다섯이 되면 넘쳐서 초상화 칸을 44 → 36으로(인사 세 줄 = 36px).
+        let face = Rect::new(panel.x + 6.0, panel.y + 22.0, 36.0, 36.0);
         ui.rect(face, ui::PANEL_LIGHT);
         let happy = self.shop_msg.is_some_and(|(m, _)| tr(m) == s.decor_thanks);
         let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
@@ -1305,7 +1349,79 @@ impl App {
                 k.pick[i] = side;
             }
         }
+        // 갈래 셋 × 깊이 여덟의 덤(0246): 깨운 것은 늘 켜진다.
+        for (b, (_, nodes)) in crate::talents::BRANCHES.iter().enumerate() {
+            for (d, n) in nodes.iter().enumerate() {
+                if let crate::talents::Node::Plus(boon) = n {
+                    if self.profile.flag(&crate::talents::key_plus(ch, b, d)) {
+                        k.boons[boon.index()] += 1;
+                    }
+                }
+            }
+        }
         k
+    }
+
+    /// 큰 나무 한 칸이 깨었나(고르기 칸은 어느 갈래든, 0246).
+    fn node_awake(&self, ch: Character, branch: usize, depth: usize) -> bool {
+        use crate::talents::{key_awake, key_plus, Node, BRANCHES};
+        match BRANCHES[branch].1[depth] {
+            Node::Pick(slot) => (0..2).any(|side| self.profile.flag(&key_awake(ch, slot, side))),
+            Node::Plus(_) => self.profile.flag(&key_plus(ch, branch, depth)),
+        }
+    }
+
+    /// 지금 깨울 수 있는 깊이인가: 맨 앞이거나 앞 칸이 깨었다(0246).
+    fn node_open(&self, ch: Character, branch: usize, depth: usize) -> bool {
+        depth == 0 || self.node_awake(ch, branch, depth - 1)
+    }
+
+    /// 갈래 한 줄의 칸들: (깊이, 갈래 A/B). 고르기 칸은 두 칸, 덤은 한 칸.
+    fn tree_cells(branch: usize) -> Vec<(usize, usize)> {
+        use crate::talents::{Node, BRANCHES};
+        let mut v = Vec::new();
+        for (d, n) in BRANCHES[branch].1.iter().enumerate() {
+            match n {
+                Node::Pick(_) => v.extend([(d, 0), (d, 1)]),
+                Node::Plus(_) => v.push((d, 0)),
+            }
+        }
+        v
+    }
+
+    /// 그 칸의 값과 이름·설명(0246).
+    fn tree_node(
+        &self,
+        ch: Character,
+        branch: usize,
+        depth: usize,
+        side: usize,
+    ) -> (u32, String, Tr, bool) {
+        use crate::talents::{key_awake, plus_cost, plus_rank, table, Node, BRANCHES};
+        match BRANCHES[branch].1[depth] {
+            Node::Pick(slot) => {
+                let tal = &table(ch)[slot.index()].1[side];
+                (
+                    tal.cost,
+                    tr(tal.name).to_string(),
+                    tal.desc,
+                    self.profile.flag(&key_awake(ch, slot, side)),
+                )
+            }
+            Node::Plus(b) => {
+                let rank = plus_rank(branch, depth);
+                let name = match rank {
+                    0 => tr(b.name()).to_string(),
+                    n => format!("{} {}", tr(b.name()), ["II", "III", "IV"][(n - 1).min(2)]),
+                };
+                (
+                    plus_cost(depth),
+                    name,
+                    b.desc(),
+                    self.node_awake(ch, branch, depth),
+                )
+            }
+        }
     }
 
     /// 큰 나무에 탭이 있나: 고를 수 있는 캐릭터가 둘 이상이면 Naïl/모모/도토(0142·0195).
@@ -1320,21 +1436,18 @@ impl App {
             .collect()
     }
 
-    /// 맡긴 반딧불로 지금 깨울 수 있는 것이 있나(재주 갈래 또는 도토 뒤 독 발톱). 나무 밑동 빛·HUD가 본다(0061).
+    /// 맡긴 반딧불로 지금 깨울 수 있는 것이 있나(열린 재주 칸 또는 도토 뒤 독 발톱). 나무 밑동 빛·HUD가 본다(0061).
     pub(super) fn tree_affordable(&self) -> bool {
         use crate::profile::key;
-        use crate::talents::{key_awake, table, KEY_LIGHT, SLOTS};
+        use crate::talents::{BRANCHES, KEY_LIGHT};
         let have = self.profile.count(KEY_LIGHT);
-        let chars = self.tree_chars();
-        let talent = chars.iter().any(|ch| {
-            SLOTS
-                .iter()
-                .zip(table(*ch).iter())
-                .any(|(slot, (_, sides))| {
-                    (0..2).any(|side| {
-                        !self.profile.flag(&key_awake(*ch, *slot, side)) && sides[side].cost <= have
-                    })
+        let talent = self.tree_chars().iter().any(|&ch| {
+            (0..BRANCHES.len()).any(|b| {
+                Self::tree_cells(b).into_iter().any(|(d, side)| {
+                    let (cost, _, _, awake) = self.tree_node(ch, b, d, side);
+                    !awake && self.node_open(ch, b, d) && cost <= have
                 })
+            })
         });
         let venom = self.profile.flag(key::DOTO_MEMORY)
             && !self.profile.flag(key::VENOM)
@@ -1342,10 +1455,16 @@ impl App {
         talent || venom
     }
 
-    /// 큰 나무의 재주(0047): 위아래 = 자리, 좌우 = 갈래, 확인 = 깨우기(반딧불)·끼기·빼기. 닫기: 뒤로·✕·바깥.
-    /// 모모가 돌아오면 탭(LB·RB 또는 탭 누르기)으로 Naïl/모모 표를 바꾼다(0142).
+    /// 독 발톱 줄(Naïl 탭, 도토 뒤, 0052)이 있나.
+    fn tree_venom_row(&self, ch: Character) -> bool {
+        ch.def().weapon_kind == crate::equipment::WeaponKind::Claw
+            && self.profile.flag(crate::profile::key::DOTO_MEMORY)
+    }
+
+    /// 큰 나무(0047 → 0246): 줄 = 갈래 셋(뿌리·가지·잎, Naïl 탭은 독 발톱 줄 하나 더), 좌우 = 깊이(고르기 칸은 두 칸),
+    /// 확인 = 깨우기(반딧불, 앞 칸을 깨워야)·고르기 칸은 끼기·빼기. 닫기: 뒤로·✕·바깥. 캐릭터 탭은 LB·RB(0142·0195).
     pub(super) fn update_tree(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
-        use crate::talents::{key_awake, key_pick, table, KEY_LIGHT, SLOTS};
+        use crate::talents::{key_awake, key_pick, key_plus, Node, BRANCHES, KEY_LIGHT};
         if let Some((_, t)) = self.shop_msg.as_mut() {
             *t -= dt;
             if *t <= 0.0 {
@@ -1372,41 +1491,70 @@ impl App {
             let ch = chars[tab.unwrap_or(0).min(chars.len() - 1)];
             if tab.is_some() && ch != self.tree_char {
                 self.tree_char = ch;
-                // 모모 탭에는 독 발톱 줄이 없다: 커서가 그 줄이면 마지막 자리로.
-                self.tree_cursor = (self.tree_cursor.0.min(SLOTS.len() - 1), 0);
+                // 독 발톱 줄이 없는 탭이면 갈래 줄로.
+                self.tree_cursor = (
+                    self.tree_cursor.0.min(BRANCHES.len() - 1),
+                    self.tree_cursor.1,
+                );
                 self.shop_msg = None;
                 self.sfx.play(crate::sfx::Id::UiMove);
             }
         }
         let ch = self.tree_char;
-        let (mut row, mut side) = self.tree_cursor;
-        // 도토 뒤엔 다섯째 줄: Naïl 자신의 독 발톱(한 칸, 0052). 모모 탭에는 없다.
-        let venom_row = ch.def().weapon_kind == crate::equipment::WeaponKind::Claw
-            && self.profile.flag(crate::profile::key::DOTO_MEMORY);
-        let n = SLOTS.len() + usize::from(venom_row);
-        if a.up {
-            row = (row + n - 1) % n;
+        let venom_row = self.tree_venom_row(ch);
+        let rows = BRANCHES.len() + usize::from(venom_row);
+        let (mut row, mut cell) = self.tree_cursor;
+        row = row.min(rows - 1);
+        // 위아래로 옮길 때는 같은 깊이를 잇는다(칸 번호는 갈래마다 다르다).
+        let depth_of = |r: usize, c: usize| -> usize {
+            if r >= BRANCHES.len() {
+                0
+            } else {
+                let cells = Self::tree_cells(r);
+                cells[c.min(cells.len() - 1)].0
+            }
+        };
+        let cell_at_depth = |r: usize, d: usize| -> usize {
+            if r >= BRANCHES.len() {
+                0
+            } else {
+                Self::tree_cells(r)
+                    .iter()
+                    .position(|(cd, _)| *cd >= d)
+                    .unwrap_or(0)
+            }
+        };
+        if a.up || a.down {
+            let d = depth_of(row, cell);
+            row = if a.up {
+                (row + rows - 1) % rows
+            } else {
+                (row + 1) % rows
+            };
+            cell = cell_at_depth(row, d);
         }
-        if a.down {
-            row = (row + 1) % n;
+        let width = if row >= BRANCHES.len() {
+            1
+        } else {
+            Self::tree_cells(row).len()
+        };
+        if a.left {
+            cell = (cell + width - 1) % width;
         }
-        if (a.left || a.right) && row < SLOTS.len() {
-            side = 1 - side;
+        if a.right {
+            cell = (cell + 1) % width;
         }
         let mut act = a.confirm;
         if let Some(Hit::TreeCell(r, c)) = tap_hit {
-            (row, side) = (r, c);
+            (row, cell) = (r, c);
             act = true;
         }
-        row = row.min(n - 1);
-        if row >= SLOTS.len() {
-            side = 0;
-        }
-        if (row, side) != self.tree_cursor {
+        cell = cell.min(width - 1);
+        if (row, cell) != self.tree_cursor {
             self.shop_msg = None;
         }
-        self.tree_cursor = (row, side);
-        if act && row >= SLOTS.len() {
+        self.tree_cursor = (row, cell);
+        if act && row >= BRANCHES.len() {
             use crate::profile::key;
             let have = self.profile.count(KEY_LIGHT);
             if self.profile.flag(key::VENOM) {
@@ -1424,31 +1572,55 @@ impl App {
                 self.sfx.play(crate::sfx::Id::Heal);
             }
         } else if act {
-            let slot = SLOTS[row];
-            let pick = key_pick(ch, slot);
-            if !self.profile.flag(&key_awake(ch, slot, side)) {
-                let cost = table(ch)[row].1[side].cost;
-                let have = self.profile.count(KEY_LIGHT);
-                if have < cost {
+            let (depth, side) = Self::tree_cells(row)[cell];
+            let (cost, _, _, awake) = self.tree_node(ch, row, depth, side);
+            let have = self.profile.count(KEY_LIGHT);
+            match BRANCHES[row].1[depth] {
+                _ if !awake && !self.node_open(ch, row, depth) => {
+                    self.shop_msg = Some((|s| s.tree_locked, 2.5));
+                    self.sfx.play(crate::sfx::Id::Deny);
+                }
+                _ if !awake && have < cost => {
                     self.shop_msg = Some((|s| s.tree_poor, 3.0));
                     self.sfx.play(crate::sfx::Id::Deny);
-                } else {
+                }
+                Node::Pick(slot) => {
+                    let pick = key_pick(ch, slot);
+                    if !awake {
+                        self.profile.set_count(KEY_LIGHT, have - cost);
+                        self.profile.set(&key_awake(ch, slot, side));
+                        self.profile.set_count(&pick, side as u32 + 1);
+                        self.shop_msg = Some((|s| s.tree_awake, 2.5));
+                        self.sfx.play(crate::sfx::Id::Heal);
+                    } else if self.profile.count(&pick) == side as u32 + 1 {
+                        self.profile.set_count(&pick, 0);
+                        self.shop_msg = Some((|s| s.tree_unequip, 2.0));
+                    } else {
+                        self.profile.set_count(&pick, side as u32 + 1);
+                        self.shop_msg = Some((|s| s.tree_equip, 2.0));
+                        self.sfx.play(crate::sfx::Id::Emerge);
+                    }
+                }
+                Node::Plus(_) if awake => {
+                    self.shop_msg = Some((|s| s.tree_on, 1.5));
+                }
+                Node::Plus(_) => {
                     self.profile.set_count(KEY_LIGHT, have - cost);
-                    self.profile.set(&key_awake(ch, slot, side));
-                    self.profile.set_count(&pick, side as u32 + 1);
+                    self.profile.set(&key_plus(ch, row, depth));
                     self.shop_msg = Some((|s| s.tree_awake, 2.5));
                     self.sfx.play(crate::sfx::Id::Heal);
                 }
-            } else if self.profile.count(&pick) == side as u32 + 1 {
-                self.profile.set_count(&pick, 0);
-                self.shop_msg = Some((|s| s.tree_unequip, 2.0));
-            } else {
-                self.profile.set_count(&pick, side as u32 + 1);
-                self.shop_msg = Some((|s| s.tree_equip, 2.0));
-                self.sfx.play(crate::sfx::Id::Emerge);
             }
             crate::profile::save(&self.profile);
-            self.world.player.talents = self.talents();
+            if ch == self.world.character {
+                let before = self.world.player.stats.max_hp;
+                self.world.player.talents = self.talents();
+                self.world.refresh_stats();
+                let gained = self.world.player.stats.max_hp - before;
+                if gained > 0 {
+                    self.world.player.heal(gained);
+                }
+            }
         }
         if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
             self.shop_msg = None;
@@ -1457,7 +1629,7 @@ impl App {
     }
 
     pub(super) fn draw_tree(&mut self, ui: &Ui) {
-        use crate::talents::{key_awake, key_pick, table, KEY_LIGHT, SLOTS};
+        use crate::talents::{key_pick, Node, BRANCHES, KEY_LIGHT};
         let s = i18n::s();
         let panel = Rect::new(20.0, 8.0, 280.0, 156.0);
         let have = self.profile.count(KEY_LIGHT);
@@ -1500,124 +1672,170 @@ impl App {
                 self.hits.push((r, Hit::TreeTab(i)));
             }
         }
-        let tal_table = table(ch);
-        let venom_row = ch.def().weapon_kind == crate::equipment::WeaponKind::Claw
-            && self.profile.flag(crate::profile::key::DOTO_MEMORY);
+        let venom_row = self.tree_venom_row(ch);
         let venom = self.profile.flag(crate::profile::key::VENOM);
-        let rows = SLOTS.len() + usize::from(venom_row);
-        let row_h = if venom_row { 18.0 } else { 21.0 };
-        let y0 = panel.y + 20.0;
-        let x0 = panel.x + 70.0;
-        let cell_w = ((panel.right() - 6.0 - x0 - 4.0) / 2.0).floor();
-        for (r, slot) in SLOTS.iter().enumerate() {
-            let y = y0 + r as f32 * row_h;
-            let (slot_name, sides) = &tal_table[r];
-            let label = ui.fit(tr(*slot_name), x0 - panel.x - 10.0, FONT_PX);
-            ui.text(&label, panel.x + 6.0, y + 4.0, FONT_PX, ui::TEXT_DIM);
-            let pick = self.profile.count(&key_pick(ch, *slot));
-            for (c, tal) in sides.iter().enumerate() {
-                let cell = Rect::new(x0 + c as f32 * (cell_w + 4.0), y, cell_w, row_h - 2.0);
-                self.hits.push((cell, Hit::TreeCell(r, c)));
-                let awake = self.profile.flag(&key_awake(ch, *slot, c));
-                let on = pick == c as u32 + 1 && awake;
-                let focus = self.tree_cursor == (r, c);
-                ui.rect(cell, if focus { ui::PANEL_LIGHT } else { ui::PANEL });
-                ui.rect_lines(cell, if focus || on { ui::ACCENT } else { ui::BORDER });
-                let (mark, mc) = match (awake, on) {
-                    (_, true) => ("●", ui::ACCENT),
-                    (true, false) => ("○", ui::TEXT),
-                    _ => ("", ui::TEXT_DIM),
-                };
-                let cost = if awake {
-                    String::new()
-                } else {
-                    tal.cost.to_string()
-                };
-                let cw = if cost.is_empty() {
-                    0.0
-                } else {
-                    ui.text_w(&cost, FONT_PX) + 4.0
-                };
-                ui.text(mark, cell.x + 3.0, ui::mid_y(cell), FONT_PX, mc);
-                let nx = mark_end(ui, cell.x);
-                let name = ui.fit(tr(tal.name), cell.right() - nx - 3.0 - cw, FONT_PX);
-                let tc = if awake { ui::TEXT } else { ui::TEXT_DIM };
-                ui.text(&name, nx, ui::mid_y(cell), FONT_PX, tc);
-                if !cost.is_empty() {
-                    let cc = if have >= tal.cost {
-                        ui::ACCENT
-                    } else {
-                        ui::TEXT_DIM
-                    };
-                    ui.text_right(&cost, cell.right() - 3.0, ui::mid_y(cell), FONT_PX, cc);
+        let rows = BRANCHES.len() + usize::from(venom_row);
+        let row_h = 18.0;
+        let y0 = panel.y + 21.0;
+        let x0 = panel.x + 58.0;
+        let (cell_w, gap) = (14.0, 4.0);
+        let (cur_r, cur_c) = self.tree_cursor;
+        for (b, (bname, nodes)) in BRANCHES.iter().enumerate() {
+            let y = y0 + b as f32 * row_h;
+            let label = ui.fit(tr(*bname), x0 - panel.x - 10.0, FONT_PX);
+            ui.text(&label, panel.x + 6.0, y + 2.0, FONT_PX, ui::TEXT_DIM);
+            let mut x = x0;
+            let mut prev_end: Option<(f32, bool)> = None;
+            for (c, (d, side)) in Self::tree_cells(b).into_iter().enumerate() {
+                let pick_pair = matches!(nodes[d], Node::Pick(_));
+                if side == 1 {
+                    // 고르기 두 칸은 붙여 그린다(한 깊이).
+                    x -= gap - 1.0;
                 }
+                let cell = Rect::new(x, y, cell_w, cell_w);
+                self.hits.push((cell, Hit::TreeCell(b, c)));
+                let (_, _, _, awake) = self.tree_node(ch, b, d, side);
+                let open = self.node_open(ch, b, d);
+                let node_awake = self.node_awake(ch, b, d);
+                // 앞 깊이와 잇는 줄(둘 다 깨었으면 밝게).
+                if side == 0 {
+                    if let Some((px, lit)) = prev_end {
+                        let col = if lit && node_awake {
+                            ui::ACCENT
+                        } else {
+                            ui::BORDER
+                        };
+                        ui.rect(Rect::new(px, y + cell_w / 2.0, x - px, 1.0), col);
+                    }
+                }
+                let on = match nodes[d] {
+                    Node::Pick(slot) => {
+                        awake && self.profile.count(&key_pick(ch, slot)) == side as u32 + 1
+                    }
+                    Node::Plus(_) => awake,
+                };
+                let focus = cur_r == b && cur_c == c;
+                ui.rect(cell, if focus { ui::PANEL_LIGHT } else { ui::PANEL });
+                let edge = if focus || on {
+                    ui::ACCENT
+                } else if open && !awake {
+                    ui::TEXT
+                } else {
+                    ui::BORDER
+                };
+                ui.rect_lines(cell, edge);
+                // 속: 켜짐 = 채운 네모, 깨었지만 안 낀 고르기 = 빈 네모, 열린 칸 = 점, 잠김 = 없음.
+                let inner = Rect::new(cell.x + 4.0, cell.y + 4.0, cell_w - 8.0, cell_w - 8.0);
+                if on {
+                    ui.rect(inner, ui::ACCENT);
+                } else if awake {
+                    ui.rect_lines(inner, ui::TEXT);
+                } else if open {
+                    ui.rect(
+                        Rect::new(cell.x + 6.0, cell.y + 6.0, 2.0, 2.0),
+                        ui::TEXT_DIM,
+                    );
+                }
+                if pick_pair && side == 1 {
+                    // 고르기 짝: 아래에 괄호 줄.
+                    ui.rect(
+                        Rect::new(
+                            cell.x - cell_w - 1.0,
+                            cell.bottom() + 1.0,
+                            cell_w * 2.0 + 1.0,
+                            1.0,
+                        ),
+                        ui::TEXT_DIM,
+                    );
+                }
+                if side == 0 || pick_pair {
+                    prev_end = Some((cell.right(), node_awake));
+                }
+                x += cell_w + gap;
             }
         }
         if venom_row {
-            // 독 발톱: 두 갈래 칸을 하나로.
-            let r = SLOTS.len();
+            // 독 발톱: 한 칸 + 이름.
+            let r = BRANCHES.len();
             let y = y0 + r as f32 * row_h;
             let label = ui.fit(s.tree_claw, x0 - panel.x - 10.0, FONT_PX);
-            ui.text(&label, panel.x + 6.0, y + 4.0, FONT_PX, ui::TEXT_DIM);
-            let cell = Rect::new(x0, y, cell_w * 2.0 + 4.0, row_h - 2.0);
-            self.hits.push((cell, Hit::TreeCell(r, 0)));
-            let focus = self.tree_cursor.0 == r;
+            ui.text(&label, panel.x + 6.0, y + 2.0, FONT_PX, ui::TEXT_DIM);
+            let cell = Rect::new(x0, y, cell_w, cell_w);
+            let focus = cur_r == r;
+            self.hits
+                .push((Rect::new(x0, y, 120.0, cell_w), Hit::TreeCell(r, 0)));
             ui.rect(cell, if focus { ui::PANEL_LIGHT } else { ui::PANEL });
-            ui.rect_lines(
-                cell,
-                if focus || venom {
-                    ui::ACCENT
-                } else {
-                    ui::BORDER
-                },
-            );
+            ui.rect_lines(cell, if focus || venom { ui::ACCENT } else { ui::TEXT });
             if venom {
-                ui.text("●", cell.x + 3.0, ui::mid_y(cell), FONT_PX, ui::ACCENT);
-            } else {
-                let cost = t::VENOM_AWAKE_COST.to_string();
-                let cc = if have >= t::VENOM_AWAKE_COST {
-                    ui::ACCENT
-                } else {
-                    ui::TEXT_DIM
-                };
-                ui.text_right(&cost, cell.right() - 3.0, ui::mid_y(cell), FONT_PX, cc);
+                ui.rect(Rect::new(cell.x + 4.0, cell.y + 4.0, 6.0, 6.0), ui::ACCENT);
             }
             let tc = if venom { ui::TEXT } else { ui::TEXT_DIM };
-            let nx = mark_end(ui, cell.x);
-            let name = ui.fit(s.w_venom, cell.right() - nx - 30.0, FONT_PX);
-            ui.text(&name, nx, ui::mid_y(cell), FONT_PX, tc);
+            let name = ui.fit(s.w_venom, 110.0, FONT_PX);
+            ui.text(&name, cell.right() + 5.0, y + 2.0, FONT_PX, tc);
         }
-        // 고른 칸의 설명 + 상태(또는 방금 한 일).
-        let (r, c) = self.tree_cursor;
-        let on_venom = venom_row && r >= SLOTS.len();
-        let r = r.min(SLOTS.len() - 1);
-        let tal = &tal_table[r].1[c];
-        let dy = y0 + rows as f32 * row_h + 3.0;
-        let desc = if on_venom {
-            s.tree_venom_desc
+        // 고른 칸: 이름 · 값/상태, 설명 두 줄.
+        let dy = y0 + rows as f32 * row_h + 2.0;
+        ui.rect(
+            Rect::new(panel.x + 4.0, dy - 2.0, panel.w - 8.0, 1.0),
+            ui::BORDER,
+        );
+        // 깨우지 않은 칸의 값은 이름 줄 오른쪽에 숫자로(상태 줄은 짧게 — 잠김 안내가 언어에 따라 길다).
+        let mut cost_tag: Option<u32> = None;
+        let (name, desc, state) = if cur_r >= BRANCHES.len() {
+            let state = match self.shop_msg {
+                Some((m, _)) => tr(m).to_string(),
+                None if venom => s.tree_venom_on.to_string(),
+                None => fill(s.tree_cost, &[&t::VENOM_AWAKE_COST]),
+            };
+            (s.w_venom.to_string(), s.tree_venom_desc, state)
         } else {
-            tr(tal.desc)
+            let cells = Self::tree_cells(cur_r);
+            let (d, side) = cells[cur_c.min(cells.len() - 1)];
+            let (cost, name, desc, awake) = self.tree_node(ch, cur_r, d, side);
+            if !awake {
+                cost_tag = Some(cost);
+            }
+            let state = match (self.shop_msg, BRANCHES[cur_r].1[d]) {
+                (Some((m, _)), _) => tr(m).to_string(),
+                _ if !awake && !self.node_open(ch, cur_r, d) => s.tree_locked.to_string(),
+                _ if !awake => fill(s.tree_cost, &[&cost]),
+                (None, Node::Pick(slot))
+                    if self.profile.count(&key_pick(ch, slot)) == side as u32 + 1 =>
+                {
+                    s.tree_on.to_string()
+                }
+                (None, Node::Pick(_)) => s.tree_off.to_string(),
+                (None, Node::Plus(_)) => s.tree_on.to_string(),
+            };
+            (name, tr(desc), state)
         };
+        let tag = cost_tag.map(|c| c.to_string()).unwrap_or_default();
+        let tag_w = if tag.is_empty() {
+            0.0
+        } else {
+            ui.text_w(&tag, FONT_PX) + 8.0
+        };
+        let name = ui.fit(&name, panel.w - 12.0 - tag_w, FONT_PX);
+        ui.text(&name, panel.x + 6.0, dy, FONT_PX, ui::ACCENT);
+        if let Some(c) = cost_tag {
+            let col = if have >= c { ui::ACCENT } else { ui::TEXT_DIM };
+            ui.text_right(&tag, panel.right() - 6.0, dy, FONT_PX, col);
+        }
         for (k, l) in ui::wrap(ui, desc, panel.w - 12.0, FONT_PX)
             .iter()
             .take(2)
             .enumerate()
         {
-            ui.text(l, panel.x + 6.0, dy + k as f32 * 12.0, FONT_PX, ui::TEXT);
+            ui.text(
+                l,
+                panel.x + 6.0,
+                dy + 13.0 + k as f32 * 12.0,
+                FONT_PX,
+                ui::TEXT,
+            );
         }
-        let awake = self.profile.flag(&key_awake(ch, SLOTS[r], c));
-        let state = match self.shop_msg {
-            Some((m, _)) => tr(m).to_string(),
-            None if on_venom && venom => s.tree_venom_on.to_string(),
-            None if on_venom => fill(s.tree_cost, &[&t::VENOM_AWAKE_COST]),
-            None if !awake => fill(s.tree_cost, &[&tal.cost]),
-            None if self.profile.count(&key_pick(ch, SLOTS[r])) == c as u32 + 1 => {
-                s.tree_on.to_string()
-            }
-            None => s.tree_off.to_string(),
-        };
         let state = ui.fit(&state, panel.w - 12.0, FONT_PX);
-        ui.text(&state, panel.x + 6.0, dy + 26.0, FONT_PX, ui::ACCENT);
+        ui.text(&state, panel.x + 6.0, dy + 39.0, FONT_PX, ui::ACCENT);
         let mut hint = super::vfill(s.tree_hint, &[Verb::Confirm, Verb::Back]);
         if self.tree_tabs() {
             // 탭 안내를 앞에. 다 안 들어가는 언어(일본어)는 원래 안내만(탭은 제목 줄에 보이고 누를 수 있다).
@@ -1683,16 +1901,15 @@ impl App {
                     self.world.inv.charms_found.push(c);
                 }
             }
+            // 무기는 기록 깃발이 섰으니(claim) 이번 런 가방에도(주인 것만 받는다).
+            Reward::Weapon(w) => {
+                self.inventory.add(w);
+            }
             Reward::Light(_) | Reward::Seeds(_) => {}
         }
         self.journal_ready = crate::journal::ready_count(&self.profile);
         self.sfx.play(crate::sfx::Id::Heal);
     }
-}
-
-/// 칸 왼쪽의 ●/○ 뒤 이름이 시작할 x. 일본어·간체 폰트의 ●는 전각(12px)이라 고정 +13이면 이름에 붙었다(0089).
-fn mark_end(ui: &Ui, x: f32) -> f32 {
-    (x + 3.0 + ui.text_w("●", FONT_PX) + 2.0).max(x + 13.0)
 }
 
 #[cfg(test)]

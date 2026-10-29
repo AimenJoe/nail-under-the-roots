@@ -612,7 +612,7 @@ impl Enemy {
         // 콩이의 등딱지(0054): 발톱은 튕긴다(패링 거울). 솟구치기(아래 배)·드릴은 뚫고 연다.
         // 강공격은 튕기지 않고 자세를 깬다(0168: 모으기 = 자세 깨기).
         let guarded = self.guarding();
-        if guarded && matches!(s.kind, StrikeKind::Claw(_)) {
+        if guarded && matches!(s.kind, StrikeKind::Claw(_) | StrikeKind::Prick) && !s.crush {
             self.shell_hit();
             return Struck::Deflected;
         }
@@ -768,6 +768,7 @@ mod tests {
             shake: 0.0,
             finisher: false,
             poison: 0.0,
+            crush: false,
         };
         let got = e.receive(&s, vec2(50.0, 50.0), vec2(1.0, 0.0));
         assert!(matches!(got, Struck::Shoved { dir } if dir.x > 0.99));
@@ -825,7 +826,39 @@ mod tests {
             shake: 0.0,
             finisher: false,
             poison: 0.0,
+            crush: false,
         }
+    }
+
+    /// 조약돌 덧신(0246): `crush`가 붙은 발차기는 등딱지에 튕기지 않고 연다. 가시 덤불(`Prick`)은 튕긴다.
+    #[test]
+    fn crushing_kicks_open_a_guard_and_pricks_bounce() {
+        let at = vec2(100.0, 100.0);
+        let mut e = Enemy::new(Kind::Kongi, at);
+        e.state = State::Guard { time: 1.0 };
+        let s = Strike {
+            crush: true,
+            ..strike(StrikeKind::Claw(1), at, 3)
+        };
+        let r = e.receive(&s, at - vec2(10.0, 0.0), vec2(1.0, 0.0));
+        assert!(
+            matches!(
+                r,
+                Struck::Hit {
+                    broke_guard: true,
+                    ..
+                }
+            ),
+            "{r:?}"
+        );
+        let mut e = Enemy::new(Kind::Kongi, at);
+        e.state = State::Guard { time: 1.0 };
+        let r = e.receive(
+            &strike(StrikeKind::Prick, at, 1),
+            at - vec2(10.0, 0.0),
+            vec2(1.0, 0.0),
+        );
+        assert_eq!(r, Struck::Deflected);
     }
 
     /// 등딱지(0054·0168): 버티는 콩이에게 발톱은 튕기고(피해 없음), 강공격은 자세를 깨고 들어간다(피해 + 긴 경직).

@@ -82,6 +82,10 @@ pub struct Weapon {
     pub moveset: &'static Moveset,
     /// 가방 칸 아이콘 색.
     pub color: Color,
+    /// 가졌는지 남는 기록 깃발(0246). 있으면 그 캐릭터의 런마다 가방에 들고 간다. None = 처음부터 든 무기.
+    pub key: Option<&'static str>,
+    /// 길의 상자·쉼터 가게에서 나온다(아직 없으면, 0246).
+    pub found_on_road: bool,
 }
 
 /// 새싹 발톱(수수가 만들어 준다, 0053). `WEAPONS` 번호.
@@ -92,14 +96,27 @@ pub const STONE_CLAW: usize = 2;
 pub const VENOM_CLAW: usize = 3;
 /// 도토의 도토리(0195).
 pub const ACORN: usize = 5;
+/// 모모 무기(0246): 가시덩굴 각반(길에서)·조약돌 덧신(콩이)·꽃잎 발목끈(저널).
+/// 길에서 찾는 둘(`BRIAR`·`PINECONE`)은 표의 `found_on_road`로 고르니 이름은 시험만 쓴다.
+#[cfg_attr(not(test), allow(dead_code))]
+pub const BRIAR: usize = 6;
+pub const PEBBLE: usize = 7;
+pub const PETAL: usize = 8;
+/// 도토 무기(0246): 솔방울(길에서)·호두(수수)·밤송이(저널).
+#[cfg_attr(not(test), allow(dead_code))]
+pub const PINECONE: usize = 9;
+pub const WALNUT: usize = 10;
+pub const CHESTNUT: usize = 11;
 
-pub static WEAPONS: [Weapon; 6] = [
+pub static WEAPONS: [Weapon; 12] = [
     Weapon {
         name: |s| s.w_sprout,
         desc: |s| s.w_sprout_desc,
         kind: WeaponKind::Claw,
         moveset: &moveset::SPROUT,
         color: Color::new(0.62, 0.86, 0.48, 1.0),
+        key: Some(crate::profile::key::SPROUT),
+        found_on_road: false,
     },
     Weapon {
         name: |s| s.w_mole,
@@ -107,6 +124,8 @@ pub static WEAPONS: [Weapon; 6] = [
         kind: WeaponKind::Claw,
         moveset: &moveset::CLAWS,
         color: Color::new(0.97, 0.93, 0.85, 1.0),
+        key: None,
+        found_on_road: false,
     },
     Weapon {
         name: |s| s.w_stone,
@@ -114,6 +133,8 @@ pub static WEAPONS: [Weapon; 6] = [
         kind: WeaponKind::Claw,
         moveset: &moveset::STONE,
         color: Color::new(0.66, 0.64, 0.62, 1.0),
+        key: Some(crate::profile::key::STONE),
+        found_on_road: false,
     },
     Weapon {
         name: |s| s.w_venom,
@@ -121,6 +142,8 @@ pub static WEAPONS: [Weapon; 6] = [
         kind: WeaponKind::Claw,
         moveset: &moveset::VENOM,
         color: Color::new(0.52, 0.86, 0.36, 1.0),
+        key: Some(crate::profile::key::VENOM),
+        found_on_road: false,
     },
     Weapon {
         name: |s| s.w_kick,
@@ -128,6 +151,8 @@ pub static WEAPONS: [Weapon; 6] = [
         kind: WeaponKind::Kick,
         moveset: &moveset::KICKS,
         color: Color::new(1.0, 0.80, 0.86, 1.0),
+        key: None,
+        found_on_road: false,
     },
     Weapon {
         name: |s| s.w_acorn,
@@ -135,6 +160,63 @@ pub static WEAPONS: [Weapon; 6] = [
         kind: WeaponKind::Acorn,
         moveset: &moveset::ACORNS,
         color: Color::new(0.86, 0.62, 0.32, 1.0),
+        key: None,
+        found_on_road: false,
+    },
+    // 모모·도토 무기 셋씩(0246).
+    Weapon {
+        name: |s| s.w_briar,
+        desc: |s| s.w_briar_desc,
+        kind: WeaponKind::Kick,
+        moveset: &moveset::BRIAR,
+        color: Color::new(0.56, 0.80, 0.42, 1.0),
+        key: Some("weapon.briar"),
+        found_on_road: true,
+    },
+    Weapon {
+        name: |s| s.w_pebble,
+        desc: |s| s.w_pebble_desc,
+        kind: WeaponKind::Kick,
+        moveset: &moveset::PEBBLE,
+        color: Color::new(0.70, 0.68, 0.66, 1.0),
+        key: Some("weapon.pebble"),
+        found_on_road: false,
+    },
+    Weapon {
+        name: |s| s.w_petal,
+        desc: |s| s.w_petal_desc,
+        kind: WeaponKind::Kick,
+        moveset: &moveset::PETAL,
+        color: Color::new(1.0, 0.62, 0.78, 1.0),
+        key: Some("weapon.petal"),
+        found_on_road: false,
+    },
+    Weapon {
+        name: |s| s.w_pine,
+        desc: |s| s.w_pine_desc,
+        kind: WeaponKind::Acorn,
+        moveset: &moveset::PINECONE,
+        color: Color::new(0.60, 0.42, 0.24, 1.0),
+        key: Some("weapon.pinecone"),
+        found_on_road: true,
+    },
+    Weapon {
+        name: |s| s.w_walnut,
+        desc: |s| s.w_walnut_desc,
+        kind: WeaponKind::Acorn,
+        moveset: &moveset::WALNUT,
+        color: Color::new(0.80, 0.68, 0.48, 1.0),
+        key: Some("weapon.walnut"),
+        found_on_road: false,
+    },
+    Weapon {
+        name: |s| s.w_chestnut,
+        desc: |s| s.w_chestnut_desc,
+        kind: WeaponKind::Acorn,
+        moveset: &moveset::CHESTNUT,
+        color: Color::new(0.50, 0.30, 0.18, 1.0),
+        key: Some("weapon.chestnut"),
+        found_on_road: false,
     },
 ];
 
@@ -160,6 +242,22 @@ pub struct Stats {
     pub throw_reach: f32,
     pub leap_mul: f32,
     pub blast: f32,
+    /// 0246(장신구 셋씩·큰 나무 재주): 강공격 모으는 시간 배율, 솟구치기 둘레 배율, 드릴 길이 배율, 박자 타의 게이지 배율,
+    /// 모모 밟기 피해 더하기, 도토 묻는 도토리 수 더하기, 맞힌 적 경직 더하기(초), 박자 창 배율, 걷는 속도 배율,
+    /// 산딸기 회복 더하기, 실뿌리 더하기, 가게 값 배율, 장신구 칸 더하기.
+    pub charge: f32,
+    pub emerge: f32,
+    pub drill: f32,
+    pub beat_sp: f32,
+    pub stomp: i32,
+    pub bury: i32,
+    pub stun: f32,
+    pub beat: f32,
+    pub speed: f32,
+    pub berry_heal: i32,
+    pub lives: u32,
+    pub bargain: f32,
+    pub charm_slots: usize,
 }
 
 impl Stats {
@@ -175,13 +273,29 @@ impl Stats {
         throw_reach: 1.0,
         leap_mul: 1.0,
         blast: 1.0,
+        charge: 1.0,
+        emerge: 1.0,
+        drill: 1.0,
+        beat_sp: 1.0,
+        stomp: 0,
+        bury: 0,
+        stun: 0.0,
+        beat: 1.0,
+        speed: 1.0,
+        berry_heal: 0,
+        lives: 0,
+        bargain: 1.0,
+        charm_slots: 0,
     };
 
-    /// 기본값에 장신구와 뿌리 심장을 더한다. 배율은 곱, 더하기는 합. 너무 극단으로 가지 않게 묶는다.
-    pub fn compute(charms: &[usize], root_hearts: i32) -> Stats {
+    /// 기본값에 장신구·큰 나무 재주(`talent`, 0246)·뿌리 심장을 더한다. 배율은 곱, 더하기는 합. 너무 극단으로 가지 않게 묶는다.
+    pub fn compute(charms: &[usize], root_hearts: i32, talent: &Mods) -> Stats {
         let mut s = Stats::BASE;
-        for &c in charms {
-            let m = CHARMS[c].mods;
+        for m in charms
+            .iter()
+            .map(|&c| &CHARMS[c].mods)
+            .chain(std::iter::once(talent))
+        {
             s.max_hp += m.max_hp;
             s.damage += m.damage;
             s.attack_speed *= m.attack_speed;
@@ -193,11 +307,32 @@ impl Stats {
             s.throw_reach *= m.throw_reach;
             s.leap_mul *= m.leap_mul;
             s.blast *= m.blast;
+            s.charge *= m.charge;
+            s.emerge *= m.emerge;
+            s.drill *= m.drill;
+            s.beat_sp *= m.beat_sp;
+            s.stomp += m.stomp;
+            s.bury += m.bury;
+            s.stun += m.stun;
+            s.beat *= m.beat;
+            s.speed *= m.speed;
+            s.berry_heal += m.berry_heal;
+            s.lives += m.lives;
+            s.bargain *= m.bargain;
+            s.charm_slots += m.charm_slots;
         }
         s.max_hp = (s.max_hp + root_hearts.min(crate::tuning::ROOT_HEART_MAX)).max(1);
         s.attack_speed = s.attack_speed.clamp(0.6, 1.8);
         s.burrow_cd = s.burrow_cd.clamp(0.3, 2.0);
+        s.charge = s.charge.clamp(0.4, 1.5);
+        s.speed = s.speed.clamp(0.7, 1.4);
+        s.bargain = s.bargain.clamp(0.4, 1.0);
         s
+    }
+
+    /// 낄 수 있는 장신구 수(기본 + 큰 나무, 0246).
+    pub fn charm_slots(&self) -> usize {
+        CHARM_SLOTS + self.charm_slots
     }
 }
 
@@ -215,9 +350,25 @@ pub struct Mods {
     pub throw_reach: f32,
     pub leap_mul: f32,
     pub blast: f32,
+    /// 0246(장신구 셋씩·큰 나무 재주): 강공격 모으는 시간 배율, 솟구치기 둘레 배율, 드릴 길이 배율, 박자 타의 게이지 배율,
+    /// 모모 밟기 피해 더하기, 도토 묻는 도토리 수 더하기, 맞힌 적 경직 더하기(초), 박자 창 배율, 걷는 속도 배율,
+    /// 산딸기 회복 더하기, 실뿌리 더하기, 가게 값 배율, 장신구 칸 더하기.
+    pub charge: f32,
+    pub emerge: f32,
+    pub drill: f32,
+    pub beat_sp: f32,
+    pub stomp: i32,
+    pub bury: i32,
+    pub stun: f32,
+    pub beat: f32,
+    pub speed: f32,
+    pub berry_heal: i32,
+    pub lives: u32,
+    pub bargain: f32,
+    pub charm_slots: usize,
 }
 
-const NO_MODS: Mods = Mods {
+pub const NO_MODS: Mods = Mods {
     max_hp: 0,
     damage: 0,
     attack_speed: 1.0,
@@ -229,6 +380,19 @@ const NO_MODS: Mods = Mods {
     throw_reach: 1.0,
     leap_mul: 1.0,
     blast: 1.0,
+    charge: 1.0,
+    emerge: 1.0,
+    drill: 1.0,
+    beat_sp: 1.0,
+    stomp: 0,
+    bury: 0,
+    stun: 0.0,
+    beat: 1.0,
+    speed: 1.0,
+    berry_heal: 0,
+    lives: 0,
+    bargain: 1.0,
+    charm_slots: 0,
 };
 
 /// 장신구: 2칸. 얻는 곳은 상자·상점(맵 단계)·저널. 대부분 누구나 끼고, 모모 것(0142)·도토 것(0195)은 그 캐릭터 런에서만 나온다.
@@ -258,7 +422,7 @@ pub const SILK_KNOT: usize = 11;
 /// 단풍잎 목도리(저널 doto_deep의 보상).
 pub const MAPLE_SCARF: usize = 14;
 
-pub static CHARMS: [Charm; 15] = [
+pub static CHARMS: [Charm; 24] = [
     Charm {
         name: |s| s.c_shell,
         desc: |s| s.c_shell_desc,
@@ -446,6 +610,123 @@ pub static CHARMS: [Charm; 15] = [
         only: Some(Character::Doto),
         journal: true,
     },
+    // Naïl 장신구 셋(0246). 흙 묻은 장갑: 강공격을 빨리 모으지만 마무리가 덜 민다.
+    Charm {
+        name: |s| s.c_glove,
+        desc: |s| s.c_glove_desc,
+        mods: Mods {
+            charge: 0.7,
+            finisher_knockback: 0.85,
+            ..NO_MODS
+        },
+        color: Color::new(0.62, 0.46, 0.32, 1.0),
+        only: Some(Character::Mole),
+        journal: false,
+    },
+    // 지렁이 굴 지도: 솟구침 둘레가 넓지만 굴파기 대기가 길다.
+    Charm {
+        name: |s| s.c_wormmap,
+        desc: |s| s.c_wormmap_desc,
+        mods: Mods {
+            emerge: 1.3,
+            burrow_cd: 1.15,
+            ..NO_MODS
+        },
+        color: Color::new(0.86, 0.58, 0.56, 1.0),
+        only: Some(Character::Mole),
+        journal: false,
+    },
+    // 두더지 앞니: 드릴이 길게 달리지만 분노가 느리게 찬다.
+    Charm {
+        name: |s| s.c_incisor,
+        desc: |s| s.c_incisor_desc,
+        mods: Mods {
+            drill: 1.35,
+            sp_gain: 0.9,
+            ..NO_MODS
+        },
+        color: Color::new(0.96, 0.92, 0.78, 1.0),
+        only: Some(Character::Mole),
+        journal: false,
+    },
+    // 모모 장신구 셋(0246). 민들레 솜: 깡충이 멀리 가지만 몸이 약하다.
+    Charm {
+        name: |s| s.c_dandelion,
+        desc: |s| s.c_dandelion_desc,
+        mods: Mods {
+            leap_mul: 1.2,
+            max_hp: -1,
+            ..NO_MODS
+        },
+        color: Color::new(0.98, 0.94, 0.70, 1.0),
+        only: Some(Character::Momo),
+        journal: false,
+    },
+    // 아침 이슬: 박자에 맞춘 차기가 기를 두 배로 채우지만 차기가 조금 느리다.
+    Charm {
+        name: |s| s.c_dew,
+        desc: |s| s.c_dew_desc,
+        mods: Mods {
+            beat_sp: 2.0,
+            attack_speed: 0.92,
+            ..NO_MODS
+        },
+        color: Color::new(0.66, 0.86, 0.98, 1.0),
+        only: Some(Character::Momo),
+        journal: false,
+    },
+    // 클로버 꽃반지: 이어 뛰기 밟기 피해 +1, 기는 느리게 찬다.
+    Charm {
+        name: |s| s.c_clover_ring,
+        desc: |s| s.c_clover_ring_desc,
+        mods: Mods {
+            stomp: 1,
+            sp_gain: 0.9,
+            ..NO_MODS
+        },
+        color: Color::new(0.60, 0.86, 0.52, 1.0),
+        only: Some(Character::Momo),
+        journal: false,
+    },
+    // 도토 장신구 셋(0246). 볼주머니: 도토리를 하나 더 묻지만 게이지가 느리게 찬다.
+    Charm {
+        name: |s| s.c_cheek,
+        desc: |s| s.c_cheek_desc,
+        mods: Mods {
+            bury: 1,
+            sp_gain: 0.9,
+            ..NO_MODS
+        },
+        color: Color::new(0.92, 0.72, 0.52, 1.0),
+        only: Some(Character::Doto),
+        journal: false,
+    },
+    // 꼬리털 빗: 뒤로 뛰기가 금방 돌아오지만 짧게 뛴다.
+    Charm {
+        name: |s| s.c_comb,
+        desc: |s| s.c_comb_desc,
+        mods: Mods {
+            burrow_cd: 0.7,
+            leap_mul: 0.85,
+            ..NO_MODS
+        },
+        color: Color::new(0.80, 0.60, 0.42, 1.0),
+        only: Some(Character::Doto),
+        journal: false,
+    },
+    // 송진: 맞은 적이 더 오래 멈추지만 도토리가 덜 난다.
+    Charm {
+        name: |s| s.c_resin,
+        desc: |s| s.c_resin_desc,
+        mods: Mods {
+            stun: 0.15,
+            throw_reach: 0.9,
+            ..NO_MODS
+        },
+        color: Color::new(0.96, 0.76, 0.30, 1.0),
+        only: Some(Character::Doto),
+        journal: false,
+    },
 ];
 
 #[cfg(test)]
@@ -476,14 +757,14 @@ mod tests {
 
     #[test]
     fn stats_combine_and_clamp() {
-        assert_eq!(Stats::compute(&[], 0), Stats::BASE);
-        let s = Stats::compute(&[0, 3], 2);
+        assert_eq!(Stats::compute(&[], 0, &NO_MODS), Stats::BASE);
+        let s = Stats::compute(&[0, 3], 2, &NO_MODS);
         assert_eq!(s.max_hp, Stats::BASE.max_hp + 1 + 2);
         assert_eq!(s.damage, 1);
         assert!((s.attack_speed - 0.9).abs() < 1e-6);
         // 뿌리 심장은 상한까지만.
         assert_eq!(
-            Stats::compute(&[], 99).max_hp,
+            Stats::compute(&[], 99, &NO_MODS).max_hp,
             Stats::BASE.max_hp + crate::tuning::ROOT_HEART_MAX
         );
     }

@@ -130,6 +130,9 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
     for b in w.toss.buried.iter().filter(|_| ground) {
         draw_buried(b, w.time);
     }
+    for p in w.toss.patches.iter().filter(|_| ground) {
+        draw_thorn_patch(p, w.time);
+    }
     for c in w.hazards.clouds.iter().filter(|_| ground) {
         draw_cloud(c, w.time);
     }

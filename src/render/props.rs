@@ -1905,12 +1905,36 @@ pub(super) fn draw_pickup(p: &world::Pickup, time: f32) {
         }
     };
     let dark = Color::new(c.r * 0.55, c.g * 0.55, c.b * 0.55, 1.0);
-    for k in 0..3 {
-        let x = base.x - 4.0 + k as f32 * 3.0;
-        let y = base.y + (k % 2) as f32;
-        draw_rectangle(x - 0.5, y - 1.0, 3.0, 8.0, OUTLINE);
-        draw_rectangle(x, y, 2.0, 6.0, c);
-        draw_rectangle(x, y + 5.0, 2.0, 1.0, dark);
+    let kind = match p.item {
+        world::Gift::Weapon(w) => crate::equipment::WEAPONS[w].kind,
+        world::Gift::Charm(_) => crate::equipment::WeaponKind::Claw,
+    };
+    match kind {
+        crate::equipment::WeaponKind::Claw => {
+            for k in 0..3 {
+                let x = base.x - 4.0 + k as f32 * 3.0;
+                let y = base.y + (k % 2) as f32;
+                draw_rectangle(x - 0.5, y - 1.0, 3.0, 8.0, OUTLINE);
+                draw_rectangle(x, y, 2.0, 6.0, c);
+                draw_rectangle(x, y + 5.0, 2.0, 1.0, dark);
+            }
+        }
+        // 뒷발 무기(0246): 바닥에 놓인 발목 띠.
+        crate::equipment::WeaponKind::Kick => {
+            draw_ellipse(base.x, base.y + 3.0, 5.5, 3.5, 0.0, OUTLINE);
+            draw_ellipse(base.x, base.y + 3.0, 4.5, 2.5, 0.0, c);
+            draw_ellipse(base.x, base.y + 3.0, 2.5, 1.0, 0.0, dark);
+            draw_rectangle(base.x + 3.0, base.y + 5.0, 1.0, 3.0, dark);
+        }
+        // 던지는 것(0246): 열매 셋 무더기.
+        crate::equipment::WeaponKind::Acorn => {
+            for (dx, dy) in [(-3.0, 4.0), (3.0, 4.0), (0.0, 0.0)] {
+                let q = vec2(base.x + dx, base.y + dy);
+                draw_circle(q.x, q.y + 1.0, 3.0, OUTLINE);
+                draw_circle(q.x, q.y + 1.0, 2.2, c);
+                draw_rectangle(q.x - 2.0, q.y - 2.0, 4.0, 2.0, dark);
+            }
+        }
     }
     draw_pickup_mark(
         p.pos + vec2(0.0, 3.0),

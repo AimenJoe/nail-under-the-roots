@@ -315,11 +315,13 @@ impl Player {
 
     /// 땅 위를 걷고 있다(발걸음 먼지, 0081): 굴 속·공중·드릴 돌진이 아니다.
     /// 걷는 속도: 흰 실 그물에 걸렸으면 느리다(0165).
+    /// 큰 나무 "가벼운 발"(0246)이 곱해진다.
     fn speed(&self) -> f32 {
+        let base = t::PLAYER_SPEED * self.stats.speed;
         if self.slow {
-            t::PLAYER_SPEED * t::WEB_SLOW
+            base * t::WEB_SLOW
         } else {
-            t::PLAYER_SPEED
+            base
         }
     }
 
@@ -359,7 +361,9 @@ impl Player {
 
     /// 솟구침 반지름: 재주 값 × 모은 힘만큼(0158). 이펙트·밀쳐내기도 같은 값.
     pub fn emerge_radius_for(&self, charge: f32) -> f32 {
-        self.talents.emerge_radius() * (1.0 + (t::EMERGE_CHARGE_RADIUS - 1.0) * charge)
+        self.talents.emerge_radius()
+            * self.stats.emerge
+            * (1.0 + (t::EMERGE_CHARGE_RADIUS - 1.0) * charge)
     }
 
     pub fn is_invulnerable(&self) -> bool {
@@ -467,11 +471,24 @@ impl Player {
         self.sp >= t::SP_MAX
     }
 
-    /// 발톱이 적을 맞혔다: SP를 채운다(드릴 자체는 채우지 않는다).
+    /// 박자 창(±초). 무기마다 배율(꽃잎 발목끈은 넓다), 큰 나무 "박자 귀"(0246).
+    pub fn beat_window(&self) -> f32 {
+        t::BEAT_WINDOW * self.moveset.beat_window * self.stats.beat
+    }
+
+    /// 강공격을 다 모으는 시간(장신구·큰 나무로 짧아진다, 0246).
+    pub fn charge_time(&self) -> f32 {
+        t::HEAVY_CHARGE * self.stats.charge
+    }
+
+    /// 발톱이 적을 맞혔다: SP를 채운다(드릴 자체는 채우지 않는다). 박자에 맞춘 타는 무기의 `beat_sp`배(0246).
     pub fn gain_sp(&mut self, finisher: bool) {
         let mut g = t::SP_PER_HIT;
         if finisher {
             g += t::SP_FINISHER_BONUS;
+        }
+        if self.on_beat {
+            g *= self.moveset.beat_sp * self.stats.beat_sp;
         }
         self.sp = (self.sp + g * self.stats.sp_gain * self.talents.sp_gain_mul()).min(t::SP_MAX);
     }
@@ -540,12 +557,12 @@ impl Player {
             return None;
         }
         let d = self.beat_clock - self.beat_at;
-        if d > t::BEAT_WINDOW * 2.0 {
+        if d > self.beat_window() * 2.0 {
             return None;
         }
         Some(BeatCue {
             k: self.beat_clock / self.beat_at,
-            window: d.abs() <= t::BEAT_WINDOW,
+            window: d.abs() <= self.beat_window(),
             waiting: self.queued == Some(Queued::Early),
         })
     }
@@ -568,9 +585,9 @@ impl Player {
             if self.combo_pending() {
                 if self.queued.is_none() {
                     let d = self.beat_clock - self.beat_at;
-                    if d < -t::BEAT_WINDOW {
+                    if d < -self.beat_window() {
                         self.queued = Some(Queued::Early);
-                    } else if d <= t::BEAT_WINDOW {
+                    } else if d <= self.beat_window() {
                         self.queued = Some(Queued::Beat);
                     } else {
                         self.attack_buf = t::INPUT_BUFFER;
@@ -793,6 +810,7 @@ impl Player {
                     shake: t::DRILL_WALL_SHAKE,
                     finisher: false,
                     poison: 0.0,
+                    crush: false,
                 });
             }
         }
@@ -934,6 +952,7 @@ mod tests {
             p.talents = crate::talents::Talents {
                 pick,
                 who: crate::equipment::Character::Momo,
+                ..Default::default()
             };
             p
         };

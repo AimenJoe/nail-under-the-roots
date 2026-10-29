@@ -1202,6 +1202,13 @@ pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
     Cutscene::new(actors, steps)
 }
 
+/// 이웃의 말 + 무기 하나(획득 창, 0246: 콩이가 모모에게 조약돌 덧신, 수수가 도토에게 호두).
+pub fn talk_give(w: &World, lines: &[(Speaker, Tr, Face)], weapon: usize) -> Cutscene {
+    let mut c = talk(w, lines);
+    c.steps.push(Step::Give(weapon));
+    c
+}
+
 /// 물든 것의 등장(0163): 음악이 끊기고 어둠이 Naïl 둘레만 남긴 채 내려앉는다 → 빛·카메라가 `at`으로 →
 /// 보라 울림으로 일어선다 → '???' 카드(도감 이름) → 말 → 빛·카메라가 돌아오고 보스 곡.
 /// 모모의 두 번째 만남과 같은 길이(짧은 판). 배우 0 = Naïl, 1 = 물든 것(월드의 적을 그대로 그린다).

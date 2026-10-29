@@ -176,6 +176,7 @@ impl Player {
             shake: 0.0,
             finisher: false,
             poison: 0.0,
+            crush: false,
         }
     }
 
@@ -323,6 +324,7 @@ mod tests {
         p.talents = crate::talents::Talents {
             pick: [2, 0, 0, 0],
             who: Character::Momo,
+            ..Default::default()
         };
         let (s, _, _) = hold_run_release(&mut p, &room, 0.4);
         let big = s.last().unwrap();

@@ -81,6 +81,8 @@ pub enum Reward {
     Fur(u8),
     /// equipment::CHARMS 번호(저널로 여는 것은 `Charm::journal`).
     Charm(usize),
+    /// equipment::WEAPONS 번호(0246): 그 무기의 기록 깃발을 세운다 — 그 캐릭터의 런마다 가방에.
+    Weapon(usize),
 }
 
 pub struct Goal {
@@ -272,6 +274,27 @@ pub const GOALS: &[Goal] = &[
         1,
         Some("doto"),
         Charm(crate::equipment::MAPLE_SCARF)
+    ),
+    // 모모·도토로 가장 깊은 곳에 두 번(0246): 그 캐릭터의 셋째 무기. 기록 키는 `clears.<캐릭터>`(profile::key::clears).
+    goal!(
+        "momo2",
+        Story,
+        jg_momo2,
+        jg_momo2_d,
+        Count("clears.Momo"),
+        2,
+        Some("momo_deep"),
+        Weapon(crate::equipment::PETAL)
+    ),
+    goal!(
+        "doto2",
+        Story,
+        jg_doto2,
+        jg_doto2_d,
+        Count("clears.Doto"),
+        2,
+        Some("doto_deep"),
+        Weapon(crate::equipment::CHESTNUT)
     ),
     goal!(
         "true_end",
@@ -677,6 +700,11 @@ pub fn claim(p: &mut Profile, g: &Goal) -> Option<Reward> {
         Charm(i) => {
             p.set(&key_charm(i));
         }
+        Weapon(w) => {
+            if let Some(k) = crate::equipment::WEAPONS[w].key {
+                p.set(k);
+            }
+        }
     }
     Some(g.reward)
 }
@@ -702,7 +730,7 @@ pub fn reward_place(r: Reward) -> Tr {
         Seeds(_) => |s| s.j_got_seeds,
         Decor(_) => |s| s.j_got_decor,
         Fur(_) => |s| s.j_got_fur,
-        Charm(_) => |s| s.j_got_charm,
+        Charm(_) | Weapon(_) => |s| s.j_got_charm,
     }
 }
 
@@ -805,7 +833,7 @@ mod tests {
         let momo_only: Vec<usize> = (0..CHARMS.len())
             .filter(|i| CHARMS[*i].only == Some(Character::Momo))
             .collect();
-        assert_eq!(momo_only.len(), 3);
+        assert_eq!(momo_only.len(), 6, "셋 + 0246의 셋");
         for i in &momo_only {
             assert!(!charm_pool(&p, Character::Mole).contains(i));
         }
@@ -825,7 +853,7 @@ mod tests {
         let doto_only: Vec<usize> = (0..CHARMS.len())
             .filter(|i| CHARMS[*i].only == Some(Character::Doto))
             .collect();
-        assert_eq!(doto_only.len(), 3);
+        assert_eq!(doto_only.len(), 6, "셋 + 0246의 셋");
         for ch in [Character::Mole, Character::Momo] {
             assert!(doto_only.iter().all(|i| !charm_pool(&p, ch).contains(i)));
         }

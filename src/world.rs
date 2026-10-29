@@ -332,6 +332,8 @@ pub struct Inventory {
     /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것, 0048)와 Naïl의 털빛(그리기만).
     /// 상자에서 나올 장신구. 기록이 정하므로 앱이 `seed_run_from_profile`에서 넣는다(0170 R-소) — 월드는 기록을 모른다.
     pub charm_pool: Vec<usize>,
+    /// 이 런의 길(상자·가게)에서 찾을 수 있는 무기(그 캐릭터 것 중 아직 없는 것, 0246). 앱이 기록에서 넣는다.
+    pub road_weapons: Vec<usize>,
     pub fur: u8,
 }
 
@@ -2277,8 +2279,11 @@ impl World {
 
     /// 장신구·씨앗으로 능력치를 다시 계산한다.
     pub fn refresh_stats(&mut self) {
-        self.player
-            .set_stats(Stats::compute(&self.inv.charms, self.inv.root_hearts));
+        self.player.set_stats(Stats::compute(
+            &self.inv.charms,
+            self.inv.root_hearts,
+            &self.player.talents.mods(),
+        ));
     }
 
     /// 퀵 슬롯 아이템을 먹기 시작한다. 체력이 가득이거나 슬롯이 비었으면 먹지 않는다(아깝지 않게).
@@ -2306,7 +2311,7 @@ impl World {
             return;
         }
         match c {
-            Consumable::Berry => p.heal(p.talents.berry_heal()),
+            Consumable::Berry => p.heal(p.talents.berry_heal() + p.stats.berry_heal),
             Consumable::Worm => p.heal(p.stats.max_hp),
         }
         self.juice.audio.play(sfx::Id::Heal);
@@ -3494,6 +3499,7 @@ mod tests {
             shake: 0.0,
             finisher: false,
             poison: 0.0,
+            crush: false,
         });
         assert!(w.juice.toast.is_some(), "고치는 때릴 수 없다");
         assert!(w.juice.audio.played(sfx::Id::WallHit));
@@ -3561,6 +3567,7 @@ mod tests {
             shake: 0.0,
             finisher: false,
             poison: 0.0,
+            crush: false,
         });
         assert!(w.room.webs.is_empty(), "발톱이 그물을 끊는다");
         assert!(w.juice.audio.played(sfx::Id::Unbind));
@@ -3623,6 +3630,7 @@ mod tests {
             shake: 0.0,
             finisher: false,
             poison: 0.0,
+            crush: false,
         };
         let k1 = w.deep.as_ref().unwrap().knots[1].pos;
         let s0 = strike(1, StrikeKind::Claw(0), k1, 1);
@@ -3844,6 +3852,7 @@ mod tests {
             shake: 0.0,
             finisher: false,
             poison: 0.0,
+            crush: false,
         };
         let brk = |w: &World| {
             w.room

@@ -93,7 +93,7 @@ pub(super) fn draw_player_fx(p: &Player, alpha: f32) {
         }
         // 강공격 모으기(0161): 발톱 끝에 빛이 모이고, 다 모이면 밝게 맥박친다. 발밑 게이지 고리(0202).
         player::State::Charging { time: ct, dir, .. } => {
-            let k = (ct / t::HEAVY_CHARGE).clamp(0.0, 1.0);
+            let k = (ct / p.charge_time()).clamp(0.0, 1.0);
             let claw = pos + dir * 7.0;
             let pulse = if k >= 1.0 {
                 0.7 + 0.3 * (ct * 20.0).sin()
@@ -279,13 +279,13 @@ pub(super) fn draw_player_fx(p: &Player, alpha: f32) {
 /// 모양(차오르는 호 → 닫힌 고리 → 굵기)으로도 읽혀 색만으로 가르지 않는다.
 /// 고리는 웅크린 발 줄(pos.y + 6~7)에 납작하게 깐다(0208): 예전 자리(가운데 +5, 세로 4.5)는 뒤쪽 호가 발보다 5px 위를
 /// 지나 도토 꼬리와 다리 사이·모모 다리 사이 틈으로 비쳐, 몸 아랫도리를 가로로 자른 것처럼 보였다.
-fn draw_charge_ring(pos: Vec2, ct: f32) {
+fn draw_charge_ring(pos: Vec2, ct: f32, full: f32) {
     let c = vec2(pos.x.round(), (pos.y + 7.0).round());
     let (rx, ry) = (10.0, 3.5);
     let at = |a: f32| c + vec2(a.sin() * rx, -a.cos() * ry);
     const N: usize = 28;
-    let k = (ct / t::HEAVY_CHARGE).clamp(0.0, 1.0);
-    let over = ct - t::HEAVY_CHARGE;
+    let k = (ct / full).clamp(0.0, 1.0);
+    let over = ct - full;
     let perfect = (0.0..=t::HEAVY_PERFECT).contains(&over);
     let seg = |i: usize, w: f32, col: Color| {
         let a0 = i as f32 / N as f32 * std::f32::consts::TAU;
@@ -334,7 +334,7 @@ fn draw_charge_ring(pos: Vec2, ct: f32) {
 /// 모으기 게이지는 바닥에(스프라이트 밑에) 그린다 — 몸 뒤쪽 호는 몸에 가리고 발 앞쪽 호가 보인다.
 pub(super) fn draw_charge_under(p: &Player, alpha: f32) {
     if let player::State::Charging { time: ct, .. } = p.state {
-        draw_charge_ring(lerp(p.prev_pos, p.pos, alpha), ct);
+        draw_charge_ring(lerp(p.prev_pos, p.pos, alpha), ct, p.charge_time());
     }
 }
 
@@ -401,8 +401,8 @@ pub(super) fn draw_jump_aim(w: &World, alpha: f32) {
 /// 다 모인 강공격을 쥐고 있는 동안 몸에 얹는 흰 실루엣의 투명도(0202). 딱 맞춘 창 동안 가장 밝다. 아니면 0.
 fn charge_glow(p: &Player) -> f32 {
     match p.state {
-        player::State::Charging { time: ct, .. } if ct >= t::HEAVY_CHARGE && !shadow_pass() => {
-            if ct - t::HEAVY_CHARGE <= t::HEAVY_PERFECT {
+        player::State::Charging { time: ct, .. } if ct >= p.charge_time() && !shadow_pass() => {
+            if ct - p.charge_time() <= t::HEAVY_PERFECT {
                 0.6
             } else {
                 0.16 + 0.1 * (ct * 8.0).sin()
@@ -419,7 +419,7 @@ fn draw_beat_cue(p: &Player, pos: Vec2) {
         let r = t::BEAT_RING_START + (t::BEAT_RING_END - t::BEAT_RING_START) * k;
         // 박자가 지난 뒤는 창 하나만큼에 걸쳐 사라진다.
         let fade = if c.k > 1.0 {
-            (1.0 - (c.k - 1.0) * t::BEAT_PERIOD / (t::BEAT_WINDOW * 2.0)).clamp(0.0, 1.0)
+            (1.0 - (c.k - 1.0) * t::BEAT_PERIOD / (p.beat_window() * 2.0)).clamp(0.0, 1.0)
         } else {
             1.0
         };
@@ -440,8 +440,8 @@ fn draw_beat_cue(p: &Player, pos: Vec2) {
         draw_circle_lines(x, y, r, w, col);
         // 박자 순간(0180): 과녁 고리가 한 번 굵고 하얗게 번쩍인다(박자 앞뒤 반 창 동안). "지금"이 모양으로도 보이게.
         let d = (c.k - 1.0).abs() * p.beat_period();
-        if d <= t::BEAT_WINDOW * 0.5 {
-            let a = 1.0 - d / (t::BEAT_WINDOW * 0.5);
+        if d <= p.beat_window() * 0.5 {
+            let a = 1.0 - d / (p.beat_window() * 0.5);
             draw_circle_lines(x, y, t::BEAT_RING_END, 2.5, Color::new(1.0, 1.0, 1.0, a));
         }
     }
@@ -574,8 +574,89 @@ pub(super) fn draw_shot(s: &world::toss::Shot, alpha: f32) {
             3.0,
             Color::new(0.42, 0.28, 0.18, 1.0),
         );
+    } else if s.bounce > 0 || (s.radius < t::ACORN_RADIUS && s.split == 0 && !s.thorns) {
+        if s.radius < t::ACORN_RADIUS {
+            // 호두 조각(0246): 작은 껍질 부스러기.
+            let p = pos.round();
+            draw_rectangle(p.x - 1.5, p.y - 1.5, 3.0, 3.0, OUTLINE);
+            draw_rectangle(
+                p.x - 1.0,
+                p.y - 1.0,
+                2.0,
+                2.0,
+                Color::new(0.82, 0.70, 0.50, 1.0),
+            );
+        } else {
+            // 솔방울(0246): 길쭉하고 비늘 줄.
+            let p = pos.round();
+            let d = Vec2::from_angle(spin);
+            for k in -1..=1 {
+                let q = (p + d * k as f32 * 1.6).round();
+                draw_circle(q.x, q.y, 2.2, OUTLINE);
+            }
+            for k in -1..=1 {
+                let q = (p + d * k as f32 * 1.6).round();
+                draw_circle(q.x, q.y, 1.5, Color::new(0.56, 0.38, 0.22, 1.0));
+                draw_rectangle(q.x, q.y - 1.0, 1.0, 1.0, Color::new(0.74, 0.54, 0.32, 1.0));
+            }
+        }
+    } else if s.split > 0 {
+        // 호두(0246): 크고 둥근 연갈색, 가운데 금.
+        let p = pos.round();
+        draw_circle(p.x, p.y, s.radius + 0.5, OUTLINE);
+        draw_circle(p.x, p.y, s.radius - 0.5, Color::new(0.82, 0.70, 0.50, 1.0));
+        let d = Vec2::from_angle(spin);
+        draw_line(
+            p.x - d.x * 3.0,
+            p.y - d.y * 3.0,
+            p.x + d.x * 3.0,
+            p.y + d.y * 3.0,
+            1.0,
+            Color::new(0.52, 0.40, 0.26, 1.0),
+        );
+    } else if s.thorns {
+        // 밤송이(0246): 가시 돋친 공.
+        let p = pos.round();
+        for k in 0..8 {
+            let d = Vec2::from_angle(spin + k as f32 * std::f32::consts::FRAC_PI_4);
+            let q = (p + d * 3.5).round();
+            draw_rectangle(q.x, q.y, 1.0, 1.0, Color::new(0.90, 0.84, 0.50, 1.0));
+        }
+        draw_circle(p.x, p.y, 3.0, OUTLINE);
+        draw_circle(p.x, p.y, 2.2, Color::new(0.50, 0.34, 0.20, 1.0));
     } else {
         draw_acorn(pos, spin);
+    }
+}
+
+/// 가시 덤불(0246): 바닥의 가시 줄기. 사라질 때 옅어진다. 찌를 때(`pulse`가 막 돌았을 때) 가시 끝이 밝다.
+pub(super) fn draw_thorn_patch(p: &world::toss::Patch, time: f32) {
+    let fade = (p.left / 0.6).min(1.0);
+    let (x, y) = (p.pos.x.round(), p.pos.y.round());
+    let r = t::THORN_PATCH_RADIUS;
+    draw_ellipse(
+        x,
+        y + 1.0,
+        r,
+        r * 0.55,
+        0.0,
+        Color::new(0.16, 0.24, 0.10, 0.35 * fade),
+    );
+    let stem = Color::new(0.30, 0.46, 0.22, fade);
+    let tip = if p.pulse > t::THORN_PATCH_PERIOD - 0.1 {
+        Color::new(1.0, 0.96, 0.80, fade)
+    } else {
+        Color::new(0.86, 0.90, 0.62, fade)
+    };
+    let seed = (p.pos.x * 3.0 + p.pos.y * 7.0) as i32;
+    for k in 0..6 {
+        let a = (seed + k * 61) as f32 * 0.37 + (time * 0.5).sin() * 0.05;
+        let d = vec2(a.cos(), a.sin() * 0.55);
+        let len = 4.0 + ((seed + k * 13).rem_euclid(4)) as f32;
+        let base = vec2(x, y) + d * 2.0;
+        let end = (base + d * len).round();
+        draw_line(base.x, base.y, end.x, end.y, 1.0, stem);
+        draw_rectangle(end.x, end.y - 1.0, 1.0, 1.0, tip);
     }
 }
 
@@ -1019,7 +1100,7 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     }
     // 다 모이면 떨린다(0161).
     let jitter = match p.state {
-        player::State::Charging { time: ct, .. } if ct >= t::HEAVY_CHARGE => {
+        player::State::Charging { time: ct, .. } if ct >= p.charge_time() => {
             ((time * 60.0) as i32 % 2) as f32
         }
         _ => 0.0,

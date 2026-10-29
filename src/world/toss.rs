@@ -15,6 +15,10 @@ pub struct Shot {
     pub left: f32,
     pub radius: f32,
     pub splash: f32,
+    /// 남은 벽 튕김(솔방울), 멈출 때 갈라질 조각 수(호두), 멈춘 자리에 가시(밤송이). 0246.
+    pub bounce: u8,
+    pub split: u8,
+    pub thorns: bool,
     /// 맞을 때 쓸 타격(모양·번호는 맞는 순간 정한다).
     pub strike: Strike,
     /// 날아가는 동안 그물·고치·매듭·부술 것에 쓰는 번호(같은 탄이 같은 것을 두 번 치지 않게).
@@ -30,10 +34,18 @@ pub struct Buried {
     pub damage: i32,
 }
 
+/// 가시 덤불(가시덩굴 각반·밤송이, 0246): `left`초 남아 `THORN_PATCH_PERIOD`마다 둘레의 적을 찌른다(적만).
+pub struct Patch {
+    pub pos: Vec2,
+    pub left: f32,
+    pub pulse: f32,
+}
+
 #[derive(Default)]
 pub struct Toss {
     pub shots: Vec<Shot>,
     pub buried: Vec<Buried>,
+    pub patches: Vec<Patch>,
     next_id: u32,
 }
 
@@ -47,11 +59,27 @@ impl Toss {
     pub fn clear(&mut self) {
         self.shots.clear();
         self.buried.clear();
+        self.patches.clear();
+    }
+
+    /// 가시 덤불을 놓는다(많으면 오래된 것부터 뺀다).
+    fn plant(&mut self, at: Vec2) {
+        if self.patches.len() >= t::THORN_PATCH_MAX {
+            self.patches.remove(0);
+        }
+        self.patches.push(Patch {
+            pos: at,
+            left: t::THORN_PATCH_TIME,
+            // 놓자마자 한 번 찌른다.
+            pulse: 0.0,
+        });
     }
 }
 
 /// 도토리 색(그림·이펙트).
 pub(crate) const ACORN: Color = Color::new(0.78, 0.52, 0.26, 1.0);
+/// 가시 덤불 잎 색(흙 튀김).
+pub(crate) const THORN_GREEN: Color = Color::new(0.42, 0.62, 0.30, 1.0);
 
 impl World {
     /// 플레이어가 이번 틱에 내놓은 탄·묻은 도토리를 받는다.
@@ -64,6 +92,9 @@ impl World {
                     reach,
                     radius,
                     splash,
+                    bounce,
+                    split,
+                    thorns,
                     strike,
                 } => {
                     let id = self.toss.id();
@@ -74,9 +105,18 @@ impl World {
                         left: reach,
                         radius,
                         splash,
+                        bounce,
+                        split,
+                        thorns,
                         strike,
                         id,
                     });
+                }
+                Spawn::Thorns { at } => {
+                    let mut p = at;
+                    self.room.resolve_circle(&mut p, 4.0);
+                    self.toss.plant(p);
+                    clods(&mut self.juice.fx, p, 4, THORN_GREEN, 40.0);
                 }
                 Spawn::Bury {
                     at,
@@ -131,12 +171,52 @@ impl World {
                 shake: 0.3,
                 finisher: false,
                 poison: 0.0,
+                crush: false,
             };
             self.juice.audio.play(sfx::Id::Emerge);
             self.juice.feel.add_trauma(0.15);
             self.juice.fx.push(ring(at, 3.0, r + 2.0, 0.25, ACORN));
             burst(&mut self.juice.fx, at, 12, DIRT, 110.0);
             self.touch_world(&s);
+            self.resolve_strike(s, at, Vec2::ZERO, true, deaths);
+        }
+        self.tick_patches(dt, deaths);
+    }
+
+    /// 가시 덤불: 때마다 둘레의 적을 찌른다(작게 밀고 잠깐 멈춘다). 플레이어는 안 다친다.
+    fn tick_patches(&mut self, dt: f32, deaths: &mut Vec<(Vec2, Kind)>) {
+        let mut pricks = Vec::new();
+        for p in &mut self.toss.patches {
+            p.left -= dt;
+            p.pulse -= dt;
+            if p.pulse <= 0.0 && p.left > 0.0 {
+                p.pulse = t::THORN_PATCH_PERIOD;
+                pricks.push(p.pos);
+            }
+        }
+        self.toss.patches.retain(|p| p.left > 0.0);
+        for at in pricks {
+            let r = t::THORN_PATCH_RADIUS;
+            let near = self
+                .enemies
+                .iter()
+                .any(|e| e.alive && e.hittable() && (e.pos - at).length() <= r + e.radius());
+            if !near {
+                continue;
+            }
+            let s = Strike {
+                id: self.toss.id(),
+                kind: StrikeKind::Prick,
+                shape: Shape::Circle { center: at, r },
+                damage: t::THORN_PATCH_DAMAGE + self.player.stats.damage,
+                knockback: 40.0,
+                stun: 0.2,
+                hitstop: 0.0,
+                shake: 0.05,
+                finisher: false,
+                poison: 0.0,
+                crush: false,
+            };
             self.resolve_strike(s, at, Vec2::ZERO, true, deaths);
         }
     }
@@ -170,6 +250,65 @@ impl World {
         });
         if !(enemy || wall || stopped || s.left <= 0.0) {
             return true;
+        }
+        // 솔방울(0246): 벽이면 한 번 튕겨 계속 난다. 축마다 막혔는지 보고 그 성분만 뒤집는다.
+        if wall && !enemy && !stopped && s.bounce > 0 && s.left > 0.0 {
+            s.bounce -= 1;
+            let back = s.prev;
+            if self.room.is_solid(vec2(s.pos.x, back.y), s.radius) {
+                s.vel.x = -s.vel.x;
+            }
+            if self.room.is_solid(vec2(back.x, s.pos.y), s.radius) {
+                s.vel.y = -s.vel.y;
+            }
+            if s.vel.normalize_or_zero() == dir {
+                s.vel = -s.vel;
+            }
+            s.pos = back;
+            self.juice.fx.push(ring(s.pos, 1.5, 4.0, 0.1, ACORN));
+            return true;
+        }
+        let stop_at = if wall { s.prev } else { s.pos };
+        // 맞은 적 뒤쪽에서 갈라진다(맞은 적을 조각이 또 치지 않게).
+        let split_at = self
+            .enemies
+            .iter()
+            .filter(|e| e.alive && e.hittable())
+            .find(|e| (e.pos - s.pos).length() <= e.radius() + s.radius)
+            .map_or(stop_at, |e| {
+                e.pos + dir * (e.radius() + t::SHARD_RADIUS + 2.0)
+            });
+        // 호두(0246): 멈추는 자리에서 조각으로 갈라진다(뒤로 튀지 않게 앞쪽 부채꼴).
+        if s.split > 0 {
+            let n = s.split as i32;
+            for i in 0..n {
+                let id = self.toss.id();
+                let off = (i as f32 - (n - 1) as f32 * 0.5) * t::SHARD_SPREAD;
+                let d = Vec2::from_angle(off).rotate(if wall { -dir } else { dir });
+                self.toss.shots.push(Shot {
+                    pos: split_at,
+                    prev: split_at,
+                    vel: d * t::SHARD_SPEED,
+                    left: t::SHARD_REACH,
+                    radius: t::SHARD_RADIUS,
+                    splash: 0.0,
+                    bounce: 0,
+                    split: 0,
+                    thorns: false,
+                    strike: Strike {
+                        damage: 1 + self.player.stats.damage,
+                        knockback: 60.0,
+                        finisher: false,
+                        ..s.strike
+                    },
+                    id,
+                });
+            }
+            clods(&mut self.juice.fx, split_at, 5, ACORN, 80.0);
+        }
+        // 밤송이(0246): 멈춘 자리에 가시.
+        if s.thorns {
+            self.toss.plant(stop_at);
         }
         if enemy || s.splash > 0.0 {
             let r = if s.splash > 0.0 {
@@ -400,5 +539,114 @@ mod tests {
             w.projectiles.iter().any(|b| b.alive && b.friendly),
             "되받아쳤다"
         );
+    }
+
+    /// 그 캐릭터·무기로 바꾼다(0246).
+    fn arm(w: &mut World, ch: Character, weapon: usize) {
+        w.character = ch;
+        w.player.kit = ch;
+        w.player.moveset = WEAPONS[weapon].moveset;
+    }
+
+    /// 한 콤보(타 수만큼 누르고 기다리기)를 끝까지.
+    fn combo(w: &mut World) {
+        for _ in 0..w.player.moveset.hits.len() {
+            w.tick(&press());
+            run(w, &Actions::default(), 26);
+        }
+    }
+
+    /// 솔방울(0246): 벽에 닿으면 한 번 튕겨 되돌아 난다.
+    #[test]
+    fn pinecones_bounce_off_a_wall_once() {
+        let mut w = doto();
+        arm(&mut w, Character::Doto, crate::equipment::PINECONE);
+        // 오른쪽 벽 가까이에서 오른쪽으로.
+        let mut x = w.player.pos.x;
+        while !w.room.is_solid(vec2(x + 30.0, w.player.pos.y), 3.0) {
+            x += 4.0;
+        }
+        w.player.pos.x = x;
+        w.tick(&press());
+        let mut bounced = false;
+        for _ in 0..40 {
+            w.tick(&Actions::default());
+            bounced |= w.toss.shots.iter().any(|s| s.vel.x < 0.0 && s.bounce == 0);
+        }
+        assert!(bounced, "벽에 튕겨 왼쪽으로 난다");
+    }
+
+    /// 호두(0246): 맞은 자리에서 조각 셋으로 갈라지고, 조각이 뒤의 적을 맞힌다(맞은 적은 다시 치지 않는다).
+    #[test]
+    fn walnuts_split_and_the_shards_fly_on() {
+        let mut w = doto();
+        arm(&mut w, Character::Doto, crate::equipment::WALNUT);
+        let front = dummy(&mut w, vec2(50.0, 0.0));
+        let back = dummy(&mut w, vec2(72.0, 0.0));
+        let (hf, hb) = (w.enemies[front].hp, w.enemies[back].hp);
+        w.tick(&press());
+        let mut most = 0;
+        for _ in 0..50 {
+            w.tick(&Actions::default());
+            most = most.max(w.toss.shots.len());
+        }
+        assert!(most >= 3, "조각 셋");
+        assert_eq!(hf - w.enemies[front].hp, 2, "앞의 적은 호두에만(피해 2)");
+        assert!(w.enemies[back].hp < hb, "뒤의 적은 조각에");
+    }
+
+    /// 밤송이(0246): 셋째 던지기가 떨어진 자리에 가시를 남기고, 그 위의 적이 찔린다(플레이어는 안 다친다).
+    #[test]
+    fn chestnut_burrs_leave_thorns_that_prick_enemies() {
+        let mut w = doto();
+        arm(&mut w, Character::Doto, crate::equipment::CHESTNUT);
+        combo(&mut w);
+        run(&mut w, &Actions::default(), 30);
+        assert!(!w.toss.patches.is_empty(), "가시가 남았다");
+        let at = w.toss.patches[0].pos;
+        w.spawn_mob(Kind::Dummy, at);
+        let e = w.enemies.len() - 1;
+        w.enemies[e].max_hp = 99;
+        w.enemies[e].hp = 99;
+        let php = w.player.hp;
+        w.player.pos = at + vec2(0.0, 2.0);
+        run(&mut w, &Actions::default(), 40);
+        assert!(w.enemies[e].hp < 99, "찔렸다");
+        assert_eq!(w.player.hp, php);
+        run(
+            &mut w,
+            &Actions::default(),
+            (t::THORN_PATCH_TIME / t::TICK_DT) as usize,
+        );
+        assert!(w.toss.patches.is_empty(), "시간이 지나면 사라진다");
+    }
+
+    /// 가시덩굴 각반(0246): 마무리 차기가 발 앞에 가시를 남긴다.
+    #[test]
+    fn briar_finisher_leaves_thorns() {
+        let mut w = doto();
+        arm(&mut w, Character::Momo, crate::equipment::BRIAR);
+        combo(&mut w);
+        assert_eq!(w.toss.patches.len(), 1);
+        assert!(
+            w.toss.patches[0].pos.x > w.player.pos.x - 4.0,
+            "앞쪽(오른쪽)에"
+        );
+    }
+
+    /// 꽃잎 발목끈(0246): 박자 창이 넓고, 박자에 맞춘 타는 기를 두 배로 채운다.
+    #[test]
+    fn petal_anklet_widens_the_beat_and_doubles_ki() {
+        let mut w = doto();
+        arm(&mut w, Character::Momo, crate::equipment::PETAL);
+        assert!(w.player.beat_window() > t::BEAT_WINDOW * 1.5);
+        w.player.sp = 0.0;
+        w.player.on_beat = false;
+        w.player.gain_sp(false);
+        let off = w.player.sp;
+        w.player.sp = 0.0;
+        w.player.on_beat = true;
+        w.player.gain_sp(false);
+        assert!((w.player.sp - off * t::PETAL_BEAT_SP).abs() < 1e-4);
     }
 }

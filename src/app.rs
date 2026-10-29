@@ -25,7 +25,7 @@ use title::*;
 
 use crate::art::Art;
 use crate::cutscene::{self, Cutscene};
-use crate::equipment::{Character, CHARMS, CHARM_SLOTS, WEAPONS};
+use crate::equipment::{Character, CHARMS, WEAPONS};
 use crate::i18n::{self, fill, tr, Tr};
 use crate::input::{self, Actions, Device, Input, Verb};
 use crate::render::{self, Renderer};
@@ -609,6 +609,11 @@ impl App {
     }
 
     /// 첫 시작(Normal)만 이야기 기록을 남긴다. 개발 시나리오는 기록을 건드리지 않는다.
+    /// 이 무기를 가졌나(기록 깃발이나 이번 런 가방, 0246).
+    fn owns_weapon(&self, w: usize) -> bool {
+        WEAPONS[w].key.is_some_and(|k| self.profile.flag(k)) || self.inventory.has(w)
+    }
+
     fn recording(&self) -> bool {
         self.current == Scenario::Normal
     }
@@ -1047,6 +1052,13 @@ impl App {
         // 큰 나무의 재주(0047): 튜토리얼만 빼고 모든 시작에(개발 시나리오도 고른 재주로 시험한다).
         if s != Scenario::Tutorial {
             self.world.player.talents = self.talents();
+            // 큰 나무 덤(0246)이 최대 체력을 올렸으면 그만큼 채워서 시작(시나리오가 정한 체력은 그대로 두고 더하기만).
+            let before = self.world.player.stats.max_hp;
+            self.world.refresh_stats();
+            let gained = self.world.player.stats.max_hp - before;
+            if gained > 0 {
+                self.world.player.heal(gained);
+            }
         }
         // 모모(0046): 이긴 수는 기록에서(빈 자리의 꽃잎). 첫 길 끝에서 싸우는 건 첫 시작에서만, 돌아오기 전까지.
         // 개발 시나리오 "모모"는 시나리오가 정한 값을 그대로 쓴다.
@@ -1087,7 +1099,11 @@ impl App {
         self.inventory = match s {
             Scenario::Normal if veteran => Inventory::new(ch, &[start]),
             Scenario::Normal | Scenario::Tutorial => Inventory::new(ch, &[]),
-            Scenario::AllClaws => Inventory::new(ch, &[start, 0, 2, 3]),
+            Scenario::AllClaws => {
+                // 그 캐릭터 무기 전부(가방이 주인 것만 받는다, 0246). 첫째(낀 것)는 시작 무기.
+                let all: Vec<usize> = std::iter::once(start).chain(0..WEAPONS.len()).collect();
+                Inventory::new(ch, &all)
+            }
             Scenario::Gear => {
                 let mut inv = Inventory::new(ch, &[start]);
                 for c in 0..CHARMS.len() {
@@ -1097,20 +1113,19 @@ impl App {
             }
             _ => Inventory::new(ch, &[start]),
         };
-        // 수수의 새싹 발톱(0053)·큰 나무에서 깨운 독 발톱(0052)도 런마다 가방에(끼는 건 가방에서).
-        // 맨손 시작(튜토리얼 전)은 빼고.
-        for (k, w) in [
-            (crate::profile::key::SPROUT, crate::equipment::SPROUT_CLAW),
-            (crate::profile::key::STONE, crate::equipment::STONE_CLAW),
-            (crate::profile::key::VENOM, crate::equipment::VENOM_CLAW),
-        ] {
-            if self.profile.flag(k)
-                && self.inventory.equipped.is_some()
-                && WEAPONS[w].kind == ch.weapon_kind()
-            {
+        // 기록으로 가진 무기(수수의 새싹 발톱 0053·콩이의 바위 발톱·큰 나무의 독 발톱 0052, 모모·도토 무기 0246)는
+        // 런마다 가방에(끼는 건 가방에서, 가방이 주인 것만 받는다). 맨손 시작(튜토리얼 전)은 빼고.
+        for (w, wp) in WEAPONS.iter().enumerate() {
+            if wp.key.is_some_and(|k| self.profile.flag(k)) && self.inventory.equipped.is_some() {
                 self.inventory.add(w);
             }
         }
+        // 이 런의 길(상자·가게)에서 찾을 무기: 이 캐릭터 것 중 아직 없는 것(0246).
+        self.world.inv.road_weapons = (0..WEAPONS.len())
+            .filter(|&w| {
+                WEAPONS[w].found_on_road && self.inventory.fits(w) && !self.inventory.has(w)
+            })
+            .collect();
         // 저널로 받은 장신구는 런마다 가방에 들고 시작한다(0050). 상자에서는 다시 안 나온다.
         if s != Scenario::Tutorial {
             for c in crate::journal::owned_charms(&self.profile, ch) {
@@ -1874,6 +1889,14 @@ impl App {
         let item = self.gift_queue.remove(0);
         match item {
             crate::world::Gift::Weapon(w) => {
+                // 가진 무기는 기록에 남는다(0246): 다음 런부터 그 캐릭터의 가방에. 개발 시나리오는 이번 런에만.
+                if let Some(k) = WEAPONS[w].key {
+                    if self.recording() && !self.profile.flag(k) {
+                        self.profile.set(k);
+                        self.save_profile();
+                    }
+                }
+                self.world.inv.road_weapons.retain(|&x| x != w);
                 self.inventory.add(w);
                 if self.inventory.equipped.is_none() && self.inventory.fits(w) {
                     self.inventory.equipped = Some(w);
@@ -1915,7 +1938,15 @@ impl App {
     fn draw_gift(&self, ui: &Ui, g: &Gift) {
         let s = i18n::s();
         let (title, name, desc) = match g.item {
-            crate::world::Gift::Weapon(w) => (s.gift_title, WEAPONS[w].name, WEAPONS[w].desc),
+            crate::world::Gift::Weapon(w) => (
+                if WEAPONS[w].kind == crate::equipment::WeaponKind::Claw {
+                    s.gift_title
+                } else {
+                    s.gift_weapon
+                },
+                WEAPONS[w].name,
+                WEAPONS[w].desc,
+            ),
             crate::world::Gift::Charm(c) => (s.gift_charm, CHARMS[c].name, CHARMS[c].desc),
         };
         let k = (g.t / 0.2).min(1.0);
@@ -1926,7 +1957,7 @@ impl App {
         ui.rect(icon, ui::PANEL_LIGHT);
         ui.rect_lines(icon, ui::BORDER);
         match g.item {
-            crate::world::Gift::Weapon(w) => draw_claw_icon(ui, icon, WEAPONS[w].color),
+            crate::world::Gift::Weapon(w) => draw_weapon_icon(ui, icon, w),
             crate::world::Gift::Charm(c) => draw_charm_icon(ui, icon, CHARMS[c].color),
         }
         ui.text(tr(name), icon.right() + 8.0, r.y + 22.0, FONT_PX, ui::TEXT);

@@ -336,6 +336,10 @@ pub const REVIVE_PUSH_RADIUS: f32 = 40.0;
 pub const REVIVE_PUSH_KNOCKBACK: f32 = 260.0;
 /// 상점 화폐 씨앗: 보물 상자 한 줌(최소, 최대), 보스.
 pub const CHEST_SEEDS: (u32, u32) = (2, 3);
+/// 상자에서 길의 무기(가시덩굴 각반·솔방울, 0246)가 나올 확률(아직 없을 때). 한 런 상자 ≈ 6 → 대개 한 런 안에.
+pub const CHEST_WEAPON: f32 = 0.3;
+/// 쉼터 가게의 길 무기 값(씨앗).
+pub const PRICE_WEAPON: u32 = 18;
 pub const BOSS_SEEDS: u32 = 4;
 /// 끝방 출구는 마지막으로 쓰러진 자리·플레이어에서 이만큼(px) 넘게 떨어진 칸에 생긴다(0060). 보상을 줍기 전에 빠지지 않게.
 pub const EXIT_MIN_DIST: f32 = 80.0;
@@ -672,6 +676,31 @@ pub const BIG_ACORN_SPEED: f32 = 0.65;
 pub const BIG_ACORN_REACH: f32 = 1.15;
 pub const BIG_ACORN_SIZE: f32 = 1.8;
 pub const BIG_ACORN_SPLASH: f32 = 22.0;
+
+// 모모·도토 무기 셋씩(0246).
+/// 꽃잎 발목끈: 박자 창 배율과, 박자에 맞춘 타가 기를 채우는 배율.
+pub const PETAL_BEAT_WINDOW: f32 = 1.7;
+pub const PETAL_BEAT_SP: f32 = 2.0;
+/// 솔방울: 빠르고 멀리(벽에 한 번 튕긴다).
+pub const PINE_SPEED: f32 = 330.0;
+pub const PINE_REACH: f32 = 150.0;
+/// 호두: 느리고 크다. 멈추면 조각 셋(조각은 짧게 날고 피해 1).
+pub const WALNUT_SPEED: f32 = 210.0;
+pub const WALNUT_REACH: f32 = 100.0;
+pub const WALNUT_RADIUS: f32 = 4.5;
+pub const SHARD_SPEED: f32 = 230.0;
+pub const SHARD_REACH: f32 = 38.0;
+pub const SHARD_RADIUS: f32 = 2.0;
+pub const SHARD_SPREAD: f32 = 0.9;
+/// 밤송이 마무리 둘의 사거리(가시를 놓을 자리라 조금 짧게).
+pub const CHESTNUT_REACH: f32 = 96.0;
+/// 가시 덤불(가시덩굴 각반·밤송이): 이만큼 남아 `THORN_PATCH_PERIOD`마다 둘레의 적을 찌른다.
+pub const THORN_PATCH_TIME: f32 = 3.0;
+pub const THORN_PATCH_RADIUS: f32 = 10.0;
+pub const THORN_PATCH_PERIOD: f32 = 0.5;
+pub const THORN_PATCH_DAMAGE: i32 = 1;
+/// 한 번에 놓일 수 있는 가시 덤불 수(오래된 것부터 사라진다).
+pub const THORN_PATCH_MAX: usize = 6;
 /// 뒤로 뛰기(회피): 시간·거리·높이. 서 있으면 겨눈 쪽 반대로, 움직이면 그쪽으로. 공중에서는 안 맞는다.
 pub const BACKLEAP_TIME: f32 = 0.32;
 pub const BACKLEAP_DIST: f32 = 62.0;
@@ -729,3 +758,17 @@ pub const PRICE_CHARM: u32 = 12;
 pub const PACK_SEEDS: u32 = 2;
 /// 이웃 곁에서 말 걸기 버튼이 먹히는 거리(px).
 pub const INTERACT_RADIUS: f32 = 22.0;
+
+// 큰 나무 갈래 셋 × 깊이 여덟(0246).
+/// 덤 칸 값(깊이마다, 처음 정한 값 — 실제는 `TALENT_PRICE_MUL`배). 깊이 0은 늘 고르기 칸이라 쓰지 않는다.
+/// 한 캐릭터를 다 깨우면 약 6천 반딧불 ≈ 25~30런(한 런 벌이 ≈ 240, 0225).
+pub const TREE_COST: [u32; 8] = [40, 45, 55, 70, 90, 110, 135, 165];
+pub const TREE_STUN: f32 = 0.1;
+pub const TREE_KNOCK: f32 = 1.2;
+pub const TREE_HASTE: f32 = 1.08;
+pub const TREE_BEAT: f32 = 1.25;
+pub const TREE_CHARGE: f32 = 0.8;
+pub const TREE_KI: f32 = 1.15;
+pub const TREE_SPEED: f32 = 1.06;
+pub const TREE_DODGE: f32 = 0.88;
+pub const TREE_BARGAIN: f32 = 0.85;

@@ -1087,7 +1087,12 @@ impl World {
     /// 전에는 "셋이 다 감긴 뒤 또"라 넷째에야 끝나 셋이라는 표시와 어긋났다(사장 피드백 2026-10-28).
     /// 도움 모드·쉼터 전(필드)은 끝없이 깨어난다.
     pub fn run_over(&self) -> bool {
-        !self.assist && self.adv.home == Place::Camp && self.adv.falls + 1 >= t::RUN_LIVES
+        !self.assist && self.adv.home == Place::Camp && self.adv.falls + 1 >= self.run_lives()
+    }
+
+    /// 이번 런의 실뿌리 수: 기본 셋 + 큰 나무 "실뿌리 하나 더"(0246).
+    pub fn run_lives(&self) -> u32 {
+        t::RUN_LIVES + self.player.stats.lives
     }
 
     /// 실뿌리를 셀 때인가(쉼터를 지난 런, 도움 모드 아님). HUD가 셋을 그린다.
@@ -1149,7 +1154,7 @@ impl World {
             (|s| s.toast_respawn, 2.5)
         } else if !strand {
             (|s| s.toast_fall, 3.0)
-        } else if self.adv.falls + 1 >= t::RUN_LIVES {
+        } else if self.adv.falls + 1 >= self.run_lives() {
             (|s| s.toast_fall_last, 4.0)
         } else {
             (|s| s.toast_fall_root, 3.5)
@@ -1366,6 +1371,7 @@ impl World {
         self.stats.chests += 1;
         // 장신구는 상자 앞(아래)에 떨어진다 — 상자 칸은 막혀 있다.
         self.charm_gift(at + vec2(0.0, 16.0));
+        self.weapon_gift(at + vec2(-14.0, 18.0));
         self.juice.audio.play(sfx::Id::Emerge);
     }
 
@@ -1387,6 +1393,11 @@ impl World {
 
     /// 장신구 하나를 `at`에 떨어뜨린다: 빛 고리와 반짝임. 방 안쪽에 묶는다(문 칸·벽 너머로 가지 않게).
     fn drop_charm(&mut self, c: usize, at: Vec2) {
+        self.drop_gift(Gift::Charm(c), crate::equipment::CHARMS[c].color, at);
+    }
+
+    /// 무기·장신구 하나를 `at`에 떨어뜨린다(0246: 무기도 바닥에).
+    fn drop_gift(&mut self, item: Gift, color: Color, at: Vec2) {
         let at = match self.loot_bounds() {
             Some(b) => vec2(
                 at.x.clamp(b.x + 8.0, b.right() - 8.0),
@@ -1394,12 +1405,18 @@ impl World {
             ),
             None => at,
         };
-        self.pickups
-            .push(crate::world::Pickup::new(at, Gift::Charm(c)));
-        self.juice
-            .fx
-            .push(ring(at, 4.0, 22.0, 0.45, crate::equipment::CHARMS[c].color));
+        self.pickups.push(crate::world::Pickup::new(at, item));
+        self.juice.fx.push(ring(at, 4.0, 22.0, 0.45, color));
         self.juice.audio.play(sfx::Id::Chest);
+    }
+
+    /// 길에서 찾는 무기(0246, `Inventory::road_weapons`): 상자에서 `CHEST_WEAPON` 확률로 하나.
+    fn weapon_gift(&mut self, at: Vec2) {
+        if self.inv.road_weapons.is_empty() || rand::gen_range(0.0, 1.0) >= t::CHEST_WEAPON {
+            return;
+        }
+        let w = self.inv.road_weapons.remove(0);
+        self.drop_gift(Gift::Weapon(w), crate::equipment::WEAPONS[w].color, at);
     }
 
     /// 아직 없는 장신구 하나(다 있으면 반딧불 한 줌). 상자·실타래 끝방(0147).

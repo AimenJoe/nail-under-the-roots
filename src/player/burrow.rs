@@ -108,20 +108,22 @@ impl Player {
                 shake: t::DRILL_HIT_SHAKE,
                 finisher: false,
                 poison: 0.0,
+                crush: false,
             });
         }
-        self.state = if time >= t::DRILL_REV + t::DRILL_TIME * self.talents.drill_mul() {
-            State::Recover {
-                time: t::DRILL_RECOVER,
-            }
-        } else {
-            State::Drill {
-                time,
-                dir,
-                aim,
-                next_hit,
-            }
-        };
+        self.state =
+            if time >= t::DRILL_REV + t::DRILL_TIME * self.talents.drill_mul() * self.stats.drill {
+                State::Recover {
+                    time: t::DRILL_RECOVER,
+                }
+            } else {
+                State::Drill {
+                    time,
+                    dir,
+                    aim,
+                    next_hit,
+                }
+            };
         strike
     }
 
@@ -186,6 +188,7 @@ impl Player {
             shake: t::EMERGE_SHAKE + t::EMERGE_CHARGE_SHAKE * charge,
             finisher: false,
             poison: 0.0,
+            crush: false,
         }
     }
 }
