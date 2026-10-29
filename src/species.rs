@@ -274,7 +274,7 @@ pub static TOAD: Species = Species {
     radius: 6.5,
     speed: 22.0,
     knock_mul: 0.5,
-    windup: 0.55,
+    windup: 0.8, // 0254: 0.55 → 0.8 — 혀 겨눔(띠)이 보이는 시간
     rest: 0.9,
     keep: (36.0, 66.0),
     fire_every: 2.0,

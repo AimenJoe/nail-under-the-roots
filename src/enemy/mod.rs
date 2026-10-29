@@ -140,6 +140,8 @@ pub struct Enemy {
     pub max_hp: i32,
     /// 예고 시간 배율(실뜨기 2단계)·걷기 배율(실뜨기 6단계).
     pub windup_mul: f32,
+    /// 예고 중 겨눈 쪽을 돌리는 지금 빠르기(rad/s, 0254). 예고가 시작되면 0부터.
+    pub turn_speed: f32,
     pub speed_mul: f32,
     /// 실뜨기를 이미 걸었나(월드가 새로 나온 적에 한 번).
     pub knotted: bool,
@@ -218,6 +220,24 @@ pub(super) struct Ctx<'a> {
 
 impl Enemy {
     /// 예고 시간(종 수치 × 실뜨기 배율).
+    /// 예고 동안 `want` 쪽으로 겨눈다(0254): 한 번에 휙 돌지 않고, 0에서 가속해 최대 빠르기까지만 돈다.
+    /// `time`은 그 예고 상태의 지난 시간 — 첫 틱이면 빠르기를 0으로(새 예고).
+    pub(super) fn aim_toward(&mut self, want: Vec2, time: f32, dt: f32) {
+        if time <= dt * 1.5 {
+            self.turn_speed = 0.0;
+        }
+        let want = want.normalize_or(self.facing);
+        let cur = self.facing.normalize_or(want);
+        self.turn_speed = (self.turn_speed + t::ENEMY_TURN_ACCEL * dt).min(t::ENEMY_TURN_MAX);
+        let diff = cur.perp_dot(want).atan2(cur.dot(want));
+        let step = self.turn_speed * dt;
+        self.facing = if diff.abs() <= step {
+            want
+        } else {
+            Vec2::from_angle(step * diff.signum()).rotate(cur)
+        };
+    }
+
     pub fn windup(&self) -> f32 {
         self.kind.species().windup * self.windup_mul
     }
@@ -257,6 +277,7 @@ impl Enemy {
             hp,
             max_hp: hp,
             windup_mul: 1.0,
+            turn_speed: 0.0,
             speed_mul: 1.0,
             knotted: false,
             roused: false,
@@ -1416,6 +1437,38 @@ mod tests {
         let dir = lashed.expect("혀를 내민다");
         assert!(dir.dot((player - e.pos).normalize()) > 0.95);
         assert!(ev.contains(&Event::Tongue) && pr.is_empty());
+    }
+
+    /// 예고 중 겨누기(0254): 플레이어가 옆으로 확 돌아도 겨눈 쪽은 가속해 따라가고 최대 빠르기를 넘지 않는다.
+    #[test]
+    fn windup_aim_turns_with_acceleration_and_a_top_speed() {
+        let mut e = Enemy::new(Kind::FieldMouse, vec2(0.0, 0.0));
+        e.facing = vec2(1.0, 0.0);
+        let want = vec2(0.0, 1.0);
+        let dt = t::TICK_DT;
+        e.aim_toward(want, dt, dt);
+        let first = e.facing.y.atan2(e.facing.x);
+        assert!(
+            first > 0.0 && first < t::ENEMY_TURN_MAX * dt,
+            "첫 틱은 아주 조금 {first}"
+        );
+        let mut time = dt;
+        while time < 0.45 {
+            time += dt;
+            e.aim_toward(want, time, dt);
+        }
+        let turned = e.facing.y.atan2(e.facing.x);
+        let most = t::ENEMY_TURN_MAX * 0.45;
+        assert!(
+            turned < most && turned > 0.3,
+            "0.45초에 {turned} rad(최대 {most})"
+        );
+        // 충분히 지나면 다다른다.
+        for _ in 0..120 {
+            time += dt;
+            e.aim_toward(want, time, dt);
+        }
+        assert!(e.facing.dot(want) > 0.999);
     }
 
     /// 두꺼비 혀(0253): 내민 순간엔 길이 0이라 안 맞고, 혀끝이 자라 닿아야 맞는다. 다 뻗은 뒤 말려 들어갈 때는 안 맞는다.

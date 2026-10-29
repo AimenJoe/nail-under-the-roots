@@ -42,7 +42,7 @@ impl Enemy {
         let events = &mut *c.events;
         let time = time + dt;
         if player_targetable {
-            self.facing = dir_to_player;
+            self.aim_toward(dir_to_player, time, dt);
         }
         if time >= self.windup() {
             self.state = State::Charge {

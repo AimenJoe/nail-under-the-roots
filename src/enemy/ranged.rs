@@ -152,7 +152,7 @@ impl Enemy {
         let sp = self.sp();
         let time = time + dt;
         if player_targetable {
-            self.facing = dir_to_player;
+            self.aim_toward(dir_to_player, time, dt);
         }
         if time >= self.windup() && sp.behavior == Behavior::Tongue {
             // 두꺼비: 겨눈 쪽으로 혀를 내민다(맞았는지는 월드가 이 틱에 본다).

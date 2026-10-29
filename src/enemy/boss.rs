@@ -73,8 +73,8 @@ impl Enemy {
                 self.pos += to.normalize() * self.speed() * 1.5 * dt;
             }
         }
-        if player_targetable {
-            self.facing = dir_to_player;
+        if player_targetable && time < t::CLOVER_THREAD_AT {
+            self.aim_toward(dir_to_player, time, dt);
         }
         if was < t::CLOVER_THREAD_AT && time >= t::CLOVER_THREAD_AT {
             events.push(Event::Thread(self.pos, self.facing));

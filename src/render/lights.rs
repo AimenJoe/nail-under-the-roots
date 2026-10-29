@@ -113,7 +113,7 @@ pub(super) fn draw_world_lights(
         );
     }
     // 포자 구름(0146)은 어둠 속에서도 옅게 빛난다(아플 때만 조금 더).
-    for c in &w.hazards.clouds {
+    for c in w.hazards.clouds.iter().filter(|c| c.time >= 0.0) {
         let fade = 1.0 - ((c.time / t::SPORE_CLOUD_TIME - 0.75) / 0.25).clamp(0.0, 1.0);
         let hot = if c.time < t::SPORE_CLOUD_GRACE {
             0.5

@@ -612,7 +612,7 @@ pub const TOAD_TONGUE_WIDTH: f32 = 4.0;
 pub const TOAD_LASH_TIME: f32 = 0.22;
 /// 혀가 다 뻗기까지(0253, 사장 "두꺼비 혀가 보이지도 않고 맞음"): 이 동안 혀끝이 자라며, 맞는 판정도 지금 뻗은 길이까지.
 /// 그 뒤 `TOAD_LASH_TIME` 동안 말려 들어간다.
-pub const TOAD_EXTEND_TIME: f32 = 0.12;
+pub const TOAD_EXTEND_TIME: f32 = 0.22; // 0254: 0.12 → 0.22(사장 "아직도 거의 즉시, 패링 불가능할 정도")
 pub const TOAD_PULL: f32 = 260.0;
 /// 박쥐: 나는 높이(그리기용 px). 날고 있어 솟구치기가 닿지 않는다.
 pub const BAT_HEIGHT: f32 = 9.0;
@@ -621,6 +621,12 @@ pub const SPORE_CLOUD_R: f32 = 22.0;
 pub const SPORE_CLOUD_TIME: f32 = 2.6;
 pub const SPORE_PUFF_TIME: f32 = 0.3;
 pub const SPORE_CLOUD_GRACE: f32 = 0.3;
+/// 포자버섯이 쓰러지며 뿜는 구름은 이만큼(초) 뒤에(0254, 사장 "죽자마자 바로 독가스"): 그동안 그 자리에 둘레 공격 예고(X 원).
+pub const SPORE_DEATH_DELAY: f32 = 0.8;
+/// 적이 예고 동안 겨눈 쪽을 돌리는 빠르기(0254, 사장 "조준이 한순간에 변경되어 예측 못 하는 경로로"): 예고가 시작되면
+/// 0에서 `ENEMY_TURN_ACCEL`(rad/s²)로 빨라져 `ENEMY_TURN_MAX`(rad/s, ≈140°/s)까지. 0.45초 예고 동안 ≈35°만 돈다.
+pub const ENEMY_TURN_ACCEL: f32 = 6.0;
+pub const ENEMY_TURN_MAX: f32 = 2.4;
 
 // ---- 큰 나무의 재주(src/talents.rs, docs/decisions/0047) -------------------------------
 /// 굴파기 A 깊은 굴: 땅속 시간·솟구침 반지름·대기 배율. B 얕은 굴.

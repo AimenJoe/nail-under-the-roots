@@ -2023,9 +2023,12 @@ impl World {
     /// 이번 틱에 쓰러진 적이 떨어뜨리는 것(루프 밖에서).
     fn settle_deaths(&mut self, deaths: Vec<(Vec2, Kind)>) {
         for (pos, kind) in deaths {
-            // 포자버섯은 쓰러지면서도 한 번 뿜는다.
+            // 포자버섯은 쓰러지면서도 한 번 뿜는다 — 예고(X 원) 뒤에(0254). 구름 시간이 음수인 동안이 예고.
             if kind == Kind::SporeCap {
-                self.hazards.clouds.push(Cloud { pos, time: 0.0 });
+                self.hazards.clouds.push(Cloud {
+                    pos,
+                    time: -t::SPORE_DEATH_DELAY,
+                });
             }
             self.adv.last_kill = pos;
             self.drop_loot(pos, kind);
@@ -3796,6 +3799,28 @@ mod tests {
         w.juice.fx.extend((0..5).map(|i| dust(i as f32)));
         w.thin_fx();
         assert_eq!(w.juice.fx.len(), 8);
+    }
+
+    /// 쓰러진 포자버섯의 구름은 예고 뒤에(0254): 그 자리에 서 있어도 `SPORE_DEATH_DELAY` 동안은 아프지 않다.
+    #[test]
+    fn spore_cap_death_cloud_waits_for_its_tell() {
+        let mut w = World::new();
+        let at = w.player.pos;
+        w.settle_deaths(vec![(at, Kind::SporeCap)]);
+        assert!(
+            w.hazards.clouds.iter().all(|c| c.time < 0.0),
+            "곧바로 퍼지지 않는다"
+        );
+        let hp = w.player.hp;
+        let ticks = ((t::SPORE_DEATH_DELAY + t::SPORE_CLOUD_GRACE) / t::TICK_DT) as usize - 2;
+        for _ in 0..ticks {
+            w.tick(&crate::input::Actions::default());
+        }
+        assert_eq!(w.player.hp, hp, "예고·퍼지는 동안은 안 아프다");
+        for _ in 0..30 {
+            w.tick(&crate::input::Actions::default());
+        }
+        assert!(w.player.hp < hp, "그 뒤 구름 안이면 아프다");
     }
 
     /// 혀 줄 맞기(0146): 선분까지 거리.

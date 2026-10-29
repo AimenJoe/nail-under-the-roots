@@ -593,6 +593,11 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
         );
         draw_tele_disk(r.pos, rad, k);
     }
+    // 쓰러진 포자버섯의 구름(0254): 퍼지기 전까지 그 자리에 둘레 예고.
+    for c in w.hazards.clouds.iter().filter(|c| c.time < 0.0) {
+        let k = crate::enemy::tele_progress(c.time + t::SPORE_DEATH_DELAY, t::SPORE_DEATH_DELAY);
+        draw_tele_disk(c.pos, t::SPORE_CLOUD_R, k);
+    }
     for e in w.enemies.iter().filter(|e| e.alive && !e.asleep) {
         let sp = e.sp();
         let pos = lerp(e.prev_pos, e.pos, alpha);
@@ -730,6 +735,10 @@ pub(super) fn draw_falling_rocks(w: &World) {
 
 /// 포자 구름(0146): 처음 잠깐(아프지 않을 때)은 옅게 부풀고, 끝에 흐려진다. 안의 점들이 천천히 돈다.
 pub(super) fn draw_cloud(c: &world::Cloud, time: f32) {
+    // 아직 예고 중(쓰러진 포자버섯, 0254): 그림은 `draw_telegraphs`의 원판.
+    if c.time < 0.0 {
+        return;
+    }
     let grow = (c.time / t::SPORE_CLOUD_GRACE).min(1.0);
     let k = c.time / t::SPORE_CLOUD_TIME;
     let fade = 1.0 - ((k - 0.75) / 0.25).clamp(0.0, 1.0);
