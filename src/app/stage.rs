@@ -420,6 +420,7 @@ impl App {
     pub(super) fn interact(&mut self, i: Interact) {
         let village = self.world.adv.place == crate::adventure::Place::Village;
         match i {
+            Interact::Chest(n) => self.world.open_chest(n),
             // 마을의 포포: 마을 꾸미기 가게(0045).
             Interact::Talk(Who::Popo) if village => {
                 self.decor_cursor = 0;
@@ -1118,6 +1119,7 @@ impl App {
             Interact::Dream => s.ia_dream,
             Interact::Gate if village => s.ia_descend,
             Interact::Gate => s.ia_route,
+            Interact::Chest(_) => s.ia_open,
         };
         let text = fill(verb, &[&crate::ui::key(input::prompt(Act::Attack))]);
         let p = (anchor - w.adv.cam).round();
@@ -1625,14 +1627,7 @@ impl App {
                 hint = both;
             }
         }
-        let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
-        // 뒤의 마을 그림 위에서도 읽히게 띠를 깐다.
-        let hw = ui.text_w(&hint, FONT_PX) + 8.0;
-        ui.rect(
-            Rect::new(160.0 - hw / 2.0, panel.bottom() + 2.0, hw, FONT_PX + 2.0),
-            ui::PANEL,
-        );
-        ui.text_center(&hint, 160.0, panel.bottom() + 3.0, FONT_PX, ui::TEXT_DIM);
+        ui.hint_strip(&hint, panel, panel.w - 8.0);
     }
 
     /// 런 통계를 기록에 쌓고(첫 시작만), 받을 수 있는 저널 목표가 새로 생기면 알린다(0048). 저장은 다른 저장 때 같이.

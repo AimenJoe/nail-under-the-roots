@@ -313,6 +313,7 @@ pub static ZH_HANS: Strings = Strings {
     ia_shop: "{0} 商店",
     ia_talk: "{0} 交谈",
     ia_look: "{0} 查看",
+    ia_open: "{0} 打开",
     ia_route: "{0} 路线图",
     map_camp: "营地 {0}",
     name_mom: "妈妈",

@@ -313,6 +313,7 @@ pub static ZH_HANT: Strings = Strings {
     ia_shop: "{0} 商店",
     ia_talk: "{0} 交談",
     ia_look: "{0} 查看",
+    ia_open: "{0} 打開",
     ia_route: "{0} 路線圖",
     map_camp: "營地 {0}",
     name_mom: "媽媽",

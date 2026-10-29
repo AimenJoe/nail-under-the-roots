@@ -144,6 +144,8 @@ pub enum Interact {
     /// 마을 할매 곁 실 고리: 실의 꿈(0055).
     Dream,
     Gate,
+    /// 굴의 닫힌 보물 상자(방 소품 번호): 버튼으로 연다(사장 2026-10-29, 예전엔 닿으면 열렸다).
+    Chest(usize),
 }
 
 /// 어두워졌다(반) → 장소를 바꾸고 → 밝아진다(반). 그동안 로직은 멈춘다.
@@ -413,10 +415,16 @@ impl World {
         ok
     }
 
-    /// 확인 버튼이 지금 할 일(쉼터에서 이웃·빈 자리·뿌리 길 곁).
+    /// 확인 버튼이 지금 할 일(쉼터에서 이웃·빈 자리·뿌리 길 곁, 굴에서는 닫힌 보물 상자 곁).
     pub fn interactable(&self) -> Option<Interact> {
+        if !self.player.is_alive() || self.adv.fade.is_some() {
+            return None;
+        }
+        if let Some(i) = self.chest_near() {
+            return Some(Interact::Chest(i));
+        }
         let hub = matches!(self.adv.place, Place::Camp | Place::Village);
-        if !hub || !self.player.is_alive() || self.adv.fade.is_some() {
+        if !hub {
             return None;
         }
         let p = self.player.pos;
@@ -451,6 +459,15 @@ impl World {
             return Some(Interact::Gate);
         }
         None
+    }
+
+    /// 곁에 있는 닫힌 보물 상자(방 소품 번호).
+    fn chest_near(&self) -> Option<usize> {
+        let p = self.player.pos;
+        self.room.props.iter().position(|pr| {
+            matches!(pr.kind, PropKind::Chest { opened: false })
+                && (pr.rect.center() - p).length() < t::INTERACT_RADIUS
+        })
     }
 
     /// 마을 큰 나무의 밑동(나무 칸 바로 아래, 걸어서 닿는 곳).
@@ -500,8 +517,10 @@ impl World {
             consider(n.pos, if n.who == Who::Bori { 26.0 } else { 16.0 });
         }
         for pr in &self.room.props {
-            if pr.kind == PropKind::Seat {
-                consider(pr.rect.center(), 12.0);
+            match pr.kind {
+                PropKind::Seat => consider(pr.rect.center(), 12.0),
+                PropKind::Chest { opened: false } => consider(pr.rect.center(), 10.0),
+                _ => {}
             }
         }
         if let Some(b) = self.tree_base() {
@@ -1247,38 +1266,42 @@ impl World {
         if let Some(at) = gift_at {
             self.charm_gift(at);
         }
-        // 보물 상자: 닿으면 연다 → 씨앗 한 줌 + 아직 없는 장신구 하나(다 있으면 반딧불).
-        let ppos = self.player.pos;
-        let near: Option<usize> = self.room.props.iter().position(|p| {
-            matches!(p.kind, PropKind::Chest { opened: false })
-                && (p.rect.center() - ppos).length() < 18.0
-        });
-        if let Some(i) = near {
-            self.room.open_chest(i);
-            self.juice.audio.play(sfx::Id::Chest);
-            let at = self.room.props[i].rect.center();
-            // 상자가 열리면 반짝임 셋(0081).
-            for (k, d) in [vec2(-5.0, -8.0), vec2(4.0, -11.0), vec2(7.0, -5.0)]
-                .into_iter()
-                .enumerate()
-            {
-                self.juice.fx.push(crate::world::Fx {
-                    pos: at + d,
-                    vel: vec2(0.0, -8.0),
-                    time: -0.08 * k as f32,
-                    dur: 0.45,
-                    kind: crate::world::FxKind::Glint {
-                        color: Color::new(1.0, 0.92, 0.55, 1.0),
-                    },
-                });
-            }
-            for _ in 0..rand::gen_range(t::CHEST_SEEDS.0, t::CHEST_SEEDS.1 + 1) {
-                self.push_loot(Loot::spawn(LootKind::Seed, at));
-            }
-            self.stats.chests += 1;
-            self.charm_gift(at);
-            self.juice.audio.play(sfx::Id::Emerge);
+    }
+
+    /// 보물 상자를 연다(앱이 확인 버튼으로 부른다, `Interact::Chest`) → 씨앗 한 줌 + 아직 없는 장신구 하나(다 있으면 반딧불).
+    pub fn open_chest(&mut self, i: usize) {
+        if !self
+            .room
+            .props
+            .get(i)
+            .is_some_and(|p| matches!(p.kind, PropKind::Chest { opened: false }))
+        {
+            return;
         }
+        self.room.open_chest(i);
+        self.juice.audio.play(sfx::Id::Chest);
+        let at = self.room.props[i].rect.center();
+        // 상자가 열리면 반짝임 셋(0081).
+        for (k, d) in [vec2(-5.0, -8.0), vec2(4.0, -11.0), vec2(7.0, -5.0)]
+            .into_iter()
+            .enumerate()
+        {
+            self.juice.fx.push(crate::world::Fx {
+                pos: at + d,
+                vel: vec2(0.0, -8.0),
+                time: -0.08 * k as f32,
+                dur: 0.45,
+                kind: crate::world::FxKind::Glint {
+                    color: Color::new(1.0, 0.92, 0.55, 1.0),
+                },
+            });
+        }
+        for _ in 0..rand::gen_range(t::CHEST_SEEDS.0, t::CHEST_SEEDS.1 + 1) {
+            self.push_loot(Loot::spawn(LootKind::Seed, at));
+        }
+        self.stats.chests += 1;
+        self.charm_gift(at);
+        self.juice.audio.play(sfx::Id::Emerge);
     }
 
     /// 아직 없는 장신구 하나(다 있으면 반딧불 한 줌). 상자·실타래 끝방(0147).
@@ -1890,6 +1913,29 @@ mod tests {
         assert_eq!(w2.interactable(), Some(Interact::Talk(Who::Susu)));
         let w = World::camp_start(2);
         assert!(!w.neighbors.iter().any(|n| n.who == Who::Susu));
+    }
+
+    /// 보물 상자는 닿아도 열리지 않고, 곁에서 확인 버튼(`Interact::Chest`)으로 연다. 열린 상자는 다시 묻지 않는다.
+    #[test]
+    fn chest_opens_with_button_not_by_touch() {
+        let mut w = World::new();
+        let c = w.player.pos + vec2(14.0, 0.0);
+        w.room.props.push(crate::room::Prop {
+            rect: Rect::new(c.x - 8.0, c.y - 8.0, 16.0, 16.0),
+            kind: PropKind::Chest { opened: false },
+        });
+        let i = w.room.props.len() - 1;
+        for _ in 0..30 {
+            w.tick(&crate::input::Actions::default());
+        }
+        assert_eq!(w.room.props[i].kind, PropKind::Chest { opened: false });
+        assert_eq!(w.interactable(), Some(Interact::Chest(i)));
+        w.open_chest(i);
+        assert_eq!(w.room.props[i].kind, PropKind::Chest { opened: true });
+        assert_eq!(w.stats.chests, 1);
+        assert_eq!(w.interactable(), None);
+        w.open_chest(i);
+        assert_eq!(w.stats.chests, 1, "열린 상자는 다시 열리지 않는다");
     }
 
     /// 마을의 큰 나무 밑동에 서면 재주 창(0047), 떨어지면 아니다.

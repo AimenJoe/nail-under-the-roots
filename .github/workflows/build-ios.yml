@@ -64,6 +64,8 @@ jobs:
           # 게임은 "assets/…" 경로로 읽는다(set_pc_assets_folder). miniquad iOS는 NSBundle에서 찾으므로 .app 바로 아래에.
           cp -R assets "$app/assets"
           rm -rf "$app/assets/vendor/.git"
+          # 웹 전용 mp3는 싣지 않는다(네이티브는 ogg만, 0235 R20).
+          rm -f "$app"/assets/music/*.mp3
           cp ios/icons/*.png "$app/"
           sed -e "s/__VERSION__/$v/" -e "s/__BUILD__/$b/" ios/Info.plist > "$app/Info.plist"
           if [ "$FLAVOR" = "dev" ]; then

@@ -97,27 +97,51 @@ const FILES: [(&str, usize, f32); 15] = [
     ("emerge", 1, 0.7),
 ];
 
-/// 이 소리의 파일 표 자리.
-fn file_of(id: Id) -> Option<usize> {
+/// 이 소리의 파일 이름(`FILES`의 이름, 없으면 합성음만). `_` 없이 모두 적는다 — 새 소리를 더하면 컴파일러가 여기를 묻는다(0235 R19).
+fn file_of(id: Id) -> Option<&'static str> {
     Some(match id {
-        Id::UiMove => 0,
-        Id::UiConfirm => 1,
-        Id::UiBack => 2,
-        Id::Buy => 3,
-        Id::Deny => 4,
-        Id::EnemyHit => 5,
-        Id::EnemyDie => 6,
-        Id::Hurt => 7,
-        Id::Chest => 8,
+        Id::UiMove => "ui_move",
+        Id::UiConfirm => "ui_confirm",
+        Id::UiBack => "ui_back",
+        Id::Buy => "buy",
+        Id::Deny => "deny",
+        Id::EnemyHit => "enemy_hit",
+        Id::EnemyDie => "enemy_die",
+        Id::Hurt => "hurt",
+        Id::Chest => "chest",
         // 마무리 타(2)는 무거운 합성음 그대로.
-        Id::Claw(0 | 1) => 9,
-        Id::Step => 10,
-        Id::Pickup => 11,
-        Id::Dodge => 12,
-        Id::Burrow => 13,
-        Id::Emerge => 14,
-        _ => return None,
+        Id::Claw(0 | 1) => "swing",
+        Id::Step => "step",
+        Id::Pickup => "pickup",
+        Id::Dodge => "dodge",
+        Id::Burrow => "burrow",
+        Id::Emerge => "emerge",
+        Id::Claw(_)
+        | Id::EmergeBig
+        | Id::Rumble
+        | Id::Ouch
+        | Id::Die
+        | Id::Shoot
+        | Id::Charge
+        | Id::Beat(_)
+        | Id::BeatTick
+        | Id::ChargeUp
+        | Id::HitTick
+        | Id::WallHit
+        | Id::Glowbug
+        | Id::Heal
+        | Id::Drill(_)
+        | Id::DrillWall
+        | Id::Parry
+        | Id::Impact
+        | Id::Unbind
+        | Id::Break => return None,
     })
+}
+
+/// 파일 소리 표에서 이 이름의 자리.
+fn file_index(name: &str) -> Option<usize> {
+    FILES.iter().position(|(n, _, _)| *n == name)
 }
 
 /// 로직이 낼 소리 한 건: 내기 / (길게 우는 소리) 끊기.
@@ -451,7 +475,7 @@ impl Sfx {
 
     /// 낼 소리, 크기, 같은 소리 간격을 셀 열쇠. 파일 소리의 변형들은 열쇠 하나를 같이 쓴다.
     fn pick(&self, id: Id) -> Option<(&Sound, f32, usize)> {
-        if let Some(f) = file_of(id) {
+        if let Some(f) = file_of(id).and_then(file_index) {
             let set = &self.files[f];
             if !set.is_empty() {
                 let mut last = self.last_variant.borrow_mut();
@@ -701,6 +725,56 @@ fn wav_bytes(samples: &[i16]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `file_of`가 돌려주는 이름은 모두 표에 있고, 표의 줄은 모두 어떤 소리가 쓴다(0235 R19).
+    #[test]
+    fn file_names_match_the_table() {
+        let ids = [
+            Id::Claw(0),
+            Id::Claw(1),
+            Id::Claw(2),
+            Id::Burrow,
+            Id::Emerge,
+            Id::EmergeBig,
+            Id::Rumble,
+            Id::EnemyHit,
+            Id::EnemyDie,
+            Id::Hurt,
+            Id::Ouch,
+            Id::Die,
+            Id::Shoot,
+            Id::Charge,
+            Id::Beat(1),
+            Id::BeatTick,
+            Id::ChargeUp,
+            Id::HitTick,
+            Id::WallHit,
+            Id::Glowbug,
+            Id::Heal,
+            Id::Drill(0),
+            Id::DrillWall,
+            Id::Parry,
+            Id::UiMove,
+            Id::UiConfirm,
+            Id::UiBack,
+            Id::Buy,
+            Id::Deny,
+            Id::Chest,
+            Id::Impact,
+            Id::Unbind,
+            Id::Break,
+            Id::Step,
+            Id::Dodge,
+            Id::Pickup,
+        ];
+        let used: Vec<&str> = ids.iter().filter_map(|i| file_of(*i)).collect();
+        for n in &used {
+            assert!(file_index(n).is_some(), "표에 없는 이름: {n}");
+        }
+        for (n, _, _) in FILES {
+            assert!(used.contains(&n), "쓰지 않는 표 줄: {n}");
+        }
+    }
 
     /// 파일 소리 표의 변형마다 wav가 있다(`make_audio.py`가 만든 수와 표의 수가 맞는다).
     #[test]

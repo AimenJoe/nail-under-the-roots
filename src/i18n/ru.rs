@@ -311,6 +311,7 @@ pub static RU: Strings = Strings {
     ia_shop: "{0} Лавка",
     ia_talk: "{0} Говорить",
     ia_look: "{0} Осмотр",
+    ia_open: "{0} Открыть",
     ia_route: "{0} Карта тропы",
     map_camp: "Привал {0}",
     name_mom: "Мама",

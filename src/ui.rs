@@ -254,6 +254,18 @@ impl Ui {
         measure_text(s, self.font.as_ref(), font_size, font_scale).width / self.scale
     }
 
+    /// 창(`panel`) 바로 아래 가운데 안내 한 줄: `max_w`에 맞춰 자르고, 뒤 그림 위에서도 읽히게 띠를 깐다(0235 R24).
+    pub fn hint_strip(&self, hint: &str, panel: Rect, max_w: f32) {
+        let hint = self.fit(hint, max_w, FONT_PX);
+        let hw = self.text_w(&hint, FONT_PX) + 8.0;
+        let cx = panel.center().x;
+        self.rect(
+            Rect::new(cx - hw / 2.0, panel.bottom() + 2.0, hw, FONT_PX + 2.0),
+            PANEL,
+        );
+        self.text_center(&hint, cx, panel.bottom() + 3.0, FONT_PX, TEXT_DIM);
+    }
+
     /// 폭에 안 맞으면 뒤를 잘라 "…"를 붙인다. 언어마다 길이가 달라 고정 칸에서 넘칠 때의 마지막 안전장치.
     pub fn fit(&self, s: &str, max_w: f32, size: f32) -> String {
         if self.text_w(s, size) <= max_w {

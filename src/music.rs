@@ -4,7 +4,7 @@
 //!   지원이 버전마다 다르다. 네이티브(quad-snd·audrey)는 mp3를 못 푼다(wav·ogg만) → 둘로 나눠 싣는다.
 //! - 네이티브는 곡을 통째로 44.1kHz f32 스테레오로 풀어 둔다(1분 ≈ 21MB). 고리는 짧게, 원본은 44.1kHz로
 //!   (다른 샘플레이트는 가장 가까운 점 리샘플이라 거칠어진다).
-//! - `TRACKS`에 있는 것만 읽는다. 없는 파일을 찾아 웹 콘솔에 404를 남기지 않게. 곡을 넣으면 여기에 한 줄.
+//! - 곡 파일 이름은 `Track::file` 한 곳(빠뜨리면 컴파일이 안 된다). 시험이 모든 곡의 두 파일을 본다.
 //! - 곡은 들어야 할 때 읽고(코루틴), 다 내려가면 놓는다. 네이티브는 읽는 그 프레임에 통째로 풀어 멈칫한다
 //!   (이 PC에서 1분 50초 곡이 약 0.2초) → 장소가 바뀌는 검은 화면에서 읽히게 된다. 보스 곡은 미리(`KEEP`).
 //! - 소리 크기는 설정의 "음악"(효과음과 따로).
@@ -45,28 +45,63 @@ pub enum Track {
     AmbDeep,
 }
 
-/// (곡, 파일 이름). 파일은 `tools/audio/make_audio.py`가 만든다(출처는 assets/LICENSES.md).
-const TRACKS: &[(Track, &str)] = &[
-    (Track::Title, "title"),
-    (Track::Village, "village"),
-    (Track::Field, "field"),
-    (Track::Camp, "camp"),
-    (Track::Roots, "roots"),
-    (Track::Deep, "deep"),
-    (Track::Boss, "boss"),
-    (Track::TitleLight, "title_light"),
-    (Track::VillageSprings, "village_springs"),
-    (Track::FieldOverworld, "field_overworld"),
-    (Track::CampCalm, "camp_calm"),
-    (Track::RootsExplorer, "roots_explorer"),
-    (Track::DeepPool, "deep_pool"),
-    (Track::Silk, "silk"),
-    (Track::BossRise, "boss_rise"),
-    (Track::Final, "final"),
-    (Track::Ending, "ending"),
-    (Track::AmbMeadow, "amb_meadow"),
-    (Track::AmbCave, "amb_cave"),
-    (Track::AmbDeep, "amb_deep"),
+impl Track {
+    /// 파일 이름(`assets/music/<이름>.ogg|mp3`). 파일은 `tools/audio/make_audio.py`가 만든다(출처는 assets/LICENSES.md).
+    /// `_` 없이 모두 적는다 — 곡을 더하면 컴파일러가 여기를 묻는다(0235 R19, 예전 `TRACKS` 표는 빠뜨리면 그 장소가 조용히 무음이었다).
+    pub fn file(self) -> &'static str {
+        match self {
+            Track::Title => "title",
+            Track::Village => "village",
+            Track::Field => "field",
+            Track::Camp => "camp",
+            Track::Roots => "roots",
+            Track::Deep => "deep",
+            Track::Boss => "boss",
+            Track::TitleLight => "title_light",
+            Track::VillageSprings => "village_springs",
+            Track::FieldOverworld => "field_overworld",
+            Track::CampCalm => "camp_calm",
+            Track::RootsExplorer => "roots_explorer",
+            Track::DeepPool => "deep_pool",
+            Track::Silk => "silk",
+            Track::BossRise => "boss_rise",
+            Track::Final => "final",
+            Track::Ending => "ending",
+            Track::AmbMeadow => "amb_meadow",
+            Track::AmbCave => "amb_cave",
+            Track::AmbDeep => "amb_deep",
+        }
+    }
+
+    /// 타이틀 쪽 곡(이때는 보스 곡을 미리 읽지 않는다).
+    fn is_title(self) -> bool {
+        matches!(self, Track::Title | Track::TitleLight)
+    }
+}
+
+/// 모든 곡(시험·패키징이 파일 목록을 만들 때). `file`의 match와 같은 수인지 시험이 본다.
+#[cfg(test)]
+const ALL: [Track; 20] = [
+    Track::Title,
+    Track::Village,
+    Track::Field,
+    Track::Camp,
+    Track::Roots,
+    Track::Deep,
+    Track::Boss,
+    Track::TitleLight,
+    Track::VillageSprings,
+    Track::FieldOverworld,
+    Track::CampCalm,
+    Track::RootsExplorer,
+    Track::DeepPool,
+    Track::Silk,
+    Track::BossRise,
+    Track::Final,
+    Track::Ending,
+    Track::AmbMeadow,
+    Track::AmbCave,
+    Track::AmbDeep,
 ];
 
 /// 다 내려간 뒤에도 놓지 않는 곡. 보스 곡은 싸움 한가운데서 갑자기 필요하다: 그때 풀면(네이티브는 그 자리에서
@@ -138,9 +173,7 @@ impl Music {
         if self.slots.iter().any(|(x, _)| *x == t) {
             return;
         }
-        let Some((_, name)) = TRACKS.iter().find(|(x, _)| *x == t) else {
-            return;
-        };
+        let name = t.file();
         let ext = if cfg!(target_arch = "wasm32") {
             "mp3"
         } else {
@@ -176,7 +209,7 @@ impl Music {
     pub fn update(&mut self, want: Option<Track>, ducked: bool, dt: f32) {
         if let Some(t) = want {
             self.request(t);
-            if !matches!(t, Track::Title | Track::TitleLight) {
+            if !t.is_title() {
                 for k in self.keep {
                     self.request(*k);
                 }
@@ -265,7 +298,8 @@ mod tests {
     #[test]
     fn every_track_has_both_files() {
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/music");
-        for (t, name) in TRACKS {
+        for t in ALL {
+            let name = t.file();
             for ext in ["mp3", "ogg"] {
                 let p = format!("{dir}/{name}.{ext}");
                 assert!(std::path::Path::new(&p).exists(), "{t:?}: {p}");

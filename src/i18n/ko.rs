@@ -311,6 +311,7 @@ pub static KO: Strings = Strings {
     ia_shop: "{0} 가게",
     ia_talk: "{0} 말 걸기",
     ia_look: "{0} 살펴보기",
+    ia_open: "{0} 열기",
     ia_route: "{0} 길 지도",
     map_camp: "쉼터 {0}",
     name_mom: "엄마",

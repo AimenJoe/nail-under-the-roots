@@ -70,6 +70,10 @@ jobs:
         if: steps.cqa.outputs.cache-hit != 'true'
         run: cargo install --locked --git https://github.com/not-fl3/cargo-quad-apk --rev "$CARGO_QUAD_APK_REV"
 
+      # 웹 전용 mp3는 싣지 않는다(네이티브는 ogg만 푼다, 0235 R20 — APK 51.9MB 중 23.9MB였다). CI 체크아웃이라 레포는 그대로.
+      - name: Keep only native audio
+        run: rm -f assets/music/*.mp3 && du -sh assets
+
       - name: Show Android toolchain
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"

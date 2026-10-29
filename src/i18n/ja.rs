@@ -311,6 +311,7 @@ pub static JA: Strings = Strings {
     ia_shop: "{0} 店",
     ia_talk: "{0} 話す",
     ia_look: "{0} 調べる",
+    ia_open: "{0} 開ける",
     ia_route: "{0} 道の地図",
     map_camp: "休み場 {0}",
     name_mom: "お母さん",

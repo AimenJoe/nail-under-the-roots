@@ -311,6 +311,7 @@ pub static FR: Strings = Strings {
     ia_shop: "{0} Boutique",
     ia_talk: "{0} Parler",
     ia_look: "{0} Regarder",
+    ia_open: "{0} Ouvrir",
     ia_route: "{0} Carte du chemin",
     map_camp: "Refuge {0}",
     name_mom: "Maman",

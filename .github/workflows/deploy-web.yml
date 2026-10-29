@@ -63,6 +63,8 @@ jobs:
           cp assets/THIRD_PARTY_LICENSES.txt dist/
           cp target/wasm32-unknown-unknown/release/nail.wasm dist/
           [ -d assets ] && cp -r assets dist/assets || true
+          # 네이티브 전용 ogg는 올리지 않는다(웹은 mp3만 읽는다, 0235 R20).
+          rm -f dist/assets/music/*.ogg
           # 어느 커밋이 올라갔는지(배포 확인용).
           echo "$GITHUB_SHA $FLAVOR" > dist/build.txt
           # 개발판: 탭 이름에 표시, 검색에 안 잡히게.

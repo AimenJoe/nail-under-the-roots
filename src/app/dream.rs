@@ -269,12 +269,6 @@ impl App {
         let legend = ui.fit(s.dream_legend, panel.w - 16.0, FONT_PX);
         ui.text(&legend, panel.x + 8.0, y + 2.0, FONT_PX, ui::TEXT_DIM);
         let hint = super::vfill(s.dream_hint, &[Verb::Confirm, Verb::Back]);
-        let hint = ui.fit(&hint, 300.0, FONT_PX);
-        let hw = ui.text_w(&hint, FONT_PX) + 8.0;
-        ui.rect(
-            Rect::new(160.0 - hw / 2.0, panel.bottom() + 2.0, hw, FONT_PX + 2.0),
-            ui::PANEL,
-        );
-        ui.text_center(&hint, 160.0, panel.bottom() + 3.0, FONT_PX, ui::TEXT_DIM);
+        ui.hint_strip(&hint, panel, 300.0);
     }
 }

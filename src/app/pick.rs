@@ -129,12 +129,6 @@ impl App {
             );
         }
         let hint = super::vfill(s.pick_hint, &[Verb::Confirm, Verb::Back]);
-        let hint = ui.fit(&hint, 300.0, FONT_PX);
-        let hw = ui.text_w(&hint, FONT_PX) + 8.0;
-        ui.rect(
-            Rect::new(160.0 - hw / 2.0, panel.bottom() + 2.0, hw, FONT_PX + 2.0),
-            ui::PANEL,
-        );
-        ui.text_center(&hint, 160.0, panel.bottom() + 3.0, FONT_PX, ui::TEXT_DIM);
+        ui.hint_strip(&hint, panel, 300.0);
     }
 }
