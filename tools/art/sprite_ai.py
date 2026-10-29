@@ -315,7 +315,8 @@ def breathe(sprite):
 def is_fur(key):
     r, g, b = (v / 255 for v in key)
     hh, ll, ss = colorsys.rgb_to_hls(r, g, b)
-    return 0.03 <= hh <= 0.12 and 0.12 <= ss <= 0.55 and 0.15 <= ll <= 0.75 and tuple(key) != OUTLINE
+    # 갈색 털: 노란 쪽(옛 Naïl 0.03~0.12)부터 붉은 자줏빛 쪽(새 Naïl 0238, 0.93~1)까지. 채도 0.5 위는 목도리 주황·분홍 손.
+    return (hh >= 0.93 or hh <= 0.12) and 0.12 <= ss < 0.5 and 0.15 <= ll <= 0.75 and tuple(key) != OUTLINE
 
 
 def fur_cx(sprite):

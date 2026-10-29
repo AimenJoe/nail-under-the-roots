@@ -1,10 +1,11 @@
-"""Naïl 스프라이트 시트(24×24 칸): 나노바나나 원본(tools/art/sources/ai/sprites/)을 게임 도트로 옮긴다(0206).
+"""Naïl 스프라이트 시트(28×28 칸): 나노바나나 원본(tools/art/sources/ai/sprites/)을 게임 도트로 옮긴다(0206 → 0238).
 
 실행: python3 tools/art/nail_ai.py [출력 경로]   (기본 assets/art/nail.png, 털빛 1~3은 같은 폴더의 nail_fur<n>.png)
 
 옮기는 법(색표·다수결 줄이기·효과 지우기·손발 색·흔들기·숨쉬기)은 공용 변환기 `sprite_ai.py`에 있고, 여기는 Naïl의
-설정(`SPEC`)과 시트 배치뿐이다. 왜 이 길인가(0203 → 0206): 16칸 손 그림은 "두더지 같지 않다"(사장) → 실루엣 시안 1 몸 +
-둥근 시트의 눈·볼(`nail_s1_v2`), 동작은 시트 B(`nail_s1_v2_b`). 몸 16px(타일·들쥐와 같은 크기, 28은 4배 넓이라 컸다).
+설정(`SPEC`)과 시트 배치뿐이다. 왜 이 길인가(0203 → 0206 → 0238): 16칸 손 그림은 "두더지 같지 않다"(사장) → 실루엣 시안 1
+(`nail_s1_v2`, 몸 16px) → 사장 "처음부터 다시"(0238): 큰 그림 다섯 안에서 고른 1번(서서 삽 손을 벌린 몸 + 주황 목도리)을
+시트 둘(`nail_v3_a`·`nail_v3_b`)로 받아 키 약 22px로(모모 23·도토 25와 나란히). 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
 
 칸 배치(게임 코드는 칸 크기 `art::NAIL_CELL`만 안다):
   줄 0: 서기 2, 걷기 4 / 줄 1: 치기 3, 맞음, 쓰러짐, 들기 3, 거두기 / 줄 2: 흙더미 2, 그림자(16칸 그림을 칸 아래 가운데에)
@@ -20,62 +21,58 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림과 털빛 표(FURS)를 같이 쓴다
-from sprite_ai import Limbs, Source, Spec, convert, is_fur, seat, seat_on_fur  # noqa: E402
+from sprite_ai import Source, Spec, convert, is_fur, seat, seat_on_fur  # noqa: E402
 
 SPRITES = HERE / "sources" / "ai" / "sprites"
-CELL = 24          # 몸 16px + 뻗은 발톱이 들어가는 칸(0206: 32칸·몸 28은 월드에 비해 컸다)
-FOOT = 22          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(16칸 시절 그대로).
+CELL = 28          # 몸 키 약 22px + 뻗은 발톱(0238: 18px는 모모 23·도토 25보다 작아 주인공이 가장 작았다)
+FOOT = 26          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(`art::nail_origin`).
 
+# 원본(0238, 사장 고름 1단계 1번 → 2단계 시트 둘, ✦ 지움). 칸 상자는 redo_concepts.components로 찾은 값.
+# 시트 A(3줄 × 4): 줄 1 서기·서기(숨)·맞음·쓰러짐, 줄 2·3 걷기(줄 2를 쓴다). 서기 두 칸은 벌린 발톱끼리 붙어 있어
+# 서기 A만 잘라(오른쪽 발톱 끝까지) 옆 칸 발톱 조각은 `tidy`로 버린다. 서기 B는 `breathe`로 만든다(따로 그린 두 칸은 숨이 끊긴다).
+# 시트 B(3줄 × 4): 줄 1 들기·치기·들기 2·(쓰지 않음), 줄 2 치기 2·강타 들기(머리 높이 — 더 높이 든 칸은 몸을 크게 그려 와 안 쓴다)·(쓰지 않음)·강타, 줄 3 거두기·(서기)·파고들기·솟구치기.
+SHEET_A = SPRITES / "nail_v3_a.png"
+SHEET_B = SPRITES / "nail_v3_b.png"
 SPEC = Spec(
     sources=[
-        # 시트 A: 시안 1 몸 + 둥근 시트의 눈·볼(✦는 지움). 원본은 서기 칸이 걷기 칸보다 크게 그려져 배율은 무리마다.
-        # 발밑 보라 줄(윗줄 y 386~391, 아랫줄 661~666)은 칸 밖으로 뺀다. 둘째 서기 칸은 쓰지 않는다(`breathe`).
         Source(
-            SPRITES / "nail_s1_v2.png",
+            SHEET_A,
             {
-                "idle_a": (39, 7, 463, 385),
-                "walk_a": (6, 419, 247, 660),
-                "walk_b": (265, 419, 499, 660),
-                "walk_c": (523, 419, 754, 660),
-                "walk_d": (777, 419, 1013, 660),
+                "idle_a": (7, 52, 276, 330),
+                "hurt": (522, 65, 739, 326),
+                "dead": (738, 166, 1001, 331),
+                "walk_a": (20, 413, 238, 686),
+                "walk_b": (270, 414, 489, 686),
+                "walk_c": (515, 413, 730, 686),
+                "walk_d": (762, 413, 984, 686),
             },
-            groups={"idle_a": "idle_a", "walk_a": "walk_a", "walk_b": "walk_a", "walk_c": "walk_a", "walk_d": "walk_a"},
+            # 배율은 서 있는 키(머리~발)로: 서기·맞음·쓰러짐은 서기 A, 걷기는 걷기 A(줄마다 그려 온 크기가 조금씩 다르다).
+            groups={"idle_a": "idle_a", "hurt": "idle_a", "dead": "idle_a",
+                    "walk_a": "walk_a", "walk_b": "walk_a", "walk_c": "walk_a", "walk_d": "walk_a"},
+            tidy=0.15,
+            strip=6,
         ),
-        # 시트 B(동작, 3×3): 눈 크기가 아홉 칸 모두 같아(같은 배율로 그렸다) 배율 하나 — 똑바로 선 들기 A의 몸 키로.
-        # 그려 온 휘두름 호는 그 네모 안의 살구 갈색만 지운다.
+        # 시트 B는 발을 머리 위로 든 칸이 많아 겉 네모 키가 칸마다 다르다 → 똑바로 선 거두기 칸의 키로 한 배율.
         Source(
-            SPRITES / "nail_s1_v2_b.png",
+            SHEET_B,
             {
-                "windup0": (9, 5, 331, 295),
-                "attack0": (350, 5, 669, 295),
-                "windup1": (692, 5, 1022, 295),
-                "attack1": (9, 317, 335, 604),
-                "windup2": (378, 314, 658, 607),
-                "attack2": (722, 320, 1022, 608),
-                "settle": (9, 626, 335, 913),
-                "hurt": (353, 621, 668, 913),
-                "dead": (698, 678, 1022, 913),
+                "windup0": (30, 51, 242, 325),
+                "attack0": (253, 67, 556, 325),
+                "windup1": (531, 60, 751, 325),
+                "attack1": (20, 413, 303, 686),
+                "windup2": (271, 413, 498, 686),
+                "attack2": (751, 447, 985, 686),
+                "settle": (20, 746, 242, 1009),
             },
             groups=dict.fromkeys(
-                ("windup0", "attack0", "windup1", "attack1", "windup2", "attack2", "settle", "hurt", "dead"), "windup0"
+                ("windup0", "attack0", "windup1", "attack1", "windup2", "attack2", "settle"), "settle"
             ),
-            erase={"attack0": [(455, 170, 669, 295)], "attack1": [(255, 317, 335, 604)]},
-            tidy=0.02,
+            tidy=0.15,
+            strip=6,
         ),
     ],
-    # 색표는 기준 칸 하나에서(다섯 칸을 합쳐 고르면 넓은 갈색에 밀려 목도리 주황이 빠졌다).
     palette_ref=(0, "idle_a"),
-    body_h=16,
-    # 손발: 원본은 검게 왔지만 초상화는 분홍 손 + 크림 발톱이다(사장 "검은 다리가 어색"). 손은 코(231, 137, 153)보다
-    # 한 단 짙게(코 바로 아래 앞발과 섞이지 않게), 발은 더 짙게. 원본 검은 손발은 색표에서 (32, 24, 35)를 받는다
-    # (눈 (20, 9, 25)과는 RGB 차 합 37).
-    limbs=Limbs(
-        limb=(32, 24, 35), paw=(198, 102, 120), sole=(150, 80, 96), arm=(108, 77, 59), shade=(75, 44, 50),
-        claw=(232, 217, 174),
-    ),
-    # 걷기 앞발: 앞으로 갈 때 1px 들어 올리고(위아래로 흔들어야 걷는 것 같다, 사장) 뒤로 1px — 오가는 폭 2px.
-    # 옆으로 2px를 그대로 밀면 앞발이 몸에서 떨어져 공중에 뜬 막대가 됐다(로딩 화면 4배에서 보였다).
-    swing={"walk_a": (1, -1), "walk_c": (-1, 0)},
+    body_h=21,
     breathe=("idle_a", "idle_b"),
 )
 
@@ -94,59 +91,12 @@ def small(grid_text):
     return cell
 
 
-# 눈(0206 고침, 사장 "걷는 애니메이션, 눈이 바뀌는 부분 이상하네"): 원본 걷기 넷은 칸마다 눈을 조금씩 다르게 그렸다
-# (까만 두 점 / 번진 보라 / 흰 빛점 / 가로 두 점) — 1배에서 걸을 때 눈이 깜빡이듯 바뀌었다. 서기 칸의 눈(까만 두 점 +
-# 왼쪽 아래 남빛 한 점)을 걷기 칸마다 코(분홍)를 기준으로 같은 자리에 찍는다.
-EYE_COLORS = {(20, 9, 25), (64, 42, 81), (100, 83, 128), (255, 255, 255)}
-PUPIL = (20, 9, 25)
-NOSE = (231, 137, 153)
-
-
-def _is_eye(cell, y, x):
-    return cell[y, x, 3] > 0 and tuple(int(v) for v in cell[y, x, :3]) in EYE_COLORS
-
-
-def _pupil(cell):
-    """눈동자(가장 짙은 점) 중 가장 위·왼쪽 — 얼굴 기준점. 코 분홍 왼쪽 6칸 안, 코 줄 위아래 3줄 안에서 찾는다
-    (코 모양은 칸마다 조금씩 달라 기준으로 쓰면 눈이 둘이 됐다)."""
-    ys, xs = np.nonzero(np.all(cell[..., :3] == NOSE, axis=-1) & (cell[..., 3] > 0))
-    ny, nx = int(ys.min()), int(xs.min())
-    pts = [(y, x) for y in range(ny - 3, ny + 2) for x in range(nx - 6, nx)
-           if cell[y, x, 3] > 0 and tuple(int(v) for v in cell[y, x, :3]) == PUPIL]
-    return min(pts)
-
-
-def same_eye(cell, ref):
-    """`ref`(서기 칸)의 눈을 `cell`의 눈동자 자리에 맞춰 찍는다. 원래 눈 점(빛점·번진 보라 포함)은 둘레 털색으로 지운다."""
-    ry, rx = _pupil(ref)
-    cy, cx = _pupil(cell)
-    dy, dx = cy - ry, cx - rx
-    eye = [(y, x) for y in range(ry - 1, ry + 3) for x in range(rx - 2, rx + 2) if _is_eye(ref, y, x)]
-    out = cell.copy()
-    y0, y1 = min(y for y, _ in eye) + dy - 1, max(y for y, _ in eye) + dy + 1
-    x0, x1 = min(x for _, x in eye) + dx - 1, max(x for _, x in eye) + dx + 1
-    fur = {}
-    for y in range(y0, y1 + 1):
-        for x in range(x0, x1 + 1):
-            if cell[y, x, 3] > 0 and not _is_eye(cell, y, x):
-                k = tuple(int(v) for v in cell[y, x])
-                fur[k] = fur.get(k, 0) + 1
-    fill = np.array(max(fur, key=fur.get), np.uint8)
-    for y in range(y0, y1 + 1):
-        for x in range(x0, x1 + 1):
-            if _is_eye(cell, y, x):
-                out[y, x] = fill
-    for y, x in eye:
-        out[y + dy, x + dx] = ref[y, x]
-    return out
-
-
 def build():
     spr = convert(SPEC)
     idle = seat(spr["idle_a"], CELL, FOOT)
     rows = [
         [idle, seat(spr["idle_b"], CELL, FOOT)]
-        + [same_eye(seat(spr[k], CELL, FOOT), idle) for k in ("walk_a", "walk_b", "walk_c", "walk_d")],
+        + [seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT) for k in ("walk_a", "walk_b", "walk_c", "walk_d")],
         # 동작 칸은 몸통 털의 가운데를 서기 칸에 맞춘다(발톱을 뻗어도 몸이 옆으로 뛰지 않게).
         [seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT)
          for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],

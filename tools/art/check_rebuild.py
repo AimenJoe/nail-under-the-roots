@@ -20,7 +20,7 @@ sys.path.insert(0, str(HERE))
 
 # (모듈, build 인자, 시트 파일, 칸 크기). 한 원본에서 여러 장이면 줄마다.
 SINGLE = [
-    ("nail_ai", None, "nail.png", 24),
+    ("nail_ai", None, "nail.png", 28),
     ("momo_ai", None, "momo.png", 32),
     ("doto_ai", None, "doto.png", 40),
     ("kongi_ai", None, "kongi.png", 32),
