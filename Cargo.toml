@@ -10,7 +10,7 @@ publish = false
 # dev: 타이틀의 "개발" 시나리오 메뉴. 스토어 배포 빌드는 --no-default-features.
 default = ["dev"]
 dev = []
-# clip: 공식 페이지 클립 찍기 전용(0228) — 플레이어가 피해를 받지 않는다. 배포 빌드에 넣지 않는다.
+# clip: 공식 페이지 클립 찍기 전용(0228) — 플레이어가 피해를 받지 않고, 자동 조종(src/autopilot.rs)이 싸운다. 배포 빌드에 넣지 않는다.
 clip = []
 
 [dependencies]

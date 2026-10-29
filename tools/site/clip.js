@@ -2,7 +2,8 @@
 // 헤드리스 녹화(recordVideo)는 도트를 뭉갰고(0155) 실시간 찍기는 칸이 고르지 않다 — 이렇게 하면 30fps 고른 무손실 칸이 나온다.
 // macroquad는 requestAnimationFrame·Date.now로 돌아서 가짜 시계가 그대로 먹힌다.
 //
-// 1) 찍기 전용 빌드: 피해를 끈다(`clip` 기능 — 대본대로 누르는 손은 적을 못 보고 자꾸 쓰러진다).
+// 1) 찍기 전용 빌드(`clip` 기능): 피해를 끄고, 자동 조종(`src/autopilot.rs`)이 월드를 보고 싸운다 — 계획 `auto`(0228 덧붙임).
+//    (예전 계획 nail·run은 정해 둔 키를 시간대로 눌러 허공을 쳤다.)
 //      cargo build --release --target wasm32-unknown-unknown --features clip
 //    dist/를 복사해 wasm만 바꿔 넣고 ROOT=<그 폴더>로 준다(dist/의 운영·개발판 wasm은 건드리지 않는다).
 // 2) 장면마다 하나씩(여럿을 한꺼번에 돌리면 swiftshader가 서로 느려져 메뉴 키를 놓친다):
@@ -41,6 +42,8 @@ function keysAt(n) {
     if (u < 1.1) { s.add('k'); s.add(d); }
     else if (u < 1.3) s.add(d);
     else if (u < 2.8) { const v = (u - 1.3) % 0.42; if (v < 0.07) s.add('j'); }
+  } else if (plan === 'auto') {
+    // 손은 놓고 자동 조종(`--features clip`의 autopilot, 0228)이 친다.
   } else if (plan === 'walk') {
     const c = Math.floor(t / 2.0), u = t % 2.0;
     if (u < 1.6) s.add(['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'][c % 4]);

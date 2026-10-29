@@ -398,6 +398,9 @@ pub struct App {
     /// 앨범에서 보이는 첫 줄(그림이 두 줄을 넘으면 굴린다, 0085).
     /// 앨범의 줄 창(0199, 다섯 칸이 한 줄).
     album_rows: crate::ui::ListView,
+    /// 클립 찍기 전용 자동 조종(`--features clip`, 0228).
+    #[cfg(feature = "clip")]
+    pilot: crate::autopilot::Pilot,
 }
 
 impl App {
@@ -512,6 +515,8 @@ impl App {
             char_cursor: 0,
             knot_level: 0,
             title_note: None,
+            #[cfg(feature = "clip")]
+            pilot: Default::default(),
         }
     }
 
@@ -733,6 +738,10 @@ impl App {
         let mut interact = None;
         while self.acc >= t::TICK_DT {
             let mut a = self.input.take();
+            #[cfg(feature = "clip")]
+            {
+                a = self.pilot.act(&self.world, a, t::TICK_DT);
+            }
             // 쉼터: 말 걸 것 곁에서 공격 버튼 = 말 걸기(휘두르지 않는다).
             if a.attack && interact.is_none() {
                 if let Some(i) = self.world.interactable() {

@@ -9,6 +9,8 @@
 mod adventure;
 mod app;
 mod art;
+#[cfg(feature = "clip")]
+mod autopilot;
 mod biome;
 mod bosses;
 mod camp;
