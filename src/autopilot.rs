@@ -39,6 +39,8 @@ impl Pilot {
             .min_by(|x, y| x.pos.distance(p.pos).total_cmp(&y.pos.distance(p.pos)));
         let Some(e) = target else {
             self.running = false;
+            // 적이 없으면 굴 안에서 아직 안 비운 싸움방으로 걷는다(문은 방 가운데 줄에 있다).
+            a.move_dir = explore(w);
             return a;
         };
         let to = e.pos - p.pos;
@@ -135,4 +137,63 @@ impl Pilot {
             self.swing = t::BEAT_PERIOD;
         }
     }
+}
+
+/// 굴에서 가장 가까운(방 사이 걸음 수) 안 비운 싸움방 쪽으로 한 걸음. 길은 방 가운데를 거쳐 문 가운데로.
+fn explore(w: &World) -> Vec2 {
+    use crate::dungeon::{room_rect, RoomKind, DIRS};
+    let Some(d) = w.adv.dungeon.as_ref() else {
+        return Vec2::ZERO;
+    };
+    let from = w.adv.current_room;
+    let want = |at: (i32, i32)| {
+        d.room(at)
+            .is_some_and(|r| !r.cleared && matches!(r.kind, RoomKind::Combat | RoomKind::Boss))
+    };
+    let p = w.player.pos;
+    let c = room_rect(from).center() + vec2(0.0, 16.0);
+    // 지금 방이 아직 안 비운 방이면(문 안쪽에 막 들어섰다) 가운데로 — 들어서면 잠기고 적이 깬다.
+    if want(from) {
+        return (c - p).normalize_or_zero();
+    }
+    // 너비 우선: 첫 걸음을 기억한다.
+    let mut seen = vec![from];
+    let mut q = std::collections::VecDeque::new();
+    if let Some(r) = d.room(from) {
+        for (k, (dx, dy)) in DIRS.iter().enumerate() {
+            if r.links[k] {
+                let n = (from.0 + dx, from.1 + dy);
+                seen.push(n);
+                q.push_back((n, k));
+            }
+        }
+    }
+    let mut first = None;
+    while let Some((at, k)) = q.pop_front() {
+        if want(at) {
+            first = Some(k);
+            break;
+        }
+        if let Some(r) = d.room(at) {
+            for (j, (dx, dy)) in DIRS.iter().enumerate() {
+                let n = (at.0 + dx, at.1 + dy);
+                if r.links[j] && !seen.contains(&n) {
+                    seen.push(n);
+                    q.push_back((n, k));
+                }
+            }
+        }
+    }
+    let Some(k) = first else {
+        return Vec2::ZERO;
+    };
+    let next = room_rect((from.0 + DIRS[k].0, from.1 + DIRS[k].1)).center() + vec2(0.0, 16.0);
+    // 문 줄에 들어서지 않았으면 먼저 방 가운데로.
+    let on_lane = if DIRS[k].0 != 0 {
+        (p.y - c.y).abs() < 8.0
+    } else {
+        (p.x - c.x).abs() < 8.0
+    };
+    let goal = if on_lane { next } else { c };
+    (goal - p).normalize_or_zero()
 }

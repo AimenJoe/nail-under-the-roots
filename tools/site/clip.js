@@ -9,7 +9,7 @@
 // 2) 장면마다 하나씩(여럿을 한꺼번에 돌리면 swiftshader가 서로 느려져 메뉴 키를 놓친다):
 //      ROOT=… node tools/site/clip.js <out> <개발 시나리오 번호> <초> <nail|run|walk> [포트]
 //    번호는 src/scenario.rs `LIST` 순서(22 웨이브 3부터, 41 모모: 아레나, 39 도토: 아레나, 45~47 넓은 방). WAIT=<ms>는 장면이 뜨기를 기다리는 시간 —
-//    clip 빌드는 시계를 걸기 전 실시간이 3초를 넘으면 화면이 검게 남는 일이 있어(0244) WAIT=600쯤으로 짧게 둔다. 말풍선은 SKIP=<초>로 넘긴다.
+//    WAIT도 가짜 시계로 흐른다(시계는 메뉴부터). 말풍선은 SKIP=<초>, 보스 만남 컷씬은 ESC=1로 넘긴다.
 // 3) 고른 칸을 이어 붙여(r_0000.png…) H.264로 — crf 16·tune animation이면 3배 확대 도트가 원본과 거의 같다:
 //      ffmpeg -framerate 30 -i r_%04d.png -c:v libx264 -preset slow -tune animation -crf 16 -pix_fmt yuv420p -movflags +faststart site/img/play.mp4
 //    첫 칸은 site/img/play_poster.png로.
@@ -61,15 +61,18 @@ const srv = http.createServer((q, r) => { let p = path.join(root, decodeURICompo
   const ctx = await b.newContext({ viewport: { width: 960, height: 540 }, locale: 'ko-KR' });
   await ctx.addInitScript((p) => { try { localStorage.clear(); localStorage.setItem('nail.profile', p); } catch (e) {} }, prof);
   const pg = await ctx.newPage();
-  const key = async (k, ms = 200) => { await pg.keyboard.press(k); await pg.waitForTimeout(ms); };
   await pg.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' });
   await pg.waitForFunction(() => document.getElementById('loading').classList.contains('done'), null, { timeout: 60000 });
   await pg.waitForTimeout(800); await pg.focus('#glcanvas');
-  await key('Enter', 900); await key('ArrowUp', 300); await key('Enter', 800);
-  for (let i = 0; i < idx; i++) await key('ArrowDown', 160);   // 60ms면 swiftshader가 바쁠 때 키를 놓쳤다
-  await key('Enter', +(process.env.WAIT || 3000));
-  for (const k of (process.env.PRE || '').split(',').filter(Boolean)) await key(k, 700);
+  // 시계는 메뉴부터 건다(0244): 장면이 뜬 뒤에 걸면 지도를 굽던 중이거나 몇 초 돈 뒤일 때 화면이 검게 남는 일이 있었다.
+  // 그 뒤로는 실시간 기다림 대신 가짜 시계를 흘린다(키 하나 = 몇 프레임).
   await pg.clock.install();
+  const tick = async (ms) => { await pg.clock.runFor(ms); };
+  const press = async (k, ms = 200) => { await pg.keyboard.down(k); await tick(50); await pg.keyboard.up(k); await tick(ms); };
+  await press('Enter', 900); await press('ArrowUp', 300); await press('Enter', 800);
+  for (let i = 0; i < idx; i++) await press('ArrowDown', 120);
+  await press('Enter', +(process.env.WAIT || 3000));
+  for (const k of (process.env.PRE || '').split(',').filter(Boolean)) await press(k, 700);
   let held = new Set(), acc = 0;
   for (let n = 0; n < N; n++) {
     const want = keysAt(n);
