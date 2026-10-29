@@ -214,6 +214,8 @@ pub static PT_BR: Strings = Strings {
     best_tip: "Dica",
     best_count: "Vizinhos encontrados {0} / {1}",
     set_controls: "Controles",
+    set_licenses: "Licenças",
+    licenses_hint: "{0} rolar · {1} fechar",
     act_attack: "Atacar",
     act_dodge: "Cavar (esquiva)",
     act_special: "Especial",

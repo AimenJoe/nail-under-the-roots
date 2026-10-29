@@ -214,6 +214,8 @@ pub static FR: Strings = Strings {
     best_tip: "Astuce",
     best_count: "Voisins rencontrés {0} / {1}",
     set_controls: "Commandes",
+    set_licenses: "Licences",
+    licenses_hint: "{0} défiler · {1} fermer",
     act_attack: "Attaquer",
     act_dodge: "Creuser (esquive)",
     act_special: "Spécial",

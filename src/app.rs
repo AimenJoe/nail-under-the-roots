@@ -79,6 +79,10 @@ enum Scene {
     Controls {
         back: Back,
     },
+    /// 라이선스(설정 안): 제3자 고지 글을 굴려 본다. 돌아가면 설정(2026-10-29, OFL·MIT·Apache 고지를 앱 안에서 볼 수 있게).
+    Licenses {
+        back: Back,
+    },
     /// 개발용 시나리오 목록. 운영 빌드(`--no-default-features`)에는 들어가는 길이 없다(0193).
     #[cfg_attr(not(feature = "dev"), allow(dead_code))]
     Dev,
@@ -330,6 +334,9 @@ pub struct App {
     /// 굴리는 목록들의 창(0199): 설정·안내 주제·도감·개발 목록.
     settings_view: crate::ui::ListView,
     help_view: crate::ui::ListView,
+    /// 라이선스 글을 창 폭에 맞춰 접은 줄(처음 열 때 한 번)과 굴리는 창.
+    license_lines: Vec<String>,
+    license_view: crate::ui::ListView,
     bestiary_view: crate::ui::ListView,
     dev_view: crate::ui::ListView,
     /// 이번 프레임의 굴리기 입력(논리 px 끌기, 칸: 휠·▲▼, 0199).
@@ -470,6 +477,8 @@ impl App {
             journal_view: Default::default(),
             settings_view: Default::default(),
             help_view: Default::default(),
+            license_lines: Vec::new(),
+            license_view: Default::default(),
             bestiary_view: Default::default(),
             dev_view: Default::default(),
             scroll_in: (0.0, 0),
@@ -541,7 +550,9 @@ impl App {
             Scene::Intro | Scene::Title | Scene::Slots | Scene::Album | Scene::Dev
         ) || matches!(
             self.scene,
-            Scene::Settings { back: Back::Title } | Scene::Controls { back: Back::Title }
+            Scene::Settings { back: Back::Title }
+                | Scene::Controls { back: Back::Title }
+                | Scene::Licenses { back: Back::Title }
         );
         if title {
             return (Some(pick(Track::TitleLight, Track::Title)), None, false);
@@ -1331,6 +1342,14 @@ impl App {
                     self.settings_cursor = row;
                     self.adjust_setting(row, adjust);
                 }
+                let open_licenses = (a.confirm && self.settings_cursor == SETTING_LICENSES)
+                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_LICENSES)));
+                if open_licenses {
+                    self.settings_cursor = SETTING_LICENSES;
+                    self.license_view.first = 0;
+                    self.scene = Scene::Licenses { back };
+                    return;
+                }
                 let open_controls = (a.confirm && self.settings_cursor == SETTING_CONTROLS)
                     || matches!(tap_hit, Some(Hit::SettingRow(SETTING_CONTROLS)));
                 if open_controls {
@@ -1369,6 +1388,7 @@ impl App {
                 }
             }
             Scene::Controls { back } => self.update_controls(a, tap_hit, back, dt),
+            Scene::Licenses { back } => self.update_licenses(a, tap_hit, back),
             Scene::Pause => self.update_pause(a, tap_hit),
             Scene::Route => self.update_route(a, tap_hit),
             Scene::Shop => self.update_shop(a, tap_hit, dt),
@@ -1398,6 +1418,7 @@ impl App {
                 | Scene::CharPick
                 | Scene::Settings { back: Back::Pause }
                 | Scene::Controls { back: Back::Pause }
+                | Scene::Licenses { back: Back::Pause }
         );
         let alpha = if self.scene == Scene::Game {
             self.acc / t::TICK_DT
@@ -1439,7 +1460,9 @@ impl App {
         let title_bg = matches!(self.scene, Scene::Title | Scene::Slots | Scene::Dev)
             || matches!(
                 self.scene,
-                Scene::Settings { back: Back::Title } | Scene::Controls { back: Back::Title }
+                Scene::Settings { back: Back::Title }
+                    | Scene::Controls { back: Back::Title }
+                    | Scene::Licenses { back: Back::Title }
             );
         if title_bg {
             self.renderer.draw_title_art(&ui, get_time() as f32);
@@ -1488,6 +1511,12 @@ impl App {
                     ui.dim();
                 }
                 self.draw_controls(&ui);
+            }
+            Scene::Licenses { back } => {
+                if back == Back::Pause {
+                    ui.dim();
+                }
+                self.draw_licenses(&ui);
             }
             Scene::Game => {
                 self.draw_letterbox(&ui);

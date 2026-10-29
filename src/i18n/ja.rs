@@ -214,6 +214,8 @@ pub static JA: Strings = Strings {
     best_tip: "コツ",
     best_count: "出会った近所 {0} / {1}",
     set_controls: "そうさ設定",
+    set_licenses: "ライセンス",
+    licenses_hint: "{0} スクロール・{1}で閉じる",
     act_attack: "こうげき",
     act_dodge: "穴ほり（回避）",
     act_special: "ひっさつ技",

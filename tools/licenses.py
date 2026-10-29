@@ -64,7 +64,7 @@ def main():
         'assets/fonts/NailCJK-ja.ttf, NailCJK-zh-Hans.ttf, NailCJK-zh-Hant.ttf — Ark Pixel Font(https://github.com/TakWolf/ark-pixel-font),',
         '  Copyright (c) 2021, TakWolf (https://takwolf.com), SIL Open Font License 1.1. 원문: assets/fonts/OFL-ArkPixel.txt',
         '  (예약 폰트 이름 없음. 게임에 쓰는 글자만 뽑아 다시 지은 수정본, 이름 Nail CJK 12 — tools/fonts/build_cjk.py)',
-        'assets/fonts/NailCJK-zh-Hant.ttf의 한자 일부 — 俐方體11號 Cubic 11(https://github.com/ACh-K/Cubic-11), SIL Open Font License 1.1.',
+        'assets/fonts/NailCJK-zh-Hant.ttf의 한자 일부 — Cubic 11 (Traditional Chinese name in the font metadata)(https://github.com/ACh-K/Cubic-11), SIL Open Font License 1.1.',
         '  JF Dot M+H 12(Copyright (c) 2005 M+ FONTS PROJECT)·M+ BITMAP FONTS(Copyright (C) 2002-2004 COZ)에서 나왔다.',
         '  원문과 원 고지: assets/fonts/OFL-Cubic11.txt (예약 폰트 이름 없음)',
         '',

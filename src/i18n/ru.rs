@@ -214,6 +214,8 @@ pub static RU: Strings = Strings {
     best_tip: "Совет",
     best_count: "Встречено соседей {0} / {1}",
     set_controls: "Управление",
+    set_licenses: "Лицензии",
+    licenses_hint: "{0} листать · {1} закрыть",
     act_attack: "Атака",
     act_dodge: "Подкоп (уклон)",
     act_special: "Спецприём",

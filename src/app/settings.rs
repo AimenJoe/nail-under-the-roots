@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) const SETTING_ROWS: [Tr; 11] = [
+pub(super) const SETTING_ROWS: [Tr; 12] = [
     |s| s.set_sound,
     |s| s.set_music,
     |s| s.set_shake,
@@ -12,19 +12,24 @@ pub(super) const SETTING_ROWS: [Tr; 11] = [
     |s| s.set_language,
     |s| s.set_assist,
     |s| s.set_controls,
+    |s| s.set_licenses,
     |s| s.set_erase,
     |s| s.set_back,
 ];
 /// 설정의 "포포의 응원"·"조작 설정"·"기록 지우기"·"돌아가기" 줄.
 pub(super) const SETTING_ASSIST: usize = 7;
 pub(super) const SETTING_CONTROLS: usize = 8;
-pub(super) const SETTING_ERASE: usize = 9;
-pub(super) const SETTING_BACK: usize = 10;
+pub(super) const SETTING_LICENSES: usize = 9;
+pub(super) const SETTING_ERASE: usize = 10;
+pub(super) const SETTING_BACK: usize = 11;
 /// 설정 창에 한 번에 보이는 줄. 줄이 더 많으면 고른 줄이 보이게 굴린다(입자 줄을 더해 열 줄이 됐다, 0141).
 pub(super) const SETTING_VISIBLE: usize = 9;
 /// 값이 아니라 누르는 줄(좌우로 바뀌지 않는다).
 pub(super) fn setting_is_button(i: usize) -> bool {
-    matches!(i, SETTING_CONTROLS | SETTING_ERASE | SETTING_BACK)
+    matches!(
+        i,
+        SETTING_CONTROLS | SETTING_LICENSES | SETTING_ERASE | SETTING_BACK
+    )
 }
 /// 조작 설정의 줄: 동작들(input::ACTS) + 기본값 + 돌아가기.
 pub(super) const CONTROL_NAMES: [Tr; 7] = [
@@ -217,6 +222,7 @@ impl App {
             String::new(),
             String::new(),
             String::new(),
+            String::new(),
         ];
         let row_h = FONT_PX + 3.0;
         // 줄이 창보다 많다: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
@@ -238,7 +244,7 @@ impl App {
                     ui.rect(r, ui::PANEL_LIGHT);
                     ui.text("▶", r.x + 2.0, ui::mid_y(r), FONT_PX, ui::ACCENT);
                 }
-                let label = if i == SETTING_CONTROLS {
+                let label = if i == SETTING_CONTROLS || i == SETTING_LICENSES {
                     format!("{label}  →")
                 } else if i == SETTING_ERASE && self.erase_armed {
                     s.set_erase_confirm.to_string()
@@ -401,3 +407,113 @@ impl App {
         }
     }
 }
+
+/// 라이선스 창에 보이는 글: 배포물에 함께 싣는 제3자 고지 그대로(`tools/licenses.py`가 만든다). 앱(APK·iOS) 안의 파일은
+/// 사람이 열어 볼 수 없어서, OFL "사용자가 쉽게 볼 수 있게"·MIT·Apache 고지를 여기서 보여 준다(2026-10-29).
+pub(super) const LICENSE_TEXT: &str = include_str!("../../assets/THIRD_PARTY_LICENSES.txt");
+
+impl App {
+    /// 라이선스 창: 위아래 한 줄, 좌우 한 쪽, 끌기·휠, 확인·뒤로·✕로 닫는다.
+    pub(super) fn update_licenses(&mut self, a: &Actions, tap_hit: Option<Hit>, back: Back) {
+        let n = self.license_lines.len();
+        let fits = LICENSE_ROWS;
+        let max_first = n.saturating_sub(fits);
+        let v = &mut self.license_view;
+        if a.up {
+            v.first = v.first.saturating_sub(1);
+        }
+        if a.down {
+            v.first = (v.first + 1).min(max_first);
+        }
+        if a.left {
+            v.first = v.first.saturating_sub(fits);
+        }
+        if a.right {
+            v.first = (v.first + fits).min(max_first);
+        }
+        let mut top = v.first;
+        v.scroll(self.scroll_in, &mut top, n);
+        // ▲▼는 공용 굴리기(`scroll_in`)가 이미 한 줄 옮겼다: 나머지를 더해 한 쪽씩.
+        if let Some(Hit::Scroll(d)) = tap_hit {
+            let step = d as i32 * (fits as i32 - 1);
+            v.first = (v.first as i32 + step).clamp(0, max_first as i32) as usize;
+        }
+        if a.cancel || a.confirm || matches!(tap_hit, Some(Hit::Close)) {
+            self.scene = Scene::Settings { back };
+        }
+    }
+
+    pub(super) fn draw_licenses(&mut self, ui: &Ui) {
+        let s = i18n::s();
+        let panel = Rect::new(8.0, 2.0, 304.0, 156.0);
+        ui.panel(panel, Some(s.set_licenses));
+        self.close_button(ui, panel);
+        // 고지 글은 번역하지 않는다: 언어와 상관없이 한국어·라틴 글꼴(Galmuri)로 찍는다.
+        let body = ui.with_base_font();
+        let w = panel.w - 16.0;
+        if self.license_lines.is_empty() {
+            self.license_lines = LICENSE_TEXT
+                .lines()
+                .flat_map(|l| {
+                    if l.trim().is_empty() {
+                        vec![String::new()]
+                    } else {
+                        ui::wrap(&body, &l.replace('\t', "    "), w, FONT_PX)
+                    }
+                })
+                .collect();
+        }
+        let n = self.license_lines.len();
+        let row_h = FONT_PX;
+        let first = self
+            .license_view
+            .window(self.license_view.first, n, LICENSE_ROWS, row_h);
+        for (i, l) in self
+            .license_lines
+            .iter()
+            .skip(first)
+            .take(LICENSE_ROWS)
+            .enumerate()
+        {
+            body.text(
+                l,
+                panel.x + 8.0,
+                panel.y + 18.0 + i as f32 * row_h,
+                FONT_PX,
+                ui::TEXT,
+            );
+        }
+        // 어디쯤인지(쪽/전체)와 ▲▼(누르면 한 쪽씩).
+        let pages = n.div_ceil(LICENSE_ROWS).max(1);
+        let page = (first / LICENSE_ROWS + 1).min(pages);
+        let pos = format!("{page}/{pages}");
+        ui.text(
+            &pos,
+            panel.right() - 30.0 - ui.text_w(&pos, FONT_PX),
+            panel.y + 3.0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+        if first > 0 {
+            let at = vec2(panel.right() - 26.0, panel.y + 3.0);
+            ui.text("▲", at.x, at.y, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(at.x - 4.0, at.y - 4.0, 16.0, 18.0),
+                Hit::Scroll(-1),
+            ));
+        }
+        if first + LICENSE_ROWS < n {
+            let at = vec2(panel.right() - 14.0, panel.bottom() - 13.0);
+            ui.text("▼", at.x, at.y, FONT_PX, ui::TEXT_DIM);
+            self.hits.push((
+                Rect::new(at.x - 5.0, at.y - 4.0, 18.0, 18.0),
+                Hit::Scroll(1),
+            ));
+        }
+        let hint = vfill(s.licenses_hint, &[Verb::Pick, Verb::Back]);
+        ui.hint_strip(&hint, panel, 300.0);
+    }
+}
+
+/// 라이선스 창에 한 번에 보이는 줄.
+const LICENSE_ROWS: usize = 11;

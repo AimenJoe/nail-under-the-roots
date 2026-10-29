@@ -214,6 +214,8 @@ pub static PL: Strings = Strings {
     best_tip: "Rada",
     best_count: "Spotkani sąsiedzi {0} / {1}",
     set_controls: "Sterowanie",
+    set_licenses: "Licencje",
+    licenses_hint: "{0} przewijaj · {1} zamknij",
     act_attack: "Atak",
     act_dodge: "Podkop (unik)",
     act_special: "Superatak",

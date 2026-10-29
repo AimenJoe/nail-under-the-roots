@@ -214,6 +214,8 @@ pub static DE: Strings = Strings {
     best_tip: "Tipp",
     best_count: "Nachbarn getroffen {0} / {1}",
     set_controls: "Steuerung",
+    set_licenses: "Lizenzen",
+    licenses_hint: "{0} blättern · {1} schließen",
     act_attack: "Angreifen",
     act_dodge: "Graben (Ausw.)",
     act_special: "Spezial",

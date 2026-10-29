@@ -377,7 +377,7 @@ strings! {
     // 상태 탭·도감 탭
     tab_bestiary, stat_power, stat_aspd, stat_dig_cd, stat_gauge, stat_weapon, seeds, fmt_secs, fmt_pct, fmt_hp, wallet_note, best_unknown, best_unseen, best_hp, best_pow, best_spd, best_atk, best_tip, best_count,
     // 조작 설정(docs/decisions/0022)
-    set_controls, act_attack, act_dodge, act_special, act_use_item, act_item_prev, act_item_next, act_map, ctl_key, ctl_pad, ctl_reset, ctl_wait, ctl_hint, ctl_fixed,
+    set_controls, set_licenses, licenses_hint, act_attack, act_dodge, act_special, act_use_item, act_item_prev, act_item_next, act_map, ctl_key, ctl_pad, ctl_reset, ctl_wait, ctl_hint, ctl_fixed,
     // 튜토리얼: 라쿤 포포(docs/decisions/0023)
     popo_name, popo_hi, popo_hi2, popo_hi0, op_stop, toast_petal, toast_petal_trail, best_petal, popo_pickup, popo_combo, popo_heavy, popo_burrow, popo_emerge, popo_parry, popo_parry_skip, popo_special, popo_item, popo_item2, popo_menu, popo_save, popo_bye, tut_step, tut_heavy, tut_parry, tut_special, tut_item,
     // 스테이지 고리: 튜토리얼 보스·쉼터·길 지도·가게 (docs/decisions/0030~0032)
@@ -486,6 +486,23 @@ mod tests {
                         c as u32
                     );
                 }
+            }
+        }
+    }
+
+    /// 라이선스 창(설정)은 제3자 고지 글을 한국어·라틴 글꼴(Galmuri)로 찍는다: 글의 모든 글자가 그 글꼴에 있어야 한다.
+    #[test]
+    fn license_text_fits_the_base_font() {
+        let cmap = font_cmap(&std::fs::read(format!("assets/{}", Lang::Ko.font_file())).unwrap());
+        let text = std::fs::read_to_string("assets/THIRD_PARTY_LICENSES.txt").unwrap();
+        for (n, line) in text.lines().enumerate() {
+            for c in line.chars().filter(|c| *c != '\t') {
+                assert!(
+                    cmap.contains(&(c as u32)),
+                    "THIRD_PARTY_LICENSES.txt {}줄: 글꼴에 없는 글자 {c:?} (U+{:04X}) — tools/licenses.py를 고친다",
+                    n + 1,
+                    c as u32
+                );
             }
         }
     }
