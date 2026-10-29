@@ -1,5 +1,7 @@
 # 걷기 네 칸 프롬프트(0229)
 
+> 여섯 다 들어감(2026-10-29, v0.5.2): 포포·보리·수수·콩이·토끼풀·모모. 옮기는 법은 `tools/art/walk_ai.py`·결정 0229.
+
 이웃·캐릭터마다 **새 대화에서 그 이웃의 참고 그림 한 장만** 붙인다(`python3 tools/art/walk_ref.py`, 지금 시트의
 서기 칸(왼쪽) + 지금 걷기 칸(오른쪽)을 6배로 — 우리 그림). 받은 원본은 `tools/art/sources/ai/sprites/<이름>_walk_v1.png`
 (✦는 `strip_logo.py`로 지운다). 도토 달리기(`doto-run-prompt.md`)와 같은 방식.

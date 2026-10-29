@@ -45,6 +45,7 @@ Top-down 3/4 view. Solid magenta background (#FF00FF), one row, three props well
 ```
 
 ### A3 — 뿌리 길 입구 다시(첫 A1에서 흙 바닥 위에 그려 옴)
+> 들어감(2026-10-28, v0.5.1): 시안 다섯 가운데 팻말 + 첫 구멍 → `hub.png` 칸 5(`HUB_GATE`). A 여섯 끝, 남은 것은 B·C·D.
 
 ```
 Draw one new prop in EXACTLY the same pixel art style as the attached sprites (a cute top-down action game:

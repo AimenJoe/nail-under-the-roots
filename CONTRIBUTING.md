@@ -4,7 +4,7 @@
 
 ## 브랜치와 배포
 - **main = 운영판 배포.** main에 push하면 웹이 바로 배포되고(Netlify), 버전이 올라가 있으면 Release(APK)가 만들어진다. 그래서 **main에는 배포하기로 정한 것만** push한다. 운영판은 개발 기능 없이 빌드한다(`--no-default-features`, 0193).
-- **`release/v<마일스톤>` = 개발판**(지금 `release/v0.6`). 마일스톤 작업은 작업 브랜치에서 여기로 합친다. push하면 개발판 웹(https://dev--nail-under-the-roots.netlify.app)과 APK(미리 보기 Release `dev`의 `nail-dev.apk`, 운영 앱과 나란히 깔린다)가 갈린다. main에 넣은 패치는 이 갈래에도 합친다. 마일스톤을 닫을 때 main에 합친다.
+- **`release/v<마일스톤>` = 개발판**(지금 `release/v0.6` — v0.6은 사장이 정할 큰 것, 그 전까지 고침·그림도 여기서 먼저 보고 사장이 배포를 말하면 v0.5.x 패치로 main에, 0227). 작업 브랜치는 여기로 합친다. push하면 개발판 웹(https://dev--nail-under-the-roots.netlify.app)과 APK(미리 보기 Release `dev`의 `nail-dev.apk`, 운영 앱과 나란히 깔린다)가 갈린다. main에 넣은 패치는 이 갈래에도 합친다. 마일스톤을 닫을 때 main에 합친다.
 - 평소 작업은 작업 브랜치(`claude/…` 등)에 커밋·push한다. 운영판 배포는 사장이 정한다: 고친 것을 모아 "이것들을 고쳤는데 v<버전>으로 배포할까요?"라고 묻고, 답을 받은 뒤 `docs/release.md`대로.
 - PR은 필수가 아니다(1인). PR을 열면 `deploy-web.yml`이 `pr-<번호>--nail-under-the-roots.netlify.app`에 미리보기를 올린다.
 - 커밋 메시지·문서는 **한국어**, 코드 식별자는 영어. 커밋 첫 줄에 결정 번호를 붙인다(예: `박자 콤보(0167): …`). 모델 이름·ID는 커밋에 쓰지 않는다.

@@ -4,8 +4,8 @@
 
 - 공식 페이지: https://aimenjoe.github.io/nail-under-the-roots/ (원본 `site/`, `pages.yml`이 GitHub Pages에 올린다, docs/decisions/0069). 게임은 https://nail-under-the-roots.netlify.app
 - 컨셉: [`docs/concept.md`](docs/concept.md)
-- 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md) (끝의 "구현 상태"·"사람이 할 일"이 현재 위치. 지금 마일스톤은 `docs/decisions/0081`(v0.3.0), 버전 규칙은 0079)
-- 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 스프라이트·대체 타일은 직접 그림(원본 `tools/art/*.py`, `python3 tools/art/<이름>.py`로 PNG 재생성 — nail·critters·chief·tiles). 초상화·일러스트·타이틀은 나노바나나 원본(`tools/art/sources/ai/`)을 `ai_portraits.py`·`ai_illust.py`가 옮긴다(`portraits.py`·`illust.py`가 부름, 새 원본은 먼저 `strip_logo.py`). 앱 아이콘은 `tools/icons/make_icons.py`. 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
+- 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md) (끝의 "구현 상태"·"사람이 할 일"이 현재 위치. 지금은 고침·새 그림을 v0.5.x 패치로 내고 v0.6은 사장이 정할 큰 것 하나 — `docs/decisions/0227`, 버전 규칙은 0079)
+- 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 캐릭터·적·이웃·소품·마을 물건 스프라이트, 초상화·일러스트·타이틀은 나노바나나 원본(`tools/art/sources/ai/`)을 코드가 게임 칸으로 옮긴다(공용 변환기 `tools/art/sprite_ai.py` + 그림마다 `*_ai.py`, 걷기 네 칸은 `walk_ai.py`, 0206·0229; 초상화·일러스트는 `ai_portraits.py`·`ai_illust.py`, 새 원본은 먼저 `strip_logo.py`). `python3 tools/art/<이름>.py`로 PNG를 다시 만든다. 대체 타일은 직접 그림(`tiles.py`). 앱 아이콘은 `tools/icons/make_icons.py`. 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
 - 결정 기록: [`docs/decisions/`](docs/decisions/)
 - 기여 규칙: [`CONTRIBUTING.md`](CONTRIBUTING.md) · 배포·릴리스 절차: [`docs/release.md`](docs/release.md) · 코드 건강 점검과 리팩터링 계획: [`docs/decisions/0169`](docs/decisions/0169-code-health-review-and-refactoring-plan.md) · 추상화 수준 판정과 다음 목표(R9~R13): [`docs/decisions/0170`](docs/decisions/0170-abstraction-level-review-and-next-refactoring-targets.md)
 - 지식 베이스: [AimenJoe/KB](https://github.com/AimenJoe/KB) (`maps/gamedev.md`)
@@ -30,7 +30,7 @@ python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 |---|---|---|
 | 이동 | WASD / 화살표 | 왼쪽 스틱, D-pad |
 | 발톱(3연타) | J | X(□) |
-| 굴파기 → 솟구침 | K (다시 누르면 조기 솟구침). 공격 중에 누르면 후딜레이 취소 | A(×) |
+| 굴파기 → 솟구침 | K (다시 누르면 조기 솟구침). 공격 중에 누르면 후딜레이 취소. 모모·도토는 회피(쥐면 달리기, 떼면 멀리뛰기) | A(×) |
 | 필살기(분노가 차면) | L | B(○) |
 | 아이템 쓰기 / 넘기기 | I / Q·E | Y(△) / LB·RB |
 | 지도 | M | Select |
@@ -42,16 +42,17 @@ python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 
 게임 동작(공격~지도)은 설정 → 조작 설정에서 바꿀 수 있다. 웹에서는 브라우저에 저장된다(docs/decisions/0022).
 
-흐름: 인트로 → 타이틀(시작하기·이어하기·오늘의 굴·앨범·설정·개발) → 슬롯 고르기(0078) → (오프닝 컷씬) → 게임. 게임 중 메뉴를 열면 탭 여섯 개(메뉴·상태·가방·저널·도감·지도).
+흐름: 인트로 → 타이틀(시작하기·이어하기·오늘의 굴·앨범·설정·개발) → 슬롯 고르기(0078) → (오프닝 컷씬) → 게임. 게임 중 메뉴를 열면 탭 일곱 개(메뉴·상태·가방·저널·도감·지도·안내).
 
 - **장비**: 캐릭터마다 무기 종류가 다르다. Naïl은 발톱 — 새싹(가벼움, 4연타)·두더지(기본)·바위(무거움, 2연타)·독. 메뉴 → 가방에서 확인으로 장착(docs/decisions/0011).
 - **무기 획득**: 처음엔 맨손. 튜토리얼에서 두더지 발톱을 줍고, 이후는 스토리(컷씬 `Give`·바닥 획득물)를 따라 하나씩(docs/decisions/0012). 개발 시나리오 "발톱 4종 비교"는 넷 다 들고 시작.
 - **초상화**: 대화창에 88×88 2배 밀도 초상화. 아홉 캐릭터 열세 묶음(물든 모습 포함), 나노바나나 원본(`tools/art/sources/ai/`)을 `ai_portraits.py`가 칸에 끼운다(0108~0122). 틀·남은 칸은 `portraits.py`(0015).
 - **장신구·퀵 아이템**: 능력치 = 무기 + 장신구 2칸(체력·공격 속도·굴파기 대기·공격력·분노 충전, 모모 런에서만 나오는 모모 것 셋 0142) + 뿌리 심장(최대 체력 영구 +1). 산딸기(체력 1)·쥬시 지렁이(체력 가득, 들고 있다가 쓰러지면 저절로 일어남 = 목숨, 최대 3)는 가방에 모아 I/Y로 먹고 Q·E/LB·RB로 넘긴다(docs/decisions/0017). 상태 탭에 능력치가 숫자로.
-- **적 = 물든 이웃**: 들쥐·생쥐 떼·시궁쥐(돌격), 다람쥐(도토리), 청설모(뛰어 덮치기). 종류 표는 `src/species.rs`, 그림은 `tools/art/critters.py`. 메뉴 → 도감에 만난 이웃이 말로 된 능력(체력·힘·빠르기)과 이야기·요령으로 적힌다(docs/decisions/0021). 개발 시나리오 "적 다섯 종".
-- **공격 예고**: 적이 공격을 준비하면 맞을 자리(돌진 길·도토리 줄·착지 고리)가 바닥에 붉게, 공격 순간이 가까울수록 진하게 깜빡인다(docs/decisions/0025).
+- **적 = 물든 이웃**: 지대마다 다른 잡몹 열 종(들쥐·생쥐 떼·시궁쥐·다람쥐·청설모·땃쥐·고슴도치·두꺼비·박쥐·포자버섯)과 길의 주인(보리·모모·도토·콩이·토끼풀), 가장 깊은 곳의 누룩 할매. 종류 표는 `src/species.rs`, 그림은 `tools/art/mobs_ai.py` 등. 메뉴 → 도감에 만난 이웃이 말로 된 능력(체력·힘·빠르기)과 이야기·요령으로 적힌다(docs/decisions/0021). 개발 시나리오 "적 다섯 종".
+- **공격 예고**: 적이 공격을 준비하면 맞을 자리(돌진 띠·내려앉을 원)가 바닥에 옅은 붉은 면 + 테두리로 뜨고, 안쪽 채움이 자라 테두리에 닿는 순간이 공격이다. 띠는 받아칠 수 있고 가운데 X가 있는 원은 피해야 한다. 진하기는 설정 "공격 예고"(0176~0198).
 - **화폐**: 반딧불(기술 해금, 많이) · 씨앗(상점, 드물게·상자·보스). 둘 다 HUD 왼쪽 위(docs/decisions/0021).
-- **스테이지 고리**: 필드 남쪽 공터의 튜토리얼 보스(들쥐 대장 보리) → 굴 아래 쉼터(체력 가득·저장·포포 가게·이웃) → 뿌리 길 곁에서 공격 버튼 = 길 지도 → 갈래마다 다른 굴(굴·둥지·저장고·샘) → 그 길의 보스 → 다음 쉼터(docs/decisions/0030~0032). 개발 시나리오 "튜토리얼 보스", "쉼터".
+- **스테이지 고리**: 첫 런은 필드 남쪽 공터의 튜토리얼 보스(들쥐 대장 보리) → 굴 아래 쉼터(체력 가득·저장·포포 가게·이웃) → 뿌리 길 곁에서 공격 버튼 = 길 지도 → 갈래마다 다른 굴 → 그 길의 보스 → 다음 쉼터(docs/decisions/0030~0032). 런 사이에는 큰 나무 아래 마을(0045)에서 재주를 깨우고 꾸미고, 마을 뿌리 길로 내려가면 바로 길 지도부터(0226). 첫 쉼터를 지나면 쓰러질 때마다 실뿌리가 하나 감기고 셋째에 런이 끝난다(0210·0225). 개발 시나리오 "튜토리얼 보스", "쉼터", "마을".
+- **캐릭터**: 나일(발톱·굴파기), 모모(뒷발·깡충, 0056), 도토(도토리 던지기, 0195). 모모·도토는 회피를 쥐면 달리고 떼면 멀리 뛴다(0209). 표는 `src/characters.rs`.
 - **모험**: 필드(연속 스크롤, 자는 적, 저장 지점)에서 굴 입구로 절차적 던전(화면 방, 들어서면 문이 닫히고 다 잡으면 열림, 보물·휴식·보스방)으로. 쓰러지면 저장 지점에서 다시(docs/decisions/0019). 개발 시나리오 "필드(모험)", "던전 바로", "아레나 웨이브".
 - **패링**: 공격을 적 공격이 닿기 직전(스윙 첫 0.12초)에 앞쪽으로 맞추면 돌진은 크게 멈칫, 투사체는 되돌아간다. SP가 크게 찬다(docs/decisions/0020).
 - **필살기 드릴 돌진**: 분노가 차면 L/B. 시동(적이 멈추고 화면이 어두워짐) → 부아아앙 화면 한 폭 돌진, 연타로 적을 벽까지 끌고 가 쾅(docs/decisions/0018, 0024). 개발 시나리오 "장신구·필살기 확인".
@@ -69,9 +70,11 @@ python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 ```sh
 cargo fmt --all -- --check
 cargo clippy --target wasm32-unknown-unknown -- -D warnings
+cargo clippy --target wasm32-unknown-unknown --no-default-features -- -D warnings   # 운영판(개발 기능 없음, 0193)
 cargo test                                        # 단위·규칙 테스트(무브셋·번역·폰트 글자·지도·굽기·패드 키 등)
 cargo build --release --target wasm32-unknown-unknown
 cargo check --target aarch64-linux-android
+cargo check --release --target aarch64-apple-ios
 python3 tools/licenses.py                         # 의존성을 바꿨을 때만: 고지 파일 다시 만들기
 ```
 
@@ -85,7 +88,7 @@ python3 tools/licenses.py                         # 의존성을 바꿨을 때�
 - `main`에 push하면 `deploy-web.yml`이 wasm을 빌드하고, 레포 Secrets에 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`가 있으면 배포한다. 시크릿이 없으면 빌드 검증만. Netlify 사이트는 **Git 연동 없이**(Deploy manually) 만든다. 이유와 절차: KB `guides/macroquad-wasm-netlify-github-actions.md`.
 
 ### Android (APK)
-- `build-android.yml`이 `src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`가 바뀐 push마다 `cargo quad-apk build --release`로 **디버그 키 서명 APK**를 만들어 Actions 아티팩트(`nail-apk-<sha>`)로 올린다. Actions 탭 → 해당 실행 → Artifacts에서 받는다.
+- `build-android.yml`이 `src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`가 바뀐 push마다 `cargo quad-apk build --release`로 **디버그 키 서명 APK**를 만들어 Actions 아티팩트(`nail-apk-<release 또는 dev>-<sha>`)로 올린다(main·release/** push, 작업 브랜치는 Actions에서 Run workflow). Actions 탭 → 해당 실행 → Artifacts에서 받는다.
 - 보통은 아래 "릴리스 = 버전 올리기"(`release.yml`)로 낸다. 손으로 `v*` 태그를 push해도 같은 APK가 Release에 붙는다(세션 프록시는 태그 push를 받지 않는다).
 - 실기 설치: 아티팩트 **zip을 풀어** 안의 `nail.apk`만 설치한다(`nail.apk.idsig`는 무시). `adb install -r nail.apk` 또는 사이드로드(알 수 없는 출처 허용). arm64 전용, Android 8.0+.
 - **제3자 에셋(Sunnyside)**: 원본은 `assets/vendor/`(gitignore). CI는 비공개 레포 `AimenJoe/nail-assets`를 Secrets `ASSETS_REPO`(=`AimenJoe/nail-assets`)·`ASSETS_TOKEN`(그 레포만 Contents 읽기, fine-grained 토큰, 만료 최대 1년)으로 받는다. 팩에서 새 파일을 쓰면 `src/art.rs` 경로와 같은 자리로 `nail-assets`에도 올린다. 토큰이 만료되면 빌드는 직접 그린 그림으로 돌아간다(실패하지 않는다).
@@ -96,6 +99,6 @@ python3 tools/licenses.py                         # 의존성을 바꿨을 때�
 - 앱 아이콘: `android/res/mipmap-*`(옛 + 적응형, `tools/icons/make_icons.py`로 생성). CI가 APK에 아이콘이 없으면 실패한다(0087).
 
 ### iOS (빌드만)
-- `build-ios.yml`(macOS 러너)이 push마다 `aarch64-apple-ios`로 빌드해 **서명하지 않은** `nail-ios-unsigned`(.ipa)를 Actions 아티팩트로 올린다. Info.plist는 `ios/Info.plist`, 아이콘은 `ios/icons/`(docs/decisions/0086).
+- `build-ios.yml`(macOS 러너)이 main·release/** push마다 `aarch64-apple-ios`로 빌드해 **서명하지 않은** `nail-ios-unsigned`(.ipa)를 Actions 아티팩트로 올린다. Info.plist는 `ios/Info.plist`, 아이콘은 `ios/icons/`(docs/decisions/0086).
 - 그대로는 기기에 깔리지 않는다. 내 기기 시험은 Sideloadly·AltStore(Windows·Mac)로 내 Apple ID 서명(무료면 7일마다 다시). 배포(TestFlight)는 Apple Developer Program이 필요하고 아직 정하지 않았다.
 - iOS에서는 게임패드가 아직 안 된다(gilrs에 iOS 백엔드가 없다). 저장은 앱 샌드박스 `Library/Application Support/nail`.
