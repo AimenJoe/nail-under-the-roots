@@ -28,7 +28,7 @@ CELL = 28          # 몸 키 약 22px + 뻗은 발톱(0238: 18px는 모모 23·�
 FOOT = 26          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(`art::nail_origin`).
 
 # 원본(0238, 사장 고름 1단계 1번 → 2단계 시트 둘, ✦ 지움). 칸 상자는 redo_concepts.components로 찾은 값.
-# 시트 A(3줄 × 4): 줄 1 서기·서기(숨)·맞음·쓰러짐, 줄 2·3 걷기(줄 2를 쓴다). 서기 두 칸은 벌린 발톱끼리 붙어 있어
+# 시트 A(3줄 × 4): 줄 1 서기·서기(숨)·맞음·쓰러짐, 줄 2·3 걷기(줄 2 첫 칸만 쓴다 — 네 칸이 거의 같고 앞발만 튀어서, 0241). 서기 두 칸은 벌린 발톱끼리 붙어 있어
 # 서기 A만 잘라(오른쪽 발톱 끝까지) 옆 칸 발톱 조각은 `tidy`로 버린다. 서기 B는 `breathe`로 만든다(따로 그린 두 칸은 숨이 끊긴다).
 # 시트 B(3줄 × 4): 줄 1 들기·치기·들기 2·(쓰지 않음), 줄 2 치기 2·강타 들기(머리 높이 — 더 높이 든 칸은 몸을 크게 그려 와 안 쓴다)·(쓰지 않음)·강타, 줄 3 거두기·(서기)·파고들기·솟구치기.
 SHEET_A = SPRITES / "nail_v3_a.png"
@@ -41,14 +41,11 @@ SPEC = Spec(
                 "idle_a": (7, 52, 276, 330),
                 "hurt": (522, 65, 739, 326),
                 "dead": (738, 166, 1001, 331),
-                "walk_a": (20, 413, 238, 686),
-                "walk_b": (270, 414, 489, 686),
-                "walk_c": (515, 413, 730, 686),
-                "walk_d": (762, 413, 984, 686),
+                "walk_a": (20, 413, 238, 686),   # 걷기는 이 한 칸에서 `walk_cycle`로 네 칸(0241)
             },
             # 배율은 서 있는 키(머리~발)로: 서기·맞음·쓰러짐은 서기 A, 걷기는 걷기 A(줄마다 그려 온 크기가 조금씩 다르다).
             groups={"idle_a": "idle_a", "hurt": "idle_a", "dead": "idle_a",
-                    "walk_a": "walk_a", "walk_b": "walk_a", "walk_c": "walk_a", "walk_d": "walk_a"},
+                    "walk_a": "walk_a"},
             tidy=0.15,
             strip=6,
         ),
@@ -91,12 +88,59 @@ def small(grid_text):
     return cell
 
 
+def walk_cycle(base):
+    """걷기 네 칸을 한 칸(걷기 A)에서 만든다(0241): 디딤 → 지나감(몸 1px 위, 앞발 듦) → 반대 디딤 → 지나감(뒷발 듦).
+
+    원본의 걷기 네 칸은 발이 거의 그대로이고 앞발(손) 자리만 칸마다 튀며 몸이 1~2px 옆으로 흔들려, 22px에서는
+    "미끄러지며 배에 얼룩이 깜박이는" 걸음이 됐다(사장 "걷는 게 어색하다"). 몸은 한 그림 그대로 두고 발만 딛게 한다.
+    발 = 몸 아래 줄(`FOOT` - 1부터)의 덩어리 둘, 왼쪽이 뒷발(오른쪽을 보는 그림).
+    """
+    split = FOOT - 1
+    on = base[..., 3] > 0
+    cols = np.nonzero(on[split:].any(axis=0))[0]
+    gaps = [x for x in range(cols.min(), cols.max()) if not on[split:, x].any()]
+    mid = gaps[len(gaps) // 2] if gaps else (cols.min() + cols.max()) // 2
+    body = base.copy()
+    body[split:] = 0
+    feet = {"back": base.copy(), "front": base.copy()}
+    feet["back"][:split] = 0
+    feet["back"][:, mid:] = 0
+    feet["front"][:split] = 0
+    feet["front"][:, :mid] = 0
+
+    def put(cell, foot, dx=0, dy=0, behind=False):
+        f = np.roll(np.roll(foot, dx, axis=1), dy, axis=0)
+        m = f[..., 3] > 0
+        if behind:
+            m &= cell[..., 3] == 0
+        cell[m] = f[m]
+
+    def frame(bob, back, front):
+        cell = np.zeros_like(base)
+        up = body.copy()
+        if bob:
+            # 배 줄(외곽선 위 둘째 줄)까지 위로 올리고 그 줄을 한 번 더 — 몸이 늘어나 발에 닿는다(밑 외곽선은 두 겹이 되지 않게).
+            k = split - 3
+            up[:k] = body[1:k + 1]
+        cell[...] = up
+        put(cell, feet["back"], *back, behind=True)
+        put(cell, feet["front"], *front)
+        return cell
+
+    return [
+        frame(0, (-1, 0), (1, 0)),     # 디딤: 발을 벌린다
+        frame(1, (0, 0), (0, -1)),     # 지나감: 몸이 올라가고 앞발을 든다
+        frame(0, (1, 0), (-1, 0)),     # 반대 디딤: 발을 모은다(앞뒤가 바뀜)
+        frame(1, (0, -1), (0, 0)),     # 지나감: 뒷발을 든다
+    ]
+
+
 def build():
     spr = convert(SPEC)
     idle = seat(spr["idle_a"], CELL, FOOT)
     rows = [
         [idle, seat(spr["idle_b"], CELL, FOOT)]
-        + [seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT) for k in ("walk_a", "walk_b", "walk_c", "walk_d")],
+        + walk_cycle(seat_on_fur(spr["walk_a"], spr["idle_a"], CELL, FOOT)),
         # 동작 칸은 몸통 털의 가운데를 서기 칸에 맞춘다(발톱을 뻗어도 몸이 옆으로 뛰지 않게).
         [seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT)
          for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],

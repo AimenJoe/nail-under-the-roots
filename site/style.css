@@ -71,7 +71,11 @@ p { margin: 0; }
 .logo { font-size: clamp(2.8rem, 8vw, 5rem); line-height: 1; margin: 0; color: var(--glow); text-shadow: 0 3px 0 #5a3a20, 0 0 24px rgba(242, 205, 92, .35); }
 .logo small { display: block; font-size: .4em; color: var(--text); margin-top: .4rem; letter-spacing: .06em; text-shadow: 0 2px 0 #000; }
 .lede { font-size: 1.12rem; max-width: 32rem; text-shadow: 0 1px 2px #000; }
-.cta { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
+.cta { display: flex; flex-direction: column; gap: .7rem; align-items: flex-start; }
+.cta-line { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
+.btn.soon { border-style: dashed; color: var(--muted); border-color: var(--muted); box-shadow: none; cursor: default; }
+.btn.soon small { font-size: .7em; opacity: .85; }
+.btn.soon:hover { transform: none; box-shadow: none; }
 .btn {
   display: inline-block; font-family: var(--f-pixel); font-size: 1.05rem; text-decoration: none; padding: .62rem 1.15rem;
   border: 2px solid var(--glow); color: var(--soil); background: var(--glow); box-shadow: 4px 4px 0 var(--root);
