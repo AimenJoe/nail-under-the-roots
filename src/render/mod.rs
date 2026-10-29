@@ -913,11 +913,10 @@ impl Renderer {
         let Some(art) = self.art.as_ref() else {
             return;
         };
-        let Some(tex) = art.chief.as_ref() else {
+        let Some(c) = art.chief(frame, true, false) else {
             return;
         };
-        let src = art::chief_cell(frame, art::CHIEF_TAINTED);
-        draw_body_fit(ui, r, tex, src, art::CHIEF_CELL, art.chief_body);
+        draw_body_fit(ui, r, c.tex, c.src, c.size, c.body);
     }
 
     /// 컷씬 배우: 돌아온 보리.

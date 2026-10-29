@@ -101,26 +101,20 @@ async fn load_sunny() -> Option<Sunny> {
     })
 }
 
-/// chief.png 칸(0216 새 그림): 40×40, 발바닥 줄 38. 칸 0·1 서기, 2·3 걷기, 4 웅크림, 5 돌진, 6 맞음, 7 부르기,
-/// 8 기뻐하기, 9 쓰러짐 — 0~7은 옛 32칸 대장 줄과 같은 뜻이라 대장의 칸 고르기는 그대로.
-pub const CHIEF_CELL: f32 = 40.0;
-pub const CHIEF_FOOT: f32 = 38.0;
-/// chief.png의 줄: 돌아온 보리 / 물든 대장(보리 줄의 색을 바꾼 것). 실루엣은 + CHIEF_ROWS.
-pub const CHIEF_BORI: u32 = 0;
-pub const CHIEF_TAINTED: u32 = 1;
-/// chief.png 걷기 네 칸의 첫 칸(10~13, `bori_walk_v1.png`, 0229).
-pub const CHIEF_WALK4: u32 = 10;
-pub const CHIEF_ROWS: u32 = 2;
-
-/// chief.png의 칸 사각형.
-pub fn chief_cell(col: u32, row: u32) -> Rect {
-    inset(Rect::new(
-        col as f32 * CHIEF_CELL,
-        row as f32 * CHIEF_CELL,
-        CHIEF_CELL,
-        CHIEF_CELL,
-    ))
-}
+/// 보리·대장 시트(chief.png, 0216 새 그림): 40×40, 발바닥 줄 38. 칸 0·1 서기, 2·3 걷기, 4 웅크림, 5 돌진, 6 맞음,
+/// 7 부르기(`frame::HOWL`), 8 기뻐하기, 9 쓰러짐, 10~13 걷기 네 칸(`bori_walk_v1.png`, 0229).
+/// 줄 0 돌아온 보리, 줄 1 물든 대장(보리 줄의 색을 바꾼 것), 실루엣은 + 2.
+/// `BIG_SHEETS`와 같은 꼴이지만 표 밖에 둔다(0230 R16): 표의 `back`·`tainted`는 critters 줄 번호(critters.png의 실루엣
+/// 줄과 묶여 있다)인데 대장은 critters 줄이 없다. 여기서 `back`·`tainted`는 chief.png 안의 줄.
+pub const CHIEF: BigSheet = BigSheet {
+    file: "art/chief.png",
+    back: 0,
+    tainted: Some(1),
+    cell: 40.0,
+    foot: 38.0,
+    walk4: 10,
+    run4: 0,
+};
 
 /// halmae.png(0219): 원본 한 장을 두 크기로. 줄 0(y 0~95) 96×96 칸 여섯 — 가장 깊은 곳, 줄 1(y 96~135) 40×40 칸
 /// 여섯 — 마을 이웃. 칸 뜻은 두 줄이 같다.
@@ -312,12 +306,12 @@ impl Art {
         }
         let (chief, chief_body) = match crate::loading::image("art/chief.png").await {
             Ok(img) => {
-                let body = body_box(&img, CHIEF_CELL, CHIEF_TAINTED);
+                let body = body_box(&img, CHIEF.cell, 1);
                 let t = Texture2D::from_image(&img);
                 t.set_filter(FilterMode::Nearest);
                 (Some(t), body)
             }
-            Err(_) => (None, Rect::new(0.0, 0.0, CHIEF_CELL, CHIEF_CELL)),
+            Err(_) => (None, Rect::new(0.0, 0.0, CHIEF.cell, CHIEF.cell)),
         };
         let props = crate::loading::texture("art/props.png").await.ok();
         if let Some(p) = &props {
@@ -488,6 +482,30 @@ pub struct BigSheet {
     /// 걷기 네 칸의 첫 칸(따로 받은 걷기 시트를 줄 끝에 붙인 것, 0229). 0이면 없다 — 걷기 칸 2·3을 오간다.
     /// 시트가 아직 옛것(칸이 모자라면)이어도 걷기 두 칸으로 돌아간다(`Art::walk`).
     pub walk4: u32,
+    /// 플레이어로 달릴 때 네 칸의 첫 칸(도토 바운드 0226, 모모는 깡충 = 걷기 네 칸). 0이면 걷기를 빠르게(`Art::run`).
+    pub run4: u32,
+}
+
+/// 칸 번호의 뜻(0230 R16): critters 줄과 큰 시트가 같은 자리를 쓴다. 렌더는 숫자 대신 이 이름으로 고른다.
+/// 걷기·달리기 네 칸은 시트마다 자리가 달라 표(`BigSheet::walk4`·`run4`)에 있다. Naïl(`nail.png`)은 따로(`draw_nail`).
+pub mod frame {
+    /// 서기 0·1(숨쉬기 두 칸).
+    pub const IDLE: u32 = 0;
+    /// 걷기 2·3(옛 두 칸).
+    pub const WALK: u32 = 2;
+    /// 큰 시트의 공중(뜀) 칸 = 걷기 둘째 칸.
+    pub const AIR: u32 = 3;
+    /// 웅크림·겨누기·시동.
+    pub const CROUCH: u32 = 4;
+    /// 말린 공(콩이·고슴도치): 4·5를 번갈아 구른다.
+    pub const BALL: u32 = 4;
+    /// 공격·차기·던지기·뛰어들기.
+    pub const STRIKE: u32 = 5;
+    pub const HURT: u32 = 6;
+    /// 큰 시트의 쓰러짐(옛 critters 줄은 없어 맞음 칸으로).
+    pub const DOWN: u32 = 7;
+    /// 울기·부르기(대장 chief.png 칸 7, 0216). 큰 시트에서는 쓰러짐과 같은 자리라 대장만 쓴다.
+    pub const HOWL: u32 = 7;
 }
 
 pub const BIG_SHEETS: [BigSheet; 16] = [
@@ -497,6 +515,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: Some(MOMO_ROW),
         cell: 32.0,
         walk4: 8,
+        run4: 8,
         foot: 30.0,
     },
     BigSheet {
@@ -505,6 +524,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: Some(DOTO_ROW),
         cell: 40.0,
         walk4: 0,
+        run4: 8,
         foot: 38.0,
     },
     BigSheet {
@@ -513,6 +533,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: Some(KONGI_ROW),
         cell: 32.0,
         walk4: 8,
+        run4: 0,
         foot: 30.0,
     },
     BigSheet {
@@ -521,6 +542,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: Some(CLOVER_ROW),
         cell: 40.0,
         walk4: 8,
+        run4: 0,
         foot: 38.0,
     },
     BigSheet {
@@ -529,6 +551,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 32.0,
         walk4: 6,
+        run4: 0,
         foot: 30.0,
     },
     BigSheet {
@@ -537,6 +560,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 32.0,
         walk4: 6,
+        run4: 0,
         foot: 30.0,
     },
     // 잡몹(0221): 24칸(박쥐만 날개 때문에 32), 물든 모습 하나. critters 줄 0 들쥐·1 생쥐·2 시궁쥐·3 다람쥐·4 청설모·
@@ -547,6 +571,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 24.0,
         walk4: 0,
+        run4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -555,6 +580,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 24.0,
         walk4: 0,
+        run4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -563,6 +589,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 24.0,
         walk4: 0,
+        run4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -571,6 +598,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 24.0,
         walk4: 0,
+        run4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -579,6 +607,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 24.0,
         walk4: 0,
+        run4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -587,6 +616,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 24.0,
         walk4: 0,
+        run4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -595,6 +625,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 24.0,
         walk4: 0,
+        run4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -603,6 +634,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 24.0,
         walk4: 0,
+        run4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -611,6 +643,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 32.0,
         walk4: 0,
+        run4: 0,
         foot: 30.0,
     },
     BigSheet {
@@ -619,6 +652,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         tainted: None,
         cell: 24.0,
         walk4: 0,
+        run4: 0,
         foot: 22.0,
     },
 ];
@@ -705,11 +739,19 @@ impl Art {
         })
     }
 
-    /// 이 줄의 시트가 가진 칸 수(큰 시트: 텍스처 폭 / 칸, 옛 16칸 시트는 7). 도토 달리기 네 칸(8~11, 0226)이 있는지 본다.
-    pub fn critter_frames(&self, row: u32) -> u32 {
+    /// 이 줄에 달리기 네 칸이 있나(`BigSheet::run4`, 시트가 그 칸까지 있어야).
+    pub fn has_run(&self, row: u32) -> bool {
         match self.big_sheet(row % CRITTER_ROWS) {
-            Some((_, b, tex, _)) => (tex.width() / b.cell) as u32,
-            None => 7,
+            Some((_, b, tex, _)) => b.run4 > 0 && (tex.width() / b.cell) as u32 >= b.run4 + 4,
+            None => false,
+        }
+    }
+
+    /// 달리는 칸(`has_run`일 때): 한 걸음에 두 칸.
+    pub fn run(&self, row: u32, steps: f32) -> u32 {
+        match self.big_sheet(row % CRITTER_ROWS) {
+            Some((_, b, _, _)) => b.run4 + (steps * 2.0) as u32 % 4,
+            None => self.walk(row, steps),
         }
     }
 
@@ -717,26 +759,54 @@ impl Art {
     /// 한 걸음에 두 칸(디딤·지나감)을 돌아 걸음 박자는 그대로, 없으면 칸 2·3.
     pub fn walk(&self, row: u32, steps: f32) -> u32 {
         match self.big_sheet(row % CRITTER_ROWS) {
-            Some((_, b, tex, _)) if b.walk4 > 0 && (tex.width() / b.cell) as u32 >= b.walk4 + 4 => {
-                b.walk4 + (steps * 2.0) as u32 % 4
-            }
-            _ => 2 + steps as u32 % 2,
+            Some((_, b, tex, _)) => walk_frame(b, tex, steps),
+            None => frame::WALK + steps as u32 % 2,
         }
     }
 
     /// 보리·대장(chief.png)의 걷는 칸(`walk`와 같은 뜻).
     pub fn chief_walk(&self, steps: f32) -> u32 {
         match &self.chief {
-            Some(t) if (t.width() / CHIEF_CELL) as u32 >= CHIEF_WALK4 + 4 => {
-                CHIEF_WALK4 + (steps * 2.0) as u32 % 4
-            }
-            _ => 2 + steps as u32 % 2,
+            Some(t) => walk_frame(&CHIEF, t, steps),
+            None => frame::WALK + steps as u32 % 2,
         }
+    }
+
+    /// chief.png 한 칸: `tainted`면 물든 대장 줄(아니면 돌아온 보리), `sil`이면 흰 실루엣 줄.
+    pub fn chief(&self, frame: u32, tainted: bool, sil: bool) -> Option<CritterCell<'_>> {
+        let tex = self.chief.as_ref()?;
+        let b = &CHIEF;
+        let row = if tainted { 1 } else { b.back } + if sil { 2 } else { 0 };
+        Some(CritterCell {
+            tex,
+            src: inset(Rect::new(
+                frame as f32 * b.cell,
+                row as f32 * b.cell,
+                b.cell,
+                b.cell,
+            )),
+            size: b.cell,
+            foot: b.foot,
+            body: if tainted {
+                self.chief_body
+            } else {
+                Rect::new(0.0, 0.0, b.cell, b.cell)
+            },
+        })
     }
 
     /// 이 줄이 새 그림 시트에 있나(쓰러짐 칸 7이 있다).
     pub fn critter_is_big(&self, row: u32) -> bool {
         self.big_sheet(row % CRITTER_ROWS).is_some()
+    }
+}
+
+/// 걷기 네 칸이 있으면(`walk4`, 시트가 그 칸까지 있어야) 한 걸음에 두 칸, 없으면 걷기 두 칸.
+fn walk_frame(b: &BigSheet, tex: &Texture2D, steps: f32) -> u32 {
+    if b.walk4 > 0 && (tex.width() / b.cell) as u32 >= b.walk4 + 4 {
+        b.walk4 + (steps * 2.0) as u32 % 4
+    } else {
+        frame::WALK + steps as u32 % 2
     }
 }
 
@@ -855,5 +925,34 @@ impl Portrait {
             Face::Determined => 3,
         };
         self.first + if i < self.faces { i } else { 0 }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// PNG 머리의 가로·세로(IHDR).
+    fn png_size(file: &str) -> (u32, u32) {
+        let b = std::fs::read(format!("assets/{file}")).expect(file);
+        let n = |i: usize| u32::from_be_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
+        (n(16), n(20))
+    }
+
+    /// 칸 표(0230 R16)가 실제 시트와 맞는다: 줄 넷(돌아온·물든 + 실루엣 둘), 걷기·달리기 네 칸이 시트 안에.
+    #[test]
+    fn sheet_table_matches_png_sizes() {
+        for b in BIG_SHEETS.iter().chain([&CHIEF]) {
+            let (w, h) = png_size(b.file);
+            let cell = b.cell as u32;
+            assert_eq!(w % cell, 0, "{} 가로", b.file);
+            assert_eq!(h / cell, 4, "{} 줄 수", b.file);
+            let cols = w / cell;
+            assert!(cols > frame::HURT, "{} 맞음 칸", b.file);
+            for first in [b.walk4, b.run4].into_iter().filter(|&f| f > 0) {
+                assert!(cols >= first + 4, "{}: 칸 {first}부터 넷", b.file);
+            }
+            assert!(b.foot < b.cell, "{} 발바닥", b.file);
+        }
     }
 }

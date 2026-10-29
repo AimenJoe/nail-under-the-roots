@@ -3,6 +3,7 @@
 //! 그림이 없으면(art 없음) 색 동그라미로.
 
 use super::*;
+use crate::art::frame as F;
 use crate::enemy::Kind;
 use crate::help::Pic;
 
@@ -138,7 +139,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             let p = t::BEAT_PERIOD;
             let ph = time % (3.0 * p + 0.5);
             let at = vec2(mid - 10.0, y);
-            critter(art, Kind::Dummy, 0, at + vec2(18.0, 0.0), true, WHITE);
+            critter(art, Kind::Dummy, F::IDLE, at + vec2(18.0, 0.0), true, WHITE);
             let i = (ph / p) as usize;
             if i < 3 {
                 let k = (ph - i as f32 * p) / p;
@@ -224,7 +225,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                     Color::new(1.0, 0.95, 0.8, 0.35 * pulse),
                 );
                 draw_rectangle(claw.x, claw.y, 1.0, 1.0, Color::new(1.0, 1.0, 1.0, pulse));
-                critter(art, Kind::Dummy, 0, at + vec2(20.0, 0.0), true, WHITE);
+                critter(art, Kind::Dummy, F::IDLE, at + vec2(20.0, 0.0), true, WHITE);
             } else {
                 let k = ((ph - 1.0) / 0.25).min(1.0);
                 nail(art, if k < 1.0 { 2 } else { 8 }, 1, at, false);
@@ -247,7 +248,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 }
                 let fly = ((ph - 1.05) / 0.25).clamp(0.0, 1.0);
                 let dx = at.x + 20.0 + (wall - 6.0 - at.x - 20.0) * fly;
-                critter(art, Kind::Dummy, 6, vec2(dx, y), true, WHITE);
+                critter(art, Kind::Dummy, F::HURT, vec2(dx, y), true, WHITE);
                 if fly >= 1.0 && ph < 1.6 {
                     let r = (ph - 1.3) * 40.0;
                     draw_circle_lines(
@@ -266,7 +267,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             let mouse = vec2(w - 22.0, y);
             if ph < 0.3 {
                 nail(art, 0, 0, vec2(16.0, y), false);
-                critter(art, Kind::FieldMouse, 0, mouse, true, WHITE);
+                critter(art, Kind::FieldMouse, F::IDLE, mouse, true, WHITE);
             } else if ph < 1.5 {
                 let k = (ph - 0.3) / 1.2;
                 let x = 16.0 + (mouse.x - 22.0) * k.min(0.6) / 0.6;
@@ -281,7 +282,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                         Color::new(0.75, 0.55, 0.38, 0.5 + 0.4 * c),
                     );
                 }
-                critter(art, Kind::FieldMouse, 0, mouse, true, WHITE);
+                critter(art, Kind::FieldMouse, F::IDLE, mouse, true, WHITE);
             } else {
                 let k = ((ph - 1.5) / 0.35).min(1.0);
                 let x = 16.0 + (mouse.x - 22.0);
@@ -298,7 +299,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 critter(
                     art,
                     Kind::FieldMouse,
-                    6,
+                    F::HURT,
                     mouse + vec2(push, 0.0),
                     true,
                     WHITE,
@@ -324,7 +325,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 critter(
                     art,
                     Kind::FieldMouse,
-                    4,
+                    F::CROUCH,
                     start + vec2(shake, 0.0),
                     true,
                     Color::new(1.0, 0.6, 0.6, 1.0),
@@ -335,7 +336,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 critter(
                     art,
                     Kind::FieldMouse,
-                    5,
+                    F::STRIKE,
                     start + (at + vec2(12.0, 0.0) - start) * k,
                     true,
                     WHITE,
@@ -353,7 +354,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                     }
                 }
                 let back = at + vec2(12.0, 0.0) + vec2(20.0 * k, 0.0);
-                critter(art, Kind::FieldMouse, 6, back, true, WHITE);
+                critter(art, Kind::FieldMouse, F::HURT, back, true, WHITE);
                 dizzy(back, time);
             }
         }
@@ -368,8 +369,8 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             let m2 = vec2(mid + 22.0, y);
             if ph < 0.9 {
                 nail(art, 0, 0, vec2(14.0, y), false);
-                critter(art, Kind::FieldMouse, 0, m1, true, WHITE);
-                critter(art, Kind::FieldMouse, 0, m2, true, WHITE);
+                critter(art, Kind::FieldMouse, F::IDLE, m1, true, WHITE);
+                critter(art, Kind::FieldMouse, F::IDLE, m2, true, WHITE);
             } else {
                 let k = ((ph - 0.9) / 0.4).min(1.0);
                 let x = 14.0 + (w - 28.0) * k;
@@ -388,9 +389,16 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 for m in [m1, m2] {
                     if x > m.x - 4.0 {
                         let up = ((x - m.x) * 0.3).min(8.0);
-                        critter(art, Kind::FieldMouse, 6, m + vec2(4.0, -up), true, WHITE);
+                        critter(
+                            art,
+                            Kind::FieldMouse,
+                            F::HURT,
+                            m + vec2(4.0, -up),
+                            true,
+                            WHITE,
+                        );
                     } else {
-                        critter(art, Kind::FieldMouse, 0, m, true, WHITE);
+                        critter(art, Kind::FieldMouse, F::IDLE, m, true, WHITE);
                     }
                 }
             }
@@ -446,7 +454,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             critter(
                 art,
                 Kind::FieldMouse,
-                4,
+                F::CROUCH,
                 m,
                 false,
                 Color::new(1.0, 0.6, 0.6, 1.0),
@@ -581,7 +589,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 critter(
                     art,
                     Kind::FieldMouse,
-                    if hit { 6 } else { 0 },
+                    if hit { F::HURT } else { F::IDLE },
                     foe_home,
                     true,
                     WHITE,
@@ -593,7 +601,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 critter(
                     art,
                     Kind::FieldMouse,
-                    2 + ((time * 10.0) as u32) % 2,
+                    F::WALK + ((time * 10.0) as u32) % 2,
                     foe,
                     true,
                     WHITE,
@@ -629,7 +637,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 critter(
                     art,
                     Kind::FieldMouse,
-                    6,
+                    F::HURT,
                     vec2(mid + 4.0 * k, y - 5.0 * k),
                     true,
                     WHITE,
@@ -647,7 +655,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
             if ph < 0.35 {
                 let k = ph / 0.35;
                 momo(art, 3, vec2(start + 12.0 * k, y), arc(k, 7.0), false);
-                critter(art, Kind::FieldMouse, 0, mouse, true, WHITE);
+                critter(art, Kind::FieldMouse, F::IDLE, mouse, true, WHITE);
             } else if ph < 1.25 {
                 let k = (ph - 0.35) / 0.9;
                 let x = start + 12.0 + (run_end - start - 12.0) * k;
@@ -661,12 +669,12 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                     Color::new(1.0, 0.78, 0.86, if k > 0.25 { 0.9 } else { 0.35 }),
                 );
                 momo(art, 2 + ((time * 16.0) as u32) % 2, vec2(x, y), 0.0, false);
-                critter(art, Kind::FieldMouse, 0, mouse, true, WHITE);
+                critter(art, Kind::FieldMouse, F::IDLE, mouse, true, WHITE);
             } else if ph < 1.75 {
                 let k = (ph - 1.25) / 0.5;
                 let x = run_end + (land - run_end) * k;
                 momo(art, 3, vec2(x, y), arc(k, 12.0), false);
-                critter(art, Kind::FieldMouse, 0, mouse, true, WHITE);
+                critter(art, Kind::FieldMouse, F::IDLE, mouse, true, WHITE);
             } else {
                 let k = ((ph - 1.75) / 0.4).min(1.0);
                 momo(art, 0, vec2(land, y), 0.0, false);
@@ -680,7 +688,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
                 critter(
                     art,
                     Kind::FieldMouse,
-                    6,
+                    F::HURT,
                     mouse + vec2(6.0 * k, 0.0),
                     true,
                     WHITE,

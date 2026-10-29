@@ -1,6 +1,7 @@
 //! 배우: Naïl·모모(플레이어), 적, 이웃(보리·할매), 발톱 자국·먹기·지렁이·굴 둔덕·혀·투사체·도토리, 부채꼴.
 
 use super::*;
+use crate::art::frame as F;
 
 /// 컷씬 배우(월드 패스 안에서, begin_world 뒤 present 전에).
 pub fn draw_actor(pos: Vec2, facing: Vec2, color: Color) {
@@ -579,28 +580,15 @@ pub(super) fn draw_shot(s: &world::toss::Shot, alpha: f32) {
 
 /// 돌아온 보리(chief.png 줄 0, 40칸·발바닥 38, 0216). 발이 `pos.y + 6`.
 pub fn draw_bori_at(art: &Art, pos: Vec2, face_left: bool, moving: bool, time: f32) {
-    let Some(tex) = art.chief.as_ref() else {
-        draw_circle(pos.x, pos.y, 10.0, Color::new(0.62, 0.45, 0.36, 1.0));
-        return;
-    };
     let frame = if moving {
         art.chief_walk(time * 6.0)
     } else {
-        ((time * 1.5) as u32) % 2
+        F::IDLE + ((time * 1.5) as u32) % 2
     };
-    let c = art::CHIEF_CELL;
-    draw_texture_ex(
-        tex,
-        (pos.x - c / 2.0).round(),
-        (pos.y + 6.0 - art::CHIEF_FOOT).round(),
-        WHITE,
-        DrawTextureParams {
-            source: Some(art::chief_cell(frame, art::CHIEF_BORI)),
-            dest_size: Some(vec2(c, c)),
-            flip_x: face_left,
-            ..Default::default()
-        },
-    );
+    match art.chief(frame, false, false) {
+        Some(c) => c.draw(vec2(pos.x, pos.y + 6.0), Vec2::ONE, face_left, WHITE),
+        None => draw_circle(pos.x, pos.y, 10.0, Color::new(0.62, 0.45, 0.36, 1.0)),
+    }
 }
 
 /// 빈 자리: 통나무 의자 + 시든 꽃잎 하나(모모가 돌아올 곳).
@@ -780,45 +768,43 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
     let frame = match p.state {
         player::State::Dead => {
             if big {
-                7
+                F::DOWN
             } else {
-                6
+                F::HURT
             }
         }
         player::State::Hop { time: ht, .. } | player::State::Leap { time: ht, .. } => {
             if ht < 0.05 {
-                4
+                F::CROUCH
             } else if big {
-                3
+                F::AIR
             } else {
-                5
+                F::STRIKE
             }
         }
         player::State::Chain { time: ht, .. } => {
             if ht < 0.05 {
-                4
+                F::CROUCH
             } else {
-                5
+                F::STRIKE
             }
         }
         // 멀리뛰기(0209): 도토가 공중에서 던졌으면 던지기 칸.
-        player::State::Jump { thrown: true, .. } => 5,
+        player::State::Jump { thrown: true, .. } => F::STRIKE,
         player::State::Jump { .. } => {
             if big {
-                3
+                F::AIR
             } else {
-                5
+                F::STRIKE
             }
         }
         // 달리기: 달리기 네 칸(8~11, 도토 바운드 0226)이 있으면 그것을, 없으면 걷기 두 칸을 빠르게.
-        player::State::Run { .. } if moving && art.critter_frames(row) >= 12 => {
-            8 + ((time * 14.0) as u32) % 4
-        }
+        player::State::Run { .. } if moving && art.has_run(row) => art.run(row, time * 7.0),
         player::State::Run { .. } if moving => art.walk(row, time * 16.0),
-        player::State::Attack { .. } | player::State::Heavy { .. } => 5,
-        player::State::Charging { .. } => 5,
-        player::State::Recover { .. } => 4,
-        _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => 6,
+        player::State::Attack { .. } | player::State::Heavy { .. } => F::STRIKE,
+        player::State::Charging { .. } => F::STRIKE,
+        player::State::Recover { .. } => F::CROUCH,
+        _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => F::HURT,
         _ if moving => art.walk(row, time * 10.0),
         _ => ((time * 2.0) as u32) % 2,
     };
@@ -1081,14 +1067,14 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
         match art {
             Some(a) if e.kind == crate::enemy::Kind::Chief => a.chief_walk(steps),
             Some(a) => a.walk(sp.sheet_row, steps),
-            None => 2 + walk,
+            None => F::WALK + walk,
         }
     } else {
         walk.min(1) * ((time * 2.0) as u32 % 2)
     };
     match e.state {
         enemy::State::Windup { time: wt } | enemy::State::Aim { time: wt } => {
-            frame = 4;
+            frame = F::CROUCH;
             // 예고: 떨림 + 점점 붉어짐
             pos.x += if ((time * 60.0) as i32) % 2 == 0 {
                 1.0
@@ -1113,17 +1099,17 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
             }
         }
         enemy::State::Crouch { time: ct, .. } => {
-            frame = 4;
+            frame = F::CROUCH;
             let k = (ct / e.windup()).min(1.0);
             tint = Color::new(1.0, 1.0 - 0.4 * k, 1.0 - 0.4 * k, 1.0);
         }
         enemy::State::Leap { .. } => {
-            frame = 5;
+            frame = F::STRIKE;
             pos.y -= e.height();
         }
         enemy::State::Pop { time: pt } => {
             // 튀어나옴: 살짝 솟았다가 내려온다.
-            frame = 5;
+            frame = F::STRIKE;
             let k = (pt / t::MOMO_POP_TIME).clamp(0.0, 1.0);
             pos.y -= (4.0 * 6.0 * k * (1.0 - k)).round();
         }
@@ -1131,7 +1117,7 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
             tint = Color::new(0.75, 0.75, 0.75, 1.0);
         }
         enemy::State::Stunned { time: st } => {
-            frame = 6;
+            frame = F::HURT;
             // 머리 위에 노란 점이 돈다.
             let a = st * 12.0;
             let s = pos + vec2(a.cos(), a.sin() * 0.5) * (r + 3.0) - vec2(0.0, r + 4.0);
@@ -1140,7 +1126,7 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
             }
         }
         enemy::State::Charge { dir, .. } => {
-            frame = 5;
+            frame = F::STRIKE;
             // 잔상
             for i in (1..4).filter(|_| marks) {
                 let back = pos - dir * (i as f32 * 4.0);
@@ -1158,7 +1144,7 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
     if let enemy::State::Howl { time: ht } = e.state {
         if e.kind == crate::enemy::Kind::Doto {
             // 도토: 땅을 판다(웅크린 칸이 떨고, 앞에 흙이 튄다). 울음 고리는 없다.
-            frame = 4;
+            frame = F::CROUCH;
             pos.x += if ((time * 30.0) as i32) % 2 == 0 {
                 1.0
             } else {
@@ -1174,13 +1160,13 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
                 world::DIRT,
             );
         } else {
-            frame = 7;
+            frame = F::HOWL;
         }
     }
     // 토끼풀(0165): 발 구르기 예고는 웅크려 떨고(점점 붉게), 품기는 보랏빛으로 실을 감는다.
     match e.state {
         enemy::State::Thump { time: tt } => {
-            frame = 4;
+            frame = F::CROUCH;
             pos.x += if ((time * 40.0) as i32) % 2 == 0 {
                 1.0
             } else {
@@ -1190,7 +1176,7 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
             tint = Color::new(1.0, 1.0 - 0.45 * k, 1.0 - 0.45 * k, 1.0);
         }
         enemy::State::Gather { time: gt } => {
-            frame = 4;
+            frame = F::CROUCH;
             tint = Color::new(0.88, 0.82, 1.0, 1.0);
             if marks {
                 for k in 0..3 {
@@ -1224,10 +1210,10 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
     // 콩이(0054): 말려 있으면 공(칸 4·5). 구를 때는 두 칸을 번갈아 띠가 돈다. 버틸 때는 등딱지에 빛이 돈다.
     if e.kind == crate::enemy::Kind::Kongi {
         match e.state {
-            enemy::State::Charge { .. } => frame = 4 + ((time * 14.0) as u32) % 2,
-            enemy::State::Windup { .. } => frame = 4,
+            enemy::State::Charge { .. } => frame = F::BALL + ((time * 14.0) as u32) % 2,
+            enemy::State::Windup { .. } => frame = F::CROUCH,
             enemy::State::Guard { .. } if marks => {
-                frame = 4;
+                frame = F::CROUCH;
                 let ph = (time * 2.5).fract();
                 let a = std::f32::consts::PI * (1.1 + ph * 0.8);
                 let g = pos + vec2(a.cos(), a.sin() * 0.8) * (r - 1.0) - vec2(0.0, 2.0);
@@ -1240,17 +1226,17 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
                     Color::new(0.75, 0.90, 1.0, 0.35 + 0.25 * (time * 6.0).sin().abs()),
                 );
             }
-            enemy::State::Guard { .. } => frame = 4,
+            enemy::State::Guard { .. } => frame = F::CROUCH,
             _ => {}
         }
     }
     // 새 졸개(0146): 고슴도치는 콩이처럼 공(칸 4·5), 혀 내밀기·포자 뿜기는 칸 5.
     match (sp.behavior, e.state) {
         (crate::species::Behavior::Roller, enemy::State::Charge { .. }) => {
-            frame = 4 + ((time * 14.0) as u32) % 2
+            frame = F::BALL + ((time * 14.0) as u32) % 2
         }
-        (crate::species::Behavior::Roller, enemy::State::Windup { .. }) => frame = 4,
-        (_, enemy::State::Lash { .. } | enemy::State::Puff { .. }) => frame = 5,
+        (crate::species::Behavior::Roller, enemy::State::Windup { .. }) => frame = F::CROUCH,
+        (_, enemy::State::Lash { .. } | enemy::State::Puff { .. }) => frame = F::STRIKE,
         _ => {}
     }
     if e.flying() {
@@ -1266,7 +1252,7 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
         pos.y -= (e.height() + (time * 5.0 + e.pos.x * 0.02).sin()).round();
     }
     if e.asleep {
-        frame = 1;
+        frame = F::IDLE + 1;
         // 자는 중: Z가 떠오른다.
         let ph = (time * 0.8 + e.pos.x * 0.013).fract();
         let z = pos + vec2(4.0 + ph * 3.0, -r - 6.0 - ph * 6.0);
@@ -1301,23 +1287,13 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
     }
     let flash = e.flash > 0.0;
     let chief = e.kind == crate::enemy::Kind::Chief;
-    if let (true, Some(tex)) = (chief, art.and_then(|a| a.chief.as_ref())) {
+    if let Some(c) = art
+        .filter(|_| chief)
+        .and_then(|a| a.chief(frame, true, flash))
+    {
         // 대장: 40칸(발바닥 38, 0216). 발은 늘 `pos.y + r` — 찌그러짐(`body`/16배)은 발을 축으로.
-        let row = art::CHIEF_TAINTED + if flash { art::CHIEF_ROWS } else { 0 };
-        let k = body / 16.0;
-        let big = k * art::CHIEF_CELL;
-        draw_texture_ex(
-            tex,
-            (pos.x - big.x / 2.0).round(),
-            (pos.y + r - art::CHIEF_FOOT * k.y).round(),
-            if flash { WHITE } else { tint },
-            DrawTextureParams {
-                source: Some(art::chief_cell(frame, row)),
-                dest_size: Some(big),
-                flip_x: e.facing.x < 0.0,
-                ..Default::default()
-            },
-        );
+        let tint = if flash { WHITE } else { tint };
+        c.draw(vec2(pos.x, pos.y + r), body / 16.0, e.facing.x < 0.0, tint);
         return;
     }
     let row = sp.sheet_row + if flash { art::CRITTER_ROWS } else { 0 };
