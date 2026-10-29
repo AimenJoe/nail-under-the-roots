@@ -1252,15 +1252,10 @@ impl World {
         }
         let mut gift_at = None;
         let mut hall_cleared = None;
-        let mut room_charm = None;
         if self.room.doors_locked() && self.enemies.is_empty() {
             self.room.set_doors_locked(false);
             room.cleared = true;
             hall_cleared = partner;
-            // 보통 싸움방을 비우면 가끔 장신구가 떨어진다(사장 2026-10-29 "드롭"). 끝방·엘리트는 아래에서 따로.
-            if room.kind == RoomKind::Combat && rand::gen_range(0.0, 1.0) < t::CHARM_ROOM_DROP {
-                room_charm = Some(self.adv.last_kill);
-            }
             self.juice.audio.play(sfx::Id::Emerge);
             if room.kind == RoomKind::Boss {
                 // 보상은 마지막으로 쓰러진 자리(플레이어 곁)에, 출구는 거기와 플레이어에서 떨어진 바닥 칸에.
@@ -1324,14 +1319,6 @@ impl World {
         if let Some(at) = gift_at {
             self.charm_gift(at);
         }
-        if let Some(at) = room_charm {
-            let missing = self.missing_charms();
-            if !missing.is_empty() {
-                let c = missing[rand::gen_range(0, missing.len())];
-                self.inv.charms_found.push(c);
-                self.drop_charm(c, at);
-            }
-        }
     }
 
     /// 보물 상자를 연다(앱이 확인 버튼으로 부른다, `Interact::Chest`) → 씨앗 한 줌 + 아직 없는 장신구 하나(다 있으면 반딧불).
@@ -1366,10 +1353,25 @@ impl World {
             self.push_loot(Loot::spawn(LootKind::Seed, at));
         }
         self.stats.chests += 1;
-        // 장신구는 상자 앞(아래)에 떨어진다 — 상자 칸은 막혀 있다.
-        self.charm_gift(at + vec2(0.0, 16.0));
+        // 장신구는 상자 앞(아래)에 떨어진다 — 상자 칸은 막혀 있다. 저장고 상자엔 장신구 대신 반딧불(0250).
+        if self.in_cache() {
+            for _ in 0..t::CACHE_GLOWBUGS {
+                self.push_loot(Loot::spawn(LootKind::Glowbug, at + vec2(0.0, 16.0)));
+            }
+        } else {
+            self.charm_gift(at + vec2(0.0, 16.0));
+        }
         self.weapon_gift(at + vec2(-14.0, 18.0));
         self.juice.audio.play(sfx::Id::Emerge);
+    }
+
+    /// 지금 저장고 칸의 굴인가(0250, 사장 "장신구 드롭 확률 및 경로가 너무 많아"): 장신구는 길 지도에서 고르는 둥지·실타래 칸의
+    /// 확정 보상과 가게로만 — 저장고 상자와 보통 싸움방(예전 5%)에서는 나오지 않는다.
+    fn in_cache(&self) -> bool {
+        match (self.adv.node, self.adv.route.as_ref()) {
+            (Some(at), Some(r)) => r.node(at).kind == NodeKind::Cache,
+            _ => false,
+        }
     }
 
     /// 장소를 떠날 때 바닥에 두고 간 장신구·무기는 가방으로 — 잃지 않게(장신구는 떨어질 때 이미 "얻은 것"으로 적힌다).
@@ -2111,6 +2113,38 @@ mod tests {
         }
         assert!(w.pickups.is_empty());
         assert!(w.inv.gifts.iter().any(|g| matches!(g, Gift::Charm(_))));
+    }
+
+    /// 장신구는 둥지 상자·실타래·가게에서만(0250): 저장고 상자는 장신구 대신 반딧불 한 줌.
+    #[test]
+    fn cache_chest_gives_glowbugs_not_a_charm() {
+        let (route, at) = (1..200)
+            .find_map(|seed| {
+                let r = Route::generate(seed, 1, false);
+                let i = r.layers[0].iter().position(|n| n.kind == NodeKind::Cache)?;
+                Some((r, (0, i)))
+            })
+            .expect("저장고 칸이 있는 길");
+        let mut w = World::new();
+        w.inv.charm_pool = vec![0, 1];
+        w.adv.route = Some(route);
+        w.adv.node = Some(at);
+        let c = w.player.pos + vec2(40.0, 0.0);
+        w.room.props.push(crate::room::Prop {
+            rect: Rect::new(c.x - 8.0, c.y - 8.0, 16.0, 16.0),
+            kind: PropKind::Chest { opened: false },
+        });
+        let i = w.room.props.len() - 1;
+        w.open_chest(i);
+        assert!(!w.pickups.iter().any(|p| matches!(p.item, Gift::Charm(_))));
+        assert!(w.inv.charms_found.is_empty());
+        assert!(
+            w.loot
+                .iter()
+                .filter(|l| l.kind == LootKind::Glowbug)
+                .count()
+                >= t::CACHE_GLOWBUGS as usize
+        );
     }
 
     /// 마을의 큰 나무 밑동에 서면 재주 창(0047), 떨어지면 아니다.

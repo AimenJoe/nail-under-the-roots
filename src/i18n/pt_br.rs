@@ -880,5 +880,5 @@ pub static PT_BR: Strings = Strings {
     h_doto: "Lutando com o Doto",
     h_doto_d: "O Doto luta de longe. O ataque atira bolotas — a terceira sai em leque de três. Segure e solte para uma bolota grande que explode onde cai. O salto para trás empurra quem está perto e mantém a mira. Com a barra cheia, enterra bolotas à frente — explodem logo e só ferem inimigos. A mão do arremesso rebate o que vier voando.",
     h_run: "Correr e salto longo",
-    h_run_d: "Momo e Doto: continue segurando o botão de cavar e você corre depois que o pulo ou o salto para trás aterrissa. Correndo, uma marca no chão à frente mostra onde você vai cair — mire e solte para saltar até lá; nada te acerta no ar. a marca da Momo gruda num inimigo à frente e ela o pisoteia ao aterrissar; o Doto arremessa três sozinho no inimigo mais próximo, ainda no ar. Ataque correndo para golpear na hora.",
+    h_run_d: "Momo e Doto: continue segurando o botão de cavar e você corre depois que o pulo ou o salto para trás aterrissa. Correndo, uma marca no chão à frente mostra onde você vai cair — mire e solte para saltar até lá; nada te acerta no ar. a marca da Momo gruda num inimigo à frente e ela o pisoteia ao aterrissar; o Doto arremessa três sozinho no inimigo mais próximo, ainda no ar (sem inimigo ao alcance, para onde você mira). Ataque correndo para golpear na hora.",
 };

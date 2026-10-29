@@ -112,15 +112,23 @@ impl Player {
         let mut thrown = thrown;
         let doto = self.kit.def().dodge == crate::characters::Dodge::Leap;
         // 도토(0212, 사장 "가장 가까운 적에게 쏴야 될 듯, 아니면 메리트가 없어"): 공중 꼭대기에서 저절로, 닿는 거리 안의
-        // 가장 가까운 적에게 셋째 타(부채꼴 셋)를 한 번. 꼭대기 전에 공격을 누르면 그때(적이 없으면 겨눈 쪽으로).
+        // 가장 가까운 적에게 셋째 타(부채꼴 셋)를 한 번. 꼭대기 전에 공격을 누르면 그때.
+        // 닿는 적이 없으면 손으로 겨눈 쪽(오른쪽 스틱 → 이동 → 뛰는 쪽)으로 — 전엔 안 눌렀으면 던지지 않았다(0250).
         if doto && !thrown && self.armed && self.no_attack <= 0.0 {
             let pressed = self.attack_buf > 0.0;
             let apex = was < t::JUMP_TIME * 0.5 && time >= t::JUMP_TIME * 0.5;
             let fan = self.moveset.hits.len() - 1;
+            let manual = if c.a.aim != Vec2::ZERO {
+                c.a.aim
+            } else if c.move_dir != Vec2::ZERO {
+                c.move_dir
+            } else {
+                self.facing
+            };
             let aim = self
                 .air_target(fan)
-                .or_else(|| pressed.then(|| c.a.aim.normalize_or(self.facing)));
-            if let (true, Some(aim)) = (pressed || apex, aim) {
+                .unwrap_or_else(|| manual.normalize_or(self.facing));
+            if pressed || apex {
                 self.facing = aim;
                 self.swing_id += 1;
                 self.attack_buf = 0.0;
@@ -363,9 +371,12 @@ mod tests {
             shots
         };
         assert_eq!(air(vec![], true).len(), 3, "누르면 한 번(부채꼴 셋)");
+        // 0250: 닿는 적이 없어도 꼭대기에서 저절로, 겨눈 쪽(아무 입력 없으면 뛰는 쪽 = 오른쪽)으로.
+        let plain = air(vec![], false);
+        assert_eq!(plain.len(), 3, "적이 없어도 꼭대기에서 한 번");
         assert!(
-            air(vec![], false).is_empty(),
-            "적도 누름도 없으면 안 던진다"
+            plain[1].1.normalize().dot(vec2(1.0, 0.0)) > 0.99,
+            "뛰는 쪽으로"
         );
         let foe = vec2(24.0 + 200.0, 60.0);
         let shots = air(vec![foe], false);

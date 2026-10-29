@@ -880,5 +880,5 @@ pub static ES: Strings = Strings {
     h_doto: "Luchar con Doto",
     h_doto_d: "Doto lucha de lejos. El ataque lanza bellotas — la tercera en abanico de tres. Mantén y suelta para una bellota grande que estalla al caer. El salto atrás aparta a los cercanos y mantiene la mira. Con la barra llena, entierra bellotas delante — estallan pronto y solo dañan a enemigos. La mano que lanza devuelve lo que vuela hacia ti.",
     h_run: "Correr y salto largo",
-    h_run_d: "Momo y Doto: mantén el botón de excavar y correrás cuando el salto o el salto atrás aterrice. Al correr, una marca en el suelo delante muestra dónde caerás — apunta y suelta para saltar justo ahí; en el aire nada te alcanza. la marca de Momo se pega a un enemigo delante y ella lo pisotea al caer; Doto lanza tres solo al enemigo más cercano, en el aire. Ataca corriendo para golpear al instante.",
+    h_run_d: "Momo y Doto: mantén el botón de excavar y correrás cuando el salto o el salto atrás aterrice. Al correr, una marca en el suelo delante muestra dónde caerás — apunta y suelta para saltar justo ahí; en el aire nada te alcanza. la marca de Momo se pega a un enemigo delante y ella lo pisotea al caer; Doto lanza tres solo al enemigo más cercano, en el aire (si no hay ninguno al alcance, hacia donde apuntas). Ataca corriendo para golpear al instante.",
 };

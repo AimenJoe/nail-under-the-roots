@@ -880,5 +880,5 @@ pub static PL: Strings = Strings {
     h_doto: "Walka jako Doto",
     h_doto_d: "Doto walczy z daleka. Atak rzuca żołędziami — trzeci rzut wachlarzem trzech. Przytrzymaj i puść: duży żołądź pęka tam, gdzie spadnie. Odskok odpycha bliskich wrogów i zachowuje celownik. Z pełnym paskiem zakopujesz żołędzie przed sobą — wkrótce pękają i ranią tylko wrogów. Ręka w rzucie odbija to, co leci w ciebie.",
     h_run: "Bieg i skok w dal",
-    h_run_d: "Momo i Doto: trzymaj dalej przycisk kopania, a po skoku lub odskoku zaczniesz biec. W biegu znacznik na ziemi przed tobą pokazuje, gdzie wylądujesz — wyceluj i puść, by skoczyć dokładnie tam; w powietrzu nic cię nie trafi. znacznik Momo przyczepia się do wroga przed nią, a ona tupie w niego przy lądowaniu; Doto w powietrzu sam rzuca trzy w najbliższego wroga. Atakuj w biegu, by uderzyć od razu.",
+    h_run_d: "Momo i Doto: trzymaj dalej przycisk kopania, a po skoku lub odskoku zaczniesz biec. W biegu znacznik na ziemi przed tobą pokazuje, gdzie wylądujesz — wyceluj i puść, by skoczyć dokładnie tam; w powietrzu nic cię nie trafi. znacznik Momo przyczepia się do wroga przed nią, a ona tupie w niego przy lądowaniu; Doto w powietrzu sam rzuca trzy w najbliższego wroga (gdy nikogo nie ma w zasięgu — tam, gdzie celujesz). Atakuj w biegu, by uderzyć od razu.",
 };
