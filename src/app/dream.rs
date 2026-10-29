@@ -101,9 +101,7 @@ impl App {
         let c = w.room.center();
         w.enemies.clear();
         w.projectiles.clear();
-        w.hazards.mines.clear();
-        w.hazards.clouds.clear();
-        w.hazards.rocks.clear();
+        w.hazards.clear_fight();
         w.loot.clear();
         let mut e = Enemy::new(k, c - vec2(0.0, 30.0));
         e.wake_delay = 1.0;
@@ -151,9 +149,7 @@ impl App {
         }
         // 보스가 쓰러졌다(대장이 부른 생쥐가 남았으면 같이 흩어진다).
         self.world.enemies.clear();
-        self.world.hazards.mines.clear();
-        self.world.hazards.clouds.clear();
-        self.world.hazards.rocks.clear();
+        self.world.hazards.clear_fight();
         if run.at + 1 < run.queue.len() {
             run.at += 1;
             let heal = dream::RUSH_HEAL;

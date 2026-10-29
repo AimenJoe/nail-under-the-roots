@@ -593,6 +593,40 @@ impl Default for Hazards {
     }
 }
 
+/// 위험물의 수명(0230 R13). 충돌 규칙은 종류마다 다르게 `World`의 틱에 있고, 언제 치우는지만 여기 한 곳.
+impl Hazards {
+    /// 싸움이 남긴 것을 치운다: 지뢰·포자 구름·떨어지는 돌·충격파·실 가닥. 고치는 방의 일부라 남긴다.
+    /// 다시 깨어날 때, 굴·쉼터·가장 깊은 곳·들판에 들어설 때, 실의 꿈에서 보스 사이에.
+    pub fn clear_fight(&mut self) {
+        self.mines.clear();
+        self.clouds.clear();
+        self.rocks.clear();
+        self.waves.clear();
+        self.thread_lash = None;
+    }
+
+    /// 장소가 바뀐다(어두운 한가운데, `swap_place`): 고치까지 전부.
+    pub fn clear_all(&mut self) {
+        self.clear_fight();
+        self.cocoons.clear();
+    }
+
+    /// 아기들의 고치 둘(0165): `c`는 둘 사이 가운데. 토끼풀은 그 앞을 지킨다.
+    pub fn place_cocoons(&mut self, c: Vec2) {
+        self.cocoons = vec![c + vec2(-13.0, 0.0), c + vec2(13.0, 2.0)];
+    }
+
+    #[cfg(test)]
+    pub fn is_clear(&self) -> bool {
+        self.mines.is_empty()
+            && self.clouds.is_empty()
+            && self.rocks.is_empty()
+            && self.cocoons.is_empty()
+            && self.waves.is_empty()
+            && self.thread_lash.is_none()
+    }
+}
+
 impl Default for Juice {
     fn default() -> Self {
         Self {

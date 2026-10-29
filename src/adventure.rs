@@ -549,9 +549,7 @@ impl World {
         f.swapped = true;
         self.spring = None;
         self.story.clear_petals();
-        self.hazards.cocoons.clear();
-        self.hazards.waves.clear();
-        self.hazards.thread_lash = None;
+        self.hazards.clear_all();
         self.exit_at = None;
         self.exit_age = 0.0;
         self.juice.petals = false;
@@ -882,8 +880,7 @@ impl World {
         }
         self.projectiles.clear();
         self.toss.clear();
-        self.hazards.clouds.clear();
-        self.hazards.rocks.clear();
+        self.hazards.clear_fight();
         self.player.pos = d.start_pos();
         self.player.prev_pos = self.player.pos;
         self.adv.current_room = d.start;
@@ -907,8 +904,7 @@ impl World {
         }
         self.projectiles.clear();
         self.toss.clear();
-        self.hazards.clouds.clear();
-        self.hazards.rocks.clear();
+        self.hazards.clear_fight();
         self.adv.dungeon = None;
         self.adv.node = None;
     }
@@ -926,9 +922,7 @@ impl World {
         self.loot.clear();
         self.projectiles.clear();
         self.toss.clear();
-        self.hazards.clouds.clear();
-        self.hazards.rocks.clear();
-        self.hazards.mines.clear();
+        self.hazards.clear_fight();
         self.npc = None;
         self.neighbors.clear();
         self.biome = Biome::Deep;
@@ -973,8 +967,7 @@ impl World {
         self.loot.clear();
         self.projectiles.clear();
         self.toss.clear();
-        self.hazards.clouds.clear();
-        self.hazards.rocks.clear();
+        self.hazards.clear_fight();
         self.npc = None;
         self.neighbors.clear();
         for (ch, at) in &p.marks {
@@ -1060,9 +1053,7 @@ impl World {
             }
         }
         let strand = self.strands_shown();
-        self.hazards.mines.clear();
-        self.hazards.clouds.clear();
-        self.hazards.rocks.clear();
+        self.hazards.clear_fight();
         if self.adv.place == Place::Deep {
             // 실에 잠겼다(0162): 맡겨 둔 쉼터로 돌아간다. 매듭은 다음에 다시.
             self.deep = None;
@@ -1180,7 +1171,7 @@ impl World {
                         if kind == Kind::Clover {
                             // 아기들의 고치 둘은 방 위쪽 가운데(0165). 토끼풀은 그 앞을 지킨다.
                             let c = vec2(interior.center().x, interior.y + 22.0);
-                            self.hazards.cocoons = vec![c + vec2(-13.0, 0.0), c + vec2(13.0, 2.0)];
+                            self.hazards.place_cocoons(c);
                             e.guard = Some(c);
                         }
                         self.adv.boss_last = e.pos;
@@ -1515,6 +1506,38 @@ mod tests {
         assert_eq!(w.adv.place, Place::Camp);
         assert_eq!(w.adv.stage, 1);
         assert!(w.strands_shown());
+    }
+
+    /// 위험물의 수명(0230 R13): 장소를 옮기면 싸움이 남긴 것도 고치도 남지 않는다.
+    #[test]
+    fn changing_place_leaves_no_hazards() {
+        use crate::world::{Cloud, Mine, Rockfall, Wave};
+        let mut w = World::field();
+        w.open_glade();
+        w.skip_glade_boss();
+        let p = w.player.pos;
+        w.hazards.mines.push(Mine {
+            pos: p,
+            time: 0.0,
+            fuse: 9.0,
+        });
+        w.hazards.clouds.push(Cloud { pos: p, time: 0.0 });
+        w.hazards.rocks.push(Rockfall { pos: p, time: 0.0 });
+        w.hazards.waves.push(Wave {
+            pos: p,
+            time: 0.0,
+            hit: false,
+        });
+        w.hazards.thread_lash = Some((p, p, 0.0));
+        w.hazards.place_cocoons(p);
+        w.descend_to_first_camp();
+        for _ in 0..2000 {
+            if !w.adventure_pre() {
+                break;
+            }
+        }
+        assert_eq!(w.adv.place, Place::Camp);
+        assert!(w.hazards.is_clear());
     }
 
     /// 지름길(0151): 공터 안, 굴 입구 바로 위의 걸을 수 있는 칸에서 시작하고, 저장도 거기.
