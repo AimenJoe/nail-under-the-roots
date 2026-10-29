@@ -65,34 +65,6 @@ impl Player {
         }
     }
 
-    /// 갈라지는 열매(도토의 고유 재주, 0247): 마무리·큰 도토리는 조각 수를 그 무기의 수와 큰 쪽으로.
-    pub(super) fn sig_throw(&self, throw: Throw, finisher: bool) -> Throw {
-        match throw {
-            Throw::Shot {
-                count,
-                spread,
-                speed,
-                reach,
-                radius,
-                splash,
-                bounce,
-                split,
-                thorns,
-            } => Throw::Shot {
-                count,
-                spread,
-                speed,
-                reach,
-                radius,
-                splash,
-                bounce,
-                split: split.max(self.talents.sig_split(finisher)),
-                thorns,
-            },
-            Throw::None => Throw::None,
-        }
-    }
-
     /// 발 앞에 가시 덤불(0246).
     pub(super) fn leave_thorns(&mut self, dir: Vec2, range: f32) {
         self.spawns.push(Spawn::Thorns {

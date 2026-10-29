@@ -12,6 +12,7 @@
 
 use crate::equipment::{Character, Mods, NO_MODS};
 use crate::i18n::Tr;
+use crate::moveset::{Hit, Throw};
 use crate::tuning as t;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -198,27 +199,27 @@ impl Talents {
         self.sig.then(|| self.who.def().signature)
     }
 
-    /// 독 발톱(Naïl의 고유 재주)이 이 타에 거는 독(초). 마무리 타·강타는 길게.
-    pub fn sig_poison(&self, finisher: bool) -> f32 {
-        match (self.signature(), finisher) {
-            (Some(Signature::Venom), false) => t::VENOM_POISON,
-            (Some(Signature::Venom), true) => t::VENOM_POISON_FINISHER,
-            _ => 0.0,
+    /// 무기 한 타에 고유 재주를 얹은 타(0247 → 0248 R27). 플레이어는 이것만 본다 — 재주가 닿는 자리는 여기 하나.
+    /// 독 발톱은 모든 타에 독(마무리·강타는 길게), 가시 발·갈라지는 열매는 마무리·강타에만. `finisher`: 콤보 마지막 타 또는 강타.
+    pub fn with_signature(&self, mut h: Hit, finisher: bool) -> Hit {
+        match self.signature() {
+            Some(Signature::Venom) => {
+                let p = if finisher {
+                    t::VENOM_POISON_FINISHER
+                } else {
+                    t::VENOM_POISON
+                };
+                h.poison = h.poison.max(p);
+            }
+            Some(Signature::Thorns) if finisher && h.throw == Throw::None => h.thorns = true,
+            Some(Signature::Split) if finisher => {
+                if let Throw::Shot { split, .. } = &mut h.throw {
+                    *split = (*split).max(t::SIG_SPLIT);
+                }
+            }
+            _ => {}
         }
-    }
-
-    /// 가시 발(모모): 마무리 차기·강차기가 가시 덤불을 남기나.
-    pub fn sig_thorns(&self, finisher: bool) -> bool {
-        finisher && self.signature() == Some(Signature::Thorns)
-    }
-
-    /// 갈라지는 열매(도토): 마무리 던지기·큰 도토리가 갈라지는 조각 수(그 무기의 수와 큰 쪽).
-    pub fn sig_split(&self, finisher: bool) -> u8 {
-        if finisher && self.signature() == Some(Signature::Split) {
-            t::SIG_SPLIT
-        } else {
-            0
-        }
+        h
     }
 
     fn side(self, slot: Slot) -> u8 {
@@ -675,19 +676,27 @@ mod tests {
             sig: true,
             ..Talents::default()
         };
+        let claw = crate::moveset::CLAWS.hits[0];
+        let kick = crate::moveset::KICKS.hits[0];
+        let acorn = crate::moveset::ACORNS.hits[0];
+        let split = |h: Hit| match h.throw {
+            Throw::Shot { split, .. } => split,
+            Throw::None => 0,
+        };
         let nail = on(Character::Mole);
-        assert!(
-            nail.sig_poison(false) > 0.0 && !nail.sig_thorns(true) && nail.sig_split(true) == 0
-        );
+        assert!(nail.with_signature(claw, false).poison > 0.0);
+        assert!(nail.with_signature(claw, true).poison > nail.with_signature(claw, false).poison);
         let momo = on(Character::Momo);
-        assert!(momo.sig_thorns(true) && !momo.sig_thorns(false) && momo.sig_poison(true) == 0.0);
+        assert!(momo.with_signature(kick, true).thorns && !momo.with_signature(kick, false).thorns);
+        assert_eq!(momo.with_signature(kick, true).poison, kick.poison);
         let doto = on(Character::Doto);
-        assert!(doto.sig_split(true) > 0 && doto.sig_split(false) == 0 && !doto.sig_thorns(true));
+        assert!(split(doto.with_signature(acorn, true)) >= t::SIG_SPLIT);
+        assert_eq!(split(doto.with_signature(acorn, false)), split(acorn));
         let off = Talents {
             who: Character::Momo,
             ..Talents::default()
         };
-        assert!(off.signature().is_none() && !off.sig_thorns(true));
+        assert!(off.signature().is_none() && !off.with_signature(kick, true).thorns);
         // 기록 키는 캐릭터마다 달라야 한다(Naïl은 예전 독 발톱 깃발 그대로).
         let keys: Vec<&str> = crate::characters::ALL
             .iter()

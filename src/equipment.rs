@@ -759,9 +759,15 @@ mod tests {
             sig: true,
             ..Default::default()
         };
-        assert!(on.sig_poison(false) > 0.0);
-        assert!(on.sig_poison(true) > on.sig_poison(false));
-        assert_eq!(crate::talents::Talents::default().sig_poison(true), 0.0);
+        let claw = moveset::CLAWS.hits[0];
+        assert!(on.with_signature(claw, false).poison > 0.0);
+        assert!(on.with_signature(claw, true).poison > on.with_signature(claw, false).poison);
+        assert_eq!(
+            crate::talents::Talents::default()
+                .with_signature(claw, true)
+                .poison,
+            claw.poison
+        );
     }
 
     /// 캐릭터의 첫 무기는 그 캐릭터가 쓰는 종류다(0056).

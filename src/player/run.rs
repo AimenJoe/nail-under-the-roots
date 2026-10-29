@@ -124,7 +124,7 @@ impl Player {
                 self.facing = aim;
                 self.swing_id += 1;
                 self.attack_buf = 0.0;
-                self.throw_shots(self.moveset.hits[fan].throw, aim, self.hit_strike(fan, aim));
+                self.throw_shots(self.hit_of(fan).throw, aim, self.hit_strike(fan, aim));
                 self.events.push(Event::Swing(fan));
                 thrown = true;
             }

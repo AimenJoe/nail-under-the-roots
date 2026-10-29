@@ -16,7 +16,7 @@ impl Player {
         let move_dir = c.move_dir;
         let mut strike = None;
         let ms = self.moveset;
-        let hit = ms.hits[idx];
+        let hit = self.hit_of(idx);
         let last = ms.last();
         // 공격 속도: 스윙 시계를 빨리(느리게) 돌린다. 활성·캔슬·후딜레이가 함께 줄어든다.
         let sdt = dt * self.stats.attack_speed;
@@ -26,18 +26,11 @@ impl Player {
             strike = Some(self.claw_strike(idx, dir));
         }
         // 던지는 타(0195): 활성 구간 첫 틱에 탄. 손앞의 판정(`claw_strike`)은 받아치기·탄 베기만.
-        // 고유 재주(0247)는 마무리 타에: 가시 발(모모)·갈라지는 열매(도토).
-        let finisher = idx == ms.last();
         if hit.throw != crate::moveset::Throw::None && time >= a0 && time - sdt < a0.max(1e-6) {
-            let throw = self.sig_throw(hit.throw, finisher);
-            self.throw_shots(throw, dir, self.hit_strike(idx, dir));
+            self.throw_shots(hit.throw, dir, self.hit_strike(idx, dir));
         }
-        // 가시 덤불을 남기는 차기(가시덩굴 각반, 0246): 활성 구간 첫 틱에 발 앞에.
-        if (hit.thorns
-            || (self.talents.sig_thorns(finisher) && hit.throw == crate::moveset::Throw::None))
-            && time >= a0
-            && time - sdt < a0.max(1e-6)
-        {
+        // 가시 덤불을 남기는 차기(가시덩굴 각반 0246·가시 발 0247): 활성 구간 첫 틱에 발 앞에.
+        if hit.thorns && time >= a0 && time - sdt < a0.max(1e-6) {
             self.leave_thorns(dir, hit.range);
         }
         self.pos += move_dir * self.speed() * ms.move_factor * dt;
@@ -131,7 +124,7 @@ impl Player {
         let move_dir = c.move_dir;
         let mut strike = None;
         let ms = self.moveset;
-        let hit = ms.heavy();
+        let hit = self.heavy_hit();
         let sdt = dt * self.stats.attack_speed;
         let time = time + sdt;
         let (a0, a1) = hit.active;
@@ -144,10 +137,9 @@ impl Player {
                 kind: StrikeKind::Heavy,
                 ..self.heavy_strike(dir, perfect)
             };
-            let throw = self.sig_throw(hit.throw, true);
-            self.throw_shots(throw, dir, s);
+            self.throw_shots(hit.throw, dir, s);
         }
-        if (hit.thorns || self.talents.sig_thorns(true))
+        if hit.thorns
             && hit.throw == crate::moveset::Throw::None
             && time >= a0
             && time - sdt < a0.max(1e-6)
@@ -259,6 +251,17 @@ impl Player {
         idx == self.moveset.last() && self.combo_beats >= self.moveset.last()
     }
 
+    /// 콤보 `idx`번째 타: 무기 타에 고유 재주를 얹은 것(0248 R27). 수치·탄·덤불은 모두 이것에서.
+    pub(super) fn hit_of(&self, idx: usize) -> crate::moveset::Hit {
+        self.talents
+            .with_signature(self.moveset.hits[idx], idx == self.moveset.last())
+    }
+
+    /// 강타: 무기 강타에 고유 재주를 얹은 것.
+    pub(super) fn heavy_hit(&self) -> crate::moveset::Hit {
+        self.talents.with_signature(self.moveset.heavy(), true)
+    }
+
     /// 이번 틱의 손 타격. 던지는 타면 손앞의 짧은 판정(`Toss`: 적은 안 맞고 받아치기·탄 베기만, 0195).
     pub(super) fn claw_strike(&self, idx: usize, dir: Vec2) -> Strike {
         let s = self.hit_strike(idx, dir);
@@ -274,7 +277,7 @@ impl Player {
 
     /// 그 타의 수치로 만든 타격(근접 타 그대로, 던지는 타면 탄이 맞힐 때 쓴다).
     pub(super) fn hit_strike(&self, idx: usize, dir: Vec2) -> Strike {
-        let h = self.moveset.hits[idx];
+        let h = self.hit_of(idx);
         Strike {
             id: self.swing_id,
             kind: StrikeKind::Claw(idx),
@@ -316,9 +319,7 @@ impl Player {
                     0.0
                 },
             finisher: idx == self.moveset.last(),
-            poison: h
-                .poison
-                .max(self.talents.sig_poison(idx == self.moveset.last())),
+            poison: h.poison,
             crush: h.crush,
         }
     }
@@ -349,7 +350,7 @@ impl Player {
     }
 
     pub(super) fn heavy_strike(&self, dir: Vec2, perfect: bool) -> Strike {
-        let h = self.moveset.heavy();
+        let h = self.heavy_hit();
         let bonus = if perfect { 1 } else { 0 };
         Strike {
             id: self.swing_id,
@@ -370,7 +371,7 @@ impl Player {
             hitstop: h.hitstop + bonus as f32 * t::HEAVY_PERFECT_HITSTOP,
             shake: h.shake,
             finisher: true,
-            poison: h.poison.max(self.talents.sig_poison(true)),
+            poison: h.poison,
             crush: h.crush,
         }
     }
