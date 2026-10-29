@@ -5,7 +5,7 @@
 옮기는 법(색표·다수결 줄이기·효과 지우기·손발 색·흔들기·숨쉬기)은 공용 변환기 `sprite_ai.py`에 있고, 여기는 Naïl의
 설정(`SPEC`)과 시트 배치뿐이다. 왜 이 길인가(0203 → 0206 → 0238): 16칸 손 그림은 "두더지 같지 않다"(사장) → 실루엣 시안 1
 (`nail_s1_v2`, 몸 16px) → 사장 "처음부터 다시"(0238): 큰 그림 다섯 안에서 고른 1번(서서 삽 손을 벌린 몸 + 주황 목도리)을
-시트 둘(`nail_v3_a`·`nail_v3_b`)로 받아 키 약 22px로(모모 23·도토 25와 나란히). 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
+시트 둘(`nail_v3_a`·`nail_v3_b`)로 받아 키 약 22px로(모모 23·도토 25와 나란히). 0242에 머리를 키워(`chibi`) 키 약 24px. 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
 
 칸 배치(게임 코드는 칸 크기 `art::NAIL_CELL`만 안다):
   줄 0: 서기 2, 걷기 4 / 줄 1: 치기 3, 맞음, 쓰러짐, 들기 3, 거두기 / 줄 2: 흙더미 2, 그림자(16칸 그림을 칸 아래 가운데에)
@@ -16,21 +16,117 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림과 털빛 표(FURS)를 같이 쓴다
-from sprite_ai import Source, Spec, convert, is_fur, seat, seat_on_fur, step_cycle  # noqa: E402
+from sprite_ai import Source, Spec, convert, is_fur, magenta, seat, seat_on_fur, step_cycle  # noqa: E402
 
 SPRITES = HERE / "sources" / "ai" / "sprites"
-CELL = 28          # 몸 키 약 22px + 뻗은 발톱(0238: 18px는 모모 23·도토 25보다 작아 주인공이 가장 작았다)
+CELL = 28          # 키 약 24px(머리 키운 뒤, 0242) + 뻗은 발톱(0238: 18px는 모모 23·도토 25보다 작아 주인공이 가장 작았다)
 FOOT = 26          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(`art::nail_origin`).
 
 # 원본(0238, 사장 고름 1단계 1번 → 2단계 시트 둘, ✦ 지움). 칸 상자는 redo_concepts.components로 찾은 값.
 # 시트 A(3줄 × 4): 줄 1 서기·서기(숨)·맞음·쓰러짐, 줄 2·3 걷기(줄 2 첫 칸만 쓴다 — 네 칸이 거의 같고 앞발만 튀어서, 0241). 서기 두 칸은 벌린 발톱끼리 붙어 있어
 # 서기 A만 잘라(오른쪽 발톱 끝까지) 옆 칸 발톱 조각은 `tidy`로 버린다. 서기 B는 `breathe`로 만든다(따로 그린 두 칸은 숨이 끊긴다).
 # 시트 B(3줄 × 4): 줄 1 들기·치기·들기 2·(쓰지 않음), 줄 2 치기 2·강타 들기(머리 높이 — 더 높이 든 칸은 몸을 크게 그려 와 안 쓴다)·(쓰지 않음)·강타, 줄 3 거두기·(서기)·파고들기·솟구치기.
+# 머리 키우기(0242, 사장 "머리 비율을 늘려 귀엽게"): 22px에서 원본 비율(머리 ≈ 키의 1/4)은 얼굴이 1px 눈으로 줄었다.
+# 줄이기 전에 원본(큰 그림)에서 머리만 HEAD배 키우고 눈을 크게(흰 반짝 포함) 다시 그린 뒤 같은 변환기로 줄인다 —
+# 줄인 도트를 손보면 계단이 생기지만 큰 그림에서 키우면 다수결 줄이기가 선을 다시 고른다. 키는 BODY_H로 2~3px 커진다.
+# 머리 = 목도리(주황) 윗쪽 털·주둥이 덩어리 중 맨 위 털에 이어진 것(발톱 크림은 뺀다), 기준점 = 목도리 윗선의 가운데.
+# 누운 칸(쓰러짐)은 머리가 옆이라 그대로.
+HEAD = 1.35
+EYE = (9, 11)       # 원본 px 반지름(가로, 세로)
+NO_HEAD = {"dead"}
+
+
+def _flood(mask, seed):
+    out = np.zeros_like(mask)
+    stack = [seed]
+    H, W = mask.shape
+    while stack:
+        y, x = stack.pop()
+        if y < 0 or x < 0 or y >= H or x >= W or out[y, x] or not mask[y, x]:
+            continue
+        out[y, x] = True
+        stack += [(y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)]
+    return out
+
+
+def chibi(img, frames):
+    """칸마다 머리를 키운 그림을 새 판에 칸씩 세로로 쌓는다(넓힌 상자가 옆 칸을 덮지 않게). → (새 판, 새 칸 상자)."""
+    slots, out = [], {}
+    for k, (x0, y0, x1, y1) in frames.items():
+        a = img[y0:y1, x0:x1]
+        if k in NO_HEAD:
+            slots.append((k, Image.fromarray(a.astype(np.uint8), "RGB")))
+            continue
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        fg = magenta(a) < 60
+        orange = fg & (r > 150) & (g > 60) & (g < 165) & (b < 100) & (r - b > 90)
+        cream = (r > 190) & (g > 175) & (b < 175) & (r - b > 40)
+        oy, ox = np.nonzero(orange)
+        cx = int(np.median(ox))
+        yn = int(oy[np.abs(ox - cx) <= 12].min())     # 목도리 윗선(가운데)
+        rows = np.arange(a.shape[0])[:, None]
+        cand = fg & ~orange & ~cream & (rows < yn)
+        ty, tx = np.nonzero(cand)
+        top = int(ty.min())
+        # 머리 폭: 머리 윗부분(맨 위 ~ 목도리까지의 위 40%) 털의 좌우 끝에서 조금 더. 벌린 앞발(어깨 높이)은 이 밖이다.
+        upper = cand & (rows < top + (yn - top) * 0.4)
+        uy, ux = np.nonzero(upper)
+        pad = (ux.max() - ux.min()) * 0.25
+        cols = np.arange(a.shape[1])[None, :]
+        cand &= (cols >= ux.min() - pad) & (cols <= ux.max() + pad)
+        head = _flood(cand, (int(ty[ty.argmin()]), int(tx[ty.argmin()])))
+        hy, hx = np.nonzero(head)
+        ax, ay = float(hx[hy >= hy.max() - 6].mean()), float(yn)
+        # 눈: 머리 속(외곽선에서 5px 안)의 어두운 점 덩어리 중 가장 큰 것. 감은 눈(가는 선)은 작아서 그리지 않는다.
+        inner = np.asarray(Image.fromarray((fg * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(11))) > 0
+        # 오른쪽을 보는 그림 — 눈은 머리 앞쪽 절반, 위쪽 2/3에 있다(뒤통수의 귀·목도리 매듭 그늘을 눈으로 잡지 않게).
+        front = (cols >= hx.mean()) & (rows < hy.min() + (hy.max() - hy.min()) * 0.7)
+        dark = head & inner & front & (a.sum(-1) < 170)
+        eye = None
+        if dark.sum() >= 12:
+            dy, dx = np.nonzero(dark)
+            best = None
+            for y, x in zip(dy, dx):
+                n = ((np.abs(dy - y) <= 5) & (np.abs(dx - x) <= 4)).sum()
+                if best is None or n > best[0]:
+                    best = (n, y, x)
+            n, by, bx = best
+            if n >= 12:
+                close = (np.abs(dy - by) <= 6) & (np.abs(dx - bx) <= 5)
+                eye = (dx[close].mean(), dy[close].mean())
+        layer = np.zeros(a.shape[:2] + (4,), np.uint8)
+        layer[..., :3] = a
+        layer[..., 3] = head * 255
+        L = Image.fromarray(layer, "RGBA")
+        L = L.resize((round(L.width * HEAD), round(L.height * HEAD)), Image.NEAREST)
+        px, py = round(ax - ax * HEAD), round(ay - ay * HEAD)
+        up, side = max(0, -py) + 4, max(0, -px, px + L.width - a.shape[1]) + 4
+        canvas = Image.new("RGB", (a.shape[1] + 2 * side, a.shape[0] + up), (255, 0, 255))
+        canvas.paste(Image.fromarray(a.astype(np.uint8), "RGB"), (side, up))
+        canvas.paste(L, (px + side, py + up), L)
+        if eye:
+            ex, ey = (eye[0] - ax) * HEAD + ax + side, (eye[1] - ay) * HEAD + ay + up
+            d = ImageDraw.Draw(canvas)
+            rx, ry = EYE
+            d.ellipse((ex - rx, ey - ry, ex + rx, ey + ry), fill=(20, 12, 16))
+            # 반짝은 눈 안쪽 위(뒤통수 쪽) — 앞쪽에 두면 줄였을 때 머리 외곽선 밖 흰 점이 됐다.
+            d.ellipse((ex - rx + 2, ey - ry + 3, ex - rx + 2 + rx * 0.8, ey - ry + 3 + rx * 0.8), fill=(250, 250, 250))
+        slots.append((k, canvas))
+    W = max(c.width for _, c in slots)
+    sheet = Image.new("RGB", (W, sum(c.height + 8 for _, c in slots)), (255, 0, 255))
+    y = 0
+    for k, c in slots:
+        sheet.paste(c, (0, y))
+        out[k] = (0, y, c.width, y + c.height)
+        y += c.height + 8
+    return np.asarray(sheet).astype(int), out
+
+
 SHEET_A = SPRITES / "nail_v3_a.png"
 SHEET_B = SPRITES / "nail_v3_b.png"
 SPEC = Spec(
@@ -48,6 +144,7 @@ SPEC = Spec(
                     "walk_a": "walk_a"},
             tidy=0.15,
             strip=6,
+            prep=chibi,
         ),
         # 시트 B는 발을 머리 위로 든 칸이 많아 겉 네모 키가 칸마다 다르다 → 똑바로 선 거두기 칸의 키로 한 배율.
         Source(
@@ -66,10 +163,11 @@ SPEC = Spec(
             ),
             tidy=0.15,
             strip=6,
+            prep=chibi,
         ),
     ],
     palette_ref=(0, "idle_a"),
-    body_h=21,
+    body_h=24,          # 머리를 키운 키(0242). 몸은 예전 21일 때와 거의 같은 크기
     breathe=("idle_a", "idle_b"),
 )
 

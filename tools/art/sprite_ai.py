@@ -46,6 +46,7 @@ class Source:
     tidy: float = 0.0
     strip: int = 0
     pink: bool = False
+    prep: object = None     # 줄이기 전에 원본을 손보는 함수 (img, frames) → (img, frames). Naïl 머리 키우기(0242)
 
 
 @dataclass
@@ -398,12 +399,15 @@ def convert(spec):
     loaded = []
     for s in spec.sources:
         img = np.asarray(Image.open(s.path).convert("RGB")).astype(int)
-        crops = {k: img[y0:y1, x0:x1] for k, (x0, y0, x1, y1) in s.frames.items()}
+        frames = s.frames
+        if s.prep:
+            img, frames = s.prep(img, dict(frames))
+        crops = {k: img[y0:y1, x0:x1] for k, (x0, y0, x1, y1) in frames.items()}
         masks = {}
         for k, a in crops.items():
             keep = solid_mask(a, pink=s.pink)
             if k in s.erase:
-                keep = erase_color(a, keep, s.erase[k], s.frames[k], spec.arc)
+                keep = erase_color(a, keep, s.erase[k], frames[k], spec.arc)
             if s.strip:
                 keep = strip_outline(a, keep, s.strip)
             masks[k] = main_parts(keep, s.tidy) if s.tidy else keep
