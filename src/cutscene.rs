@@ -825,8 +825,6 @@ pub enum Speaker {
     Bori,
     /// 누룩 할매(마을, 0045). 초상화 칸 15~16(0049).
     Halmae,
-    /// 물든 모모(첫 길의 보스, 이름표 "???", 0046).
-    MomoTainted,
     /// 돌아온 모모(마을). 초상화 칸 12~14(0049).
     Momo,
     /// 물든 도토(둘째 길의 보스, 이름표 "???") / 돌아온 도토(마을, 0052).
@@ -840,6 +838,8 @@ pub enum Speaker {
     /// 물든 토끼풀(굴토끼 옛 굴의 보스, 이름표 "???") / 돌아온 토끼풀(0165). 초상화는 아직 없다(색 네모).
     CloverTainted,
     Clover,
+    /// 마을에 남은 Naïl(다른 캐릭터로 걸을 때의 이웃, 0249). `Nail`은 늘 이번 런의 플레이어다.
+    NailHome,
 }
 
 fn speaker_actor(w: &World, who: Speaker) -> Actor {
@@ -859,7 +859,6 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
         Speaker::Chief => hidden(i18n::tr(crate::species::CHIEF.name), Portrait::CHIEF, fur),
         Speaker::Bori => hidden(i18n::s().bori_name, Portrait::BORI, fur),
         Speaker::Halmae => halmae_actor(),
-        Speaker::MomoTainted => momo_tainted_actor(w.player.pos),
         Speaker::Momo => momo_actor(),
         Speaker::DotoTainted => Actor {
             name: "???",
@@ -884,6 +883,13 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
             ..story_actor("???", CLOVER_FUR)
         },
         Speaker::Clover => clover_actor(w.player.pos),
+        Speaker::NailHome => {
+            let mole = crate::equipment::Character::Mole;
+            Actor {
+                portrait: Some((mole.def().portrait)(w.inv.fur)),
+                ..story_actor(mole.name(), crate::world::MOLE)
+            }
+        }
     }
 }
 
@@ -1174,20 +1180,13 @@ fn momo_tainted_actor(pos: Vec2) -> Actor {
 
 /// 여러 이웃이 번갈아 말하는 짧은 대화(쉼터·보스 장면). 배우 순서 = `Speaker` 순서.
 pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
-    let order = [
-        Speaker::Nail,
-        Speaker::Popo,
-        Speaker::Chief,
-        Speaker::Bori,
-        Speaker::Halmae,
-        Speaker::MomoTainted,
-        Speaker::Momo,
-        Speaker::DotoTainted,
-        Speaker::Doto,
-        Speaker::Susu,
-        Speaker::KongiTainted,
-        Speaker::Kongi,
-    ];
+    // 배우 0은 늘 플레이어, 나머지는 말하는 차례대로. 고정 순서 표였을 때 표에 없던 토끼풀(0165)의 말이 플레이어 이름으로 나왔다(0249).
+    let mut order = vec![Speaker::Nail];
+    for (who, _, _) in lines {
+        if !order.contains(who) {
+            order.push(*who);
+        }
+    }
     let actors = order.iter().map(|s| speaker_actor(w, *s)).collect();
     let steps = lines
         .iter()

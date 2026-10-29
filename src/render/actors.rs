@@ -1142,6 +1142,23 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     }
 }
 
+/// 이웃으로 선 Naïl(다른 캐릭터로 마을을 걸을 때, 0249): 서기 두 칸을 숨 쉬듯.
+pub(super) fn draw_nail_at(art: &Art, pos: Vec2, fur: u8, face_left: bool, time: f32) {
+    let o = art::nail_origin(pos);
+    draw_texture_ex(
+        art.nail_fur(fur),
+        o.x,
+        o.y,
+        WHITE,
+        DrawTextureParams {
+            source: Some(art::nail_cell(((time * 2.0) as u32) % 2, 0)),
+            dest_size: Some(vec2(art::NAIL_CELL, art::NAIL_CELL)),
+            flip_x: face_left,
+            ..Default::default()
+        },
+    );
+}
+
 /// 적: 그림(critters.png)이 있으면 종류의 줄에서 상태에 맞는 칸, 없으면 색 원.
 /// 예고(떨림·웅크림·조준)는 칸 4 + 떨림/밝아짐, 공격은 칸 5, 맞음·경직은 칸 6. 번쩍일 때는 흰 실루엣 줄.
 pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, stop: f32) {

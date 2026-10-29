@@ -539,6 +539,20 @@ impl App {
                     &[(Speaker::Doto, text, Face::Happy)],
                 ));
             }
+            // 다른 캐릭터로 걸을 때 큰 나무 곁의 Naïl(0249): 둘은 함께, 하나는 지금 걷는 이에게.
+            Interact::Talk(Who::Nail) => {
+                let own: Tr = match self.world.character {
+                    crate::equipment::Character::Doto => |s| s.nail_v_doto,
+                    _ => |s| s.nail_v_momo,
+                };
+                let lines: [Tr; 3] = [|s| s.nail_v1, own, |s| s.nail_v2];
+                let text = lines[self.talk_n as usize % lines.len()];
+                self.talk_n += 1;
+                self.play(cutscene::talk(
+                    &self.world,
+                    &[(Speaker::NailHome, text, Face::Happy)],
+                ));
+            }
             Interact::Talk(Who::Momo) => {
                 let lines: [Tr; 3] = [|s| s.momo_v1, |s| s.momo_v2, |s| s.momo_v3];
                 let text = lines[self.talk_n as usize % lines.len()];
@@ -1154,7 +1168,13 @@ impl App {
             Interact::Talk(Who::Popo) if village => s.ia_decor,
             Interact::Talk(Who::Popo) => s.ia_shop,
             Interact::Talk(
-                Who::Bori | Who::Momo | Who::Doto | Who::Susu | Who::Kongi | Who::Clover,
+                Who::Bori
+                | Who::Momo
+                | Who::Doto
+                | Who::Susu
+                | Who::Kongi
+                | Who::Clover
+                | Who::Nail,
             ) => s.ia_talk,
             Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,

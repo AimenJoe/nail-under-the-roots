@@ -396,22 +396,56 @@ DOTO = dict(MOMO, **{
 })
 # 작은 귀(왼쪽): 끝에 짙은 술(F), 안쪽 분홍.
 D_EAR = [".F.", "FbF", "bpb", "bpb", ".b."]
-# 큰 꼬리: 엉덩이(위쪽 끝)에서 등 위로 넓게 부풀어 오른다. c 털, C 결, T 밝은 끝 털.
-D_TAIL = [
-    ".....TTTTT.....",
-    "...TTcccccTT...",
-    "..TccCCcCCccT..",
-    ".TcCCCcCCCCcCT.",
-    ".TcCCcCCCcCCcT.",
-    "TcCCCCcCCCCCcCT",
-    "TcCCcCCCCcCCcCT",
-    "TccCCCCcCCCCccT",
-    ".TcCCcCCCCcCcT.",
-    ".TccCCCCcCCccT.",
-    "..TccCCcCCccT..",
-    "...TTcccccTT...",
-    ".....TTTTT.....",
-]
+# 큰 꼬리(2026-10-29 다시, 사장: "꼬리가 너무 원에 가까워, 좀 더 길쭉하게"): 엉덩이(위쪽 끝)에서 말려 올라와 등을 따라
+# 머리 쪽으로 길게 눕는 복슬한 꼬리. 위 끝(말린 등)은 둥글고, 가운데가 가장 넓고, 머리 쪽 끝은 조금 가늘어진다.
+# 가장자리는 털 뭉치로 들쭉날쭉(T 밝은 털), 안은 c 털에 C 결을 비스듬히 드문드문 — 가운데 줄을 두면 나뭇잎처럼 읽혔다.
+# 오른쪽 가장자리는 몸통처럼 그늘(C). sway(−1..1)는 머리 쪽 끝만 옆으로 휜다(걸음마다 살랑, 뿌리는 그대로).
+D_TAIL_HALF = [2.0, 3.5, 4.5, 5.0, 5.0, 5.0, 5.0, 5.0, 4.5, 4.5, 4.5, 4.0, 4.0, 4.0, 3.5, 3.5, 3.0, 2.5, 1.5]
+D_TAIL_W = 15
+
+
+def d_tail(sway=0.0):
+    rows = []
+    n = len(D_TAIL_HALF)
+    for y, hw in enumerate(D_TAIL_HALF):
+        t = (y + 0.5) / n
+        cx = (D_TAIL_W - 1) / 2 + sway * 2.0 * t * t
+        # 털 뭉치: 세 줄마다 한 줄씩 양옆으로 반 칸 더(좌우 엇갈려).
+        fl = 0.7 if y % 3 == 1 else 0.0
+        fr = 0.7 if y % 3 == 2 else 0.0
+        r = ''
+        for x in range(D_TAIL_W):
+            dx = x - cx
+            lim = hw + (fl if dx < 0 else fr)
+            d = abs(dx)
+            if d > lim:
+                r += '.'
+            elif d > lim - 1.0 or y in (0, n - 1) or (dx < 0 and d > lim - 2.0):
+                r += 'C' if dx > 0 and y not in (0, n - 1) else 'T'
+            elif dx > lim - 2.2:
+                r += 'C'
+            elif d > 1.0 and (y + (x if dx < 0 else -x)) % 4 == 0:
+                r += 'C'
+            else:
+                r += 'c'
+        rows.append(r)
+    return rows
+
+
+D_TAIL = d_tail()
+
+
+def put_tail(g, x, y, rows):
+    """꼬리를 얹기 전에 오른쪽 아래로 1px 그림자(d)를 몸 위에만 — 같은 털빛이라 등과 섞이지 않게."""
+    for j, r in enumerate(rows):
+        for i, ch in enumerate(r):
+            gx, gy = x + i + 1, y + j + 1
+            if ch != '.' and 0 <= gx < S and 0 <= gy < S and g[gy][gx] not in '.':
+                g[gy][gx] = 'd'
+    put(g, x, y, rows)
+# 꼬리를 얹는 x(꼬리 가운데 = 몸 가운데 15.5 근처).
+D_TAIL_X = 9
+
 
 def doto_body(i):
     """모모 걸음과 같은 들썩임·발, 귀·꽃·솜꼬리는 없이."""
@@ -440,8 +474,8 @@ def doto_ears(g, ell, dy):
 def doto_frame(i):
     g, ell, dy = doto_body(i)
     doto_ears(g, ell, dy)
-    # 꼬리는 걸음마다 좌우로 1px 살랑.
-    put(g, 8 + [0, 1, 0, -1, 0, 1][i], 0, D_TAIL)
+    # 꼬리는 걸음마다 끝이 좌우로 살랑.
+    put_tail(g, D_TAIL_X, 0, d_tail([0, 1, 0, -1, 0, 1][i]))
     return outline(g)
 
 
@@ -452,7 +486,7 @@ def doto_look(wink):
         put(g, 19, 22, M_WINK)
     put(g, 7, 17, D_EAR)
     put(g, 22, 17, flip(D_EAR))
-    put(g, 8, 0, D_TAIL)
+    put_tail(g, D_TAIL_X, 0, D_TAIL)
     return outline(g)
 
 
@@ -470,7 +504,7 @@ def doto_spin(k):
             put(g, x, 22, rows)
     # 큰 꼬리는 등 가운데(재질 각 0)에 붙어 돈다 — 뒤로 가면 몸 너머로 끝만 보인다.
     x = spin_x(MOMO_BODY, 6, 0.0, phase, len(D_TAIL[0]))
-    put(g, 8 if x is None else x, 0, D_TAIL if x is not None else D_TAIL[:4])
+    put_tail(g, D_TAIL_X if x is None else x, 0, D_TAIL if x is not None else D_TAIL[:3])
     return outline(g)
 
 

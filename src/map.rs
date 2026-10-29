@@ -148,7 +148,8 @@ pub fn parse(rows: &[&str]) -> Parsed {
             }
             if matches!(
                 ch,
-                'K' | 'b' | 'M' | 'H' | 'Y' | 'W' | 'd' | 'g' | 'j' | 'z' | 'X' | '*' | '1'..='9'
+                'K' | 'b' | 'M' | 'H' | 'Y' | 'W' | 'd' | 'g' | 'j' | 'n' | 'z' | 'X' | '*' | '1'
+                    ..='9'
             ) {
                 marks.push((ch, at));
             }

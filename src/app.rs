@@ -1687,6 +1687,8 @@ impl App {
             doto: self.profile.flag(key::DOTO_MEMORY) && self.picked() != Character::Doto,
             kongi: self.profile.flag(key::KONGI_BACK),
             clover: self.profile.flag(key::CLOVER_BACK),
+            // 거꾸로 Naïl은 다른 캐릭터로 걸을 때 큰 나무 곁에 남는다(0249).
+            nail: self.picked() != Character::Mole,
             decor,
             // 토끼풀 가족이 돌아오면(0165) 큰 나무의 잎이 한 단계 더.
             growth: crate::village::growth(

@@ -433,7 +433,7 @@ strings! {
     c_pinecone, c_pinecone_desc, c_acorn_cap, c_acorn_cap_desc, c_maple, c_maple_desc, c_glove, c_glove_desc, c_wormmap, c_wormmap_desc, c_incisor, c_incisor_desc, c_dandelion, c_dandelion_desc, c_dew, c_dew_desc, c_clover_ring, c_clover_ring_desc, c_cheek, c_cheek_desc, c_comb, c_comb_desc, c_resin, c_resin_desc, jg_doto_deep, jg_doto_deep_d,
     set_tells,
     h_doto, h_doto_d, h_run, h_run_d,
-    run_doto, seat_doto, dend_1, dend_2, dend_3, dend_4, doto_t_deep,
+    run_doto, seat_doto, nail_v1, nail_v2, nail_v_momo, nail_v_doto, dend_1, dend_2, dend_3, dend_4, doto_t_deep,
 }
 
 #[cfg(test)]

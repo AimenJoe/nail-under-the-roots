@@ -322,6 +322,7 @@ impl World {
                 'd' if v.doto => w.neighbors.push(Npc::standing(Who::Doto, *at)),
                 'g' if v.kongi => w.neighbors.push(Npc::standing(Who::Kongi, *at)),
                 'j' if v.clover => w.neighbors.push(Npc::standing(Who::Clover, *at)),
+                'n' if v.nail => w.neighbors.push(Npc::standing(Who::Nail, *at)),
                 _ => {}
             }
         }
@@ -2004,6 +2005,20 @@ mod tests {
         assert!(v.neighbors.iter().any(|n| n.who == Who::Doto));
         let v = World::village(crate::village::State::default());
         assert!(!v.neighbors.iter().any(|n| n.who == Who::Doto));
+    }
+
+    /// 다른 캐릭터로 마을을 걸으면 Naïl이 큰 나무 곁 이웃으로 서고, 곁에서 말을 걸 수 있다(0249).
+    #[test]
+    fn nail_stays_in_the_village_when_someone_else_walks() {
+        let mut w = World::village(crate::village::State {
+            nail: true,
+            ..Default::default()
+        });
+        let at = w.neighbors.iter().find(|n| n.who == Who::Nail).unwrap().pos;
+        w.player.pos = at + vec2(0.0, 14.0);
+        assert_eq!(w.interactable(), Some(Interact::Talk(Who::Nail)));
+        let v = World::village(crate::village::State::default());
+        assert!(!v.neighbors.iter().any(|n| n.who == Who::Nail));
     }
 
     /// 콩이(0054): 마지막 길 끝 굴만 콩이가 지키고(싸울 때만), 이긴 뒤엔 마을에 있다.
