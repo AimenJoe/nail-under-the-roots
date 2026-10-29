@@ -158,8 +158,10 @@ pub fn all_awake_keys() -> Vec<String> {
         }
         for (b, (_, nodes)) in BRANCHES.iter().enumerate() {
             for (d, n) in nodes.iter().enumerate() {
-                if matches!(n, Node::Plus(_)) {
-                    keys.push(key_plus(ch, b, d));
+                match n {
+                    Node::Plus(_) => keys.push(key_plus(ch, b, d)),
+                    Node::Sig => keys.push(ch.def().signature.key().to_string()),
+                    Node::Pick(_) => {}
                 }
             }
         }
@@ -175,6 +177,8 @@ pub struct Talents {
     pub who: Character,
     /// 깨운 덤의 수(`Boon` 순서, 0246).
     pub boons: [u8; BOONS.len()],
+    /// 고유 재주(`Node::Sig`, 0247)를 깨웠나. 무엇인지는 `who`의 표(`CharacterDef::signature`).
+    pub sig: bool,
 }
 
 impl Talents {
@@ -187,6 +191,34 @@ impl Talents {
             }
         }
         m
+    }
+
+    /// 깨운 고유 재주(없으면 None).
+    pub fn signature(&self) -> Option<Signature> {
+        self.sig.then(|| self.who.def().signature)
+    }
+
+    /// 독 발톱(Naïl의 고유 재주)이 이 타에 거는 독(초). 마무리 타·강타는 길게.
+    pub fn sig_poison(&self, finisher: bool) -> f32 {
+        match (self.signature(), finisher) {
+            (Some(Signature::Venom), false) => t::VENOM_POISON,
+            (Some(Signature::Venom), true) => t::VENOM_POISON_FINISHER,
+            _ => 0.0,
+        }
+    }
+
+    /// 가시 발(모모): 마무리 차기·강차기가 가시 덤불을 남기나.
+    pub fn sig_thorns(&self, finisher: bool) -> bool {
+        finisher && self.signature() == Some(Signature::Thorns)
+    }
+
+    /// 갈라지는 열매(도토): 마무리 던지기·큰 도토리가 갈라지는 조각 수(그 무기의 수와 큰 쪽).
+    pub fn sig_split(&self, finisher: bool) -> u8 {
+        if finisher && self.signature() == Some(Signature::Split) {
+            t::SIG_SPLIT
+        } else {
+            0
+        }
     }
 
     fn side(self, slot: Slot) -> u8 {
@@ -484,12 +516,53 @@ impl Boon {
     }
 }
 
+/// 캐릭터마다 하나인 고유 재주(0247): 같은 칸 자리(가지 갈래), 같은 값, 내용만 다르다. 예전의 "독 발톱 줄"(0052,
+/// Naïl만·도토를 되찾아야)을 대신한다 — 캐릭터 사이 예외 없이 같은 꼴.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Signature {
+    /// Naïl 독 발톱: 어느 발톱이든 맞힌 적에게 독(마무리·강타는 길게).
+    Venom,
+    /// 모모 가시 발: 마무리 차기·강차기가 발 앞에 가시 덤불.
+    Thorns,
+    /// 도토 갈라지는 열매: 마무리 던지기·큰 도토리가 맞은 자리에서 조각으로.
+    Split,
+}
+
+impl Signature {
+    /// 기록 키(바꾸지 않는다, 0041). Naïl은 예전 독 발톱 깃발을 그대로 — 깨운 사람은 깬 채로.
+    pub fn key(self) -> &'static str {
+        match self {
+            Signature::Venom => crate::profile::key::VENOM,
+            Signature::Thorns => "sig.momo.thorns",
+            Signature::Split => "sig.doto.split",
+        }
+    }
+
+    pub fn name(self) -> Tr {
+        match self {
+            Signature::Venom => |s| s.sig_venom,
+            Signature::Thorns => |s| s.sig_thorns,
+            Signature::Split => |s| s.sig_split,
+        }
+    }
+
+    pub fn desc(self) -> Tr {
+        match self {
+            Signature::Venom => |s| s.sig_venom_d,
+            Signature::Thorns => |s| s.sig_thorns_d,
+            Signature::Split => |s| s.sig_split_d,
+        }
+    }
+}
+
 /// 갈래의 한 칸.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Node {
     /// 두 갈래 고르기(위의 자리, 그 캐릭터의 표).
     Pick(Slot),
     Plus(Boon),
+    /// 그 캐릭터의 고유 재주(0247).
+    Sig,
 }
 
 pub const DEPTH: usize = 8;
@@ -518,7 +591,7 @@ pub const BRANCHES: [(Tr, [Node; DEPTH]); 3] = [
             Node::Plus(Boon::Beat),
             Node::Plus(Boon::Charge),
             Node::Plus(Boon::Ki),
-            Node::Plus(Boon::Haste),
+            Node::Sig,
             Node::Plus(Boon::Edge),
         ],
     ),
@@ -580,6 +653,48 @@ mod tests {
             who: Character::Doto,
             ..with(slot, side)
         }
+    }
+
+    /// 고유 재주(0247): 세 캐릭터 모두 같은 칸 자리(가지 갈래 하나), 내용만 다르다. 깨우기 전엔 아무것도 없다.
+    #[test]
+    fn signature_is_one_cell_per_character_with_its_own_effect() {
+        let sig_cells: Vec<(usize, usize)> = BRANCHES
+            .iter()
+            .enumerate()
+            .flat_map(|(b, (_, nodes))| {
+                nodes
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, n)| **n == Node::Sig)
+                    .map(move |(d, _)| (b, d))
+            })
+            .collect();
+        assert_eq!(sig_cells.len(), 1, "고유 재주 칸은 하나");
+        let on = |who| Talents {
+            who,
+            sig: true,
+            ..Talents::default()
+        };
+        let nail = on(Character::Mole);
+        assert!(
+            nail.sig_poison(false) > 0.0 && !nail.sig_thorns(true) && nail.sig_split(true) == 0
+        );
+        let momo = on(Character::Momo);
+        assert!(momo.sig_thorns(true) && !momo.sig_thorns(false) && momo.sig_poison(true) == 0.0);
+        let doto = on(Character::Doto);
+        assert!(doto.sig_split(true) > 0 && doto.sig_split(false) == 0 && !doto.sig_thorns(true));
+        let off = Talents {
+            who: Character::Momo,
+            ..Talents::default()
+        };
+        assert!(off.signature().is_none() && !off.sig_thorns(true));
+        // 기록 키는 캐릭터마다 달라야 한다(Naïl은 예전 독 발톱 깃발 그대로).
+        let keys: Vec<&str> = crate::characters::ALL
+            .iter()
+            .map(|d| d.signature.key())
+            .collect();
+        assert_eq!(keys[0], crate::profile::key::VENOM);
+        assert!(keys.iter().enumerate().all(|(i, k)| !keys[..i].contains(k)));
     }
 
     /// 모모(0142): 자리 1·3은 모모 것. 갈래마다 맞바꿈이 있고, Naïl의 굴파기·드릴 수치는 먹지 않는다.

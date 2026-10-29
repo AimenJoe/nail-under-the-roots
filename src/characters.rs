@@ -73,6 +73,8 @@ pub struct CharacterDef {
     pub special: Special,
     /// 큰 나무의 재주 표와 자리 넷의 기록 키 이름(자리 2·4는 캐릭터끼리 같은 키, 0142).
     pub talents: &'static [(Tr, [Talent; 2]); 4],
+    /// 큰 나무 가지 갈래의 고유 재주 한 칸(0247): 칸 자리는 모두 같고 내용만 캐릭터마다.
+    pub signature: crate::talents::Signature,
     pub talent_keys: [&'static str; 4],
     /// 고르기 창의 초상화(털빛을 받는다)와 소개.
     pub portrait: fn(u8) -> Portrait,
@@ -101,6 +103,7 @@ pub static ALL: [CharacterDef; 3] = [
         dodge: Dodge::Burrow,
         special: Special::Drill,
         talents: &crate::talents::TABLE,
+        signature: crate::talents::Signature::Venom,
         talent_keys: ["burrow", "parry", "drill", "eat"],
         portrait: Portrait::nail,
         pick_text: |s| s.pick_nail,
@@ -124,6 +127,7 @@ pub static ALL: [CharacterDef; 3] = [
         dodge: Dodge::Hop,
         special: Special::Chain,
         talents: &crate::talents::MOMO_TABLE,
+        signature: crate::talents::Signature::Thorns,
         talent_keys: ["hop", "parry", "chain", "eat"],
         portrait: |_| Portrait::MOMO,
         pick_text: |s| s.pick_momo,
@@ -147,6 +151,7 @@ pub static ALL: [CharacterDef; 3] = [
         dodge: Dodge::Leap,
         special: Special::Bury,
         talents: &crate::talents::DOTO_TABLE,
+        signature: crate::talents::Signature::Split,
         talent_keys: ["leap", "parry", "bury", "eat"],
         portrait: |_| Portrait::DOTO,
         pick_text: |s| s.pick_doto,

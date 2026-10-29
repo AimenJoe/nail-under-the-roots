@@ -92,7 +92,8 @@ pub struct Weapon {
 pub const SPROUT_CLAW: usize = 0;
 /// 바위 발톱(콩이가 준다, 0054).
 pub const STONE_CLAW: usize = 2;
-/// 독 발톱(큰 나무에서 깨운다, 0052).
+/// 독 발톱(예전 무기, 0052). 지금은 Naïl의 고유 재주라(0247) 어디서도 주지 않는다 — 번호만 남는다.
+#[cfg(test)]
 pub const VENOM_CLAW: usize = 3;
 /// 도토의 도토리(0195).
 pub const ACORN: usize = 5;
@@ -142,7 +143,9 @@ pub static WEAPONS: [Weapon; 12] = [
         kind: WeaponKind::Claw,
         moveset: &moveset::VENOM,
         color: Color::new(0.52, 0.86, 0.36, 1.0),
-        key: Some(crate::profile::key::VENOM),
+        // 독 발톱은 Naïl의 고유 재주가 됐다(0247): 기록 깃발(`weapon.venom`)은 그 재주 칸의 키. 이 줄은
+        // 예전 저장(가방 번호)을 읽으려고 자리만 남는다 — 어디서도 주지 않는다.
+        key: None,
         found_on_road: false,
     },
     Weapon {
@@ -745,6 +748,20 @@ mod tests {
                 assert!(last.hitstop >= h.hitstop, "{name}");
             }
         }
+    }
+
+    /// 독 발톱은 Naïl의 고유 재주가 됐다(0247): 기록 깃발로도, 길에서도 무기를 주지 않는다. 독은 재주가 발톱 타에 건다.
+    #[test]
+    fn venom_is_a_talent_not_a_weapon() {
+        let w = &WEAPONS[VENOM_CLAW];
+        assert!(w.key.is_none() && !w.found_on_road);
+        let on = crate::talents::Talents {
+            sig: true,
+            ..Default::default()
+        };
+        assert!(on.sig_poison(false) > 0.0);
+        assert!(on.sig_poison(true) > on.sig_poison(false));
+        assert_eq!(crate::talents::Talents::default().sig_poison(true), 0.0);
     }
 
     /// 캐릭터의 첫 무기는 그 캐릭터가 쓰는 종류다(0056).

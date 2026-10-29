@@ -13,6 +13,7 @@ mod pick;
 mod run;
 mod slots;
 mod stage;
+mod tree;
 // 0169 R4: 장면별로 나눴다. 자식은 `use super::*`로 부모의 가져오기·App 필드를 함께 쓴다.
 mod album;
 mod help;
@@ -329,6 +330,8 @@ enum Hit {
     TreeTab(usize),
     /// 실의 꿈 줄.
     DreamRow(usize),
+    /// 실의 꿈: 누구로 꿀까 ◀(-1)·▶(+1).
+    DreamWho(i8),
     /// 캐릭터 고르기 칸.
     CharCard(usize),
 }
@@ -372,6 +375,8 @@ pub struct App {
     /// 지금 플레이 중인 시나리오. "다시 시작"은 이걸 다시 만든다.
     current: Scenario,
     cutscene: Option<Cutscene>,
+    /// 컷씬 건너뛰기를 누르고 있은 시간(`SKIP_HOLD`에 닿으면 건너뛴다).
+    skip_hold: f32,
     tutorial: Option<Tutorial>,
     gift: Option<Gift>,
     /// 아직 창을 못 띄운 획득(여러 개가 한꺼번에 들어올 때).
@@ -434,10 +439,14 @@ pub struct App {
     decor_cursor: usize,
     /// 재주 창 커서(자리, 갈래).
     tree_cursor: (usize, usize),
+    /// 일시정지 재주 탭의 고른 칸(줄, 칸, 0247).
+    pause_tree_cursor: (usize, usize),
     /// 큰 나무에서 보고 있는 캐릭터의 재주 표(0142).
     tree_char: Character,
     /// 실의 꿈(0055): 고르기 창의 줄, 꾸고 있는 꿈.
     dream_cursor: usize,
+    /// 실의 꿈을 꿀 캐릭터(고를 수 있는 캐릭터 목록 `pick_list`의 번호).
+    dream_who: usize,
     dream: Option<dream::DreamRun>,
     /// 꿈에서 깬 직후 고르기 창이 입력을 받지 않는 남은 시간(싸우던 연타가 다음 꿈을 열지 않게).
     dream_lock: f32,
@@ -524,6 +533,7 @@ impl App {
             dev_cursor: 0,
             current: Scenario::Normal,
             cutscene: None,
+            skip_hold: 0.0,
             tutorial: None,
             gift_queue: Vec::new(),
             settings,
@@ -568,8 +578,10 @@ impl App {
             after_cutscene: AfterCut::Game,
             decor_cursor: 0,
             tree_cursor: (0, 0),
+            pause_tree_cursor: (0, 0),
             tree_char: Character::Mole,
             dream_cursor: 0,
+            dream_who: 0,
             dream: None,
             dream_lock: 0.0,
             char_cursor: 0,
@@ -690,10 +702,18 @@ impl App {
             }
             Scene::Cutscene => {
                 let mut a = self.input.take();
-                // 건너뛰기 안내를 누르면 뒤로와 같다(터치).
+                // 건너뛰기는 길게 누를 때만(0247): 뒤로 버튼, 터치는 건너뛰기 안내를 짚고 있기.
+                // 짧게 누른 뒤로·메뉴는 버리고, 안내를 톡 친 것은 대사 넘기기로 새지 않게 먹는다.
+                let holding =
+                    a.back_held || a.press.is_some_and(|p| self.hit_at(p) == Some(Hit::Skip));
                 if a.tap.is_some_and(|p| self.hit_at(p) == Some(Hit::Skip)) {
-                    a.cancel = true;
                     a.tap = None;
+                }
+                self.skip_hold = if holding { self.skip_hold + dt } else { 0.0 };
+                a.cancel = self.skip_hold >= t::SKIP_HOLD;
+                a.menu = false;
+                if a.cancel {
+                    self.skip_hold = 0.0;
                 }
                 if let Some(c) = self.cutscene.as_mut() {
                     c.update(&a, dt, &mut self.world);
@@ -1727,8 +1747,14 @@ impl App {
         } else {
             fill(s.knot_level, &[&self.knot_level])
         };
-        let (row, l, r) =
-            ui.setting_row(s.knot_title, &label, panel.x + 8.0, y, panel.w - 16.0, true);
+        // 줄 이름 자리에 이 단계의 보상(0247): 반딧불 +N%.
+        let bonus = crate::knots::Knots::new(self.knot_level).glow_bonus_pct();
+        let name = if bonus == 0 {
+            s.knot_title.to_string()
+        } else {
+            fill(s.knot_bonus, &[&bonus])
+        };
+        let (row, l, r) = ui.setting_row(&name, &label, panel.x + 8.0, y, panel.w - 16.0, true);
         self.hits.push((l, Hit::KnotLeft));
         self.hits.push((r, Hit::KnotRight));
         self.hits.push((row, Hit::KnotGo));
@@ -1863,8 +1889,27 @@ impl App {
         }
         // 건너뛰기 안내는 누를 수도 있다(터치에는 뒤로 버튼이 없다).
         let skip = vfill(i18n::s().cut_skip, &[Verb::Skip]);
-        ui.text_center(&skip, 160.0, 1.0, FONT_PX, ui::TEXT_DIM);
+        let held = (self.skip_hold / t::SKIP_HOLD).clamp(0.0, 1.0);
+        ui.text_center(
+            &skip,
+            160.0,
+            1.0,
+            FONT_PX,
+            if held > 0.0 { ui::TEXT } else { ui::TEXT_DIM },
+        );
         let sw = ui.text_w(&skip, FONT_PX) + 16.0;
+        // 누르고 있는 동안 안내 아래 띠가 찬다.
+        if held > 0.0 {
+            let bw = sw - 16.0;
+            ui.rect(
+                Rect::new(160.0 - bw / 2.0, 15.0, bw, 2.0),
+                Color::new(0.0, 0.0, 0.0, 0.5),
+            );
+            ui.rect(
+                Rect::new(160.0 - bw / 2.0, 15.0, bw * held, 2.0),
+                ui::ACCENT,
+            );
+        }
         self.hits
             .push((Rect::new(160.0 - sw / 2.0, 0.0, sw, 18.0), Hit::Skip));
         if c.fade > 0.0 {

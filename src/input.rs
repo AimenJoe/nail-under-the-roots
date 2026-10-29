@@ -440,6 +440,10 @@ pub struct Actions {
     pub confirm: bool,
     /// 메뉴 뒤로. Esc / B(○).
     pub cancel: bool,
+    /// 뒤로(Esc·Backspace / B(○)·Start·기기 뒤로)를 누르고 있다(지금 상태). 컷씬은 길게 눌러야 건너뛴다.
+    pub back_held: bool,
+    /// 메뉴 모드에서 끌지 않고 짚고 있는 손가락 자리(화면 논리 px). 길게 누르기용.
+    pub press: Option<Vec2>,
     /// 일시정지 메뉴 열기. Esc / Start / Select / 터치 MENU.
     pub menu: bool,
     pub restart: bool,
@@ -741,6 +745,8 @@ impl Input {
         now.aim = pad.aim;
         now.dodge_held = kb.dodge_held || pad.dodge_held || touch.dodge_held;
         now.attack_held = kb.attack_held || pad.attack_held || touch.attack_held;
+        now.back_held = kb.back_held || pad.back_held;
+        now.press = touch.press;
 
         // 메뉴 탐색 에지(반복 포함)는 이동 방향에서 만든다. 키·D패드의 눌림 에지(아래 read_*)와
         // 같은 프레임에 겹치면 |=라 한 칸이다. 스틱에는 눌림 에지가 없으므로 첫 칸도 여기서 낸다.
@@ -761,6 +767,8 @@ impl Input {
         a.aim = self.held.aim;
         a.dodge_held = self.held.dodge_held;
         a.attack_held = self.held.attack_held;
+        a.back_held = self.held.back_held;
+        a.press = self.held.press;
         self.pending = Actions::default();
         a
     }
@@ -924,6 +932,7 @@ impl Input {
         }
         a.dodge_held = self.touch.dig.is_some();
         a.attack_held = self.touch.atk.is_some();
+        a.press = self.touch.menu.filter(|m| !m.dragging).map(|m| m.start);
         if let Some(s) = self.touch.stick {
             let v = (s.pos - s.origin) / layout.stick_radius;
             let len = v.length();
@@ -1000,6 +1009,8 @@ impl Input {
         a.confirm = j(Pad::South);
         a.cancel = j(Pad::East) || is_key_pressed(KeyCode::Back);
         a.menu = j(Pad::Start);
+        a.back_held = [Pad::East, Pad::Start].iter().any(|p| is_key_down(p.key()))
+            || is_key_down(KeyCode::Back);
         a.tab_prev = j(Pad::L1);
         a.tab_next = j(Pad::R1);
         a.up = is_key_pressed(KeyCode::Up);
@@ -1082,6 +1093,7 @@ fn read_keyboard() -> Actions {
         confirm: is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) || k(Act::Attack),
         cancel: is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Backspace),
         menu: is_key_pressed(KeyCode::Escape),
+        back_held: is_key_down(KeyCode::Escape) || is_key_down(KeyCode::Backspace),
         restart: false,
         tab_prev: is_key_pressed(KeyCode::Q),
         tab_next: is_key_pressed(KeyCode::E),
@@ -1178,6 +1190,8 @@ fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
         a.confirm |= pad.is_just_pressed(Button::ActionDown);
         a.cancel |= pad.is_just_pressed(Button::ActionRight);
         a.menu |= pad.is_just_pressed(Button::RightCenterCluster);
+        a.back_held |= pad.is_currently_pressed(Button::ActionRight)
+            || pad.is_currently_pressed(Button::RightCenterCluster);
         a.tab_prev |= pad.is_just_pressed(Button::FrontLeftUpper);
         a.tab_next |= pad.is_just_pressed(Button::FrontRightUpper);
         a.up |= pad.is_just_pressed(Button::DPadUp);

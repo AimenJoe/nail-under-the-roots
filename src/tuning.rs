@@ -42,6 +42,8 @@ pub const NAV_RELEASE: f32 = 0.3;
 /// 누르고 있을 때 반복: 처음 지연, 그 뒤 간격(초).
 pub const NAV_REPEAT_DELAY: f32 = 0.35;
 pub const NAV_REPEAT_EVERY: f32 = 0.1;
+/// 컷씬 건너뛰기: 뒤로(또는 터치로 건너뛰기 안내)를 이만큼 누르고 있어야 한다(실수로 넘기지 않게, 0247).
+pub const SKIP_HOLD: f32 = 0.8;
 
 // ---- 발톱 3연타 ------------------------------------------------------------
 /// 타별 스윙 길이. 1·2타 빠름, 3타 느림.
@@ -413,6 +415,8 @@ pub const KNOT_SPEED: f32 = 1.15;
 pub const KNOT_BOSS_HP: f32 = 1.25;
 pub const KNOT_PARRY: f32 = 0.75;
 pub const KNOT_BURROW_CD: f32 = 1.25;
+/// 실뜨기의 보상(0247): 단계마다 마을로 보내는 반딧불 +15%(10단계면 ×2.5).
+pub const KNOT_GLOW_STEP: f32 = 0.15;
 /// 마을 씨앗(docs/decisions/0045): 가장 깊은 곳에 닿으면 남은 씨앗 + 이것, 새 실뜨기 단계 + 이것, 오늘의 굴 완주 + 이것.
 pub const VILLAGE_SEEDS_CLEAR: u32 = 5;
 pub const VILLAGE_SEEDS_KNOT: u32 = 10;
@@ -492,6 +496,8 @@ pub const POISON_TICK: f32 = 0.8;
 /// 독 발톱 1·2타가 거는 독(초), 마지막 타가 거는 독(초).
 pub const VENOM_POISON: f32 = 0.9;
 pub const VENOM_POISON_FINISHER: f32 = 2.5;
+/// 갈라지는 열매(도토의 고유 재주, 0247): 마무리 던지기·큰 도토리가 갈라지는 조각 수.
+pub const SIG_SPLIT: u8 = 2;
 
 // ---- 공통 전투 ------------------------------------------------------------
 /// 넉백 속도 감쇠(1/s). v *= exp(-k·dt).
@@ -742,8 +748,6 @@ pub const KONGI_RECOIL_LOCK: f32 = 0.35;
 /// 솟구치기(아래 배)·드릴로 등딱지를 열면 이만큼 어질어질.
 pub const KONGI_BREAK_STUN: f32 = 1.6;
 
-/// 깨운 독 발톱(큰 나무, 0052)의 값(반딧불).
-pub const VENOM_AWAKE_COST: u32 = 120 * TALENT_PRICE_MUL;
 /// 큰 나무 재주·독 발톱 값의 배율(0225). 한 런(길 셋)에 반딧불이 350~450 모여, 처음 값(재주 40~80, 셋 캐릭터 다 해서
 /// 940 + 독 발톱 120)으로는 세 런이면 다 깨웠다(사장 "반딧불 수집량이 너무 많다"). 줍는 손맛은 두고 값을 올린다.
 pub const TALENT_PRICE_MUL: u32 = 3;

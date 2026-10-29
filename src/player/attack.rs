@@ -26,11 +26,18 @@ impl Player {
             strike = Some(self.claw_strike(idx, dir));
         }
         // 던지는 타(0195): 활성 구간 첫 틱에 탄. 손앞의 판정(`claw_strike`)은 받아치기·탄 베기만.
+        // 고유 재주(0247)는 마무리 타에: 가시 발(모모)·갈라지는 열매(도토).
+        let finisher = idx == ms.last();
         if hit.throw != crate::moveset::Throw::None && time >= a0 && time - sdt < a0.max(1e-6) {
-            self.throw_shots(hit.throw, dir, self.hit_strike(idx, dir));
+            let throw = self.sig_throw(hit.throw, finisher);
+            self.throw_shots(throw, dir, self.hit_strike(idx, dir));
         }
         // 가시 덤불을 남기는 차기(가시덩굴 각반, 0246): 활성 구간 첫 틱에 발 앞에.
-        if hit.thorns && time >= a0 && time - sdt < a0.max(1e-6) {
+        if (hit.thorns
+            || (self.talents.sig_thorns(finisher) && hit.throw == crate::moveset::Throw::None))
+            && time >= a0
+            && time - sdt < a0.max(1e-6)
+        {
             self.leave_thorns(dir, hit.range);
         }
         self.pos += move_dir * self.speed() * ms.move_factor * dt;
@@ -137,9 +144,10 @@ impl Player {
                 kind: StrikeKind::Heavy,
                 ..self.heavy_strike(dir, perfect)
             };
-            self.throw_shots(hit.throw, dir, s);
+            let throw = self.sig_throw(hit.throw, true);
+            self.throw_shots(throw, dir, s);
         }
-        if hit.thorns
+        if (hit.thorns || self.talents.sig_thorns(true))
             && hit.throw == crate::moveset::Throw::None
             && time >= a0
             && time - sdt < a0.max(1e-6)
@@ -308,7 +316,9 @@ impl Player {
                     0.0
                 },
             finisher: idx == self.moveset.last(),
-            poison: h.poison,
+            poison: h
+                .poison
+                .max(self.talents.sig_poison(idx == self.moveset.last())),
             crush: h.crush,
         }
     }
@@ -360,7 +370,7 @@ impl Player {
             hitstop: h.hitstop + bonus as f32 * t::HEAVY_PERFECT_HITSTOP,
             shake: h.shake,
             finisher: true,
-            poison: h.poison,
+            poison: h.poison.max(self.talents.sig_poison(true)),
             crush: h.crush,
         }
     }

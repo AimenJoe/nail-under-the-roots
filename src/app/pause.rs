@@ -1,22 +1,30 @@
-//! 일시정지 메뉴의 탭 일곱(메뉴·상태·가방·저널·도감·지도·안내, 안내는 0180).
+//! 일시정지 메뉴의 탭 여덟(메뉴·상태·재주·가방·발자국·도감·지도·안내, 안내는 0180, 재주는 0247).
 
 use super::*;
 
 /// 상태 탭 글 한 줄 높이 = 위아래로 한 번 내리는 양.
 pub(super) const STATUS_LINE: f32 = 12.0;
-pub(super) const PAUSE_TABS: [Tr; 7] = [
+pub(super) const PAUSE_TABS: [Tr; 8] = [
     |s| s.tab_menu,
     |s| s.tab_status,
+    |s| s.tab_talents,
     |s| s.tab_bag,
     |s| s.tab_journal,
     |s| s.tab_bestiary,
     |s| s.tab_map,
     |s| s.pm_help,
 ];
-/// 안내 탭 번호(0180).
-pub(super) const TAB_HELP: usize = 6;
+/// 탭 번호.
+const TAB_STATUS: usize = 1;
+/// 재주 탭(0247): 큰 나무 그림을 읽기만(목표는 정할 수 있다).
+const TAB_TALENTS: usize = 2;
+const TAB_BAG: usize = 3;
+const TAB_JOURNAL: usize = 4;
+const TAB_BESTIARY: usize = 5;
 /// 지도 탭 번호(지도 버튼으로 바로 연다).
-pub(super) const TAB_MAP: usize = 5;
+pub(super) const TAB_MAP: usize = 6;
+/// 안내 탭 번호(0180).
+pub(super) const TAB_HELP: usize = 7;
 pub(super) const PAUSE_MENU: [Tr; 4] = [
     |s| s.pm_resume,
     |s| s.pm_restart,
@@ -95,8 +103,8 @@ impl App {
         if let Some(Hit::PauseTab(i)) = tap_hit {
             self.pause_tab = i;
         }
-        // 가로 탐색이 없는 탭에서는 좌우로도 탭을 넘긴다.
-        let horizontal_tab = self.pause_tab != 2;
+        // 가로 탐색이 없는 탭에서는 좌우로도 탭을 넘긴다(가방·재주는 좌우로 칸을 옮기고, 끝에서 한 번 더 밀면 옆 탭).
+        let horizontal_tab = !matches!(self.pause_tab, TAB_BAG | TAB_TALENTS);
         if horizontal_tab && a.left {
             self.pause_tab = (self.pause_tab + n_tabs - 1) % n_tabs;
         }
@@ -104,7 +112,7 @@ impl App {
             self.pause_tab = (self.pause_tab + 1) % n_tabs;
         }
         // 좌우로 가방에 들어오면 들어온 쪽 끝 칸(같은 줄)에서 시작한다.
-        if self.pause_tab == 2 && came_in != 2 && (a.left || a.right) {
+        if self.pause_tab == TAB_BAG && came_in != TAB_BAG && (a.left || a.right) {
             let cols = self.inventory.cols;
             let n = self.inventory.slots.len();
             let row_start = self.inv_cursor / cols * cols;
@@ -155,11 +163,21 @@ impl App {
                     _ => {}
                 }
             }
-            2 => {
+            TAB_TALENTS => {
+                if self.update_pause_tree(a, tap_hit, came_in == TAB_TALENTS) {
+                    // 좌우 끝에서 밀었다: 옆 탭으로.
+                    self.pause_tab = if a.left {
+                        (self.pause_tab + n_tabs - 1) % n_tabs
+                    } else {
+                        (self.pause_tab + 1) % n_tabs
+                    };
+                }
+            }
+            TAB_BAG => {
                 let cols = self.inventory.cols;
                 let n = self.inventory.slots.len();
                 // 좌우 끝에서 한 번 더 밀면 옆 탭으로(다른 탭은 좌우가 곧 탭 넘기기라 같은 손으로 빠져나온다).
-                let lr = came_in == 2;
+                let lr = came_in == TAB_BAG;
                 if lr && a.left {
                     if self.inv_cursor.is_multiple_of(cols) {
                         self.pause_tab = (self.pause_tab + n_tabs - 1) % n_tabs;
@@ -213,7 +231,7 @@ impl App {
                     }
                 }
             }
-            3 => {
+            TAB_JOURNAL => {
                 let n = crate::journal::visible(&self.profile).len().max(1);
                 if a.up {
                     self.journal_cursor = (self.journal_cursor + n - 1) % n;
@@ -233,7 +251,7 @@ impl App {
                     self.claim_journal();
                 }
             }
-            1 => {
+            TAB_STATUS => {
                 // 글이 칸보다 길면 위아래로 한 줄씩 내린다(언어·재주·장신구에 따라 길이가 다르다).
                 let mut step = 0.0;
                 if a.up || tap_hit == Some(Hit::StatusScroll(-1)) {
@@ -247,7 +265,7 @@ impl App {
                 step += drag + steps as f32 * STATUS_LINE;
                 self.status_scroll = (self.status_scroll + step).clamp(0.0, self.status_max);
             }
-            4 => {
+            TAB_BESTIARY => {
                 let n = crate::species::BESTIARY.len();
                 if a.up {
                     self.bestiary_cursor = (self.bestiary_cursor + n - 1) % n;
@@ -318,10 +336,11 @@ impl App {
                     self.hits.push((r, Hit::PauseItem(i)));
                 }
             }
-            1 => self.draw_status(ui, content),
-            2 => self.draw_inventory(ui, content),
-            3 => self.draw_journal(ui, content),
-            4 => self.draw_bestiary(ui, content),
+            TAB_STATUS => self.draw_status(ui, content),
+            TAB_TALENTS => self.draw_pause_tree(ui, content),
+            TAB_BAG => self.draw_inventory(ui, content),
+            TAB_JOURNAL => self.draw_journal(ui, content),
+            TAB_BESTIARY => self.draw_bestiary(ui, content),
             TAB_HELP => self.draw_help_body(ui, content),
             _ => self.draw_map(ui, content),
         }
@@ -472,6 +491,10 @@ impl App {
             *y += 2.0;
         };
         block(&mut y, &fill(s.stat_talents, &[&talents]), ui::ACCENT);
+        // 큰 나무의 목표(0247) 한 줄. 나무 그림은 재주 탭에.
+        if let Some(goal) = self.tree_goal_text(self.world.character) {
+            block(&mut y, &goal, super::tree::GOLD);
+        }
         // 화폐 설명.
         block(&mut y, s.wallet_note, ui::TEXT_DIM);
         // 다 그린 높이로 내릴 수 있는 끝을 잰다(언어를 바꾸거나 재주를 끼면 달라진다).

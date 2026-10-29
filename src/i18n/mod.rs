@@ -347,7 +347,7 @@ strings! {
     // 설정
     settings, set_sound, set_music, set_shake, set_effects, set_debug, set_language, set_back, on, off, settings_hint,
     // 일시정지
-    tab_menu, tab_status, tab_bag, tab_journal, tab_map, tab_hint,
+    tab_menu, tab_status, tab_talents, tab_bag, tab_journal, tab_map, tab_hint,
     pm_resume, pm_restart, pm_settings, pm_title,
     // 상태
     hp, this_run, run_stats, combo_stats, bare_hands, bare_hands_desc,
@@ -393,7 +393,7 @@ strings! {
     // 런의 끝(docs/decisions/0042)
     node_deepest, node_deepest_desc, run_after_half, deep_sub, deep_1, deep_goal, deep_k1, deep_k2, deep_k3, deep_wrap, deep_sleep,
     // 실뜨기(docs/decisions/0043)
-    knot_title, knot_intro, knot_level, knot_none, knot_locked, knot_hint, knot_1, knot_2, knot_3, knot_4, knot_5, knot_6, knot_7, knot_8, knot_9, knot_10, toast_knot_open,
+    knot_title, knot_intro, knot_level, knot_bonus, knot_none, knot_locked, knot_hint, knot_1, knot_2, knot_3, knot_4, knot_5, knot_6, knot_7, knot_8, knot_9, knot_10, toast_knot_open,
     // 오늘의 굴(docs/decisions/0044)
     title_daily, daily_best, daily_clear, toast_daily_clear,
     // 마을(docs/decisions/0045)
@@ -413,7 +413,7 @@ strings! {
     // 이웃 말 걸기(docs/decisions/0051)
     bori_t_momo, bori_t_halmae, bori_t_falls, bori_t_tree, momo_t_deep, momo_t_bori,
     // 도토(docs/decisions/0052)
-    mob_doto, mob_doto_lore, mob_doto_atk, mob_doto_tip, name_doto, doto_meet_1, doto_meet_1b, doto_b1, doto_b2, doto_b3, doto_b4, doto_b5, doto_b6, doto_memory, doto_v1, doto_v2, doto_v3, bori_t_doto, momo_t_doto, popo_doto, tree_claw, tree_venom_desc, tree_venom_on, jg_doto, jg_doto_d, jg_true, jg_true_d,
+    mob_doto, mob_doto_lore, mob_doto_atk, mob_doto_tip, name_doto, doto_meet_1, doto_meet_1b, doto_b1, doto_b2, doto_b3, doto_b4, doto_b5, doto_b6, doto_memory, doto_v1, doto_v2, doto_v3, bori_t_doto, momo_t_doto, popo_doto, sig_venom_d, sig_venom, sig_thorns, sig_thorns_d, sig_split, sig_split_d, tree_path, tree_short, tree_goal_set, tree_goal_clear, tree_goal_line, tree_always, tree_on_far, tree_off_far, jg_doto, jg_doto_d, jg_true, jg_true_d,
     // 수수(docs/decisions/0053)
     name_susu, susu_1, susu_2, susu_3, susu_4, susu_5, susu_v1, susu_v2, susu_v3, jg_susu, jg_susu_d,
     // 진행을 따르는 이웃 말 더(docs/decisions/0053)

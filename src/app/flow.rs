@@ -12,7 +12,12 @@ use crate::scenario::Scenario;
 /// 마을도 고른 캐릭터로 걷는다(사장 2026-10-29: 도토로 고르면 엔딩 뒤 올라오는 길·마을까지 도토) — 그 이웃은 자리에서 빠진다.
 pub fn character(s: Scenario, picked: Character) -> Character {
     match s {
-        Scenario::Normal | Scenario::Daily | Scenario::Deepest | Scenario::Village => picked,
+        // 실의 꿈도 고른 캐릭터로(꿈 고르기 창에서 바꾼다).
+        Scenario::Normal
+        | Scenario::Daily
+        | Scenario::Deepest
+        | Scenario::Village
+        | Scenario::Dream => picked,
         // 개발: 도토로 싸워 보기(0195).
         Scenario::DotoArena | Scenario::DotoMobs => Character::Doto,
         Scenario::MomoArena => Character::Momo,
@@ -189,7 +194,7 @@ mod tests {
         for s in [Scenario::Normal, Scenario::Daily, Scenario::Deepest] {
             assert_eq!(character(s, Character::Momo), Character::Momo);
         }
-        assert_eq!(character(Scenario::Dream, Character::Momo), Character::Mole);
+        assert_eq!(character(Scenario::Dream, Character::Momo), Character::Momo);
         assert_eq!(
             character(Scenario::Village, Character::Doto),
             Character::Doto

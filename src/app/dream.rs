@@ -45,6 +45,7 @@ impl App {
     /// 마을 실 고리: 꿈 고르기 창.
     pub(super) fn open_dream(&mut self) {
         self.dream_cursor = 0;
+        self.dream_who = self.picked_index();
         self.world.freeze();
         self.scene = Scene::DreamPick;
     }
@@ -53,6 +54,21 @@ impl App {
         if self.dream_lock > 0.0 {
             self.dream_lock -= dt;
             return;
+        }
+        // 누구로 꿀까(고를 수 있는 캐릭터가 둘 이상일 때): 좌우·◀▶.
+        let who = self.pick_list().len().max(1);
+        let mut turn = if a.left {
+            -1
+        } else if a.right {
+            1
+        } else {
+            0
+        };
+        if let Some(Hit::DreamWho(d)) = tap_hit {
+            turn = d as i32;
+        }
+        if who > 1 && turn != 0 {
+            self.dream_who = (self.dream_who as i32 + turn).rem_euclid(who as i32) as usize;
         }
         let n = ROWS;
         if a.up {
@@ -68,6 +84,13 @@ impl App {
         }
         if go {
             if dream::unlocked(&self.profile, self.dream_cursor) {
+                // 고른 캐릭터는 기록에 남는다(깨어난 마을도, 다음 런도 그 캐릭터 — 뿌리 길 고르기와 같은 칸).
+                let list = self.pick_list();
+                if let Some(d) = list.get(self.dream_who) {
+                    self.profile
+                        .set_count(crate::profile::key::CHAR_PICK, d.code as u32);
+                    crate::profile::save(&self.profile);
+                }
                 self.dream = Some(DreamRun::new(self.dream_cursor));
                 self.start(Scenario::Dream);
                 self.sfx.play(crate::sfx::Id::Emerge);
@@ -216,7 +239,14 @@ impl App {
 
     pub(super) fn draw_dream_pick(&mut self, ui: &Ui) {
         let s = i18n::s();
-        let panel = Rect::new(36.0, 8.0, 248.0, 152.0);
+        let list = self.pick_list();
+        // 고를 캐릭터가 둘 이상이면 누구로 꿀까 한 줄을 더한다(창을 조금 키우고 줄을 1px씩 좁혀).
+        let who = list.len() > 1;
+        let (panel, row_h) = if who {
+            (Rect::new(36.0, 2.0, 248.0, 164.0), 16.0)
+        } else {
+            (Rect::new(36.0, 8.0, 248.0, 152.0), 17.0)
+        };
         ui.panel(panel, Some(s.dream_title));
         self.close_button(ui, panel);
         let mut y = panel.y + 20.0;
@@ -228,8 +258,23 @@ impl App {
             y += 13.0;
         }
         y += 4.0;
+        if who {
+            let d = list[self.dream_who.min(list.len() - 1)];
+            let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, 15.0);
+            ui.rect(r, ui::PANEL_LIGHT);
+            let ty = ui::mid_y(r);
+            ui.text_center(d.id.name(), r.center().x, ty, FONT_PX, ui::ACCENT);
+            ui.text("◀", r.x + 6.0, ty, FONT_PX, ui::TEXT);
+            ui.text_right("▶", r.right() - 6.0, ty, FONT_PX, ui::TEXT);
+            let half = r.w / 2.0;
+            self.hits
+                .push((Rect::new(r.x, r.y, half, r.h), Hit::DreamWho(-1)));
+            self.hits
+                .push((Rect::new(r.x + half, r.y, half, r.h), Hit::DreamWho(1)));
+            y += 18.0;
+        }
         for row in 0..ROWS {
-            let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, 16.0);
+            let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, row_h - 1.0);
             self.hits.push((r, Hit::DreamRow(row)));
             let open = dream::unlocked(&self.profile, row);
             let on = row == self.dream_cursor;
@@ -264,7 +309,7 @@ impl App {
             if star {
                 ui.text("★", r.right() - rw + 2.0, ty, FONT_PX, ui::ACCENT);
             }
-            y += 17.0;
+            y += row_h;
         }
         let legend = ui.fit(s.dream_legend, panel.w - 16.0, FONT_PX);
         ui.text(&legend, panel.x + 8.0, y + 2.0, FONT_PX, ui::TEXT_DIM);

@@ -3,7 +3,7 @@
 //! 누룩 할매의 실뜨기 모양 하나가 다음 런의 어려움 하나다. **단계식**(Slay the Spire Ascension):
 //! N단계를 고르면 1~N의 매듭이 모두 걸린다. 캐릭터마다 따로 열리고, 지금 열린 가장 높은 단계로
 //! 가장 깊은 곳에 닿으면 다음 단계가 열린다. 첫 클리어(0단계)가 1단계를 연다.
-//! 매듭은 이미 있는 수치만 바꾼다. 보상은 힘이 아닌 것(0040).
+//! 매듭은 이미 있는 수치만 바꾼다. 보상은 단계마다 마을로 보내는 반딧불이 늘어나는 것(0247 — 0040의 "힘이 아닌 보상"에 더해).
 
 use crate::i18n::Tr;
 use crate::tuning as t;
@@ -122,6 +122,16 @@ impl Knots {
         }
     }
 
+    /// 보상(0247): 마을로 보내는 반딧불이 단계마다 `KNOT_GLOW_STEP`씩 는다. 더한 퍼센트.
+    pub fn glow_bonus_pct(self) -> u32 {
+        (self.level as f32 * t::KNOT_GLOW_STEP * 100.0).round() as u32
+    }
+
+    /// 보상을 더한 반딧불 수(반올림).
+    pub fn glow(self, n: u32) -> u32 {
+        (n as f32 * (1.0 + self.level as f32 * t::KNOT_GLOW_STEP)).round() as u32
+    }
+
     /// 10: 쥬시 지렁이가 떨어지지 않는다(가게에는 있다).
     pub fn worm_mul(self) -> f32 {
         if self.has(10) {
@@ -153,6 +163,19 @@ mod tests {
         assert!(ten.parry_mul() < 1.0 && ten.burrow_cd_mul() > 1.0);
         assert_eq!(ten.worm_mul(), 0.0);
         assert_eq!(NAMES.len(), MAX_LEVEL as usize);
+    }
+
+    /// 보상: 0단계는 그대로, 단계마다 반딧불이 는다.
+    #[test]
+    fn higher_levels_bank_more_glowbugs() {
+        assert_eq!(Knots::new(0).glow(20), 20);
+        assert_eq!(Knots::new(0).glow_bonus_pct(), 0);
+        assert_eq!(Knots::new(2).glow(20), 26);
+        assert_eq!(Knots::new(10).glow(20), 50);
+        assert_eq!(Knots::new(10).glow_bonus_pct(), 150);
+        for l in 1..=MAX_LEVEL {
+            assert!(Knots::new(l).glow(40) > Knots::new(l - 1).glow(40));
+        }
     }
 
     /// 적에는 한 번만 건다(월드가 틱마다 불러도 겹치지 않는다).

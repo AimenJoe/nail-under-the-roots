@@ -350,19 +350,54 @@ impl Ui {
     }
 
     /// 가로 탭 줄(폭 `max_w` 안). 각 탭의 논리 rect를 돌려준다.
-    /// 이름이 긴 언어면 여백을 줄이고, 그래도 넘치면 탭마다 같은 몫으로 자른다.
+    /// 이름이 긴 언어면 여백을 줄이고, 그래도 넘치면 고른 탭이 보이게 이어진 몇 개만 그리고(양끝에 ◀ ▶) 나머지는
+    /// 화면 밖 빈 rect — 잘린 이름("メ…")만 늘어서면 무슨 탭인지 모른다(일시정지 탭 여덟, 0247).
     pub fn tabs(&self, labels: &[&str], active: usize, x: f32, y: f32, max_w: f32) -> Vec<Rect> {
         let n = labels.len().max(1) as f32;
         let text: f32 = labels.iter().map(|l| self.text_w(l, FONT_PX)).sum();
         let pad = ((max_w - text - 2.0 * (n - 1.0)) / n).clamp(2.0, 10.0);
-        let share = (max_w - 2.0 * (n - 1.0)) / n - pad;
-        let mut rects = Vec::with_capacity(labels.len());
+        let w_of = |i: usize| self.text_w(labels[i], FONT_PX) + pad;
+        let hidden = Rect::new(-1000.0, -1000.0, 0.0, 0.0);
+        let mut rects = vec![hidden; labels.len()];
+        // 다 들어가면 전부, 아니면 고른 탭을 둘러싼 창(◀ ▶ 자리를 빼고).
+        let (first, last) = if text + n * pad + 2.0 * (n - 1.0) <= max_w || labels.is_empty() {
+            (0, labels.len().saturating_sub(1))
+        } else {
+            let arrow = self.text_w("◀", FONT_PX) + 2.0;
+            let room = max_w - 2.0 * arrow;
+            let (mut a, mut b) = (active, active);
+            let mut used = w_of(active);
+            loop {
+                let grew_right = b + 1 < labels.len() && used + 2.0 + w_of(b + 1) <= room;
+                if grew_right {
+                    b += 1;
+                    used += 2.0 + w_of(b);
+                }
+                let grew_left = a > 0 && used + 2.0 + w_of(a - 1) <= room;
+                if grew_left {
+                    a -= 1;
+                    used += 2.0 + w_of(a);
+                }
+                if !grew_right && !grew_left {
+                    break;
+                }
+            }
+            (a, b)
+        };
+        let windowed = first > 0 || last + 1 < labels.len();
         let mut cx = x;
-        for (i, l) in labels.iter().enumerate() {
-            let l = if text + n * pad + 2.0 * (n - 1.0) > max_w {
-                self.fit(l, share, FONT_PX)
+        if windowed {
+            let c = if first > 0 { TEXT } else { BORDER };
+            self.text("◀", cx, y + 2.0, FONT_PX, c);
+            cx += self.text_w("◀", FONT_PX) + 2.0;
+        }
+        for i in first..=last.min(labels.len().saturating_sub(1)) {
+            let l = if windowed {
+                labels[i].to_string()
+            } else if text + n * pad + 2.0 * (n - 1.0) > max_w {
+                self.fit(labels[i], (max_w - 2.0 * (n - 1.0)) / n - pad, FONT_PX)
             } else {
-                l.to_string()
+                labels[i].to_string()
             };
             let w = self.text_w(&l, FONT_PX) + pad;
             let r = Rect::new(cx, y, w, FONT_PX + 4.0);
@@ -377,8 +412,16 @@ impl Ui {
                 FONT_PX,
                 if i == active { ACCENT } else { TEXT_DIM },
             );
-            rects.push(r);
+            rects[i] = r;
             cx += w + 2.0;
+        }
+        if windowed {
+            let c = if last + 1 < labels.len() {
+                TEXT
+            } else {
+                BORDER
+            };
+            self.text_right("▶", x + max_w, y + 2.0, FONT_PX, c);
         }
         rects
     }

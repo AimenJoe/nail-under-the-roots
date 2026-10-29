@@ -564,9 +564,6 @@ fn pic_enemy(c: PicCtx) {
     }
 }
 
-/// 안내 그림의 줍는 것(반딧불·씨앗·뿌리 심장)은 게임 시계의 이 배로 — 크게 키워 혼자 보이니 게임 빠르기가 바빠 보인다.
-const LOOT_PACE: f32 = 0.4;
-
 /// 안내 그림에 놓을 줍는 것. `Loot::place`는 날갯짓·빛·반짝임의 박자(`phase`)를 무작위로 뽑는데, 그림은 프레임마다 새로
 /// 만드니 박자가 매 프레임 바뀌어 초당 60번 깜빡였다(사장 "아직도 굉장히 빠르다" — 빠르기를 0.4 → 0.2로 늦춰도 그대로였던
 /// 까닭). 박자를 고정한다.
@@ -589,7 +586,7 @@ fn pic_loot(c: PicCtx) {
     .enumerate()
     {
         let l = still_loot(k, vec2(xs[i], y), i as f32 * 0.31);
-        props::draw_loot(&l, 1.0, time * LOOT_PACE, false);
+        props::draw_loot(&l, 1.0, time, false);
     }
 }
 
@@ -861,11 +858,11 @@ fn pic_village(c: PicCtx) {
     draw_circle(tx + 6.0, y - 13.0, 7.0, Color::new(0.33, 0.58, 0.32, 1.0));
     nail(art, ((time * 2.0) as u32) % 2, 0, vec2(18.0, y), false);
     for i in 0..4 {
-        let k = (time * 0.35 + i as f32 * 0.25).fract(); // 큰 나무로 날아가는 빠르기(줍는 것 박자 `LOOT_PACE`와 함께 늦춤)
+        let k = (time * 0.6 + i as f32 * 0.25).fract();
         let p = vec2(24.0, y - 4.0)
             + (vec2(tx, y - 18.0) - vec2(24.0, y - 4.0)) * k
             + vec2(0.0, -(k * std::f32::consts::PI).sin() * 8.0);
         let l = still_loot(loot::LootKind::Glowbug, p, i as f32 * 0.23);
-        props::draw_loot(&l, 1.0, time * LOOT_PACE, false);
+        props::draw_loot(&l, 1.0, time, false);
     }
 }
