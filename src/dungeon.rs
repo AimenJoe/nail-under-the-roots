@@ -4,6 +4,8 @@
 //!   카메라는 지금 방 안에만 머물고, 문을 지나면 옆 방으로 미끄러진다(밀기 전환).
 //! - 방 그래프: 시작방에서 무작위로 가지를 뻗는다(나무) + 고리 하나. 시작에서 가장 먼 방 = 보스,
 //!   막다른 방 하나 = 보물(장신구 상자), 다른 막다른 방 = 휴식(산딸기). 나머지는 전투.
+//! - 넓은 방(0244): 이어진 싸움방 둘을 하나로(가로 2칸·세로 2칸). 사이 벽을 터서 카메라가 그 안을 따라 움직인다.
+//! - 방 지형(0244): 싸움방마다 `Layout`(굴 그대로·뿌리 기둥·골짜기·돌밭) 하나.
 //! - 전투방: 안으로 들어서면 문이 닫히고(Room::set_doors_locked), 다 잡으면 열린다. 보스방을 비우면 출구(U)와 뿌리 심장.
 //! - 시작방에는 필드로 돌아가는 출구가 있다.
 //!
@@ -44,6 +46,8 @@ pub struct DRoom {
     pub enemies: Vec<(Kind, Vec2)>,
     /// 첫 적이 엘리트(실타래 칸의 끝방, 0147).
     pub elite: bool,
+    /// 넓은 방(0244)이면 짝 방이 있는 문 방향(`DIRS` 번호). 둘은 함께 잠기고 함께 비워진다.
+    pub hall: Option<usize>,
 }
 
 impl DRoom {
@@ -92,6 +96,32 @@ impl Dungeon {
 
     pub fn room_mut(&mut self, at: (i32, i32)) -> Option<&mut DRoom> {
         self.rooms.iter_mut().find(|r| r.at == at)
+    }
+
+    /// 넓은 방(0244)의 짝 방 칸.
+    pub fn partner(&self, at: (i32, i32)) -> Option<(i32, i32)> {
+        let d = self.room(at)?.hall?;
+        Some((at.0 + DIRS[d].0, at.1 + DIRS[d].1))
+    }
+
+    /// 이 방이 차지하는 월드 사각형(넓은 방이면 둘을 합친 것). 카메라·떨어진 것이 이 안에 머문다.
+    pub fn area(&self, at: (i32, i32)) -> Rect {
+        let r = room_rect(at);
+        match self.partner(at) {
+            Some(p) => r.combine_with(room_rect(p)),
+            None => r,
+        }
+    }
+
+    /// 잠그는 안쪽(넓은 방이면 둘의 안쪽을 합친 것).
+    pub fn area_interior(&self, at: (i32, i32)) -> Rect {
+        let Some(r) = self.room(at) else {
+            return room_rect(at);
+        };
+        match self.partner(at).and_then(|p| self.room(p)) {
+            Some(q) => r.interior().combine_with(q.interior()),
+            None => r.interior(),
+        }
     }
 
     /// 시작방에서 처음 서는 곳(출구 아래).
@@ -162,6 +192,8 @@ pub struct Params {
     pub biome: Biome,
     /// 끝방에 엘리트 하나 + 졸개 둘(실타래 칸, 0147).
     pub elite: bool,
+    /// 넓은 방(이어진 싸움방 둘을 하나로, 0244)을 몇 개까지.
+    pub halls: usize,
 }
 
 impl Params {
@@ -177,6 +209,7 @@ impl Params {
             boss: None,
             biome: Biome::Meadow,
             elite: false,
+            halls: 0,
         }
     }
 
@@ -188,6 +221,7 @@ impl Params {
             treasure: true,
             rest: true,
             start_exit: true,
+            halls: 1,
             ..Self::new(depth)
         }
     }
@@ -207,6 +241,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
         visited: true,
         enemies: Vec::new(),
         elite: false,
+        hall: None,
     }];
     // 가지 뻗기
     let mut guard = 0;
@@ -231,6 +266,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             visited: false,
             enemies: Vec::new(),
             elite: false,
+            hall: None,
         });
     }
     // 고리 하나: 이웃인데 안 이어진 쌍(큰 굴만)
@@ -279,6 +315,30 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
         }
     }
 
+    // 넓은 방(0244): 이어진 싸움방 둘(둘 다 아직 짝이 없는)을 하나로. 굴 모양 난수와 따로라 방 배치는 그대로다.
+    let mut hrng = Rng::new((seed ^ 0x4A11_5EED) | 1);
+    for _ in 0..prm.halls {
+        let pairs: Vec<(usize, usize, usize)> = (0..rooms.len())
+            .flat_map(|i| (0..4).map(move |d| (i, d)))
+            .filter(|&(i, d)| rooms[i].links[d] && rooms[i].kind == RoomKind::Combat)
+            .filter_map(|(i, d)| {
+                let at = (rooms[i].at.0 + DIRS[d].0, rooms[i].at.1 + DIRS[d].1);
+                let j = rooms.iter().position(|r| r.at == at)?;
+                (j > i
+                    && rooms[j].kind == RoomKind::Combat
+                    && rooms[i].hall.is_none()
+                    && rooms[j].hall.is_none())
+                .then_some((i, j, d))
+            })
+            .collect();
+        if pairs.is_empty() || !hrng.chance(t::HALL_CHANCE) {
+            continue;
+        }
+        let (i, j, d) = pairs[hrng.below(pairs.len() as u64) as usize];
+        rooms[i].hall = Some(d);
+        rooms[j].hall = Some((d + 2) % 4);
+    }
+
     let goal_at = rooms[boss].at;
     // 격자
     let mut grid = Grid::filled(GRID as usize * ROOM_W, GRID as usize * ROOM_H, Cell::Wall);
@@ -317,7 +377,22 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             grid.set(ox + 16, oy + 3, Cell::Exit);
         }
         // 방 모양(0063): 모서리·가장자리 혹·바위 무리. 굴 모양 난수와 따로라 같은 시드면 방 배치·적은 그대로다.
-        shape_room(&mut grid, ox, oy, room.kind, seed ^ hash_at(room.at));
+        // 방 지형(0244): 싸움방(이름 있는 주인의 방은 빼고)마다 하나. 다른 난수라 굴 모양 난수는 그대로다.
+        let layout = match room.kind {
+            RoomKind::Combat => Layout::roll(&mut rng_at(seed, room.at, 0x1A70_0F17)),
+            RoomKind::Boss if prm.boss.is_none() => {
+                Layout::roll(&mut rng_at(seed, room.at, 0x1A70_0F17))
+            }
+            _ => Layout::Plain,
+        };
+        shape_room(
+            &mut grid,
+            ox,
+            oy,
+            room.kind,
+            layout,
+            seed ^ hash_at(room.at),
+        );
         match room.kind {
             RoomKind::Start => {
                 if prm.start_exit {
@@ -351,6 +426,12 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                     (RoomKind::Boss, Goal::Boss) => 5 + depth as usize,
                     (RoomKind::Boss, _) => 3 + depth.min(2) as usize + prm.tough as usize,
                     _ => 2 + depth.min(2) as usize + rng.below(2) as usize,
+                };
+                // 넓은 방(0244)은 둘이 함께 깨어나니 한 방에 하나씩 덜(둘 합쳐 한 방의 1.5배쯤).
+                let count = if room.hall.is_some() {
+                    count.saturating_sub(1).max(2)
+                } else {
+                    count
                 };
                 for k in 0..count {
                     let kind = crate::species::roll(rng.unit(), depth + prm.tough, prm.biome);
@@ -432,6 +513,28 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             prm.biome,
             n_break,
         );
+    }
+    // 넓은 방(0244): 짝 방 사이 벽을 튼다(문 칸도 바닥으로). 방 모양을 다 만든 뒤라 둘 다 제 모양 그대로 이어진다.
+    for room in &rooms {
+        let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
+        match room.hall {
+            // 오른쪽 짝: 이 방 오른쪽 벽 줄 + 짝 방 왼쪽 벽 줄.
+            Some(1) => {
+                for y in 2..ROOM_H - 1 {
+                    grid.set(ox + ROOM_W - 1, oy + y, Cell::Floor);
+                    grid.set(ox + ROOM_W, oy + y, Cell::Floor);
+                }
+            }
+            // 아래 짝: 이 방 아래 벽 줄 + 짝 방 위 벽 두 줄.
+            Some(2) => {
+                for x in 1..ROOM_W - 1 {
+                    grid.set(ox + x, oy + ROOM_H - 1, Cell::Floor);
+                    grid.set(ox + x, oy + ROOM_H, Cell::Floor);
+                    grid.set(ox + x, oy + ROOM_H + 1, Cell::Floor);
+                }
+            }
+            _ => {}
+        }
     }
     let dungeon = Dungeon {
         rooms,
@@ -570,10 +673,38 @@ fn hash_at(at: (i32, i32)) -> u64 {
         ^ (at.1 as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
 }
 
+/// 방 지형(0244). 굴 모양(모서리·혹·바위 무리) 위에 얹는다. 모두 문 앞 십자 길과 `KEEP` 자리는 비운다.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Layout {
+    /// 굴 그대로(0063).
+    Plain,
+    /// 뿌리 기둥: 네 사분면에 2×2 기둥(위)·2×1 기둥(아래). 돌아 들어가며 싸운다.
+    Pillars,
+    /// 골짜기: 위·아래 벽에서 내려오는 능선 둘(가운데 길에서 끊긴다). 방이 세 갈래로 나뉜다.
+    Canyon,
+    /// 돌밭: 한 칸짜리 돌 5~8개를 흩는다. 원거리 적의 탄을 막고, 돌진을 끊는다.
+    Rubble,
+}
+
+impl Layout {
+    pub fn roll(rng: &mut Rng) -> Self {
+        let r = rng.unit();
+        if r < t::LAYOUT_ODDS[0] {
+            Self::Plain
+        } else if r < t::LAYOUT_ODDS[1] {
+            Self::Pillars
+        } else if r < t::LAYOUT_ODDS[2] {
+            Self::Canyon
+        } else {
+            Self::Rubble
+        }
+    }
+}
+
 /// 네모난 방을 굴처럼(0063): 모서리를 메우고, 가장자리에 1~2칸 혹을 내고, 가운데 쪽에 바위 무리를 하나 둔다.
 /// 문 앞 십자 길(가로 5~8줄, 세로 8~11칸)과 `KEEP` 자리(둘레 한 칸까지)는 건드리지 않는다.
 /// 다 만든 뒤 모든 바닥이 방 가운데에서 이어지는지 보고, 안 이어지면 네모로 되돌린다.
-fn shape_room(grid: &mut Grid, ox: usize, oy: usize, kind: RoomKind, seed: u64) {
+fn shape_room(grid: &mut Grid, ox: usize, oy: usize, kind: RoomKind, layout: Layout, seed: u64) {
     let mut rng = Rng::new(seed | 1);
     let lane = |x: usize, y: usize| (8..=11).contains(&x) || (5..=8).contains(&y);
     let kept = |x: usize, y: usize| {
@@ -646,6 +777,47 @@ fn shape_room(grid: &mut Grid, ox: usize, oy: usize, kind: RoomKind, seed: u64) 
         for _ in 0..1 + rng.below(3) {
             let (dx, dy) = DIRS[rng.below(4) as usize];
             wall((bx as i32 + dx) as usize, (by as i32 + dy) as usize);
+        }
+    }
+    // 방 지형(0244).
+    match layout {
+        Layout::Plain => {}
+        Layout::Pillars => {
+            for (x, y) in [
+                (6, 3),
+                (7, 3),
+                (6, 4),
+                (7, 4),
+                (12, 3),
+                (13, 3),
+                (12, 4),
+                (13, 4),
+                (6, 9),
+                (7, 9),
+                (12, 9),
+                (13, 9),
+            ] {
+                wall(x, y);
+            }
+        }
+        Layout::Canyon => {
+            for x in [6, 13] {
+                for y in [2, 3, 4, 9, 10] {
+                    wall(x, y);
+                }
+            }
+        }
+        Layout::Rubble => {
+            let n = 5 + rng.below(4);
+            for _ in 0..n {
+                for _ in 0..8 {
+                    let (x, y) = (2 + rng.below(16) as usize, 3 + rng.below(7) as usize);
+                    if free(x, y) {
+                        wall(x, y);
+                        break;
+                    }
+                }
+            }
         }
     }
     // 모든 바닥이 가운데에서 이어지는가.
@@ -849,7 +1021,7 @@ mod tests {
             let g = room.grid.as_ref().unwrap();
             for r in &d.rooms {
                 let (ox, oy) = (r.at.0 as usize * ROOM_W, r.at.1 as usize * ROOM_H);
-                if r.links[1] {
+                if r.links[1] && r.hall != Some(1) {
                     assert_eq!(g.get(ox + ROOM_W - 1, oy + 6), Cell::Door);
                     assert_eq!(g.get(ox + ROOM_W, oy + 6), Cell::Door, "옆 방 왼쪽 문");
                 }
@@ -967,6 +1139,66 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// 넓은 방(0244): 짝은 서로를 가리키는 이어진 싸움방 둘이고, 사이 벽이 트여 있으며, 카메라 사각형은 둘을 합친 것.
+    /// 길의 굴(방 여섯)이면 대부분 넓은 방이 하나 있다.
+    #[test]
+    fn halls_pair_two_linked_combat_rooms_with_an_open_seam() {
+        let prm = Params {
+            rooms: 6,
+            halls: 1,
+            ..Params::new(1)
+        };
+        let mut with_hall = 0;
+        for seed in 1..60 {
+            let (d, room) = generate(seed, &prm);
+            let g = room.grid.as_ref().unwrap();
+            let halls: Vec<_> = d.rooms.iter().filter(|r| r.hall.is_some()).collect();
+            assert!(halls.len() == 0 || halls.len() == 2, "seed {seed}");
+            if halls.is_empty() {
+                continue;
+            }
+            with_hall += 1;
+            for r in &halls {
+                let k = r.hall.unwrap();
+                assert!(r.links[k], "이어진 쌍");
+                assert_eq!(r.kind, RoomKind::Combat);
+                let p = d.partner(r.at).unwrap();
+                assert_eq!(d.partner(p), Some(r.at), "서로를 가리킨다");
+                let area = d.area(r.at);
+                assert!(area.w > room_rect(r.at).w || area.h > room_rect(r.at).h);
+                assert!(d
+                    .area_interior(r.at)
+                    .contains(d.room(p).unwrap().interior().center()));
+            }
+            // 사이 벽이 트였다: 한쪽 방 가운데에서 짝 방 가운데까지 바닥으로 걸어갈 수 있다(문 칸 없이).
+            let (a, b) = (halls[0].at, d.partner(halls[0].at).unwrap());
+            let cell = |at: (i32, i32)| (at.0 as usize * ROOM_W + 10, at.1 as usize * ROOM_H + 6);
+            let (from, to) = (cell(a), cell(b));
+            let mut seen = std::collections::HashSet::from([from]);
+            let mut q = std::collections::VecDeque::from([from]);
+            while let Some((x, y)) = q.pop_front() {
+                for (dx, dy) in DIRS {
+                    let n = ((x as i32 + dx) as usize, (y as i32 + dy) as usize);
+                    if g.get(n.0, n.1) == Cell::Floor && seen.insert(n) {
+                        q.push_back(n);
+                    }
+                }
+            }
+            assert!(seen.contains(&to), "seed {seed}: 문 없이 이어진다");
+        }
+        assert!(with_hall * 10 >= 59 * 6, "넓은 방이 자주: {with_hall}/59");
+    }
+
+    /// 방 지형(0244): 네 가지가 다 나오고, 어느 것이든 적 자리·길은 막지 않는다(`shaped_rooms_…`가 본다).
+    #[test]
+    fn every_layout_appears() {
+        let mut seen = std::collections::HashSet::new();
+        for seed in 1..200 {
+            seen.insert(Layout::roll(&mut Rng::new(seed)));
+        }
+        assert_eq!(seen.len(), 4);
     }
 
     #[test]

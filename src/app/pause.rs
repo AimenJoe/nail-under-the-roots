@@ -1093,9 +1093,27 @@ impl App {
                 _ => Color::new(0.16, 0.12, 0.18, 1.0),
             };
             ui.rect(rect, fill_c);
-            ui.rect_lines(rect, if current { ui::ACCENT } else { ui::BORDER });
+            // 넓은 방(0244): 짝 방 쪽 틈을 같은 색으로 메워 한 방으로 보인다.
+            if let Some(k) = r.hall {
+                let (dx, dy) = DIRS[k];
+                let bridge = match (dx, dy) {
+                    (1, 0) => Rect::new(rect.right(), rect.y, gap, rect.h),
+                    (0, 1) => Rect::new(rect.x, rect.bottom(), rect.w, (ch + gap) * 0.62 - rect.h),
+                    _ => Rect::new(0.0, 0.0, 0.0, 0.0),
+                };
+                ui.rect(bridge, fill_c);
+            }
+            let partner_current = d.partner(r.at) == Some(self.world.adv.current_room);
+            ui.rect_lines(
+                rect,
+                if current || partner_current {
+                    ui::ACCENT
+                } else {
+                    ui::BORDER
+                },
+            );
             for (k, (dx, dy)) in DIRS.iter().enumerate() {
-                if r.links[k] {
+                if r.links[k] && r.hall != Some(k) {
                     let c = rect.center();
                     let e = c + vec2(
                         *dx as f32 * (cw / 2.0 + gap / 2.0),

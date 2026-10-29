@@ -392,6 +392,34 @@ impl World {
         self.enter_node();
     }
 
+    /// 개발: 길의 보통 굴(0244)에서 넓은 방 안으로 바로. 넓은 방이 나올 때까지 굴을 다시 짓는다.
+    pub fn enter_route_hall_now(&mut self) {
+        if let Some(r) = self.adv.route.as_mut() {
+            let i = r.layers[0]
+                .iter()
+                .position(|n| n.kind == NodeKind::Burrow)
+                .unwrap_or(0);
+            r.at = Some((0, i));
+        }
+        for _ in 0..30 {
+            self.enter_node();
+            let hall = self.adv.dungeon.as_ref().and_then(|d| {
+                d.rooms
+                    .iter()
+                    .find(|r| r.hall.is_some())
+                    .map(|r| (r.at, d.area_interior(r.at)))
+            });
+            if let Some((at, inside)) = hall {
+                self.adv.current_room = at;
+                self.player.pos = dungeon::room_rect(at).center() + vec2(0.0, 8.0);
+                self.player.prev_pos = self.player.pos;
+                debug_assert!(inside.contains(self.player.pos));
+                self.snap_cam();
+                return;
+            }
+        }
+    }
+
     /// 개발: 길의 샘 칸(0159)으로 바로. 샘 칸이 없는 길이면 끝방 앞 층 첫 칸.
     pub fn enter_route_spring_now(&mut self) {
         if let Some(r) = self.adv.route.as_mut() {
@@ -1134,6 +1162,16 @@ impl World {
         }
         let goal = d.goal;
         let named = d.boss;
+        // 넓은 방(0244): 짝 방은 함께 들르고, 짝 방의 적도 함께 깨어나며, 함께 비워진다.
+        let partner = d.partner(self.adv.current_room);
+        let hall_inside = d.area_interior(self.adv.current_room);
+        let mut partner_enemies = Vec::new();
+        if let Some(p) = partner.and_then(|p| d.room_mut(p)) {
+            p.visited = true;
+            if !p.cleared && !self.room.doors_locked() && hall_inside.contains(self.player.pos) {
+                partner_enemies = std::mem::take(&mut p.enemies);
+            }
+        }
         if let Some(m) = self
             .enemies
             .iter()
@@ -1170,12 +1208,14 @@ impl World {
         if fights
             && !room.cleared
             && !self.room.doors_locked()
-            && room.interior().contains(self.player.pos)
+            && hall_inside.contains(self.player.pos)
         {
             self.room.set_doors_locked(true);
             let elite = room.elite;
             let interior = room.interior();
-            for (n, (kind, pos)) in room.enemies.drain(..).enumerate() {
+            let mut wake = std::mem::take(&mut room.enemies);
+            wake.extend(partner_enemies);
+            for (n, (kind, pos)) in wake.into_iter().enumerate() {
                 for off in crate::species::pack_offsets(kind) {
                     let mut e = Enemy::new(kind, pos + off);
                     e.wake_delay = t::ROOM_WAKE_DELAY;
@@ -1203,9 +1243,11 @@ impl World {
             self.juice.feel.add_trauma(0.25);
         }
         let mut gift_at = None;
+        let mut hall_cleared = None;
         if self.room.doors_locked() && self.enemies.is_empty() {
             self.room.set_doors_locked(false);
             room.cleared = true;
+            hall_cleared = partner;
             self.juice.audio.play(sfx::Id::Emerge);
             if room.kind == RoomKind::Boss {
                 // 보상은 마지막으로 쓰러진 자리(플레이어 곁)에, 출구는 거기와 플레이어에서 떨어진 바닥 칸에.
@@ -1262,6 +1304,9 @@ impl World {
                     }
                 }
             }
+        }
+        if let Some(p) = hall_cleared.and_then(|p| self.adv.dungeon.as_mut()?.room_mut(p)) {
+            p.cleared = true;
         }
         if let Some(at) = gift_at {
             self.charm_gift(at);
@@ -1328,7 +1373,7 @@ impl World {
     pub fn loot_bounds(&self) -> Option<Rect> {
         match self.adv.place {
             Place::Dungeon => {
-                let r = dungeon::room_rect(self.adv.current_room);
+                let r = self.dungeon_area();
                 Some(Rect::new(r.x + 22.0, r.y + 38.0, r.w - 44.0, r.h - 60.0))
             }
             _ => None,
@@ -1350,7 +1395,15 @@ impl World {
                 _ => self.room.inner,
             },
             Place::Camp | Place::Village => self.room.inner,
-            Place::Dungeon => dungeon::room_rect(self.adv.current_room),
+            Place::Dungeon => self.dungeon_area(),
+        }
+    }
+
+    /// 지금 방이 차지하는 사각형(넓은 방이면 둘을 합친 것, 0244).
+    fn dungeon_area(&self) -> Rect {
+        match &self.adv.dungeon {
+            Some(d) => d.area(self.adv.current_room),
+            None => dungeon::room_rect(self.adv.current_room),
         }
     }
 
@@ -1994,8 +2047,13 @@ mod economy_probe {
                         for dr in &d.rooms {
                             for (k, _) in &dr.enemies {
                                 let (lo, hi) = crate::loot::glowbugs_for(*k);
-                                sb += (lo + hi) as f32 / 2.0;
-                                ss += k.species().seed_chance;
+                                let keep = if crate::bosses::of(*k).is_some() {
+                                    1.0
+                                } else {
+                                    t::KILL_LOOT_KEEP
+                                };
+                                sb += (lo + hi) as f32 / 2.0 * keep;
+                                ss += k.species().seed_chance * keep;
                                 kills += 1.0;
                             }
                         }

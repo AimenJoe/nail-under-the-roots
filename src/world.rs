@@ -2339,12 +2339,20 @@ impl World {
             return;
         }
         let (lo, hi) = loot::glowbugs_for(kind);
+        // 굴이 넓어진 만큼 잡몹의 몫만 덜어 낸다(0244). 길의 주인은 그대로.
+        let keep = if crate::bosses::of(kind).is_some() {
+            1.0
+        } else {
+            t::KILL_LOOT_KEEP
+        };
         if hi > 0 {
             for _ in 0..rand::gen_range(lo, hi + 1) {
-                self.push_loot(Loot::spawn(LootKind::Glowbug, pos));
+                if rand::gen_range(0.0, 1.0) < keep {
+                    self.push_loot(Loot::spawn(LootKind::Glowbug, pos));
+                }
             }
         }
-        if rand::gen_range(0.0, 1.0) < kind.species().seed_chance {
+        if rand::gen_range(0.0, 1.0) < kind.species().seed_chance * keep {
             self.push_loot(Loot::spawn(LootKind::Seed, pos));
         }
         if kind != Kind::Dummy && rand::gen_range(0.0, 1.0) < t::WORM_CHANCE * self.knots.worm_mul()

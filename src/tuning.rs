@@ -574,6 +574,11 @@ pub const ELITE_HP: f32 = 3.0;
 pub const ELITE_WINDUP: f32 = 0.8;
 pub const ELITE_KNOCK: f32 = 0.5;
 pub const ELITE_ESCORTS: usize = 2;
+/// 넓은 굴(0244): 넓은 방을 만들 기회마다 실제로 만들 확률, 싸움방 지형의 누적 확률(굴 그대로·뿌리 기둥·골짜기, 나머지 돌밭).
+pub const HALL_CHANCE: f32 = 0.8;
+pub const LAYOUT_ODDS: [f32; 3] = [0.3, 0.55, 0.78];
+/// 굴이 넓어져(방이 약 1.6배) 싸움이 늘었으니, 쓰러진 적이 떨어뜨리는 반딧불 한 마리·씨앗이 실제로 나올 확률(0244, 경제 0148을 지킨다).
+pub const KILL_LOOT_KEEP: f32 = 0.65;
 
 pub const SHREW_BITES: u32 = 2;
 pub const SHREW_REAIM: f32 = 0.4;

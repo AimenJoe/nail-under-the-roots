@@ -18,11 +18,11 @@ pub const CHOICE_LAYERS: usize = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
-    /// 보통 굴: 싸움방 몇 개 + 끝방(무리). 씨앗.
+    /// 보통 굴: 싸움방 넷(넓은 방 하나가 섞이곤 한다, 0244) + 끝방(무리). 씨앗.
     Burrow,
     /// 둥지: 더 센 무리, 끝에 장신구 상자.
     Nest,
-    /// 저장고: 작은 굴, 싸움 하나 + 상자.
+    /// 저장고: 작은 굴, 싸움 둘 + 상자.
     Cache,
     /// 샘: 싸움 없음. 체력을 채우고 산딸기.
     Spring,
@@ -30,7 +30,7 @@ pub enum NodeKind {
     Elite,
     /// 그 길의 보스.
     Boss,
-    /// 굴토끼 옛 굴(0165): 셋째 길 보스 층의 둘째 칸. 흰 실 굴 네 방, 끝에 물든 어미 굴토끼. 모모가 돌아온 뒤에만.
+    /// 굴토끼 옛 굴(0165): 셋째 길 보스 층의 둘째 칸. 흰 실 굴(보스 굴과 같은 크기), 끝에 물든 어미 굴토끼. 모모가 돌아온 뒤에만.
     Warren,
 }
 
@@ -239,25 +239,28 @@ impl Route {
         let depth = self.depth_at(at.0);
         match n.kind {
             NodeKind::Burrow => Params {
-                rooms: 4,
+                rooms: 6,
                 goal: Goal::Pack,
+                halls: 1,
                 ..Params::new(depth)
             },
             NodeKind::Nest => Params {
-                rooms: 4,
+                rooms: 6,
                 goal: Goal::Pack,
+                halls: 1,
                 tough: 2,
                 treasure: true,
                 ..Params::new(depth)
             },
             NodeKind::Cache => Params {
-                rooms: 3,
+                rooms: 4,
                 goal: Goal::Treasure,
                 ..Params::new(depth)
             },
             NodeKind::Elite => Params {
-                rooms: 3,
+                rooms: 5,
                 goal: Goal::Pack,
+                halls: 1,
                 elite: true,
                 ..Params::new(depth)
             },
@@ -267,8 +270,9 @@ impl Route {
                 ..Params::new(depth)
             },
             NodeKind::Boss | NodeKind::Warren => Params {
-                rooms: 4,
+                rooms: 6,
                 goal: Goal::Boss,
+                halls: 1,
                 ..Params::new(depth + 1)
             },
         }

@@ -87,6 +87,8 @@ pub enum Scenario {
     Exit,
     /// 보스 2단계 확인(0233): 빈 방에 보스 하나, 체력 반 — 깨자마자 2단계로 깨어난다.
     BossHalf(Kind),
+    /// 넓은 방(0244): 길의 보통 굴에서 넓은 방 안에 바로(들어서면 두 칸의 적이 함께 깬다).
+    Hall,
 }
 
 pub struct Entry {
@@ -95,7 +97,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 45] = [
+pub const LIST: [Entry; 46] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -321,6 +323,11 @@ pub const LIST: [Entry; 45] = [
         desc: "첫 만남 모모, 체력 반(0233). 2단계면 첫 만남에도 굴로 숨고 뛰기를 두 번 잇는다.",
         scenario: Scenario::BossHalf(Kind::Momo),
     },
+    Entry {
+        name: "넓은 방",
+        desc: "길의 보통 굴, 화면 두 칸짜리 넓은 방 안(0244). 카메라가 방 안을 따라가고 두 칸의 적이 함께 깬다. 방마다 지형(기둥·골짜기·돌밭).",
+        scenario: Scenario::Hall,
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -433,6 +440,12 @@ pub fn build(s: Scenario) -> World {
                 w.snap_cam();
             }
             w.player.hp = (w.player.stats.max_hp / 2).max(1);
+            w
+        }
+        Scenario::Hall => {
+            let mut w = World::camp_start(1);
+            w.adv.events.clear();
+            w.enter_route_hall_now();
             w
         }
         Scenario::Exit => {
