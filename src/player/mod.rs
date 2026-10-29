@@ -104,6 +104,11 @@ pub enum State {
         item: Consumable,
         time: f32,
     },
+    /// 쓰러졌는데 쥬시 지렁이가 있었다(0243): `REVIVE_DOWN_TIME` 동안 누워 지렁이를 먹고, 끝나면 일어나며 `Event::Rose`.
+    /// 이 동안은 안 맞고 움직이지 못한다. 체력은 일어날 때 채운다(그 전엔 0 — HUD도 쓰러진 걸 보인다).
+    Revive {
+        time: f32,
+    },
     Dead,
 }
 
@@ -166,6 +171,8 @@ pub enum Event {
     },
     /// 도토가 도토리를 묻었다(0195).
     Bury,
+    /// 지렁이를 먹고 일어났다(0243): 월드가 둘레를 밀어내고 연출.
+    Rose,
 }
 
 pub struct Player {
@@ -362,6 +369,7 @@ impl Player {
             || matches!(
                 self.state,
                 State::Drill { .. }
+                    | State::Revive { .. }
                     | State::Hop { .. }
                     | State::Leap { .. }
                     | State::Chain { .. }
@@ -478,7 +486,34 @@ impl Player {
         self.hp = (self.hp + n).min(self.stats.max_hp);
     }
 
-    /// 쓰러진 자리에서 일어난다(쥬시 지렁이).
+    /// 쓰러졌는데 쥬시 지렁이가 있다(0243): 누워서 먹기 시작. 일어나는 건 `tick_revive`.
+    pub fn start_revive(&mut self) {
+        self.state = State::Revive { time: 0.0 };
+        self.vel *= 0.5;
+        self.combo_timer = 0.0;
+        self.queued = None;
+    }
+
+    fn tick_revive(&mut self, dt: f32, time: f32) {
+        let time = time + dt;
+        self.vel *= 0.85;
+        if time >= t::REVIVE_DOWN_TIME {
+            self.revive();
+            self.events.push(Event::Rose);
+        } else {
+            self.state = State::Revive { time };
+        }
+    }
+
+    /// 누워 있던 비율 0..1(그림: 지렁이가 입으로 들어가고 빛이 모인다). 일어나기 전이 아니면 None.
+    pub fn revive_progress(&self) -> Option<f32> {
+        match self.state {
+            State::Revive { time } => Some((time / t::REVIVE_DOWN_TIME).clamp(0.0, 1.0)),
+            _ => None,
+        }
+    }
+
+    /// 쓰러진 자리에서 일어난다(쥬시 지렁이로 누웠다 일어날 때, 쉼터에서 깰 때).
     pub fn revive(&mut self) {
         let hp = (self.stats.max_hp as f32 * t::REVIVE_HP_FRAC).ceil() as i32;
         self.hp = hp.clamp(1, self.stats.max_hp);
@@ -689,6 +724,7 @@ impl Player {
         let c = Ctx { a, dt, move_dir };
         match self.state {
             State::Dead => {}
+            State::Revive { time } => self.tick_revive(dt, time),
             State::Free => strike = self.tick_free(&c),
             State::Attack { idx, time, dir } => strike = self.tick_attack(&c, idx, time, dir),
             State::Charging { time, dir, after } => {

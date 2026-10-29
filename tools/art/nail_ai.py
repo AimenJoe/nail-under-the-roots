@@ -6,7 +6,7 @@
 설정(`SPEC`)과 시트 배치뿐이다. 왜 이 길인가(0203 → 0206 → 0238): 16칸 손 그림은 "두더지 같지 않다"(사장) → 실루엣 시안 1
 (`nail_s1_v2`, 몸 16px) → 사장 "처음부터 다시"(0238): 큰 그림 다섯 안에서 고른 1번(서서 삽 손을 벌린 몸 + 주황 목도리)을
 시트 둘(`nail_v3_a`·`nail_v3_b`)로 받아 키 약 22px로(모모 23·도토 25와 나란히). 0242: 머리를 키운 시험(`chibi`, 사장 "좋은데?") →
-그 비율로 처음부터 그린 v4 시트 둘(`nail_v4_a`·`nail_v4_b`, 2.5등신·큰 눈)을 받아 지금 쓴다(`SPEC`, 키 약 24px). 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
+그 비율로 처음부터 그린 v4 시트 둘(`nail_v4_a`·`nail_v4_b`, 2.5등신·큰 눈)을 받아 지금 쓴다(`SPEC`, 외곽선까지 키 약 21px — 아기라 이웃보다 작게). 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
 
 칸 배치(게임 코드는 칸 크기 `art::NAIL_CELL`만 안다):
   줄 0: 서기 2, 걷기 4 / 줄 1: 치기 3, 맞음, 쓰러짐, 들기 3, 거두기 / 줄 2: 흙더미 2, 그림자(16칸 그림을 칸 아래 가운데에)
@@ -247,7 +247,7 @@ SPEC = Spec(
         ),
     ],
     palette_ref=(0, "idle_a"),
-    body_h=24,
+    body_h=19,      # 외곽선까지 키 약 21px — 모모 23·도토 25·포포 26보다 작게(사장 "아기라는 느낌이 아니라 좀 줄여야", 0242)
     breathe=("idle_a", "idle_b"),
 )
 
@@ -282,18 +282,23 @@ def eye(x, y, clear=()):
     return t
 
 
-TOUCH = {
-    "idle_a": eye(12, 8, [(13, 7), (14, 9), (14, 8)]),
-    "idle_b": eye(12, 9, [(13, 8), (14, 10), (14, 9)]),
-    "walk_1": eye(12, 7, [(14, 8)]),
-    "attack0": eye(12, 8, [(12, 7), (13, 7), (14, 8), (14, 9)]),
-    "attack1": eye(12, 8, [(13, 7), (14, 8), (14, 9)]),
-    "attack2": eye(12, 8, [(14, 9), (14, 10), (15, 9), (14, 8)]),
-    "windup0": eye(11, 7, [(13, 8), (13, 9)]),
-    "windup1": eye(14, 8, [(13, 9), (13, 10)]),
-    "windup2": eye(13, 6, [(12, 7)]),
-    "settle": eye(11, 8, [(12, 7), (13, 8), (13, 9)]),
-}
+# 눈 도장을 찍을 칸(맞음·쓰러짐은 눈을 감았다). 자리는 줄인 칸의 검은 점 덩어리 가운데에서 찾는다(`auto_eye`) —
+# 키(`body_h`)를 바꾸면 눈 자리도 바뀌어, 손으로 적은 좌표는 매번 틀어졌다(0242 크기 줄이기).
+EYE_FRAMES = ("idle_a", "idle_b", "walk_1", "attack0", "attack1", "attack2", "windup0", "windup1", "windup2", "settle")
+TOUCH = {}
+
+
+def auto_eye(cell):
+    """머리(위 절반)의 새까만 점 덩어리 가운데에 `eye` 도장. 덩어리의 다른 검은 점은 털로."""
+    a = cell[: CELL // 2]
+    blk = (a[..., 3] > 0) & (a[..., :3].astype(int).sum(-1) == 0)
+    ys, xs = np.nonzero(blk)
+    if len(ys) == 0:
+        return {}
+    cx, cy = xs.mean(), ys.mean()
+    near = (np.abs(xs - cx) <= 2.5) & (np.abs(ys - cy) <= 2.5)
+    x, y = int(round(xs[near].mean() - 0.5)), int(round(ys[near].mean() - 1.0))
+    return eye(x, y, [(int(px), int(py)) for px, py in zip(xs[near], ys[near])])
 
 
 def fill_holes(cell):
@@ -314,7 +319,9 @@ def fill_holes(cell):
 
 def touch(cell, name):
     out = fill_holes(cell)
-    for (x, y), ink in TOUCH.get(name, {}).items():
+    marks = dict(auto_eye(out)) if name in EYE_FRAMES else {}
+    marks.update(TOUCH.get(name, {}))
+    for (x, y), ink in marks.items():
         out[y, x] = (0, 0, 0, 0) if ink is None else INK[ink] + (255,)
     return out
 

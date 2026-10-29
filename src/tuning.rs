@@ -326,6 +326,10 @@ pub const EAT_MOVE_FACTOR: f32 = 0.5;
 pub const ITEM_COOLDOWN: f32 = 1.5;
 /// 쓰러졌다 일어날 때 체력(최대의 비율, 올림)과 무적 시간.
 pub const REVIVE_HP_FRAC: f32 = 0.6;
+/// 쓰러졌다가 지렁이로 일어나기 전에 누워 있는 시간(0243): 쓰러진 걸 보이고, 지렁이가 입으로 들어가는 짬.
+/// 이 동안은 안 맞는다. 쓰러지는 순간 멈춤은 `REVIVE_HITSTOP`.
+pub const REVIVE_DOWN_TIME: f32 = 0.9;
+pub const REVIVE_HITSTOP: f32 = 0.2;
 pub const REVIVE_INVULN: f32 = 2.0;
 /// 일어날 때 주변을 밀어내는 충격.
 pub const REVIVE_PUSH_RADIUS: f32 = 40.0;

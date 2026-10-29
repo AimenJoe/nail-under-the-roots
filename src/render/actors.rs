@@ -16,7 +16,7 @@ pub(super) fn draw_player(p: &Player, alpha: f32, time: f32) {
     let pos = lerp(p.prev_pos, p.pos, alpha);
     let body = if p.flash > 0.0 { WHITE } else { world::MOLE };
     match p.state {
-        player::State::Dead => {
+        player::State::Dead | player::State::Revive { .. } => {
             draw_rectangle(pos.x - 8.0, pos.y - 2.0, 16.0, 5.0, GRAY);
             return;
         }
@@ -53,6 +53,9 @@ pub(super) fn draw_player_fx(p: &Player, alpha: f32) {
     let pos = lerp(p.prev_pos, p.pos, alpha);
     if let Some((item, k)) = p.eat_progress() {
         draw_eating(pos, p.face_left, item, k);
+    }
+    if let Some(k) = p.revive_progress() {
+        draw_reviving(pos, p.face_left, k);
     }
     match p.state {
         player::State::Attack { idx, time: at, dir } => {
@@ -723,6 +726,52 @@ pub(super) fn draw_eating(pos: Vec2, face_left: bool, item: crate::items::Consum
     draw_rectangle(pos.x - bw / 2.0, y, (bw * k).round(), 1.0, world::BERRY);
 }
 
+/// 지렁이로 일어나는 중(0243): 누운 몸 위로 쥬시 지렁이가 떨어져 꿈틀대며 입으로 쏙 들어가고(앞 60%),
+/// 그 뒤 분홍 빛이 몸으로 모여 든다(닫히는 고리 + 반짝). 다 모이면 월드가 `worm_rise`로 터뜨린다.
+fn draw_reviving(pos: Vec2, face_left: bool, k: f32) {
+    let side = if face_left { -1.0 } else { 1.0 };
+    let mouth = pos + vec2(side * 7.0, 1.0);
+    let berry = world::BERRY;
+    if k < 0.6 {
+        // 위에서 통 떨어져(0~0.2) 입가에서 꿈틀(0.2~0.45) → 줄어들며 쏙(0.45~0.6).
+        let fall = (k / 0.2).min(1.0);
+        let at = mouth - vec2(0.0, 14.0 * (1.0 - fall * fall) + 3.0);
+        let shrink = if k > 0.45 {
+            1.0 - (k - 0.45) / 0.15
+        } else {
+            1.0
+        };
+        if shrink > 0.05 {
+            let at = at + vec2(-side * 3.0 * (1.0 - shrink), 0.0);
+            draw_worm(vec2(at.x.round(), at.y.round()), k * 40.0, shrink.max(0.4));
+        }
+    }
+    // 빛이 모인다: 큰 고리가 몸으로 닫히고, 마지막엔 하얀 테두리가 깜박.
+    let g = ((k - 0.35) / 0.65).clamp(0.0, 1.0);
+    if g > 0.0 {
+        let r = 20.0 * (1.0 - g) + 4.0;
+        let a = 0.25 + 0.55 * g;
+        draw_circle_lines(
+            pos.x,
+            pos.y - 2.0,
+            r,
+            1.0,
+            Color::new(berry.r, berry.g, berry.b, a),
+        );
+        for i in 0..4 {
+            let ang = i as f32 * std::f32::consts::FRAC_PI_2 + g * 2.0;
+            let q = pos + vec2(ang.cos(), ang.sin() * 0.6) * r;
+            draw_rectangle(
+                q.x.round(),
+                (q.y - 2.0).round(),
+                1.0,
+                1.0,
+                Color::new(1.0, 1.0, 1.0, a),
+            );
+        }
+    }
+}
+
 /// 쥬시 지렁이: 꿈틀대는 분홍 마디 + 반들거리는 하이라이트. `k`는 크기 배율(1 = 월드, HUD는 더 크게).
 pub fn draw_worm(p: Vec2, ph: f32, k: f32) {
     let body = Color::new(0.95, 0.55, 0.62, 1.0);
@@ -766,7 +815,7 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
     let pos = lerp(p.prev_pos, p.pos, alpha) - vec2(0.0, p.height().round());
     let moving = (p.pos - p.prev_pos).length() > 0.05;
     let frame = match p.state {
-        player::State::Dead => {
+        player::State::Dead | player::State::Revive { .. } => {
             if big {
                 F::DOWN
             } else {
@@ -914,7 +963,7 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
         _ => 0.0,
     };
     let (col, row) = match p.state {
-        player::State::Dead => (4, 1),
+        player::State::Dead | player::State::Revive { .. } => (4, 1),
         // 힘을 모으면(0158) 흙더미가 더 빨리 들썩인다.
         player::State::Burrow { time: bt } => {
             (((bt * (12.0 + 16.0 * p.burrow_charge())) as u32) % 2, 2)

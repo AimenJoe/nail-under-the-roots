@@ -907,6 +907,7 @@ impl World {
     /// 1-2. 플레이어 이벤트(휘두름·박자·땅파기·먹기 …) → 소리·효과·월드 일. 다 먹었으면 효과를 건다.
     fn player_events(&mut self) {
         let mut ate = None;
+        let mut rose = false;
         for ev in &self.player.events {
             match ev {
                 player::Event::Swing(i) => self.juice.audio.play(sfx::Id::Claw(*i)),
@@ -1147,11 +1148,15 @@ impl World {
                     let p = self.player.pos + self.player.facing * 10.0;
                     clods(&mut self.juice.fx, p, 8, DIRT, 70.0);
                 }
+                player::Event::Rose => rose = true,
                 player::Event::Hurt | player::Event::Die | player::Event::Parry => {}
             }
         }
         if let Some(c) = ate {
             self.finish_eating(c);
+        }
+        if rose {
+            self.worm_rise();
         }
     }
 
@@ -2138,7 +2143,12 @@ impl World {
                     } else if self.inv.bag.take(Consumable::Worm) {
                         // 쓰러졌다: 쥬시 지렁이가 있으면 저절로 먹고 일어난다(목숨). 맞은 그 틱에 — 전에는 플레이어 틱
                         // (맞기 전 단계)에서 이번 틱의 Die 이벤트를 찾아서, 다음 틱엔 이벤트가 지워져 한 번도 못 일어났다(0200).
-                        self.revive();
+                        // 바로 일어나면 쓰러졌는지 몰랐다(사장, 0243) → 쓰러지는 소리·멈춤과 함께 잠깐 눕고(`State::Revive`),
+                        // 지렁이를 다 먹으면 `Event::Rose`로 `worm_rise`.
+                        self.player.start_revive();
+                        self.juice.audio.play(sfx::Id::Die);
+                        self.juice.feel.add_hitstop(t::REVIVE_HITSTOP);
+                        burst(&mut self.juice.fx, self.player.pos, 10, MOLE, 70.0);
                     } else {
                         self.juice.audio.play(sfx::Id::Die);
                         burst(&mut self.juice.fx, self.player.pos, 16, MOLE, 90.0);
@@ -2290,9 +2300,8 @@ impl World {
         burst(&mut self.juice.fx, pos, 8, BERRY, 60.0);
     }
 
-    /// 쥬시 지렁이로 일어난다: 체력 일부, 잠깐 무적, 주변을 밀어낸다.
-    fn revive(&mut self) {
-        self.player.revive();
+    /// 쥬시 지렁이를 다 먹고 일어났다(`Event::Rose`, 0243): 주변을 밀어내고 빛·소리·한마디.
+    fn worm_rise(&mut self) {
         let pos = self.player.pos;
         for e in &mut self.enemies {
             let d = e.pos - pos;
@@ -2309,8 +2318,18 @@ impl World {
         self.juice
             .fx
             .push(ring(pos, 4.0, t::REVIVE_PUSH_RADIUS, 0.4, BERRY));
+        self.juice
+            .fx
+            .push(ring(pos, 2.0, t::REVIVE_PUSH_RADIUS * 0.6, 0.3, WHITE));
         burst(&mut self.juice.fx, pos, 20, BERRY, 120.0);
-        self.juice.feel.add_trauma(0.4);
+        for i in 0..6 {
+            let a = i as f32 * std::f32::consts::TAU / 6.0;
+            self.juice
+                .fx
+                .push(glint(pos + vec2(a.cos(), a.sin()) * 10.0, WHITE, 0.4));
+        }
+        self.juice.feel.add_trauma(0.5);
+        self.juice.feel.add_hitstop(0.08);
         self.juice.toast = Some((|s| s.toast_revive, 2.5));
     }
 
@@ -3399,7 +3418,20 @@ mod tests {
         assert!(w.inv.bag.add(Consumable::Worm));
         hit(&mut w);
         w.tick(&Actions::default());
-        assert!(w.player.is_alive(), "지렁이를 먹고 일어난다");
+        // 바로 일어나지 않고 잠깐 눕는다(0243): 쓰러진 게 보이고, 그동안은 안 맞는다.
+        assert!(
+            matches!(w.player.state, player::State::Revive { .. }),
+            "누워서 지렁이를 먹는다"
+        );
+        assert!(w.player.is_alive() && w.player.is_invulnerable());
+        assert!(w.juice.audio.played(sfx::Id::Die));
+        for _ in 0..((t::REVIVE_DOWN_TIME + t::REVIVE_HITSTOP + 0.2) * 60.0) as usize {
+            w.tick(&Actions::default());
+        }
+        assert!(
+            matches!(w.player.state, player::State::Free),
+            "다 먹고 일어난다"
+        );
         assert!(w.player.hp > 1 && w.player.invuln > 0.0);
         assert!(!w.inv.bag.take(Consumable::Worm), "지렁이는 먹었다");
         assert!(w.juice.toast.is_some());
