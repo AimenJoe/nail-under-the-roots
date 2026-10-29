@@ -40,7 +40,9 @@ ILLUSTS = ["title", "mother_burrow"]
 # (첫 칸, 칸 수) 대신 칸 번호 목록도 된다(칸 수 자리는 None) — (번호, dy)면 그 칸을 dy px 옮긴다.
 SPRITES = {
     "nail": ("nail.png", 0, 2, 4),
-    "momo": ("momo.png", 0, 8, 4),  # 깡충 네 칸(0229)
+    # 깡충 네 칸(0229). 게임에서는 몸이 앞으로 나아가 공중 칸이 바닥에 붙어 있어도 되지만, 제자리 띠에서는 뛰는 것으로
+    # 안 읽혀서(사장 "뛰는 게 이상함") 박차기·공중 칸을 띄운다.
+    "momo": ("momo.png", 0, [8, (9, -2), (10, -6), 11], None),
     "doto": ("doto.png", 0, 8, 4),  # 달리기 바운드 네 칸(0226). 제자리에서 돌리니 앞끝을 맞춘다(`FRONT`)
     # 이웃 걷기는 따로 받은 네 칸(디딤·지나감·디딤·지나감, 0229) — 시트 줄 끝에 붙어 있다.
     "popo": ("popo.png", 0, 6, 4),
@@ -116,13 +118,23 @@ def bust_cache() -> None:
         re.sub(r'(fonts/galmuri11-sub\.woff2)(\?v=[0-9a-f]+)?"', rf'\1?v={font}"', css.read_text(encoding="utf-8")),
         encoding="utf-8",
     )
+    # 그림·영상도 같은 이름으로 바뀌면 옛것이 보였다(새 클립 대신 예전 클립, 사장 2026-10-29) → img/ 안의 파일마다 해시.
+    imgs = {p.name: hashlib.sha1(p.read_bytes()).hexdigest()[:8] for p in (site / "img").iterdir() if p.is_file()}
+    sprites = hashlib.sha1(b"".join(bytes.fromhex(imgs[n]) for n in sorted(imgs) if n.startswith("sp_"))).hexdigest()[:8]
     tags = {}
+    for name in ("site.js",):
+        js = site / name
+        # 걷는 띠는 site.js가 sp_*.png 주소를 만든다 — 그 판의 해시를 함께 넘긴다.
+        js.write_text(re.sub(r'const SPRITE_V = "[0-9a-f]*";', f'const SPRITE_V = "{sprites}";',
+                             js.read_text(encoding="utf-8")), encoding="utf-8")
     for name in ("style.css", "site.js"):
         tags[name] = hashlib.sha1((site / name).read_bytes()).hexdigest()[:8]
     for page in site.rglob("*.html"):
         text = page.read_text(encoding="utf-8")
         for name, h in tags.items():
             text = re.sub(rf'((?:\.\./)?{re.escape(name)})(\?v=[0-9a-f]+)?"', rf'\1?v={h}"', text)
+        for name, h in imgs.items():
+            text = re.sub(rf'((?:\.\./)?img/{re.escape(name)})(\?v=[0-9a-f]+)?(["\)])', rf'\1?v={h}\3', text)
         page.write_text(text, encoding="utf-8")
 
 

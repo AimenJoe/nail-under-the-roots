@@ -102,6 +102,14 @@ def navy_eyes(cell):
         inner = all(on[y + dy, x + dx] for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)))   # 귀 가장자리는 뺀다
         if key != OUTLINE and lum(key) < 40 and inner and top + h * 0.2 < y < top + h * 0.6 and x > left + w * 0.55:
             out[y, x, :3] = EYE_NAVY
+        elif key != OUTLINE and lum(key) < 40 and y < top + h * 0.25:
+            # 웅크린 칸의 누운 귀: 원본이 뒷귀 외곽선을 앞귀 외곽선 바로 밑에 그려 줄이면 머리 위에 검은 띠가 남았다
+            # → 둘레의 밝은 털색으로 메운다.
+            near = [tuple(int(v) for v in cell[y + dy, x + dx, :3]) for dy, dx in ((1, 0), (0, -1), (0, 1), (-1, 0))
+                    if 0 <= y + dy < CELL and 0 <= x + dx < CELL and cell[y + dy, x + dx, 3]]
+            fur = [c for c in near if c != OUTLINE and lum(c) >= 40]
+            if fur:
+                out[y, x, :3] = max(fur, key=fur.count)
     return out
 
 
