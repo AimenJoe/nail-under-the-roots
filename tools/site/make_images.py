@@ -40,7 +40,7 @@ ILLUSTS = ["title", "mother_burrow"]
 # (첫 칸, 칸 수) 대신 칸 번호 목록도 된다(칸 수 자리는 None) — (번호, dy)면 그 칸을 dy px 옮긴다.
 SPRITES = {
     "nail": ("nail.png", 0, 2, 4),
-    "momo": ("momo.png", 0, 2, 2),
+    "momo": ("momo.png", 0, 8, 4),  # 깡충 네 칸(0229)
     "doto": ("doto.png", 0, 8, 4),  # 달리기 바운드 네 칸(0226). 제자리에서 돌리니 앞끝을 맞춘다(`FRONT`)
     # 이웃 걷기는 따로 받은 네 칸(디딤·지나감·디딤·지나감, 0229) — 시트 줄 끝에 붙어 있다.
     "popo": ("popo.png", 0, 6, 4),

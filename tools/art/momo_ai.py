@@ -25,6 +25,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "pixel"))
 from pxl import Pxl  # noqa: E402
+import walk_ai  # noqa: E402
 from sprite_ai import OUTLINE, Source, Spec, convert, seat  # noqa: E402
 
 CELL, FOOT = 32, 30
@@ -45,12 +46,13 @@ SPEC_B = Spec(
     palette_ref=(0, "hurt"),
     body_h=21,     # 시트 A 서기 칸의 외곽선 안 키
 )
-ORDER = ["idle_a", "idle_b", "crouch", "jump", "windup", "kick", "hurt", "down"]
+ORDER = ["idle_a", "idle_b", "crouch", "jump", "windup", "kick", "hurt", "down"] + walk_ai.NAMES   # 8~11 깡충 넷(0229)
 
 # 물든 모모(0029): critters의 물든 털(보라 4단) + 밝은 털 한 단, 초록으로 빛나는 눈, 시든 꽃.
 TAINT_FUR = [(58, 42, 66), (88, 64, 90), (118, 90, 116), (150, 124, 146), (196, 178, 196)]
 TAINT_OUTLINE = (26, 16, 38)
 EYE_GREEN = [(24, 84, 52), (60, 170, 96), (140, 240, 150)]
+EYE_NAVY = (60, 37, 85)        # 돌아온 모모 눈(시트 A의 남빛)
 WITHER = [(92, 62, 70), (130, 92, 96), (164, 124, 120)]
 
 
@@ -88,6 +90,21 @@ def taint(cell):
     return out
 
 
+def navy_eyes(cell):
+    """깡충 칸(0229)의 눈: 원본 눈이 외곽선처럼 새까매서 줄이면 거의 검정이 된다 — 그러면 물든 줄의 초록 눈(`taint`는
+    남빛을 초록으로)이 깡충 칸에서만 꺼진다. 머리 자리(겉 네모 키의 20~60%·앞쪽, 귀 끝은 빼고)의 외곽선 아닌 안쪽 아주 어두운 점을 남빛으로."""
+    out = cell.copy()
+    on = np.pad(cell[..., 3] > 0, 1)[1:, 1:]       # 오른쪽·아래 가장자리 너머를 비어 있는 것으로
+    ys, xs = np.nonzero(cell[..., 3] > 0)
+    top, h, left, w = ys.min(), ys.max() - ys.min() + 1, xs.min(), xs.max() - xs.min() + 1
+    for y, x in zip(ys, xs):
+        key = tuple(int(v) for v in cell[y, x, :3])
+        inner = all(on[y + dy, x + dx] for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)))   # 귀 가장자리는 뺀다
+        if key != OUTLINE and lum(key) < 40 and inner and top + h * 0.2 < y < top + h * 0.6 and x > left + w * 0.55:
+            out[y, x, :3] = EYE_NAVY
+    return out
+
+
 def build():
     a = np.asarray(Pxl.load(SHEET_A).image())
     cells = {}
@@ -99,6 +116,9 @@ def build():
     b = convert(SPEC_B)
     for k in ("windup", "kick", "hurt", "down"):
         cells[k] = seat(b[k], CELL, FOOT)
+    # 색표는 시트 B의 맞음 칸(시트 A는 .pxl이라 원본이 없다).
+    for k, v in walk_ai.cells("momo", SPEC_B.sources[0], CELL, FOOT, "hurt").items():
+        cells[k] = navy_eyes(v)
     sheet = np.zeros((CELL * 4, CELL * len(ORDER), 4), np.uint8)
     for c, k in enumerate(ORDER):
         for r, cell in enumerate((cells[k], taint(cells[k]))):

@@ -172,7 +172,12 @@ def shrink(a, keep, scale, pal):
     ys, xs = np.nonzero(keep)
     a, keep = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1], keep[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
     idx = np.asarray(Image.fromarray(a.astype(np.uint8)).quantize(palette=pal, dither=Image.Dither.NONE))
-    colors = np.array(pal.getpalette()[: NCOL * 3]).reshape(-1, 3)
+    full = np.array(pal.getpalette()[:768]).reshape(-1, 3)
+    colors = full[:NCOL]
+    # 색표 뒤쪽은 0(검정)으로 채워져 있어, 색표에 짙은 색이 없으면 짙은 점이 그쪽으로 간다(모모 깡충 원본, 0229)
+    # → 색표 안의 가장 가까운 색으로 접는다. 전에는 그 자리에서 터졌으니 이미 만든 시트는 바뀌지 않는다.
+    fold = np.array([((colors - c) ** 2).sum(-1).argmin() for c in full])
+    idx = fold[idx]
     H, W = a.shape[:2]
     h, w = max(1, round(H * scale)), max(1, round(W * scale))
     out = np.zeros((h, w, 4), np.uint8)
