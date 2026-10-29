@@ -1,9 +1,10 @@
-"""콩이(아르마딜로) 스프라이트 시트(32×32 칸, 발바닥 30, 0206 C4). 이름 있는 보스(그림 규칙 0203 키 18~20px), 몸이 옆으로 길어
+"""콩이(아르마딜로) 스프라이트 시트(32×32 칸, 발바닥 30, 0206 C4 → 0238 다시). 이름 있는 보스(키 약 22px), 몸이 옆으로 길어
 칸은 32.
 
 실행: python3 tools/art/kongi_ai.py [출력 경로]   (기본 assets/art/kongi.png)
 
-원본: `sources/ai/sprites/kongi_v1.png`(✦ 지움). 크기 기준 그림(`kongi_silhouette.py`의 `ref_kongi_scale` — 게임 크기 Naïl 옆
+원본: `sources/ai/sprites/kongi_v2.png`(0238, 사장 고름 3번 — 모래색 등딱지·큰 귀·꼬리, ✦ 지움). 걷기 넷도 같은 시트 안.
+옛 원본 `kongi_v1.png`(0217)에 대한 아래 설명(공 배율·띠)은 그대로 맞다. 크기 기준 그림(`kongi_silhouette.py`의 `ref_kongi_scale` — 게임 크기 Naïl 옆
 서기·공 실루엣 8배)을 붙여 받았다. 블록 약 8~9px, 고른 격자가 아니라 원본 외곽선을 걷고(`strip`) 줄인다. 공은 서 있는 키와 거의
 같은 지름으로 와서(실루엣은 16px로 줬다) 서기 배율로 줄이면 공이 지름 20px — 공 두 칸은 따로 공 지름으로 줄인다(`BALL`).
 
@@ -27,21 +28,28 @@ import walk_ai  # noqa: E402
 from sprite_ai import OUTLINE, Source, Spec, convert, lum, ramp, seat, sheet4  # noqa: E402
 
 CELL, FOOT = 32, 30
-SRC = HERE / "sources" / "ai" / "sprites" / "kongi_v1.png"
-STAND = ["idle_a", "idle_b", "walk_a", "walk_b", "hurt", "down"]
-STAND_BOXES = [(4, 42, 248, 227), (260, 47, 508, 227), (520, 47, 760, 227), (772, 47, 1016, 227),
-               (516, 294, 756, 478), (772, 328, 1012, 474)]
+SRC = HERE / "sources" / "ai" / "sprites" / "kongi_v2.png"
+# 원본(0238, 사장 고름 1단계 3번 → 시트 한 장, ✦ 지움): 윗줄 서기·서기(숨)·맞음·뒤집힘(+ 같은 셋 한 번 더, 쓰지 않음),
+# 아랫줄 걷기 넷·공 둘·반쯤 말기·펴기(뒤 둘은 쓰지 않음). 칸 상자는 redo_concepts.components로 찾은 값.
+# 원본이 작다(키 약 100px, 블록 약 4~5px) — 외곽선 걷기는 4px.
+STAND = ["idle_a", "idle_b", "walk_a", "walk_b", "hurt", "down"] + walk_ai.NAMES
+STAND_BOXES = [(15, 7, 136, 110), (153, 7, 273, 110), (12, 133, 133, 229), (271, 130, 389, 227),
+               (284, 7, 405, 111), (429, 27, 552, 112),
+               (12, 133, 133, 229), (145, 131, 262, 229), (271, 130, 389, 227), (387, 131, 503, 231)]
 BALL = ["ball_a", "ball_b"]
-BALL_BOXES = [(42, 303, 214, 474), (298, 303, 470, 474)]
+BALL_BOXES = [(519, 141, 606, 231), (640, 141, 728, 231)]
+STRIP = 4
 SPEC = Spec(
-    sources=[Source(SRC, dict(zip(STAND, STAND_BOXES)), groups=dict.fromkeys(STAND, "idle_a"), tidy=0.15, strip=9)],
+    sources=[Source(SRC, dict(zip(STAND, STAND_BOXES)),
+                    groups={**dict.fromkeys(STAND[:6], "idle_a"), **dict.fromkeys(walk_ai.NAMES, walk_ai.NAMES[0])},
+                    tidy=0.15, strip=STRIP)],
     palette_ref=(0, "idle_a"),
-    body_h=19,      # 서기 칸 외곽선 안 키(귀 끝~발) → 외곽선까지 20~21
+    body_h=21,      # 서기 칸 외곽선 안 키(귀 끝~발) → 외곽선까지 22~23(Naïl 22보다 조금 크게 — 길의 주인)
 )
 SPEC_BALL = Spec(
-    sources=[Source(SRC, dict(zip(BALL, BALL_BOXES)), groups=dict.fromkeys(BALL, "ball_a"), tidy=0.15, strip=9)],
+    sources=[Source(SRC, dict(zip(BALL, BALL_BOXES)), groups=dict.fromkeys(BALL, "ball_a"), tidy=0.15, strip=STRIP)],
     palette_ref=(0, "ball_a"),
-    body_h=15,      # 공 지름(외곽선 안) → 외곽선까지 16~17
+    body_h=16,      # 공 지름(외곽선 안) → 외곽선까지 17~18
 )
 ORDER = ["idle_a", "idle_b", "walk_a", "walk_b", "ball_a", "ball_b", "hurt", "down"] + walk_ai.NAMES   # 8~11 걷기 넷(0229)
 
@@ -99,7 +107,7 @@ def thread(cell):
     xs = np.nonzero(on.any(0))[0]
     y = int(ys.min()) + int((ys.max() - ys.min() + 1) * 0.45)
     x0, x1 = int(xs.min()), int(xs.max())
-    wide = (x1 - x0) > (ys.max() - ys.min()) * 1.2
+    wide = (x1 - x0) > (ys.max() - ys.min()) * 1.05   # 서 있는 칸(새 콩이는 몸이 덜 길다, 0238). 공은 폭 ≈ 키
     face = x0 + (x1 - x0) * 0.55 if wide else x1 + 1
     for x in range(x0, x1 + 1):
         if x >= face or not on[y, x]:
@@ -185,6 +193,14 @@ def arcs(cell, ink):
     return out
 
 
+def ink_lines(cell):
+    """몸 안쪽 선(다리 사이·귀 테두리)이 순검정으로 온다(0238 원본) — 외곽선 색으로 맞춘다(검은 점이 배에 얼룩처럼 보였다)."""
+    out = cell.copy()
+    dark = (cell[..., 3] > 0) & (cell[..., :3].astype(int).sum(-1) < 60)
+    out[dark, :3] = OUTLINE
+    return out
+
+
 def pinkish(c):
     h, _, _ = colorsys.rgb_to_hls(*(v / 255 for v in c))
     return h < 0.07 or h > 0.85
@@ -193,8 +209,7 @@ def pinkish(c):
 def build():
     spr = convert(SPEC)
     spr.update(convert(SPEC_BALL))
-    cells = {k: seat(spr[k], CELL, FOOT) for k in ORDER if k not in walk_ai.NAMES}
-    cells.update(walk_ai.cells("kongi", SPEC.sources[0], CELL, FOOT))
+    cells = {k: ink_lines(seat(spr[k], CELL, FOOT)) for k in ORDER}
     stand = cells["idle_a"]
     pal = {tuple(int(v) for v in p[:3]) for p in stand[stand[..., 3] > 0]} - {OUTLINE}
     for k, box in zip(BALL, BALL_BOXES):
