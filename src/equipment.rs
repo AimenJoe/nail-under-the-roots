@@ -108,8 +108,11 @@ pub const PETAL: usize = 8;
 pub const PINECONE: usize = 9;
 pub const WALNUT: usize = 10;
 pub const CHESTNUT: usize = 11;
+/// Naïl의 길 무기(0251): 딱정벌레 발톱. 표의 `found_on_road`로 고르니 이름은 시험만 쓴다.
+#[cfg_attr(not(test), allow(dead_code))]
+pub const BEETLE: usize = 12;
 
-pub static WEAPONS: [Weapon; 12] = [
+pub static WEAPONS: [Weapon; 13] = [
     Weapon {
         name: |s| s.w_sprout,
         desc: |s| s.w_sprout_desc,
@@ -220,6 +223,16 @@ pub static WEAPONS: [Weapon; 12] = [
         color: Color::new(0.50, 0.30, 0.18, 1.0),
         key: Some("weapon.chestnut"),
         found_on_road: false,
+    },
+    // Naïl도 길에서 하나(0251, 사장 "나일도 길에서 하나 찾도록"). 번호는 끝에 붙인다(가방 저장이 번호라).
+    Weapon {
+        name: |s| s.w_beetle,
+        desc: |s| s.w_beetle_desc,
+        kind: WeaponKind::Claw,
+        moveset: &moveset::BEETLE,
+        color: Color::new(0.40, 0.66, 0.62, 1.0),
+        key: Some("weapon.beetle"),
+        found_on_road: true,
     },
 ];
 
@@ -748,6 +761,20 @@ mod tests {
                 assert!(last.hitstop >= h.hitstop, "{name}");
             }
         }
+    }
+
+    /// 캐릭터마다 길에서 찾는 무기가 하나씩(0251): Naïl 딱정벌레 발톱(모든 타가 등딱지를 연다)·모모 가시덩굴 각반·도토 솔방울.
+    #[test]
+    fn each_character_finds_one_weapon_on_the_road() {
+        for kind in [WeaponKind::Claw, WeaponKind::Kick, WeaponKind::Acorn] {
+            let road: Vec<usize> = (0..WEAPONS.len())
+                .filter(|&w| WEAPONS[w].found_on_road && WEAPONS[w].kind == kind)
+                .collect();
+            assert_eq!(road.len(), 1, "{kind:?}");
+            assert!(WEAPONS[road[0]].key.is_some(), "얻으면 기록에 남는다");
+        }
+        assert!(WEAPONS[BEETLE].moveset.hits.iter().all(|h| h.crush));
+        assert!(WEAPONS[BEETLE].found_on_road);
     }
 
     /// 독 발톱은 Naïl의 고유 재주가 됐다(0247): 기록 깃발로도, 길에서도 무기를 주지 않는다. 독은 재주가 발톱 타에 건다.

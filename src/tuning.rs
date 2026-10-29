@@ -338,8 +338,9 @@ pub const REVIVE_PUSH_RADIUS: f32 = 40.0;
 pub const REVIVE_PUSH_KNOCKBACK: f32 = 260.0;
 /// 상점 화폐 씨앗: 보물 상자 한 줌(최소, 최대), 보스.
 pub const CHEST_SEEDS: (u32, u32) = (2, 3);
-/// 상자에서 길의 무기(가시덩굴 각반·솔방울, 0246)가 나올 확률(아직 없을 때). 한 런 상자 ≈ 6 → 대개 한 런 안에.
-pub const CHEST_WEAPON: f32 = 0.3;
+/// 상자에서 물건이 나올 확률(0251, 사장 "반딧불 90%, 10%가 무기 또는 장신구"): 길 무기가 아직 없으면 그것, 있으면 장신구.
+/// 나머지(90%)는 반딧불 한 줌 `CHEST_GLOWBUGS`. 한 런 상자 ≈ 2.8개.
+pub const CHEST_GEAR: f32 = 0.1;
 /// 쉼터 가게의 길 무기 값(씨앗).
 pub const PRICE_WEAPON: u32 = 18;
 pub const BOSS_SEEDS: u32 = 4;
@@ -589,8 +590,8 @@ pub const HALL_CHANCE: f32 = 0.8;
 pub const LAYOUT_ODDS: [f32; 3] = [0.3, 0.55, 0.78];
 /// 굴이 넓어져(방이 약 1.6배) 싸움이 늘었으니, 쓰러진 적이 떨어뜨리는 반딧불 한 마리·씨앗이 실제로 나올 확률(0244, 경제 0148을 지킨다).
 pub const KILL_LOOT_KEEP: f32 = 0.65;
-/// 저장고(`NodeKind::Cache`) 상자의 반딧불(0250): 장신구는 둥지 상자·실타래에서만 나오니 대신 한 줌.
-pub const CACHE_GLOWBUGS: u32 = 6;
+/// 상자에서 물건 대신 나오는 반딧불 한 줌(0250 → 0251). 한 런 ≈ +15마리(런 반딧불 ≈ 242의 6%).
+pub const CHEST_GLOWBUGS: u32 = 6;
 
 pub const SHREW_BITES: u32 = 2;
 pub const SHREW_REAIM: f32 = 0.4;

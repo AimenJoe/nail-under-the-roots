@@ -1323,6 +1323,12 @@ impl World {
 
     /// 보물 상자를 연다(앱이 확인 버튼으로 부른다, `Interact::Chest`) → 씨앗 한 줌 + 아직 없는 장신구 하나(다 있으면 반딧불).
     pub fn open_chest(&mut self, i: usize) {
+        let gear = rand::gen_range(0.0, 1.0) < t::CHEST_GEAR;
+        self.open_chest_as(i, gear);
+    }
+
+    /// `open_chest`의 굴림을 밖에서 정한 판(시험이 둘 다 본다).
+    fn open_chest_as(&mut self, i: usize, gear: bool) {
         if !self
             .room
             .props
@@ -1353,24 +1359,24 @@ impl World {
             self.push_loot(Loot::spawn(LootKind::Seed, at));
         }
         self.stats.chests += 1;
-        // 장신구는 상자 앞(아래)에 떨어진다 — 상자 칸은 막혀 있다. 저장고 상자엔 장신구 대신 반딧불(0250).
-        if self.in_cache() {
-            for _ in 0..t::CACHE_GLOWBUGS {
-                self.push_loot(Loot::spawn(LootKind::Glowbug, at + vec2(0.0, 16.0)));
-            }
-        } else {
-            self.charm_gift(at + vec2(0.0, 16.0));
-        }
-        self.weapon_gift(at + vec2(-14.0, 18.0));
+        // 물건은 상자 앞(아래)에 떨어진다 — 상자 칸은 막혀 있다.
+        self.chest_gift(gear, at + vec2(0.0, 16.0));
         self.juice.audio.play(sfx::Id::Emerge);
     }
 
-    /// 지금 저장고 칸의 굴인가(0250, 사장 "장신구 드롭 확률 및 경로가 너무 많아"): 장신구는 길 지도에서 고르는 둥지·실타래 칸의
-    /// 확정 보상과 가게로만 — 저장고 상자와 보통 싸움방(예전 5%)에서는 나오지 않는다.
-    fn in_cache(&self) -> bool {
-        match (self.adv.node, self.adv.route.as_ref()) {
-            (Some(at), Some(r)) => r.node(at).kind == NodeKind::Cache,
-            _ => false,
+    /// 상자의 물건(0251, 사장 "상자에서 반딧불 90%, 10%가 무기 또는 장신구, 단 해당 무기가 있으면 장신구"):
+    /// `gear`면 아직 없는 길 무기 → 없으면 아직 없는 장신구 → 그것도 없으면 반딧불. 아니면 반딧불 한 줌.
+    /// 장신구가 확정으로 나오는 곳은 실타래 엘리트 하나와 가게(0250).
+    fn chest_gift(&mut self, gear: bool, at: Vec2) {
+        if gear && !self.inv.road_weapons.is_empty() {
+            let w = self.inv.road_weapons.remove(0);
+            self.drop_gift(Gift::Weapon(w), crate::equipment::WEAPONS[w].color, at);
+        } else if gear && !self.missing_charms().is_empty() {
+            self.charm_gift(at);
+        } else {
+            for _ in 0..t::CHEST_GLOWBUGS {
+                self.push_loot(Loot::spawn(LootKind::Glowbug, at));
+            }
         }
     }
 
@@ -1407,15 +1413,6 @@ impl World {
         self.pickups.push(crate::world::Pickup::new(at, item));
         self.juice.fx.push(ring(at, 4.0, 22.0, 0.45, color));
         self.juice.audio.play(sfx::Id::Chest);
-    }
-
-    /// 길에서 찾는 무기(0246, `Inventory::road_weapons`): 상자에서 `CHEST_WEAPON` 확률로 하나.
-    fn weapon_gift(&mut self, at: Vec2) {
-        if self.inv.road_weapons.is_empty() || rand::gen_range(0.0, 1.0) >= t::CHEST_WEAPON {
-            return;
-        }
-        let w = self.inv.road_weapons.remove(0);
-        self.drop_gift(Gift::Weapon(w), crate::equipment::WEAPONS[w].color, at);
     }
 
     /// 아직 없는 장신구 하나(다 있으면 반딧불 한 줌). 상자·실타래 끝방(0147).
@@ -2094,7 +2091,7 @@ mod tests {
             kind: PropKind::Chest { opened: false },
         });
         let i = w.room.props.len() - 1;
-        w.open_chest(i);
+        w.open_chest_as(i, true);
         assert!(
             !w.inv.gifts.iter().any(|g| matches!(g, Gift::Charm(_))),
             "바로 가방으로 가지 않는다"
@@ -2115,35 +2112,48 @@ mod tests {
         assert!(w.inv.gifts.iter().any(|g| matches!(g, Gift::Charm(_))));
     }
 
-    /// 장신구는 둥지 상자·실타래·가게에서만(0250): 저장고 상자는 장신구 대신 반딧불 한 줌.
+    /// 상자(0251): 열에 아홉은 반딧불 한 줌, 하나는 물건 — 길 무기가 아직 없으면 그것, 있으면 장신구, 그것도 다 있으면 반딧불.
     #[test]
-    fn cache_chest_gives_glowbugs_not_a_charm() {
-        let (route, at) = (1..200)
-            .find_map(|seed| {
-                let r = Route::generate(seed, 1, false);
-                let i = r.layers[0].iter().position(|n| n.kind == NodeKind::Cache)?;
-                Some((r, (0, i)))
-            })
-            .expect("저장고 칸이 있는 길");
-        let mut w = World::new();
-        w.inv.charm_pool = vec![0, 1];
-        w.adv.route = Some(route);
-        w.adv.node = Some(at);
-        let c = w.player.pos + vec2(40.0, 0.0);
-        w.room.props.push(crate::room::Prop {
-            rect: Rect::new(c.x - 8.0, c.y - 8.0, 16.0, 16.0),
-            kind: PropKind::Chest { opened: false },
-        });
-        let i = w.room.props.len() - 1;
-        w.open_chest(i);
-        assert!(!w.pickups.iter().any(|p| matches!(p.item, Gift::Charm(_))));
-        assert!(w.inv.charms_found.is_empty());
-        assert!(
-            w.loot
+    fn chest_gives_glowbugs_or_the_road_weapon_then_a_charm() {
+        let open = |gear: bool, road: Vec<usize>, pool: Vec<usize>| {
+            let mut w = World::new();
+            w.inv.charm_pool = pool;
+            w.inv.road_weapons = road;
+            let c = w.player.pos + vec2(40.0, 0.0);
+            w.room.props.push(crate::room::Prop {
+                rect: Rect::new(c.x - 8.0, c.y - 8.0, 16.0, 16.0),
+                kind: PropKind::Chest { opened: false },
+            });
+            let i = w.room.props.len() - 1;
+            w.open_chest_as(i, gear);
+            let bugs = w
+                .loot
                 .iter()
                 .filter(|l| l.kind == LootKind::Glowbug)
-                .count()
-                >= t::CACHE_GLOWBUGS as usize
+                .count();
+            let items: Vec<Gift> = w.pickups.iter().map(|p| p.item).collect();
+            (bugs, items)
+        };
+        let beetle = crate::equipment::BEETLE;
+        let (bugs, items) = open(false, vec![beetle], vec![0, 1]);
+        assert!(
+            bugs >= t::CHEST_GLOWBUGS as usize && items.is_empty(),
+            "90%: 반딧불"
+        );
+        let (_, items) = open(true, vec![beetle], vec![0, 1]);
+        assert!(
+            matches!(items[..], [Gift::Weapon(w)] if w == beetle),
+            "10%: 길 무기 먼저"
+        );
+        let (_, items) = open(true, vec![], vec![0, 1]);
+        assert!(
+            matches!(items[..], [Gift::Charm(_)]),
+            "무기가 있으면 장신구"
+        );
+        let (bugs, items) = open(true, vec![], vec![]);
+        assert!(
+            bugs >= t::CHEST_GLOWBUGS as usize && items.is_empty(),
+            "다 있으면 반딧불"
         );
     }
 

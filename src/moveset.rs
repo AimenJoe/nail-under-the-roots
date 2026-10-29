@@ -383,6 +383,38 @@ pub static STONE: Moveset = Moveset {
     beat_sp: 1.0,
 };
 
+/// 딱정벌레 발톱(Naïl의 길 무기, 0251): 단단한 날개껍질을 씌운 3연타. 모든 타가 등딱지에 튕기지 않고 연다.
+/// 대신 기본 발톱보다 조금 느리고(스윙 ×1.25) 마무리가 덜 민다.
+pub static BEETLE: Moveset = Moveset {
+    hits: &[
+        Hit {
+            swing: 0.15,
+            active: (0.03, 0.10),
+            crush: true,
+            ..claw(0)
+        },
+        Hit {
+            swing: 0.15,
+            active: (0.03, 0.10),
+            crush: true,
+            ..claw(1)
+        },
+        Hit {
+            swing: 0.25,
+            active: (0.07, 0.17),
+            recovery: 0.16,
+            knockback: 260.0,
+            crush: true,
+            ..claw(2)
+        },
+    ],
+    combo_window: t::CLAW_COMBO_WINDOW,
+    move_factor: 0.35,
+    mark: Color::new(0.52, 0.74, 0.70, 1.0),
+    beat_window: 1.0,
+    beat_sp: 1.0,
+};
+
 /// 독 발톱: 3연타, 한 방은 가볍지만 맞은 적에게 독. 마지막 타는 독이 길다.
 pub static VENOM: Moveset = Moveset {
     hits: &[
