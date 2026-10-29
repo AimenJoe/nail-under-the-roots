@@ -113,23 +113,21 @@ def chibi(img, frames):
         body[head] = (255, 0, 255)
         canvas = Image.new("RGB", (a.shape[1] + 2 * side, a.shape[0] + up), (255, 0, 255))
         canvas.paste(Image.fromarray(body.astype(np.uint8), "RGB"), (side, up))
-        # 키운 머리의 외곽선 띠는 뺀다: 몸(털·목도리) 위에 얹히면 목·뒤통수에 선이 두 겹으로 겹쳐 검은 덩어리가 됐다(사장).
         la = np.array(L)
         m = la[..., 3] > 0
         band = m & ~(np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(OUTLINE_BAND))) > 0)
         dark = la[..., :3].astype(int).sum(-1) < 170
-        # 바탕 쪽 외곽선도 뺀다: 키운 외곽선(≈8px)이 변환기가 걷는 폭(`strip` 6)보다 굵어 남은 선 + 변환기 외곽선이 두 겹이 됐다.
-        # 빼면 머리 가장자리가 털이 되고 변환기가 1px 외곽선을 새로 두른다.
-        la[band & dark, 3] = 0
-        # 머리 안의 선(주둥이와 얼굴 사이·귀)도 1.35배 굵어져 줄이면 검은 쐐기가 됐다 → 안쪽 어두운 선을 한 겹 깎아
-        # 원래 굵기로. 깎인 점은 둘레(7×7)의 밝은 점 평균 색으로 메운다.
+        # 키운 외곽선(≈8px)은 변환기가 걷는 폭(`strip` 6)보다 굵어, 남은 선 + 변환기 외곽선이 두 겹이 됐다. 빼서 투명으로 두면
+        # 목에 틈이 생겨 변환기가 틈 양쪽에 선을 둘러 더 검어졌다 → 외곽선 띠는 둘레 털 색으로 칠하고(실루엣은 그대로),
+        # 변환기가 바탕 쪽에만 1px 외곽선을 새로 두르게 한다.
+        # 머리 안의 선(주둥이와 얼굴 사이·귀)도 1.35배 굵어져 → 한 겹 깎아 원래 굵기로.
         inner_dark = dark & m & ~band
         core = np.asarray(Image.fromarray((inner_dark * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(THIN))) > 0
-        shave = inner_dark & ~core
+        shave = (inner_dark & ~core) | (band & dark)
         if shave.any():
             light = (m & ~dark).astype(float)
             col = la[..., :3].astype(float) * light[..., None]
-            win = 7
+            win = 15     # 외곽선 띠(≈8px) 한가운데서도 털 점이 잡히게
             pad = win // 2
             cs = np.pad(col, ((pad, pad), (pad, pad), (0, 0)))
             ws = np.pad(light, pad)
@@ -141,6 +139,7 @@ def chibi(img, frames):
                     wacc += ws[dy:dy + col.shape[0], dx:dx + col.shape[1]]
             fill = shave & (wacc > 0)
             la[fill, :3] = (acc[fill] / wacc[fill][:, None]).astype(np.uint8)
+            la[shave & ~fill, 3] = 0
         L = Image.fromarray(la, "RGBA")
         canvas.paste(L, (px + side, py + up), L)
         if eye:
@@ -220,15 +219,74 @@ def small(grid_text):
     return cell
 
 
+# 점 다듬기(0242, 사장 "스프라이트 하나씩 보면서 다듬어"): 변환 뒤 칸마다 손볼 점. (x, y) → 색 이름(`INK`) 또는 None(지움).
+# 칸 좌표는 28칸 그대로(왼쪽 위 0,0). PNG를 손으로 고치지 않고 여기 적어 두면 다시 만들어도 남는다.
+INK = {
+    "line": (43, 29, 42), "dark": (61, 27, 51), "fur": (84, 53, 58), "fur2": (121, 75, 77),
+    "eye": (20, 12, 16), "scarf": (211, 105, 53), "scarf2": (169, 66, 49), "shade": (63, 29, 53),
+    "snout": (236, 160, 137),
+}
+# 뒤통수의 붉은 점(목도리 매듭이 머리 외곽선 띠 칠하기에 섞인 색) → 그늘 털, 눈은 세로 2px.
+TOUCH = {
+    "idle_a": {(9, 7): "shade", (9, 8): "shade", (8, 9): "shade", (7, 10): "shade", (8, 10): "shade",
+               (9, 11): "shade", (10, 10): "fur", (14, 7): "eye"},
+    "idle_b": {(9, 8): "shade", (9, 9): "shade", (8, 10): "shade", (7, 11): "shade", (8, 11): "shade",
+               (9, 12): "shade", (10, 11): "fur", (14, 8): "eye"},
+    # 맞음: 얼굴을 가린 앞발 사이 검은 점이 몰려 있다 → 그늘로 풀어 준다.
+    "hurt": {(9, 8): "shade", (9, 9): "shade", (8, 10): "shade", (9, 10): "shade", (8, 11): "shade",
+             (9, 11): "shade", (14, 7): "fur", (17, 13): "shade", (16, 15): "shade", (18, 12): "shade",
+             (12, 12): "shade"},
+    "dead": {(9, 16): "shade", (16, 17): "shade", (17, 17): "fur", (18, 17): "shade", (17, 18): "shade",
+             (18, 18): "shade"},
+    # 들기 2: 머리 위 앞발과 머리 사이 검은 쐐기.
+    "windup2": {(19, 4): "fur", (20, 4): "line", (14, 7): "eye"},
+    "settle": {(9, 7): "shade", (9, 8): "shade", (7, 9): "shade", (8, 9): "shade", (8, 10): "shade",
+               (8, 11): "shade", (9, 10): "shade", (9, 11): "shade"},
+    "windup1": {(9, 8): "shade", (8, 10): "shade", (10, 11): "shade", (15, 8): "eye"},
+    "attack0": {(8, 8): "shade", (8, 9): "shade", (8, 10): "shade", (7, 11): "shade", (8, 11): "shade",
+                (9, 9): "shade", (9, 10): "shade", (11, 12): "fur"},
+    "attack1": {(7, 6): "shade", (7, 7): "shade", (8, 7): "shade", (7, 8): "shade", (8, 8): "shade",
+                (8, 9): "shade", (6, 10): "shade"},
+    "attack2": {(9, 9): "shade", (10, 9): "shade", (9, 10): "shade", (10, 10): "shade", (11, 10): "shade",
+                (11, 9): "fur"},
+    # 걷기: 눈이 주둥이 윗선에 붙어 검은 덩어리 → 주둥이 뒤로 옮긴다.
+    "walk_a": {(18, 6): "fur", (19, 6): "line", (19, 7): "snout", (16, 6): "eye", (16, 7): "eye",
+               (8, 7): "shade", (8, 9): "shade", (8, 10): "shade", (8, 11): "shade", (9, 10): "fur"},
+}
+
+
+def fill_holes(cell):
+    """실루엣 안의 1~2px 구멍(위아래 또는 좌우가 막힌 투명 점)을 외곽선 색으로 메운다 — 머리를 붙인 목·뒤통수에 남던 틈."""
+    out = cell.copy()
+    for _ in range(2):
+        on = out[..., 3] > 0
+        H, W = on.shape
+        for y in range(1, H - 1):
+            for x in range(1, W - 1):
+                if on[y, x]:
+                    continue
+                n = on[y - 1, x] + on[y + 1, x] + on[y, x - 1] + on[y, x + 1]
+                if n >= 3 or (on[y, x - 1] and on[y, x + 1] and (on[y - 1, x] or on[y + 1, x])):
+                    out[y, x] = INK["line"] + (255,)
+    return out
+
+
+def touch(cell, name):
+    out = fill_holes(cell)
+    for (x, y), ink in TOUCH.get(name, {}).items():
+        out[y, x] = (0, 0, 0, 0) if ink is None else INK[ink] + (255,)
+    return out
+
+
 def build():
     spr = convert(SPEC)
-    idle = seat(spr["idle_a"], CELL, FOOT)
+    sat = lambda k: touch(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT), k)
+    idle = touch(seat(spr["idle_a"], CELL, FOOT), "idle_a")
     rows = [
-        [idle, seat(spr["idle_b"], CELL, FOOT)]
-        + step_cycle(seat_on_fur(spr["walk_a"], spr["idle_a"], CELL, FOOT), FOOT - 1),
+        [idle, touch(seat(spr["idle_b"], CELL, FOOT), "idle_b")]
+        + step_cycle(sat("walk_a"), FOOT - 1),
         # 동작 칸은 몸통 털의 가운데를 서기 칸에 맞춘다(발톱을 뻗어도 몸이 옆으로 뛰지 않게).
-        [seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT)
-         for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
+        [sat(k) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
         [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
     ]
     sheet = np.zeros((CELL * 6, CELL * 9, 4), np.uint8)
