@@ -29,6 +29,7 @@ SINGLE = [
     ("halmae_ai", None, "halmae.png", 40),
     ("props_ai", None, "props.png", 24),
     ("hub_ai", None, "hub.png", 48),
+    ("tree_ai", None, "tree.png", 104),
 ]
 
 

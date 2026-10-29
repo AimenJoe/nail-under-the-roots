@@ -38,6 +38,8 @@ pub struct Art {
     pub props: Option<Texture2D>,
     /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸 여섯(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리·뿌리 길 입구. 없으면 팩·코드 그림.
     pub hub: Option<Texture2D>,
+    /// 큰 나무 잎 단계 다섯 칸(tree.png, `tools/art/tree_ai.py`, 0238).
+    pub tree: Option<Texture2D>,
     /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 털빛 1~3, 줄 4 돌아온 모모. 땅 단면 전환에서만.
     pub dig: Option<Texture2D>,
     /// 컷씬 일러스트(illust::Illust::ALL 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
@@ -162,6 +164,30 @@ pub const HUB_LOG: u32 = 4;
 /// 뿌리 길 입구(팻말 + 첫 구멍). 구멍 가운데 = 발 + (5, -9).
 pub const HUB_GATE: u32 = 5;
 
+/// 큰 나무 칸(tree.png, 0238): 잎 단계 0~4 다섯 칸 한 줄. 밑동(줄기 아래 가운데)이 칸의 (W/2, `TREE_BASE`).
+pub const TREE_W: f32 = 128.0;
+pub const TREE_H: f32 = 104.0;
+pub const TREE_BASE: f32 = 86.0;
+
+/// 큰 나무 잎 단계 `growth`(0~4)를 밑동 `base`에 그린다.
+pub fn draw_tree(tex: &Texture2D, growth: u8, base: Vec2) {
+    draw_texture_ex(
+        tex,
+        (base.x - TREE_W / 2.0).round(),
+        (base.y - TREE_BASE).round(),
+        WHITE,
+        DrawTextureParams {
+            source: Some(inset(Rect::new(
+                growth.min(4) as f32 * TREE_W,
+                0.0,
+                TREE_W,
+                TREE_H,
+            ))),
+            ..Default::default()
+        },
+    );
+}
+
 /// 마을·쉼터 물건 한 칸을 발바닥 `feet`(가운데)에 그린다.
 pub fn draw_hub(tex: &Texture2D, frame: u32, feet: Vec2, tint: Color) {
     draw_texture_ex(
@@ -264,6 +290,7 @@ impl Art {
                 "art/halmae.png",
                 "art/props.png",
                 "art/hub.png",
+                "art/tree.png",
                 "art/dig.png",
             ]
             .iter()
@@ -321,6 +348,10 @@ impl Art {
         let hub = crate::loading::texture("art/hub.png").await.ok();
         if let Some(h) = &hub {
             h.set_filter(FilterMode::Nearest);
+        }
+        let tree = crate::loading::texture("art/tree.png").await.ok();
+        if let Some(t) = &tree {
+            t.set_filter(FilterMode::Nearest);
         }
         let halmae = crate::loading::texture("art/halmae.png").await.ok();
         if let Some(h) = &halmae {
@@ -387,6 +418,7 @@ impl Art {
             halmae,
             props,
             hub,
+            tree,
             dig,
             illust,
         })

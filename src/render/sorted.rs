@@ -373,8 +373,12 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
             }
         }
         Drawable::Tree(at, growth) => {
-            match art.sunny.as_ref() {
-                Some(sunny) if growth > 0 => draw_great_tree_sunny(sunny, at, growth, w.time),
+            // 새 그림(0238)이 있으면 그것, 없으면 예전 그리기(팩 잎 · 코드 줄기).
+            match (art.tree.as_ref(), art.sunny.as_ref()) {
+                (Some(tex), _) => art::draw_tree(tex, growth, at + vec2(0.0, 8.0)),
+                (None, Some(sunny)) if growth > 0 => {
+                    draw_great_tree_sunny(sunny, at, growth, w.time)
+                }
                 _ => draw_great_tree(at, growth, w.time),
             }
             if w.adv.village.is_some_and(|v| v.tree_ready) && !shadow_pass() {
