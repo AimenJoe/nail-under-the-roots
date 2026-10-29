@@ -10,8 +10,8 @@ const base = 'nail-profile 1\nflag tutorial\nflag bori\nflag line.village_intro\
 const full = base + 'flag momo\nflag doto_memory\nflag kongi\nflag half_ending\ncount clears.Mole 4\ncount momo_wins 3\n' +
   [0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => `flag decor.${i}\n`).join('') + 'count glowbugs_banked 300\n';
 
-async function open(browser, prof) {
-  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale: 'ko-KR' });
+async function open(browser, prof, locale = 'ko-KR') {
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale });
   await ctx.addInitScript((p) => {
     try { if (!sessionStorage.getItem('x')) { sessionStorage.setItem('x', 1); localStorage.setItem('nail.profile', p); } } catch (e) {}
   }, prof);
@@ -26,8 +26,8 @@ async function open(browser, prof) {
 }
 
 // 타이틀 → 개발 → 시나리오 idx.
-async function dev(browser, idx, wait = 1500, prof = base) {
-  const s = await open(browser, prof);
+async function dev(browser, idx, wait = 1500, prof = base, locale = 'ko-KR') {
+  const s = await open(browser, prof, locale);
   await s.key('Enter', 600);
   await s.key('ArrowUp', 300); // 개발은 타이틀 메뉴 맨 끝 — 위로 한 번이면 돌아서 닿는다(메뉴 줄 수와 상관없이)
   await s.key('Enter', 600);
@@ -52,6 +52,13 @@ async function swings(s, name, n = 8, k = 'j') {
   for (const [idx, name] of [[1, 'camp'], [2, 'camp2'], [25, 'camp3']]) {
     const s = await dev(browser, idx);
     for (let i = 0; i < 4; i++) await s.key('Enter', 400);
+    await s.shot(name); await s.ctx.close();
+  }
+  // 길 지도(갈림길, 0228 덧붙임): 첫 쉼터에서 뿌리 길(G) 곁으로 걸어가 J. 한국어 = route, 영어 = route_en(en/ 페이지).
+  for (const [loc, name] of [['ko-KR', 'route'], ['en-US', 'route_en']]) {
+    const s = await dev(browser, 1, 1500, base, loc);
+    for (let i = 0; i < 4; i++) await s.key('Enter', 400);
+    await s.hold('ArrowRight', 150); await s.hold('ArrowDown', 900); await s.key('j', 1500);
     await s.shot(name); await s.ctx.close();
   }
   // 지대 넷: 잠깐 걸어 적이 다가오게 한 뒤. 꽃 핀 입구는 환경 시나리오, 뿌리·흰 실은 실타래 굴(덤불·그물), 심층은 새 졸개 다섯.
