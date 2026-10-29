@@ -349,16 +349,7 @@ pub fn build(s: Scenario) -> World {
             w.open_glade();
             w
         }
-        Scenario::Boss => {
-            let mut w = World::field();
-            w.open_glade();
-            if let Some(g) = w.adv.glade {
-                w.player.pos = vec2(g.center().x, g.y - 40.0);
-                w.player.prev_pos = w.player.pos;
-            }
-            w.snap_cam();
-            w
-        }
+        Scenario::Boss => boss_glade(),
         Scenario::Dream => {
             let mut w = World::empty();
             w.biome = crate::biome::Biome::Roots;
@@ -375,120 +366,18 @@ pub fn build(s: Scenario) -> World {
             w.adv.events.clear();
             w
         }
-        Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi | Scenario::Clover => {
-            let doto = s == Scenario::Doto;
-            let stage = match s {
-                Scenario::Doto => 2,
-                Scenario::Kongi | Scenario::Clover => crate::tuning::FINAL_STAGE,
-                _ => 1,
-            };
-            let mut w = World::camp_start(stage);
-            w.inv.seeds = 40;
-            w.adv.events.clear();
-            w.story.seed(crate::world::StorySeed {
-                momo_fight: matches!(s, Scenario::Momo(_)),
-                momo_wins: if let Scenario::Momo(wins) = s {
-                    wins
-                } else {
-                    0
-                },
-                doto_fight: doto,
-                kongi_fight: s == Scenario::Kongi,
-                clover_fight: s == Scenario::Clover,
-                warren_open: s == Scenario::Clover,
-                ..Default::default()
-            });
-            if s == Scenario::Clover {
-                w.reroll_route();
-                w.enter_route_warren_now();
-            } else {
-                w.enter_route_boss_now();
-            }
-            // 끝방 문 안쪽에 바로 선다(들어서면 잠기고 모모가 말한다).
-            let boss = w.adv.dungeon.as_ref().and_then(|d| {
-                d.rooms
-                    .iter()
-                    .find(|r| r.kind == crate::dungeon::RoomKind::Boss)
-                    .map(|r| r.interior().center())
-            });
-            if let Some(c) = boss {
-                w.player.pos = c + vec2(0.0, 40.0);
-                w.player.prev_pos = w.player.pos;
-                w.snap_cam();
-            }
-            w
-        }
-        Scenario::LastRootlet => {
-            let mut w = World::camp_start(1);
-            w.adv.events.clear();
-            w.adv.falls = crate::tuning::RUN_LIVES - 1;
-            w.player.hp = 1;
-            let at = w.player.pos + vec2(26.0, 0.0);
-            w.spawn_mob(Kind::FieldMouse, at);
-            w
-        }
+        Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi | Scenario::Clover => road_boss(s),
+        Scenario::LastRootlet => last_rootlet(),
         Scenario::Camp2 => {
             let mut w = World::camp_start(2);
             w.inv.seeds = 40;
             w.adv.events.clear();
             w
         }
-        Scenario::Spring => {
-            let mut w = World::camp_start(1);
-            w.adv.events.clear();
-            w.enter_route_spring_now();
-            // 샘 방(쉼방) 문 안쪽에, 체력은 반으로.
-            let rest = w.adv.dungeon.as_ref().and_then(|d| {
-                d.rooms
-                    .iter()
-                    .find(|r| r.kind == crate::dungeon::RoomKind::Rest)
-                    .map(|r| r.interior().center())
-            });
-            if let Some(c) = rest {
-                w.player.pos = c + vec2(0.0, 48.0);
-                w.player.prev_pos = w.player.pos;
-                w.snap_cam();
-            }
-            w.player.hp = (w.player.stats.max_hp / 2).max(1);
-            w
-        }
-        Scenario::Hall(_) => {
-            let mut w = World::camp_start(2);
-            w.adv.events.clear();
-            w.enter_route_hall_now();
-            w.juice.toast = None;
-            w
-        }
-        Scenario::Exit => {
-            let mut w = World::camp_start(1);
-            w.adv.events.clear();
-            w.enter_route_boss_now();
-            // 끝방의 적을 비운다: 들어서면 바로 클리어 → 출구.
-            if let Some(d) = w.adv.dungeon.as_mut() {
-                for r in &mut d.rooms {
-                    r.enemies.clear();
-                }
-            }
-            let boss = w.adv.dungeon.as_ref().and_then(|d| {
-                d.rooms
-                    .iter()
-                    .find(|r| r.kind == crate::dungeon::RoomKind::Boss)
-                    .map(|r| r.interior().center())
-            });
-            if let Some(c) = boss {
-                w.player.pos = c + vec2(0.0, 40.0);
-                w.player.prev_pos = w.player.pos;
-                w.snap_cam();
-            }
-            w
-        }
-        Scenario::Camp => {
-            let mut w = World::camp_start(1);
-            w.inv.seeds = 40;
-            // 첫 쉼터 안내 컷씬은 건너뛴다(바로 확인).
-            w.adv.events.clear();
-            w
-        }
+        Scenario::Spring => spring(),
+        Scenario::Hall(_) => hall(),
+        Scenario::Exit => exit(),
+        Scenario::Camp => camp(),
         Scenario::Dungeon => {
             let mut w = World::field();
             w.enter_dungeon_now();
@@ -507,164 +396,329 @@ pub fn build(s: Scenario) -> World {
         | Scenario::Ascent
         | Scenario::Tutorial => World::empty(),
         // 무기 비교(0246): 빈 방 + 오른쪽에 허수아비 셋(쓰러지지 않는다) — 탄·가시·조각을 그대로 본다.
-        Scenario::AllClaws => {
-            let mut w = World::empty();
-            let c = w.room.center();
-            for (i, dy) in [-20.0, 0.0, 20.0].into_iter().enumerate() {
-                w.spawn_mob(Kind::Dummy, c + vec2(60.0 + i as f32 * 12.0, dy));
-            }
-            for e in &mut w.enemies {
-                e.max_hp = 999;
-                e.hp = 999;
-            }
-            w.player.pos = c - vec2(40.0, 0.0);
-            w
-        }
-        Scenario::Breakables => {
-            use crate::room::{Breakable, Prop, PropKind};
-            let mut w = World::empty();
-            let c = w.player.pos;
-            for (i, b) in [
-                Breakable::Mound,
-                Breakable::Gall,
-                Breakable::RockPile,
-                Breakable::SilkBall,
-            ]
-            .into_iter()
-            .enumerate()
-            {
-                // 플레이어 아래 줄(위 줄은 빈 방의 나무가 흙더미를 가렸다).
-                let at = c + vec2(-48.0 + 32.0 * i as f32, 36.0);
-                w.room.add_prop(Prop {
-                    rect: Rect::new(at.x - 8.0, at.y - 8.0, 16.0, 16.0),
-                    kind: PropKind::Breakable(b),
-                });
-            }
-            w
-        }
-        Scenario::Gear => {
-            let mut w = build(Scenario::Chargers(2));
-            w.inv.bag.berries = 3;
-            w.inv.bag.worms = 2;
-            w.player.sp = crate::tuning::SP_MAX;
-            w.player.hp = 3;
-            w.loot.push(Loot::place(
-                LootKind::RootHeart,
-                w.room.center() + vec2(-40.0, 30.0),
-            ));
-            w
-        }
-        Scenario::BossHalf(kind) => {
-            let mut w = World::empty();
-            let c = w.room.center();
-            let mut e = Enemy::new(kind, c - vec2(0.0, 30.0));
-            e.wake_delay = 1.0;
-            e.knotted = true; // 실뜨기가 체력을 다시 채우지 않게(개발 확인용)
-            e.hp = e.max_hp / 2;
-            w.enemies.push(e);
-            w.player.pos = c + vec2(0.0, 44.0);
-            w.player.prev_pos = w.player.pos;
-            w.player.facing = vec2(0.0, -1.0);
-            w
-        }
-        Scenario::AllSpecies => {
-            let mut w = World::empty();
-            let mobs = crate::species::BESTIARY
-                .iter()
-                .filter(|k| **k != Kind::Chief);
-            for (i, k) in mobs.enumerate() {
-                let p = spawn_point(&w, i);
-                w.spawn_mob(*k, p);
-            }
-            w
-        }
-        Scenario::NewMobs | Scenario::DotoMobs => {
-            let mut w = World::empty();
-            w.biome = Biome::Deep;
-            let mobs = [
-                Kind::Shrew,
-                Kind::Hedgehog,
-                Kind::Toad,
-                Kind::Bat,
-                Kind::SporeCap,
-            ];
-            for (i, k) in mobs.into_iter().enumerate() {
-                let p = spawn_point(&w, i);
-                w.spawn_mob(k, p);
-            }
-            w
-        }
-        Scenario::Loot => {
-            let mut w = World::empty();
-            w.player.hp = 2;
-            // 오른쪽 길목(기둥을 피해서). 오른쪽으로 걸어가면 반딧불이 끌려오고 산딸기를 밟는다.
-            let c = w.room.center() + vec2(40.0, 0.0);
-            for _ in 0..12 {
-                w.loot
-                    .push(Loot::spawn(LootKind::Glowbug, c + vec2(0.0, -30.0)));
-            }
-            for _ in 0..2 {
-                w.loot
-                    .push(Loot::place(LootKind::Berry, c + vec2(0.0, -2.0)));
-            }
-            // 왼쪽에 줍는 것 한 줄(판정 9의 "주울 수 있다" 표시를 보려고, 닿지 않는 거리).
-            let left = w.room.center() - vec2(90.0, 0.0);
-            for (i, k) in [
-                LootKind::Berry,
-                LootKind::Worm,
-                LootKind::Seed,
-                LootKind::RootHeart,
-            ]
-            .into_iter()
-            .enumerate()
-            {
-                w.loot
-                    .push(Loot::place(k, left + vec2(i as f32 * 18.0, 0.0)));
-            }
-            // 바닥 장신구(2026-10-29): 같은 줄 앞에(플레이어 자석 거리 밖).
-            w.pickups.push(crate::world::Pickup::new(
-                left - vec2(20.0, 0.0),
-                crate::world::Gift::Charm(0),
-            ));
-            w
-        }
-        Scenario::Chargers(n) => {
-            let mut w = World::empty();
-            for i in 0..n {
-                let p = spawn_point(&w, i as usize);
-                w.spawn_enemy(Kind::FieldMouse, p);
-            }
-            w
-        }
-        Scenario::Shooters(n) => {
-            let mut w = World::empty();
-            for i in 0..n {
-                let p = spawn_point(&w, i as usize + 1);
-                w.spawn_enemy(Kind::Chipmunk, p);
-            }
-            w
-        }
+        Scenario::AllClaws => all_claws(),
+        Scenario::Breakables => breakables(),
+        Scenario::Gear => gear(),
+        Scenario::BossHalf(kind) => boss_half(kind),
+        Scenario::AllSpecies => all_species(),
+        Scenario::NewMobs | Scenario::DotoMobs => new_mobs(),
+        Scenario::Loot => loot(),
+        Scenario::Chargers(n) => chargers(n),
+        Scenario::Shooters(n) => shooters(n),
         Scenario::InBiome(b) => {
             let mut w = build(Scenario::OneEach);
             w.biome = b;
             w
         }
-        Scenario::OneEach => {
-            let mut w = World::empty();
-            let a = spawn_point(&w, 0);
-            let b = spawn_point(&w, 3);
-            w.spawn_enemy(Kind::FieldMouse, a);
-            w.spawn_enemy(Kind::Chipmunk, b);
-            w
-        }
-        Scenario::FromWave(n) => {
-            let mut w = World::empty();
-            w.auto_waves = true;
-            w.wave = n.saturating_sub(1);
-            w.next_wave();
-            w
+        Scenario::OneEach => one_each(),
+        Scenario::FromWave(n) => from_wave(n),
+    }
+}
+
+/// 시나리오 `Scenario::Boss`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn boss_glade() -> World {
+    let mut w = World::field();
+    w.open_glade();
+    if let Some(g) = w.adv.glade {
+        w.player.pos = vec2(g.center().x, g.y - 40.0);
+        w.player.prev_pos = w.player.pos;
+    }
+    w.snap_cam();
+    w
+}
+
+/// 시나리오 `Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi | Scenario::Clover`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn road_boss(s: Scenario) -> World {
+    let doto = s == Scenario::Doto;
+    let stage = match s {
+        Scenario::Doto => 2,
+        Scenario::Kongi | Scenario::Clover => crate::tuning::FINAL_STAGE,
+        _ => 1,
+    };
+    let mut w = World::camp_start(stage);
+    w.inv.seeds = 40;
+    w.adv.events.clear();
+    w.story.seed(crate::world::StorySeed {
+        momo_fight: matches!(s, Scenario::Momo(_)),
+        momo_wins: if let Scenario::Momo(wins) = s {
+            wins
+        } else {
+            0
+        },
+        doto_fight: doto,
+        kongi_fight: s == Scenario::Kongi,
+        clover_fight: s == Scenario::Clover,
+        warren_open: s == Scenario::Clover,
+        ..Default::default()
+    });
+    if s == Scenario::Clover {
+        w.reroll_route();
+        w.enter_route_warren_now();
+    } else {
+        w.enter_route_boss_now();
+    }
+    // 끝방 문 안쪽에 바로 선다(들어서면 잠기고 모모가 말한다).
+    let boss = w.adv.dungeon.as_ref().and_then(|d| {
+        d.rooms
+            .iter()
+            .find(|r| r.kind == crate::dungeon::RoomKind::Boss)
+            .map(|r| r.interior().center())
+    });
+    if let Some(c) = boss {
+        w.player.pos = c + vec2(0.0, 40.0);
+        w.player.prev_pos = w.player.pos;
+        w.snap_cam();
+    }
+    w
+}
+
+/// 시나리오 `Scenario::LastRootlet`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn last_rootlet() -> World {
+    let mut w = World::camp_start(1);
+    w.adv.events.clear();
+    w.adv.falls = crate::tuning::RUN_LIVES - 1;
+    w.player.hp = 1;
+    let at = w.player.pos + vec2(26.0, 0.0);
+    w.spawn_mob(Kind::FieldMouse, at);
+    w
+}
+
+/// 시나리오 `Scenario::Spring`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn spring() -> World {
+    let mut w = World::camp_start(1);
+    w.adv.events.clear();
+    w.enter_route_spring_now();
+    // 샘 방(쉼방) 문 안쪽에, 체력은 반으로.
+    let rest = w.adv.dungeon.as_ref().and_then(|d| {
+        d.rooms
+            .iter()
+            .find(|r| r.kind == crate::dungeon::RoomKind::Rest)
+            .map(|r| r.interior().center())
+    });
+    if let Some(c) = rest {
+        w.player.pos = c + vec2(0.0, 48.0);
+        w.player.prev_pos = w.player.pos;
+        w.snap_cam();
+    }
+    w.player.hp = (w.player.stats.max_hp / 2).max(1);
+    w
+}
+
+/// 시나리오 `Scenario::Hall(_)`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn hall() -> World {
+    let mut w = World::camp_start(2);
+    w.adv.events.clear();
+    w.enter_route_hall_now();
+    w.juice.toast = None;
+    w
+}
+
+/// 시나리오 `Scenario::Exit`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn exit() -> World {
+    let mut w = World::camp_start(1);
+    w.adv.events.clear();
+    w.enter_route_boss_now();
+    // 끝방의 적을 비운다: 들어서면 바로 클리어 → 출구.
+    if let Some(d) = w.adv.dungeon.as_mut() {
+        for r in &mut d.rooms {
+            r.enemies.clear();
         }
     }
+    let boss = w.adv.dungeon.as_ref().and_then(|d| {
+        d.rooms
+            .iter()
+            .find(|r| r.kind == crate::dungeon::RoomKind::Boss)
+            .map(|r| r.interior().center())
+    });
+    if let Some(c) = boss {
+        w.player.pos = c + vec2(0.0, 40.0);
+        w.player.prev_pos = w.player.pos;
+        w.snap_cam();
+    }
+    w
+}
+
+/// 시나리오 `Scenario::Camp`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn camp() -> World {
+    let mut w = World::camp_start(1);
+    w.inv.seeds = 40;
+    // 첫 쉼터 안내 컷씬은 건너뛴다(바로 확인).
+    w.adv.events.clear();
+    w
+}
+
+/// 시나리오 `Scenario::AllClaws`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn all_claws() -> World {
+    let mut w = World::empty();
+    let c = w.room.center();
+    for (i, dy) in [-20.0, 0.0, 20.0].into_iter().enumerate() {
+        w.spawn_mob(Kind::Dummy, c + vec2(60.0 + i as f32 * 12.0, dy));
+    }
+    for e in &mut w.enemies {
+        e.max_hp = 999;
+        e.hp = 999;
+    }
+    w.player.pos = c - vec2(40.0, 0.0);
+    w
+}
+
+/// 시나리오 `Scenario::Breakables`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn breakables() -> World {
+    use crate::room::{Breakable, Prop, PropKind};
+    let mut w = World::empty();
+    let c = w.player.pos;
+    for (i, b) in [
+        Breakable::Mound,
+        Breakable::Gall,
+        Breakable::RockPile,
+        Breakable::SilkBall,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        // 플레이어 아래 줄(위 줄은 빈 방의 나무가 흙더미를 가렸다).
+        let at = c + vec2(-48.0 + 32.0 * i as f32, 36.0);
+        w.room.add_prop(Prop {
+            rect: Rect::new(at.x - 8.0, at.y - 8.0, 16.0, 16.0),
+            kind: PropKind::Breakable(b),
+        });
+    }
+    w
+}
+
+/// 시나리오 `Scenario::Gear`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn gear() -> World {
+    let mut w = build(Scenario::Chargers(2));
+    w.inv.bag.berries = 3;
+    w.inv.bag.worms = 2;
+    w.player.sp = crate::tuning::SP_MAX;
+    w.player.hp = 3;
+    w.loot.push(Loot::place(
+        LootKind::RootHeart,
+        w.room.center() + vec2(-40.0, 30.0),
+    ));
+    w
+}
+
+/// 시나리오 `Scenario::BossHalf(kind)`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn boss_half(kind: Kind) -> World {
+    let mut w = World::empty();
+    let c = w.room.center();
+    let mut e = Enemy::new(kind, c - vec2(0.0, 30.0));
+    e.wake_delay = 1.0;
+    e.knotted = true; // 실뜨기가 체력을 다시 채우지 않게(개발 확인용)
+    e.hp = e.max_hp / 2;
+    w.enemies.push(e);
+    w.player.pos = c + vec2(0.0, 44.0);
+    w.player.prev_pos = w.player.pos;
+    w.player.facing = vec2(0.0, -1.0);
+    w
+}
+
+/// 시나리오 `Scenario::AllSpecies`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn all_species() -> World {
+    let mut w = World::empty();
+    let mobs = crate::species::BESTIARY
+        .iter()
+        .filter(|k| **k != Kind::Chief);
+    for (i, k) in mobs.enumerate() {
+        let p = spawn_point(&w, i);
+        w.spawn_mob(*k, p);
+    }
+    w
+}
+
+/// 시나리오 `Scenario::NewMobs | Scenario::DotoMobs`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn new_mobs() -> World {
+    let mut w = World::empty();
+    w.biome = Biome::Deep;
+    let mobs = [
+        Kind::Shrew,
+        Kind::Hedgehog,
+        Kind::Toad,
+        Kind::Bat,
+        Kind::SporeCap,
+    ];
+    for (i, k) in mobs.into_iter().enumerate() {
+        let p = spawn_point(&w, i);
+        w.spawn_mob(k, p);
+    }
+    w
+}
+
+/// 시나리오 `Scenario::Loot`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn loot() -> World {
+    let mut w = World::empty();
+    w.player.hp = 2;
+    // 오른쪽 길목(기둥을 피해서). 오른쪽으로 걸어가면 반딧불이 끌려오고 산딸기를 밟는다.
+    let c = w.room.center() + vec2(40.0, 0.0);
+    for _ in 0..12 {
+        w.loot
+            .push(Loot::spawn(LootKind::Glowbug, c + vec2(0.0, -30.0)));
+    }
+    for _ in 0..2 {
+        w.loot
+            .push(Loot::place(LootKind::Berry, c + vec2(0.0, -2.0)));
+    }
+    // 왼쪽에 줍는 것 한 줄(판정 9의 "주울 수 있다" 표시를 보려고, 닿지 않는 거리).
+    let left = w.room.center() - vec2(90.0, 0.0);
+    for (i, k) in [
+        LootKind::Berry,
+        LootKind::Worm,
+        LootKind::Seed,
+        LootKind::RootHeart,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        w.loot
+            .push(Loot::place(k, left + vec2(i as f32 * 18.0, 0.0)));
+    }
+    // 바닥 장신구(2026-10-29): 같은 줄 앞에(플레이어 자석 거리 밖).
+    w.pickups.push(crate::world::Pickup::new(
+        left - vec2(20.0, 0.0),
+        crate::world::Gift::Charm(0),
+    ));
+    w
+}
+
+/// 시나리오 `Scenario::Chargers(n)`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn chargers(n: u32) -> World {
+    let mut w = World::empty();
+    for i in 0..n {
+        let p = spawn_point(&w, i as usize);
+        w.spawn_enemy(Kind::FieldMouse, p);
+    }
+    w
+}
+
+/// 시나리오 `Scenario::Shooters(n)`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn shooters(n: u32) -> World {
+    let mut w = World::empty();
+    for i in 0..n {
+        let p = spawn_point(&w, i as usize + 1);
+        w.spawn_enemy(Kind::Chipmunk, p);
+    }
+    w
+}
+
+/// 시나리오 `Scenario::OneEach`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn one_each() -> World {
+    let mut w = World::empty();
+    let a = spawn_point(&w, 0);
+    let b = spawn_point(&w, 3);
+    w.spawn_enemy(Kind::FieldMouse, a);
+    w.spawn_enemy(Kind::Chipmunk, b);
+    w
+}
+
+/// 시나리오 `Scenario::FromWave(n)`의 월드(0248 R29: `build`의 갈래를 함수로).
+fn from_wave(n: u32) -> World {
+    let mut w = World::empty();
+    w.auto_waves = true;
+    w.wave = n.saturating_sub(1);
+    w.next_wave();
+    w
 }
 
 /// 플레이어에서 먼 스폰 지점을 순서대로.
