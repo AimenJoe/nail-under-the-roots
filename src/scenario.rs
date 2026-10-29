@@ -325,7 +325,7 @@ pub const LIST: [Entry; 48] = [
     },
     Entry {
         name: "넓은 방",
-        desc: "길의 보통 굴, 화면 두 칸짜리 넓은 방 안(0244). 카메라가 방 안을 따라가고 두 칸의 적이 함께 깬다. 방마다 지형(기둥·골짜기·돌밭).",
+        desc: "둘째 길의 보통 굴, 화면 두 칸짜리 넓은 방 안(0244). 카메라가 방 안을 따라가고 두 칸의 적이 함께 깬다. 방마다 지형(기둥·골짜기·돌밭).",
         scenario: Scenario::Hall(crate::equipment::Character::Mole),
     },
     Entry {
@@ -453,7 +453,7 @@ pub fn build(s: Scenario) -> World {
             w
         }
         Scenario::Hall(_) => {
-            let mut w = World::camp_start(1);
+            let mut w = World::camp_start(2);
             w.adv.events.clear();
             w.enter_route_hall_now();
             w.juice.toast = None;
