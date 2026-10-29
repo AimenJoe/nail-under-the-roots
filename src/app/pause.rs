@@ -4,27 +4,86 @@ use super::*;
 
 /// 상태 탭 글 한 줄 높이 = 위아래로 한 번 내리는 양.
 pub(super) const STATUS_LINE: f32 = 12.0;
-pub(super) const PAUSE_TABS: [Tr; 8] = [
-    |s| s.tab_menu,
-    |s| s.tab_status,
-    |s| s.tab_talents,
-    |s| s.tab_bag,
-    |s| s.tab_journal,
-    |s| s.tab_bestiary,
-    |s| s.tab_map,
-    |s| s.pm_help,
+/// 일시정지 탭 하나(0248 R30): 이름, 좌우를 칸 옮기기에 쓰나(가방·재주 — 끝에서 더 밀면 옆 탭), 입력·그림.
+/// `update(앱, 입력, 누른 자리, 이 탭에 머물러 있었나)` → 옆 탭으로 넘길 쪽(`Some(±1)`). 새 탭 = 이 표 한 줄 + 함수 둘.
+pub(super) struct PauseTab {
+    pub name: Tr,
+    pub lr: bool,
+    pub update: fn(&mut App, &Actions, Option<Hit>, bool) -> Option<i8>,
+    pub draw: fn(&mut App, &Ui, Rect),
+}
+
+pub(super) const PAUSE_TABS: [PauseTab; 8] = [
+    PauseTab {
+        name: |s| s.tab_menu,
+        lr: false,
+        update: |app, a, tap, _| {
+            app.update_pause_menu(a, tap);
+            None
+        },
+        draw: |app, ui, c| app.draw_pause_menu(ui, c),
+    },
+    PauseTab {
+        name: |s| s.tab_status,
+        lr: false,
+        update: |app, a, tap, _| {
+            app.update_status(a, tap);
+            None
+        },
+        draw: |app, ui, c| app.draw_status(ui, c),
+    },
+    // 재주 탭(0247): 큰 나무 그림을 읽기만(목표는 정할 수 있다).
+    PauseTab {
+        name: |s| s.tab_talents,
+        lr: true,
+        update: |app, a, tap, stayed| {
+            app.update_pause_tree(a, tap, stayed)
+                .then_some(if a.left { -1 } else { 1 })
+        },
+        draw: |app, ui, c| app.draw_pause_tree(ui, c),
+    },
+    PauseTab {
+        name: |s| s.tab_bag,
+        lr: true,
+        update: |app, a, tap, stayed| app.update_bag(a, tap, stayed),
+        draw: |app, ui, c| app.draw_inventory(ui, c),
+    },
+    PauseTab {
+        name: |s| s.tab_journal,
+        lr: false,
+        update: |app, a, tap, _| {
+            app.update_journal_tab(a, tap);
+            None
+        },
+        draw: |app, ui, c| app.draw_journal(ui, c),
+    },
+    PauseTab {
+        name: |s| s.tab_bestiary,
+        lr: false,
+        update: |app, a, tap, _| {
+            app.update_bestiary(a, tap);
+            None
+        },
+        draw: |app, ui, c| app.draw_bestiary(ui, c),
+    },
+    PauseTab {
+        name: |s| s.tab_map,
+        lr: false,
+        update: |_, _, _, _| None,
+        draw: |app, ui, c| app.draw_map(ui, c),
+    },
+    PauseTab {
+        name: |s| s.pm_help,
+        lr: false,
+        update: |app, a, tap, _| {
+            app.help_nav(a, tap);
+            None
+        },
+        draw: |app, ui, c| app.draw_help_body(ui, c),
+    },
 ];
-/// 탭 번호.
-const TAB_STATUS: usize = 1;
-/// 재주 탭(0247): 큰 나무 그림을 읽기만(목표는 정할 수 있다).
-const TAB_TALENTS: usize = 2;
-const TAB_BAG: usize = 3;
-const TAB_JOURNAL: usize = 4;
-const TAB_BESTIARY: usize = 5;
 /// 지도 탭 번호(지도 버튼으로 바로 연다).
 pub(super) const TAB_MAP: usize = 6;
-/// 안내 탭 번호(0180).
-pub(super) const TAB_HELP: usize = 7;
 pub(super) const PAUSE_MENU: [Tr; 4] = [
     |s| s.pm_resume,
     |s| s.pm_restart,
@@ -86,8 +145,11 @@ pub(super) fn draw_charm_icon(ui: &Ui, r: Rect, color: Color) {
 }
 
 impl App {
+    /// 일시정지 입력(0248 R30): 탭 넘기기(Q·E·탭 누르기, 좌우 — 좌우를 칸 옮기기에 쓰는 탭은 그 탭이 끝에서 넘긴다)만 여기,
+    /// 탭 안의 입력은 탭 표 `PAUSE_TABS`의 `update`.
     pub(super) fn update_pause(&mut self, a: &Actions, tap_hit: Option<Hit>) {
         let n_tabs = PAUSE_TABS.len();
+        let step = |t: usize, d: i32| (t as i32 + d).rem_euclid(n_tabs as i32) as usize;
         // 이번 입력을 받기 전 탭: 좌우로 가방에 막 들어온 프레임에 같은 좌우가 가방 끝에서 또 탭을 넘기지 않게.
         let came_in = self.pause_tab;
         if a.cancel || a.menu {
@@ -95,196 +157,210 @@ impl App {
             return;
         }
         if a.tab_prev {
-            self.pause_tab = (self.pause_tab + n_tabs - 1) % n_tabs;
+            self.pause_tab = step(self.pause_tab, -1);
         }
         if a.tab_next {
-            self.pause_tab = (self.pause_tab + 1) % n_tabs;
+            self.pause_tab = step(self.pause_tab, 1);
         }
         if let Some(Hit::PauseTab(i)) = tap_hit {
             self.pause_tab = i;
         }
-        // 가로 탐색이 없는 탭에서는 좌우로도 탭을 넘긴다(가방·재주는 좌우로 칸을 옮기고, 끝에서 한 번 더 밀면 옆 탭).
-        let horizontal_tab = !matches!(self.pause_tab, TAB_BAG | TAB_TALENTS);
-        if horizontal_tab && a.left {
-            self.pause_tab = (self.pause_tab + n_tabs - 1) % n_tabs;
+        // 좌우를 칸에 쓰지 않는 탭에서는 좌우로도 탭을 넘긴다.
+        if !PAUSE_TABS[self.pause_tab].lr {
+            if a.left {
+                self.pause_tab = step(self.pause_tab, -1);
+            }
+            if a.right {
+                self.pause_tab = step(self.pause_tab, 1);
+            }
         }
-        if horizontal_tab && a.right {
-            self.pause_tab = (self.pause_tab + 1) % n_tabs;
+        let tab = self.pause_tab;
+        if let Some(d) = (PAUSE_TABS[tab].update)(self, a, tap_hit, came_in == tab) {
+            self.pause_tab = step(tab, d as i32);
         }
-        // 좌우로 가방에 들어오면 들어온 쪽 끝 칸(같은 줄)에서 시작한다.
-        if self.pause_tab == TAB_BAG && came_in != TAB_BAG && (a.left || a.right) {
-            let cols = self.inventory.cols;
-            let n = self.inventory.slots.len();
-            let row_start = self.inv_cursor / cols * cols;
-            self.inv_cursor = if a.right {
-                row_start
-            } else {
-                (row_start + cols - 1).min(n - 1)
-            };
+    }
+
+    /// 메뉴 탭: 이어하기·다시 하기·설정·타이틀로.
+    fn update_pause_menu(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        let n = PAUSE_MENU.len();
+        if a.up {
+            self.pause_cursor = (self.pause_cursor + n - 1) % n;
         }
-        match self.pause_tab {
-            0 => {
-                let n = PAUSE_MENU.len();
-                if a.up {
-                    self.pause_cursor = (self.pause_cursor + n - 1) % n;
+        if a.down {
+            self.pause_cursor = (self.pause_cursor + 1) % n;
+        }
+        let chosen = if a.confirm {
+            Some(self.pause_cursor)
+        } else if let Some(Hit::PauseItem(i)) = tap_hit {
+            Some(i)
+        } else {
+            None
+        };
+        match chosen {
+            Some(0) => self.scene = Scene::Game,
+            Some(1) => {
+                // 다시 하기·타이틀로: 런이 끝난다. 들고 있던 반딧불은 마을로(0047) — 굴 안이면 잃는다(0210).
+                if self.safe_to_bank() {
+                    self.bank_glowbugs();
                 }
-                if a.down {
-                    self.pause_cursor = (self.pause_cursor + 1) % n;
-                }
-                let chosen = if a.confirm {
-                    Some(self.pause_cursor)
-                } else if let Some(Hit::PauseItem(i)) = tap_hit {
-                    Some(i)
-                } else {
-                    None
-                };
-                match chosen {
-                    Some(0) => self.scene = Scene::Game,
-                    Some(1) => {
-                        // 다시 하기·타이틀로: 런이 끝난다. 들고 있던 반딧불은 마을로(0047) — 굴 안이면 잃는다(0210).
-                        if self.safe_to_bank() {
-                            self.bank_glowbugs();
-                        }
-                        self.start_game();
-                    }
-                    Some(2) => {
-                        self.settings_cursor = 0;
-                        self.scene = Scene::Settings { back: Back::Pause };
-                    }
-                    Some(3) => {
-                        if self.safe_to_bank() {
-                            self.bank_glowbugs();
-                        }
-                        // 쉼터에서 나가면 그 쉼터부터 이어한다(굴 안이면 마지막 쉼터, 0080).
-                        self.checkpoint_run();
-                        self.title_cursor = 0;
-                        self.scene = Scene::Title;
-                    }
-                    _ => {}
-                }
+                self.start_game();
             }
-            TAB_TALENTS => {
-                if self.update_pause_tree(a, tap_hit, came_in == TAB_TALENTS) {
-                    // 좌우 끝에서 밀었다: 옆 탭으로.
-                    self.pause_tab = if a.left {
-                        (self.pause_tab + n_tabs - 1) % n_tabs
-                    } else {
-                        (self.pause_tab + 1) % n_tabs
-                    };
-                }
+            Some(2) => {
+                self.settings_cursor = 0;
+                self.scene = Scene::Settings { back: Back::Pause };
             }
-            TAB_BAG => {
-                let cols = self.inventory.cols;
-                let n = self.inventory.slots.len();
-                // 좌우 끝에서 한 번 더 밀면 옆 탭으로(다른 탭은 좌우가 곧 탭 넘기기라 같은 손으로 빠져나온다).
-                let lr = came_in == TAB_BAG;
-                if lr && a.left {
-                    if self.inv_cursor.is_multiple_of(cols) {
-                        self.pause_tab = (self.pause_tab + n_tabs - 1) % n_tabs;
-                        return;
-                    }
-                    self.inv_cursor -= 1;
+            Some(3) => {
+                if self.safe_to_bank() {
+                    self.bank_glowbugs();
                 }
-                if lr && a.right {
-                    if self.inv_cursor % cols == cols - 1 || self.inv_cursor + 1 >= n {
-                        self.pause_tab = (self.pause_tab + 1) % n_tabs;
-                        return;
-                    }
-                    self.inv_cursor += 1;
-                }
-                if a.up && self.inv_cursor >= cols {
-                    self.inv_cursor -= cols;
-                }
-                if a.down && self.inv_cursor + cols < n {
-                    self.inv_cursor += cols;
-                }
-                let mut equip = a.confirm;
-                if let Some(Hit::InvSlot(i)) = tap_hit {
-                    equip = self.inv_cursor == i;
-                    self.inv_cursor = i;
-                }
-                if equip {
-                    match self.inventory.slots[self.inv_cursor] {
-                        Some(Item::Weapon(w)) => {
-                            // 캐릭터가 쓸 수 있는 종류만.
-                            if WEAPONS[w].kind == self.world.character.weapon_kind() {
-                                self.inventory.equipped = Some(w);
-                                self.apply_equipped();
-                                self.sfx.play(crate::sfx::Id::Claw(2));
-                            }
-                        }
-                        Some(Item::Charm(c)) => {
-                            // 끼고 있으면 빼고, 아니면 낀다. 칸이 가득이면 먼저 낀 것과 바꾼다.
-                            let charms = &mut self.world.inv.charms;
-                            if let Some(i) = charms.iter().position(|x| *x == c) {
-                                charms.remove(i);
-                            } else {
-                                if charms.len() >= self.world.player.stats.charm_slots() {
-                                    charms.remove(0);
-                                }
-                                charms.push(c);
-                            }
-                            self.world.refresh_stats();
-                            self.sfx.play(crate::sfx::Id::Claw(1));
-                        }
-                        None => {}
-                    }
-                }
+                // 쉼터에서 나가면 그 쉼터부터 이어한다(굴 안이면 마지막 쉼터, 0080).
+                self.checkpoint_run();
+                self.title_cursor = 0;
+                self.scene = Scene::Title;
             }
-            TAB_JOURNAL => {
-                let n = crate::journal::visible(&self.profile).len().max(1);
-                if a.up {
-                    self.journal_cursor = (self.journal_cursor + n - 1) % n;
-                }
-                if a.down {
-                    self.journal_cursor = (self.journal_cursor + 1) % n;
-                }
-                let mut take = a.confirm;
-                self.journal_view
-                    .scroll(self.scroll_in, &mut self.journal_cursor, n);
-                if let Some(Hit::JournalItem(i)) = tap_hit {
-                    // 고른 칸을 한 번 더 누르면 받는다.
-                    take = i == self.journal_cursor;
-                    self.journal_cursor = i;
-                }
-                if take {
-                    self.claim_journal();
-                }
-            }
-            TAB_STATUS => {
-                // 글이 칸보다 길면 위아래로 한 줄씩 내린다(언어·재주·장신구에 따라 길이가 다르다).
-                let mut step = 0.0;
-                if a.up || tap_hit == Some(Hit::StatusScroll(-1)) {
-                    step = -STATUS_LINE;
-                }
-                if a.down || tap_hit == Some(Hit::StatusScroll(1)) {
-                    step = STATUS_LINE;
-                }
-                // 끌기는 그만큼, 휠·▲▼는 한 줄씩(0199).
-                let (drag, steps) = self.scroll_in;
-                step += drag + steps as f32 * STATUS_LINE;
-                self.status_scroll = (self.status_scroll + step).clamp(0.0, self.status_max);
-            }
-            TAB_BESTIARY => {
-                let n = crate::species::BESTIARY.len();
-                if a.up {
-                    self.bestiary_cursor = (self.bestiary_cursor + n - 1) % n;
-                }
-                if a.down {
-                    self.bestiary_cursor = (self.bestiary_cursor + 1) % n;
-                }
-                self.bestiary_view
-                    .scroll(self.scroll_in, &mut self.bestiary_cursor, n);
-                if let Some(Hit::BestiaryItem(i)) = tap_hit {
-                    self.bestiary_cursor = i;
-                }
-                // 확인(또는 설명을 누르기) = 설명 쪽 넘기기. 좌우는 일시정지에서 탭을 바꾼다.
-                if a.confirm || tap_hit == Some(Hit::BestiaryPage) {
-                    self.bestiary_page = (self.bestiary_page + 1) % 3;
-                }
-            }
-            TAB_HELP => self.help_nav(a, tap_hit),
             _ => {}
+        }
+    }
+
+    /// 가방 탭: 칸 옮기기(좌우 끝에서 더 밀면 옆 탭 — `Some(±1)`), 확인으로 끼기.
+    fn update_bag(&mut self, a: &Actions, tap_hit: Option<Hit>, stayed: bool) -> Option<i8> {
+        let cols = self.inventory.cols;
+        let n = self.inventory.slots.len();
+        // 좌우로 막 들어왔으면 들어온 쪽 끝 칸(같은 줄)에서 시작한다.
+        if !stayed {
+            if a.left || a.right {
+                let row_start = self.inv_cursor / cols * cols;
+                self.inv_cursor = if a.right {
+                    row_start
+                } else {
+                    (row_start + cols - 1).min(n - 1)
+                };
+            }
+        } else {
+            // 좌우 끝에서 한 번 더 밀면 옆 탭으로(다른 탭은 좌우가 곧 탭 넘기기라 같은 손으로 빠져나온다).
+            if a.left {
+                if self.inv_cursor.is_multiple_of(cols) {
+                    return Some(-1);
+                }
+                self.inv_cursor -= 1;
+            }
+            if a.right {
+                if self.inv_cursor % cols == cols - 1 || self.inv_cursor + 1 >= n {
+                    return Some(1);
+                }
+                self.inv_cursor += 1;
+            }
+        }
+        if a.up && self.inv_cursor >= cols {
+            self.inv_cursor -= cols;
+        }
+        if a.down && self.inv_cursor + cols < n {
+            self.inv_cursor += cols;
+        }
+        let mut equip = a.confirm;
+        if let Some(Hit::InvSlot(i)) = tap_hit {
+            equip = self.inv_cursor == i;
+            self.inv_cursor = i;
+        }
+        if equip {
+            match self.inventory.slots[self.inv_cursor] {
+                Some(Item::Weapon(w)) => {
+                    // 캐릭터가 쓸 수 있는 종류만.
+                    if WEAPONS[w].kind == self.world.character.weapon_kind() {
+                        self.inventory.equipped = Some(w);
+                        self.apply_equipped();
+                        self.sfx.play(crate::sfx::Id::Claw(2));
+                    }
+                }
+                Some(Item::Charm(c)) => {
+                    // 끼고 있으면 빼고, 아니면 낀다. 칸이 가득이면 먼저 낀 것과 바꾼다.
+                    let charms = &mut self.world.inv.charms;
+                    if let Some(i) = charms.iter().position(|x| *x == c) {
+                        charms.remove(i);
+                    } else {
+                        if charms.len() >= self.world.player.stats.charm_slots() {
+                            charms.remove(0);
+                        }
+                        charms.push(c);
+                    }
+                    self.world.refresh_stats();
+                    self.sfx.play(crate::sfx::Id::Claw(1));
+                }
+                None => {}
+            }
+        }
+        None
+    }
+
+    /// 발자국 탭: 목표 고르기·받기.
+    fn update_journal_tab(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        let n = crate::journal::visible(&self.profile).len().max(1);
+        if a.up {
+            self.journal_cursor = (self.journal_cursor + n - 1) % n;
+        }
+        if a.down {
+            self.journal_cursor = (self.journal_cursor + 1) % n;
+        }
+        let mut take = a.confirm;
+        self.journal_view
+            .scroll(self.scroll_in, &mut self.journal_cursor, n);
+        if let Some(Hit::JournalItem(i)) = tap_hit {
+            // 고른 칸을 한 번 더 누르면 받는다.
+            take = i == self.journal_cursor;
+            self.journal_cursor = i;
+        }
+        if take {
+            self.claim_journal();
+        }
+    }
+
+    /// 상태 탭: 위아래로 굴리기.
+    fn update_status(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        // 글이 칸보다 길면 위아래로 한 줄씩 내린다(언어·재주·장신구에 따라 길이가 다르다).
+        let mut step = 0.0;
+        if a.up || tap_hit == Some(Hit::StatusScroll(-1)) {
+            step = -STATUS_LINE;
+        }
+        if a.down || tap_hit == Some(Hit::StatusScroll(1)) {
+            step = STATUS_LINE;
+        }
+        // 끌기는 그만큼, 휠·▲▼는 한 줄씩(0199).
+        let (drag, steps) = self.scroll_in;
+        step += drag + steps as f32 * STATUS_LINE;
+        self.status_scroll = (self.status_scroll + step).clamp(0.0, self.status_max);
+    }
+
+    /// 도감 탭: 고르기·설명 쪽 넘기기.
+    fn update_bestiary(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        let n = crate::species::BESTIARY.len();
+        if a.up {
+            self.bestiary_cursor = (self.bestiary_cursor + n - 1) % n;
+        }
+        if a.down {
+            self.bestiary_cursor = (self.bestiary_cursor + 1) % n;
+        }
+        self.bestiary_view
+            .scroll(self.scroll_in, &mut self.bestiary_cursor, n);
+        if let Some(Hit::BestiaryItem(i)) = tap_hit {
+            self.bestiary_cursor = i;
+        }
+        // 확인(또는 설명을 누르기) = 설명 쪽 넘기기. 좌우는 일시정지에서 탭을 바꾼다.
+        if a.confirm || tap_hit == Some(Hit::BestiaryPage) {
+            self.bestiary_page = (self.bestiary_page + 1) % 3;
+        }
+    }
+
+    /// 메뉴 탭 그림.
+    fn draw_pause_menu(&mut self, ui: &Ui, content: Rect) {
+        let rects = ui.menu_list(
+            &trs(&PAUSE_MENU),
+            self.pause_cursor,
+            content.x + 90.0,
+            content.y + 12.0,
+            100.0,
+        );
+        for (i, r) in rects.into_iter().enumerate() {
+            self.hits.push((r, Hit::PauseItem(i)));
         }
     }
 
@@ -294,7 +370,7 @@ impl App {
         let panel = Rect::new(12.0, 8.0, 296.0, 156.0);
         ui.panel(panel, None);
         let tabs = ui.tabs(
-            &trs(&PAUSE_TABS),
+            &PAUSE_TABS.iter().map(|t| tr(t.name)).collect::<Vec<_>>(),
             self.pause_tab,
             panel.x + 6.0,
             panel.y + 5.0,
@@ -323,27 +399,7 @@ impl App {
             panel.w - 16.0,
             panel.h - 38.0,
         );
-        match self.pause_tab {
-            0 => {
-                let rects = ui.menu_list(
-                    &trs(&PAUSE_MENU),
-                    self.pause_cursor,
-                    content.x + 90.0,
-                    content.y + 12.0,
-                    100.0,
-                );
-                for (i, r) in rects.into_iter().enumerate() {
-                    self.hits.push((r, Hit::PauseItem(i)));
-                }
-            }
-            TAB_STATUS => self.draw_status(ui, content),
-            TAB_TALENTS => self.draw_pause_tree(ui, content),
-            TAB_BAG => self.draw_inventory(ui, content),
-            TAB_JOURNAL => self.draw_journal(ui, content),
-            TAB_BESTIARY => self.draw_bestiary(ui, content),
-            TAB_HELP => self.draw_help_body(ui, content),
-            _ => self.draw_map(ui, content),
-        }
+        (PAUSE_TABS[self.pause_tab].draw)(self, ui, content);
     }
 
     /// 상태 탭: 캐릭터 능력치는 숫자로(두 칸 표), 그 아래 필살기·장신구·재주·화폐 설명.
@@ -1255,5 +1311,23 @@ fn draw_reward_icon(ui: &Ui, r: crate::journal::Reward, x: f32, y: f32) {
             ui.rect(Rect::new(x + 1.0, y + 1.0, 2.0, 5.0), c);
             ui.rect(Rect::new(x + 4.0, y + 2.0, 2.0, 5.0), c);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 탭 표(0248 R30): 지도 버튼이 여는 번호가 지도 탭이고, 좌우를 칸에 쓰는 탭은 가방·재주 둘뿐.
+    #[test]
+    fn pause_tab_table_matches_its_numbers() {
+        let ko = &crate::i18n::KO;
+        assert_eq!((PAUSE_TABS[TAB_MAP].name)(ko), ko.tab_map);
+        let lr: Vec<&str> = PAUSE_TABS
+            .iter()
+            .filter(|t| t.lr)
+            .map(|t| (t.name)(ko))
+            .collect();
+        assert_eq!(lr, vec![ko.tab_talents, ko.tab_bag]);
     }
 }
