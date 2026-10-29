@@ -2,24 +2,45 @@
 
 use super::*;
 
-pub(super) const SETTING_ROWS: [Tr; 11] = [
-    |s| s.set_sound,
-    |s| s.set_music,
-    |s| s.set_shake,
-    |s| s.set_effects,
-    |s| s.set_tells,
-    |s| s.set_debug,
-    |s| s.set_language,
-    |s| s.set_assist,
-    |s| s.set_controls,
-    |s| s.set_licenses,
-    |s| s.set_erase,
-];
-/// 설정의 "포포의 응원"·"조작 설정"·"라이선스"·"기록 지우기" 줄. 돌아가기 줄은 없다 — 닫기 단추·뒤로(Esc·B)·창 밖 탭(0239).
+/// 설정 줄. 데스크톱은 값 줄 끝에 "전체 화면"이 하나 더 있다(0240) — 그 뒤 줄 번호가 하나씩 밀린다(`D`).
+pub(super) const SETTING_ROWS: &[Tr] = if crate::DESKTOP {
+    &[
+        |s| s.set_sound,
+        |s| s.set_music,
+        |s| s.set_shake,
+        |s| s.set_effects,
+        |s| s.set_tells,
+        |s| s.set_debug,
+        |s| s.set_language,
+        |s| s.set_assist,
+        |s| s.set_fullscreen,
+        |s| s.set_controls,
+        |s| s.set_licenses,
+        |s| s.set_erase,
+    ]
+} else {
+    &[
+        |s| s.set_sound,
+        |s| s.set_music,
+        |s| s.set_shake,
+        |s| s.set_effects,
+        |s| s.set_tells,
+        |s| s.set_debug,
+        |s| s.set_language,
+        |s| s.set_assist,
+        |s| s.set_controls,
+        |s| s.set_licenses,
+        |s| s.set_erase,
+    ]
+};
+const D: usize = crate::DESKTOP as usize;
+/// 설정의 "포포의 응원"·"전체 화면"(데스크톱)·"조작 설정"·"라이선스"·"기록 지우기" 줄. 돌아가기 줄은 없다 — 닫기 단추·뒤로(Esc·B)·창 밖 탭(0239).
 pub(super) const SETTING_ASSIST: usize = 7;
-pub(super) const SETTING_CONTROLS: usize = 8;
-pub(super) const SETTING_LICENSES: usize = 9;
-pub(super) const SETTING_ERASE: usize = 10;
+/// 데스크톱에서만 있는 줄(다른 빌드에서는 이 번호가 조작 설정이라 `crate::DESKTOP`과 같이 본다).
+pub(super) const SETTING_FULLSCREEN: usize = 8;
+pub(super) const SETTING_CONTROLS: usize = 8 + D;
+pub(super) const SETTING_LICENSES: usize = 9 + D;
+pub(super) const SETTING_ERASE: usize = 10 + D;
 /// 설정 창에 한 번에 보이는 줄. 줄이 더 많으면 고른 줄이 보이게 굴린다(입자 줄을 더해 열 줄이 됐다, 0141).
 pub(super) const SETTING_VISIBLE: usize = 9;
 /// 줄 간격과 묶음 사이 틈(0239): 값 줄 | 다른 화면으로 가는 줄 | 기록 지우기. 아홉 줄 + 틈 둘이 창 안에 든다.
@@ -35,7 +56,7 @@ const ERASE_INK: Color = Color::new(0.86, 0.47, 0.42, 1.0);
 pub(super) fn setting_is_button(i: usize) -> bool {
     matches!(i, SETTING_CONTROLS | SETTING_LICENSES | SETTING_ERASE)
 }
-/// 줄이 몇째 묶음인가: 0 = 값, 1 = 다른 화면(조작·라이선스), 2 = 기록 지우기.
+/// 줄이 몇째 묶음인가: 0 = 값(전체 화면 포함), 1 = 다른 화면(조작·라이선스), 2 = 기록 지우기.
 fn setting_group(i: usize) -> usize {
     match i {
         SETTING_ERASE => 2,
@@ -71,6 +92,8 @@ pub struct Settings {
     pub debug_overlay: bool,
     /// 사람이 고른 언어(None = 기기 언어).
     pub lang: Option<i18n::Lang>,
+    /// 전체 화면(데스크톱, 0240). F11로도 바꾼다.
+    pub fullscreen: bool,
 }
 
 impl Settings {
@@ -115,6 +138,7 @@ impl App {
                 i18n::set_lang(l);
                 self.settings.lang = Some(l);
             }
+            SETTING_FULLSCREEN if crate::DESKTOP => self.toggle_fullscreen(),
             SETTING_ASSIST => {
                 use crate::profile::key;
                 if !self.profile.unset(key::ASSIST) {
@@ -127,6 +151,13 @@ impl App {
         }
     }
 
+    /// 전체 화면 ↔ 창(데스크톱, 0240): 설정 줄과 F11이 같이 쓴다. 바로 저장한다.
+    pub(super) fn toggle_fullscreen(&mut self) {
+        self.settings.fullscreen = !self.settings.fullscreen;
+        macroquad::window::set_fullscreen(self.settings.fullscreen);
+        self.save_prefs();
+    }
+
     pub(super) fn save_prefs(&self) {
         crate::prefs::save(&crate::prefs::Prefs {
             volume: self.settings.volume,
@@ -135,6 +166,7 @@ impl App {
             effects: self.settings.effects,
             tells: self.settings.tells,
             lang: self.settings.lang,
+            fullscreen: self.settings.fullscreen,
             bindings: crate::input::bindings(),
         });
     }
@@ -212,7 +244,7 @@ impl App {
         // 터치로도 나갈 수 있게 닫기 단추(0198): 돌아가기 줄이 가려져 있으면 손가락만으로는 나갈 길이 없었다.
         self.close_button(ui, panel);
         let assist = self.assist_resist();
-        let values = [
+        let mut values = vec![
             format!("{}%", self.settings.volume * 10),
             format!("{}%", self.settings.music * 10),
             format!("{}%", self.settings.shake * 10),
@@ -231,10 +263,18 @@ impl App {
             } else {
                 s.off.to_string()
             },
-            String::new(),
-            String::new(),
-            String::new(),
         ];
+        if crate::DESKTOP {
+            values.push(
+                if self.settings.fullscreen {
+                    s.on
+                } else {
+                    s.off
+                }
+                .to_string(),
+            );
+        }
+        values.resize(SETTING_ROWS.len(), String::new());
         let row_h = SETTING_ROW_H;
         // 줄이 창보다 많다: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
         let n = SETTING_ROWS.len();
@@ -245,7 +285,7 @@ impl App {
         let x = panel.x + 6.0;
         let w = panel.w - 12.0;
         let mut y = panel.y + 18.0;
-        for (i, label) in trs(&SETTING_ROWS)
+        for (i, label) in trs(SETTING_ROWS)
             .into_iter()
             .enumerate()
             .skip(first)

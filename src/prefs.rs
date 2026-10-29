@@ -3,7 +3,7 @@
 //! 줄 하나로 적는다(0175. 전엔 저장하지 않아 켤 때마다 기본값이었다 — 사장: "업데이트하면 언어가 사라진다").
 //!
 //! 칸: 0 표식(MAGIC), 1 소리+1, 2 흔들림+1, 3 언어(0 = 기기 언어), 4..11 키 번호+1, 11..18 패드 번호+1,
-//! 18 음악+1(0081), 19 입자 효과+1(0141), 20 공격 예고 진하기+1(0198). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
+//! 18 음악+1(0081), 19 입자 효과+1(0141), 20 공격 예고 진하기+1(0198), 21 전체 화면+1(데스크톱, 0240). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
 //! 0은 "없음"(플러그인이 없거나 저장 전). 표식이 다르면 통째로 무시한다(형식이 바뀌면 MAGIC을 올린다).
 
 use crate::i18n::Lang;
@@ -11,7 +11,7 @@ use crate::input::Bindings;
 
 const MAGIC: u32 = 0x4E41_0001;
 /// 저장 칸 수.
-const CELLS: usize = 21;
+const CELLS: usize = 22;
 /// 공격 예고 진하기 기본값(1..=10, 0198).
 pub const TELLS_DEFAULT: u8 = 5;
 
@@ -26,6 +26,8 @@ pub struct Prefs {
     pub tells: u8,
     /// None = 기기 언어를 따른다.
     pub lang: Option<Lang>,
+    /// 전체 화면(데스크톱만 쓴다, 0240).
+    pub fullscreen: bool,
     pub bindings: Bindings,
 }
 
@@ -75,6 +77,7 @@ fn encode(p: &Prefs) -> [u32; CELLS] {
     v[18] = p.music as u32 + 1;
     v[19] = p.effects as u32 + 1;
     v[20] = p.tells as u32 + 1;
+    v[21] = p.fullscreen as u32 + 1;
     for i in 0..7 {
         v[4 + i] = p.bindings.keys[i] as u32 + 1;
         v[11 + i] = p.bindings.pads[i] as u32 + 1;
@@ -113,6 +116,8 @@ fn decode(v: &[u32; CELLS]) -> Option<Prefs> {
             (v[20] - 1).clamp(1, 10) as u8
         },
         lang: lang_from(v[3]),
+        // 칸이 없던 옛 저장(0)은 창.
+        fullscreen: v[21] == 2,
         bindings: b.sanitized(),
     })
 }
@@ -227,6 +232,7 @@ mod tests {
             effects: 5,
             tells: 3,
             lang: Some(Lang::Pl),
+            fullscreen: true,
             bindings: Bindings::DEFAULT,
         };
         store::write_to(&p, &encode(&prefs));
@@ -267,6 +273,8 @@ mod tests {
         // 예고 칸(20, 0198)은 v0.3에 없었다: 기본값으로 읽고, 다시 쓰면 그 칸만 채워진다.
         assert_eq!(p.tells, TELLS_DEFAULT);
         assert_eq!(encode(&p)[..20], v[..20]);
+        // 전체 화면 칸(21, 0240)도 없었다: 창으로.
+        assert!(!p.fullscreen);
         // 음악(0081)·입자(0141) 칸이 없던 옛 저장: 0은 기본값 7·10.
         v[18] = 0;
         v[19] = 0;
@@ -288,6 +296,7 @@ mod tests {
             effects: 4,
             tells: 9,
             lang: Some(Lang::Ja),
+            fullscreen: false,
             bindings: b,
         };
         assert_eq!(decode(&encode(&p)), Some(p));

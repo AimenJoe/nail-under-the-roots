@@ -215,6 +215,8 @@ pub static DE: Strings = Strings {
     best_count: "Nachbarn getroffen {0} / {1}",
     set_controls: "Steuerung",
     set_licenses: "Lizenzen",
+    set_fullscreen: "Vollbild",
+    title_quit: "Beenden",
     licenses_hint: "{0} blättern · {1} schließen",
     act_attack: "Angreifen",
     act_dodge: "Graben (Ausw.)",

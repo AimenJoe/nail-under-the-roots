@@ -215,6 +215,8 @@ pub static JA: Strings = Strings {
     best_count: "出会った近所 {0} / {1}",
     set_controls: "そうさ設定",
     set_licenses: "ライセンス",
+    set_fullscreen: "全画面",
+    title_quit: "ゲームを終える",
     licenses_hint: "{0} スクロール・{1}で閉じる",
     act_attack: "こうげき",
     act_dodge: "穴ほり（回避）",

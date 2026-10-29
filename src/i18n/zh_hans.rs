@@ -215,6 +215,8 @@ pub static ZH_HANS: Strings = Strings {
     best_count: "遇到的邻居 {0} / {1}",
     set_controls: "操作设置",
     set_licenses: "许可",
+    set_fullscreen: "全屏",
+    title_quit: "退出游戏",
     licenses_hint: "{0} 翻页 · {1} 关闭",
     act_attack: "攻击",
     act_dodge: "挖洞（闪避）",

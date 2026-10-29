@@ -215,6 +215,8 @@ pub static ES: Strings = Strings {
     best_count: "Vecinos encontrados {0} / {1}",
     set_controls: "Controles",
     set_licenses: "Licencias",
+    set_fullscreen: "Pantalla completa",
+    title_quit: "Salir",
     licenses_hint: "{0} desplazar · {1} cerrar",
     act_attack: "Atacar",
     act_dodge: "Cavar (esquivar)",

@@ -215,6 +215,8 @@ pub static EN: Strings = Strings {
     best_count: "Neighbors met {0} / {1}",
     set_controls: "Controls",
     set_licenses: "Licenses",
+    set_fullscreen: "Fullscreen",
+    title_quit: "Quit",
     licenses_hint: "{0} scroll · {1} close",
     act_attack: "Attack",
     act_dodge: "Burrow (dodge)",

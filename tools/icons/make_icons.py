@@ -1,4 +1,4 @@
-"""앱 아이콘 만들기(iOS 0086, Android 0087, 그림 0123). 산출물(ios/icons/*.png, android/res/mipmap-*)을 커밋하고, 이 파일이 원본이다.
+"""앱 아이콘 만들기(iOS 0086, Android 0087, 그림 0123, PC 0240). 산출물(ios/icons/*.png, android/res/mipmap-*, pc/nail.ico·nail.icns)을 커밋하고, 이 파일이 원본이다.
 
 실행: python3 tools/icons/make_icons.py
 - 그림(0123): 큰 나무와 보라 실이 얽힌 뿌리의 추상 실루엣. 64×64 격자에 코드로 찍는다(`art`).
@@ -152,10 +152,22 @@ def android(src):
         f.write(ADAPTIVE_XML)
 
 
+def pc(src):
+    """PC(0240): Windows 실행 파일 아이콘 `pc/nail.ico`(16~256), macOS 앱 아이콘 `pc/nail.icns`(16~1024).
+    CI(build-desktop.yml)가 Windows exe에 rcedit로 넣고, macOS `.app/Contents/Resources`에 둔다."""
+    out = os.path.join(ROOT, 'pc')
+    os.makedirs(out, exist_ok=True)
+    render(src, 256).save(os.path.join(out, 'nail.ico'),
+                          sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    render(src, 1024).save(os.path.join(out, 'nail.icns'))
+    print('pc nail.ico nail.icns')
+
+
 def main():
     src = art()
     ios(src)
     android(src)
+    pc(src)
 
 
 if __name__ == '__main__':

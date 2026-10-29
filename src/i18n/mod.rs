@@ -377,7 +377,7 @@ strings! {
     // 상태 탭·도감 탭
     tab_bestiary, stat_power, stat_aspd, stat_dig_cd, stat_gauge, stat_weapon, seeds, fmt_secs, fmt_pct, fmt_hp, wallet_note, best_unknown, best_unseen, best_hp, best_pow, best_spd, best_atk, best_tip, best_count,
     // 조작 설정(docs/decisions/0022)
-    set_controls, set_licenses, licenses_hint, act_attack, act_dodge, act_special, act_use_item, act_item_prev, act_item_next, act_map, ctl_key, ctl_pad, ctl_reset, ctl_wait, ctl_hint, ctl_fixed,
+    set_controls, set_licenses, set_fullscreen, title_quit, licenses_hint, act_attack, act_dodge, act_special, act_use_item, act_item_prev, act_item_next, act_map, ctl_key, ctl_pad, ctl_reset, ctl_wait, ctl_hint, ctl_fixed,
     // 튜토리얼: 라쿤 포포(docs/decisions/0023)
     popo_name, popo_hi, popo_hi2, popo_hi0, op_stop, toast_petal, toast_petal_trail, best_petal, popo_pickup, popo_combo, popo_heavy, popo_burrow, popo_emerge, popo_parry, popo_parry_skip, popo_special, popo_item, popo_item2, popo_menu, popo_save, popo_bye, tut_step, tut_heavy, tut_parry, tut_special, tut_item,
     // 스테이지 고리: 튜토리얼 보스·쉼터·길 지도·가게 (docs/decisions/0030~0032)

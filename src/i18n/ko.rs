@@ -215,6 +215,8 @@ pub static KO: Strings = Strings {
     best_count: "만난 이웃 {0} / {1}",
     set_controls: "조작 설정",
     set_licenses: "라이선스",
+    set_fullscreen: "전체 화면",
+    title_quit: "끝내기",
     licenses_hint: "{0} 넘기기 · {1} 닫기",
     act_attack: "공격",
     act_dodge: "굴파기(회피)",

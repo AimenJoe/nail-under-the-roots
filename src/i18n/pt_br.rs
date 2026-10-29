@@ -215,6 +215,8 @@ pub static PT_BR: Strings = Strings {
     best_count: "Vizinhos encontrados {0} / {1}",
     set_controls: "Controles",
     set_licenses: "Licenças",
+    set_fullscreen: "Tela cheia",
+    title_quit: "Sair",
     licenses_hint: "{0} rolar · {1} fechar",
     act_attack: "Atacar",
     act_dodge: "Cavar (esquiva)",

@@ -16,6 +16,8 @@ pub(super) enum TitleItem {
     Settings,
     #[cfg(feature = "dev")]
     Dev,
+    /// 끝내기(데스크톱만, 0240). 웹·모바일은 브라우저·OS가 닫는다.
+    Quit,
 }
 /// 앨범 칸 배치(가로 칸 수).
 /// 타이틀에 보이는 버전: Cargo.toml 버전(= 릴리스 태그 v<버전>, 0059) + CI에서 만들었으면 커밋 앞 7자.
@@ -66,6 +68,9 @@ impl App {
         v.push(TitleItem::Settings);
         #[cfg(feature = "dev")]
         v.push(TitleItem::Dev);
+        if crate::DESKTOP {
+            v.push(TitleItem::Quit);
+        }
         v
     }
 
@@ -89,6 +94,7 @@ impl App {
             TitleItem::Settings => s.title_settings.to_string(),
             #[cfg(feature = "dev")]
             TitleItem::Dev => s.title_dev.to_string(),
+            TitleItem::Quit => s.title_quit.to_string(),
         }
     }
 

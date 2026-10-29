@@ -650,6 +650,11 @@ fn layout_for(w: f32, h: f32) -> TouchOverlay {
 }
 
 impl Input {
+    /// 이번 프레임에 전체 화면 키(F11, 데스크톱, 0240)를 눌렀나. 창 일이라 `Actions`(게임 동작)에 넣지 않는다.
+    pub fn fullscreen_pressed(&self) -> bool {
+        crate::DESKTOP && is_key_pressed(KeyCode::F11)
+    }
+
     pub fn new() -> Self {
         // 터치를 마우스로 흉내 내지 않는다: 메뉴의 탭·끌기는 read_touch가 맡는다(0199).
         simulate_mouse_with_touch(false);

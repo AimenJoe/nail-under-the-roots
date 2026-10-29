@@ -215,6 +215,8 @@ pub static RU: Strings = Strings {
     best_count: "Встречено соседей {0} / {1}",
     set_controls: "Управление",
     set_licenses: "Лицензии",
+    set_fullscreen: "Полный экран",
+    title_quit: "Выход",
     licenses_hint: "{0} листать · {1} закрыть",
     act_attack: "Атака",
     act_dodge: "Подкоп (уклон)",

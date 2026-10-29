@@ -215,6 +215,8 @@ pub static ZH_HANT: Strings = Strings {
     best_count: "遇到的鄰居 {0} / {1}",
     set_controls: "操作設定",
     set_licenses: "許可",
+    set_fullscreen: "全螢幕",
+    title_quit: "離開遊戲",
     licenses_hint: "{0} 翻頁 · {1} 關閉",
     act_attack: "攻擊",
     act_dodge: "挖洞（閃避）",

@@ -462,7 +462,11 @@ impl App {
                 .unwrap_or(crate::prefs::TELLS_DEFAULT),
             debug_overlay: false,
             lang: saved.and_then(|p| p.lang),
+            fullscreen: crate::DESKTOP && saved.is_some_and(|p| p.fullscreen),
         };
+        if settings.fullscreen {
+            macroquad::window::set_fullscreen(true);
+        }
         if let Some(p) = saved {
             crate::input::set_bindings(p.bindings);
         }
@@ -629,6 +633,9 @@ impl App {
     pub fn frame(&mut self) {
         self.input.set_menu_mode(self.scene != Scene::Game);
         self.input.poll();
+        if self.input.fullscreen_pressed() {
+            self.toggle_fullscreen();
+        }
         let dt = get_frame_time().min(t::MAX_FRAME_DT);
         let target = if self.scene == Scene::Cutscene {
             1.0
@@ -1249,6 +1256,8 @@ impl App {
                         self.dev_cursor = 0;
                         self.scene = Scene::Dev;
                     }
+                    // 기록·설정은 바뀔 때마다 이미 저장했다(0240).
+                    Some(TitleItem::Quit) => macroquad::miniquad::window::order_quit(),
                     None => {}
                 }
             }

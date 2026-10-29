@@ -1,0 +1,190 @@
+name: build-desktop
+# PC 빌드(0240): Windows(x64 zip) · macOS(인텔+애플 실리콘 겸용 .app zip) · Linux(x64 tar.gz).
+# - release/** push: 개발판(기본 기능)을 Actions 아티팩트로.
+# - release.yml이 부를 때(release_tag): 운영판(--no-default-features)을 만들어 그 태그의 GitHub Release에 붙인다.
+# - 손으로: Actions → build-desktop → Run workflow(브랜치 고르기, 0169 R8와 같은 방식).
+# main push마다는 돌리지 않는다: macOS 러너는 분당 비용이 리눅스의 약 10배라(레포를 비공개로 바꾸면 유료, 0237) 릴리스·개발판에서만.
+# 묶음 안: 실행 파일 + assets(웹 전용 mp3·vendor/.git 뺌) + 제3자 고지. 게임은 실행 파일 옆(또는 .app/Contents/Resources)의
+# assets를 찾는다(src/main.rs `assets_dir`). 서명: macOS는 임시(ad-hoc) 서명만, Windows는 서명 없음 — docs/decisions/0240.
+on:
+  push:
+    branches: ['release/**']
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'third_party/**'
+      - 'pc/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/build-desktop.yml'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        required: true
+
+concurrency:
+  group: desktop-${{ inputs.release_tag || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+          - os: macos-latest
+            name: macos
+          # glibc를 낮게: 오래된 배포판·Steam Deck(SteamOS)에서도 뜨게 22.04에서 빌드한다.
+          - os: ubuntu-22.04
+            name: linux
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write   # release_tag일 때 Release에 붙이기
+    env:
+      ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      # 유료 에셋 팩(레포 밖, 0010). 시크릿이 없으면 건너뛰고 직접 그린 대체 그림으로 빌드한다.
+      # persist-credentials: false — 묶음에 assets/vendor/.git이 실려도 토큰이 남지 않게(0235 R23).
+      - name: Fetch vendor assets (private repo)
+        if: env.ASSETS_REPO != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.ASSETS_REPO }}
+          token: ${{ secrets.ASSETS_TOKEN }}
+          path: assets/vendor
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.name == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.name }}
+
+      - name: Linux build deps
+        if: matrix.name == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
+
+      - name: Flavor
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then
+            echo "FEATURES=--no-default-features" >> "$GITHUB_ENV"; echo "FLAVOR=release" >> "$GITHUB_ENV"
+          else
+            echo "FEATURES=" >> "$GITHUB_ENV"; echo "FLAVOR=dev" >> "$GITHUB_ENV"
+          fi
+          echo "VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)" >> "$GITHUB_ENV"
+
+      # 묶음에 넣을 assets: 네이티브는 ogg만 푼다(mp3는 웹 전용, 0235 R20). vendor의 .git은 뺀다.
+      - name: Stage assets
+        run: |
+          mkdir -p stage
+          cp -R assets stage/assets
+          rm -f stage/assets/music/*.mp3
+          rm -rf stage/assets/vendor/.git
+          cp assets/THIRD_PARTY_LICENSES.txt stage/
+          du -sh stage/assets
+
+      - name: Build (Windows)
+        if: matrix.name == 'windows'
+        run: cargo build --release $FEATURES
+      - name: Build (Linux)
+        if: matrix.name == 'linux'
+        run: cargo build --release $FEATURES
+      - name: Build (macOS, universal)
+        if: matrix.name == 'macos'
+        run: |
+          cargo build --release $FEATURES --target aarch64-apple-darwin
+          cargo build --release $FEATURES --target x86_64-apple-darwin
+          lipo -create -output target/release-nail-universal \
+            target/aarch64-apple-darwin/release/nail target/x86_64-apple-darwin/release/nail
+          lipo -info target/release-nail-universal
+
+      - name: Package (Windows)
+        if: matrix.name == 'windows'
+        run: |
+          # 실행 파일 아이콘(pc/nail.ico, tools/icons/make_icons.py)을 rcedit로 넣는다(빌드 의존성 없이).
+          curl -sSL -o rcedit.exe https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
+          ./rcedit.exe target/release/nail.exe --set-icon pc/nail.ico \
+            --set-version-string ProductName "Nail: Under the Roots" \
+            --set-version-string FileDescription "Nail: Under the Roots" \
+            --set-file-version "$VERSION" --set-product-version "$VERSION"
+          D="Nail-Under-the-Roots"
+          mkdir -p "$D"
+          cp target/release/nail.exe "$D/Nail.exe"
+          cp -R stage/assets stage/THIRD_PARTY_LICENSES.txt "$D/"
+          7z a -tzip "nail-windows-$FLAVOR.zip" "$D" > /dev/null
+          ls -la "nail-windows-$FLAVOR.zip"
+          echo "PKG=nail-windows-$FLAVOR.zip" >> "$GITHUB_ENV"
+
+      - name: Package (macOS)
+        if: matrix.name == 'macos'
+        run: |
+          APP="Nail.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp target/release-nail-universal "$APP/Contents/MacOS/nail"
+          cp -R stage/assets "$APP/Contents/Resources/assets"
+          cp stage/THIRD_PARTY_LICENSES.txt "$APP/Contents/Resources/"
+          cp pc/nail.icns "$APP/Contents/Resources/nail.icns"
+          cat > "$APP/Contents/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>Naïl</string>
+            <key>CFBundleDisplayName</key><string>Naïl: Under the Roots</string>
+            <key>CFBundleIdentifier</key><string>io.github.aimenjoe.nail</string>
+            <key>CFBundleExecutable</key><string>nail</string>
+            <key>CFBundleIconFile</key><string>nail.icns</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+            <key>CFBundleVersion</key><string>${VERSION}</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>LSApplicationCategoryType</key><string>public.app-category.role-playing-games</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          EOF
+          plutil -lint "$APP/Contents/Info.plist"
+          # 임시(ad-hoc) 서명: lipo로 합치면 arm64의 링커 서명이 깨져 애플 실리콘에서 켜지지 않는다.
+          # 개발자 ID 서명·공증은 Apple Developer 가입 뒤(0240). 그 전에는 처음 열 때 "개인정보 보호 및 보안 → 그래도 열기".
+          codesign --force --deep -s - "$APP"
+          codesign --verify --verbose "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "nail-macos-$FLAVOR.zip"
+          ls -la "nail-macos-$FLAVOR.zip"
+          echo "PKG=nail-macos-$FLAVOR.zip" >> "$GITHUB_ENV"
+
+      - name: Package (Linux)
+        if: matrix.name == 'linux'
+        run: |
+          D="Nail-Under-the-Roots"
+          mkdir -p "$D"
+          cp target/release/nail "$D/nail"
+          cp -R stage/assets stage/THIRD_PARTY_LICENSES.txt "$D/"
+          tar czf "nail-linux-$FLAVOR.tar.gz" "$D"
+          ls -la "nail-linux-$FLAVOR.tar.gz"
+          ldd "$D/nail" | head -20
+          echo "PKG=nail-linux-$FLAVOR.tar.gz" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nail-${{ matrix.name }}-${{ env.FLAVOR }}-${{ github.sha }}
+          path: ${{ env.PKG }}
+          retention-days: 7
+
+      - name: Attach to Release
+        if: inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: ${{ env.PKG }}

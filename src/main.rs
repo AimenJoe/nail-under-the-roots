@@ -5,6 +5,11 @@
 //! `app`(장면·메뉴) · `ui`(패널 그리기) · `i18n`(언어별 글) · `cutscene`(JRPG식 컷씬) · `loot`(반딧불·산딸기) · `scenario`(개발용 시작 구성) · `sfx` · `tuning`(수치).
 //! 범위와 판정 기준: docs/phase-1-combat-prototype.md
 #![allow(clippy::new_without_default)]
+// Windows 운영판: 콘솔 창을 띄우지 않는다(0240). 디버그 빌드는 eprintln!을 보게 그대로.
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
 
 mod adventure;
 mod app;
@@ -59,6 +64,31 @@ mod world;
 
 use macroquad::prelude::*;
 
+/// 데스크톱(Windows·macOS·Linux) 빌드인가(0240): 끝내기·전체 화면처럼 PC에만 있는 것을 가른다.
+pub const DESKTOP: bool = cfg!(not(any(
+    target_arch = "wasm32",
+    target_os = "android",
+    target_os = "ios"
+)));
+
+/// 에셋 폴더(0240). macroquad는 데스크톱에서 "지금 폴더 기준"으로 읽어, 바로가기·Finder로 켜면 그림·소리를 못 찾았다.
+/// 실행 파일 옆 `assets`(Windows·Linux 묶음), `.app/Contents/Resources/assets`(macOS), 그다음 지금 폴더(`cargo run`) 순.
+fn assets_dir() -> String {
+    if DESKTOP {
+        if let Some(dir) = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        {
+            for c in [dir.join("assets"), dir.join("../Resources/assets")] {
+                if c.join("fonts").is_dir() {
+                    return c.to_string_lossy().into_owned();
+                }
+            }
+        }
+    }
+    "assets".to_owned()
+}
+
 fn window_conf() -> Conf {
     Conf {
         window_title: "Naïl: Under the Roots".to_owned(),
@@ -88,8 +118,8 @@ async fn load_font(path: &str) -> Option<Font> {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    // 데스크톱·웹은 "assets/…", Android는 APK assets 루트. (macroquad set_pc_assets_folder)
-    set_pc_assets_folder("assets");
+    // 웹은 "assets/…", Android는 APK assets 루트, 데스크톱은 실행 파일 기준(`assets_dir`). (macroquad set_pc_assets_folder)
+    set_pc_assets_folder(&assets_dir());
     // 기기 언어로 시작한다. 설정에서 바꿀 수 있다(아직 저장하지 않음, docs/decisions/0013).
     i18n::set_lang(i18n::detect());
     // 시작할 때 읽는 파일(폰트·그림·소리)을 한꺼번에 받고(웹 로딩 막대가 파일마다 찬다), 받아 둔 바이트로 만든다(0092).

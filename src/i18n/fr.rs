@@ -215,6 +215,8 @@ pub static FR: Strings = Strings {
     best_count: "Voisins rencontrés {0} / {1}",
     set_controls: "Commandes",
     set_licenses: "Licences",
+    set_fullscreen: "Plein écran",
+    title_quit: "Quitter",
     licenses_hint: "{0} défiler · {1} fermer",
     act_attack: "Attaquer",
     act_dodge: "Creuser (esquive)",
