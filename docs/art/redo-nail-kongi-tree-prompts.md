@@ -43,15 +43,65 @@ a scratch on the shell / youthful and bouncy. Shell colors in warm sand or olive
 In one corner of each cell also draw the SAME design curled into a ball (bands visible), half size.
 ```
 
-## 2단계 — 도트 시트(고른 안을 붙여서, Naïl 예)
+## 2단계 — 도트 시트(사장 고름 2026-10-29: Naïl 1번, 콩이 3번)
+붙이는 것: **고른 안**(`ref/ref_nail_pick.png`·`ref/ref_kongi_pick.png`, `redo_concepts.py`가 1단계 원본에서 잘라 냄) +
+**그림체 판**(`ref/ref_redo_style.png`). 대화마다 새로. 받은 시트는 `sprites/nail_v3_a.png`·`nail_v3_b.png`·`kongi_v2.png`.
+게임 크기: Naïl 키 약 22px(지금 18 → 모모 23·도토 25와 나란히), 콩이 키 약 20px·공 지름 약 16px. 줄이는 건 우리가 한다 —
+시트는 크게, 칸마다 같은 크기·같은 점 크기로만 받으면 된다.
+
+### Naïl 시트 A — 서기·맞음·쓰러짐·걷기(붙임: ref_nail_pick + ref_redo_style)
 ```
-Turn the attached design (the one I chose) into a pixel art sprite sheet in EXACTLY the style of the other attached
-sprites. Keep the design's proportions and colors. Solid magenta background (#FF00FF), no text, no grid lines.
-Row 1: idle (2 frames, slight breathing). Row 2: walk cycle (4 frames, paws swinging).
-Same size and same pixel block size in every frame, feet on the same line, facing right.
+Turn the first attached character design (a baby mole hero with an orange scarf and big spade paws held out to the
+sides) into a pixel art sprite sheet, in EXACTLY the pixel style of the second attached image (chunky pixels, dark plum
+1px outline, soft 3-4 tone shading, light from the top-left). The second image is only a style reference: do not draw
+those animals. Keep the mole's design exactly: dark brown velvety fur, lighter brown belly, short snout with a big round
+pink nose, small shiny eye, orange scarf tied at the neck with the knot at the back, big pink spade paws with pale cream
+claws held out wide to the sides, small pink feet, tiny tail.
+
+2 rows x 4 frames, evenly spaced on a solid magenta background (#FF00FF), no text, no grid lines, no shadows, no ground,
+no effects. Every frame the same character size and the same pixel block size, facing right in a 3/4 top-down view,
+feet on the same baseline in each row.
+Row 1: (1) idle, paws out to the sides; (2) idle breathing, body 1 pixel lower and paws slightly lower;
+       (3) hurt: flinching backward, eyes squeezed shut, paws up; (4) knocked down: lying on his back, paws limp.
+Row 2: walk cycle, 4 frames: short stubby legs stepping, the spade paws swinging forward and back in opposition,
+       body bobbing 1 pixel.
 ```
-그다음 시트 B(치기 3·들기·맞음·쓰러짐·거두기)는 0206과 같다 — 시트 A를 붙여서. 콩이는 서기·걷기·말기·구르기·맞음·
-뒤집힘(0054의 칸 목록, `kongi_ai.py`의 `Spec`).
+
+### Naïl 시트 B — 치기 셋·모으기·거두기·파고들기(A를 받은 뒤. 붙임: 받은 시트 A + ref_redo_style)
+```
+Using the attached sprite sheet of the baby mole (same character, same size, same pixel block size, same colors and
+outline), draw his attack frames in the same pixel style. 3 rows x 3 frames, evenly spaced on a solid magenta background
+(#FF00FF), no text, no grid lines, no shadows, no ground, no motion lines, no slash effects, facing right, feet on the
+same baseline.
+Row 1: (1) wind-up 1: right paw pulled back; (2) strike 1: right paw swiped forward, claws leading;
+       (3) wind-up 2: left paw pulled back across the body.
+Row 2: (1) strike 2: left paw swiped forward; (2) heavy wind-up: crouched low, both paws raised high above the head;
+       (3) heavy strike: both paws slammed down in front, body leaning forward.
+Row 3: (1) settle: paws coming back down to the sides; (2) diving into the ground: head and front paws pointing down,
+       body tilted forward as if starting to dig; (3) bursting up: jumping straight up, paws raised, body stretched.
+```
+
+### 콩이 시트 — 서기·맞음·쓰러짐·걷기·공(붙임: ref_kongi_pick + ref_redo_style)
+```
+Turn the first attached character design (a three-banded armadillo with a sand-colored domed shell, big pink-lined
+ears, a pointy face with a pink snout, short sturdy legs and a tail shield; the ball next to it is the same armadillo
+curled up) into a pixel art sprite sheet, in EXACTLY the pixel style of the second attached image (chunky pixels, dark
+plum 1px outline, soft 3-4 tone shading, light from the top-left). The second image is only a style reference: do not
+draw those animals. Keep the armadillo's design exactly: three clear shell bands across the middle, a separate head
+shield and tail shield, big ears, pale belly, proud stubborn expression.
+
+3 rows x 4 frames, evenly spaced on a solid magenta background (#FF00FF), no text, no grid lines, no shadows, no ground,
+no effects. Every frame the same character size and the same pixel block size, facing right in a 3/4 top-down view,
+feet on the same baseline in each row.
+Row 1: (1) idle, standing proud with chin up; (2) idle breathing, shell 1 pixel lower;
+       (3) hurt: flinching back, eyes shut; (4) knocked over: lying on his back, legs in the air, shell on the ground.
+Row 2: walk cycle, 4 frames: short legs stepping, body and shell bobbing 1 pixel.
+Row 3: (1) curled into a tight ball, bands visible; (2) the same ball rolled a quarter turn (bands rotated);
+       (3) half curled: head tucked, tail shield coming around; (4) uncurling: peeking out of the ball.
+The ball is about two thirds of the standing height.
+```
+받은 뒤 우리 쪽: `nail_ai.py`(Spec 원본 둘·`body_h` 20 · 칸 24 → 28)와 `kongi_ai.py`(원본·칸 상자, 걷기 넷은 시트 안에서),
+`check_rebuild.py`, 게임 크기 그림 확인.
 
 ## 큰 나무 — 두 장(시든 나무 + 다 핀 나무)
 다섯 단계를 한 장에 청하면 줄기·뿌리가 단계마다 달라진다(같은 그림을 다섯 번 그리게 하는 것은 잘 안 된다).

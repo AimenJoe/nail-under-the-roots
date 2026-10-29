@@ -200,3 +200,38 @@ def tree_test(path, heights, out_name):
 
 if __name__ == "__main__":
     tree_test(SPRITES / "tree_v1.png", [90, 110], "redo_tree_test.png")
+
+
+def export_pick(path, index, keep, out_name, with_ball=False):
+    """고른 안 하나를 마젠타 바탕 그림으로(2단계 프롬프트에 붙인다). 콩이는 같은 칸의 공도 오른쪽 아래에."""
+    rgb, comps = figures(path, keep)
+    if keep == 10:
+        stand = sorted(sorted(comps, key=lambda c: -c[0])[:5], key=lambda c: c[1][0])
+        balls = sorted(sorted(comps, key=lambda c: -c[0])[5:], key=lambda c: c[1][0])
+    else:
+        stand, balls = comps, []
+    parts = [stand[index]] + ([balls[index]] if with_ball else [])
+    h, w = rgb.shape[:2]
+    x0 = max(0, min(b[0] for _, b, _ in parts) - 16)
+    y0 = max(0, min(b[1] for _, b, _ in parts) - 16)
+    x1 = min(w, max(b[2] for _, b, _ in parts) + 16)
+    y1 = min(h, max(b[3] for _, b, _ in parts) + 16)
+    mask = np.zeros(rgb.shape[:2], bool)
+    for _, _, m in parts:
+        mask |= m
+    pad = 16
+    out = np.zeros((y1 - y0 + 2 * pad, x1 - x0 + 2 * pad, 3), np.uint8)
+    out[...] = (255, 0, 255)
+    sub = mask[y0:y1, x0:x1]
+    region = out[pad:pad + y1 - y0, pad:pad + x1 - x0]
+    region[sub] = rgb[y0:y1, x0:x1][sub]
+    im = Image.fromarray(out)
+    im = im.resize((im.width * 2, im.height * 2), Image.NEAREST)
+    im.save(OUT / out_name)
+    print(OUT / out_name)
+
+
+if __name__ == "__main__":
+    # 사장이 고른 안(2026-10-29): Naïl 1(주황 목도리·삽 손 벌림), 콩이 3(모래색·큰 귀·꼬리).
+    export_pick(SPRITES / "nail_redo_concepts_v1.png", 0, 5, "ref_nail_pick.png")
+    export_pick(SPRITES / "kongi_redo_concepts_v1.png", 2, 10, "ref_kongi_pick.png", with_ball=True)
