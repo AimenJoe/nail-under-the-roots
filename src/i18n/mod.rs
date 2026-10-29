@@ -350,12 +350,12 @@ strings! {
     tab_menu, tab_status, tab_talents, tab_bag, tab_journal, tab_map, tab_hint,
     pm_resume, pm_restart, pm_settings, pm_title,
     // 상태
-    hp, this_run, run_stats, combo_stats, bare_hands, bare_hands_desc,
-    burrow, burrow_stats, special, glowbugs,
+    hp, bare_hands,
+    burrow, special, glowbugs,
     // 가방
     bag_combo, equipped, equip_hint, empty_slot, empty_slot_desc, slots,
     // 지도
-    map_floor, map_proto, map_note,
+    map_floor, map_note,
     // 저널
     // 환경
     biome_meadow, biome_roots, biome_deep, biome_silk, depth_m, depth_short,
@@ -365,11 +365,11 @@ strings! {
     // 튜토리얼
     tut_move, tut_pickup, tut_attack, tut_burrow, tut_emerge, tut_outro,
     // 컷씬
-    cut_skip, op_1, op_2, op_3, op_4, op_5,
+    cut_skip, op_1, op_2, op_3, op_4,
     // 사망
     dead, dead_hint, dead_final, dead_final_hint,
     // 장신구·가방·필살기(docs/decisions/0017, 0018)
-    c_shell, c_shell_desc, c_whisker, c_whisker_desc, c_soil, c_soil_desc, c_flint, c_flint_desc, c_amulet, c_amulet_desc, it_berry, it_berry_desc, it_worm, it_worm_desc, toast_heart, toast_revive, quick_hint, special_name, special_desc, charms_label, charms_none, stat_attack, charm_equip, charm_unequip, bag_items, charm_slots,
+    c_shell, c_shell_desc, c_whisker, c_whisker_desc, c_soil, c_soil_desc, c_flint, c_flint_desc, c_amulet, c_amulet_desc, it_berry, it_berry_desc, it_worm, it_worm_desc, toast_heart, toast_revive, quick_hint, special_name, special_desc, charms_label, charms_none, charm_equip, charm_unequip, bag_items, charm_slots,
     // 모험(docs/decisions/0019)
     toast_save, toast_respawn, toast_fall, toast_fall_root, toast_fall_last, toast_run_lost, toast_boss, gift_charm, gift_elsewhere, map_field, map_dungeon, map_legend, toast_parry,
     // 적 종류·도감·게이지(docs/decisions/0021)
@@ -401,7 +401,7 @@ strings! {
     // 모모(docs/decisions/0046)
     mob_momo, mob_momo_lore, mob_momo_atk, mob_momo_tip, momo_meet_1, momo_meet_1b, momo_meet_2, momo_meet_2b, momo_meet_3, momo_meet_3b, momo_flee_1, momo_flee_2, momo_flee_wait, momo_petal, momo_r6, momo_r7, seat_p1, seat_p2, seat_p3, momo_v1, momo_v2, momo_v3, bori_momo, popo_momo, momo_v4, bori_clover, halmae_clover,
     // 큰 나무의 재주(docs/decisions/0047)
-    tal_burrow, tal_burrow_a, tal_burrow_a_desc, tal_burrow_b, tal_burrow_b_desc, tal_parry, tal_parry_a, tal_parry_a_desc, tal_parry_b, tal_parry_b_desc, tal_drill, tal_drill_a, tal_drill_a_desc, tal_drill_b, tal_drill_b_desc, tal_eat, tal_eat_a, tal_eat_a_desc, tal_eat_b, tal_eat_b_desc, tal_hop, tal_hop_a, tal_hop_a_desc, tal_hop_b, tal_hop_b_desc, tal_chain, tal_chain_a, tal_chain_a_desc, tal_chain_b, tal_chain_b_desc, c_clover, c_clover_desc, c_cotton, c_cotton_desc, c_crown, c_crown_desc, c_knot, c_knot_desc, tree_title, tree_light, tree_cost, tree_poor, tree_awake, tree_equip, tree_unequip, tree_on, tree_off, tree_hint, ia_tree, toast_camp_bank, tree_intro,
+    tal_burrow, tal_burrow_a, tal_burrow_a_desc, tal_burrow_b, tal_burrow_b_desc, tal_parry, tal_parry_a, tal_parry_a_desc, tal_parry_b, tal_parry_b_desc, tal_drill, tal_drill_a, tal_drill_a_desc, tal_drill_b, tal_drill_b_desc, tal_eat, tal_eat_a, tal_eat_a_desc, tal_eat_b, tal_eat_b_desc, tal_hop, tal_hop_a, tal_hop_a_desc, tal_hop_b, tal_hop_b_desc, tal_chain, tal_chain_a, tal_chain_a_desc, tal_chain_b, tal_chain_b_desc, c_clover, c_clover_desc, c_cotton, c_cotton_desc, c_crown, c_crown_desc, c_knot, c_knot_desc, tree_title, tree_light, tree_awake, tree_equip, tree_unequip, tree_on, tree_off, tree_hint, ia_tree, toast_camp_bank, tree_intro,
     // 저널(docs/decisions/0048)
     cat_story, cat_fight, cat_explore, cat_neighbors, cat_village, j_reward, j_claim, j_progress, j_toast, r_light, r_decor, r_charm, fur_0, fur_1, fur_2, fur_3, puddle_none, ia_puddle, decor_7, decor_8, decor_9, c_bell, c_bell_desc, c_thread, c_thread_desc, c_petal, c_petal_desc, jg_tutorial, jg_tutorial_d, jg_bori, jg_bori_d, jg_camp, jg_camp_d, jg_deeper, jg_deeper_d, jg_deepest, jg_deepest_d, jg_momo1, jg_momo1_d, jg_momo3, jg_momo3_d, jg_kills, jg_kills_d, jg_kills2, jg_kills2_d, jg_ambush, jg_ambush_d, jg_ambush2, jg_ambush2_d, jg_parry, jg_parry_d, jg_parry2, jg_parry2_d, jg_drill, jg_drill_d, jg_slam, jg_slam_d, jg_finisher, jg_finisher_d, jg_chest, jg_chest_d, jg_chest2, jg_chest2_d, jg_spring, jg_spring_d, jg_berry, jg_berry_d, jg_runs, jg_runs_d, jg_falls, jg_falls_d, jg_daily, jg_daily_d, jg_mobs, jg_mobs_d, jg_mobs2, jg_mobs2_d, jg_light, jg_light_d, jg_talent, jg_talent_d, jg_talent2, jg_talent2_d, jg_decor, jg_decor_d, jg_decor2, jg_decor2_d, jg_knot, jg_knot_d, jg_mobs3, jg_mobs3_d, jg_heavy, jg_heavy_d, jg_heavy2, jg_heavy2_d, j_done, j_waiting,
     // 저널 보상이 어디 있나(docs/decisions/0050)
@@ -429,7 +429,7 @@ strings! {
     // 안내 화면(docs/decisions/0178)
     pm_help, h_move, h_move_d, h_combo, h_combo_d, h_heavy, h_heavy_d, h_burrow, h_burrow_d, h_parry, h_parry_d, h_special, h_special_d, h_eat, h_eat_d, h_enemy, h_enemy_d, h_loot, h_loot_d, h_camp, h_camp_d, h_gear, h_gear_d, h_break, h_break_d, h_village, h_village_d,
     // 플레이어블 도토(0195)
-    pick_doto, stat_leap_cd, toast_shell_doto, toast_thorn_doto, toast_web_doto, gauge_acorn, w_acorn, w_acorn_desc, w_briar, w_briar_desc, w_pebble, w_pebble_desc, w_petal, w_petal_desc, w_pine, w_pine_desc, w_walnut, w_walnut_desc, w_chestnut, w_chestnut_desc, gift_weapon, r_weapon, jg_momo2, jg_momo2_d, jg_doto2, jg_doto2_d, kongi_pebble, susu_walnut, tal_leap, tal_leap_a, tal_leap_a_desc, tal_leap_b, tal_leap_b_desc, tal_bury, tal_bury_a, tal_bury_a_desc, tal_bury_b, tal_bury_b_desc, tb_root, tb_branch, tb_leaf, tree_locked, bn_hp, bn_hp_d, bn_berry, bn_berry_d, bn_stun, bn_stun_d, bn_lives, bn_lives_d, bn_knock, bn_knock_d, bn_haste, bn_haste_d, bn_beat, bn_beat_d, bn_charge, bn_charge_d, bn_ki, bn_ki_d, bn_edge, bn_edge_d, bn_speed, bn_speed_d, bn_dodge, bn_dodge_d, bn_bargain, bn_bargain_d, bn_charm, bn_charm_d,
+    pick_doto, stat_leap_cd, toast_shell_doto, toast_thorn_doto, toast_web_doto, gauge_acorn, w_acorn, w_acorn_desc, w_briar, w_briar_desc, w_pebble, w_pebble_desc, w_petal, w_petal_desc, w_pine, w_pine_desc, w_walnut, w_walnut_desc, w_chestnut, w_chestnut_desc, gift_weapon, r_weapon, jg_momo2, jg_momo2_d, jg_doto2, jg_doto2_d, kongi_pebble, susu_walnut, tal_leap, tal_leap_a, tal_leap_a_desc, tal_leap_b, tal_leap_b_desc, tal_bury, tal_bury_a, tal_bury_a_desc, tal_bury_b, tal_bury_b_desc, tb_root, tb_branch, tb_leaf, bn_hp, bn_hp_d, bn_berry, bn_berry_d, bn_stun, bn_stun_d, bn_lives, bn_lives_d, bn_knock, bn_knock_d, bn_haste, bn_haste_d, bn_beat, bn_beat_d, bn_charge, bn_charge_d, bn_ki, bn_ki_d, bn_edge, bn_edge_d, bn_speed, bn_speed_d, bn_dodge, bn_dodge_d, bn_bargain, bn_bargain_d, bn_charm, bn_charm_d,
     c_pinecone, c_pinecone_desc, c_acorn_cap, c_acorn_cap_desc, c_maple, c_maple_desc, c_glove, c_glove_desc, c_wormmap, c_wormmap_desc, c_incisor, c_incisor_desc, c_dandelion, c_dandelion_desc, c_dew, c_dew_desc, c_clover_ring, c_clover_ring_desc, c_cheek, c_cheek_desc, c_comb, c_comb_desc, c_resin, c_resin_desc, jg_doto_deep, jg_doto_deep_d,
     set_tells,
     h_doto, h_doto_d, h_run, h_run_d,
@@ -473,6 +473,44 @@ mod tests {
 
     /// 폰트는 서브셋이라(CLAUDE.md) 표의 글자가 그 언어 폰트에 없으면 빈칸으로 나온다. TTF cmap을 직접 읽어 확인한다.
     /// 일본어·중국어 표를 고쳐서 여기서 깨지면 tools/fonts/build_cjk.py를 다시 돌린다.
+    /// 표의 글은 모두 어딘가에서 쓴다(0248): 화면을 고치며 안 쓰게 된 키가 열한 언어 표에 남아 번역·글꼴 일만 늘린다.
+    /// 키 이름이 `src/`(i18n 밖)의 어느 파일에 낱말로 나오면 쓰는 것으로 친다(`goal!` 같은 매크로 인자도).
+    #[test]
+    fn every_key_is_used_somewhere() {
+        fn walk(dir: &std::path::Path, out: &mut String) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    if !p.ends_with("i18n") {
+                        walk(&p, out);
+                    }
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push_str(&std::fs::read_to_string(&p).unwrap());
+                }
+            }
+        }
+        let mut code = String::new();
+        walk(std::path::Path::new("src"), &mut code);
+        let is_word = |c: char| c.is_ascii_alphanumeric() || c == '_';
+        let used = |key: &str| {
+            code.match_indices(key).any(|(i, _)| {
+                let before = code[..i].chars().next_back().is_none_or(|c| !is_word(c));
+                let after = code[i + key.len()..]
+                    .chars()
+                    .next()
+                    .is_none_or(|c| !is_word(c));
+                before && after
+            })
+        };
+        let unused: Vec<&str> = KO
+            .all()
+            .into_iter()
+            .map(|(k, _)| k)
+            .filter(|k| !used(k))
+            .collect();
+        assert!(unused.is_empty(), "아무 데서도 안 쓰는 글: {unused:?}");
+    }
+
     #[test]
     fn every_glyph_is_in_the_font() {
         for &l in Lang::ALL {
