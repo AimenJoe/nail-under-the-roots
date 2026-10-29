@@ -46,7 +46,9 @@ function keysAt(n) {
   } else if (plan === 'auto') {
     // 손은 놓고 자동 조종(`--features clip`의 autopilot, 0228)이 친다.
     // SKIP=<초>면 그동안 0.4초마다 Enter(보스 만남 말풍선 넘기기) — 그 칸은 잘라 낸다.
-    if (t < +(process.env.SKIP || 0) && (n % 12) < 2) s.add('Enter');
+    // ESC=1이면 첫 칸들에서 Escape 한 번(보스 만남 컷씬 건너뛰기).
+    if (process.env.ESC && n >= 3 && n < 5) s.add('Escape');
+    else if (t < +(process.env.SKIP || 0) && (n % 12) < 2) s.add('Enter');
   } else if (plan === 'walk') {
     const c = Math.floor(t / 2.0), u = t % 2.0;
     if (u < 1.6) s.add(['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'][c % 4]);
