@@ -166,8 +166,8 @@ pub const HUB_GATE: u32 = 5;
 
 /// 큰 나무 칸(tree.png, 0238): 잎 단계 0~4 다섯 칸 한 줄. 밑동(줄기 아래 가운데)이 칸의 (W/2, `TREE_BASE`).
 pub const TREE_W: f32 = 128.0;
-pub const TREE_H: f32 = 104.0;
-pub const TREE_BASE: f32 = 86.0;
+pub const TREE_H: f32 = 112.0;
+pub const TREE_BASE: f32 = 96.0;
 
 /// 큰 나무 잎 단계 `growth`(0~4)를 밑동 `base`에 그린다.
 pub fn draw_tree(tex: &Texture2D, growth: u8, base: Vec2) {

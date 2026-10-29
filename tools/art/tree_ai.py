@@ -28,7 +28,7 @@ HALF = 512          # 왼쪽 시든 나무 | 오른쪽 다 핀 나무
 CUT = 452           # 이 줄 아래(벼랑 앞면)는 버린다
 BASE_SRC = 418      # 원본에서 밑동(구멍 아래) 줄
 HEIGHT = 100        # 줄인 나무 키(잎 꼭대기 ~ 자른 줄)
-W, H = 128, 104
+W, H = 128, 112
 CLUMPS = 12
 STAGE_CLUMPS = [0, 3, 7, 10, 12]
 NCOL = 32           # 나무는 갈색·초록·분홍·보라·빛 — 20색으로는 잎의 밝은 단이 빠졌다
@@ -203,7 +203,7 @@ def _build(img, dead, live, dk, cm, clump, clean, stages, top):
     return sheet
 
 
-BASE = 86           # 칸 위에서 밑동 줄
+BASE = 96           # 칸 위에서 밑동 줄(잎 꼭대기가 칸 위 끝에 닿지 않게 — 86이면 다 핀 나무가 6px 잘렸다)
 
 
 def threads_back(sp, a, k, x0, x1):
