@@ -124,3 +124,25 @@ Solid magenta background (#FF00FF) around and between the two trees, no ground t
 ```
 우리 쪽 일: `hub_ai.py`에 나무 칸(폭 약 110·키 약 90 게임 px — 마을 지도에서 나무 위 여백이 60px라 지도 `village.rs`의
 Y 자리를 한두 줄 내릴 수 있다), 잎 덩어리 자르기(마젠타·외곽선으로 덩어리 나누기), 자람 단계 합성, 반딧불·흔들림은 코드.
+
+## 파 내려가기 — 땅 단면 전환의 큰 Naïl(0156 → 0238 덧붙임)
+붙임: **새 Naïl 시트 A**(`sprites/nail_v3_a.png`, 몸·색) + **자세 참고**(`ref/ref_dig_pose.png`, `tools/art/dig_ref.py`가 지금
+`dig.png`의 Naïl 줄을 아래 배치대로 8배로 — 옛 몸이라 자세·카메라만). 받은 것은 `sprites/nail_dig_v1.png`.
+게임은 32×32 칸 16개를 쓴다: 긁기 6 · 보기 · 윙크 · 돌기 8. 돌기 넷은 우리가 둘씩 늘려 8칸으로, 털빛 셋은 색 바꾸기.
+```
+Draw the same baby mole as the first attached sprite sheet (dark brown fur, lighter belly, orange scarf with the knot
+at the back, big pink spade paws with pale cream claws, big round pink nose, small pink feet, tiny tail), in exactly
+the same pixel style, colors and pixel block size, digging straight DOWN into the earth.
+Camera: we look down at his back from above and behind. His head points DOWN toward the bottom of each frame, his back
+and rump face us, the tiny tail and the pink soles of his feet are at the top of the frame. The second attached image
+shows the POSES and the camera only (it is an older drawing of him): copy those poses, not that drawing.
+
+3 rows x 4 frames, evenly spaced on a solid magenta background (#FF00FF), no text, no grid lines, no soil, no dirt
+particles, no shadows, no effects. Same character size and same pixel block size in every frame, body centered.
+Row 1: dig cycle, 4 frames: the two spade paws scoop alternately beside his head and throw earth back past the
+       shoulders (left paw reaching forward / both paws at the shoulders / right paw reaching forward / both at the shoulders).
+Row 2: (1) he pauses and turns his head to look back up at us over his shoulder, face upside down, happy;
+       (2) the same, winking; (3) both paws reaching far down past his head; (4) both paws pulled back to his shoulders.
+Row 3: spinning around his own head-to-tail axis like a corkscrew, 4 frames: back view / right side view /
+       belly view (pale belly and the front of the scarf) / left side view.
+```
