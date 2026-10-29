@@ -151,7 +151,7 @@ pub const LIST: [Entry; 43] = [
     },
     Entry {
         name: "떨어지는 것 확인",
-        desc: "체력 2/5. 반딧불 12마리와 산딸기 2개가 튀어나온다. 다가가 끌려오는 반딧불, 회복을 본다.",
+        desc: "체력 2/5. 반딧불 12마리와 산딸기 2개가 튀어나온다. 왼쪽엔 산딸기·지렁이·씨앗·뿌리 심장이 놓여 있다(주울 수 있다 표시).",
         scenario: Scenario::Loot,
     },
     Entry {
@@ -544,6 +544,20 @@ pub fn build(s: Scenario) -> World {
             for _ in 0..2 {
                 w.loot
                     .push(Loot::place(LootKind::Berry, c + vec2(0.0, -2.0)));
+            }
+            // 왼쪽에 줍는 것 한 줄(판정 9의 "주울 수 있다" 표시를 보려고, 닿지 않는 거리).
+            let left = w.room.center() - vec2(90.0, 0.0);
+            for (i, k) in [
+                LootKind::Berry,
+                LootKind::Worm,
+                LootKind::Seed,
+                LootKind::RootHeart,
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                w.loot
+                    .push(Loot::place(k, left + vec2(i as f32 * 18.0, 0.0)));
             }
             w
         }

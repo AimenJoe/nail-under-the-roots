@@ -406,6 +406,10 @@ pub const VILLAGE_SEEDS_KNOT: u32 = 10;
 pub const VILLAGE_SEEDS_DAILY: u32 = 5;
 /// 한 런 = 필드 + 길 몇 개. 이 번째 길의 주인을 이기면 가장 깊은 곳(엔딩, docs/decisions/0042).
 pub const FINAL_STAGE: u32 = 3;
+
+/// "주울 수 있다" 표시(판정 9): 발밑 고리가 퍼지는 주기, 머리 위 별이 반짝이는 주기(초).
+pub const PICKUP_RING_EVERY: f32 = 1.2;
+pub const PICKUP_GLINT_EVERY: f32 = 1.6;
 /// 장소를 바꿀 때 어두워지는(그리고 밝아지는) 시간.
 pub const FADE_HALF: f32 = 0.3;
 /// 내려가는 전환(굴로·다음 쉼터로)의 반: 이 동안 지층 단면이 흐른다(0156). 굽기가 길면 가운데가 더 길어진다.

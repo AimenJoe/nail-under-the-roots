@@ -1682,6 +1682,52 @@ pub(super) fn draw_room_art(art: &Art, w: &World) {
 
 /// 반딧불(빛나는 꽁무니 + 날개 깜빡임, 둥실) / 산딸기(빨간 열매 + 잎).
 /// `light_only`: 어둠 위에 빛만 다시 그린다(심층에서도 반딧불이 보이게).
+/// "주울 수 있다" 표시(사장 판정 9, 2026-10-29: 떨어진 꽃잎·산딸기·쥬시 지렁이가 줍는 물건으로 안 읽힌다).
+/// 줍는 것 모두가 같은 말을 쓴다 — 1.2초마다 발밑에서 옅은 고리가 퍼지고(풍경은 이렇게 움직이지 않는다),
+/// 1.6초마다 머리 위에 네 갈래 별이 반짝인다. `top`은 물건 윗끝, `feet`는 바닥 점, `seed`는 물건마다 박자를 어긋나게.
+/// `glint_only`는 어둠 위 패스(어두운 지대에서 줍는 것이 묻히지 않게 별만 한 번 더).
+pub(super) fn draw_pickup_mark(feet: Vec2, top: Vec2, time: f32, seed: f32, glint_only: bool) {
+    let mark = Color::new(1.0, 0.95, 0.78, 1.0);
+    if !glint_only {
+        // 발밑의 옅은 빛 자리(숨 쉬듯) — 풀밭·꽃밭에서도 "놓인 물건" 자리가 먼저 보이게.
+        let breathe = 0.5 + 0.5 * ((time + seed) * 3.0).sin();
+        draw_ellipse(
+            feet.x.round(),
+            feet.y.round(),
+            6.0,
+            2.5,
+            0.0,
+            Color::new(mark.r, mark.g, mark.b, 0.16 + 0.12 * breathe),
+        );
+        let k = ((time + seed) / t::PICKUP_RING_EVERY).fract();
+        let a = (1.0 - k) * 0.9;
+        draw_ellipse_lines(
+            feet.x.round(),
+            feet.y.round(),
+            3.0 + 8.0 * k,
+            1.5 + 3.5 * k,
+            0.0,
+            1.0,
+            Color::new(mark.r, mark.g, mark.b, a),
+        );
+    }
+    let k = ((time + seed * 1.7) / t::PICKUP_GLINT_EVERY).fract();
+    if k < 0.3 {
+        // 피었다 진다: 가운데 점 → 팔 1px → 2px → 1px.
+        let a = (1.0 - (k / 0.3 - 0.5).abs() * 2.0).clamp(0.0, 1.0);
+        let arm = (a * 3.0).round();
+        let (gx, gy) = (top.x.round() + 3.0, top.y.round() - 3.0);
+        let col = Color::new(1.0, 1.0, 1.0, 0.6 + 0.4 * a);
+        draw_rectangle(gx, gy, 1.0, 1.0, col);
+        if arm > 0.0 {
+            draw_rectangle(gx, gy - arm, 1.0, arm, col);
+            draw_rectangle(gx, gy + 1.0, 1.0, arm, col);
+            draw_rectangle(gx - arm, gy, arm, 1.0, col);
+            draw_rectangle(gx + 1.0, gy, arm, 1.0, col);
+        }
+    }
+}
+
 pub(super) fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool) {
     let q = lerp(l.prev_pos, l.pos, alpha);
     let ph = time * 6.0 + l.phase * 10.0;
@@ -1723,10 +1769,17 @@ pub(super) fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool)
             }
         }
         loot::LootKind::Worm => {
+            let p = vec2(q.x.round(), (q.y - l.z).round() - 2.0);
+            draw_pickup_mark(
+                vec2(q.x, q.y + 1.0),
+                p - vec2(0.0, 3.0),
+                time,
+                l.phase * 7.0,
+                light_only,
+            );
             if light_only {
                 return;
             }
-            let p = vec2(q.x.round(), (q.y - l.z).round() - 2.0);
             draw_worm(p, ph, 1.0);
         }
         loot::LootKind::RootHeart => {
@@ -1739,6 +1792,13 @@ pub(super) fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool)
                 p.y + 1.0,
                 7.0,
                 Color::new(1.0, 0.4, 0.45, 0.15 * pulse),
+            );
+            draw_pickup_mark(
+                vec2(q.x, q.y + 1.0),
+                p - vec2(0.0, 4.0),
+                time,
+                l.phase * 7.0,
+                light_only,
             );
             if light_only {
                 return;
@@ -1772,6 +1832,13 @@ pub(super) fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool)
             // 씨앗: 통통한 갈색 알 + 초록 새싹 한 잎. 살짝 둥실.
             let hover = 1.0 + (ph * 0.7).sin() * 0.5;
             let p = vec2(q.x.round(), (q.y - l.z - hover).round() - 2.0);
+            draw_pickup_mark(
+                vec2(q.x, q.y + 1.0),
+                p - vec2(0.0, 3.0),
+                time,
+                l.phase * 7.0,
+                light_only,
+            );
             if light_only {
                 return;
             }
@@ -1789,6 +1856,13 @@ pub(super) fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool)
             draw_rectangle(p.x, p.y - 3.0, 2.0, 1.0, Color::new(0.45, 0.78, 0.35, 1.0));
         }
         loot::LootKind::Berry => {
+            draw_pickup_mark(
+                vec2(q.x, q.y + 1.0),
+                vec2(q.x, (q.y - l.z).round() - 8.0),
+                time,
+                l.phase * 7.0,
+                light_only,
+            );
             if light_only {
                 return;
             }
@@ -1811,11 +1885,13 @@ pub(super) fn draw_pickup(p: &world::Pickup, time: f32) {
         draw_rectangle(x, y, 2.0, 6.0, c);
         draw_rectangle(x, y + 5.0, 2.0, 1.0, dark);
     }
-    let ph = (time * 2.0).fract();
-    let s = base + vec2(5.0, -3.0) + vec2(0.0, -ph * 4.0);
-    let a = 1.0 - ph;
-    draw_rectangle(s.x, s.y - 1.0, 1.0, 3.0, Color::new(1.0, 1.0, 1.0, a));
-    draw_rectangle(s.x - 1.0, s.y, 3.0, 1.0, Color::new(1.0, 1.0, 1.0, a));
+    draw_pickup_mark(
+        p.pos + vec2(0.0, 3.0),
+        base - vec2(-1.0, 1.0),
+        time,
+        p.pos.x * 0.07,
+        false,
+    );
 }
 
 /// 환경 어둠: 플레이어 주변만 밝고 바깥은 어둡다. 빛나는 버섯은 어둠 위에 다시.

@@ -59,15 +59,8 @@ pub(super) fn draw_left_petal(at: Vec2, time: f32) {
     draw_rectangle(x - 1.0, y0 - 2.0, 3.0, 1.0, c);
     draw_rectangle(x - 1.0, y0 + 1.0, 2.0, 1.0, c);
     draw_rectangle(x, y0 - 1.0, 1.0, 1.0, pink);
-    // 반짝임: 1.6초마다 위로 열십자 하나가 피었다 진다(줍는 것들의 반짝임과 같은 말).
-    let k = (time / 1.6).fract();
-    if k < 0.35 {
-        let a = (1.0 - (k / 0.35 - 0.5).abs() * 2.0).clamp(0.0, 1.0);
-        let (gx, gy) = (x + 3.0, y0 - 5.0 - (k * 6.0).round());
-        let col = Color::new(1.0, 0.92, 0.95, a);
-        draw_rectangle(gx, gy - 1.0, 1.0, 3.0, col);
-        draw_rectangle(gx - 1.0, gy, 3.0, 1.0, col);
-    }
+    // 줍는 것 모두와 같은 "주울 수 있다" 표시(퍼지는 고리 + 반짝이는 별, 사장 판정 9).
+    draw_pickup_mark(vec2(x, y + 2.0), vec2(x, y0 - 3.0), time, x * 0.07, false);
     let tw = (time * 2.3).sin();
     if tw > 0.6 {
         let a = (tw - 0.6) / 0.4;
