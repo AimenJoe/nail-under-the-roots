@@ -15,6 +15,7 @@ pub fn character(s: Scenario, picked: Character) -> Character {
         // 개발: 도토로 싸워 보기(0195).
         Scenario::DotoArena | Scenario::DotoMobs => Character::Doto,
         Scenario::MomoArena => Character::Momo,
+        Scenario::Hall(c) => c,
         _ => Character::Mole,
     }
 }

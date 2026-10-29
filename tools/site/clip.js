@@ -61,7 +61,7 @@ const srv = http.createServer((q, r) => { let p = path.join(root, decodeURICompo
   await pg.waitForFunction(() => document.getElementById('loading').classList.contains('done'), null, { timeout: 60000 });
   await pg.waitForTimeout(800); await pg.focus('#glcanvas');
   await key('Enter', 900); await key('ArrowUp', 300); await key('Enter', 800);
-  for (let i = 0; i < idx; i++) await key('ArrowDown', 60);
+  for (let i = 0; i < idx; i++) await key('ArrowDown', 160);   // 60ms면 swiftshader가 바쁠 때 키를 놓쳤다
   await key('Enter', +(process.env.WAIT || 3000));
   for (const k of (process.env.PRE || '').split(',').filter(Boolean)) await key(k, 700);
   await pg.clock.install();
