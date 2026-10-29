@@ -249,6 +249,8 @@ pub struct Player {
     swing_id: u32,
     /// 지금 스윙을 시작하고 흐른 실제 시간(패링 창).
     swing_age: f32,
+    /// 공격 버튼을 이어서 쥔 시간(0255). 떼면 0. `swing_age`보다 길면 지금 스윙을 낸 누름(또는 그 전 누름)을 아직 쥐고 있다.
+    hold: f32,
 }
 
 /// 한 틱의 바깥 상황(0170 R9): 상태 함수들이 같은 것을 본다.
@@ -306,6 +308,7 @@ impl Player {
             beat_show: 0.0,
             swing_id: 0,
             swing_age: f32::MAX,
+            hold: 0.0,
         }
     }
 
@@ -498,6 +501,17 @@ impl Player {
         t::HEAVY_CHARGE * self.stats.charge
     }
 
+    /// 모으는 자세로 들어갈 때인가(0255): 지금 스윙을 낸 누름을 `HEAVY_HOLD_START` 넘게 쥐고 있다. 들어설 때의 모으기 시계
+    /// (스윙 시작부터 `HEAVY_CHARGE_LEAD` 뒤부터 센다 — 다 모이는 때가 스윙 길이와 상관없다)를 돌려준다.
+    /// 스윙·후딜레이가 끝난 뒤에만 부른다 — 모으다 떼면 바로 다음 타가 나가니, 다음 타를 늦추는 것은 무기의 공격 속도뿐이다.
+    pub(super) fn charge_from_hold(&self, a: &Actions) -> Option<f32> {
+        (a.attack_held && self.hold >= self.swing_age && self.swing_age >= t::HEAVY_HOLD_START)
+            .then(|| {
+                // 스윙이 길어 이미 다 모였으면 다음 틱에 다 모인다(번쩍·`HeavyReady`를 거른다).
+                (self.swing_age - t::HEAVY_CHARGE_LEAD).min(self.charge_time() - 1e-3)
+            })
+    }
+
     /// 발톱이 적을 맞혔다: SP를 채운다(드릴 자체는 채우지 않는다). 박자에 맞춘 타는 무기의 `beat_sp`배(0246).
     pub fn gain_sp(&mut self, finisher: bool) {
         let mut g = t::SP_PER_HIT;
@@ -684,6 +698,17 @@ impl Player {
                 0
             };
             self.start_swing(idx, a.aim, beat);
+        } else if let Some(time) = self
+            .charge_from_hold(a)
+            .filter(|_| self.armed && self.no_attack <= 0.0 && self.queued.is_none())
+        {
+            // 스윙이 끝난 뒤에도 그 누름을 쥐고 있다(짧은 스윙): 모으기로(0255). 다음 자리는 콤보가 이어지면 그 타.
+            let after = if self.combo_timer > 0.0 {
+                self.combo_next
+            } else {
+                0
+            };
+            self.start_charging(time, self.facing, after);
         } else {
             self.pos += move_dir * self.speed() * dt;
         }
@@ -732,6 +757,7 @@ impl Player {
         self.parry_cd = (self.parry_cd - dt).max(0.0);
         self.no_attack = (self.no_attack - dt).max(0.0);
         self.swing_age += dt;
+        self.hold = if a.attack_held { self.hold + dt } else { 0.0 };
         // 박자를 지나는 틱인가(0180): 콤보 중일 때만. 타가 나가 시계가 되감기면 그 소리가 박자다.
         let before = self.beat_clock;
         self.beat_clock = (self.beat_clock + dt * self.stats.attack_speed).min(60.0);
@@ -1375,7 +1401,7 @@ mod tests {
         assert!((half - 0.6).abs() < 0.04, "떼면 바로 솟구친다 {half}");
     }
 
-    /// 강공격(0161·0167): 누르면 평타가 바로, 누르고 있으면 활성 구간 뒤 모으기 → 0.45초 뒤 떼면 피해 2 이상·넓은 한 방.
+    /// 강공격(0161·0167·0255): 누르면 평타가 바로, 누르고 있으면 스윙 뒤 모으기 → 누른 지 0.55초 뒤 떼면 피해 2 이상·넓은 한 방.
     /// 강공격 뒤 콤보는 다음 타로 이어지고, 후딜레이는 끊지 못하지만 잠금은 없다(0161 덧붙임 철회).
     #[test]
     fn press_swings_at_once_and_holding_charges_a_heavy_strike() {
@@ -1398,9 +1424,9 @@ mod tests {
             "누르면 바로 평타"
         );
         assert!(ev.contains(&Event::Swing(0)));
-        // 평타 뒤에도 누르고 있으면 모은다(활성 구간 뒤 바로), 다음 자리는 2타.
+        // 평타 뒤에도 누르고 있으면 모은다(스윙이 끝나고 쥔 지 `HEAVY_HOLD_START` 뒤, 0255), 다음 자리는 2타.
         let mut n = 0;
-        while matches!(p.state, State::Attack { .. }) && n < 100 {
+        while !matches!(p.state, State::Charging { .. }) && n < 100 {
             tick(&mut p, &room, &hold);
             n += 1;
         }
@@ -1414,6 +1440,9 @@ mod tests {
             let (s, ev) = tick(&mut p, &room, &hold);
             assert!(s.is_none(), "모으는 동안 판정은 없다");
             ready |= ev.contains(&Event::HeavyReady);
+            if ready {
+                break;
+            }
         }
         assert!(ready, "다 모이면 발톱이 빛난다");
         let (_, ev) = tick(&mut p, &room, &release);
@@ -1478,21 +1507,20 @@ mod tests {
             "강공격 뒤 콤보가 2타로 이어진다 {:?}",
             p.state
         );
-        // 덜 모으고 떼면 아무것도 안 나간다(평타는 이미 나갔다).
+        // 짧게 쥐고 떼면(보통 누름) 모으기에 들어서지 않는다 — 평타 하나만(0255).
         let mut q = Player::new(room.center());
         tick(&mut q, &room, &press);
-        let mut n = 0;
-        while matches!(q.state, State::Attack { .. }) && n < 100 {
-            tick(&mut q, &room, &hold);
-            n += 1;
+        let mut swings = 1;
+        for k in 0..60 {
+            let a = if k < 8 { &hold } else { &release };
+            let (_, ev) = tick(&mut q, &room, a);
+            assert!(
+                !matches!(q.state, State::Charging { .. }),
+                "짧게 쥔 손은 모으지 않는다"
+            );
+            swings += ev.iter().filter(|e| matches!(e, Event::Swing(_))).count();
         }
-        assert!(matches!(q.state, State::Charging { .. }));
-        tick(&mut q, &room, &release);
-        assert!(
-            matches!(q.state, State::Free),
-            "덜 모으고 떼면 아무것도 {:?}",
-            q.state
-        );
+        assert_eq!(swings, 1, "보통 누름은 평타 하나");
     }
 
     /// 딱 맞춘 강타(0168): 다 모인 뒤 `HEAVY_PERFECT`를 넘겨 떼면 보통 강공격(피해 그대로, `perfect` 아님).
@@ -1760,41 +1788,58 @@ mod tests {
         }
     }
 
-    /// 덜 모은 강타(0253): 모으는 자세로 `HEAVY_TAP_GRACE`보다 오래 쥐었다가 다 모이기 전에 떼면 다음 평타가 나간다.
-    /// 막 모으기에 들어서자 뗀 것(보통 누름)은 아무것도 안 나간다.
+    /// 덜 모은 강타(0253 → 0255, 사장 "중간 취소로 공격이 나가지 않는 경우는 없어야 함. 무기의 공격 속도만이 다음 공격을
+    /// 유예시킨다"): 모든 무기에서 첫 타를 누른 채 몇 틱을 쥐든 — 모으는 자세에 들어섰으면 떼는 틱에 강타나 다음 평타가
+    /// 나간다. 짧게 쥔 손(`HEAVY_HOLD_START` 아래)은 모으기에 들어서지 않는다. 뗀 타는 첫 타의 스윙·후딜레이가 끝나기 전에는
+    /// 나가지 않는다.
     #[test]
-    fn releasing_a_partial_charge_swings_the_next_hit() {
+    fn every_release_of_a_charge_attacks_and_only_the_swing_delays_it() {
         let room = Room::new();
-        let press = Actions {
-            attack: true,
-            attack_held: true,
-            ..Default::default()
-        };
-        let hold = Actions {
-            attack_held: true,
-            ..Default::default()
-        };
-        let charge_for = |secs: f32| {
-            let mut p = Player::new(room.center());
-            tick(&mut p, &room, &press);
-            while matches!(p.state, State::Attack { .. }) {
-                tick(&mut p, &room, &hold);
+        for w in crate::equipment::WEAPONS.iter() {
+            let ms = w.moveset;
+            let first = ms.hits[0].swing + ms.hits[0].recovery;
+            for held in 1..=70usize {
+                let mut p = Player::new(room.center());
+                p.moveset = ms;
+                let mut charged = false;
+                let mut age = 0.0;
+                for k in 0..held {
+                    let a = Actions {
+                        attack: k == 0,
+                        attack_held: true,
+                        ..Default::default()
+                    };
+                    tick(&mut p, &room, &a);
+                    age += t::TICK_DT;
+                    if matches!(p.state, State::Charging { .. }) {
+                        charged = true;
+                        assert!(
+                            age + 1e-4 >= t::HEAVY_HOLD_START,
+                            "{held}틱: 짧게 쥔 손은 모으지 않는다"
+                        );
+                    }
+                }
+                let was = p.state;
+                let (_, ev) = tick(&mut p, &room, &Actions::default());
+                age += t::TICK_DT;
+                let attacked = ev
+                    .iter()
+                    .any(|e| matches!(e, Event::Swing(_) | Event::Heavy));
+                if matches!(was, State::Charging { .. }) {
+                    assert!(
+                        attacked,
+                        "{held}틱 쥐고 뗐는데 아무것도 안 나갔다 {:?}",
+                        p.state
+                    );
+                    assert!(age + 1e-4 >= first, "{held}틱: 첫 타가 끝나기 전에 다음 타");
+                    if ev.contains(&Event::Swing(1)) {
+                        assert!(matches!(p.state, State::Attack { idx: 1, .. }));
+                    }
+                } else {
+                    assert!(!charged || attacked, "{held}틱: 모으다 말았다");
+                }
             }
-            assert!(matches!(p.state, State::Charging { after: 1, .. }));
-            for _ in 0..(secs / t::TICK_DT).round() as usize {
-                tick(&mut p, &room, &hold);
-            }
-            let (_, ev) = tick(&mut p, &room, &Actions::default());
-            (p.state, ev)
-        };
-        let (state, ev) = charge_for((t::HEAVY_TAP_GRACE + t::HEAVY_CHARGE) * 0.5);
-        assert!(matches!(state, State::Attack { idx: 1, .. }), "{state:?}");
-        assert!(ev.contains(&Event::Swing(1)) && !ev.contains(&Event::Heavy));
-        let (state, ev) = charge_for(t::HEAVY_TAP_GRACE * 0.5);
-        assert!(
-            !matches!(state, State::Attack { .. })
-                && !ev.iter().any(|e| matches!(e, Event::Swing(_)))
-        );
+        }
     }
 
     /// 무기마다 박자 콤보(사장 "무기마다 리듬 타격 검증, 2타가 제대로 안 나간다"): 박자 한가운데에 누르면 모든 이음이

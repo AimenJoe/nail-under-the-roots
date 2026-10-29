@@ -42,22 +42,16 @@ impl Player {
         } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
             // 굴파기(깡충) 캔슬: 후딜레이를 끊고 다음 콤보로 섞는다.
             self.start_dodge(move_dir);
-        } else if time >= a1 && a.attack_held {
-            // 활성 구간이 지났는데 아직 누르고 있다: 바로 강공격 모으기(0161). 어느 타 뒤든.
-            // 강공격(또는 덜 모으고 뗀 것) 뒤 콤보는 다음 타로 이어진다.
-            self.combo_timer = 0.0;
-            self.events.push(Event::ChargeStart);
-            self.state = State::Charging {
-                time: 0.0,
-                dir,
-                after: idx + 1,
-            };
         } else if time >= hit.swing + hit.recovery {
             // 스윙이 끝났다. 박자 창 안에서 눌러 뒀으면 그 자리에서 다음 타(0174; 창이 후딜레이 안에 열리는 마무리 타).
+            // 이 스윙을 낸 누름을 아직 쥐고 있으면 강공격 모으기(0161 → 0255: 활성 구간 뒤가 아니라 스윙이 끝난 뒤, 쥔 지
+            // `HEAVY_HOLD_START` 넘어서 — 짧게 누른 손은 모으기에 들어서지 않고, 모으다 떼면 늘 무언가 나간다).
             // 아니면 서서 콤보 창을 연다 — 창 전에 눌러 둔 타는 `tick_free`가 박자에 내보낸다. 마지막 타 뒤는 1타부터.
             let next = if idx < last { idx + 1 } else { 0 };
             if self.queue_due() {
                 self.start_swing(next, a.aim, self.queued == Some(super::Queued::Beat));
+            } else if let Some(time) = self.charge_from_hold(a).filter(|_| self.queued.is_none()) {
+                self.start_charging(time, dir, idx + 1);
             } else {
                 self.state = State::Free;
                 self.combo_next = next;
@@ -96,27 +90,25 @@ impl Player {
         } else if !a.attack_held {
             if time >= self.charge_time() {
                 self.start_heavy(dir, after, time - self.charge_time() <= t::HEAVY_PERFECT);
-            } else if time > t::HEAVY_TAP_GRACE {
-                // 모으다 덜 모으고 뗐다(0253): 다음 평타가 나간다(마지막 타 뒤면 1타). 모으는 자세를 보였는데 아무것도
-                // 안 나가면 입력을 먹은 것처럼 느껴졌다.
+            } else {
+                // 덜 모으고 뗐다(0253 → 0255): 언제 떼든 다음 평타가 나간다(마지막 타 뒤면 1타) — 모으는 자세를 보였는데
+                // 아무것도 안 나가면 입력을 먹은 것처럼 느껴졌다. 모으기는 스윙이 끝난 뒤에만 들어서니 공격 속도도 그대로다.
                 let next = if after <= self.moveset.last() {
                     after
                 } else {
                     0
                 };
                 self.start_swing(next, dir, false);
-            } else {
-                // 막 모으기에 들어서자 뗐다 = 그냥 누른 것: 아무것도 안 나가고(평타는 이미 나갔다), 콤보는 거기서 이어진다.
-                // 콤보 창은 스윙 끝과 같이 박자 창이 다 닫힐 때까지(0205): 보통 누름(0.1초 남짓)도 활성 구간 뒤까지
-                // 쥐고 있어 여기로 오는데, 무기의 짧은 창(0.3초)만 주면 박자(0.42초) 전에 닫혀 박자에 누른 2타가 1타로 돌아갔다.
-                self.state = State::Free;
-                if after <= self.moveset.last() {
-                    self.combo_next = after;
-                    self.combo_timer = self.combo_window_after_swing();
-                }
             }
         }
         None
+    }
+
+    /// 모으는 자세로(0161·0255). `time`은 모으기 시계(누른 때부터 센 것), `after`는 강타·덜 모은 타 뒤 다음 자리.
+    pub(super) fn start_charging(&mut self, time: f32, dir: Vec2, after: usize) {
+        self.combo_timer = 0.0;
+        self.events.push(Event::ChargeStart);
+        self.state = State::Charging { time, dir, after };
     }
 
     /// 강타(0168): 활성 구간·후딜레이, 딱 맞춘 강타.
@@ -164,18 +156,10 @@ impl Player {
         };
         if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
             self.start_dodge(move_dir);
-        } else if time >= a1 && a.attack_held {
-            // 강공격 뒤에도 누르고 있으면 다시 모은다.
-            self.combo_timer = 0.0;
-            self.events.push(Event::ChargeStart);
-            self.state = State::Charging {
-                time: 0.0,
-                dir,
-                after,
-            };
         } else if time >= hit.swing + hit.recovery {
             // 강공격의 후딜레이는 끊지 못한다(0167: 0161 덧붙임의 0.3초 잠금은 뺐다). 박자 창 안에서 눌러 뒀으면
             // 후딜레이가 끝나는 순간 다음 타, 아니면 서서 콤보 창(창 전에 눌러 둔 타는 박자에, 0174).
+            // 강타 중에 다시 눌러 쥐고 있으면 그 누름이 다음 평타를 내고, 그 뒤 모은다(0255 — 누르면 늘 평타가 먼저).
             let next = if after <= ms.last() { after } else { 0 };
             if self.queue_due() {
                 self.start_swing(next, a.aim, self.queued == Some(super::Queued::Beat));

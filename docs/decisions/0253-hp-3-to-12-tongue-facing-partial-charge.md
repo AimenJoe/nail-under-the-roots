@@ -28,6 +28,7 @@
   그보다 짧으면 그냥 누른 것 — 보통 누름도 활성 구간 뒤까지 쥐고 있어 모으기에 잠깐 들어서고, 박자에 누르는 손은 0.25초까지 쥔다
   (0.12로 했더니 박자 시험 `every_weapon_chains_every_hit_on_the_beat_whatever_the_tap_length`에서 박자 이음이 엇박 평타로 바뀌었다).
 - 시험 `releasing_a_partial_charge_swings_the_next_hit`.
+- → **0255**가 고침: 모으기는 쥔 지 0.27초·스윙이 끝난 뒤에만 들어서고, 들어선 뒤에는 언제 떼든 무언가 나간다(`HEAVY_TAP_GRACE` 뺌).
 
 ## 5. 산딸기 덜(사장 "확률은 아직도 꽤나 높아" → 제안에 "수정하고 배포해")
 - 가장 크게 작용하던 것은 불운 보정이었다(6번 처치 안 나오면 다음엔 확정). `BERRY_PITY_KILLS` 6 → 10, `BERRY_BASE_CHANCE` 6% → 3%.
