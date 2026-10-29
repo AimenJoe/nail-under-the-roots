@@ -113,8 +113,9 @@ def build():
     spr = convert(SPEC)
     cells = {k: seat(spr[k], CELL, FOOT) for k in NAMES}
     cells.update(walk_ai.cells("bori", SPEC.sources[0], CELL, FOOT))
-    # 걷기는 첫 칸 하나에서 발만 딛게(0241): 따로 받은 걷기 넷(`bori_walk_v1.png`)은 넷째 칸만 키·몸이 커서 걸음마다 몸이 튀었다.
-    steps = step_cycle(cells[walk_ai.NAMES[0]], FOOT - 1, reach=2)
+    # 걷기는 한 칸에서 발만 딛게(0241): 따로 받은 걷기 넷(`bori_walk_v1.png`)은 넷째 칸만 키·몸이 커서 걸음마다 몸이 튀었다.
+    # 바탕은 셋째 칸 — 첫 칸은 앞발이 한 줄뿐이라 들면 몸에 묻혀 외발로 걷는 것처럼 보였다(사장 "보리 걷는 게 더 어색").
+    steps = step_cycle(cells[walk_ai.NAMES[2]], FOOT - 1, reach=2)
     cells.update(zip(walk_ai.NAMES, steps))
     return sheet4([(cells[k], threads(taint(cells[k]))) for k in ORDER])
 
