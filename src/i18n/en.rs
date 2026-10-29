@@ -280,7 +280,7 @@ pub static EN: Strings = Strings {
     node_burrow: "Burrow",
     node_burrow_desc: "A burrow full of rats. Beat the pack at the end for seeds.",
     node_nest: "Nest",
-    node_nest_desc: "Where tougher packs gather. Holds a chest.",
+    node_nest_desc: "Where tougher packs gather. Holds a chest; beat them all for a Juicy Worm.",
     node_cache: "Cache",
     node_cache_desc: "A small burrow. A chest sits in the acorn store.",
     node_spring: "Spring",

@@ -282,7 +282,7 @@ pub static ZH_HANS: Strings = Strings {
     node_burrow: "洞穴",
     node_burrow_desc: "老鼠住的洞穴。打败尽头的鼠群可得种子。",
     node_nest: "巢穴",
-    node_nest_desc: "更强的鼠群聚集之处。有宝箱。",
+    node_nest_desc: "更强的鼠群聚集之处。有宝箱，全部打倒还有多汁蚯蚓。",
     node_cache: "储藏洞",
     node_cache_desc: "小洞穴。橡子储藏处里有个宝箱。",
     node_spring: "泉水",

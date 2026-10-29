@@ -280,7 +280,7 @@ pub static DE: Strings = Strings {
     node_burrow: "Bau",
     node_burrow_desc: "Ein Bau voller Ratten. Besieg das Rudel am Ende für Samen.",
     node_nest: "Nest",
-    node_nest_desc: "Hier sammeln sich stärkere Rudel. Hier steht eine Truhe.",
+    node_nest_desc: "Hier sammeln sich stärkere Rudel. Eine Truhe – und ein Saftwurm, wenn du alle besiegst.",
     node_cache: "Vorrat",
     node_cache_desc: "Ein kleiner Bau. Im Eichelvorrat steht eine Truhe.",
     node_spring: "Quelle",

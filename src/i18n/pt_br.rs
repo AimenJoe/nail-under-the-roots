@@ -280,7 +280,7 @@ pub static PT_BR: Strings = Strings {
     node_burrow: "Toca",
     node_burrow_desc: "Uma toca cheia de ratos. Vença o bando do fim para ganhar sementes.",
     node_nest: "Ninho",
-    node_nest_desc: "Onde se juntam bandos mais fortes. Tem um baú.",
+    node_nest_desc: "Onde se juntam bandos mais fortes. Tem um baú; vença todos e ganhe uma Minhoca suculenta.",
     node_cache: "Despensa",
     node_cache_desc: "Uma toca pequena. Há um baú no estoque de bolotas.",
     node_spring: "Nascente",

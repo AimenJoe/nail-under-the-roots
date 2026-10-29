@@ -280,7 +280,7 @@ pub static KO: Strings = Strings {
     node_burrow: "굴",
     node_burrow_desc: "쥐들이 사는 굴. 끝의 무리를 잡으면 씨앗.",
     node_nest: "둥지",
-    node_nest_desc: "더 센 무리가 모인 곳. 끝에 상자가 있다.",
+    node_nest_desc: "더 센 무리가 모인 곳. 끝에 상자, 다 이기면 쥬시 지렁이.",
     node_cache: "저장고",
     node_cache_desc: "작은 굴. 도토리 저장고 안에 상자가 있다.",
     node_spring: "샘",

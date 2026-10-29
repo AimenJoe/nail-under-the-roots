@@ -280,7 +280,7 @@ pub static JA: Strings = Strings {
     node_burrow: "穴",
     node_burrow_desc: "ネズミたちの穴。おくの群れをたおすとタネ。",
     node_nest: "巣",
-    node_nest_desc: "手ごわい群れが集まる場所。宝箱がある。",
+    node_nest_desc: "手ごわい群れが集まる場所。宝箱があり、ぜんぶたおすとジューシーミミズ。",
     node_cache: "たくわえ穴",
     node_cache_desc: "小さな穴。ドングリのたくわえの中に箱がある。",
     node_spring: "泉",

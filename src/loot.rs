@@ -137,7 +137,7 @@ pub fn glowbugs_for(kind: Kind) -> (u32, u32) {
     kind.species().glowbugs
 }
 
-/// 이 처치에서 산딸기가 떨어질 확률. 깎인 체력만큼 오르고, `since_heal`번 연속 안 나왔으면 반드시.
+/// 이 처치에서 산딸기가 떨어질 확률. 깎인 체력의 비율만큼 오르고(최대 체력과 무관, 0252), `since_heal`번 연속 안 나왔으면 반드시.
 pub fn berry_chance(hp: i32, max_hp: i32, since_heal: u32, kind: Kind) -> f32 {
     let missing = (max_hp - hp).max(0);
     if kind == Kind::Dummy || missing == 0 {
@@ -146,7 +146,8 @@ pub fn berry_chance(hp: i32, max_hp: i32, since_heal: u32, kind: Kind) -> f32 {
     if since_heal >= t::BERRY_PITY_KILLS {
         return 1.0;
     }
-    (t::BERRY_BASE_CHANCE + t::BERRY_CHANCE_PER_MISSING * missing as f32).min(1.0)
+    let ratio = missing as f32 / max_hp.max(1) as f32;
+    (t::BERRY_BASE_CHANCE + t::BERRY_CHANCE_MISSING_ALL * ratio).min(1.0)
 }
 
 #[cfg(test)]
@@ -179,6 +180,13 @@ mod tests {
         let three = berry_chance(2, 5, 0, Kind::FieldMouse);
         assert!(three > one && one > 0.0);
         assert_eq!(berry_chance(4, 5, t::BERRY_PITY_KILLS, Kind::Chipmunk), 1.0);
+        // 0252: 기본 체력에서 한 칸 = 5%, 그리고 최대 체력이 커도 같은 비율이면 같은 확률.
+        assert!((one - (t::BERRY_BASE_CHANCE + 0.05)).abs() < 1e-6);
+        assert!((berry_chance(8, 10, 0, Kind::FieldMouse) - one).abs() < 1e-6);
+        assert!(
+            berry_chance(9, 10, 0, Kind::FieldMouse) < one,
+            "큰 체력의 한 칸은 덜"
+        );
     }
 
     /// 모든 떨어진 것이 반딧불만큼 끌려와 주워진다. 못 담는 것(can_take = false)은 끌리지 않는다(0207).

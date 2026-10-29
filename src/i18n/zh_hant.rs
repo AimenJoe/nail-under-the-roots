@@ -282,7 +282,7 @@ pub static ZH_HANT: Strings = Strings {
     node_burrow: "洞穴",
     node_burrow_desc: "老鼠住的洞穴。打敗盡頭的鼠群可得種子。",
     node_nest: "巢穴",
-    node_nest_desc: "更強的鼠群聚集之處。有寶箱。",
+    node_nest_desc: "更強的鼠群聚集之處。有寶箱，全部打倒還有多汁蚯蚓。",
     node_cache: "儲藏洞",
     node_cache_desc: "小洞穴。橡子儲藏處裡有個寶箱。",
     node_spring: "泉水",

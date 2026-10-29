@@ -298,21 +298,23 @@ pub const LOOT_COLLECT_RADIUS: f32 = 8.0;
 pub const LOOT_MAGNET_RADIUS: f32 = 44.0;
 pub const LOOT_MAGNET_ACCEL: f32 = 900.0;
 pub const LOOT_MAGNET_MAX_SPEED: f32 = 230.0;
-/// 산딸기가 떨어질 확률 = 기본 + 깎인 체력 1칸마다. 체력이 가득이면 0.
+/// 산딸기가 떨어질 확률 = 기본 + 깎인 **비율** × 이것. 체력이 가득이면 0.
+/// 기본 체력(`PLAYER_HP` 5칸)에서 한 칸에 5%(사장 2026-10-29, 예전 칸마다 8%). 칸 수가 아니라 비율이라
+/// 최대 체력이 커도(뿌리 심장·장신구) 같은 비율만큼 깎였으면 같은 확률이다(0252, 사장 "최대 체력이 높을수록 더 잘 나오면 부당").
 pub const BERRY_BASE_CHANCE: f32 = 0.06;
-pub const BERRY_CHANCE_PER_MISSING: f32 = 0.08;
+pub const BERRY_CHANCE_MISSING_ALL: f32 = 0.05 * PLAYER_HP as f32;
 /// 체력이 깎인 채로 이만큼 처치해도 안 나왔으면 다음엔 반드시(불운 보정).
 pub const BERRY_PITY_KILLS: u32 = 6;
 /// 산딸기 하나가 채우는 체력.
 pub const BERRY_HEAL: i32 = 1;
-/// 쥬시 지렁이: 처치마다 이 확률로 떨어진다(체력과 무관, 드묾).
-pub const WORM_CHANCE: f32 = 0.035;
+/// 쥬시 지렁이: 처치마다 이 확률로 떨어진다(체력과 무관, 드묾). 0252: 3.5% → 1%(한 런 ≈7 → ≈2), 대신 둥지 칸 끝에서 확정.
+pub const WORM_CHANCE: f32 = 0.01;
 /// 부술 수 있는 것(0175): 타격 판정 반지름, 깨졌을 때 나오는 것의 확률(순서대로 씨앗·산딸기·반딧불·지렁이, 나머지는 빈손).
 pub const BREAK_R: f32 = 8.0;
 pub const BREAK_SEED: f32 = 0.18;
 pub const BREAK_BERRY: f32 = 0.12;
 pub const BREAK_GLOWBUG: f32 = 0.06;
-pub const BREAK_WORM: f32 = 0.04;
+pub const BREAK_WORM: f32 = 0.015;
 
 // ---- 가방(퀵 아이템, src/items.rs, docs/decisions/0017) ----------------------------------
 /// 들고 다닐 수 있는 수. 가득이면 바닥에 남는다.

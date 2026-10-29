@@ -280,7 +280,7 @@ pub static PL: Strings = Strings {
     node_burrow: "Nora",
     node_burrow_desc: "Nora pełna szczurów. Pokonaj stado na końcu, by zdobyć nasiona.",
     node_nest: "Gniazdo",
-    node_nest_desc: "Tu zbierają się twardsze stada. Jest tu skrzynia.",
+    node_nest_desc: "Tu zbierają się twardsze stada. Jest skrzynia, a za pokonanie wszystkich — Soczysty robak.",
     node_cache: "Spiżarnia",
     node_cache_desc: "Mała nora. W żołędziowej spiżarni stoi skrzynia.",
     node_spring: "Źródło",

@@ -1162,6 +1162,7 @@ impl World {
     /// 던전: 방이 바뀌면 들르고, 전투방이면 안에 들어선 순간 잠그고 적을 깨운다. 다 잡으면 열고 보상.
     fn dungeon_rooms(&mut self) {
         let at = dungeon::room_at(self.player.pos);
+        let nest = self.node_kind() == Some(NodeKind::Nest);
         let Some(d) = self.adv.dungeon.as_mut() else {
             return;
         };
@@ -1305,6 +1306,10 @@ impl World {
                     for _ in 0..t::PACK_SEEDS {
                         self.loot.push(Loot::spawn(LootKind::Seed, at));
                     }
+                    // 둥지 칸(0252, 사장 "둥지는 확정"): 끝 무리를 다 잡으면 쥬시 지렁이 하나. 처치 드롭은 1%로 줄였다.
+                    if nest {
+                        self.loot.push(Loot::spawn(LootKind::Worm, at));
+                    }
                     self.juice.toast = Some((|s| s.toast_goal, 2.5));
                     // 실타래 칸(0147): 엘리트를 풀어 주면 상자처럼 장신구 하나(다 있으면 반딧불).
                     if room.elite {
@@ -1362,6 +1367,12 @@ impl World {
         // 물건은 상자 앞(아래)에 떨어진다 — 상자 칸은 막혀 있다.
         self.chest_gift(gear, at + vec2(0.0, 16.0));
         self.juice.audio.play(sfx::Id::Emerge);
+    }
+
+    /// 지금 들어와 있는 길 지도 칸의 종류(길의 굴이 아니면 None).
+    fn node_kind(&self) -> Option<NodeKind> {
+        let (at, r) = (self.adv.node?, self.adv.route.as_ref()?);
+        Some(r.node(at).kind)
     }
 
     /// 상자의 물건(0251, 사장 "상자에서 반딧불 90%, 10%가 무기 또는 장신구, 단 해당 무기가 있으면 장신구"):
@@ -2110,6 +2121,38 @@ mod tests {
         }
         assert!(w.pickups.is_empty());
         assert!(w.inv.gifts.iter().any(|g| matches!(g, Gift::Charm(_))));
+    }
+
+    /// 둥지 칸(0252): 끝 무리를 다 잡으면 쥬시 지렁이 하나 확정. 보통 굴 끝은 없다.
+    #[test]
+    fn nest_end_gives_a_juicy_worm() {
+        let worms_after_end = |kind: NodeKind| {
+            let mut w = World::camp_start(2);
+            if let Some(r) = w.adv.route.as_mut() {
+                r.layers[1][0].kind = kind;
+                r.at = Some((1, 0));
+            }
+            w.enter_node();
+            let end = w
+                .adv
+                .dungeon
+                .as_ref()
+                .and_then(|d| d.rooms.iter().find(|r| r.kind == RoomKind::Boss))
+                .map(|r| r.at)
+                .expect("끝방");
+            let c = dungeon::room_rect(end).center();
+            w.player.pos = c;
+            w.player.prev_pos = c;
+            for _ in 0..5 {
+                w.tick(&crate::input::Actions::default());
+            }
+            assert!(w.room.doors_locked(), "끝방에 들어서면 잠긴다");
+            w.enemies.clear();
+            w.tick(&crate::input::Actions::default());
+            w.loot.iter().filter(|l| l.kind == LootKind::Worm).count()
+        };
+        assert_eq!(worms_after_end(NodeKind::Nest), 1);
+        assert_eq!(worms_after_end(NodeKind::Burrow), 0);
     }
 
     /// 상자(0251): 열에 아홉은 반딧불 한 줌, 하나는 물건 — 길 무기가 아직 없으면 그것, 있으면 장신구, 그것도 다 있으면 반딧불.

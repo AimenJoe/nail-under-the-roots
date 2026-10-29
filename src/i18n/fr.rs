@@ -280,7 +280,7 @@ pub static FR: Strings = Strings {
     node_burrow: "Terrier",
     node_burrow_desc: "Un terrier plein de rats. Bats la bande du fond pour gagner des graines.",
     node_nest: "Nid",
-    node_nest_desc: "Là où se réunissent des bandes plus fortes. Contient un coffre.",
+    node_nest_desc: "Là où se réunissent des bandes plus fortes. Un coffre, et un Ver juteux si tu les bats tous.",
     node_cache: "Réserve",
     node_cache_desc: "Un petit terrier. Un coffre attend dans la réserve de glands.",
     node_spring: "Source",

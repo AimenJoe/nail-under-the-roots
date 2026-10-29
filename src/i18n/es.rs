@@ -280,7 +280,7 @@ pub static ES: Strings = Strings {
     node_burrow: "Madriguera",
     node_burrow_desc: "Una madriguera llena de ratas. Vence a la manada del final y gana semillas.",
     node_nest: "Nido",
-    node_nest_desc: "Donde se juntan manadas más duras. Tiene un cofre.",
+    node_nest_desc: "Donde se juntan manadas más duras. Tiene un cofre; véncelas a todas y ganarás una Lombriz jugosa.",
     node_cache: "Despensa",
     node_cache_desc: "Una madriguera pequeña. Hay un cofre en el almacén de bellotas.",
     node_spring: "Manantial",
