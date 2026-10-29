@@ -24,7 +24,7 @@ GAP = 40
 
 def frames():
     out = {}
-    for si, src in enumerate(nail_ai.SPEC.sources):
+    for si, src in enumerate(nail_ai.SPEC_V3.sources):
         img = np.asarray(Image.open(src.path).convert("RGB")).astype(int)
         done, boxes = nail_ai.chibi(img, dict(src.frames), ref=True)
         for k, (x0, y0, x1, y1) in boxes.items():

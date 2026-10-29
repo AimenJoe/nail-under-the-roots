@@ -5,7 +5,8 @@
 옮기는 법(색표·다수결 줄이기·효과 지우기·손발 색·흔들기·숨쉬기)은 공용 변환기 `sprite_ai.py`에 있고, 여기는 Naïl의
 설정(`SPEC`)과 시트 배치뿐이다. 왜 이 길인가(0203 → 0206 → 0238): 16칸 손 그림은 "두더지 같지 않다"(사장) → 실루엣 시안 1
 (`nail_s1_v2`, 몸 16px) → 사장 "처음부터 다시"(0238): 큰 그림 다섯 안에서 고른 1번(서서 삽 손을 벌린 몸 + 주황 목도리)을
-시트 둘(`nail_v3_a`·`nail_v3_b`)로 받아 키 약 22px로(모모 23·도토 25와 나란히). 0242에 머리를 키워(`chibi`) 키 약 24px. 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
+시트 둘(`nail_v3_a`·`nail_v3_b`)로 받아 키 약 22px로(모모 23·도토 25와 나란히). 0242: 머리를 키운 시험(`chibi`, 사장 "좋은데?") →
+그 비율로 처음부터 그린 v4 시트 둘(`nail_v4_a`·`nail_v4_b`, 2.5등신·큰 눈)을 받아 지금 쓴다(`SPEC`, 키 약 24px). 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
 
 칸 배치(게임 코드는 칸 크기 `art::NAIL_CELL`만 안다):
   줄 0: 서기 2, 걷기 4 / 줄 1: 치기 3, 맞음, 쓰러짐, 들기 3, 거두기 / 줄 2: 흙더미 2, 그림자(16칸 그림을 칸 아래 가운데에)
@@ -165,7 +166,8 @@ def chibi(img, frames, ref=False):
 
 SHEET_A = SPRITES / "nail_v3_a.png"
 SHEET_B = SPRITES / "nail_v3_b.png"
-SPEC = Spec(
+# v3 + 머리 키우기(0242 첫판) — 지금 게임은 v4(아래 `SPEC`). 참고 그림 `chibi_ref.py`가 이 설정을 쓴다.
+SPEC_V3 = Spec(
     sources=[
         Source(
             SHEET_A,
@@ -208,6 +210,48 @@ SPEC = Spec(
 )
 
 
+# v4(0242, 사장 고름): 처음부터 2.5등신·큰 눈으로 받은 시트 둘. 머리 키우기(`chibi`) 없이 그대로 줄인다.
+# 시트 A(2줄 × 4): 줄 1 들기 1·치기 1·들기 2·치기 2, 줄 2 서기·서기 2(안 씀)·파고들기(안 씀)·강타 들기.
+# 시트 B(2줄 × 4): 줄 1 맞음·쓰러짐·강타·거두기, 줄 2 걷기 넷. 칸 상자는 redo_concepts.components로 찾은 값.
+SHEET_V4_A = SPRITES / "nail_v4_a.png"
+SHEET_V4_B = SPRITES / "nail_v4_b.png"
+SPEC = Spec(
+    sources=[
+        Source(
+            SHEET_V4_A,
+            {
+                "windup0": (38, 34, 239, 265),
+                "attack0": (281, 34, 517, 265),
+                "windup1": (542, 34, 735, 265),
+                "attack1": (768, 34, 986, 265),
+                "idle_a": (29, 294, 252, 530),
+                "windup2": (789, 290, 995, 538),
+            },
+            groups=dict.fromkeys(("windup0", "attack0", "windup1", "attack1", "idle_a", "windup2"), "idle_a"),
+            tidy=0.15,
+            strip=6,
+        ),
+        # 시트 B는 따로 받아 그려 온 크기가 조금 다르다 → 똑바로 선 거두기 칸의 키로 한 배율.
+        Source(
+            SHEET_V4_B,
+            {   # 줄 2 걷기 넷 중 첫 칸만 쓴다: (289, 294, 487, 530) · (542, 294, 751, 530) · (789, 289, 986, 538)는 안 씀
+                "hurt": (46, 34, 239, 265),
+                "dead": (272, 93, 517, 265),
+                "attack2": (546, 38, 764, 265),
+                "settle": (793, 34, 986, 265),
+                "walk_1": (29, 294, 252, 530),
+            },
+            groups=dict.fromkeys(("hurt", "dead", "attack2", "settle", "walk_1"), "settle"),
+            tidy=0.15,
+            strip=6,
+        ),
+    ],
+    palette_ref=(0, "idle_a"),
+    body_h=24,
+    breathe=("idle_a", "idle_b"),
+)
+
+
 def small(grid_text):
     """16칸 그림(흙더미·그림자)을 칸 아래 가운데에."""
     rows = legacy.outline(legacy.grid(grid_text))
@@ -224,37 +268,31 @@ def small(grid_text):
 
 # 점 다듬기(0242, 사장 "스프라이트 하나씩 보면서 다듬어"): 변환 뒤 칸마다 손볼 점. (x, y) → 색 이름(`INK`) 또는 None(지움).
 # 칸 좌표는 28칸 그대로(왼쪽 위 0,0). PNG를 손으로 고치지 않고 여기 적어 두면 다시 만들어도 남는다.
-INK = {
-    "line": (43, 29, 42), "dark": (61, 27, 51), "fur": (84, 53, 58), "fur2": (121, 75, 77),
-    "eye": (20, 12, 16), "scarf": (211, 105, 53), "scarf2": (169, 66, 49), "shade": (63, 29, 53),
-    "snout": (236, 160, 137),
+INK = {   # v4 색표의 점
+    "line": (43, 29, 42), "fur": (82, 56, 57), "eye": (0, 0, 0), "shine": (249, 225, 190),
 }
-# 뒤통수의 붉은 점(목도리 매듭이 머리 외곽선 띠 칠하기에 섞인 색) → 그늘 털, 눈은 세로 2px.
+
+
+def eye(x, y, clear=()):
+    """눈 도장: 가로 2 × 세로 3 검은 점 + 오른쪽 위 반짝 한 점(왼쪽 위가 (x, y)). clear는 털로 덮을 옛 눈 점.
+    v4를 줄이면 칸마다 눈이 "+"·고리·세모로 달라져(반짝이 가운데·옆에 남아) 얼굴이 칸마다 바뀌어 보였다."""
+    t = {p: "fur" for p in clear}
+    t.update({(x, y): "eye", (x + 1, y): "shine", (x, y + 1): "eye", (x + 1, y + 1): "eye",
+              (x, y + 2): "eye", (x + 1, y + 2): "eye"})
+    return t
+
+
 TOUCH = {
-    "idle_a": {(9, 7): "shade", (9, 8): "shade", (8, 9): "shade", (7, 10): "shade", (8, 10): "shade",
-               (9, 11): "shade", (10, 10): "fur", (14, 7): "eye"},
-    "idle_b": {(9, 8): "shade", (9, 9): "shade", (8, 10): "shade", (7, 11): "shade", (8, 11): "shade",
-               (9, 12): "shade", (10, 11): "fur", (14, 8): "eye"},
-    # 맞음: 얼굴을 가린 앞발 사이 검은 점이 몰려 있다 → 그늘로 풀어 준다.
-    "hurt": {(9, 8): "shade", (9, 9): "shade", (8, 10): "shade", (9, 10): "shade", (8, 11): "shade",
-             (9, 11): "shade", (14, 7): "fur", (17, 13): "shade", (16, 15): "shade", (18, 12): "shade",
-             (12, 12): "shade"},
-    "dead": {(9, 16): "shade", (16, 17): "shade", (17, 17): "fur", (18, 17): "shade", (17, 18): "shade",
-             (18, 18): "shade"},
-    # 들기 2: 머리 위 앞발과 머리 사이 검은 쐐기.
-    "windup2": {(19, 4): "fur", (20, 4): "line", (14, 7): "eye"},
-    "settle": {(9, 7): "shade", (9, 8): "shade", (7, 9): "shade", (8, 9): "shade", (8, 10): "shade",
-               (8, 11): "shade", (9, 10): "shade", (9, 11): "shade"},
-    "windup1": {(9, 8): "shade", (8, 10): "shade", (10, 11): "shade", (15, 8): "eye"},
-    "attack0": {(8, 8): "shade", (8, 9): "shade", (8, 10): "shade", (7, 11): "shade", (8, 11): "shade",
-                (9, 9): "shade", (9, 10): "shade", (11, 12): "fur"},
-    "attack1": {(7, 6): "shade", (7, 7): "shade", (8, 7): "shade", (7, 8): "shade", (8, 8): "shade",
-                (8, 9): "shade", (6, 10): "shade"},
-    "attack2": {(9, 9): "shade", (10, 9): "shade", (9, 10): "shade", (10, 10): "shade", (11, 10): "shade",
-                (11, 9): "fur"},
-    # 걷기: 눈이 주둥이 윗선에 붙어 검은 덩어리 → 주둥이 뒤로 옮긴다.
-    "walk_a": {(18, 6): "fur", (19, 6): "line", (19, 7): "snout", (16, 6): "eye", (16, 7): "eye",
-               (8, 7): "shade", (8, 9): "shade", (8, 10): "shade", (8, 11): "shade", (9, 10): "fur"},
+    "idle_a": eye(12, 8, [(13, 7), (14, 9), (14, 8)]),
+    "idle_b": eye(12, 9, [(13, 8), (14, 10), (14, 9)]),
+    "walk_1": eye(12, 7, [(14, 8)]),
+    "attack0": eye(12, 8, [(12, 7), (13, 7), (14, 8), (14, 9)]),
+    "attack1": eye(12, 8, [(13, 7), (14, 8), (14, 9)]),
+    "attack2": eye(12, 8, [(14, 9), (14, 10), (15, 9), (14, 8)]),
+    "windup0": eye(11, 7, [(13, 8), (13, 9)]),
+    "windup1": eye(14, 8, [(13, 9), (13, 10)]),
+    "windup2": eye(13, 6, [(12, 7)]),
+    "settle": eye(11, 8, [(12, 7), (13, 8), (13, 9)]),
 }
 
 
@@ -287,7 +325,8 @@ def build():
     idle = touch(seat(spr["idle_a"], CELL, FOOT), "idle_a")
     rows = [
         [idle, touch(seat(spr["idle_b"], CELL, FOOT), "idle_b")]
-        + step_cycle(sat("walk_a"), FOOT - 1),
+        # v4도 걷기 넷을 그려 왔지만 넷째 칸만 몸이 좁고 키가 커 걸음마다 튀었다 → 첫 칸에서 발만 딛게(0241, 다른 캐릭터와 같이).
+        + step_cycle(sat("walk_1"), FOOT - 1),
         # 동작 칸은 몸통 털의 가운데를 서기 칸에 맞춘다(발톱을 뻗어도 몸이 옆으로 뛰지 않게).
         [sat(k) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
         [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
