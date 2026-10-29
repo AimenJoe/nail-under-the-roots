@@ -22,6 +22,11 @@
       document.querySelectorAll("[data-latest-version]").forEach((el) => { el.textContent = latest.tag_name; });
       document.querySelectorAll("[data-latest-date]").forEach((el) => { el.textContent = fmt(latest.published_at); });
       if (apk) document.querySelectorAll("[data-apk]").forEach((el) => { el.href = apk.browser_download_url; });
+      // PC 묶음(0240): nail-<windows|macos|linux>-release.(zip|tar.gz).
+      document.querySelectorAll("[data-pc]").forEach((el) => {
+        const pc = (latest.assets || []).find((a) => a.name.startsWith(`nail-${el.dataset.pc}-`));
+        if (pc) el.href = pc.browser_download_url;
+      });
       const news = document.querySelector("[data-news]");
       if (news) {
         news.textContent = "";

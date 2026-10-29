@@ -16,6 +16,7 @@ cargo clippy --target wasm32-unknown-unknown -- -D warnings
 cargo clippy --target wasm32-unknown-unknown --no-default-features -- -D warnings   # 운영판(0193)
 cargo build --release --target wasm32-unknown-unknown
 cargo check --target aarch64-linux-android          # Android에서만 깨지는 의존성
+cargo clippy --release --target x86_64-pc-windows-msvc --no-default-features -- -D warnings   # PC(0240), 링크 없이 리눅스에서도
 cargo check --release --target aarch64-apple-ios    # 리눅스에서도 된다
 cargo test                                           # 리눅스: libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev libudev-dev pkg-config
 python3 tools/licenses.py                            # 의존성을 바꿨을 때만
