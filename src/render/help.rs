@@ -564,6 +564,10 @@ fn pic_enemy(c: PicCtx) {
     }
 }
 
+/// 안내 그림의 줍는 것(반딧불·씨앗·뿌리 심장)은 게임 시계의 이 배로 — 크게 키워 혼자 보이니 게임 빠르기(날갯짓·둥실·고리)가
+/// 너무 바빠 보였다(사장 "안내의 반딧불과 씨앗 애니메이션 속도가 너무 빠름").
+const LOOT_PACE: f32 = 0.4;
+
 fn pic_loot(c: PicCtx) {
     let PicCtx { w, time, y, .. } = c;
     // 반딧불(재주) · 씨앗(가게) · 뿌리 심장(최대 체력).
@@ -577,7 +581,7 @@ fn pic_loot(c: PicCtx) {
     .enumerate()
     {
         let l = loot::Loot::place(k, vec2(xs[i], y));
-        props::draw_loot(&l, 1.0, time, false);
+        props::draw_loot(&l, 1.0, time * LOOT_PACE, false);
     }
 }
 
@@ -848,11 +852,11 @@ fn pic_village(c: PicCtx) {
     draw_circle(tx + 6.0, y - 13.0, 7.0, Color::new(0.33, 0.58, 0.32, 1.0));
     nail(art, ((time * 2.0) as u32) % 2, 0, vec2(18.0, y), false);
     for i in 0..4 {
-        let k = (time * 0.6 + i as f32 * 0.25).fract();
+        let k = (time * 0.35 + i as f32 * 0.25).fract(); // 큰 나무로 날아가는 빠르기(줍는 것 박자 `LOOT_PACE`와 함께 늦춤)
         let p = vec2(24.0, y - 4.0)
             + (vec2(tx, y - 18.0) - vec2(24.0, y - 4.0)) * k
             + vec2(0.0, -(k * std::f32::consts::PI).sin() * 8.0);
         let l = loot::Loot::place(loot::LootKind::Glowbug, p);
-        props::draw_loot(&l, 1.0, time, false);
+        props::draw_loot(&l, 1.0, time * LOOT_PACE, false);
     }
 }
