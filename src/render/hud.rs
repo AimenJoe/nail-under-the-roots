@@ -7,18 +7,29 @@ use crate::input::TouchKind;
 
 /// 보스 체력 막대(화면 위 가운데): 이름 + 막대. 깨어 있는 보스가 있을 때만.
 /// 위에 둔다: 던전 방(192px)이 화면(180px)보다 커서 방 아래쪽에 서면 아래 막대가 Naïl과 보스를 가렸다(0046).
-pub(super) fn draw_boss_bar(ui: &Ui, w: &World) {
+/// 화면 가운데 위 이름표가 왼쪽 위 HUD(체력·반딧불·씨앗, 오른쪽 끝 `left_end`)에 닿으면 한 줄 아래로(0253:
+/// 최대 체력 12칸이면 HUD가 x≈165까지 온다).
+fn top_center_drop(left_end: f32, nw: f32) -> f32 {
+    if left_end > 160.0 - nw / 2.0 - 2.0 {
+        14.0
+    } else {
+        0.0
+    }
+}
+
+pub(super) fn draw_boss_bar(ui: &Ui, w: &World, left_end: f32) {
     let Some(b) = w.enemies.iter().find(|e| e.is_boss() && !e.asleep) else {
         return;
     };
     let name = crate::i18n::tr(b.sp().name);
-    let bar = Rect::new(90.0, 4.0 + crate::ui::FONT_PX + 4.0, 140.0, 4.0);
     let nw = ui.text_w(name, crate::ui::FONT_PX) + 10.0;
+    let dy = top_center_drop(left_end, nw);
+    let bar = Rect::new(90.0, dy + 4.0 + crate::ui::FONT_PX + 4.0, 140.0, 4.0);
     ui.rect(
-        Rect::new(160.0 - nw / 2.0, 2.0, nw, crate::ui::FONT_PX + 3.0),
+        Rect::new(160.0 - nw / 2.0, dy + 2.0, nw, crate::ui::FONT_PX + 3.0),
         Color::new(0.07, 0.05, 0.09, 0.75),
     );
-    ui.text_center(name, 160.0, 3.0, crate::ui::FONT_PX, crate::ui::ACCENT);
+    ui.text_center(name, 160.0, dy + 3.0, crate::ui::FONT_PX, crate::ui::ACCENT);
     ui.rect(
         Rect::new(bar.x - 1.0, bar.y - 1.0, bar.w + 2.0, bar.h + 2.0),
         OUTLINE,
@@ -50,18 +61,19 @@ pub(super) fn draw_boss_bar(ui: &Ui, w: &World) {
 }
 
 /// 가장 깊은 곳(0162)의 위쪽 표시: 할매 이름 + 매듭 셋(남은 것은 보라, 끊은 것은 풀린 흰 실) + 감긴 수(실 고리).
-pub(super) fn draw_deep_bar(ui: &Ui, w: &World) {
+pub(super) fn draw_deep_bar(ui: &Ui, w: &World, left_end: f32) {
     let Some(d) = &w.deep else {
         return;
     };
     let name = crate::i18n::s().name_halmae;
     let nw = ui.text_w(name, crate::ui::FONT_PX) + 10.0;
+    let dy = top_center_drop(left_end, nw);
     ui.rect(
-        Rect::new(160.0 - nw / 2.0, 2.0, nw, crate::ui::FONT_PX + 3.0),
+        Rect::new(160.0 - nw / 2.0, dy + 2.0, nw, crate::ui::FONT_PX + 3.0),
         Color::new(0.07, 0.05, 0.09, 0.75),
     );
-    ui.text_center(name, 160.0, 3.0, crate::ui::FONT_PX, crate::ui::ACCENT);
-    let y = 4.0 + crate::ui::FONT_PX + 5.0;
+    ui.text_center(name, 160.0, dy + 3.0, crate::ui::FONT_PX, crate::ui::ACCENT);
+    let y = dy + 4.0 + crate::ui::FONT_PX + 5.0;
     for (i, k) in d.knots.iter().enumerate() {
         let x = 160.0 - 16.0 + i as f32 * 16.0;
         if k.cut {

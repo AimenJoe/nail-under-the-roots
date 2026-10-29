@@ -12,6 +12,7 @@ use crate::tuning as t;
 mod boss;
 mod melee;
 mod ranged;
+pub use ranged::tongue_out;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Kind {
@@ -1415,6 +1416,35 @@ mod tests {
         let dir = lashed.expect("혀를 내민다");
         assert!(dir.dot((player - e.pos).normalize()) > 0.95);
         assert!(ev.contains(&Event::Tongue) && pr.is_empty());
+    }
+
+    /// 두꺼비 혀(0253): 내민 순간엔 길이 0이라 안 맞고, 혀끝이 자라 닿아야 맞는다. 다 뻗은 뒤 말려 들어갈 때는 안 맞는다.
+    #[test]
+    fn toad_tongue_hits_only_once_it_has_grown_to_the_player() {
+        let room = Room::new();
+        let mut e = Enemy::new(Kind::Toad, room.center());
+        let dir = vec2(1.0, 0.0);
+        let near = e.pos + dir * (e.radius() + 20.0);
+        let far = e.pos + dir * (e.radius() + 60.0);
+        let at = |e: &mut Enemy, time: f32| e.state = State::Lash { time, dir };
+        at(&mut e, 0.0);
+        assert!(!e.tongue_reaches(&room, far, 3.0) && !e.tongue_reaches(&room, near, 3.0));
+        at(&mut e, t::TOAD_EXTEND_TIME * 0.4);
+        assert!(
+            e.tongue_reaches(&room, near, 3.0),
+            "가까운 데는 먼저 닿는다"
+        );
+        assert!(!e.tongue_reaches(&room, far, 3.0), "먼 데는 아직");
+        at(&mut e, t::TOAD_EXTEND_TIME);
+        assert!(e.tongue_reaches(&room, far, 3.0), "다 뻗으면 끝까지");
+        at(&mut e, t::TOAD_EXTEND_TIME + t::TOAD_LASH_TIME * 0.3);
+        assert!(
+            !e.tongue_reaches(&room, near, 3.0),
+            "말려 들어갈 때는 안 맞는다"
+        );
+        assert!(
+            tongue_out(t::TOAD_EXTEND_TIME * 0.5) > 0.5 && tongue_out(t::TOAD_EXTEND_TIME) == 1.0
+        );
     }
 
     /// 박쥐(0146): 늘 떠 있고(솟구치기 안 닿음), 내리꽂을 때 낮아진다.

@@ -337,7 +337,8 @@ impl Stats {
             s.bargain *= m.bargain;
             s.charm_slots += m.charm_slots;
         }
-        s.max_hp = (s.max_hp + root_hearts.min(crate::tuning::ROOT_HEART_MAX)).max(1);
+        s.max_hp = (s.max_hp + root_hearts.min(crate::tuning::ROOT_HEART_MAX))
+            .clamp(1, crate::tuning::MAX_HP_CAP);
         s.attack_speed = s.attack_speed.clamp(0.6, 1.8);
         s.burrow_cd = s.burrow_cd.clamp(0.3, 2.0);
         s.charge = s.charge.clamp(0.4, 1.5);
@@ -817,6 +818,19 @@ mod tests {
             Stats::compute(&[], 99, &NO_MODS).max_hp,
             Stats::BASE.max_hp + crate::tuning::ROOT_HEART_MAX
         );
+        // 0253: 시작 3칸, 무엇을 더해도 12칸까지(재주 +3, 뿌리 심장 +5, 굳은 껍질 +1·꽃잎 +2 = 14 → 12).
+        assert_eq!(Stats::BASE.max_hp, 3);
+        let talent = Mods {
+            max_hp: 3,
+            ..NO_MODS
+        };
+        let petal = (0..CHARMS.len())
+            .find(|&c| CHARMS[c].mods.max_hp == 2)
+            .unwrap();
+        let shell = (0..CHARMS.len())
+            .find(|&c| CHARMS[c].mods.max_hp == 1)
+            .unwrap();
+        assert_eq!(Stats::compute(&[shell, petal], 5, &talent).max_hp, 12);
     }
 
     #[test]

@@ -18,8 +18,12 @@ pub const WALL_TOP: f32 = 24.0;
 // ---- 플레이어 ------------------------------------------------------------
 pub const PLAYER_RADIUS: f32 = 6.0;
 pub const PLAYER_SPEED: f32 = 90.0;
-/// 최대 체력. 3이면 오래 못 버틴다(사장 피드백 2026-10-25) → 5 + 산딸기 회복(docs/decisions/0016).
-pub const PLAYER_HP: i32 = 5;
+/// 시작 체력. 3이면 오래 못 버틴다(사장 피드백 2026-10-25) → 5 + 산딸기 회복(docs/decisions/0016)
+/// → 다시 3(0253, 사장 "시작시에는 3개로": 재주·뿌리 심장·장신구로 늘어나는 폭이 커져 16칸까지 갔다).
+pub const PLAYER_HP: i32 = 3;
+/// 최대 체력의 상한(0253, 사장 "최대 12개까지만"): 재주·뿌리 심장·장신구를 다 더해도 이 위로는 안 오른다.
+/// 하트 12칸 = HUD 왼쪽 위 123px — 화면 가운데 보스 이름표(x 130~)에 닿지 않는다.
+pub const MAX_HP_CAP: i32 = 12;
 /// 퀵 슬롯이 저절로 바뀌었을 때 깜빡이는 시간(0091).
 pub const QUICK_FLASH: f32 = 1.2;
 /// 피격 후 무적 시간.
@@ -118,6 +122,11 @@ pub const COCOON_R: f32 = 9.0;
 /// 그 뒤로는 모으는 자세(느려지고 발톱에 빛). 모으기 수치는 누른 때부터 센다.
 /// 누른 때(또는 평타 뒤 계속 누른 때)부터 이만큼(초) 지나 떼면 강공격(수치는 `moveset::heavy_of`).
 pub const HEAVY_CHARGE: f32 = 0.45;
+/// 모으기에 들어선 뒤 이만큼(초) 안에 떼면 그냥 누른 것(평타는 이미 나갔다). 그 뒤 다 모으기 전에 떼면 다음 평타(0253,
+/// 사장 "다 모으지 못하고 놓을 때는 일반 공격이 나가야 함"). 보통 누름도 활성 구간 뒤까지 쥐고 있어 모으기에 잠깐 들어선다 —
+/// 박자에 누르는 손은 0.25초까지 쥐고 있어(시험 `every_weapon_chains_every_hit_on_the_beat_whatever_the_tap_length`) 0.12면
+/// 박자 이음이 엇박 평타로 바뀌었다.
+pub const HEAVY_TAP_GRACE: f32 = 0.2;
 /// 적 예고가 다 찬 채로 보이는 시간(초, 0188). 공격이 나가는 틱에 예고가 사라지므로, 진행이 그 틱에 1이 되면 다 찬 그림은
 /// 한 번도 그려지지 않았다(마지막에 보이는 건 97% 안팎 — "꽉 차기 전에 공격이 나온다", 사장). 공격 시각은 그대로 두고
 /// 그림만 이만큼 먼저 다 찬다. 짧은 예고는 길이의 1/4까지만.
@@ -302,7 +311,7 @@ pub const LOOT_MAGNET_MAX_SPEED: f32 = 230.0;
 /// 기본 체력(`PLAYER_HP` 5칸)에서 한 칸에 5%(사장 2026-10-29, 예전 칸마다 8%). 칸 수가 아니라 비율이라
 /// 최대 체력이 커도(뿌리 심장·장신구) 같은 비율만큼 깎였으면 같은 확률이다(0252, 사장 "최대 체력이 높을수록 더 잘 나오면 부당").
 pub const BERRY_BASE_CHANCE: f32 = 0.06;
-pub const BERRY_CHANCE_MISSING_ALL: f32 = 0.05 * PLAYER_HP as f32;
+pub const BERRY_CHANCE_MISSING_ALL: f32 = 0.05 * PLAYER_HP as f32; // 시작 체력 3이면 다 깎여도 +15%
 /// 체력이 깎인 채로 이만큼 처치해도 안 나왔으면 다음엔 반드시(불운 보정).
 pub const BERRY_PITY_KILLS: u32 = 6;
 /// 산딸기 하나가 채우는 체력.
@@ -601,6 +610,9 @@ pub const SHREW_REAIM: f32 = 0.4;
 pub const TOAD_TONGUE_REACH: f32 = 70.0;
 pub const TOAD_TONGUE_WIDTH: f32 = 4.0;
 pub const TOAD_LASH_TIME: f32 = 0.22;
+/// 혀가 다 뻗기까지(0253, 사장 "두꺼비 혀가 보이지도 않고 맞음"): 이 동안 혀끝이 자라며, 맞는 판정도 지금 뻗은 길이까지.
+/// 그 뒤 `TOAD_LASH_TIME` 동안 말려 들어간다.
+pub const TOAD_EXTEND_TIME: f32 = 0.12;
 pub const TOAD_PULL: f32 = 260.0;
 /// 박쥐: 나는 높이(그리기용 px). 날고 있어 솟구치기가 닿지 않는다.
 pub const BAT_HEIGHT: f32 = 9.0;

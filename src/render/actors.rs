@@ -1573,12 +1573,32 @@ pub(super) fn draw_player_halo(p: Vec2, time: f32) {
     );
 }
 
-/// 두꺼비 혀(0146): 맞는 순간 다 뻗었다가 말려 들어간다(맞았는지는 월드가 뻗은 틱에 본다).
+/// 바라보는 쪽(0253, 사장 "어느 방향을 바라보는지 표시가 있어야 그 방향으로 패링·원거리 조준"): 발밑 고리 가장자리의
+/// 삼각형. 3/4 시점이라 고리처럼 위아래를 눌러 그린다(끝이 가로 17, 세로 7). 받아치기·던지기·멀리뛰기가 모두 이 쪽이다.
+pub(super) fn draw_facing_mark(p: Vec2, facing: Vec2, time: f32) {
+    let d = facing.normalize_or(vec2(1.0, 0.0));
+    let c = vec2(p.x, p.y + 6.0);
+    let squash = |v: Vec2| vec2(v.x, v.y * 0.42);
+    let tip = c + squash(d * 17.0);
+    let base = c + squash(d * 10.5);
+    let side = squash(vec2(-d.y, d.x) * 4.5);
+    let a = 0.75 + 0.15 * (time * 2.2).sin();
+    let outline = Color::new(0.12, 0.08, 0.06, 0.6 * a);
+    let fill = Color::new(1.0, 0.9, 0.6, a);
+    draw_triangle(
+        tip + d,
+        base + side * 1.4 - d * 0.5,
+        base - side * 1.4 - d * 0.5,
+        outline,
+    );
+    draw_triangle(tip, base + side, base - side, fill);
+}
+
+/// 두꺼비 혀(0146): 뻗었다가 말려 들어간다. 길이는 맞는 판정과 같은 `enemy::tongue_out`(0253).
 pub(super) fn draw_tongue(w: &World, pos: Vec2, r: f32, dir: Vec2, time: f32) {
     let start = pos + dir * r;
     let reach = w.room.ray_len(start, dir, 1.0, t::TOAD_TONGUE_REACH);
-    let k = (time / t::TOAD_LASH_TIME).clamp(0.0, 1.0);
-    let len = reach * (1.0 - k * k);
+    let len = reach * crate::enemy::tongue_out(time);
     let (a, b) = (
         (start - vec2(0.0, 2.0)).round(),
         (start + dir * len - vec2(0.0, 2.0)).round(),

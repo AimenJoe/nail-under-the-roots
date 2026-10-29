@@ -862,7 +862,7 @@ pub static FR: Strings = Strings {
     h_burrow: "Creuser et jaillir",
     h_burrow_d: "Le bouton creuser te cache sous terre (rien ne te touche). Garde-le enfoncé pour rester dessous et rassembler ta force ; relâche pour jaillir et repousser tout autour. Plus tu attends, plus c'est large. Momo saute à la place (intouchable en l'air ; en retombant elle repousse ceux qui l'entourent, sans les blesser).",
     h_parry: "Parer",
-    h_parry_d: "Quand un ennemi charge tout droit (alerte en bande), attaque juste avant l'impact pour le renvoyer et l'étourdir. Les ennemis recroquevillés (Kongi, hérissons) renvoient les griffes sur leur carapace : ouvre-les avec un coup lourd ou en jaillissant.",
+    h_parry_d: "Quand un ennemi charge tout droit (alerte en bande), attaque juste avant l'impact pour le renvoyer et l'étourdir. Les ennemis recroquevillés (Kongi, hérissons) renvoient les griffes sur leur carapace : ouvre-les avec un coup lourd ou en jaillissant. Les renvois et les lancers partent là où pointe le petit triangle à tes pieds.",
     h_special: "Botte secrète",
     h_special_d: "Frapper les ennemis remplit la jauge. Pleine, appuie sur botte secrète : Naïl devient une foreuse et traverse l'écran (cogne les murs) ; Momo enchaîne trois bonds et retombe lourdement. Ça part dans la direction visée.",
     h_eat: "Manger",

@@ -862,7 +862,7 @@ pub static DE: Strings = Strings {
     h_burrow: "Graben und Auftauchen",
     h_burrow_d: "Die Grabtaste versteckt dich unter der Erde (nichts trifft dich). Halte sie, um unten zu bleiben und Kraft zu sammeln; lass los, um hochzuschießen und alles ringsum wegzustoßen. Je länger, desto weiter. Momo hüpft stattdessen (in der Luft unverwundbar; die Landung schubst Gegner weg, ohne Schaden).",
     h_parry: "Abwehren",
-    h_parry_d: "Wenn ein Gegner geradeaus anstürmt (Warnung als Bahn), greif kurz vor dem Aufprall an, um ihn abzuwehren und benommen zu machen. Eingerollte Gegner (Kongi, Igel) prallen die Krallen am Panzer ab: öffne sie mit einem schweren Hieb oder durchs Auftauchen.",
+    h_parry_d: "Wenn ein Gegner geradeaus anstürmt (Warnung als Bahn), greif kurz vor dem Aufprall an, um ihn abzuwehren und benommen zu machen. Eingerollte Gegner (Kongi, Igel) prallen die Krallen am Panzer ab: öffne sie mit einem schweren Hieb oder durchs Auftauchen. Abwehren und Würfe gehen dorthin, wohin das kleine Dreieck an deinen Füßen zeigt.",
     h_special: "Spezialattacke",
     h_special_d: "Treffer füllen die Leiste. Ist sie voll, drück Spezial: Naïl wird zum Bohrer und kreuzt den Bildschirm (knallt gegen Wände); Momo reiht drei Sprünge aneinander und kommt hart herunter. Sie geht in die Zielrichtung.",
     h_eat: "Essen",

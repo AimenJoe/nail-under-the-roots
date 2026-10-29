@@ -862,7 +862,7 @@ pub static PT_BR: Strings = Strings {
     h_burrow: "Cavar e irromper",
     h_burrow_d: "O botão de cavar esconde você no chão (nada te acerta). Segure para ficar embaixo juntando força; solte para irromper e empurrar tudo ao redor. Quanto mais tempo, mais largo. Momo pula em vez disso (no ar, nada a acerta, e ao cair ela empurra quem está perto, sem ferir).",
     h_parry: "Rebater",
-    h_parry_d: "Quando um inimigo avança reto (aviso em faixa), ataque logo antes de ele chegar para rebatê-lo e deixá-lo tonto. Inimigos encolhidos (Kongi, ouriços) rebatem as garras no casco: abra-os com um golpe pesado ou irrompendo.",
+    h_parry_d: "Quando um inimigo avança reto (aviso em faixa), ataque logo antes de ele chegar para rebatê-lo e deixá-lo tonto. Inimigos encolhidos (Kongi, ouriços) rebatem as garras no casco: abra-os com um golpe pesado ou irrompendo. Rebatidas e arremessos vão para onde aponta o triângulo aos seus pés.",
     h_special: "Especial",
     h_special_d: "Acertar inimigos enche a barra. Cheia, aperte especial: Naïl vira uma broca e cruza a tela (bate na parede); Momo encadeia três pulos e desce com força. Vai para onde você mira.",
     h_eat: "Comer",

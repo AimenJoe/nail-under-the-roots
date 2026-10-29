@@ -862,7 +862,7 @@ pub static PL: Strings = Strings {
     h_burrow: "Kopanie i wyskok",
     h_burrow_d: "Przycisk kopania chowa cię pod ziemią (nic cię nie trafi). Trzymaj, by zostać pod ziemią i zbierać siłę; puść, by wyskoczyć i odepchnąć wszystko wokół. Im dłużej, tym szerzej. Momo zamiast tego skacze (w powietrzu nic jej nie trafi, a lądując odpycha wrogów bez obrażeń).",
     h_parry: "Odbicie",
-    h_parry_d: "Gdy wróg szarżuje prosto na ciebie (ostrzeżenie w pasie), zaatakuj tuż przed zderzeniem, by go odbić i zamroczyć. Zwinięci wrogowie (Kongi, jeże) odbijają pazury pancerzem: otwórz ich ciężkim ciosem albo wyskokiem.",
+    h_parry_d: "Gdy wróg szarżuje prosto na ciebie (ostrzeżenie w pasie), zaatakuj tuż przed zderzeniem, by go odbić i zamroczyć. Zwinięci wrogowie (Kongi, jeże) odbijają pazury pancerzem: otwórz ich ciężkim ciosem albo wyskokiem. Odbicia i rzuty lecą tam, gdzie wskazuje trójkącik przy stopach.",
     h_special: "Specjał",
     h_special_d: "Trafienia napełniają pasek. Gdy jest pełny, naciśnij specjał: Naïl zmienia się w wiertło i przecina ekran (trzaska o ścianę), Momo łączy trzy skoki i spada z impetem. Leci tam, gdzie celujesz.",
     h_eat: "Jedzenie",

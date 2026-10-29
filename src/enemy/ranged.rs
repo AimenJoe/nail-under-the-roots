@@ -2,18 +2,33 @@
 
 use super::*;
 
+/// 혀가 뻗은 정도 0..1(0253): 뻗는 동안 끝이 빠르게 자라다 닿을 때 느려지고(감속), 다 뻗은 뒤 말려 들어간다.
+/// 맞는 판정(`tongue_reaches`)과 그림(`render::actors::draw_tongue`)이 같이 쓴다.
+pub fn tongue_out(time: f32) -> f32 {
+    if time <= t::TOAD_EXTEND_TIME {
+        let k = (time / t::TOAD_EXTEND_TIME).clamp(0.0, 1.0);
+        1.0 - (1.0 - k) * (1.0 - k)
+    } else {
+        let k = ((time - t::TOAD_EXTEND_TIME) / t::TOAD_LASH_TIME).clamp(0.0, 1.0);
+        1.0 - k * k
+    }
+}
+
 impl Enemy {
-    /// 두꺼비 혀(0146): 내민 틱에 혀 줄이 `ppos`(반지름 `pr`)에 닿나. 벽에 막히면 거기까지.
+    /// 두꺼비 혀(0146): 지금 뻗은 혀 줄이 `ppos`(반지름 `pr`)에 닿나. 벽에 막히면 거기까지.
+    /// 뻗는 동안(`TOAD_EXTEND_TIME`)만 맞힌다 — 혀끝이 닿는 게 보인 뒤에 맞는다(0253). 말려 들어갈 때는 안 맞는다.
     pub fn tongue_reaches(&self, room: &Room, ppos: Vec2, pr: f32) -> bool {
         let State::Lash { time, dir } = self.state else {
             return false;
         };
-        if time > 0.0 {
+        if time > t::TOAD_EXTEND_TIME {
             return false;
         }
         let start = self.pos + dir * self.radius();
-        let reach = room.ray_len(start, dir, 1.0, t::TOAD_TONGUE_REACH);
-        combat::dist_to_segment(ppos, start, start + dir * reach) <= pr + t::TOAD_TONGUE_WIDTH
+        let reach = room.ray_len(start, dir, 1.0, t::TOAD_TONGUE_REACH) * tongue_out(time);
+        reach > 0.0
+            && combat::dist_to_segment(ppos, start, start + dir * reach)
+                <= pr + t::TOAD_TONGUE_WIDTH
     }
 
     /// 거리 두기(던지기·뛰기·혀·포자): 멀면 다가가고 가까우면 물러나며, 때가 되면 겨눈다.
@@ -103,12 +118,12 @@ impl Enemy {
         }
     }
 
-    /// 두꺼비의 혀 내밀기(0146).
+    /// 두꺼비의 혀 내밀기(0146): 뻗고(`TOAD_EXTEND_TIME`) 말려 들어간다(`TOAD_LASH_TIME`).
     pub(super) fn tick_lash(&mut self, c: &mut Ctx<'_>, time: f32, dir: Vec2) {
         let dt = c.dt;
         let sp = self.sp();
         let time = time + dt;
-        self.state = if time >= t::TOAD_LASH_TIME {
+        self.state = if time >= t::TOAD_EXTEND_TIME + t::TOAD_LASH_TIME {
             State::Rest { time: sp.rest }
         } else {
             State::Lash { time, dir }

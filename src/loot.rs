@@ -180,8 +180,10 @@ mod tests {
         let three = berry_chance(2, 5, 0, Kind::FieldMouse);
         assert!(three > one && one > 0.0);
         assert_eq!(berry_chance(4, 5, t::BERRY_PITY_KILLS, Kind::Chipmunk), 1.0);
-        // 0252: 기본 체력에서 한 칸 = 5%, 그리고 최대 체력이 커도 같은 비율이면 같은 확률.
-        assert!((one - (t::BERRY_BASE_CHANCE + 0.05)).abs() < 1e-6);
+        // 0252: 시작 체력에서 한 칸 = 5%, 그리고 최대 체력이 커도 같은 비율이면 같은 확률.
+        let hp = t::PLAYER_HP;
+        let base_one = berry_chance(hp - 1, hp, 0, Kind::FieldMouse);
+        assert!((base_one - (t::BERRY_BASE_CHANCE + 0.05)).abs() < 1e-6);
         assert!((berry_chance(8, 10, 0, Kind::FieldMouse) - one).abs() < 1e-6);
         assert!(
             berry_chance(9, 10, 0, Kind::FieldMouse) < one,

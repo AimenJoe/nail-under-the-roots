@@ -162,6 +162,14 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
     if standing && ground {
         draw_ellipse(pp.x, pp.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
         draw_player_halo(pp, w.time);
+        // 바라보는 쪽(0253): 싸우는 곳에서만 — 마을·쉼터는 고리만.
+        let hub = matches!(
+            w.adv.place,
+            crate::adventure::Place::Village | crate::adventure::Place::Camp
+        );
+        if !hub {
+            draw_facing_mark(pp, w.player.facing, w.time);
+        }
     }
     if !ground {
         // 해 그림자: 땅속 플레이어(둔덕)·줍는 것은 그림자를 드리우지 않는다. 모닥불은 돌만(아래).

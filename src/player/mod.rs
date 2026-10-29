@@ -1760,6 +1760,43 @@ mod tests {
         }
     }
 
+    /// 덜 모은 강타(0253): 모으는 자세로 `HEAVY_TAP_GRACE`보다 오래 쥐었다가 다 모이기 전에 떼면 다음 평타가 나간다.
+    /// 막 모으기에 들어서자 뗀 것(보통 누름)은 아무것도 안 나간다.
+    #[test]
+    fn releasing_a_partial_charge_swings_the_next_hit() {
+        let room = Room::new();
+        let press = Actions {
+            attack: true,
+            attack_held: true,
+            ..Default::default()
+        };
+        let hold = Actions {
+            attack_held: true,
+            ..Default::default()
+        };
+        let charge_for = |secs: f32| {
+            let mut p = Player::new(room.center());
+            tick(&mut p, &room, &press);
+            while matches!(p.state, State::Attack { .. }) {
+                tick(&mut p, &room, &hold);
+            }
+            assert!(matches!(p.state, State::Charging { after: 1, .. }));
+            for _ in 0..(secs / t::TICK_DT).round() as usize {
+                tick(&mut p, &room, &hold);
+            }
+            let (_, ev) = tick(&mut p, &room, &Actions::default());
+            (p.state, ev)
+        };
+        let (state, ev) = charge_for((t::HEAVY_TAP_GRACE + t::HEAVY_CHARGE) * 0.5);
+        assert!(matches!(state, State::Attack { idx: 1, .. }), "{state:?}");
+        assert!(ev.contains(&Event::Swing(1)) && !ev.contains(&Event::Heavy));
+        let (state, ev) = charge_for(t::HEAVY_TAP_GRACE * 0.5);
+        assert!(
+            !matches!(state, State::Attack { .. })
+                && !ev.iter().any(|e| matches!(e, Event::Swing(_)))
+        );
+    }
+
     /// 무기마다 박자 콤보(사장 "무기마다 리듬 타격 검증, 2타가 제대로 안 나간다"): 박자 한가운데에 누르면 모든 이음이
     /// 다음 타 + Beat. 사람 손가락은 한 틱이 아니라 0.05~0.2초 누르고 있으니 그 길이마다 본다 — 활성 구간 뒤에도
     /// 누르고 있으면 모으기로 갔다가 덜 모으고 떼는데, 그때 콤보 창이 박자보다 먼저 닫히면 1타로 돌아갔다.

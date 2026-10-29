@@ -862,7 +862,7 @@ pub static ES: Strings = Strings {
     h_burrow: "Excavar y emerger",
     h_burrow_d: "El botón de excavar te esconde bajo tierra (nada te alcanza). Mantenlo para quedarte abajo y reunir fuerza; suelta para emerger y empujar todo alrededor. Cuanto más tiempo, más amplio. Momo salta en su lugar (en el aire nada la toca y al caer aparta a los cercanos, sin herirlos).",
     h_parry: "Repeler",
-    h_parry_d: "Cuando un enemigo carga en línea recta (aviso en franja), ataca justo antes del impacto para repelerlo y dejarlo aturdido. Los enemigos acurrucados (Kongi, erizos) rebotan las garras en su caparazón: ábrelos con un golpe fuerte o emergiendo.",
+    h_parry_d: "Cuando un enemigo carga en línea recta (aviso en franja), ataca justo antes del impacto para repelerlo y dejarlo aturdido. Los enemigos acurrucados (Kongi, erizos) rebotan las garras en su caparazón: ábrelos con un golpe fuerte o emergiendo. Los rechazos y lanzamientos van hacia donde apunta el triangulito a tus pies.",
     h_special: "Especial",
     h_special_d: "Golpear enemigos llena la barra. Llena, pulsa especial: Naïl se vuelve un taladro y cruza la pantalla (choca con la pared); Momo encadena tres saltos y cae con fuerza. Sale hacia donde apuntas.",
     h_eat: "Comer",

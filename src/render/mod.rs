@@ -805,14 +805,15 @@ impl Renderer {
             .as_ref()
             .and_then(|a| a.sunny.as_ref())
             .map(|s| &s.sheet);
-        // 왼쪽 위 바탕판(0091): 체력·반딧불·씨앗이 밝은 바닥 위에서 묻혔다.
-        {
+        // 왼쪽 위 바탕판(0091): 체력·반딧불·씨앗이 밝은 바닥 위에서 묻혔다. 오른쪽 끝은 가운데 이름표가 피한다(0253).
+        let left_end = {
             let gx = 3.0 + w.player.stats.max_hp as f32 * hp_step(sheet) + 5.0;
             let sx = gx + 7.0 + ui.text_w(&w.inv.glowbugs.to_string(), crate::ui::FONT_PX) + 6.0;
             let tx = if sheet.is_some() { sx + 9.0 } else { sx + 5.0 };
             let end = tx + ui.text_w(&w.inv.seeds.to_string(), crate::ui::FONT_PX);
             hud_plate(ui, Rect::new(0.0, -1.0, end + 3.0, 13.0));
-        }
+            end + 3.0
+        };
         draw_hud_bars(ui, w, sheet);
         let out = ui.with_outline();
         // 반딧불: 체력 칸 오른쪽. 숫자는 언어 폰트(숫자는 모든 폰트에 있다). 글자 윗부분이 화면 밖으로 잘리지 않게 y ≥ 1.
@@ -903,8 +904,8 @@ impl Renderer {
                 );
             }
         }
-        draw_boss_bar(ui, w);
-        draw_deep_bar(ui, w);
+        draw_boss_bar(ui, w, left_end);
+        draw_deep_bar(ui, w, left_end);
         draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
     }
 

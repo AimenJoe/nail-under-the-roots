@@ -862,7 +862,7 @@ pub static EN: Strings = Strings {
     h_burrow: "Burrow and emerge",
     h_burrow_d: "The burrow button hides you underground (you can't be hit). Hold it to stay down and gather strength; release to burst up and push everything around you. The longer you hold, the wider. Momo hops instead (untouchable in the air; the landing shoves foes aside without hurting them).",
     h_parry: "Parry",
-    h_parry_d: "When an enemy charges straight at you (a lane-shaped tell), attack just before it lands to knock it back and leave it dizzy. Curled-up enemies (Kongi, hedgehogs) bounce claws off their shell: open them with a heavy strike or by emerging.",
+    h_parry_d: "When an enemy charges straight at you (a lane-shaped tell), attack just before it lands to knock it back and leave it dizzy. Curled-up enemies (Kongi, hedgehogs) bounce claws off their shell: open them with a heavy strike or by emerging. Parries and throws go where the little triangle at your feet points.",
     h_special: "Special",
     h_special_d: "Hitting enemies fills the gauge. When it's full, press special: Naïl becomes a drill and crosses the screen (slamming into walls); Momo chains three hops and comes down hard. It goes where you aim.",
     h_eat: "Eating",

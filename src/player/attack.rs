@@ -96,8 +96,17 @@ impl Player {
         } else if !a.attack_held {
             if time >= self.charge_time() {
                 self.start_heavy(dir, after, time - self.charge_time() <= t::HEAVY_PERFECT);
+            } else if time > t::HEAVY_TAP_GRACE {
+                // 모으다 덜 모으고 뗐다(0253): 다음 평타가 나간다(마지막 타 뒤면 1타). 모으는 자세를 보였는데 아무것도
+                // 안 나가면 입력을 먹은 것처럼 느껴졌다.
+                let next = if after <= self.moveset.last() {
+                    after
+                } else {
+                    0
+                };
+                self.start_swing(next, dir, false);
             } else {
-                // 덜 모으고 뗐다: 아무것도 안 나가고(평타는 이미 나갔다), 콤보는 거기서 이어진다.
+                // 막 모으기에 들어서자 뗐다 = 그냥 누른 것: 아무것도 안 나가고(평타는 이미 나갔다), 콤보는 거기서 이어진다.
                 // 콤보 창은 스윙 끝과 같이 박자 창이 다 닫힐 때까지(0205): 보통 누름(0.1초 남짓)도 활성 구간 뒤까지
                 // 쥐고 있어 여기로 오는데, 무기의 짧은 창(0.3초)만 주면 박자(0.42초) 전에 닫혀 박자에 누른 2타가 1타로 돌아갔다.
                 self.state = State::Free;
