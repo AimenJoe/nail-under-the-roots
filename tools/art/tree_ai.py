@@ -21,7 +21,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import sprite_ai  # noqa: E402
-from sprite_ai import outline, shared_palette, shrink  # noqa: E402
+from sprite_ai import OUTLINE, lum, outline, ramp, shared_palette, shrink  # noqa: E402
 
 SRC = HERE / "sources" / "ai" / "sprites" / "tree_v1.png"
 HALF = 512          # 왼쪽 시든 나무 | 오른쪽 다 핀 나무
@@ -155,7 +155,7 @@ def build():
     # 색 수는 공용 변환기의 전역 — 나무만 32색으로 쓰고 되돌린다(재현 검사가 한 프로세스에서 다른 시트도 만든다).
     keep_ncol, sprite_ai.NCOL = sprite_ai.NCOL, NCOL
     try:
-        return _build(img, dead, live, dk, cm, clump, clean, stages, top)
+        return grade(_build(img, dead, live, dk, cm, clump, clean, stages, top))
     finally:
         sprite_ai.NCOL = keep_ncol
 
@@ -201,6 +201,41 @@ def _build(img, dead, live, dk, cm, clump, clean, stages, top):
                     cell[yy, xx] = sp[y, x]
         sheet[:, i * W:(i + 1) * W] = cell
     return sheet
+
+
+# 마을 톤(0238 덧붙임, 사장 "나무 톤이 좀 튄다"): 원본 잎은 채도 0.8~1.0의 쨍한 초록, 줄기는 자줏빛 짙은 갈색이라
+# 마을(풀·작은 나무·덤불 채도 0.3~0.5, 둔덕 흙 갈색)에서 튀었다. 게임 화면에서 잰 마을 색 단계로 밝기 순서대로 옮긴다.
+LEAF = [(26, 52, 44), (36, 93, 68), (60, 138, 78), (82, 166, 76), (98, 200, 91), (150, 214, 120)]
+BARK = [(52, 36, 38), (78, 56, 44), (98, 70, 52), (118, 84, 62), (142, 106, 78)]
+
+
+def grade(sheet):
+    """잎(초록)·줄기(갈색·자줏빛 갈색)를 마을 단계로. 꽃 분홍·불빛·보라 실·외곽선은 그대로, 거의 검정은 외곽선 색."""
+    import colorsys
+    out = sheet.copy()
+    on = out[..., 3] > 0
+    keys = {tuple(int(v) for v in out[y, x, :3]) for y, x in zip(*np.nonzero(on))}
+    leaf, bark, remap = [], [], {}
+    for k in keys:
+        h, l, s_ = colorsys.rgb_to_hls(*(v / 255 for v in k))
+        if l < 0.07:
+            remap[k] = OUTLINE
+        elif 0.18 <= h <= 0.52 and s_ > 0.2:
+            leaf.append(k)
+        elif (h >= 0.82 or h <= 0.12) and s_ < 0.62 and l < 0.5 and k != OUTLINE:
+            bark.append(k)
+    for group, steps in ((leaf, LEAF), (bark, BARK)):
+        if not group:
+            continue
+        ls = [lum(c) for c in group]
+        lo, hi = min(ls), max(ls)
+        for c, L in zip(group, ls):
+            remap[c] = ramp(steps, (L - lo) / max(1.0, hi - lo))
+    for y, x in zip(*np.nonzero(on)):
+        k = tuple(int(v) for v in out[y, x, :3])
+        if k in remap:
+            out[y, x, :3] = remap[k]
+    return out
 
 
 BASE = 96           # 칸 위에서 밑동 줄(잎 꼭대기가 칸 위 끝에 닿지 않게 — 86이면 다 핀 나무가 6px 잘렸다)
