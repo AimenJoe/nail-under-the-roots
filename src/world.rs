@@ -3518,11 +3518,9 @@ mod tests {
         );
     }
 
-    /// 가장 깊은 곳(0162): 매듭은 평타 여섯(강공격은 두 배)에 끊기고, 당기기에 세 번 감기면 실에 잠긴다.
-    /// 감기면 가장 가까운 매듭이 다시 조여진다. 셋 다 끊으면 잠시 뒤 엔딩.
+    /// 할매 2단계(0233): 매듭이 하나 남으면 당기기 뒤에 곧바로 한 번 더, 그다음은 보통 사이.
     #[test]
     fn deep_last_knot_pulls_twice() {
-        // 할매 2단계(0233): 매듭이 하나 남으면 당기기 뒤에 곧바로 한 번 더, 그다음은 보통 사이.
         let mut w = World::new();
         let c = w.player.pos + vec2(0.0, -80.0);
         w.player.pos = c + vec2(0.0, t::DEEP_PULL_REACH + 60.0); // 실이 닿지 않는 곳(감기지 않게)
@@ -3548,6 +3546,8 @@ mod tests {
         assert!(ends(&mut w) > t::DEEP_ECHO_GAP, "그다음은 보통 사이");
     }
 
+    /// 가장 깊은 곳(0162): 매듭은 평타 여섯(강공격은 두 배)에 끊기고, 당기기에 세 번 감기면 실에 잠긴다.
+    /// 감기면 가장 가까운 매듭이 다시 조여진다. 셋 다 끊으면 잠시 뒤 엔딩.
     #[test]
     fn deep_knots_cut_and_three_wraps_put_you_to_sleep() {
         use crate::adventure::AdvEvent;
