@@ -844,6 +844,14 @@ impl World {
             self.touch_world(&s);
         }
         self.take_spawns();
+        self.player_rumble(dt);
+        self.player_events();
+        self.drill_fx();
+        strike
+    }
+
+    /// 1-1. 땅이 운다: 땅속에서 힘을 모으는 동안(0158)과 달리며 멀리뛰기를 모은 동안(0215). 흔들림·흙알·소리.
+    fn player_rumble(&mut self, dt: f32) {
         // 땅속에서 힘을 모으는 동안(0158) 땅이 운다: 힘에 비례해 흔들리고 흙알이 튄다.
         if self.player.is_burrowed() {
             let charge = self.player.burrow_charge();
@@ -888,6 +896,10 @@ impl World {
                 );
             }
         }
+    }
+
+    /// 1-2. 플레이어 이벤트(휘두름·박자·땅파기·먹기 …) → 소리·효과·월드 일. 다 먹었으면 효과를 건다.
+    fn player_events(&mut self) {
         let mut ate = None;
         for ev in &self.player.events {
             match ev {
@@ -1135,6 +1147,10 @@ impl World {
         if let Some(c) = ate {
             self.finish_eating(c);
         }
+    }
+
+    /// 1-3. 드릴: 시동 중엔 불꽃이 모이고, 돌진 중엔 흙이 튀고 화면이 계속 떨린다.
+    fn drill_fx(&mut self) {
         // 드릴: 시동 중엔 불꽃이 모이고, 돌진 중엔 흙이 튀고 화면이 계속 떨린다.
         if let player::State::Drill { dir, time, .. } = self.player.state {
             let p = self.player.pos;
@@ -1161,7 +1177,6 @@ impl World {
                 });
             }
         }
-        strike
     }
 
     /// 1a. 퀵 아이템·거절 표시·먹기 시작·토스트 시계.
