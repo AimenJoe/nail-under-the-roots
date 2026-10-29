@@ -596,7 +596,7 @@ impl World {
         f.swapped = true;
         self.spring = None;
         self.story.clear_petals();
-        self.hazards.clear_all();
+        self.clear_place();
         self.exit_at = None;
         self.exit_age = 0.0;
         self.juice.petals = false;
@@ -927,8 +927,7 @@ impl World {
             self.loot.clear();
         }
         self.projectiles.clear();
-        self.toss.clear();
-        self.hazards.clear_fight();
+        self.clear_fight();
         self.player.pos = d.start_pos();
         self.player.prev_pos = self.player.pos;
         self.adv.current_room = d.start;
@@ -952,8 +951,7 @@ impl World {
             self.biome = s.biome;
         }
         self.projectiles.clear();
-        self.toss.clear();
-        self.hazards.clear_fight();
+        self.clear_fight();
         self.adv.dungeon = None;
         self.adv.node = None;
     }
@@ -973,8 +971,7 @@ impl World {
         self.enemies.clear();
         self.loot.clear();
         self.projectiles.clear();
-        self.toss.clear();
-        self.hazards.clear_fight();
+        self.clear_fight();
         self.npc = None;
         self.neighbors.clear();
         self.biome = Biome::Deep;
@@ -1019,8 +1016,7 @@ impl World {
         self.enemies.clear();
         self.loot.clear();
         self.projectiles.clear();
-        self.toss.clear();
-        self.hazards.clear_fight();
+        self.clear_fight();
         self.npc = None;
         self.neighbors.clear();
         for (ch, at) in &p.marks {
@@ -1111,7 +1107,7 @@ impl World {
             }
         }
         let strand = self.strands_shown();
-        self.hazards.clear_fight();
+        self.clear_fight();
         if self.adv.place == Place::Deep {
             // 실에 잠겼다(0162): 맡겨 둔 쉼터로 돌아간다. 매듭은 다음에 다시.
             self.deep = None;
@@ -1671,6 +1667,12 @@ mod tests {
         });
         w.hazards.thread_lash = Some((p, p, 0.0));
         w.hazards.place_cocoons(p);
+        // 플레이어가 깐 가시 덤불도(0248).
+        w.toss.patches.push(crate::world::toss::Patch {
+            pos: p,
+            left: 9.0,
+            pulse: 0.0,
+        });
         w.descend_to_first_camp();
         for _ in 0..2000 {
             if !w.adventure_pre() {
@@ -1679,6 +1681,7 @@ mod tests {
         }
         assert_eq!(w.adv.place, Place::Camp);
         assert!(w.hazards.is_clear());
+        assert!(w.toss.patches.is_empty());
     }
 
     /// 지름길(0151): 공터 안, 굴 입구 바로 위의 걸을 수 있는 칸에서 시작하고, 저장도 거기.
@@ -1732,8 +1735,15 @@ mod tests {
             let at = w.player.pos + vec2(30.0, 0.0);
             w.spawn_mob(Kind::Momo, at);
             w.inv.glowbugs = 5;
+            // 쓰러진 자리에 깐 가시 덤불은 일어날 때 남지 않는다(0248: 전에는 위험물만 치웠다).
+            w.toss.patches.push(crate::world::toss::Patch {
+                pos: w.player.pos,
+                left: 9.0,
+                pulse: 0.0,
+            });
             w.player.hp = 0;
             w.respawn_at_save();
+            assert!(w.toss.patches.is_empty());
             assert_eq!(w.adv.falls, n);
             assert_eq!(w.inv.glowbugs, 0);
             assert!(w.story.fight(Kind::Momo), "모모에게 쓰러져도 모모는 남는다");

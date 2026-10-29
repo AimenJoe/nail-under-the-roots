@@ -645,6 +645,21 @@ impl Hazards {
     }
 }
 
+impl World {
+    /// 싸움이 남긴 것을 치운다(0230 R13 → 0248): 위험물 + 플레이어가 던지고 묻고 깐 것(`toss` — 도토리 탄·묻은 도토리·가시 덤불).
+    /// 방에 들어갈 때·쓰러져 일어날 때·꿈의 다음 보스 앞에서. 둘을 따로 부르면 한쪽을 빠뜨린다(쓰러진 자리에 덤불이 남았다).
+    pub fn clear_fight(&mut self) {
+        self.hazards.clear_fight();
+        self.toss.clear();
+    }
+
+    /// 장소가 바뀐다(어두운 한가운데): 고치까지 전부.
+    pub fn clear_place(&mut self) {
+        self.hazards.clear_all();
+        self.toss.clear();
+    }
+}
+
 impl Default for Juice {
     fn default() -> Self {
         Self {
