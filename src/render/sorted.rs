@@ -425,28 +425,44 @@ pub(super) fn drawable_x(w: &World, alpha: f32, d: &Drawable) -> f32 {
 }
 
 /// 큰 나무 뿌리 끝을 덮는 풀 포기: 뿌리가 풀밭 위에 얹힌 것이 아니라 땅에서 솟은 것처럼.
+/// 같은 간격으로 늘어서면 심은 것 같다(사장, 2026-10-29): 뿌리 끝 몇 곳에 덩어리로 모으고, 크기·높이·간격을 다 다르게.
 fn draw_root_grass(b: Vec2) {
-    let blades = [
-        Color::from_rgba(82, 138, 72, 255),
-        Color::from_rgba(96, 156, 80, 255),
-        Color::from_rgba(123, 207, 92, 255),
+    let dark = Color::from_rgba(82, 138, 72, 255);
+    let mid = Color::from_rgba(96, 156, 80, 255);
+    let light = Color::from_rgba(123, 207, 92, 255);
+    // (dx, dy, 잎 높이들(왼쪽부터), 왼쪽으로 기울기). 덩어리 셋 + 외톨이 잎 몇.
+    let tufts: [(f32, f32, &[f32], bool); 11] = [
+        (-55.0, 9.0, &[2.0, 3.0], true),
+        (-49.0, 12.0, &[3.0, 5.0, 4.0, 2.0], true),
+        (-44.0, 14.0, &[2.0, 3.0], false),
+        (-27.0, 16.0, &[2.0], false),
+        (-15.0, 15.0, &[3.0, 4.0, 2.0], true),
+        (-11.0, 17.0, &[2.0, 3.0], false),
+        (6.0, 16.0, &[2.0], true),
+        (21.0, 15.0, &[4.0, 6.0, 3.0, 4.0, 2.0], false),
+        (27.0, 16.0, &[2.0, 3.0], false),
+        (45.0, 13.0, &[3.0, 2.0], false),
+        (54.0, 10.0, &[2.0, 4.0, 3.0], false),
     ];
-    for (dx, dy) in [
-        (-50.0, 12.0),
-        (-36.0, 15.0),
-        (-21.0, 14.0),
-        (-6.0, 15.0),
-        (9.0, 15.0),
-        (24.0, 14.0),
-        (39.0, 15.0),
-        (52.0, 11.0),
-    ] {
+    for (dx, dy, blades, lean_left) in tufts {
         let (x, y) = ((b.x + dx).round(), (b.y + dy).round());
-        // 세 잎: 왼쪽으로 기운 짙은 잎, 곧은 잎, 오른쪽 밝은 잎.
-        draw_rectangle(x - 2.0, y - 2.0, 1.0, 2.0, blades[0]);
-        draw_rectangle(x - 1.0, y - 3.0, 1.0, 3.0, blades[1]);
-        draw_rectangle(x, y - 4.0, 1.0, 4.0, blades[1]);
-        draw_rectangle(x + 1.0, y - 2.0, 1.0, 2.0, blades[2]);
-        draw_rectangle(x - 2.0, y, 5.0, 1.0, blades[0]);
+        let n = blades.len() as f32;
+        for (k, &h) in blades.iter().enumerate() {
+            let bx = x + k as f32 - (n / 2.0).floor();
+            // 바깥 잎은 짙게(그늘), 가운데 큰 잎은 밝게.
+            let c = if h >= 4.0 {
+                light
+            } else if k == 0 || k + 1 == blades.len() {
+                dark
+            } else {
+                mid
+            };
+            draw_rectangle(bx, y - h, 1.0, h, c);
+            // 긴 잎 끝은 한 점 옆으로 휜다.
+            if h >= 4.0 {
+                let tip = if lean_left { -1.0 } else { 1.0 };
+                draw_rectangle(bx + tip, y - h - 1.0, 1.0, 1.0, c);
+            }
+        }
     }
 }

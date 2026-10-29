@@ -736,12 +736,17 @@ impl App {
             }
         }
         ui.text(
-            &fill(
-                s.slots,
-                &[
-                    &self.inventory.slots.iter().filter(|x| x.is_some()).count(),
-                    &self.inventory.slots.len(),
-                ],
+            &ui.fit(
+                &fill(
+                    s.slots,
+                    &[
+                        &self.inventory.owner.name(),
+                        &self.inventory.slots.iter().filter(|x| x.is_some()).count(),
+                        &self.inventory.slots.len(),
+                    ],
+                ),
+                cols as f32 * (slot + gap),
+                FONT_PX,
             ),
             x0,
             y0 + 3.0 * (slot + gap) + 2.0,

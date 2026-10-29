@@ -206,7 +206,9 @@ pub enum Item {
 }
 
 /// 가방. 지금은 무기만 들어간다. 그 밖의 아이템은 2단계(방 클리어 보상)에서.
+/// 가방은 캐릭터마다(0246): 그 캐릭터가 쓸 수 있는 무기·장신구만 든다. 다른 캐릭터 것은 기록에 남아 그 캐릭터로 내려갈 때 들고 간다.
 pub struct Inventory {
+    pub owner: Character,
     pub slots: Vec<Option<Item>>,
     pub cols: usize,
     /// 장착 중인 무기(WEAPONS 번호). 맨손이면 None.
@@ -214,9 +216,10 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    /// `weapons`를 넣고 첫 번째를 장착한다. 비어 있으면 맨손.
-    fn new(weapons: &[usize]) -> Self {
+    /// `weapons` 가운데 주인이 쓰는 것만 넣고 그 첫째를 장착한다. 없으면 맨손.
+    fn new(owner: Character, weapons: &[usize]) -> Self {
         let mut inv = Self {
+            owner,
             slots: (0..15).map(|_| None).collect(),
             cols: 5,
             equipped: None,
@@ -224,8 +227,18 @@ impl Inventory {
         for w in weapons {
             inv.add(*w);
         }
-        inv.equipped = weapons.first().copied();
+        inv.equipped = weapons.iter().copied().find(|&w| inv.fits(w));
         inv
+    }
+
+    /// 이 가방 주인이 쓰는 무기 종류인가.
+    fn fits(&self, w: usize) -> bool {
+        WEAPONS[w].kind == self.owner.weapon_kind()
+    }
+
+    /// 이 가방 주인이 낄 수 있는 장신구인가(`only`가 다른 캐릭터면 아니다).
+    fn fits_charm(&self, c: usize) -> bool {
+        CHARMS[c].only.is_none_or(|o| o == self.owner)
     }
 
     fn has(&self, w: usize) -> bool {
@@ -236,10 +249,11 @@ impl Inventory {
 
     /// 장신구를 빈 칸에 넣는다. 이미 있으면 그대로.
     fn add_charm(&mut self, c: usize) {
-        if self
-            .slots
-            .iter()
-            .any(|s| matches!(s, Some(Item::Charm(x)) if *x == c))
+        if !self.fits_charm(c)
+            || self
+                .slots
+                .iter()
+                .any(|s| matches!(s, Some(Item::Charm(x)) if *x == c))
         {
             return;
         }
@@ -250,7 +264,7 @@ impl Inventory {
 
     /// 빈 칸에 넣는다. 이미 있으면 그대로.
     fn add(&mut self, w: usize) {
-        if self.has(w) {
+        if !self.fits(w) || self.has(w) {
             return;
         }
         if let Some(slot) = self.slots.iter_mut().find(|s| s.is_none()) {
@@ -525,7 +539,7 @@ impl App {
             dev_view: Default::default(),
             scroll_in: (0.0, 0),
             journal_check: 0.0,
-            inventory: Inventory::new(&[]),
+            inventory: Inventory::new(Character::Mole, &[]),
             gift: None,
             sfx,
             music,
@@ -1071,17 +1085,17 @@ impl App {
     /// 들고 시작하는 무기·장신구(0012·0050·0053): 시나리오별 기본 + 기록으로 받은 것.
     fn fill_inventory(&mut self, s: Scenario, ch: Character, start: usize, veteran: bool) {
         self.inventory = match s {
-            Scenario::Normal if veteran => Inventory::new(&[start]),
-            Scenario::Normal | Scenario::Tutorial => Inventory::new(&[]),
-            Scenario::AllClaws => Inventory::new(&[start, 0, 2, 3]),
+            Scenario::Normal if veteran => Inventory::new(ch, &[start]),
+            Scenario::Normal | Scenario::Tutorial => Inventory::new(ch, &[]),
+            Scenario::AllClaws => Inventory::new(ch, &[start, 0, 2, 3]),
             Scenario::Gear => {
-                let mut inv = Inventory::new(&[start]);
+                let mut inv = Inventory::new(ch, &[start]);
                 for c in 0..CHARMS.len() {
                     inv.add_charm(c);
                 }
                 inv
             }
-            _ => Inventory::new(&[start]),
+            _ => Inventory::new(ch, &[start]),
         };
         // 수수의 새싹 발톱(0053)·큰 나무에서 깨운 독 발톱(0052)도 런마다 가방에(끼는 건 가방에서).
         // 맨손 시작(튜토리얼 전)은 빼고.
@@ -1861,7 +1875,7 @@ impl App {
         match item {
             crate::world::Gift::Weapon(w) => {
                 self.inventory.add(w);
-                if self.inventory.equipped.is_none() {
+                if self.inventory.equipped.is_none() && self.inventory.fits(w) {
                     self.inventory.equipped = Some(w);
                     self.apply_equipped();
                 }
@@ -1886,6 +1900,18 @@ impl App {
         }
     }
 
+    /// 받은 것이 지금 캐릭터 것이 아니면 그 주인(가방에 넣지 않고 기록에 남는다, 0246).
+    fn gift_owner(&self, item: crate::world::Gift) -> Option<Character> {
+        match item {
+            crate::world::Gift::Weapon(w) if !self.inventory.fits(w) => crate::characters::ALL
+                .iter()
+                .find(|d| d.weapon_kind == WEAPONS[w].kind)
+                .map(|d| d.id),
+            crate::world::Gift::Charm(c) if !self.inventory.fits_charm(c) => CHARMS[c].only,
+            _ => None,
+        }
+    }
+
     fn draw_gift(&self, ui: &Ui, g: &Gift) {
         let s = i18n::s();
         let (title, name, desc) = match g.item {
@@ -1904,8 +1930,16 @@ impl App {
             crate::world::Gift::Charm(c) => draw_charm_icon(ui, icon, CHARMS[c].color),
         }
         ui.text(tr(name), icon.right() + 8.0, r.y + 22.0, FONT_PX, ui::TEXT);
+        // 다른 캐릭터 것이면(0246) 설명을 두 줄로 줄이고 누구 가방에 갔는지 아래에.
+        let owner = self.gift_owner(g.item);
+        let rows = if owner.is_some() { 2 } else { 3 };
+        if let Some(o) = owner {
+            let note = fill(s.gift_elsewhere, &[&o.name()]);
+            let note = ui.fit(&note, r.w - 36.0, FONT_PX);
+            ui.text(&note, r.x + 10.0, r.bottom() - 15.0, FONT_PX, ui::ACCENT);
+        }
         let lines = ui::wrap(ui, tr(desc), r.right() - icon.right() - 16.0, FONT_PX);
-        for (i, l) in lines.iter().take(3).enumerate() {
+        for (i, l) in lines.iter().take(rows).enumerate() {
             ui.text(
                 l,
                 icon.right() + 8.0,
@@ -2057,5 +2091,41 @@ impl App {
             let hint = vfill(s.dead_final_hint, &[Verb::Confirm]);
             ui.text_center(&hint, 160.0, 140.0, FONT_PX, ui::TEXT);
         }
+    }
+}
+
+#[cfg(test)]
+mod bag_tests {
+    use super::*;
+
+    /// 가방은 캐릭터마다(0246): 도토 가방엔 발톱·모모 장신구가 안 들어가고, 누구나 장신구·도토 것은 들어간다.
+    #[test]
+    fn bag_takes_only_what_its_owner_can_use() {
+        let doto = Character::Doto.starting_weapon();
+        let mut inv = Inventory::new(Character::Doto, &[crate::equipment::STONE_CLAW, doto]);
+        assert!(!inv.has(crate::equipment::STONE_CLAW));
+        assert!(inv.has(doto));
+        // 맞는 무기 가운데 첫째를 낀다.
+        assert_eq!(inv.equipped, Some(doto));
+        inv.add(crate::equipment::SPROUT_CLAW);
+        assert!(!inv.has(crate::equipment::SPROUT_CLAW));
+        let momo_only = CHARMS
+            .iter()
+            .position(|c| c.only == Some(Character::Momo))
+            .unwrap();
+        let anyone = CHARMS.iter().position(|c| c.only.is_none()).unwrap();
+        inv.add_charm(momo_only);
+        inv.add_charm(anyone);
+        inv.add_charm(crate::equipment::MAPLE_SCARF);
+        let charms: Vec<usize> = inv
+            .slots
+            .iter()
+            .filter_map(|s| match s {
+                Some(Item::Charm(c)) => Some(*c),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(charms, vec![anyone, crate::equipment::MAPLE_SCARF]);
+        assert!(CHARMS[crate::equipment::MAPLE_SCARF].only == Some(Character::Doto));
     }
 }

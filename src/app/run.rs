@@ -159,7 +159,7 @@ impl App {
         w.refresh_stats();
         w.player.hp = w.player.stats.max_hp;
         w.player.sp = r.sp_milli as f32 / 1000.0;
-        let mut inv = Inventory::new(&[]);
+        let mut inv = Inventory::new(w.character, &[]);
         for (slot, s) in inv.slots.iter_mut().zip(&r.slots) {
             *slot = s.map(|s| match s {
                 Slot::Weapon(x) => Item::Weapon(x),
