@@ -145,10 +145,10 @@ impl Tutorial {
                         self.enter_attack(w);
                     } else {
                         let p = ahead(w, 40.0);
-                        w.pickups.push(Pickup {
-                            pos: p,
-                            weapon: Character::Mole.starting_weapon(),
-                        });
+                        w.pickups.push(Pickup::new(
+                            p,
+                            crate::world::Gift::Weapon(Character::Mole.starting_weapon()),
+                        ));
                         self.say(&[(|s| s.popo_pickup, Face::Normal, None)]);
                         self.enter(Stage::Pickup, 0);
                     }

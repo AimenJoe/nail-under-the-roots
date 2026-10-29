@@ -155,7 +155,7 @@ pub const LIST: [Entry; 48] = [
     },
     Entry {
         name: "떨어지는 것 확인",
-        desc: "체력 2/5. 반딧불 12마리와 산딸기 2개가 튀어나온다. 왼쪽엔 산딸기·지렁이·씨앗·뿌리 심장이 놓여 있다(주울 수 있다 표시).",
+        desc: "체력 2/5. 반딧불 12마리와 산딸기 2개가 튀어나온다. 왼쪽엔 산딸기·지렁이·씨앗·뿌리 심장·장신구가 놓여 있다(주울 수 있다 표시).",
         scenario: Scenario::Loot,
     },
     Entry {
@@ -608,6 +608,11 @@ pub fn build(s: Scenario) -> World {
                 w.loot
                     .push(Loot::place(k, left + vec2(i as f32 * 18.0, 0.0)));
             }
+            // 바닥 장신구(2026-10-29): 같은 줄 앞에(플레이어 자석 거리 밖).
+            w.pickups.push(crate::world::Pickup::new(
+                left - vec2(20.0, 0.0),
+                crate::world::Gift::Charm(0),
+            ));
             w
         }
         Scenario::Chargers(n) => {

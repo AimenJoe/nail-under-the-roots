@@ -626,7 +626,8 @@ fn pic_gear(c: PicCtx) {
         props::draw_pickup(
             &world::Pickup {
                 pos: vec2(chest.center().x, chest.y - rise + 8.0),
-                weapon: 1,
+                item: world::Gift::Weapon(1),
+                age: 1.0,
             },
             time,
         );

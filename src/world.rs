@@ -292,11 +292,22 @@ impl Deep {
     }
 }
 
-/// 바닥에 놓인 무기. 닿으면 얻는다.
+/// 바닥에 놓인 무기·장신구. 닿으면 얻는다(장신구도 상자·엘리트에서 바닥에 떨어진다 — 사장 2026-10-29 "눈으로 봐야 재밌다").
 pub struct Pickup {
     pub pos: Vec2,
-    /// equipment::WEAPONS 번호.
-    pub weapon: usize,
+    pub item: Gift,
+    /// 떨어진 뒤 흐른 시간(떨어지는 연출·줍기 대기).
+    pub age: f32,
+}
+
+impl Pickup {
+    pub fn new(pos: Vec2, item: Gift) -> Self {
+        Self {
+            pos,
+            item,
+            age: 0.0,
+        }
+    }
 }
 
 /// 런이 들고 다니는 것(0169 R2): 가방·장신구·반딧불·씨앗·뿌리 심장·털빛·받을 선물. `suspend::RunSave`가 적는 쪽.
@@ -1243,20 +1254,25 @@ impl World {
         let mut got = Vec::new();
         let pull = t::LOOT_MAGNET_MAX_SPEED * dt;
         self.pickups.retain_mut(|p| {
+            p.age += dt;
+            // 막 떨어진 것은 잠깐 줍지 않는다(떨어지는 걸 보게, 떨어진 것과 같은 규칙).
+            if p.age < t::LOOT_PICKUP_DELAY {
+                return true;
+            }
             let to = ppos - p.pos;
             let d = to.length();
             if d < t::LOOT_MAGNET_RADIUS && d > 0.0 {
                 p.pos += to / d * pull.min(d);
             }
             if (p.pos - ppos).length() <= t::PICKUP_RADIUS {
-                got.push((p.pos, p.weapon));
+                got.push((p.pos, p.item));
                 false
             } else {
                 true
             }
         });
-        for (pos, w) in got {
-            self.inv.gifts.push(Gift::Weapon(w));
+        for (pos, item) in got {
+            self.inv.gifts.push(item);
             self.juice.audio.play(sfx::Id::Pickup);
             self.juice.fx.push(ring(pos, 4.0, 18.0, 0.3, WHITE));
             burst(&mut self.juice.fx, pos, 14, PROJECTILE, 80.0);

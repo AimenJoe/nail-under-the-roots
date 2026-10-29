@@ -1872,12 +1872,39 @@ pub(super) fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool)
     }
 }
 
-/// 바닥 무기: 떠오르는 발톱 세 개 + 반짝임.
+/// 바닥 무기: 떠오르는 발톱 세 개 + 반짝임. 바닥 장신구: 끈 달린 작은 방울(장신구 색) + 반짝임.
+/// 막 떨어진 것은 위에서 떨어져 한 번 튄다(`Pickup::age`).
 pub(super) fn draw_pickup(p: &world::Pickup, time: f32) {
-    let c = crate::equipment::WEAPONS[p.weapon].color;
-    let dark = Color::new(c.r * 0.55, c.g * 0.55, c.b * 0.55, 1.0);
-    let bob = ((time * 3.0).sin() * 1.5).round();
+    let drop = {
+        let k = (p.age / 0.45).clamp(0.0, 1.0);
+        // 떨어지기(앞 70%) → 작게 튀기.
+        if k < 0.7 {
+            (1.0 - k / 0.7).powi(2) * 18.0
+        } else {
+            ((k - 0.7) / 0.3 * std::f32::consts::PI).sin() * 3.0
+        }
+    };
+    let bob = if p.age < 0.45 {
+        -drop.round()
+    } else {
+        ((time * 3.0).sin() * 1.5).round()
+    };
     let base = vec2(p.pos.x.round(), p.pos.y.round() - 6.0 + bob);
+    let c = match p.item {
+        world::Gift::Weapon(w) => crate::equipment::WEAPONS[w].color,
+        world::Gift::Charm(i) => {
+            draw_charm_drop(base, crate::equipment::CHARMS[i].color);
+            draw_pickup_mark(
+                p.pos + vec2(0.0, 3.0),
+                base - vec2(-1.0, 1.0),
+                time,
+                p.pos.x * 0.07,
+                false,
+            );
+            return;
+        }
+    };
+    let dark = Color::new(c.r * 0.55, c.g * 0.55, c.b * 0.55, 1.0);
     for k in 0..3 {
         let x = base.x - 4.0 + k as f32 * 3.0;
         let y = base.y + (k % 2) as f32;
@@ -1892,6 +1919,20 @@ pub(super) fn draw_pickup(p: &world::Pickup, time: f32) {
         p.pos.x * 0.07,
         false,
     );
+}
+
+/// 바닥 장신구 한 개: 끈 고리 + 방울(가방 칸 아이콘 `draw_charm_icon`과 같은 꼴을 작게).
+fn draw_charm_drop(at: Vec2, c: Color) {
+    let dark = Color::new(c.r * 0.6, c.g * 0.6, c.b * 0.6, 1.0);
+    let (x, y) = (at.x - 3.0, at.y - 3.0);
+    // 끈.
+    draw_rectangle(x + 1.0, y - 3.0, 5.0, 1.0, OUTLINE);
+    draw_rectangle(x + 3.0, y - 2.0, 1.0, 2.0, OUTLINE);
+    // 방울: 어두운 테두리 + 색 + 반짝.
+    draw_rectangle(x - 1.0, y - 1.0, 9.0, 9.0, OUTLINE);
+    draw_rectangle(x, y, 7.0, 7.0, dark);
+    draw_rectangle(x + 1.0, y, 5.0, 6.0, c);
+    draw_rectangle(x + 1.0, y + 1.0, 2.0, 2.0, Color::new(1.0, 1.0, 1.0, 0.85));
 }
 
 /// 환경 어둠: 플레이어 주변만 밝고 바깥은 어둡다. 빛나는 버섯은 어둠 위에 다시.

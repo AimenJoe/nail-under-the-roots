@@ -579,6 +579,8 @@ pub const HALL_CHANCE: f32 = 0.8;
 pub const LAYOUT_ODDS: [f32; 3] = [0.3, 0.55, 0.78];
 /// 굴이 넓어져(방이 약 1.6배) 싸움이 늘었으니, 쓰러진 적이 떨어뜨리는 반딧불 한 마리·씨앗이 실제로 나올 확률(0244, 경제 0148을 지킨다).
 pub const KILL_LOOT_KEEP: f32 = 0.65;
+/// 보통 싸움방을 비우면 장신구가 바닥에 떨어질 확률(2026-10-29). 한 런 싸움방 ≈ 30개 → 평균 1~2개.
+pub const CHARM_ROOM_DROP: f32 = 0.05;
 
 pub const SHREW_BITES: u32 = 2;
 pub const SHREW_REAIM: f32 = 0.4;

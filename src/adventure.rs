@@ -908,6 +908,7 @@ impl World {
     }
 
     fn build_dungeon(&mut self, prm: &Params, biome: Biome) {
+        self.sweep_pickups();
         self.adv.seed = self.adv.seed.wrapping_add(0x9E37_79B9);
         let prm = Params { biome, ..*prm };
         let (d, room) = dungeon::generate(self.adv.seed, &prm);
@@ -941,6 +942,7 @@ impl World {
 
     /// 맡겨 둔 필드·쉼터로 돌아온다.
     fn restore_field(&mut self) {
+        self.sweep_pickups();
         if let Some(s) = self.adv.field.take() {
             self.room = s.room;
             self.enemies = s.enemies;
@@ -959,6 +961,7 @@ impl World {
     /// 가장 깊은 곳(0162): 굴은 버리고(맡겨 둔 쉼터는 그대로 — 실에 잠기면 거기로 돌아간다) 한 방을 짓는다.
     /// 가운데 할매, 앞쪽 반원에 매듭 셋, 플레이어는 아래 가운데. 들어서면 할매의 말(`DeepIntro`).
     fn enter_deep(&mut self) {
+        self.sweep_pickups();
         self.adv.dungeon = None;
         self.adv.node = None;
         self.adv.place = Place::Deep;
@@ -1004,6 +1007,7 @@ impl World {
 
     /// 다음 쉼터: 필드·굴은 버리고 쉼터를 새로 짓는다. 체력 가득, 저장 고리가 다시 설 곳, 새 길.
     fn enter_camp(&mut self) {
+        self.sweep_pickups();
         self.adv.field = None;
         self.adv.dungeon = None;
         self.adv.node = None;
@@ -1246,10 +1250,15 @@ impl World {
         }
         let mut gift_at = None;
         let mut hall_cleared = None;
+        let mut room_charm = None;
         if self.room.doors_locked() && self.enemies.is_empty() {
             self.room.set_doors_locked(false);
             room.cleared = true;
             hall_cleared = partner;
+            // 보통 싸움방을 비우면 가끔 장신구가 떨어진다(사장 2026-10-29 "드롭"). 끝방·엘리트는 아래에서 따로.
+            if room.kind == RoomKind::Combat && rand::gen_range(0.0, 1.0) < t::CHARM_ROOM_DROP {
+                room_charm = Some(self.adv.last_kill);
+            }
             self.juice.audio.play(sfx::Id::Emerge);
             if room.kind == RoomKind::Boss {
                 // 보상은 마지막으로 쓰러진 자리(플레이어 곁)에, 출구는 거기와 플레이어에서 떨어진 바닥 칸에.
@@ -1313,6 +1322,14 @@ impl World {
         if let Some(at) = gift_at {
             self.charm_gift(at);
         }
+        if let Some(at) = room_charm {
+            let missing = self.missing_charms();
+            if !missing.is_empty() {
+                let c = missing[rand::gen_range(0, missing.len())];
+                self.inv.charms_found.push(c);
+                self.drop_charm(c, at);
+            }
+        }
     }
 
     /// 보물 상자를 연다(앱이 확인 버튼으로 부른다, `Interact::Chest`) → 씨앗 한 줌 + 아직 없는 장신구 하나(다 있으면 반딧불).
@@ -1347,27 +1364,56 @@ impl World {
             self.push_loot(Loot::spawn(LootKind::Seed, at));
         }
         self.stats.chests += 1;
-        self.charm_gift(at);
+        // 장신구는 상자 앞(아래)에 떨어진다 — 상자 칸은 막혀 있다.
+        self.charm_gift(at + vec2(0.0, 16.0));
         self.juice.audio.play(sfx::Id::Emerge);
     }
 
-    /// 아직 없는 장신구 하나(다 있으면 반딧불 한 줌). 상자·실타래 끝방(0147).
-    fn charm_gift(&mut self, at: Vec2) {
-        let missing: Vec<usize> = self
-            .inv
+    /// 장소를 떠날 때 바닥에 두고 간 장신구·무기는 가방으로 — 잃지 않게(장신구는 떨어질 때 이미 "얻은 것"으로 적힌다).
+    fn sweep_pickups(&mut self) {
+        let left: Vec<Gift> = self.pickups.drain(..).map(|p| p.item).collect();
+        self.inv.gifts.extend(left);
+    }
+
+    /// 이 런에서 아직 얻지 않은 장신구(캐릭터에 맞는 것만 든 `charm_pool`에서).
+    fn missing_charms(&self) -> Vec<usize> {
+        self.inv
             .charm_pool
             .iter()
             .copied()
             .filter(|c| !self.inv.charms_found.contains(c))
-            .collect();
+            .collect()
+    }
+
+    /// 장신구 하나를 `at`에 떨어뜨린다: 빛 고리와 반짝임. 방 안쪽에 묶는다(문 칸·벽 너머로 가지 않게).
+    fn drop_charm(&mut self, c: usize, at: Vec2) {
+        let at = match self.loot_bounds() {
+            Some(b) => vec2(
+                at.x.clamp(b.x + 8.0, b.right() - 8.0),
+                at.y.clamp(b.y + 8.0, b.bottom() - 8.0),
+            ),
+            None => at,
+        };
+        self.pickups
+            .push(crate::world::Pickup::new(at, Gift::Charm(c)));
+        self.juice
+            .fx
+            .push(ring(at, 4.0, 22.0, 0.45, crate::equipment::CHARMS[c].color));
+        self.juice.audio.play(sfx::Id::Chest);
+    }
+
+    /// 아직 없는 장신구 하나(다 있으면 반딧불 한 줌). 상자·실타래 끝방(0147).
+    fn charm_gift(&mut self, at: Vec2) {
+        let missing = self.missing_charms();
         if missing.is_empty() {
             for _ in 0..12 {
                 self.push_loot(Loot::spawn(LootKind::Glowbug, at));
             }
         } else {
+            // 바닥에 떨어뜨린다(사장 2026-10-29): 가방에 바로 넣지 않고 눈앞에 떨어져 주워야 얻는다.
             let c = missing[rand::gen_range(0, missing.len())];
             self.inv.charms_found.push(c);
-            self.inv.gifts.push(Gift::Charm(c));
+            self.drop_charm(c, at);
         }
     }
 
@@ -1991,6 +2037,38 @@ mod tests {
         assert_eq!(w.interactable(), None);
         w.open_chest(i);
         assert_eq!(w.stats.chests, 1, "열린 상자는 다시 열리지 않는다");
+    }
+
+    /// 상자의 장신구는 가방으로 바로 가지 않고 상자 앞 바닥에 떨어진다(2026-10-29). 다가가 주우면 얻고, 줍지 않고 떠나면 가방으로.
+    #[test]
+    fn chest_charm_drops_on_the_floor_then_is_picked_up() {
+        let mut w = World::new();
+        w.inv.charm_pool = vec![0, 1];
+        let c = w.player.pos + vec2(40.0, 0.0);
+        w.room.props.push(crate::room::Prop {
+            rect: Rect::new(c.x - 8.0, c.y - 8.0, 16.0, 16.0),
+            kind: PropKind::Chest { opened: false },
+        });
+        let i = w.room.props.len() - 1;
+        w.open_chest(i);
+        assert!(
+            !w.inv.gifts.iter().any(|g| matches!(g, Gift::Charm(_))),
+            "바로 가방으로 가지 않는다"
+        );
+        let drop = w
+            .pickups
+            .iter()
+            .find(|p| matches!(p.item, Gift::Charm(_)))
+            .map(|p| p.pos)
+            .expect("바닥에 떨어진다");
+        assert!(drop.y > c.y, "상자 앞(아래)에");
+        w.player.pos = drop;
+        w.player.prev_pos = drop;
+        for _ in 0..60 {
+            w.tick(&crate::input::Actions::default());
+        }
+        assert!(w.pickups.is_empty());
+        assert!(w.inv.gifts.iter().any(|g| matches!(g, Gift::Charm(_))));
     }
 
     /// 마을의 큰 나무 밑동에 서면 재주 창(0047), 떨어지면 아니다.
