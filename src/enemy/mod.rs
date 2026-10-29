@@ -123,6 +123,8 @@ pub enum Event {
     /// 토끼풀이 발을 굴렀다(그 자리) / 실 한 가닥을 뻗었다(자리, 방향). 판정은 월드가(0165).
     Thump(Vec2),
     Thread(Vec2, Vec2),
+    /// 보스가 체력 반 아래에서 2단계로 깨어났다(그 자리, 0233). 한 싸움에 한 번.
+    Rouse(Vec2),
 }
 
 pub struct Enemy {
@@ -138,6 +140,8 @@ pub struct Enemy {
     pub speed_mul: f32,
     /// 실뜨기를 이미 걸었나(월드가 새로 나온 적에 한 번).
     pub knotted: bool,
+    /// 보스 2단계(0233): 체력 반 아래에서 한 번 깨어났다 — 예고·쉬기·걸음이 빨라지고 덜 멈칫한다.
+    pub roused: bool,
     pub state: State,
     pub facing: Vec2,
     pub flash: f32,
@@ -233,7 +237,8 @@ impl Enemy {
     /// 걷기(거리 맞추기) 속도(종 수치 × 실뜨기 배율).
     pub fn speed(&self) -> f32 {
         let web = if self.webbed > 0.0 { t::WEB_SLOW } else { 1.0 };
-        self.kind.species().speed * self.speed_mul * web
+        let p2 = if self.roused { t::BOSS_P2_SPEED } else { 1.0 };
+        self.kind.species().speed * self.speed_mul * web * p2
     }
 
     pub fn new(kind: Kind, pos: Vec2) -> Self {
@@ -250,6 +255,7 @@ impl Enemy {
             windup_mul: 1.0,
             speed_mul: 1.0,
             knotted: false,
+            roused: false,
             state,
             facing: vec2(-1.0, 0.0),
             flash: 0.0,
@@ -409,6 +415,9 @@ impl Enemy {
             room.resolve_circle(&mut self.pos, r);
             return;
         }
+        if self.is_boss() && !self.roused && self.alive && self.hurt_half() {
+            self.rouse(events);
+        }
 
         let mut c = Ctx {
             player_pos,
@@ -541,6 +550,15 @@ impl Enemy {
         self.hp * 2 <= self.max_hp
     }
 
+    /// 보스 2단계로 깨어난다(0233, 한 번): 예고가 짧아지고(`windup_mul`), 걸음·쉬기·멈칫은 `roused`를 보는 곳에서.
+    /// 하던 동작은 그대로 잇는다 — 연출은 월드가 `Event::Rouse`로.
+    fn rouse(&mut self, events: &mut Vec<Event>) {
+        self.roused = true;
+        self.windup_mul *= t::BOSS_P2_WINDUP;
+        self.flash = t::HIT_FLASH;
+        events.push(Event::Rouse(self.pos));
+    }
+
     /// 공격 동작 중(예고 포함): 보스는 맞아도 멈추지 않는다(슈퍼아머). 피하고 빈틈에 때리는 보스.
     fn armored(&self) -> bool {
         self.is_boss()
@@ -657,6 +675,7 @@ impl Enemy {
         let elite = if self.elite { t::ELITE_KNOCK } else { 1.0 };
         self.vel = knock_dir * knockback * self.sp().knock_mul * elite;
         if self.is_boss() && dmg > 0 {
+            let stun = stun * if self.roused { t::BOSS_P2_STUN } else { 1.0 };
             if !self.armored() {
                 let left = match self.state {
                     // 벽에 박고 어질어질한 동안은 그 시간을 지킨다(빈틈을 맞아서 줄이지 않는다).
@@ -1118,6 +1137,54 @@ mod tests {
         }
         let n = ev.iter().filter(|x| **x == Event::Summon).count();
         assert!(n >= 1 && n as u32 <= t::CHIEF_SUMMONS, "{n}");
+    }
+
+    /// 보스 2단계(0233): 반 아래로 내려간 다음 틱에 한 번 깨어난다 — 예고가 짧아지고, 걸음이 빨라지고, 덜 멈칫한다.
+    /// 깨어나는 소식은 한 번만, 잡몹은 깨어나지 않는다.
+    #[test]
+    fn bosses_rouse_once_below_half() {
+        let room = Room::new();
+        let player = room.center() + vec2(200.0, 0.0);
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        for kind in [
+            Kind::Chief,
+            Kind::Momo,
+            Kind::Doto,
+            Kind::Kongi,
+            Kind::Clover,
+        ] {
+            let mut e = Enemy::new(kind, room.center());
+            let (windup, speed) = (e.windup(), e.speed());
+            e.hurt(1, vec2(1.0, 0.0), 0.0, 0.3);
+            let calm = match e.state {
+                State::Stunned { time } => time,
+                _ => panic!("{kind:?}: 빈틈에 맞으면 멈칫"),
+            };
+            ev.clear();
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            assert!(!e.roused && !ev.iter().any(|x| matches!(x, Event::Rouse(_))));
+            e.hp = e.max_hp / 2;
+            e.state = State::Approach;
+            for _ in 0..3 {
+                e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            }
+            let n = ev.iter().filter(|x| matches!(x, Event::Rouse(_))).count();
+            assert_eq!(n, 1, "{kind:?}: 한 번만 깨어난다");
+            assert!(
+                e.roused && e.windup() < windup && e.speed() > speed,
+                "{kind:?}"
+            );
+            e.state = State::Approach;
+            e.hurt(1, vec2(1.0, 0.0), 0.0, 0.3);
+            match e.state {
+                State::Stunned { time } => assert!(time < calm, "{kind:?}: 덜 멈칫"),
+                _ => panic!("{kind:?}"),
+            }
+        }
+        let mut rat = Enemy::new(Kind::FieldMouse, room.center());
+        rat.hp = 1;
+        rat.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+        assert!(!rat.roused, "잡몹은 깨어나지 않는다");
     }
 
     /// 모모: 1번째는 뛰기·차기만, 2번째부터 굴로 숨는다(숨은 동안 안 맞는다). 3번째는 뛰기를 이어서 한다.

@@ -80,6 +80,8 @@ pub const DEEP_PULL_REACH: f32 = 150.0;
 pub const DEEP_THREAD_W: f32 = 5.0;
 /// 감기면: 가운데로 끌려가는 속도, 감겨 있는 시간, 몇 번 감기면 실에 잠기나(쉼터 모닥불로).
 pub const DEEP_PULL_SPEED: f32 = 240.0;
+/// 할매 2단계(0233): 매듭이 하나 남으면 당기기가 두 번 잇달아 온다 — 둘째는 첫째가 끝나고 이만큼 뒤.
+pub const DEEP_ECHO_GAP: f32 = 0.7;
 pub const DEEP_WRAP_TIME: f32 = 1.3;
 pub const DEEP_WRAPS: u32 = 3;
 /// 셋 다 끊은 뒤 엔딩까지: 놓아주기 이펙트(0163, 실이 풀리고 흰 꽃잎, 빛이 커진다)를 본다.
@@ -523,8 +525,16 @@ pub const MASTER_VOLUME: f32 = 0.5;
 pub const CHIEF_HOWL_MUL: f32 = 1.6;
 /// 부하를 부르는 최대 횟수(한 번에 생쥐 떼 하나 = 셋).
 pub const CHIEF_SUMMONS: u32 = 2;
-/// 공격이 아닐 때 맞으면 멈칫하는 시간 배율(보통 적의 경직 × 이것).
-pub const CHIEF_STUN_MUL: f32 = 0.35;
+/// 공격이 아닐 때 맞으면 멈칫하는 시간 배율(보통 적의 경직 × 이것). 판정 5(보스가 약하다)로 0.35 → 0.3(0233).
+pub const CHIEF_STUN_MUL: f32 = 0.3;
+/// 보스 2단계(0233): 체력이 반 아래로 내려가면 한 번 깨어난다 — 예고 × `BOSS_P2_WINDUP`, 쉬는 시간은 `BOSS_P2_REST`배
+/// 빨리 지나고, 걸음 × `BOSS_P2_SPEED`, 맞았을 때 멈칫 × `BOSS_P2_STUN`. 깨어나는 순간 히트스톱·흔들림.
+pub const BOSS_P2_WINDUP: f32 = 0.85;
+pub const BOSS_P2_REST: f32 = 1.4;
+pub const BOSS_P2_SPEED: f32 = 1.15;
+pub const BOSS_P2_STUN: f32 = 0.6;
+pub const BOSS_P2_HITSTOP: f32 = 0.12;
+pub const BOSS_P2_TRAUMA: f32 = 0.4;
 
 // ---- 새 잡몹(src/species.rs, docs/decisions/0146) -------------------------------------
 /// 뒤쥐: 한 번 예고에 몇 번 무나, 다음 물기 예고는 종 예고 × 이것(짧게 다시 겨눈다).

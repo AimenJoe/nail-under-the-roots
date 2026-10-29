@@ -243,6 +243,8 @@ pub struct Deep {
     pub asleep: bool,
     /// 감긴 뒤 한 번 알려 준 힌트.
     hinted: bool,
+    /// 방금 당기기가 2단계의 둘째(곧바로 오는) 당기기로 예약됐다(0233).
+    echo: bool,
 }
 
 impl Deep {
@@ -272,6 +274,7 @@ impl Deep {
             done_t: None,
             asleep: false,
             hinted: false,
+            echo: false,
         }
     }
 
@@ -1447,6 +1450,7 @@ impl World {
         let mut bury = 0;
         let mut thumps = Vec::new();
         let mut threads = Vec::new();
+        let mut rouse = Vec::new();
         for ev in &self.enemy_events {
             match ev {
                 enemy::Event::Charge => self.juice.audio.play(sfx::Id::Charge),
@@ -1471,7 +1475,11 @@ impl World {
                 enemy::Event::Spore => self.juice.audio.play(sfx::Id::Burrow),
                 enemy::Event::Thump(at) => thumps.push(*at),
                 enemy::Event::Thread(at, dir) => threads.push((*at, *dir)),
+                enemy::Event::Rouse(at) => rouse.push(*at),
             }
+        }
+        for at in rouse {
+            self.rouse_fx(at);
         }
         for at in thumps {
             self.thump_at(at);
@@ -1480,6 +1488,17 @@ impl World {
             self.thread_at(at, dir);
         }
         (summon, bury)
+    }
+
+    /// 보스가 2단계로 깨어났다(0233): 멈칫 + 흔들림 + 쿵, 보라 실 고리 둘이 퍼지고 실 부스러기가 튄다.
+    fn rouse_fx(&mut self, at: Vec2) {
+        self.juice.audio.play(sfx::Id::Impact);
+        self.juice.audio.play(sfx::Id::Rumble);
+        self.juice.feel.add_hitstop(t::BOSS_P2_HITSTOP);
+        self.juice.feel.add_trauma(t::BOSS_P2_TRAUMA);
+        self.juice.fx.push(ring(at, 6.0, 44.0, 0.45, THREAD));
+        self.juice.fx.push(ring(at, 2.0, 26.0, 0.3, ROUSE));
+        burst(&mut self.juice.fx, at, 14, THREAD, 120.0);
     }
 
     /// 모모가 숨는·튀어나오는 자리의 흙, 포자 구름·충격파·실 가닥의 시계.
@@ -2909,7 +2928,14 @@ impl World {
                 }
                 if p.time >= t::DEEP_PULL_WINDUP + t::DEEP_PULL_TIME {
                     d.pull = None;
-                    d.next_pull = d.pull_every();
+                    // 2단계(0233): 매듭이 하나 남으면 한 번 더 곧바로.
+                    let last = d.cut_count() + 1 >= d.knots.len();
+                    d.echo = last && !d.echo;
+                    d.next_pull = if d.echo {
+                        t::DEEP_ECHO_GAP
+                    } else {
+                        d.pull_every()
+                    };
                 }
             }
         }
@@ -3212,6 +3238,8 @@ const STEP_DUST_EVERY: f32 = 12.0;
 const CLOD_GRAVITY: f32 = 360.0;
 /// 쓰러진 이웃에서 풀려 나오는 실의 보라(물든 털의 실 색).
 pub const THREAD: Color = Color::new(0.68, 0.45, 0.92, 1.0);
+/// 2단계로 깨어난 보스의 붉은 기운(0233): 깨어날 때 둘째 고리, 그 뒤 발밑 고리.
+pub const ROUSE: Color = Color::new(0.95, 0.35, 0.45, 1.0);
 
 /// 먼지·연기 `n`개: `spread` 반경 안 아무 데서, 천천히 퍼진다.
 pub(crate) fn puff(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, size: f32, dur: f32) {
@@ -3483,6 +3511,34 @@ mod tests {
 
     /// 가장 깊은 곳(0162): 매듭은 평타 여섯(강공격은 두 배)에 끊기고, 당기기에 세 번 감기면 실에 잠긴다.
     /// 감기면 가장 가까운 매듭이 다시 조여진다. 셋 다 끊으면 잠시 뒤 엔딩.
+    #[test]
+    fn deep_last_knot_pulls_twice() {
+        // 할매 2단계(0233): 매듭이 하나 남으면 당기기 뒤에 곧바로 한 번 더, 그다음은 보통 사이.
+        let mut w = World::new();
+        let c = w.player.pos + vec2(0.0, -80.0);
+        w.player.pos = c + vec2(0.0, t::DEEP_PULL_REACH + 60.0); // 실이 닿지 않는 곳(감기지 않게)
+        w.deep = Some(Deep::new(c));
+        let ends = |w: &mut World| {
+            let d = w.deep.as_mut().unwrap();
+            d.next_pull = 0.0;
+            w.deep_tick(t::TICK_DT);
+            while w.deep.as_ref().unwrap().pull.is_some() {
+                w.deep_tick(t::TICK_DT);
+            }
+            w.deep.as_ref().unwrap().next_pull
+        };
+        assert!(ends(&mut w) > t::DEEP_ECHO_GAP, "매듭 셋: 보통 사이");
+        for k in w.deep.as_mut().unwrap().knots.iter_mut().take(2) {
+            k.cut = true;
+        }
+        assert_eq!(
+            ends(&mut w),
+            t::DEEP_ECHO_GAP,
+            "하나 남으면 곧바로 한 번 더"
+        );
+        assert!(ends(&mut w) > t::DEEP_ECHO_GAP, "그다음은 보통 사이");
+    }
+
     #[test]
     fn deep_knots_cut_and_three_wraps_put_you_to_sleep() {
         use crate::adventure::AdvEvent;

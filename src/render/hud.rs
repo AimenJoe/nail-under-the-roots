@@ -25,14 +25,28 @@ pub(super) fn draw_boss_bar(ui: &Ui, w: &World) {
     );
     ui.rect(bar, Color::new(0.20, 0.10, 0.14, 1.0));
     let k = (b.hp.max(0) as f32 / b.max_hp.max(1) as f32).clamp(0.0, 1.0);
-    ui.rect(
-        Rect::new(bar.x, bar.y, (bar.w * k).round(), bar.h),
-        Color::new(0.85, 0.30, 0.38, 1.0),
-    );
-    ui.rect(
-        Rect::new(bar.x, bar.y, (bar.w * k).round(), 1.0),
-        Color::new(1.0, 0.6, 0.62, 1.0),
-    );
+    // 2단계(0233): 깨어나면 막대가 짙은 붉은 보라로 숨 쉰다.
+    let (fill, top) = if b.roused {
+        let p = 0.5 + 0.5 * (get_time() as f32 * 6.0).sin();
+        (
+            Color::new(0.78 + 0.12 * p, 0.22, 0.42, 1.0),
+            Color::new(1.0, 0.55, 0.75, 1.0),
+        )
+    } else {
+        (
+            Color::new(0.85, 0.30, 0.38, 1.0),
+            Color::new(1.0, 0.6, 0.62, 1.0),
+        )
+    };
+    ui.rect(Rect::new(bar.x, bar.y, (bar.w * k).round(), bar.h), fill);
+    ui.rect(Rect::new(bar.x, bar.y, (bar.w * k).round(), 1.0), top);
+    // 반 자리 눈금: 여기 아래에서 보스가 2단계로 깨어난다.
+    if !b.roused {
+        ui.rect(
+            Rect::new((bar.x + bar.w / 2.0).round(), bar.y - 1.0, 1.0, bar.h + 2.0),
+            OUTLINE,
+        );
+    }
 }
 
 /// 가장 깊은 곳(0162)의 위쪽 표시: 할매 이름 + 매듭 셋(남은 것은 보라, 끊은 것은 풀린 흰 실) + 감긴 수(실 고리).

@@ -1263,6 +1263,34 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
             draw_line(z.x, z.y + 3.0, z.x + 3.0, z.y + 3.0, 1.0, c);
         }
     }
+    // 2단계 보스(0233): 발밑에 붉은 고리 두 겹이 빠르게 숨 쉬고, 몸에서 붉은 불씨가 피어오른다(깨어났다는 표시).
+    if e.roused && marks {
+        let ph = (time * 6.0).sin();
+        let c = crate::world::ROUSE;
+        for (grow, a) in [(0.0, 0.85), (3.0, 0.45)] {
+            draw_ellipse_lines(
+                pos.x.round(),
+                (pos.y + r * 0.6).round(),
+                r + 2.0 + grow + ph,
+                (r + 2.0 + grow) * 0.45,
+                0.0,
+                1.0,
+                Color::new(c.r, c.g, c.b, a),
+            );
+        }
+        for i in 0..4 {
+            let k = (time * 0.9 + i as f32 * 0.25 + e.pos.x * 0.01).fract();
+            let x = pos.x + ((i as f32 * 2.3 + time * 2.0).sin() * r * 0.7);
+            let y = pos.y - r * 0.3 - k * (r + 10.0);
+            draw_rectangle(
+                x.round(),
+                y.round(),
+                1.0,
+                1.0,
+                Color::new(1.0, 0.45 + 0.3 * (1.0 - k), 0.5, 1.0 - k),
+            );
+        }
+    }
     // 엘리트(0147): 발밑에 보라 실 고리가 숨 쉬고, 실 매듭 셋이 돈다.
     if e.elite && marks {
         let ph = time * 3.0 + e.pos.x * 0.05;

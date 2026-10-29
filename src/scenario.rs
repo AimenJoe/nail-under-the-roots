@@ -4,7 +4,7 @@
 use macroquad::prelude::*;
 
 use crate::biome::Biome;
-use crate::enemy::Kind;
+use crate::enemy::{Enemy, Kind};
 use crate::loot::{Loot, LootKind};
 use crate::world::World;
 
@@ -85,6 +85,8 @@ pub enum Scenario {
     Spring,
     /// 출구 확인(0159): 적 없는 한 방짜리 굴 — 들어서면 바로 출구가 열린다.
     Exit,
+    /// 보스 2단계 확인(0233): 빈 방에 보스 하나, 체력 반 — 깨자마자 2단계로 깨어난다.
+    BossHalf(Kind),
 }
 
 pub struct Entry {
@@ -93,7 +95,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 43] = [
+pub const LIST: [Entry; 45] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -309,6 +311,16 @@ pub const LIST: [Entry; 43] = [
         desc: "실뿌리 둘이 감긴 채 체력 1, 곁에 들쥐(0225). 맞으면 셋째가 감기며 런이 끝나는 연출 → 확인으로 마을.",
         scenario: Scenario::LastRootlet,
     },
+    Entry {
+        name: "보스 2단계: 대장",
+        desc: "빈 방에 들쥐 대장, 체력 반(0233). 깨자마자 2단계 — 붉은 발밑 고리, 빨라진 예고·걸음, 덜 멈칫.",
+        scenario: Scenario::BossHalf(Kind::Chief),
+    },
+    Entry {
+        name: "보스 2단계: 모모",
+        desc: "첫 만남 모모, 체력 반(0233). 2단계면 첫 만남에도 굴로 숨고 뛰기를 두 번 잇는다.",
+        scenario: Scenario::BossHalf(Kind::Momo),
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -503,6 +515,19 @@ pub fn build(s: Scenario) -> World {
                 LootKind::RootHeart,
                 w.room.center() + vec2(-40.0, 30.0),
             ));
+            w
+        }
+        Scenario::BossHalf(kind) => {
+            let mut w = World::empty();
+            let c = w.room.center();
+            let mut e = Enemy::new(kind, c - vec2(0.0, 30.0));
+            e.wake_delay = 1.0;
+            e.knotted = true; // 실뜨기가 체력을 다시 채우지 않게(개발 확인용)
+            e.hp = e.max_hp / 2;
+            w.enemies.push(e);
+            w.player.pos = c + vec2(0.0, 44.0);
+            w.player.prev_pos = w.player.pos;
+            w.player.facing = vec2(0.0, -1.0);
             w
         }
         Scenario::AllSpecies => {

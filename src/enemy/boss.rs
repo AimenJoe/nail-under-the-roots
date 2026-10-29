@@ -197,6 +197,7 @@ impl Enemy {
 
     /// 모모의 다음 수(0046). 만날수록 한 수씩 는다:
     /// 1번째 높이 뛰기 ↔ 뒷발 차기, 2번째 + 굴로 숨기, 3번째 + 뛰기를 세 번 이어서.
+    /// 2단계(0233)에서는 한 수 앞당긴다: 1번째도 굴로 숨고, 뛰기를 두 번 잇는다(3번째는 그대로 세 번).
     /// 차기는 가까워야, 뛰기는 조금 멀어도 된다. 안 닿으면 걸어서 다가간다.
     pub(super) fn momo_next(
         &mut self,
@@ -205,12 +206,14 @@ impl Enemy {
         events: &mut Vec<Event>,
     ) -> State {
         let sp = self.sp();
-        let moves = if self.level >= 2 { 3 } else { 2 };
+        let moves = if self.level >= 2 || self.roused { 3 } else { 2 };
         match self.pattern % moves {
             0 if dist < sp.trigger * 1.5 => {
                 self.pattern += 1;
                 self.chain = if self.level >= 3 {
                     t::MOMO_HOP_CHAIN - 1
+                } else if self.roused {
+                    1
                 } else {
                     0
                 };

@@ -113,7 +113,8 @@ impl Enemy {
     pub(super) fn tick_rest(&mut self, c: &mut Ctx<'_>, time: f32) {
         let dt = c.dt;
         let sp = self.sp();
-        let time = time - dt;
+        // 2단계 보스(0233)는 쉬는 시간이 빨리 지난다.
+        let time = time - dt * if self.roused { t::BOSS_P2_REST } else { 1.0 };
         self.state = if time <= 0.0 {
             idle_of(sp.behavior)
         } else {
