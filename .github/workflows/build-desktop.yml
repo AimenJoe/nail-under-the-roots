@@ -72,7 +72,8 @@ jobs:
 
       - name: Linux build deps
         if: matrix.name == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
+        # libudev: 패드(gilrs)가 리눅스에서 장치를 찾을 때 쓴다.
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev libudev-dev
 
       - name: Flavor
         env:
