@@ -37,7 +37,7 @@ pub static JA: Strings = Strings {
     set_back: "もどる",
     on: "オン",
     off: "オフ",
-    settings_hint: "{0}で変更・Webではこのブラウザに保存",
+    settings_hint: "{0}で変更・{1}で閉じる・Webではこのブラウザに保存",
     tab_menu: "メニュー",
     tab_status: "つよさ",
     tab_bag: "どうぐ",

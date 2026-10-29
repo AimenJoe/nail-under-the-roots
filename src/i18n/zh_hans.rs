@@ -37,7 +37,7 @@ pub static ZH_HANS: Strings = Strings {
     set_back: "返回",
     on: "开",
     off: "关",
-    settings_hint: "{0}切换·网页版保存在此浏览器",
+    settings_hint: "{0}切换·{1} 关闭·网页版保存在此浏览器",
     tab_menu: "菜单",
     tab_status: "状态",
     tab_bag: "背包",

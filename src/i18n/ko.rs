@@ -37,7 +37,7 @@ pub static KO: Strings = Strings {
     set_back: "돌아가기",
     on: "켬",
     off: "끔",
-    settings_hint: "{0} 값 바꾸기 · 웹에서는 이 브라우저에 저장된다",
+    settings_hint: "{0} 값 바꾸기 · {1} 닫기 · 웹에서는 이 브라우저에 저장된다",
     tab_menu: "메뉴",
     tab_status: "상태",
     tab_bag: "가방",

@@ -37,7 +37,7 @@ pub static ZH_HANT: Strings = Strings {
     set_back: "返回",
     on: "開",
     off: "關",
-    settings_hint: "{0}切換·網頁版儲存在此瀏覽器",
+    settings_hint: "{0}切換·{1} 關閉·網頁版儲存在此瀏覽器",
     tab_menu: "選單",
     tab_status: "狀態",
     tab_bag: "背包",

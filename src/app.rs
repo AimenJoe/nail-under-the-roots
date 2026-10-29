@@ -1374,10 +1374,7 @@ impl App {
                         self.erase_armed = true;
                     }
                 }
-                let back_chosen = a.cancel
-                    || matches!(tap_hit, Some(Hit::Close))
-                    || (a.confirm && self.settings_cursor == SETTING_BACK)
-                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_BACK)));
+                let back_chosen = a.cancel || matches!(tap_hit, Some(Hit::Close));
                 if back_chosen {
                     self.erase_armed = false;
                     self.save_prefs();

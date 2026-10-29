@@ -37,7 +37,7 @@ pub static FR: Strings = Strings {
     set_back: "Retour",
     on: "Oui",
     off: "Non",
-    settings_hint: "{0} pour changer · Sur le web, enregistré dans ce navigateur",
+    settings_hint: "{0} pour changer · {1} fermer · Sur le web, enregistré dans ce navigateur",
     tab_menu: "Menu",
     tab_status: "État",
     tab_bag: "Sac",

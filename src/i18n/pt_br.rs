@@ -37,7 +37,7 @@ pub static PT_BR: Strings = Strings {
     set_back: "Voltar",
     on: "Ligado",
     off: "Desligado",
-    settings_hint: "{0} para mudar · Salvo neste navegador na web",
+    settings_hint: "{0} para mudar · {1} fechar · Salvo neste navegador na web",
     tab_menu: "Menu",
     tab_status: "Status",
     tab_bag: "Mochila",

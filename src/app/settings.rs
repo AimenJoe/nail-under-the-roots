@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) const SETTING_ROWS: [Tr; 12] = [
+pub(super) const SETTING_ROWS: [Tr; 11] = [
     |s| s.set_sound,
     |s| s.set_music,
     |s| s.set_shake,
@@ -14,22 +14,34 @@ pub(super) const SETTING_ROWS: [Tr; 12] = [
     |s| s.set_controls,
     |s| s.set_licenses,
     |s| s.set_erase,
-    |s| s.set_back,
 ];
-/// 설정의 "포포의 응원"·"조작 설정"·"기록 지우기"·"돌아가기" 줄.
+/// 설정의 "포포의 응원"·"조작 설정"·"라이선스"·"기록 지우기" 줄. 돌아가기 줄은 없다 — 닫기 단추·뒤로(Esc·B)·창 밖 탭(0239).
 pub(super) const SETTING_ASSIST: usize = 7;
 pub(super) const SETTING_CONTROLS: usize = 8;
 pub(super) const SETTING_LICENSES: usize = 9;
 pub(super) const SETTING_ERASE: usize = 10;
-pub(super) const SETTING_BACK: usize = 11;
 /// 설정 창에 한 번에 보이는 줄. 줄이 더 많으면 고른 줄이 보이게 굴린다(입자 줄을 더해 열 줄이 됐다, 0141).
 pub(super) const SETTING_VISIBLE: usize = 9;
+/// 줄 간격과 묶음 사이 틈(0239): 값 줄 | 다른 화면으로 가는 줄 | 기록 지우기. 아홉 줄 + 틈 둘이 창 안에 든다.
+const SETTING_ROW_H: f32 = FONT_PX + 2.0;
+const SETTING_GAP: f32 = 4.0;
+/// 묶음 사이 가는 선(창 제목 밑줄과 같은 색, 반만 진하게).
+const GROUP_LINE: Color = Color::new(0.55, 0.40, 0.28, 0.5);
+/// 더 굴릴 수 없는 쪽의 ▲·▼.
+const SCROLL_SHUT: Color = Color::new(0.52, 0.48, 0.46, 0.3);
+/// 기록 지우기(되돌릴 수 없는 줄)의 글자색. 색만으로 알리지 않는다 — 맨 끝 따로 묶음 + 한 번 더 묻기.
+const ERASE_INK: Color = Color::new(0.86, 0.47, 0.42, 1.0);
 /// 값이 아니라 누르는 줄(좌우로 바뀌지 않는다).
 pub(super) fn setting_is_button(i: usize) -> bool {
-    matches!(
-        i,
-        SETTING_CONTROLS | SETTING_LICENSES | SETTING_ERASE | SETTING_BACK
-    )
+    matches!(i, SETTING_CONTROLS | SETTING_LICENSES | SETTING_ERASE)
+}
+/// 줄이 몇째 묶음인가: 0 = 값, 1 = 다른 화면(조작·라이선스), 2 = 기록 지우기.
+fn setting_group(i: usize) -> usize {
+    match i {
+        SETTING_ERASE => 2,
+        SETTING_CONTROLS | SETTING_LICENSES => 1,
+        _ => 0,
+    }
 }
 /// 조작 설정의 줄: 동작들(input::ACTS) + 기본값 + 돌아가기.
 pub(super) const CONTROL_NAMES: [Tr; 7] = [
@@ -222,75 +234,82 @@ impl App {
             String::new(),
             String::new(),
             String::new(),
-            String::new(),
         ];
-        let row_h = FONT_PX + 3.0;
+        let row_h = SETTING_ROW_H;
         // 줄이 창보다 많다: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
         let n = SETTING_ROWS.len();
         let first = self
             .settings_view
             .window(self.settings_cursor, n, SETTING_VISIBLE, row_h);
+        // 모든 줄은 같은 왼쪽 선에서 시작한다(0239): 예전에는 누르는 줄만 ▶ 자리만큼 들여 썼다.
+        let x = panel.x + 6.0;
+        let w = panel.w - 12.0;
+        let mut y = panel.y + 18.0;
         for (i, label) in trs(&SETTING_ROWS)
             .into_iter()
             .enumerate()
             .skip(first)
             .take(SETTING_VISIBLE)
         {
-            let y = panel.y + 18.0 + (i - first) as f32 * row_h;
+            if i > first && setting_group(i) != setting_group(i - 1) {
+                let ly = (y + SETTING_GAP * 0.5).round();
+                ui.line(vec2(x + 4.0, ly), vec2(x + w - 4.0, ly), GROUP_LINE);
+                y += SETTING_GAP;
+            }
             let selected = self.settings_cursor == i;
             if setting_is_button(i) {
-                let r = Rect::new(panel.x + 6.0, y, panel.w - 12.0, FONT_PX + 3.0);
+                let r = Rect::new(x, y, w, FONT_PX + 4.0);
                 if selected {
                     ui.rect(r, ui::PANEL_LIGHT);
-                    ui.text("▶", r.x + 2.0, ui::mid_y(r), FONT_PX, ui::ACCENT);
                 }
-                let label = if i == SETTING_CONTROLS || i == SETTING_LICENSES {
-                    format!("{label}  →")
-                } else if i == SETTING_ERASE && self.erase_armed {
-                    s.set_erase_confirm.to_string()
+                let ty = ui::mid_y(r);
+                let erase = i == SETTING_ERASE;
+                let label = if erase && self.erase_armed {
+                    s.set_erase_confirm
                 } else {
-                    label.to_string()
+                    label
                 };
-                ui.text(
-                    &label,
-                    r.x + 14.0,
-                    ui::mid_y(r),
-                    FONT_PX,
-                    if selected { ui::TEXT } else { ui::TEXT_DIM },
-                );
+                let ink = match (erase, selected) {
+                    (true, _) => ERASE_INK,
+                    (false, true) => ui::TEXT,
+                    (false, false) => ui::TEXT_DIM,
+                };
+                // 다른 화면으로 가는 줄은 값 칸의 ▶ 자리에 →(가는 곳이 있다는 표시). 기록 지우기는 표시 없음.
+                let arrow_w = if erase { 0.0 } else { 12.0 };
+                if !erase {
+                    let ac = if selected { ui::ACCENT } else { ui::TEXT_DIM };
+                    ui.text("→", x + w - 4.0 - arrow_w, ty, FONT_PX, ac);
+                }
+                let label = ui.fit(label, w - 8.0 - arrow_w - 4.0, FONT_PX);
+                ui.text(&label, x + 4.0, ty, FONT_PX, ink);
                 self.hits.push((r, Hit::SettingRow(i)));
             } else {
-                let (row, l, r) = ui.setting_row(
-                    label,
-                    &values[i],
-                    panel.x + 6.0,
-                    y,
-                    panel.w - 12.0,
-                    selected,
-                );
+                let (row, l, r) = ui.setting_row(label, &values[i], x, y, w, selected);
                 self.hits.push((l, Hit::SettingLeft(i)));
                 self.hits.push((r, Hit::SettingRight(i)));
                 self.hits.push((row, Hit::SettingRow(i)));
             }
+            y += row_h;
         }
-        // 가려진 줄이 있으면 위·아래 끝에 표시. 누르면 그쪽으로 한 줄 굴린다(터치, 0198). ▲는 닫기 단추 옆.
-        if first > 0 {
-            let at = vec2(panel.right() - 30.0, panel.y + 4.0);
-            ui.text("▲", at.x, at.y, FONT_PX, ui::TEXT_DIM);
-            self.hits.push((
-                Rect::new(at.x - 5.0, at.y - 4.0, 18.0, 18.0),
-                Hit::Scroll(-1),
-            ));
+        // 줄이 창보다 많으면 제목 줄의 닫기 단추 옆에 ▲▼ 한 쌍(0239). 더 갈 수 없는 쪽은 흐리게, 누르면 한 줄 굴린다(터치, 0198).
+        // 예전에는 ▼가 창 오른쪽 아래에 있어 마지막 줄의 ▶·→와 겹쳤다.
+        if n > SETTING_VISIBLE {
+            for (glyph, dx, step, open) in [
+                ("▲", 44.0, -1, first > 0),
+                ("▼", 30.0, 1, first + SETTING_VISIBLE < n),
+            ] {
+                let at = vec2(panel.right() - dx, panel.y + 4.0);
+                let c = if open { ui::TEXT_DIM } else { SCROLL_SHUT };
+                ui.text(glyph, at.x, at.y, FONT_PX, c);
+                if open {
+                    self.hits.push((
+                        Rect::new(at.x - 2.0, at.y - 4.0, 14.0, 18.0),
+                        Hit::Scroll(step),
+                    ));
+                }
+            }
         }
-        if first + SETTING_VISIBLE < n {
-            let at = vec2(panel.right() - 14.0, panel.bottom() - 13.0);
-            ui.text("▼", at.x, at.y, FONT_PX, ui::TEXT_DIM);
-            self.hits.push((
-                Rect::new(at.x - 5.0, at.y - 4.0, 18.0, 18.0),
-                Hit::Scroll(1),
-            ));
-        }
-        let settings_hint = vfill(s.settings_hint, &[Verb::Change]);
+        let settings_hint = vfill(s.settings_hint, &[Verb::Change, Verb::Back]);
         for (i, l) in ui::wrap(ui, &settings_hint, 300.0, FONT_PX)
             .iter()
             .take(2)

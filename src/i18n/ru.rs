@@ -37,7 +37,7 @@ pub static RU: Strings = Strings {
     set_back: "Назад",
     on: "Вкл",
     off: "Выкл",
-    settings_hint: "{0}: изменить · В вебе сохраняется в этом браузере",
+    settings_hint: "{0}: изменить · {1} закрыть · В вебе сохраняется в этом браузере",
     tab_menu: "Меню",
     tab_status: "Статус",
     tab_bag: "Сумка",
