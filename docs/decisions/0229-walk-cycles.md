@@ -48,3 +48,4 @@
 - "새 클립이 아니라 예전 것이 보인다": 같은 이름(`play.mp4`)이라 브라우저·Pages 캐시가 옛 영상을 줬다 → `bust_cache`가 `img/` 안의 파일마다
   내용 해시를 HTML 주소에 붙이고(`?v=`), 걷는 띠가 쓰는 `sp_*.png`는 `site.js`의 `SPRITE_V`로 넘긴다.
 
+덧붙임(2026-10-29, 0230 R16): `CHIEF_WALK4` → `art::CHIEF.walk4`, 걷기 칸 고르기는 `walk_frame` 하나(`Art::walk`·`chief_walk`가 같이 쓴다), 달리기는 `critter_frames ≥ 12` 대신 `BigSheet::run4`.

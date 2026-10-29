@@ -21,3 +21,5 @@
 
 ## 사장 확인
 - 보리가 쉼터·마을·컷씬에서, 물든 대장이 튜토리얼 공터 싸움(웅크림·돌진·부르기·맞음)에서 잘 읽히는지, 목의 보라 실이 "물들었다"로 충분한지.
+
+덧붙임(2026-10-29, 0230 R16): `CHIEF_CELL`·`CHIEF_FOOT`·`CHIEF_BORI`·`CHIEF_TAINTED`·`chief_cell`은 `art::CHIEF`(`BigSheet` 꼴, cell 40·foot 38·walk4 10)와 `Art::chief(frame, tainted, sil)`로 바뀌었다. 그리기 식은 같다.

@@ -27,3 +27,5 @@
 - 받을 것: 청설모 바운드 네 칸(밀기·공중·착지·모으기) — `docs/art/doto-run-prompt.md`, 참고 그림 `ref_doto_run.png`(우리 도토 칸 6배).
 - 게임은 미리 준비: 시트에 칸 8~11이 있으면(`Art::critter_frames` ≥ 12) 달릴 때 그 넷을 돈다(초당 14칸).
 - 들어감: 사장이 만든 `doto_run_v1.png`(✦ 지움, 네 칸) → `doto_ai.py` `RUN_SPEC`(서기 칸과 같은 키 18 기준, 공중 칸만 3px 위) → `doto.png` 칸 8~11(480×160). 개발 39 "도토: 아레나"에서 회피를 쥐고 달려 봤다(좌우 모두 네 자세가 돈다).
+
+덧붙임(2026-10-29, 0230): `App::village_run`·`pending_route` → `After::village_run`(쉼터 → 런 첫 한마디 → 길 지도, `app/after.rs` 시험), `Art::critter_frames ≥ 12` → `BigSheet::run4` + `Art::has_run`·`run`.
