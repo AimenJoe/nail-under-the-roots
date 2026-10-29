@@ -80,6 +80,10 @@ enum Scene {
     Controls {
         back: Back,
     },
+    /// 포포의 응원(설정 안, 0256): 도움 항목 넷. 돌아가면 설정.
+    Assist {
+        back: Back,
+    },
     /// 라이선스(설정 안): 제3자 고지 글을 굴려 본다. 돌아가면 설정(2026-10-29, OFL·MIT·Apache 고지를 앱 안에서 볼 수 있게).
     Licenses {
         back: Back,
@@ -129,12 +133,13 @@ impl Scene {
         match self {
             Scene::Intro | Scene::Album => Layer::Title,
             Scene::Title | Scene::Slots | Scene::Dev => Layer::TitleArt,
-            Scene::Settings { back } | Scene::Controls { back } | Scene::Licenses { back } => {
-                match back {
-                    Back::Title => Layer::TitleArt,
-                    Back::Pause => Layer::World,
-                }
-            }
+            Scene::Settings { back }
+            | Scene::Controls { back }
+            | Scene::Assist { back }
+            | Scene::Licenses { back } => match back {
+                Back::Title => Layer::TitleArt,
+                Back::Pause => Layer::World,
+            },
             Scene::Cutscene
             | Scene::Game
             | Scene::Pause
@@ -392,6 +397,8 @@ pub struct App {
     /// 라이선스 글을 창 폭에 맞춰 접은 줄(처음 열 때 한 번)과 굴리는 창.
     license_lines: Vec<String>,
     license_view: crate::ui::ListView,
+    /// 포포의 응원 창의 고른 줄(0256).
+    assist_cursor: usize,
     bestiary_view: crate::ui::ListView,
     dev_view: crate::ui::ListView,
     /// 이번 프레임의 굴리기 입력(논리 px 끌기, 칸: 휠·▲▼, 0199).
@@ -543,6 +550,7 @@ impl App {
             help_view: Default::default(),
             license_lines: Vec::new(),
             license_view: Default::default(),
+            assist_cursor: 0,
             bestiary_view: Default::default(),
             dev_view: Default::default(),
             scroll_in: (0.0, 0),
@@ -628,19 +636,23 @@ impl App {
         self.current == Scenario::Normal
     }
 
-    /// 도움 모드 "포포의 응원": 켜져 있으면 20%에서 시작해 쓰러질 때마다 2%씩, 최대 80%(Hades God Mode를 참고, 0041).
+    /// 도움 모드 "포포의 응원"(0041 → 0256): 기록의 항목 넷.
+    fn assist(&self) -> crate::assist::Assist {
+        crate::assist::Assist::read(&self.profile)
+    }
+
+    /// 지금 줄여 주는 받는 피해 비율.
     fn assist_resist(&self) -> f32 {
-        use crate::profile::key;
-        if self.profile.flag(key::ASSIST) {
-            (0.2 + 0.02 * self.profile.count(key::ASSIST_DEATHS) as f32).min(0.8)
-        } else {
-            0.0
-        }
+        self.assist()
+            .resist_now(self.profile.count(crate::profile::key::ASSIST_DEATHS))
     }
 
     fn apply_assist(&mut self) {
+        let a = self.assist();
         self.world.player.resist = self.assist_resist();
-        self.world.assist = self.profile.flag(crate::profile::key::ASSIST);
+        self.world.player.parry_assist = a.parry_mul();
+        self.world.assist = a.go_on;
+        self.world.tell_mul = a.tell_mul();
     }
 
     /// 짧은 한마디(런 사이). 맞는 줄이 있으면 대화 컷씬.
@@ -956,7 +968,7 @@ impl App {
         }
         use crate::profile::key;
         self.profile.add(key::DEATHS, 1);
-        if self.profile.flag(key::ASSIST) {
+        if self.assist().resist == crate::assist::RESIST_SCALING {
             self.profile.add(key::ASSIST_DEATHS, 1);
         }
         self.save_profile();
@@ -1385,6 +1397,14 @@ impl App {
                     self.scene = Scene::Licenses { back };
                     return;
                 }
+                let open_assist = (a.confirm && self.settings_cursor == SETTING_ASSIST)
+                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_ASSIST)));
+                if open_assist {
+                    self.settings_cursor = SETTING_ASSIST;
+                    self.assist_cursor = 0;
+                    self.scene = Scene::Assist { back };
+                    return;
+                }
                 let open_controls = (a.confirm && self.settings_cursor == SETTING_CONTROLS)
                     || matches!(tap_hit, Some(Hit::SettingRow(SETTING_CONTROLS)));
                 if open_controls {
@@ -1420,6 +1440,7 @@ impl App {
                 }
             }
             Scene::Controls { back } => self.update_controls(a, tap_hit, back, dt),
+            Scene::Assist { back } => self.update_assist(a, tap_hit, back),
             Scene::Licenses { back } => self.update_licenses(a, tap_hit, back),
             Scene::Pause => self.update_pause(a, tap_hit),
             Scene::Route => self.update_route(a, tap_hit),
@@ -1522,6 +1543,12 @@ impl App {
                     ui.dim();
                 }
                 self.draw_controls(&ui);
+            }
+            Scene::Assist { back } => {
+                if back == Back::Pause {
+                    ui.dim();
+                }
+                self.draw_assist(&ui);
             }
             Scene::Licenses { back } => {
                 if back == Back::Pause {

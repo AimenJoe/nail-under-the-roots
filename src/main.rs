@@ -14,6 +14,7 @@
 mod adventure;
 mod app;
 mod art;
+mod assist;
 #[cfg(feature = "clip")]
 mod autopilot;
 mod biome;

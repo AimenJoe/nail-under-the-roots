@@ -54,7 +54,10 @@ const SCROLL_SHUT: Color = Color::new(0.52, 0.48, 0.46, 0.3);
 const ERASE_INK: Color = Color::new(0.86, 0.47, 0.42, 1.0);
 /// 값이 아니라 누르는 줄(좌우로 바뀌지 않는다).
 pub(super) fn setting_is_button(i: usize) -> bool {
-    matches!(i, SETTING_CONTROLS | SETTING_LICENSES | SETTING_ERASE)
+    matches!(
+        i,
+        SETTING_ASSIST | SETTING_CONTROLS | SETTING_LICENSES | SETTING_ERASE
+    )
 }
 /// 줄이 몇째 묶음인가: 0 = 값(전체 화면 포함), 1 = 다른 화면(조작·라이선스), 2 = 기록 지우기.
 fn setting_group(i: usize) -> usize {
@@ -139,14 +142,6 @@ impl App {
                 self.settings.lang = Some(l);
             }
             SETTING_FULLSCREEN if crate::DESKTOP => self.toggle_fullscreen(),
-            SETTING_ASSIST => {
-                use crate::profile::key;
-                if !self.profile.unset(key::ASSIST) {
-                    self.profile.set(key::ASSIST);
-                }
-                crate::profile::save(&self.profile);
-                self.apply_assist();
-            }
             _ => {}
         }
     }
@@ -243,7 +238,6 @@ impl App {
         ui.panel(panel, Some(s.settings));
         // 터치로도 나갈 수 있게 닫기 단추(0198): 돌아가기 줄이 가려져 있으면 손가락만으로는 나갈 길이 없었다.
         self.close_button(ui, panel);
-        let assist = self.assist_resist();
         let mut values = vec![
             format!("{}%", self.settings.volume * 10),
             format!("{}%", self.settings.music * 10),
@@ -257,12 +251,8 @@ impl App {
             }
             .to_string(),
             s.lang_name.to_string(),
-            // 포포의 응원: 켜져 있으면 지금 줄여 주는 비율.
-            if assist > 0.0 {
-                format!("{} {}%", s.on, (assist * 100.0).round())
-            } else {
-                s.off.to_string()
-            },
+            // 포포의 응원은 창으로 가는 줄(0256).
+            String::new(),
         ];
         if crate::DESKTOP {
             values.push(
@@ -351,6 +341,124 @@ impl App {
         }
         let settings_hint = vfill(s.settings_hint, &[Verb::Change, Verb::Back]);
         for (i, l) in ui::wrap(ui, &settings_hint, 300.0, FONT_PX)
+            .iter()
+            .take(2)
+            .enumerate()
+        {
+            ui.text_center(
+                l,
+                160.0,
+                panel.bottom() + 1.0 + i as f32 * 12.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
+    }
+
+    /// 포포의 응원 창(0256): 위아래로 항목, 좌우로 값, 바꾸면 바로 기록에 쓰고 월드에 넣는다. 뒤로·닫기로 설정.
+    pub(super) fn update_assist(&mut self, a: &Actions, tap_hit: Option<Hit>, back: Back) {
+        let n = crate::assist::ROWS;
+        if a.up {
+            self.assist_cursor = (self.assist_cursor + n - 1) % n;
+        }
+        if a.down {
+            self.assist_cursor = (self.assist_cursor + 1) % n;
+        }
+        let mut adjust = 0i8;
+        if a.left {
+            adjust = -1;
+        }
+        if a.right || a.confirm {
+            adjust = 1;
+        }
+        match tap_hit {
+            Some(Hit::SettingLeft(i)) => {
+                self.assist_cursor = i;
+                adjust = -1;
+            }
+            Some(Hit::SettingRight(i)) | Some(Hit::SettingRow(i)) => {
+                self.assist_cursor = i;
+                adjust = 1;
+            }
+            _ => {}
+        }
+        if adjust != 0 {
+            let mut v = self.assist();
+            v.step(self.assist_cursor, adjust);
+            if v != self.assist() {
+                v.write(&mut self.profile);
+                crate::profile::save(&self.profile);
+                self.apply_assist();
+                self.sfx.play(crate::sfx::Id::Claw(0));
+            }
+        }
+        if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
+            self.scene = Scene::Settings { back };
+        }
+    }
+
+    pub(super) fn draw_assist(&mut self, ui: &Ui) {
+        use crate::assist::{PARRY, RESIST_FIXED, RESIST_SCALING, TELLS};
+        let panel = Rect::new(56.0, 0.0, 208.0, 155.0);
+        let s = i18n::s();
+        ui.panel(panel, Some(s.set_assist));
+        self.close_button(ui, panel);
+        let v = self.assist();
+        let more = |k: f32| {
+            if k <= 1.0 {
+                s.off.to_string()
+            } else {
+                format!("+{}%", ((k - 1.0) * 100.0).round())
+            }
+        };
+        let resist = if v.resist >= RESIST_SCALING {
+            let pct = (self.assist_resist() * 100.0).round() as i32;
+            fill(s.ast_scaling, &[&pct])
+        } else if v.resist == 0 {
+            s.off.to_string()
+        } else {
+            format!("-{}%", (RESIST_FIXED[v.resist] * 100.0).round())
+        };
+        let rows: [(&str, String, &str); crate::assist::ROWS] = [
+            (s.ast_resist, resist, s.ast_resist_d),
+            (
+                s.ast_go_on,
+                if v.go_on { s.on } else { s.off }.to_string(),
+                s.ast_go_on_d,
+            ),
+            (s.ast_tells, more(TELLS[v.tells]), s.ast_tells_d),
+            (s.ast_parry, more(PARRY[v.parry]), s.ast_parry_d),
+        ];
+        let x = panel.x + 6.0;
+        let w = panel.w - 12.0;
+        let mut y = panel.y + 18.0;
+        for (i, (label, value, _)) in rows.iter().enumerate() {
+            let (row, l, r) = ui.setting_row(label, value, x, y, w, self.assist_cursor == i);
+            self.hits.push((l, Hit::SettingLeft(i)));
+            self.hits.push((r, Hit::SettingRight(i)));
+            self.hits.push((row, Hit::SettingRow(i)));
+            y += SETTING_ROW_H;
+        }
+        // 고른 항목이 하는 일(한 줄 설명, 창 안에서 줄바꿈).
+        let ly = (y + SETTING_GAP * 0.5).round();
+        ui.line(vec2(x + 4.0, ly), vec2(x + w - 4.0, ly), GROUP_LINE);
+        y += SETTING_GAP + 2.0;
+        let desc = rows[self.assist_cursor.min(rows.len() - 1)].2;
+        let lines = ui::wrap(ui, desc, w - 8.0, FONT_PX);
+        let room = ((panel.bottom() - 3.0 - y) / (FONT_PX + 1.0))
+            .floor()
+            .max(1.0) as usize;
+        for (k, l) in lines.iter().take(room).enumerate() {
+            ui.text(
+                l,
+                x + 4.0,
+                y + k as f32 * (FONT_PX + 1.0),
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
+        let hint = vfill(s.settings_hint, &[Verb::Change, Verb::Back]);
+        for (i, l) in ui::wrap(ui, &hint, 300.0, FONT_PX)
             .iter()
             .take(2)
             .enumerate()

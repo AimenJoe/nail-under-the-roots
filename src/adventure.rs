@@ -1098,15 +1098,7 @@ impl World {
     }
 
     fn respawn_at_save(&mut self) {
-        // 길의 주인에게 쓰러져도 주인은 남는다(0210). 이기지 않고 지나가기(0046)는 도움 모드에서만:
-        // 그 런에서는 그 길 끝이 보통 무리가 된다.
-        if self.assist {
-            for k in [Kind::Momo, Kind::Doto, Kind::Kongi, Kind::Clover] {
-                if self.enemies.iter().any(|e| e.kind == k) {
-                    self.story.set_fight(k, false);
-                }
-            }
-        }
+        // 길의 주인에게 쓰러져도 주인은 남는다(0210). 포포의 응원도 주인을 건너뛰게 하지 않는다(0256 — 이야기가 주인을 이겨야 나아간다).
         let strand = self.strands_shown();
         self.clear_fight();
         if self.adv.place == Place::Deep {
@@ -1765,7 +1757,10 @@ mod tests {
         w.spawn_mob(Kind::Momo, w.player.pos + vec2(30.0, 0.0));
         w.player.hp = 0;
         w.respawn_at_save();
-        assert!(!w.story.fight(Kind::Momo), "도움 모드: 그 런은 지나간다");
+        assert!(
+            w.story.fight(Kind::Momo),
+            "포포의 응원도 주인을 건너뛰게 하지 않는다(0256)"
+        );
         assert_eq!(w.adv.falls, t::RUN_LIVES - 1, "도움 모드에서는 세지 않는다");
     }
 

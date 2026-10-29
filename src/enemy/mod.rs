@@ -242,8 +242,8 @@ impl Enemy {
         self.kind.species().windup * self.windup_mul
     }
 
-    /// 실뜨기 매듭을 건다(한 번만): 체력·예고.
-    pub fn apply_knots(&mut self, k: crate::knots::Knots) {
+    /// 실뜨기 매듭을 건다(한 번만): 체력·예고. `tells` = 포포의 응원 "공격 예고 길게"(0256)도 같이.
+    pub fn apply_knots(&mut self, k: crate::knots::Knots, tells: f32) {
         if self.knotted {
             return;
         }
@@ -253,7 +253,7 @@ impl Enemy {
             self.max_hp = (self.max_hp as f32 * k.boss_hp_mul()).ceil() as i32;
         }
         self.hp = self.max_hp;
-        self.windup_mul *= k.windup_mul();
+        self.windup_mul *= k.windup_mul() * tells;
         self.speed_mul *= k.enemy_speed_mul();
     }
 
@@ -1352,7 +1352,7 @@ mod tests {
         assert_eq!(e.max_hp, (plain.max_hp as f32 * t::ELITE_HP).ceil() as i32);
         assert!(e.windup() < plain.windup());
         let before = e.windup();
-        e.apply_knots(crate::knots::Knots::new(2));
+        e.apply_knots(crate::knots::Knots::new(2), 1.0);
         assert!(
             e.windup() <= before,
             "실뜨기가 엘리트 예고를 덮어쓰지 않는다"

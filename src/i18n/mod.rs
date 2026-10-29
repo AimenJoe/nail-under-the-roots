@@ -389,7 +389,7 @@ strings! {
     // 이야기 컷씬: 오프닝·보리·모모·엔딩(docs/decisions/0037, 0039)
     name_mom, name_halmae, name_momo, op_n1, op_n2, op_n3, op_mom_1, op_mom_2, bori_free, momo_r1, momo_r2, momo_r3, momo_r4, momo_r5, half_1, half_2, half_3, half_4, half_5, true_1, true_2, true_3, true_4, epi_1, epi_2, epi_clover,
     // 다회차: 앨범·도움 모드·기록 지우기·깨어날 때 한마디(docs/decisions/0041)
-    title_album, album_count, album_hint, album_close, set_assist, set_erase, set_erase_confirm, ret_first, ret_roots, ret_bori, ret_assist, ret_ten, run_again, run_again_bori,
+    title_album, album_count, album_hint, album_close, set_assist, ast_resist, ast_resist_d, ast_scaling, ast_go_on, ast_go_on_d, ast_tells, ast_tells_d, ast_parry, ast_parry_d, set_erase, set_erase_confirm, ret_first, ret_roots, ret_bori, ret_assist, ret_ten, run_again, run_again_bori,
     // 런의 끝(docs/decisions/0042)
     node_deepest, node_deepest_desc, run_after_half, deep_sub, deep_1, deep_goal, deep_k1, deep_k2, deep_k3, deep_wrap, deep_sleep,
     // 실뜨기(docs/decisions/0043)

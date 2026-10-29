@@ -24,10 +24,14 @@ pub mod key {
     pub const DEATHS: &str = "deaths";
     /// 실뿌리가 다 감겨 끝난 런 수(0210).
     pub const RUNS_LOST: &str = "runs_lost";
-    /// 도움 모드 "포포의 응원"이 켜져 있다(0040).
+    /// 도움 모드 "포포의 응원"(0040): 예전에는 한 줄 켜기, 지금은 "쓰러져도 계속"(0256, `assist::Assist`).
     pub const ASSIST: &str = "assist";
-    /// 도움 모드를 켠 채 쓰러진 수(받는 피해가 이만큼 더 준다).
+    /// "쓰러질수록"을 켠 채 쓰러진 수(받는 피해가 이만큼 더 준다).
     pub const ASSIST_DEATHS: &str = "assist_deaths";
+    /// 포포의 응원 항목(0256): 받는 피해 단계 + 1, 공격 예고 단계, 받아치기 창 단계.
+    pub const ASSIST_RESIST: &str = "assist_resist";
+    pub const ASSIST_TELLS: &str = "assist_tells";
+    pub const ASSIST_PARRY: &str = "assist_parry";
     /// 가장 멀리 간 쉼터 번호.
     pub const DEEPEST: &str = "deepest";
     /// 가장 깊은 곳에 닿아 반쪽 엔딩을 봤다 / 참 엔딩을 봤다(0042).

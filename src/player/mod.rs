@@ -197,6 +197,8 @@ pub struct Player {
     pub eat_cd_mul: f32,
     /// 실뜨기 8·9(0053): 패링 창 배율, 굴파기 대기 배율.
     pub parry_mul: f32,
+    /// 포포의 응원 "받아치기 창 넓게"(0256). 앱이 넣는다.
+    pub parry_assist: f32,
     pub burrow_knot: f32,
     /// 큰 나무의 재주(docs/decisions/0047). 앱이 기록에서 정한다.
     pub talents: crate::talents::Talents,
@@ -277,6 +279,7 @@ impl Player {
             item_cd: 0.0,
             eat_cd_mul: 1.0,
             parry_mul: 1.0,
+            parry_assist: 1.0,
             burrow_knot: 1.0,
             talents: crate::talents::Talents::default(),
             resist: 0.0,
@@ -450,7 +453,8 @@ impl Player {
     pub fn parry_dir(&self) -> Option<Vec2> {
         match self.state {
             State::Attack { dir, .. } | State::Heavy { dir, .. }
-                if self.parry_open && self.swing_age < t::PARRY_WINDOW * self.parry_mul =>
+                if self.parry_open
+                    && self.swing_age < t::PARRY_WINDOW * self.parry_mul * self.parry_assist =>
             {
                 Some(dir)
             }

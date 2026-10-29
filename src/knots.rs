@@ -185,8 +185,8 @@ mod tests {
         use crate::enemy::Kind;
         let mut e = Enemy::new(Kind::FieldMouse, macroquad::prelude::Vec2::ZERO);
         let (hp, wind) = (e.max_hp, e.windup());
-        e.apply_knots(Knots::new(2));
-        e.apply_knots(Knots::new(2));
+        e.apply_knots(Knots::new(2), 1.0);
+        e.apply_knots(Knots::new(2), 1.0);
         assert_eq!(e.max_hp, (hp as f32 * t::KNOT_ENEMY_HP).ceil() as i32);
         assert_eq!(e.hp, e.max_hp);
         assert!((e.windup() - wind * t::KNOT_WINDUP).abs() < 1e-6);
@@ -199,12 +199,12 @@ mod tests {
         use crate::enemy::Kind;
         let mut b = Enemy::new(Kind::Momo, macroquad::prelude::Vec2::ZERO);
         let hp = b.max_hp;
-        b.apply_knots(Knots::new(7));
+        b.apply_knots(Knots::new(7), 1.0);
         let once = (hp as f32 * t::KNOT_ENEMY_HP).ceil();
         assert_eq!(b.max_hp, (once * t::KNOT_BOSS_HP).ceil() as i32);
         let mut m = Enemy::new(Kind::FieldMouse, macroquad::prelude::Vec2::ZERO);
         let sp = m.speed();
-        m.apply_knots(Knots::new(7));
+        m.apply_knots(Knots::new(7), 1.0);
         assert_eq!(
             m.max_hp,
             (crate::species::FIELD_MOUSE.hp as f32 * t::KNOT_ENEMY_HP).ceil() as i32

@@ -563,9 +563,11 @@ pub struct World {
     pub neighbors: Vec<Npc>,
     /// 연습: 맞아도 체력이 줄지 않는다(튜토리얼).
     pub no_damage: bool,
-    /// 도움 모드 "포포의 응원"(0041)이 켜져 있다. 앱이 넣는다. 쓰러짐이 너그럽다: 실뿌리 없음, 반딧불 30%만,
-    /// 길의 주인에게 쓰러지면 그 런은 지나간다(0210).
+    /// 포포의 응원 "쓰러져도 계속"(0041 → 0256). 앱이 넣는다. 쓰러짐이 너그럽다: 실뿌리 없음, 반딧불 30%만 잃는다.
+    /// 길의 주인은 그래도 이겨야 지나간다(0256 — 예전에는 주인에게 쓰러지면 그 런은 지나갔다).
     pub assist: bool,
+    /// 포포의 응원 "공격 예고 길게"(0256): 적이 깰 때 `windup_mul`에 곱한다. 앱이 넣는다.
+    pub tell_mul: f32,
     /// 도감: 만난(깨어 있는 것을 본) 적 종류.
     pub seen: Vec<Kind>,
     /// 모험 구조: 장소·카메라·던전·저장 지점(adventure.rs).
@@ -708,6 +710,7 @@ impl World {
             neighbors: Vec::new(),
             no_damage: false,
             assist: false,
+            tell_mul: 1.0,
             adv: Adventure::default(),
             debug: Debug {
                 overlay: false,
@@ -784,9 +787,9 @@ impl World {
             self.freeze_interp();
             return;
         }
-        let knots = self.knots;
+        let (knots, tells) = (self.knots, self.tell_mul);
         for e in &mut self.enemies {
-            e.apply_knots(knots);
+            e.apply_knots(knots, tells);
         }
         // 문(0094): 열리는 순간 문마다 보라 실이 풀려 흩어지고 흙먼지가 인다.
         if self.room.tick_doors(dt) {
