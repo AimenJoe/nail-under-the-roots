@@ -6,7 +6,9 @@
 
 use macroquad::prelude::*;
 
+mod after;
 mod dream;
+mod flow;
 mod pick;
 mod run;
 mod slots;
@@ -361,16 +363,8 @@ pub struct App {
     profile: crate::profile::Profile,
     /// 이번 쓰러짐을 이미 셌나.
     death_noted: bool,
-    /// 깨어나는 장면(어두워졌다 밝아짐)이 끝나면 한마디.
-    pending_wake: bool,
-    /// 내려가는 전환이 끝나면 런 첫 한마디(마을에서 첫 쉼터로 곧장 내려간 런, 0225).
-    pending_run_start: bool,
-    /// 쉼터 도착 한마디(쉼터 번호): 내려가는 전환이 끝나면 튼다(0225).
-    pending_camp: Option<u32>,
-    /// 마을에서 내려온 런(0226): 첫 쉼터에 닿으면 도착 한마디 대신 길 지도를 바로 연다(쉼터는 깨어나는 자리로만).
-    village_run: bool,
-    /// 길 지도를 열 차례(런 첫 한마디가 끝난 뒤).
-    pending_route: bool,
+    /// 전환이 끝난 뒤에 할 일(깨어난 뒤·쉼터 도착·런 첫 한마디·길 지도, 0230 R15).
+    after: after::After,
     /// 설정 "기록 지우기"를 한 번 눌렀다(한 번 더 누르면 지운다).
     erase_armed: bool,
     /// 이 컷씬이 끝나면 갈 곳(엔딩 = 런의 끝).
@@ -496,11 +490,7 @@ impl App {
             talk_n: 0,
             profile: crate::profile::load(),
             death_noted: false,
-            pending_wake: false,
-            pending_run_start: false,
-            pending_camp: None,
-            village_run: false,
-            pending_route: false,
+            after: after::After::default(),
             erase_armed: false,
             album_cursor: 0,
             album_view: None,
@@ -675,7 +665,9 @@ impl App {
                                 self.start(Scenario::Village);
                                 self.world.start_ascent();
                             }
-                            AfterCut::Respawn if self.world.run_over() => self.lose_run(),
+                            AfterCut::Respawn if self.world.run_over() => {
+                                self.lose_run(flow::back_to_village(self.current))
+                            }
                             AfterCut::Respawn => {
                                 self.scene = Scene::Game;
                                 self.world.start_fade(crate::adventure::Transition::Respawn);
@@ -788,44 +780,26 @@ impl App {
                 self.on_death();
             }
         }
-        // 깨어나는 어두워짐·밝아짐이 끝나면 이웃의 한마디(갈색 뿌리가 데려왔다, 0037).
-        if self.pending_wake
-            && self.world.adv.fade.is_none()
-            && self.world.player.is_alive()
-            && self.scene == Scene::Game
-        {
-            self.pending_wake = false;
-            self.say_story(crate::story::When::Wake);
-        }
-        if self.pending_camp.is_some()
-            && self.world.adv.fade.is_none()
-            && self.world.player.is_alive()
-            && self.scene == Scene::Game
-        {
-            let n = self.pending_camp.take().unwrap_or(1);
-            if std::mem::take(&mut self.village_run) {
-                self.pending_route = true;
-            } else {
-                self.play(cutscene::camp_arrive(&self.world, n));
+        // 전환이 끝난 뒤에 할 일(0230 R15). 문은 일마다 새로 잰다 — 앞의 한마디가 컷씬을 열면 뒤의 일은 기다린다.
+        for kind in after::ORDER {
+            let gate = after::Gate {
+                settled: self.world.adv.fade.is_none(),
+                alive: self.world.player.is_alive(),
+                in_game: self.scene == Scene::Game,
+                cutscene: self.cutscene.is_some(),
+            };
+            match self.after.take(kind, gate) {
+                // 깨어나는 어두워짐·밝아짐이 끝나면 이웃의 한마디(갈색 뿌리가 데려왔다, 0037).
+                Some(after::Do::SayWake) => {
+                    self.say_story(crate::story::When::Wake);
+                }
+                Some(after::Do::CampArrive(n)) => self.play(cutscene::camp_arrive(&self.world, n)),
+                Some(after::Do::SayRunStart) => {
+                    self.say_story(crate::story::When::RunStart);
+                }
+                Some(after::Do::OpenRoute) => self.open_route(true),
+                None => {}
             }
-        }
-        if self.pending_run_start
-            && self.pending_camp.is_none()
-            && self.world.adv.fade.is_none()
-            && self.world.player.is_alive()
-            && self.scene == Scene::Game
-        {
-            self.pending_run_start = false;
-            self.say_story(crate::story::When::RunStart);
-        }
-        if self.pending_route
-            && !self.pending_run_start
-            && self.world.adv.fade.is_none()
-            && self.cutscene.is_none()
-            && self.scene == Scene::Game
-        {
-            self.pending_route = false;
-            self.open_route(true);
         }
         self.take_gifts();
         if let Some(tu) = self.tutorial.as_mut() {
@@ -857,18 +831,20 @@ impl App {
         // 꿈에서 쓰러지면 잠깐 뒤 마을로 깬다(tick_dream). 재시작 입력은 받지 않는다.
         if restart && self.dream.is_none() {
             // 모험(필드·던전)에서 쓰러지면 저장 지점으로. 아레나·개발 시나리오는 처음부터.
-            if self.world.adv.place != crate::adventure::Place::Arena
-                && !self.world.player.is_alive()
-            {
-                if self.world.run_over() {
-                    self.lose_run();
-                    return;
+            let fall = flow::fall(
+                self.current,
+                self.world.adv.place == crate::adventure::Place::Arena,
+                self.world.player.is_alive(),
+                self.world.run_over(),
+            );
+            match fall {
+                flow::Fall::RunLost { to_village } => self.lose_run(to_village),
+                flow::Fall::Respawn { wake_line } => {
+                    self.world.begin_respawn();
+                    self.death_t = 0.0;
+                    self.after.set_wake(wake_line);
                 }
-                self.world.begin_respawn();
-                self.death_t = 0.0;
-                self.pending_wake = self.recording();
-            } else {
-                self.start_game();
+                flow::Fall::Restart => self.start_game(),
             }
         } else if open_pause {
             self.open_pause();
@@ -880,14 +856,14 @@ impl App {
 
     /// 실뿌리가 다 감긴 뒤 또 쓰러졌다(0210): 런이 끝난다. 쉼터 뒤에 주운 반딧불은 마을로 가지 않는다(잃는다).
     /// 이야기 런은 마을로(뿌리가 데려다 놓는다), 오늘의 굴은 타이틀로. 맡겨 둔 반딧불·기록은 그대로.
-    fn lose_run(&mut self) {
+    fn lose_run(&mut self, to_village: bool) {
         self.world.inv.glowbugs = 0;
         self.clear_run();
         if self.recording() {
             self.profile.add(crate::profile::key::RUNS_LOST, 1);
             self.save_profile();
         }
-        if self.current == Scenario::Normal {
+        if to_village {
             self.start(Scenario::Village);
             self.world.juice.toast = Some((|s| s.toast_run_lost, 5.0));
         } else {
@@ -944,30 +920,16 @@ impl App {
         self.world.debug.hitboxes = hitboxes;
         self.journal_cursor = 0;
         self.journal_view = Default::default();
-        // 캐릭터(0056): 런(첫 시작·오늘의 굴·실의 꿈)은 뿌리 길에서 고른 캐릭터, 그 밖(마을·개발)은 Naïl.
-        // 고른 캐릭터(0056): 보통 런·오늘의 굴, 개발의 가장 깊은 곳(모모 끝 장면 보기).
-        // 실의 꿈은 Naïl만: 꿈 목록에 모모가 있다.
-        let ch = match s {
-            Scenario::Normal | Scenario::Daily | Scenario::Deepest => self.picked(),
-            // 개발: 도토로 싸워 보기(0195).
-            Scenario::DotoArena | Scenario::DotoMobs => Character::Doto,
-            Scenario::MomoArena => Character::Momo,
-            _ => Character::Mole,
-        };
+        let ch = flow::character(s, self.picked());
         self.world.character = ch;
         self.world.player.kit = ch;
         // 무기는 스토리를 따라 하나씩(docs/decisions/0012). 첫 시작·튜토리얼은 맨손에서 출발해
         // 튜토리얼에서 두더지 발톱을 줍는다. 개발 시나리오는 테스트를 위해 기본 발톱(또는 전부)을 들고 시작.
         let start = ch.starting_weapon();
-        // 튜토리얼을 마친 기록이 있으면 오프닝·튜토리얼을 건너뛰고 발톱을 든 채 시작한다(0041).
-        let veteran = s == Scenario::Normal && self.profile.flag(crate::profile::key::TUTORIAL);
+        let veteran = flow::veteran(s, self.profile.flag(crate::profile::key::TUTORIAL));
         self.note_run_start(s);
         self.death_noted = false;
-        self.pending_wake = false;
-        self.pending_run_start = false;
-        self.pending_camp = None;
-        self.village_run = false;
-        self.pending_route = false;
+        self.after.clear();
         self.apply_assist();
         self.seed_run_from_profile(s, ch);
         self.fill_inventory(s, ch, start, veteran);
@@ -1109,62 +1071,75 @@ impl App {
 
     /// 첫 장면: 마을·지름길(숙련자)·오프닝 컷씬·튜토리얼·가장 깊은 곳·실의 꿈·이야기 미리보기.
     fn enter_first_scene(&mut self, s: Scenario, veteran: bool) {
-        // 첫 시작은 컷씬 → 플레이 튜토리얼 → 웨이브 1. 튜토리얼이 끝나야 자동 웨이브가 켜진다.
-        if s == Scenario::Village {
-            self.scene = Scene::Game;
-            if self.story_after_ascent.is_none() {
-                self.say_story(crate::story::When::Village);
-            }
-            return;
-        }
-        if veteran {
-            self.world.open_glade();
-            if self.profile.flag(crate::profile::key::BORI_BACK) {
-                self.world.skip_glade_boss();
-                if self.resuming {
-                    // 쉼터 이어하기는 곧바로 그 쉼터를 다시 세운다(`resume_run`).
-                    self.world.start_near_entrance();
-                } else {
-                    // 마을 뿌리 길에서 첫 쉼터로 곧장 내려간다(0225, 지름길 0151을 대신한다). 런 첫 한마디는 닿은 뒤에.
-                    self.world.descend_to_first_camp();
-                    self.scene = Scene::Game;
-                    self.pending_run_start = true;
-                    self.village_run = true;
-                    return;
+        let bori_back = self.profile.flag(crate::profile::key::BORI_BACK);
+        match flow::first(s, veteran, bori_back, self.resuming) {
+            flow::First::Village => {
+                self.scene = Scene::Game;
+                if self.story_after_ascent.is_none() {
+                    self.say_story(crate::story::When::Village);
                 }
             }
-            self.scene = Scene::Game;
-            if !self.resuming {
-                self.say_story(crate::story::When::RunStart);
+            flow::First::Descend => {
+                // 마을 뿌리 길에서 첫 쉼터로 곧장 내려간다(0225, 지름길 0151을 대신한다). 런 첫 한마디는 닿은 뒤에.
+                self.world.open_glade();
+                self.world.skip_glade_boss();
+                self.world.descend_to_first_camp();
+                self.scene = Scene::Game;
+                self.after.village_run();
             }
-            return;
-        }
-        if matches!(s, Scenario::Normal | Scenario::Tutorial) {
-            self.tutorial = Some(Tutorial::new(&mut self.world));
-        }
-        if matches!(s, Scenario::Normal | Scenario::CutsceneOnly) {
-            // 아레나(컷씬만)는 비우고, 필드(첫 시작)는 멀리 자는 적을 둔다. 컷씬 좌표는 왼쪽 위 화면 기준.
-            if self.world.adv.place == crate::adventure::Place::Arena {
-                self.world.enemies.clear();
+            flow::First::Field {
+                skip_boss,
+                near_entrance,
+                say,
+            } => {
+                self.world.open_glade();
+                if skip_boss {
+                    self.world.skip_glade_boss();
+                }
+                if near_entrance {
+                    // 쉼터 이어하기는 곧바로 그 쉼터를 다시 세운다(`resume_run`).
+                    self.world.start_near_entrance();
+                }
+                self.scene = Scene::Game;
+                if say {
+                    self.say_story(crate::story::When::RunStart);
+                }
             }
-            self.world.wave = 0;
-            self.world.player.pos = vec2(40.0, 90.0);
-            self.world.snap_cam();
-            self.cutscene = Some(cutscene::opening(&self.world));
-            self.scene = Scene::Cutscene;
-        } else if s == Scenario::Deepest {
-            // 가장 깊은 곳(0162): 할매와 매듭 셋. 들어서면 할매의 말, 셋 다 끊으면 반쪽 엔딩.
-            self.world.enter_deep_now();
-            self.scene = Scene::Game;
-        } else if s == Scenario::Dream {
-            self.begin_dream();
-            self.scene = Scene::Game;
-        } else if s == Scenario::StoryPreview {
-            self.world.wave = 0;
-            self.cutscene = Some(cutscene::story_preview(&self.world));
-            self.scene = Scene::Cutscene;
-        } else {
-            self.scene = Scene::Game;
+            flow::First::Opening { tutorial } => {
+                // 첫 시작은 컷씬 → 플레이 튜토리얼 → 웨이브 1. 튜토리얼이 끝나야 자동 웨이브가 켜진다.
+                if tutorial {
+                    self.tutorial = Some(Tutorial::new(&mut self.world));
+                }
+                // 아레나(컷씬만)는 비우고, 필드(첫 시작)는 멀리 자는 적을 둔다. 컷씬 좌표는 왼쪽 위 화면 기준.
+                if self.world.adv.place == crate::adventure::Place::Arena {
+                    self.world.enemies.clear();
+                }
+                self.world.wave = 0;
+                self.world.player.pos = vec2(40.0, 90.0);
+                self.world.snap_cam();
+                self.cutscene = Some(cutscene::opening(&self.world));
+                self.scene = Scene::Cutscene;
+            }
+            flow::First::Deepest => {
+                // 가장 깊은 곳(0162): 할매와 매듭 셋. 들어서면 할매의 말, 셋 다 끊으면 반쪽 엔딩.
+                self.world.enter_deep_now();
+                self.scene = Scene::Game;
+            }
+            flow::First::Dream => {
+                self.begin_dream();
+                self.scene = Scene::Game;
+            }
+            flow::First::StoryPreview => {
+                self.world.wave = 0;
+                self.cutscene = Some(cutscene::story_preview(&self.world));
+                self.scene = Scene::Cutscene;
+            }
+            flow::First::Play { tutorial } => {
+                if tutorial {
+                    self.tutorial = Some(Tutorial::new(&mut self.world));
+                }
+                self.scene = Scene::Game;
+            }
         }
     }
 

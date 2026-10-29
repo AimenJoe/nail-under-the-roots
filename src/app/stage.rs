@@ -294,7 +294,7 @@ impl App {
                     }
                     self.checkpoint_run();
                     // 도착 한마디는 내려가는 단면이 다 흐른 뒤에(0225): 가운데서 대화가 뜨면 월드가 멈춰 단면이 중간 깊이에 섰다.
-                    self.pending_camp = Some(n);
+                    self.after.camp(n);
                 }
                 AdvEvent::RouteOpen => self.open_route(false),
                 // 오늘의 굴은 싸움 없이 기록만(0162). 이야기 런은 가장 깊은 곳의 실매듭 끊기로.
