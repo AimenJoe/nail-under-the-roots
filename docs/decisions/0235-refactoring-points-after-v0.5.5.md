@@ -31,3 +31,11 @@
 - **R20**: CI만 고쳤다 — Android·iOS는 `assets/music/*.mp3`를 빼고, 웹 배포는 `*.ogg`를 뺀다(레포·로컬 빌드는 그대로). 공용 파일 목록(데모·PC 패키징)은 PC 빌드 때.
 - **R24**: `Ui::hint_strip(hint, panel, max_w)` 하나를 고르기 창·실의 꿈·큰 나무 창이 같이 쓴다(세 창 모두 화면 가운데라 자리는 그대로).
 - 덤: `dungeon.rs`의 겹친 `#[test]`(같은 시험이 두 번 돌았다) 지움.
+
+## 남은 것(2026-10-29, v0.5.6 뒤 다시 봄)
+- **R21**: 라이선스 화면(크레딧 대신)이 R21보다 먼저 들어갔고, 예상한 대로 `Scene::Licenses`를 타이틀 곡·`in_world`·`title_bg` 세 `matches!`에 손으로 넣었다(빠뜨려도 컴파일된다). `music_track` 73줄, 시험 0. → 다음 장면(데모 끝 화면·PC 끝내기) 전에 한다.
+- **R22**: `tools/licenses.py`에 Kenney 줄이 아직 둘, 출처 원본이 넷(`make_audio.py`·`LICENSES.md`·`licenses.py`·고지 파일). 라이선스 화면은 생성된 `THIRD_PARTY_LICENSES.txt`를 그대로 읽으니 원본 하나로 모으면 화면도 따라온다. → Steam 출시 전(고지 정확도).
+- **R23**: 그대로(`persist-credentials` 지정 0곳, `site.js` `REPO`). → 레포 나누기 때(0237 순서 2~6과 같이).
+- **R20 목록 부분**: 공용 에셋 목록 → PC 빌드 때.
+- **R25**: 미룸(`world.rs` 3,829줄).
+- 0169 R8의 하지 않은 것: `CLAUDE.md`의 "어디에 뭐가 있나"를 `docs/architecture.md`로 — 글 작업, 미룸.
