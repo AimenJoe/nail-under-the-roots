@@ -685,7 +685,7 @@ pub static FR: Strings = Strings {
     doto_memory: "Doto s'est souvenu de l'endroit où la graine est enterrée.",
     doto_v1: "Enterre des trucs un peu partout et ils poussent au printemps. Oublier, ça a du bon, tu sais.",
     doto_v2: "Ce chapeau? C'est la cupule du plus gros gland du monde. Lui, je ne l'oublie jamais.",
-    doto_v3: "J'entends tes griffes bourdonner au pied du Grand Arbre. Quelque chose veut se réveiller.",
+    doto_v3: "J'ai aussi enterré un gland sous les racines du Grand Arbre. Où ça ? ... L'arbre s'en souviendra, sûrement.",
     bori_t_doto: "Doto est revenu? Ce chenapan a un jour enterré mes provisions d'hiver et oublié où. Hé hé.",
     momo_t_doto: "Doto m'a donné un gland. Il a dit de l'enterrer un jour. Si je l'oublie, il deviendra un arbre.",
     popo_doto: "Doto l'écureuil est arrivé au village! Il a déjà creusé des trous partout.",

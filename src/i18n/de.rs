@@ -685,7 +685,7 @@ pub static DE: Strings = Strings {
     doto_memory: "Doto hat sich erinnert, wo der Samen vergraben ist.",
     doto_v1: "Vergrab hier und da was, dann sprießt es im Frühling. Vergessen hat auch sein Gutes, weißt du.",
     doto_v2: "Der Hut? Das ist das Hütchen der größten Eichel aller Zeiten. Das vergess ich nie.",
-    doto_v3: "Am Fuß des Großen Baums höre ich deine Krallen summen. Da will etwas aufwachen.",
+    doto_v3: "Unter den Wurzeln des Großen Baums hab ich auch eine Eichel vergraben. Wo genau? ... Der Baum wird sich schon erinnern.",
     bori_t_doto: "Doto ist zurück? Der Schlingel hat mal meine Wintervorräte vergraben und vergessen, wo. Hehe.",
     momo_t_doto: "Doto hat mir eine Eichel geschenkt. Ich soll sie irgendwann vergraben. Wenn ich sie vergesse, wird ein Baum draus.",
     popo_doto: "Doto, das Eichhörnchen, ist ins Dorf gekommen! Er hat schon überall Löcher gegraben.",

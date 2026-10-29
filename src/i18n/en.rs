@@ -685,7 +685,7 @@ pub static EN: Strings = Strings {
     doto_memory: "Doto remembered where the seed was buried.",
     doto_v1: "Bury things here and there and they sprout in spring. Forgetting has its uses, you know.",
     doto_v2: "This hat? It's the cap of the biggest acorn ever. This one I never forget.",
-    doto_v3: "I hear your claws humming by the foot of the great tree. Something wants to wake up.",
+    doto_v3: "I buried an acorn under the great tree's roots too. Where exactly? ...The tree will remember, I'm sure.",
     bori_t_doto: "Doto's back? That rascal once buried my winter stores and forgot where. Heh.",
     momo_t_doto: "Doto gave me an acorn. Said to bury it someday. If I forget it, it becomes a tree.",
     popo_doto: "Doto the squirrel came to the village! He's already dug holes everywhere.",

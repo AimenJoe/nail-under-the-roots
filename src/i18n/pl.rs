@@ -685,7 +685,7 @@ pub static PL: Strings = Strings {
     doto_memory: "Doto przypomniał sobie, gdzie zakopał nasionko.",
     doto_v1: "Zakopuj rzeczy tu i tam, a wiosną wykiełkują. Zapominanie też się przydaje, wiesz?",
     doto_v2: "Ta czapka? To kapelusik największego żołędzia na świecie. O nim nigdy nie zapominam.",
-    doto_v3: "Przy Wielkim Drzewie słychać, jak brzęczą twoje pazury. Coś chce się obudzić.",
+    doto_v3: "Pod korzeniami Wielkiego Drzewa też zakopałem żołądź. Gdzie dokładnie? ...Drzewo na pewno zapamięta.",
     bori_t_doto: "Doto wrócił? Ten urwis zakopał kiedyś moje zimowe zapasy i zapomniał gdzie. Hehe.",
     momo_t_doto: "Doto dał mi żołądź. Kazał go kiedyś zakopać. Jak o nim zapomnę, wyrośnie drzewo.",
     popo_doto: "Doto przyszedł do wioski! Już wszędzie wykopał dołki.",

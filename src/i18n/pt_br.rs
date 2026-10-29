@@ -685,7 +685,7 @@ pub static PT_BR: Strings = Strings {
     doto_memory: "Doto lembrou onde a semente foi enterrada.",
     doto_v1: "Enterra aqui e ali que brota na primavera. Esquecer também tem sua utilidade, sabia?",
     doto_v2: "Este chapéu? É o chapéu da maior bolota de todas. Esse eu nunca esqueço.",
-    doto_v3: "Perto do pé da grande árvore, ouço suas garras zumbindo. Algo quer despertar.",
+    doto_v3: "Enterrei uma bolota debaixo das raízes da grande árvore também. Onde mesmo? ...A árvore vai lembrar, com certeza.",
     bori_t_doto: "O Doto voltou? Aquele danado já enterrou minhas provisões de inverno e esqueceu onde. Hehe.",
     momo_t_doto: "O Doto me deu uma bolota. Disse pra enterrar um dia. Se eu esquecer, vira árvore.",
     popo_doto: "O esquilo Doto chegou na vila! Já cavou buracos por todo lado.",
