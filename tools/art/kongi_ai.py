@@ -25,7 +25,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import walk_ai  # noqa: E402
-from sprite_ai import OUTLINE, Source, Spec, convert, lum, ramp, seat, sheet4  # noqa: E402
+from sprite_ai import OUTLINE, Source, Spec, convert, lum, ramp, seat, sheet4, step_cycle  # noqa: E402
 
 CELL, FOOT = 32, 30
 SRC = HERE / "sources" / "ai" / "sprites" / "kongi_v2.png"
@@ -217,6 +217,11 @@ def build():
     ink = min(pal, key=lambda c: sum((a - b) ** 2 for a, b in zip(c, BAND_INK)))
     for k in STAND:
         cells[k] = arcs(cells[k], ink)
+    # 걷기는 첫 칸 하나에서 발만 딛게(0241): 원본 네 칸은 등딱지 크기·머리 높이·눈이 칸마다 달라 걸을 때 몸이 끓었다.
+    # 두 칸 걷기(walk_a·b)도 같은 순환의 두 디딤 칸으로.
+    steps = step_cycle(cells[walk_ai.NAMES[0]], FOOT - 2)
+    cells.update(zip(walk_ai.NAMES, steps))
+    cells["walk_a"], cells["walk_b"] = steps[0], steps[2]
     return sheet4([(cells[k], thread(taint(cells[k]))) for k in ORDER])
 
 

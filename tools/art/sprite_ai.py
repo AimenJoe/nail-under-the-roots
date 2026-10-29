@@ -345,6 +345,53 @@ def seat_on_fur(sprite, ref, cell, foot):
     return seat(sprite, cell, foot, dx=round(anchor - ((cell - sprite.shape[1]) // 2 + fur_cx(sprite))))
 
 
+def step_cycle(base, split):
+    """걷기 네 칸을 앉힌 칸 하나에서 만든다(0241): 디딤 → 지나감(몸 1px 위, 뒷발 듦) → 반대 디딤 → 지나감(앞발 듦).
+
+    나노바나나 걷기 네 칸은 발이 거의 그대로이고 칸마다 몸(앞발·등딱지·머리)이 조금씩 달라, 게임 크기에서는
+    미끄러지며 몸이 끓는 걸음이 됐다(사장: Naïl "걷는 게 어색하다", 콩이 "걷는 게 걸린다"). 몸은 한 그림 그대로 두고 발만 딛게 한다.
+    발 = `split` 줄부터 아래의 덩어리 둘(가운데 빈 열로 가름), 왼쪽이 뒷발(오른쪽을 보는 그림).
+    """
+    on = base[..., 3] > 0
+    cols = np.nonzero(on[split:].any(axis=0))[0]
+    gaps = [x for x in range(cols.min(), cols.max()) if not on[split:, x].any()]
+    mid = gaps[len(gaps) // 2] if gaps else (cols.min() + cols.max()) // 2
+    body = base.copy()
+    body[split:] = 0
+    feet = {"back": base.copy(), "front": base.copy()}
+    feet["back"][:split] = 0
+    feet["back"][:, mid:] = 0
+    feet["front"][:split] = 0
+    feet["front"][:, :mid] = 0
+
+    def put(cell, foot, dx=0, dy=0, behind=False):
+        f = np.roll(np.roll(foot, dx, axis=1), dy, axis=0)
+        m = f[..., 3] > 0
+        if behind:
+            m &= cell[..., 3] == 0
+        cell[m] = f[m]
+
+    def frame(bob, back, front):
+        cell = np.zeros_like(base)
+        up = body.copy()
+        if bob:
+            # 배 줄(외곽선 위 둘째 줄)까지 위로 올리고 그 줄을 한 번 더 — 몸이 늘어나 발에 닿는다(밑 외곽선은 두 겹이 되지 않게).
+            k = split - 3
+            up[:k] = body[1:k + 1]
+        cell[...] = up
+        put(cell, feet["back"], *back, behind=True)
+        put(cell, feet["front"], *front)
+        return cell
+
+    # 든 발은 앞으로, 디딘 발은 뒤로 간다(몸 기준). 반대로 들면 뒷걸음처럼 보인다(사장 "뒤로 걷는 느낌", 0241).
+    return [
+        frame(0, (-1, 0), (1, 0)),     # 디딤: 뒷발 뒤, 앞발 앞
+        frame(1, (0, -1), (0, 0)),     # 지나감: 몸이 올라가고 뒷발을 들어 앞으로(앞발은 디딘 채 뒤로)
+        frame(0, (1, 0), (-1, 0)),     # 반대 디딤: 뒷발이 앞에 내려앉고 앞발은 뒤에
+        frame(1, (0, 0), (0, -1)),     # 지나감: 앞발을 들어 앞으로(뒷발은 디딘 채 뒤로)
+    ]
+
+
 def convert(spec):
     """Spec → 이름 → 줄인 RGBA(외곽선 없음, 칸에 앉히기 전)."""
     loaded = []

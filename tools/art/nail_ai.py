@@ -21,7 +21,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림과 털빛 표(FURS)를 같이 쓴다
-from sprite_ai import Source, Spec, convert, is_fur, seat, seat_on_fur  # noqa: E402
+from sprite_ai import Source, Spec, convert, is_fur, seat, seat_on_fur, step_cycle  # noqa: E402
 
 SPRITES = HERE / "sources" / "ai" / "sprites"
 CELL = 28          # 몸 키 약 22px + 뻗은 발톱(0238: 18px는 모모 23·도토 25보다 작아 주인공이 가장 작았다)
@@ -41,7 +41,7 @@ SPEC = Spec(
                 "idle_a": (7, 52, 276, 330),
                 "hurt": (522, 65, 739, 326),
                 "dead": (738, 166, 1001, 331),
-                "walk_a": (20, 413, 238, 686),   # 걷기는 이 한 칸에서 `walk_cycle`로 네 칸(0241)
+                "walk_a": (20, 413, 238, 686),   # 걷기는 이 한 칸에서 `sprite_ai.step_cycle`로 네 칸(0241)
             },
             # 배율은 서 있는 키(머리~발)로: 서기·맞음·쓰러짐은 서기 A, 걷기는 걷기 A(줄마다 그려 온 크기가 조금씩 다르다).
             groups={"idle_a": "idle_a", "hurt": "idle_a", "dead": "idle_a",
@@ -88,60 +88,12 @@ def small(grid_text):
     return cell
 
 
-def walk_cycle(base):
-    """걷기 네 칸을 한 칸(걷기 A)에서 만든다(0241): 디딤 → 지나감(몸 1px 위, 뒷발 듦) → 반대 디딤 → 지나감(앞발 듦).
-
-    원본의 걷기 네 칸은 발이 거의 그대로이고 앞발(손) 자리만 칸마다 튀며 몸이 1~2px 옆으로 흔들려, 22px에서는
-    "미끄러지며 배에 얼룩이 깜박이는" 걸음이 됐다(사장 "걷는 게 어색하다"). 몸은 한 그림 그대로 두고 발만 딛게 한다.
-    발 = 몸 아래 줄(`FOOT` - 1부터)의 덩어리 둘, 왼쪽이 뒷발(오른쪽을 보는 그림).
-    """
-    split = FOOT - 1
-    on = base[..., 3] > 0
-    cols = np.nonzero(on[split:].any(axis=0))[0]
-    gaps = [x for x in range(cols.min(), cols.max()) if not on[split:, x].any()]
-    mid = gaps[len(gaps) // 2] if gaps else (cols.min() + cols.max()) // 2
-    body = base.copy()
-    body[split:] = 0
-    feet = {"back": base.copy(), "front": base.copy()}
-    feet["back"][:split] = 0
-    feet["back"][:, mid:] = 0
-    feet["front"][:split] = 0
-    feet["front"][:, :mid] = 0
-
-    def put(cell, foot, dx=0, dy=0, behind=False):
-        f = np.roll(np.roll(foot, dx, axis=1), dy, axis=0)
-        m = f[..., 3] > 0
-        if behind:
-            m &= cell[..., 3] == 0
-        cell[m] = f[m]
-
-    def frame(bob, back, front):
-        cell = np.zeros_like(base)
-        up = body.copy()
-        if bob:
-            # 배 줄(외곽선 위 둘째 줄)까지 위로 올리고 그 줄을 한 번 더 — 몸이 늘어나 발에 닿는다(밑 외곽선은 두 겹이 되지 않게).
-            k = split - 3
-            up[:k] = body[1:k + 1]
-        cell[...] = up
-        put(cell, feet["back"], *back, behind=True)
-        put(cell, feet["front"], *front)
-        return cell
-
-    # 든 발은 앞으로, 디딘 발은 뒤로 간다(몸 기준). 반대로 들면 뒷걸음처럼 보인다(사장 "뒤로 걷는 느낌", 0241).
-    return [
-        frame(0, (-1, 0), (1, 0)),     # 디딤: 뒷발 뒤, 앞발 앞
-        frame(1, (0, -1), (0, 0)),     # 지나감: 몸이 올라가고 뒷발을 들어 앞으로(앞발은 디딘 채 뒤로)
-        frame(0, (1, 0), (-1, 0)),     # 반대 디딤: 뒷발이 앞에 내려앉고 앞발은 뒤에
-        frame(1, (0, 0), (0, -1)),     # 지나감: 앞발을 들어 앞으로(뒷발은 디딘 채 뒤로)
-    ]
-
-
 def build():
     spr = convert(SPEC)
     idle = seat(spr["idle_a"], CELL, FOOT)
     rows = [
         [idle, seat(spr["idle_b"], CELL, FOOT)]
-        + walk_cycle(seat_on_fur(spr["walk_a"], spr["idle_a"], CELL, FOOT)),
+        + step_cycle(seat_on_fur(spr["walk_a"], spr["idle_a"], CELL, FOOT), FOOT - 1),
         # 동작 칸은 몸통 털의 가운데를 서기 칸에 맞춘다(발톱을 뻗어도 몸이 옆으로 뛰지 않게).
         [seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT)
          for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
