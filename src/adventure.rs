@@ -1961,3 +1961,87 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod economy_probe {
+    use crate::dungeon::{self, Goal};
+    use crate::room::PropKind;
+    use crate::route::{NodeKind, Route};
+    use crate::tuning as t;
+
+    /// 경제 재기(돌리지 않는 시험): 길마다 처음부터 끝까지 한 줄로 걸었을 때 기대 반딧불·씨앗.
+    /// cargo test economy_probe -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn economy_probe() {
+        let (mut tot_b, mut tot_s) = (0.0, 0.0);
+        for stage in 1..=t::FINAL_STAGE {
+            let (mut sb, mut ss, mut kills, mut nodes) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+            let runs = 40;
+            for seed in 0..runs {
+                let r = Route::generate(seed * 7919 + 13, stage, false);
+                let mut i = (seed as usize) % r.layers[0].len();
+                for l in 0..r.layers.len() {
+                    let node = &r.layers[l][i];
+                    if node.kind != NodeKind::Spring {
+                        let prm = r.params((l, i));
+                        let prm = dungeon::Params {
+                            biome: node.biome,
+                            ..prm
+                        };
+                        let (d, room) = dungeon::generate(seed * 31 + l as u64, &prm);
+                        nodes += 1.0;
+                        for dr in &d.rooms {
+                            for (k, _) in &dr.enemies {
+                                let (lo, hi) = crate::loot::glowbugs_for(*k);
+                                sb += (lo + hi) as f32 / 2.0;
+                                ss += k.species().seed_chance;
+                                kills += 1.0;
+                            }
+                        }
+                        if let Some(k) = d.boss {
+                            let (lo, hi) = crate::loot::glowbugs_for(k);
+                            sb += (lo + hi) as f32 / 2.0;
+                            ss += k.species().seed_chance;
+                        }
+                        match d.goal {
+                            Goal::Boss => ss += t::BOSS_SEEDS as f32,
+                            Goal::Pack => ss += t::PACK_SEEDS as f32,
+                            _ => {}
+                        }
+                        for p in &room.props {
+                            match p.kind {
+                                PropKind::Chest { .. } => {
+                                    ss += (t::CHEST_SEEDS.0 + t::CHEST_SEEDS.1) as f32 / 2.0
+                                }
+                                PropKind::Breakable(_) => {
+                                    ss += t::BREAK_SEED;
+                                    sb += t::BREAK_GLOWBUG;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    if l + 1 < r.layers.len() {
+                        i = node.next[(seed as usize + l) % node.next.len()];
+                    }
+                }
+            }
+            let n = runs as f32;
+            println!(
+                "길 {stage}: 굴 {:.1}, 처치 {:.1}, 반딧불 {:.0}, 씨앗 {:.0}",
+                nodes / n,
+                kills / n,
+                sb / n,
+                ss / n
+            );
+            tot_b += sb / n;
+            tot_s += ss / n;
+        }
+        println!(
+            "한 런(길 셋, 쉼터 숨은 자리 빼고): 반딧불 {tot_b:.0}, 씨앗 {tot_s:.0} (+ 숨은 자리 쉼터마다 반딧불 {} 씨앗 {})",
+            t::CAMP_NOOK_BUGS,
+            t::CAMP_NOOK_SEEDS
+        );
+    }
+}

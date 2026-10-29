@@ -304,9 +304,9 @@ pub const BERRY_HEAL: i32 = 1;
 pub const WORM_CHANCE: f32 = 0.035;
 /// 부술 수 있는 것(0175): 타격 판정 반지름, 깨졌을 때 나오는 것의 확률(순서대로 씨앗·산딸기·반딧불·지렁이, 나머지는 빈손).
 pub const BREAK_R: f32 = 8.0;
-pub const BREAK_SEED: f32 = 0.30;
+pub const BREAK_SEED: f32 = 0.18;
 pub const BREAK_BERRY: f32 = 0.12;
-pub const BREAK_GLOWBUG: f32 = 0.10;
+pub const BREAK_GLOWBUG: f32 = 0.06;
 pub const BREAK_WORM: f32 = 0.04;
 
 // ---- 가방(퀵 아이템, src/items.rs, docs/decisions/0017) ----------------------------------
@@ -328,8 +328,8 @@ pub const REVIVE_INVULN: f32 = 2.0;
 pub const REVIVE_PUSH_RADIUS: f32 = 40.0;
 pub const REVIVE_PUSH_KNOCKBACK: f32 = 260.0;
 /// 상점 화폐 씨앗: 보물 상자 한 줌(최소, 최대), 보스.
-pub const CHEST_SEEDS: (u32, u32) = (3, 5);
-pub const BOSS_SEEDS: u32 = 6;
+pub const CHEST_SEEDS: (u32, u32) = (2, 3);
+pub const BOSS_SEEDS: u32 = 4;
 /// 끝방 출구는 마지막으로 쓰러진 자리·플레이어에서 이만큼(px) 넘게 떨어진 칸에 생긴다(0060). 보상을 줍기 전에 빠지지 않게.
 pub const EXIT_MIN_DIST: f32 = 80.0;
 /// 잠긴 문(물든 뿌리 + 보라 실, 0094)이 자라 막는 시간 / 풀려 걷히는 시간.
@@ -541,7 +541,7 @@ pub const BOSS_P2_TRAUMA: f32 = 0.4;
 /// 지름길(0151): 보리가 돌아온 뒤의 런은 굴 입구(D) 이만큼 위(공터 안)에서 시작한다.
 pub const FIELD_SHORTCUT_UP: f32 = 64.0;
 /// 쉼터의 숨은 자리(0151): 반딧불·씨앗 수.
-pub const CAMP_NOOK_BUGS: u32 = 6;
+pub const CAMP_NOOK_BUGS: u32 = 4;
 pub const CAMP_NOOK_SEEDS: u32 = 2;
 /// 할 수 없는 행동(0149): 눌렀는데 조건 때문에 안 되면 HUD 칸이 이 시간 동안 붉게 떤다.
 pub const DENY_TIME: f32 = 0.35;
@@ -712,6 +712,6 @@ pub const PRICE_WORM: u32 = 10;
 pub const PRICE_HEART: u32 = 14;
 pub const PRICE_CHARM: u32 = 12;
 /// 길 지도의 끝 무리(굴·둥지)를 잡으면 나오는 씨앗.
-pub const PACK_SEEDS: u32 = 3;
+pub const PACK_SEEDS: u32 = 2;
 /// 이웃 곁에서 말 걸기 버튼이 먹히는 거리(px).
 pub const INTERACT_RADIUS: f32 = 22.0;
