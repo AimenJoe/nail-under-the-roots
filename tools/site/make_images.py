@@ -68,7 +68,7 @@ def shifted(cell: Image.Image, dx: int) -> Image.Image:
     return out
 
 
-CELLS = {"nail.png": 24, "momo.png": 32, "doto.png": 40, "popo.png": 32, "bat.png": 32, "susu.png": 32,
+CELLS = {"nail.png": 28, "momo.png": 32, "doto.png": 40, "popo.png": 32, "bat.png": 32, "susu.png": 32,
          "chief.png": 40, "kongi.png": 32, "clover.png": 40}
 
 

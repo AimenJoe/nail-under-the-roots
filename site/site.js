@@ -113,10 +113,10 @@
   // 첫 화면 아래 걷는 띠(0228 덧붙임): 들를 때마다 이웃 몇이 무작위로 나와 건너가고, 하나가 나가면 다른 이가 들어온다.
   // 칸 크기(c)의 2배로 그린다. f = 한 칸 시간, d = 건너는 시간(도토는 달리고 모모는 깡충, 보리·수수는 느릿느릿).
   const box = document.querySelector("[data-parade]");
-  const SPRITE_V = "aa29bf8c";   // make_images.py가 sp_*.png 판의 해시를 적는다(캐시 깨기)
+  const SPRITE_V = "6b3b97ba";   // make_images.py가 sp_*.png 판의 해시를 적는다(캐시 깨기)
   if (!box || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const CAST = [
-    { k: "nail", n: 4, c: 24, f: 0.16, d: 26 },
+    { k: "nail", n: 4, c: 28, f: 0.16, d: 26 },
     { k: "popo", n: 4, c: 32, f: 0.16, d: 28 },
     { k: "momo", n: 4, c: 32, f: 0.1, d: 17 },
     { k: "doto", n: 4, c: 40, f: 0.075, d: 10 },
