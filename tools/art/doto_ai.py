@@ -22,7 +22,7 @@ from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from sprite_ai import OUTLINE, Source, Spec, convert, seat  # noqa: E402
+from sprite_ai import OUTLINE, Source, Spec, convert, lum, ramp, seat, sheet4  # noqa: E402
 
 CELL, FOOT = 40, 38
 NAMES = ["idle_a", "idle_b", "run", "aim", "throw", "hurt", "down"]
@@ -64,12 +64,6 @@ TAINT_OUTLINE = (26, 16, 38)
 EYE_AMBER = [(130, 64, 12), (232, 142, 32), (255, 214, 96)]
 
 
-def lum(c):
-    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
-
-
-def ramp(colors, t):
-    return colors[min(len(colors) - 1, max(0, int(t * len(colors))))]
 
 
 def taint(cell):
@@ -113,14 +107,7 @@ def build():
     for k in RUN_NAMES:
         # 공중 칸은 발 줄에서 3px 띄운다(뛰는 높이).
         cells[k] = seat(run[k], CELL, FOOT, dy=-3 if k == "run_b4" else 0)
-    sheet = np.zeros((CELL * 4, CELL * len(ORDER), 4), np.uint8)
-    for c, k in enumerate(ORDER):
-        for r, cell in enumerate((cells[k], taint(cells[k]))):
-            sheet[r * CELL:(r + 1) * CELL, c * CELL:(c + 1) * CELL] = cell
-            sil = np.zeros_like(cell)
-            sil[cell[..., 3] > 0] = [255, 255, 255, 255]
-            sheet[(r + 2) * CELL:(r + 3) * CELL, c * CELL:(c + 1) * CELL] = sil
-    return sheet
+    return sheet4([(cells[k], taint(cells[k])) for k in ORDER])
 
 
 if __name__ == "__main__":

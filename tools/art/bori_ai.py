@@ -23,7 +23,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import walk_ai  # noqa: E402
-from sprite_ai import OUTLINE, Source, Spec, convert, seat  # noqa: E402
+from sprite_ai import OUTLINE, Source, Spec, convert, lum, ramp, seat, sheet4  # noqa: E402
 
 CELL, FOOT = 40, 38
 NAMES = ["idle_a", "idle_b", "walk_a", "walk_b", "crouch", "charge", "hurt", "call", "happy", "down"]
@@ -53,12 +53,6 @@ EYE_RED = [(110, 16, 22), (214, 40, 40), (255, 140, 120)]
 THREAD = [(96, 52, 160), (168, 110, 230)]
 
 
-def lum(c):
-    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
-
-
-def ramp(colors, t):
-    return colors[min(len(colors) - 1, max(0, int(t * len(colors))))]
 
 
 def taint(cell):
@@ -119,14 +113,7 @@ def build():
     spr = convert(SPEC)
     cells = {k: seat(spr[k], CELL, FOOT) for k in NAMES}
     cells.update(walk_ai.cells("bori", SPEC.sources[0], CELL, FOOT))
-    sheet = np.zeros((CELL * 4, CELL * len(ORDER), 4), np.uint8)
-    for c, k in enumerate(ORDER):
-        for r, cell in enumerate((cells[k], threads(taint(cells[k])))):
-            sheet[r * CELL:(r + 1) * CELL, c * CELL:(c + 1) * CELL] = cell
-            sil = np.zeros_like(cell)
-            sil[cell[..., 3] > 0] = [255, 255, 255, 255]
-            sheet[(r + 2) * CELL:(r + 3) * CELL, c * CELL:(c + 1) * CELL] = sil
-    return sheet
+    return sheet4([(cells[k], threads(taint(cells[k]))) for k in ORDER])
 
 
 if __name__ == "__main__":

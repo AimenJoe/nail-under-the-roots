@@ -20,7 +20,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from neighbors_ai import redraw_eyes, transfer  # noqa: E402
-from sprite_ai import Source, Spec, breathe, convert, seat  # noqa: E402
+from sprite_ai import Source, Spec, breathe, convert, seat, sheet4  # noqa: E402
 
 CELL, FOOT = 24, 22
 
@@ -139,8 +139,8 @@ def build(name):
     spr = convert(spec(name))
     src = np.asarray(Image.open(HERE / "sources" / "ai" / "sprites" / f"{name}_v1.png").convert("RGB")).astype(int)
     size, foot = m.get("cell", (CELL, FOOT))
-    sheet = np.zeros((size * 4, size * len(m["order"]), 4), np.uint8)
-    for c, src_name in enumerate(m["order"]):
+    cols = []
+    for src_name in m["order"]:
         base = src_name.lstrip("~!")
         sprite = spr[base]
         if src_name.startswith("~"):
@@ -152,11 +152,8 @@ def build(name):
             cell = transfer(cell, src, m["frames"][base], pred, ink, hits)   # 뒤집은 칸은 자리가 안 맞아 건너뛴다
         if base in m.get("red_eyes", ()):
             cell = redraw_eyes(cell, src, m["frames"][base], False, ink=RED_EYE[1], band=(0.15, 0.7))
-        sil = np.zeros_like(cell)
-        sil[cell[..., 3] > 0] = [255, 255, 255, 255]
-        for r, im in enumerate((cell, cell, sil, sil)):
-            sheet[r * size:(r + 1) * size, c * size:(c + 1) * size] = im
-    return sheet
+        cols.append((cell, cell))
+    return sheet4(cols)
 
 
 if __name__ == "__main__":

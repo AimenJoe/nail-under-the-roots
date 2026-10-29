@@ -17,7 +17,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import walk_ai  # noqa: E402
-from sprite_ai import OUTLINE, Source, Spec, breathe, convert, seat  # noqa: E402
+from sprite_ai import OUTLINE, Source, Spec, breathe, convert, seat, sheet4  # noqa: E402
 
 CELL, FOOT = 32, 30
 NAMES = ["idle_a", "idle_b", "walk_a", "walk_b", "act", "happy"]
@@ -196,19 +196,16 @@ def build(name):
         wsrc = np.asarray(Image.open(walk_ai.source(name)).convert("RGB")).astype(int)
         walk = walk_ai.cells(name, sp.sources[0], CELL, FOOT, sp.palette_ref[1])
         plan += [(k, walk[k], wsrc, box) for k, box in zip(walk_ai.NAMES, walk_ai.WALK[name]["boxes"])]
-    sheet = np.zeros((CELL * 4, CELL * len(plan), 4), np.uint8)
-    for c, (k, cell, src, box) in enumerate(plan):
+    cols = []
+    for k, cell, src, box in plan:
         for pred, ink, hits, *outside in SHEETS[name].get("marks", []):
             cell = transfer(cell, src, box, pred, ink, hits, *outside)
         if SHEETS[name].get("eyes"):
             cell = redraw_eyes(cell, src, box, k == "happy")
         if "sparkle" in SHEETS[name] and k != "happy":
             cell = sparkle(cell, SHEETS[name]["sparkle"])
-        sil = np.zeros_like(cell)
-        sil[cell[..., 3] > 0] = [255, 255, 255, 255]
-        for r, im in enumerate((cell, cell, sil, sil)):
-            sheet[r * CELL:(r + 1) * CELL, c * CELL:(c + 1) * CELL] = im
-    return sheet
+        cols.append((cell, cell))
+    return sheet4(cols)
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "pixel"))
 from pxl import Pxl  # noqa: E402
 import walk_ai  # noqa: E402
-from sprite_ai import OUTLINE, Source, Spec, convert, seat  # noqa: E402
+from sprite_ai import OUTLINE, Source, Spec, convert, lum, ramp, seat, sheet4  # noqa: E402
 
 CELL, FOOT = 32, 30
 A_CELL, A_FOOT = 24, 22     # 시트 A(.pxl)의 칸
@@ -56,13 +56,6 @@ EYE_NAVY = (60, 37, 85)        # 돌아온 모모 눈(시트 A의 남빛)
 WITHER = [(92, 62, 70), (130, 92, 96), (164, 124, 120)]
 
 
-def lum(c):
-    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
-
-
-def ramp(colors, t):
-    """t(0..1) 자리의 색(단 사이를 섞지 않고 가까운 단)."""
-    return colors[min(len(colors) - 1, int(t * len(colors)))]
 
 
 def taint(cell):
@@ -127,14 +120,7 @@ def build():
     # 색표는 시트 B의 맞음 칸(시트 A는 .pxl이라 원본이 없다).
     for k, v in walk_ai.cells("momo", SPEC_B.sources[0], CELL, FOOT, "hurt").items():
         cells[k] = navy_eyes(v)
-    sheet = np.zeros((CELL * 4, CELL * len(ORDER), 4), np.uint8)
-    for c, k in enumerate(ORDER):
-        for r, cell in enumerate((cells[k], taint(cells[k]))):
-            sheet[r * CELL:(r + 1) * CELL, c * CELL:(c + 1) * CELL] = cell
-            sil = np.zeros_like(cell)
-            sil[cell[..., 3] > 0] = [255, 255, 255, 255]
-            sheet[(r + 2) * CELL:(r + 3) * CELL, c * CELL:(c + 1) * CELL] = sil
-    return sheet
+    return sheet4([(cells[k], taint(cells[k])) for k in ORDER])
 
 
 if __name__ == "__main__":

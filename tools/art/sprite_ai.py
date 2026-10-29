@@ -174,10 +174,10 @@ def shrink(a, keep, scale, pal):
     idx = np.asarray(Image.fromarray(a.astype(np.uint8)).quantize(palette=pal, dither=Image.Dither.NONE))
     full = np.array(pal.getpalette()[:768]).reshape(-1, 3)
     colors = full[:NCOL]
-    # 색표 뒤쪽은 0(검정)으로 채워져 있어, 색표에 짙은 색이 없으면 짙은 점이 그쪽으로 간다(모모 깡충 원본, 0229)
-    # → 색표 안의 가장 가까운 색으로 접는다. 전에는 그 자리에서 터졌으니 이미 만든 시트는 바뀌지 않는다.
+    # 색표 뒤쪽은 0(검정)으로 채워져 있어, 색표에 짙은 색이 없으면 짙은 점이 그쪽으로 간다(모모 깡충 원본, 0229).
+    # 표는 그대로 두고(그 점들은 표 안의 색에 표를 보태지 않는다), 다수결에서 이긴 칸만 표 안의 가장 가까운 색으로 접는다.
+    # 표를 미리 접으면 짙은 점이 외곽선 색에 표를 보태 도토 칸 8점이 바뀌었다(0230 R17).
     fold = np.array([((colors - c) ** 2).sum(-1).argmin() for c in full])
-    idx = fold[idx]
     H, W = a.shape[:2]
     h, w = max(1, round(H * scale)), max(1, round(W * scale))
     out = np.zeros((h, w, 4), np.uint8)
@@ -188,9 +188,37 @@ def shrink(a, keep, scale, pal):
             k = keep[ya:yb, xa:xb]
             if k.mean() < 0.5:
                 continue
-            c = np.bincount(idx[ya:yb, xa:xb][k], minlength=NCOL).argmax()
+            c = fold[np.bincount(idx[ya:yb, xa:xb][k], minlength=NCOL).argmax()]
             out[oy, ox] = list(colors[c]) + [255]
     return out
+
+
+def lum(c):
+    """밝기(BT.601) — 물든 모습 색 바꾸기가 쓴다."""
+    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+
+def ramp(colors, t):
+    """t(0..1) 자리의 색(단 사이를 섞지 않고 가까운 단)."""
+    return colors[min(len(colors) - 1, max(0, int(t * len(colors))))]
+
+
+def silhouette(cell):
+    """칸의 흰 실루엣(맞을 때 번쩍임·다 모였을 때 빛, 게임이 + 2줄로 읽는다)."""
+    sil = np.zeros_like(cell)
+    sil[cell[..., 3] > 0] = [255, 255, 255, 255]
+    return sil
+
+
+def sheet4(cols):
+    """칸 [(돌아온, 물든)] → 네 줄 시트: 돌아온·물든 + 각각의 흰 실루엣(게임 `art::BigSheet`, 0206). 물든 모습이 없는
+    시트(이웃·잡몹)는 같은 칸을 둘 넣는다. 0230 R17: 변환기마다 같은 붙이기를 손으로 하던 것."""
+    size = cols[0][0].shape[0]
+    sheet = np.zeros((size * 4, size * len(cols), 4), np.uint8)
+    for c, (back, tainted) in enumerate(cols):
+        for r, im in enumerate((back, tainted, silhouette(back), silhouette(tainted))):
+            sheet[r * size:(r + 1) * size, c * size:(c + 1) * size] = im
+    return sheet
 
 
 def outline(rgba):

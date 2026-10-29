@@ -24,7 +24,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import walk_ai  # noqa: E402
-from sprite_ai import OUTLINE, Source, Spec, convert, seat  # noqa: E402
+from sprite_ai import OUTLINE, Source, Spec, convert, lum, ramp, seat, sheet4  # noqa: E402
 
 CELL, FOOT = 32, 30
 SRC = HERE / "sources" / "ai" / "sprites" / "kongi_v1.png"
@@ -54,12 +54,6 @@ THREAD = [(96, 52, 160), (168, 110, 230)]
 BAND_INK = (92, 70, 50)          # 원본 띠의 갈색(서기 칸 팔레트에서 가장 가까운 색을 쓴다)
 
 
-def lum(c):
-    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
-
-
-def ramp(colors, t):
-    return colors[min(len(colors) - 1, max(0, int(t * len(colors))))]
 
 
 def eyes(cell):
@@ -208,14 +202,7 @@ def build():
     ink = min(pal, key=lambda c: sum((a - b) ** 2 for a, b in zip(c, BAND_INK)))
     for k in STAND:
         cells[k] = arcs(cells[k], ink)
-    sheet = np.zeros((CELL * 4, CELL * len(ORDER), 4), np.uint8)
-    for c, k in enumerate(ORDER):
-        for r, cell in enumerate((cells[k], thread(taint(cells[k])))):
-            sheet[r * CELL:(r + 1) * CELL, c * CELL:(c + 1) * CELL] = cell
-            sil = np.zeros_like(cell)
-            sil[cell[..., 3] > 0] = [255, 255, 255, 255]
-            sheet[(r + 2) * CELL:(r + 3) * CELL, c * CELL:(c + 1) * CELL] = sil
-    return sheet
+    return sheet4([(cells[k], thread(taint(cells[k]))) for k in ORDER])
 
 
 if __name__ == "__main__":
