@@ -150,3 +150,51 @@ Row 2: (1) he pauses and turns his head to look back up at us over his shoulder,
 Row 3: spinning around his own head-to-tail axis like a corkscrew, 4 frames: back view / right side view /
        belly view (pale belly and the front of the scarf) / left side view.
 ```
+
+## Naïl 3단계 — 머리 큰 시트(0242 비교용, 2026-10-29)
+지금 게임의 Naïl은 v3 시트에서 **줄이기 전에 머리를 1.35배 키우고 눈을 크게 그린 것**(`nail_ai.chibi`)이다. 이 비율을 처음부터 그린
+시트를 새로 받아, 같은 변환기로 줄인 것과 지금 것을 나란히 놓고 사장이 고른다.
+
+붙이는 것(새 대화): **비율 참고** `ref/ref_nail_chibi.png`(`python3 tools/art/chibi_ref.py` — 머리 키운 큰 그림 넷: 서기·걷기 / 치기·거두기) +
+**그림체 판** `ref/ref_redo_style.png`. 지금 게임 칸을 8배로 키운 `ref_nail_chibi_game.png`는 **붙이지 않는다**(비교용 — 점 그림을
+붙이면 덩어리 그대로 따라 그린다). 받은 원본은 `sprites/nail_v4_a.png`·`nail_v4_b.png`(✦는 `strip_logo.py`).
+게임 크기: 키 약 24px, 칸 28. 줄이는 건 우리가 한다 — 칸마다 같은 크기·같은 점 크기로만.
+
+### Naïl v4 시트 A — 서기·맞음·쓰러짐·걷기(붙임: ref_nail_chibi + ref_redo_style)
+```
+Redraw the baby mole hero from the first attached image as a pixel art sprite sheet with CUTE CHIBI PROPORTIONS,
+in EXACTLY the pixel style of the second attached image (chunky pixels, dark plum 1px outline, soft 3-4 tone shading,
+light from the top-left). The second image is only a style reference: do not draw those animals.
+Keep his design: dark brown velvety fur, lighter brown oval belly, short snout with a big round pink nose, orange scarf
+tied at the neck with the knot at the back of the head, big pink spade paws with pale cream claws, small pink feet,
+tiny tail. Proportions like the first image, pushed a little further: about 2.5 heads tall, the round head is about
+45% of his total height and as wide as his body, a short soft pear-shaped body, short stubby legs. ONE big shiny black
+eye with a white highlight placed just behind the snout (it must stay readable when the sprite is shrunk to 24 pixels
+tall), a small pink blush under the eye. Keep the outline thin and even: no thick black areas under the head or around
+the neck — shade the chin and neck with darker brown, not black.
+
+2 rows x 4 frames, evenly spaced on a solid magenta background (#FF00FF), no text, no grid lines, no shadows, no ground,
+no effects. Every frame the same character size and the same pixel block size, facing right in a 3/4 top-down view,
+feet on the same baseline in each row.
+Row 1: (1) idle, spade paws held out wide to the sides; (2) idle breathing, body 1 pixel lower, paws slightly lower;
+       (3) hurt: flinching backward, eye squeezed shut, paws up near the face; (4) knocked down: lying on his back, paws limp.
+Row 2: walk cycle, 4 frames: short stubby legs clearly stepping (one foot forward, then the other), the spade paws
+       swinging forward and back in opposition, head and body bobbing 1 pixel. The head size stays the same in every frame.
+```
+
+### Naïl v4 시트 B — 치기·모으기·거두기(A를 받은 뒤. 붙임: 받은 시트 A + ref_redo_style)
+```
+Using the attached sprite sheet of the chibi baby mole (same character, same big head, same size, same pixel block size,
+same colors and outline), draw his attack frames in the same pixel style. 3 rows x 3 frames, evenly spaced on a solid
+magenta background (#FF00FF), no text, no grid lines, no shadows, no ground, no motion lines, no slash effects, facing
+right, feet on the same baseline. Keep the big shiny eye visible in every frame (do not hide the face behind the paws).
+Row 1: (1) wind-up 1: right paw pulled back; (2) strike 1: right paw swiped forward, claws leading;
+       (3) wind-up 2: left paw pulled back across the body.
+Row 2: (1) strike 2: left paw swiped forward; (2) heavy wind-up: crouched low, both paws raised beside the head (not
+       covering it); (3) heavy strike: both paws slammed down in front, body leaning forward.
+Row 3: (1) settle: paws coming back down to the sides; (2) diving into the ground: head and front paws pointing down,
+       body tilted forward; (3) bursting up: jumping straight up, paws raised, body stretched.
+```
+
+받으면: `nail_ai.py`에 v4 원본·칸 상자를 넣고 `chibi`는 끈 채(원본이 이미 머리 큰 비율) 줄여, 지금 시트와 8배 나란히 비교 그림을 만든다 →
+사장이 고른 쪽을 쓴다. 고르기 전에는 `assets/art/nail.png`를 바꾸지 않는다.

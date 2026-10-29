@@ -56,8 +56,10 @@ def _flood(mask, seed):
     return out
 
 
-def chibi(img, frames):
-    """칸마다 머리를 키운 그림을 새 판에 칸씩 세로로 쌓는다(넓힌 상자가 옆 칸을 덮지 않게). → (새 판, 새 칸 상자)."""
+def chibi(img, frames, ref=False):
+    """칸마다 머리를 키운 그림을 새 판에 칸씩 세로로 쌓는다(넓힌 상자가 옆 칸을 덮지 않게). → (새 판, 새 칸 상자).
+    ref: 참고 그림용(`chibi_ref.py`) — 원래 머리를 지우거나 외곽선을 털로 칠하지 않고 큰 그림 그대로 위에 얹는다(줄이기용 손질은
+    큰 그림에서 보면 선이 끊겨 보여, 나노바나나가 그 흠까지 따라 그린다)."""
     slots, out = [], {}
     for k, (x0, y0, x1, y1) in frames.items():
         a = img[y0:y1, x0:x1]
@@ -72,7 +74,7 @@ def chibi(img, frames):
         cx = int(np.median(ox))
         yn = int(oy[np.abs(ox - cx) <= 12].min())     # 목도리 윗선(가운데)
         rows = np.arange(a.shape[0])[:, None]
-        cand = fg & ~orange & ~cream & (rows < yn)
+        cand = fg & ~cream & (rows < yn) & (~orange if not ref else True)   # 참고 그림은 뒤통수 목도리 매듭도 머리와 같이 키운다
         ty, tx = np.nonzero(cand)
         top = int(ty.min())
         # 머리 폭: 머리 윗부분(맨 위 ~ 목도리까지의 위 40%) 털의 좌우 끝에서 조금 더. 벌린 앞발(어깨 높이)은 이 밖이다.
@@ -110,7 +112,8 @@ def chibi(img, frames):
         up, side = max(0, -py) + 4, max(0, -px, px + L.width - a.shape[1]) + 4
         # 원래 머리는 지우고 붙인다 — 남겨 두면 키운 머리 밑으로 옛 턱·주둥이 외곽선이 비져 나와 검은 쐐기가 됐다(사장).
         body = a.copy()
-        body[head] = (255, 0, 255)
+        if not ref:
+            body[head] = (255, 0, 255)
         canvas = Image.new("RGB", (a.shape[1] + 2 * side, a.shape[0] + up), (255, 0, 255))
         canvas.paste(Image.fromarray(body.astype(np.uint8), "RGB"), (side, up))
         la = np.array(L)
@@ -124,7 +127,7 @@ def chibi(img, frames):
         inner_dark = dark & m & ~band
         core = np.asarray(Image.fromarray((inner_dark * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(THIN))) > 0
         shave = (inner_dark & ~core) | (band & dark)
-        if shave.any():
+        if shave.any() and not ref:
             light = (m & ~dark).astype(float)
             col = la[..., :3].astype(float) * light[..., None]
             win = 15     # 외곽선 띠(≈8px) 한가운데서도 털 점이 잡히게
