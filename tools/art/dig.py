@@ -387,37 +387,91 @@ def momo_spin(k):
     return outline(g)
 
 
-# 도토(0195, 임시 — 0191 C에서 다시 그린다): 모모의 몸에 청설모 털빛. 솜꼬리 대신 등 위로 큰 꼬리, 귀 끝에 술,
-# 꽃 자리에는 도토리 갓(F 갓, Y 알).
+# 도토(0195 → 2026-10-29 다시): 위에서 본 청설모. 모모의 몸(둥근 등)에 청설모 털빛을 쓰되, 토끼 귀 대신
+# 머리 옆에 끝에 술이 달린 작은 귀 둘, 솜꼬리 대신 엉덩이에서 등을 덮으며 올라가는 큰 꼬리(사장: "귀가 너무 크고 꼬리가 너무 작다").
 DOTO = dict(MOMO, **{
     'd': (120, 54, 34), 'b': (172, 84, 46), 'h': (214, 126, 72), 'l': (238, 204, 164),
     'p': (226, 150, 120), 'q': (176, 96, 80), 'c': (226, 140, 84), 'C': (190, 104, 60),
-    'F': (104, 70, 44), 'Y': (204, 146, 76),
+    'T': (246, 196, 140), 'F': (104, 70, 44), 'Y': (204, 146, 76),
 })
-BUSH = [".ccc.", "ccccc", "ccCcc", "cccCc", ".ccc."]
+# 작은 귀(왼쪽): 끝에 짙은 술(F), 안쪽 분홍.
+D_EAR = [".F.", "FbF", "bpb", "bpb", ".b."]
+# 큰 꼬리: 엉덩이(위쪽 끝)에서 등 위로 넓게 부풀어 오른다. c 털, C 결, T 밝은 끝 털.
+D_TAIL = [
+    ".....TTTTT.....",
+    "...TTcccccTT...",
+    "..TccCCcCCccT..",
+    ".TcCCCcCCCCcCT.",
+    ".TcCCcCCCcCCcT.",
+    "TcCCCCcCCCCCcCT",
+    "TcCCcCCCCcCCcCT",
+    "TccCCCCcCCCCccT",
+    ".TcCCcCCCCcCcT.",
+    ".TccCCCCcCCccT.",
+    "..TccCCcCCccT..",
+    "...TTcccccTT...",
+    ".....TTTTT.....",
+]
+
+def doto_body(i):
+    """모모 걸음과 같은 들썩임·발, 귀·꽃·솜꼬리는 없이."""
+    dy = [0, 0, 1, 0, 1, 1][i]
+    ell = [(cx, cy + dy * (k >= 2), rx, ry) for k, (cx, cy, rx, ry) in enumerate(MOMO_BODY)]
+    g = back(ell, [(x, y + dy * (y > 14)) for x, y in MOMO_GRAIN], hump=(12.5, 13.0, 3.5))
+    head_shade(g, 23 + dy)
+    fy = [22, 24, 23, 22, 24, 24][i], [24, 22, 24, 23, 22, 24][i]
+    put(g, attach_x(ell, fy[0] + dy + 1, 3, 'L', 1), fy[0] + dy, M_FRONT)
+    put(g, attach_x(ell, fy[1] + dy + 1, 3, 'R', 1), fy[1] + dy, flip(M_FRONT))
+    up_left = i % 2 == 0
+    for side in ('L', 'R'):
+        kick = up_left == (side == 'L')
+        rows = M_HIND_KICK if kick else M_HIND_REST
+        if side == 'R':
+            rows = flip(rows)
+        put(g, attach_x(ell, 6, len(rows[0]), side), 3 if kick else 5, rows)
+    return g, ell, dy
 
 
-def doto_tail(g, dy=0):
-    put(g, 13, 0 + dy, BUSH)
-    return g
+def doto_ears(g, ell, dy):
+    put(g, attach_x(ell, 24 + dy, 3, 'L', 2), 21 + dy, D_EAR)
+    put(g, attach_x(ell, 24 + dy, 3, 'R', 2), 21 + dy, flip(D_EAR))
 
 
 def doto_frame(i):
-    g = momo_frame(i)
-    g = [[ch if ch != 'o' else '.' for ch in row] for row in g]
-    return outline(doto_tail(g))
+    g, ell, dy = doto_body(i)
+    doto_ears(g, ell, dy)
+    # 꼬리는 걸음마다 좌우로 1px 살랑.
+    put(g, 8 + [0, 1, 0, -1, 0, 1][i], 0, D_TAIL)
+    return outline(g)
 
 
 def doto_look(wink):
-    g = momo_look(wink)
-    g = [[ch if ch != 'o' else '.' for ch in row] for row in g]
-    return outline(doto_tail(g))
+    g, ell, dy = doto_body(0)
+    put(g, 9, 19, M_LOOK_HEAD)
+    if wink:
+        put(g, 19, 22, M_WINK)
+    put(g, 7, 17, D_EAR)
+    put(g, 22, 17, flip(D_EAR))
+    put(g, 8, 0, D_TAIL)
+    return outline(g)
 
 
 def doto_spin(k):
-    g = momo_spin(k)
-    g = [[ch if ch != 'o' else '.' for ch in row] for row in g]
-    return outline(doto_tail(g))
+    phase = k / 8 * 2 * math.pi
+    g = back(MOMO_BODY, MOMO_GRAIN, hump=(12.5, 13.0, 3.5), phase=phase, belly=1.4)
+    head_shade(g, 23)
+    for am, rows in ((-1.1, D_EAR), (1.1, flip(D_EAR))):
+        x = spin_x(MOMO_BODY, 24, am, phase, len(rows[0]))
+        if x is not None:
+            put(g, x, 21, rows)
+    for am, rows in ((-math.pi / 2, M_FRONT), (math.pi / 2, flip(M_FRONT))):
+        x = spin_x(MOMO_BODY, 23, am, phase, 3)
+        if x is not None:
+            put(g, x, 22, rows)
+    # 큰 꼬리는 등 가운데(재질 각 0)에 붙어 돈다 — 뒤로 가면 몸 너머로 끝만 보인다.
+    x = spin_x(MOMO_BODY, 6, 0.0, phase, len(D_TAIL[0]))
+    put(g, 8 if x is None else x, 0, D_TAIL if x is not None else D_TAIL[:4])
+    return outline(g)
 
 
 def paint(img, ox, oy, g, pal):

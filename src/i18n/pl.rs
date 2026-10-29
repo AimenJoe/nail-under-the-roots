@@ -363,6 +363,7 @@ pub static PL: Strings = Strings {
     node_deepest: "Najgłębsze miejsce",
     deep_sub: "Prastara grzybnia",
     deep_1: "Babciu. Pozwól, że rozplączę te nici.",
+    deep_goal: "Trzy fioletowe węzły wiążą nici z Babcią. Wystarczy je przeciąć. Babci się nie bije.",
     deep_k1: "...Nie boli, maluchu. Tylko trochę pusto.",
     deep_k2: "Jeśli puszczę... dokąd wszyscy pójdą?",
     deep_k3: "...Rozumiem. Twoje pazurki są takie ciepłe.",

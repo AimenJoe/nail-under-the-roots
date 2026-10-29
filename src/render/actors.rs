@@ -854,6 +854,8 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
         player::State::Charging { .. } => F::STRIKE,
         player::State::Recover { .. } => F::CROUCH,
         _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => F::HURT,
+        // 걷기: 도토는 낮은 바운드 네 칸(2026-10-29)이라 달리기(14칸/초)보다 느리게, 모모 깡충은 그대로.
+        _ if moving && p.kit == crate::equipment::Character::Doto => art.walk(row, time * 4.5),
         _ if moving => art.walk(row, time * 10.0),
         _ => ((time * 2.0) as u32) % 2,
     };

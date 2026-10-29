@@ -289,7 +289,8 @@ pub static CHARMS: [Charm; 15] = [
             ..NO_MODS
         },
         color: Color::new(0.50, 0.36, 0.26, 1.0),
-        only: None,
+        // 굴파기는 Naïl의 회피라 Naïl 런에서만(사장 2026-10-29: 도토에게 굴파기 장신구가 나왔다).
+        only: Some(Character::Mole),
         journal: false,
     },
     Charm {
@@ -339,7 +340,8 @@ pub static CHARMS: [Charm; 15] = [
             ..NO_MODS
         },
         color: Color::new(0.90, 0.88, 0.96, 1.0),
-        only: None,
+        // 이것도 "굴파기" 장신구라 Naïl 런에서만.
+        only: Some(Character::Mole),
         journal: true,
     },
     // 모모의 꽃잎(모모가 돌아오면): 체력 +2, 발톱이 느리다.

@@ -778,17 +778,18 @@ fn popo_actor(pos: Vec2, visible: bool) -> Actor {
 }
 
 /// 플레이어 배우: 이번 런에 내려간 캐릭터(Naïl 또는 모모, 0056). 몸은 월드가 그린다.
+/// 플레이어 배우: 이 런의 캐릭터(Naïl·모모·도토)의 이름·색·초상화(`characters.rs` 표). 엔딩도 고른 캐릭터로 말한다.
 fn nail_actor(w: &World) -> Actor {
-    let momo = w.character == crate::equipment::Character::Momo;
+    use crate::equipment::Character;
     Actor {
         name: w.character.name(),
         sprite: None,
-        color: if momo { MOMO_PETAL } else { crate::world::MOLE },
-        portrait: Some(if momo {
-            Portrait::MOMO
-        } else {
-            Portrait::nail(w.inv.fur)
-        }),
+        color: match w.character {
+            Character::Mole => crate::world::MOLE,
+            Character::Momo => MOMO_PETAL,
+            Character::Doto => DOTO_FUR,
+        },
+        portrait: Some((w.character.def().portrait)(w.inv.fur)),
         pos: w.player.pos,
         facing: w.player.facing,
         visible: true,
@@ -1872,6 +1873,8 @@ pub fn halmae_meet(w: &World) -> Cutscene {
         Step::Narrate(|s| s.half_1),
         say(2, Face::Normal, |s| s.half_2),
         say(0, Face::Determined, |s| s.deep_1),
+        // 무엇을 칠지(사장 2026-10-29 "불명확"): 매듭 셋만 끊는다. 싸우는 동안은 매듭 위 표시(`draw_knot_mark`).
+        Step::Narrate(|s| s.deep_goal),
     ];
     Cutscene::new(story_actors(w), steps)
 }

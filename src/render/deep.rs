@@ -76,6 +76,9 @@ pub(super) fn draw_deep(art: &Art, d: &world::Deep, w: &World, alpha: f32) {
             ((t * 0.9) as u32) % 2
         };
         art::draw_halmae(tex, frame, true, vec2(c.x, c.y + 28.0));
+        // 매듭은 할매 앞에(아래쪽). 전엔 새 그림 갈래가 여기서 바로 돌아가 매듭이 그려지지 않았다 —
+        // 무엇을 칠지 보이지 않던 까닭(사장 2026-10-29).
+        draw_knots(d, t);
         return;
     }
     draw_ellipse(
@@ -159,9 +162,39 @@ pub(super) fn draw_deep(art: &Art, d: &world::Deep, w: &World, alpha: f32) {
     draw_rectangle(mx - 2.0, my, 5.0, 1.0, eye);
     draw_rectangle(mx - 3.0, my - 1.0, 1.0, 1.0, eye);
     draw_rectangle(mx + 3.0, my - 1.0, 1.0, 1.0, eye);
-    // 매듭.
+    draw_knots(d, t);
+}
+
+/// 매듭 셋과, 아직 안 끊긴 매듭 위의 표시(통통 뛰는 화살표 + 퍼지는 고리): 칠 것은 이것뿐이다.
+fn draw_knots(d: &world::Deep, t: f32) {
     for k in &d.knots {
         draw_knot(k, t);
+    }
+    if d.done_t.is_some() {
+        return;
+    }
+    for (i, k) in d.knots.iter().enumerate().filter(|(_, k)| !k.cut) {
+        let ph = t * 1.6 + i as f32 * 0.7;
+        let ring = (ph * 0.8).fract();
+        draw_circle_lines(
+            k.pos.x.round(),
+            k.pos.y.round(),
+            t::DEEP_KNOT_R + 2.0 + ring * 8.0,
+            1.0,
+            Color::new(1.0, 0.92, 0.6, 0.7 * (1.0 - ring)),
+        );
+        let bob = (ph * 2.0).sin().abs() * 3.0;
+        let (x, y) = (
+            k.pos.x.round(),
+            (k.pos.y - t::DEEP_KNOT_R - 9.0 - bob).round(),
+        );
+        // 아래를 가리키는 작은 화살표(어두운 테두리 + 밝은 속).
+        for (dy, w) in [(0.0, 7.0), (1.0, 5.0), (2.0, 3.0), (3.0, 1.0)] {
+            draw_rectangle(x - (w + 2.0) / 2.0, y + dy - 1.0, w + 2.0, 3.0, OUTLINE);
+        }
+        for (dy, w) in [(0.0, 7.0), (1.0, 5.0), (2.0, 3.0), (3.0, 1.0)] {
+            draw_rectangle(x - w / 2.0, y + dy, w, 1.0, Color::new(1.0, 0.92, 0.6, 1.0));
+        }
     }
 }
 

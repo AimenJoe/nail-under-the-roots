@@ -391,7 +391,7 @@ strings! {
     // 다회차: 앨범·도움 모드·기록 지우기·깨어날 때 한마디(docs/decisions/0041)
     title_album, album_count, album_hint, album_close, set_assist, set_erase, set_erase_confirm, ret_first, ret_roots, ret_bori, ret_assist, ret_ten, run_again, run_again_bori,
     // 런의 끝(docs/decisions/0042)
-    node_deepest, node_deepest_desc, run_after_half, deep_sub, deep_1, deep_k1, deep_k2, deep_k3, deep_wrap, deep_sleep,
+    node_deepest, node_deepest_desc, run_after_half, deep_sub, deep_1, deep_goal, deep_k1, deep_k2, deep_k3, deep_wrap, deep_sleep,
     // 실뜨기(docs/decisions/0043)
     knot_title, knot_intro, knot_level, knot_none, knot_locked, knot_hint, knot_1, knot_2, knot_3, knot_4, knot_5, knot_6, knot_7, knot_8, knot_9, knot_10, toast_knot_open,
     // 오늘의 굴(docs/decisions/0044)

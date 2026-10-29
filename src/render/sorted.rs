@@ -375,7 +375,19 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
         Drawable::Tree(at, growth) => {
             // 새 그림(0238)이 있으면 그것, 없으면 예전 그리기(팩 잎 · 코드 줄기).
             match (art.tree.as_ref(), art.sunny.as_ref()) {
-                (Some(tex), _) => art::draw_tree(tex, growth, at + vec2(0.0, 8.0)),
+                (Some(tex), _) => {
+                    let b = at + vec2(0.0, 8.0);
+                    // 밑동이 땅에 붙어 보이게(사장 2026-10-29 "밑부분이 어울리지 않는다"): 뿌리 아래 넓은 그늘,
+                    // 그리고 뿌리 끝을 덮는 풀 몇 포기(풀밭과 같은 초록).
+                    if !shadow_pass() {
+                        draw_ellipse(b.x, b.y + 11.0, 56.0, 9.0, 0.0, SHADOW_SOFT);
+                        draw_ellipse(b.x, b.y + 9.0, 34.0, 6.0, 0.0, SHADOW_SOFT);
+                    }
+                    art::draw_tree(tex, growth, b);
+                    if !shadow_pass() {
+                        draw_root_grass(b);
+                    }
+                }
                 (None, Some(sunny)) if growth > 0 => {
                     draw_great_tree_sunny(sunny, at, growth, w.time)
                 }
@@ -409,5 +421,32 @@ pub(super) fn drawable_x(w: &World, alpha: f32, d: &Drawable) -> f32 {
             .map_or(0.0, |n| lerp(n.prev_pos, n.pos, alpha).x),
         Drawable::Neighbor(i) => w.neighbors[i].pos.x,
         Drawable::Tree(at, _) | Drawable::Decor(_, at) | Drawable::DreamLoop(at) => at.x,
+    }
+}
+
+/// 큰 나무 뿌리 끝을 덮는 풀 포기: 뿌리가 풀밭 위에 얹힌 것이 아니라 땅에서 솟은 것처럼.
+fn draw_root_grass(b: Vec2) {
+    let blades = [
+        Color::from_rgba(82, 138, 72, 255),
+        Color::from_rgba(96, 156, 80, 255),
+        Color::from_rgba(123, 207, 92, 255),
+    ];
+    for (dx, dy) in [
+        (-50.0, 12.0),
+        (-36.0, 15.0),
+        (-21.0, 14.0),
+        (-6.0, 15.0),
+        (9.0, 15.0),
+        (24.0, 14.0),
+        (39.0, 15.0),
+        (52.0, 11.0),
+    ] {
+        let (x, y) = ((b.x + dx).round(), (b.y + dy).round());
+        // 세 잎: 왼쪽으로 기운 짙은 잎, 곧은 잎, 오른쪽 밝은 잎.
+        draw_rectangle(x - 2.0, y - 2.0, 1.0, 2.0, blades[0]);
+        draw_rectangle(x - 1.0, y - 3.0, 1.0, 3.0, blades[1]);
+        draw_rectangle(x, y - 4.0, 1.0, 4.0, blades[1]);
+        draw_rectangle(x + 1.0, y - 2.0, 1.0, 2.0, blades[2]);
+        draw_rectangle(x - 2.0, y, 5.0, 1.0, blades[0]);
     }
 }

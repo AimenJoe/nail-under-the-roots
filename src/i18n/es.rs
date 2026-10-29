@@ -363,6 +363,7 @@ pub static ES: Strings = Strings {
     node_deepest: "Lo más profundo",
     deep_sub: "Un micelio antiguo",
     deep_1: "Abuela. Déjame soltar estos hilos.",
+    deep_goal: "Tres nudos morados atan los hilos a la Abuela. Basta con cortarlos. A la Abuela no se le pega.",
     deep_k1: "...No duele, pequeño. Solo se siente un poco vacío.",
     deep_k2: "Si suelto... ¿adónde irán todos?",
     deep_k3: "...Ya veo. Tus garras son tan cálidas.",

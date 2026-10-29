@@ -363,6 +363,7 @@ pub static FR: Strings = Strings {
     node_deepest: "Le Tréfonds",
     deep_sub: "Un mycélium très ancien",
     deep_1: "Mamie. Laisse-moi défaire ces fils.",
+    deep_goal: "Trois nœuds violets relient les fils à Mamie. Il suffit de les trancher. On ne frappe pas Mamie.",
     deep_k1: "...Ça ne fait pas mal, petit. C'est juste un peu vide.",
     deep_k2: "Si je lâche... où iront-ils tous?",
     deep_k3: "...Je vois. Tes griffes sont si chaudes.",

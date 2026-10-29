@@ -9,7 +9,8 @@
 둘째 칸은 같은 그림을 1px 띄운다(걷기 통통). 달리기 네 칸은 따로 받은 `doto_run_v1.png`(바운드: 밀기·공중·착지·모으기, 0226).
 
 칸 배치(critters 도토 줄과 같은 뜻, `art::Art::critter`가 도토 두 줄을 여기로 돌린다):
-  칸 0·1 서기, 2·3 걷기(달리기 그림 한 칸), 4 겨누기(던지기 들기), 5 던지기, 6 맞음, 7 쓰러짐, 8~11 달리기 바운드(있으면 달릴 때 돈다)
+  칸 0·1 서기, 2·3 걷기(달리기 그림 한 칸), 4 겨누기(던지기 들기), 5 던지기, 6 맞음, 7 쓰러짐, 8~11 달리기 바운드(있으면 달릴 때 돈다),
+  12~15 걷기 네 칸(달리기 바운드를 낮게 — 걸을 때도 깡충)
   줄 0 돌아온 도토 · 줄 1 물든 도토(보스: 회보라 털·호박색으로 빛나는 눈 — 줄 0의 색을 바꿔 만든다, 모자·도토리는 그대로)
   줄 2·3: 줄 0·1의 흰 실루엣(피격 번쩍·다 모인 몸빛)
 """
@@ -56,7 +57,11 @@ RUN_SPEC = Spec(
     palette_ref=(0, "run_a"),
     body_h=18,
 )
-ORDER = ["idle_a", "idle_b", "run", "run_b", "aim", "throw", "hurt", "down"] + RUN_NAMES
+# 걷기 네 칸(2026-10-29, 사장 "걷는 것 같지 않다 — 뛰는 것은 잘 표현돼 있다"): 걷기 두 칸이 같은 달리기 그림을 1px 띄운
+# 것이었다. 청설모는 걸을 때도 깡충거리므로, 사장이 좋다고 한 달리기 바운드 네 칸을 낮게(공중 칸을 1px만) 띄워 걷기로 쓴다.
+# (달리기 그림 한 칸에서 발만 딛는 `step_cycle`은 뻗은 질주 자세라 걸음으로 읽히지 않았다.) 칸 12~15, `BigSheet::walk4`.
+WALK_NAMES = ["walk_a", "walk_b", "walk_c", "walk_d"]
+ORDER = ["idle_a", "idle_b", "run", "run_b", "aim", "throw", "hurt", "down"] + RUN_NAMES + WALK_NAMES
 
 # 물든 도토(0052): 초상화 doto_tainted_glare의 회보라 털, 호박색으로 빛나는 눈. 모자·도토리는 그대로.
 TAINT_FUR = [(58, 48, 62), (86, 74, 90), (114, 100, 116), (146, 132, 146), (196, 186, 194)]
@@ -107,6 +112,8 @@ def build():
     for k in RUN_NAMES:
         # 공중 칸은 발 줄에서 3px 띄운다(뛰는 높이).
         cells[k] = seat(run[k], CELL, FOOT, dy=-3 if k == "run_b4" else 0)
+    for k, r in zip(WALK_NAMES, RUN_NAMES):
+        cells[k] = seat(run[r], CELL, FOOT, dy=-1 if r == "run_b4" else 0)
     return sheet4([(cells[k], taint(cells[k])) for k in ORDER])
 
 

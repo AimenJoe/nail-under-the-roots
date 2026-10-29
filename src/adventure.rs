@@ -963,7 +963,9 @@ impl World {
         self.adv.node = None;
         self.adv.place = Place::Deep;
         let mut room = Room::new();
+        // 기본 방의 기둥 둘은 그림(소품)만 지우면 충돌 사각형이 남아 가운데에 투명벽이 생겼다(사장 2026-10-29). 둘 다 비운다.
         room.props.clear();
+        room.solids.clear();
         self.room = room;
         self.enemies.clear();
         self.loot.clear();

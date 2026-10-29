@@ -1626,8 +1626,9 @@ impl App {
         crate::village::State {
             bori: self.profile.flag(key::BORI_BACK),
             halmae: self.profile.flag(key::HALF_ENDING) || self.profile.flag(key::TRUE_ENDING),
-            momo: self.profile.flag(key::MOMO_BACK),
-            doto: self.profile.flag(key::DOTO_MEMORY),
+            // 고른 캐릭터로 마을을 걸으면(모모·도토) 그 이웃은 자리에 따로 서 있지 않는다 — 플레이어가 그 자신이다.
+            momo: self.profile.flag(key::MOMO_BACK) && self.picked() != Character::Momo,
+            doto: self.profile.flag(key::DOTO_MEMORY) && self.picked() != Character::Doto,
             kongi: self.profile.flag(key::KONGI_BACK),
             clover: self.profile.flag(key::CLOVER_BACK),
             decor,

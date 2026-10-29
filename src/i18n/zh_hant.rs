@@ -365,6 +365,7 @@ pub static ZH_HANT: Strings = Strings {
     node_deepest: "最深處",
     deep_sub: "古老的菌絲",
     deep_1: "奶奶，這些絲線，讓我來解開吧。",
+    deep_goal: "連著婆婆的紫色絲線上有三個結——只要把它們切斷就好。不要打婆婆。",
     deep_k1: "……不疼的，孩子。只是有點空落落。",
     deep_k2: "放開了……大家會去哪兒呢。",
     deep_k3: "……是啊。你的爪子真暖和。",

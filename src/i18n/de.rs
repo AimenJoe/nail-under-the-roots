@@ -363,6 +363,7 @@ pub static DE: Strings = Strings {
     node_deepest: "Der tiefste Grund",
     deep_sub: "Ein uraltes Myzel",
     deep_1: "Oma. Lass mich diese Fäden lösen.",
+    deep_goal: "Drei violette Knoten binden die Fäden an Oma. Nur die müssen durchtrennt werden. Oma selbst wird nicht geschlagen.",
     deep_k1: "...Es tut nicht weh, Kleines. Es fühlt sich nur ein wenig leer an.",
     deep_k2: "Wenn ich loslasse... wohin gehen dann alle?",
     deep_k3: "...Ich verstehe. Deine Krallen sind so warm.",

@@ -8,10 +8,11 @@ use crate::equipment::Character;
 use crate::scenario::Scenario;
 
 /// 이 런의 캐릭터(0056): 런(첫 시작·오늘의 굴)과 개발의 가장 깊은 곳은 뿌리 길에서 고른 캐릭터,
-/// 개발의 도토·모모 시험장은 그 캐릭터, 그 밖(마을·실의 꿈·개발)은 Naïl. 실의 꿈은 Naïl만: 꿈 목록에 모모가 있다.
+/// 개발의 도토·모모 시험장은 그 캐릭터, 그 밖(실의 꿈·개발)은 Naïl. 실의 꿈은 Naïl만: 꿈 목록에 모모가 있다.
+/// 마을도 고른 캐릭터로 걷는다(사장 2026-10-29: 도토로 고르면 엔딩 뒤 올라오는 길·마을까지 도토) — 그 이웃은 자리에서 빠진다.
 pub fn character(s: Scenario, picked: Character) -> Character {
     match s {
-        Scenario::Normal | Scenario::Daily | Scenario::Deepest => picked,
+        Scenario::Normal | Scenario::Daily | Scenario::Deepest | Scenario::Village => picked,
         // 개발: 도토로 싸워 보기(0195).
         Scenario::DotoArena | Scenario::DotoMobs => Character::Doto,
         Scenario::MomoArena => Character::Momo,
@@ -189,7 +190,7 @@ mod tests {
         assert_eq!(character(Scenario::Dream, Character::Momo), Character::Mole);
         assert_eq!(
             character(Scenario::Village, Character::Doto),
-            Character::Mole
+            Character::Doto
         );
         assert_eq!(
             character(Scenario::DotoArena, Character::Mole),

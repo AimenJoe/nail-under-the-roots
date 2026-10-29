@@ -363,6 +363,7 @@ pub static PT_BR: Strings = Strings {
     node_deepest: "O lugar mais profundo",
     deep_sub: "Um micélio antigo",
     deep_1: "Vovó. Deixe que eu solte esses fios.",
+    deep_goal: "Três nós roxos prendem os fios à Vovó. Basta cortar esses nós. Na Vovó não se bate.",
     deep_k1: "...Não dói, pequeno. Só fica um pouco vazio.",
     deep_k2: "Se eu soltar... para onde todos vão?",
     deep_k3: "...Entendo. Suas garras são tão quentes.",

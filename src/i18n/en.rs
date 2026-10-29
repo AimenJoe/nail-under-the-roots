@@ -363,6 +363,7 @@ pub static EN: Strings = Strings {
     node_deepest: "The Deepest Place",
     deep_sub: "An ancient mycelium",
     deep_1: "Granny. Let me loosen these threads for you.",
+    deep_goal: "Three purple knots tie the threads to Granny. Cut those, and only those. Granny herself is not to be struck.",
     deep_k1: "...It doesn't hurt, little one. It just feels a bit empty.",
     deep_k2: "If I let go... where will everyone go?",
     deep_k3: "...I see. Your claws are so warm.",

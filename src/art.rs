@@ -556,7 +556,8 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: DOTO_BACK_ROW,
         tainted: Some(DOTO_ROW),
         cell: 40.0,
-        walk4: 0,
+        // 걷기 = 낮게 뛰는 바운드 네 칸(2026-10-29, doto_ai.py).
+        walk4: 12,
         run4: 8,
         foot: 38.0,
     },
