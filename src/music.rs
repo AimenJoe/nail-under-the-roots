@@ -14,9 +14,11 @@ use macroquad::audio::{
 };
 use macroquad::experimental::coroutines::{start_coroutine, Coroutine};
 
-/// 어디의 곡인가. 같은 곡이 여러 장소에 걸릴 수 있다(`App::music_track`).
+/// 어디의 곡인가. 같은 곡이 여러 장소에 걸릴 수 있다(`App::music_track`). 장소마다 옛 곡과 사장이 고른 새 곡(0234)을
+/// 둘 다 쓴다 — 어떤 때 어느 곡인지는 `App::music_track` 한 곳.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Track {
+    /// 옛 곡(0154): 서곡 · 마을 · 필드 칩튠 · 눈 오는 쉼터 · 굴 칩튠 · 신비의 사당 · 싸움 2.
     Title,
     Village,
     Field,
@@ -24,6 +26,23 @@ pub enum Track {
     Roots,
     Deep,
     Boss,
+    /// 새 곡(0234).
+    TitleLight,
+    VillageSprings,
+    FieldOverworld,
+    CampCalm,
+    RootsExplorer,
+    DeepPool,
+    Silk,
+    /// 보스 2단계(0233): 깨어나면 이 곡으로 넘어간다.
+    BossRise,
+    /// 가장 깊은 곳(할매와 매듭).
+    Final,
+    Ending,
+    /// 환경음(음악 밑에 깔리는 고리, `Music::ambience`).
+    AmbMeadow,
+    AmbCave,
+    AmbDeep,
 }
 
 /// (곡, 파일 이름). 파일은 `tools/audio/make_audio.py`가 만든다(출처는 assets/LICENSES.md).
@@ -35,11 +54,25 @@ const TRACKS: &[(Track, &str)] = &[
     (Track::Roots, "roots"),
     (Track::Deep, "deep"),
     (Track::Boss, "boss"),
+    (Track::TitleLight, "title_light"),
+    (Track::VillageSprings, "village_springs"),
+    (Track::FieldOverworld, "field_overworld"),
+    (Track::CampCalm, "camp_calm"),
+    (Track::RootsExplorer, "roots_explorer"),
+    (Track::DeepPool, "deep_pool"),
+    (Track::Silk, "silk"),
+    (Track::BossRise, "boss_rise"),
+    (Track::Final, "final"),
+    (Track::Ending, "ending"),
+    (Track::AmbMeadow, "amb_meadow"),
+    (Track::AmbCave, "amb_cave"),
+    (Track::AmbDeep, "amb_deep"),
 ];
 
 /// 다 내려간 뒤에도 놓지 않는 곡. 보스 곡은 싸움 한가운데서 갑자기 필요하다: 그때 풀면(네이티브는 그 자리에서
 /// 통째로 푼다) 화면이 멈춘다 → 처음 게임 장면에 들어설 때(화면이 검을 때) 미리 읽고 쥐고 있는다.
-const KEEP: &[Track] = &[Track::Boss];
+/// 2단계 곡도 싸움 한가운데서 넘어가니 같이 쥔다(0233·0234).
+const KEEP: &[Track] = &[Track::Boss, Track::BossRise];
 
 /// 교차 시간(초): 새 곡이 올라오고 옛 곡이 내려가는 데 걸리는 시간.
 const FADE: f32 = 1.0;
@@ -47,6 +80,8 @@ const FADE: f32 = 1.0;
 const DUCK: f32 = 0.5;
 /// 음악 전체 크기(효과음 MASTER_VOLUME과 따로 맞춘다).
 const MASTER: f32 = 0.6;
+/// 환경음 전체 크기(설정의 "효과음"에 곱한다). 음악 밑에 깔릴 만큼 — 귀로 맞춘다.
+const AMB_MASTER: f32 = 0.35;
 
 enum Slot {
     Loading(Coroutine<Option<Sound>>),
@@ -66,6 +101,10 @@ pub struct Music {
     volume: f32,
     /// 지금 낮춘 정도(1 = 그대로, DUCK = 낮춤). 부드럽게 따라간다.
     duck: f32,
+    /// 전체 크기(음악 `MASTER`, 환경음 `AMB_MASTER`).
+    master: f32,
+    /// 다 내려가도 쥐고 있는 곡(음악은 `KEEP`, 환경음은 없음).
+    keep: &'static [Track],
 }
 
 impl Music {
@@ -76,6 +115,17 @@ impl Music {
             old: Vec::new(),
             volume: 0.7,
             duck: 1.0,
+            master: MASTER,
+            keep: KEEP,
+        }
+    }
+
+    /// 환경음 층(0234): 같은 교차·낮추기로 음악 밑에 고리 하나. 크기는 설정의 효과음을 따른다.
+    pub fn ambience() -> Self {
+        Self {
+            master: AMB_MASTER,
+            keep: &[],
+            ..Self::new()
         }
     }
 
@@ -126,8 +176,8 @@ impl Music {
     pub fn update(&mut self, want: Option<Track>, ducked: bool, dt: f32) {
         if let Some(t) = want {
             self.request(t);
-            if t != Track::Title {
-                for k in KEEP {
+            if !matches!(t, Track::Title | Track::TitleLight) {
+                for k in self.keep {
                     self.request(*k);
                 }
             }
@@ -173,7 +223,7 @@ impl Music {
         let step = dt / FADE;
         let target = if ducked { DUCK } else { 1.0 };
         self.duck += (target - self.duck) * (dt * 6.0).min(1.0);
-        let gain = MASTER * self.volume * self.duck;
+        let gain = self.master * self.volume * self.duck;
         if let Some((t, level)) = self.now.as_mut() {
             *level = (*level + step).min(1.0);
             let (t, level) = (*t, *level);
@@ -202,7 +252,24 @@ impl Music {
             !matches!(s, Slot::Ready(_))
                 || Some(*t) == now
                 || fading.contains(t)
-                || KEEP.contains(t)
+                || self.keep.contains(t)
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 표의 곡마다 두 파일(웹 mp3·네이티브 ogg)이 있다 — 없으면 웹 콘솔에 404, 네이티브는 조용히 빈다.
+    #[test]
+    fn every_track_has_both_files() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/music");
+        for (t, name) in TRACKS {
+            for ext in ["mp3", "ogg"] {
+                let p = format!("{dir}/{name}.{ext}");
+                assert!(std::path::Path::new(&p).exists(), "{t:?}: {p}");
+            }
+        }
     }
 }

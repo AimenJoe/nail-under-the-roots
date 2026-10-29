@@ -1,9 +1,14 @@
 """효과음·음악 파일 만들기(docs/decisions/0081). 산출물(assets/sfx, assets/music)을 커밋하고, 이 파일이 원본이다.
 
-실행: python3 tools/audio/make_audio.py <Kenney 폴더> <rpgchip 폴더> <어쿠스틱 폴더>
+실행(단계마다 따로, 자기 표의 파일만 다시 쓴다):
+  python3 tools/audio/make_audio.py kenney <Kenney 폴더>
+  python3 tools/audio/make_audio.py music <rpgchip 폴더> <어쿠스틱 폴더>
+  python3 tools/audio/make_audio.py oga <OpenGameArt 폴더>
   - Kenney(CC0): https://kenney.nl/assets/interface-sounds · impact-sounds · rpg-audio 의 zip을 한 폴더에 푼다.
   - rpgchip(CC0, Aureolus_Omicron): https://opengameart.org/content/15-melodic-rpg-chiptunes 의 zip을 푼다.
   - 어쿠스틱(CC0, OpenGameArt, 0154): 아래 `ACOUSTIC` 표의 페이지에서 받아 표의 파일 이름으로 한 폴더에 둔다.
+  - OpenGameArt(CC0, 0234): `OGA_*` 표. 페이지 https://opengameart.org/content/<slug> 마다 <slug> 폴더 하나에 받은
+    파일을 그대로 두고, zip은 그 안 x/에 푼다.
   → assets/sfx/<이름>_<n>.wav, assets/music/<이름>.ogg(데스크톱·Android) + .mp3(웹)
   ffmpeg(libvorbis·libmp3lame)와 numpy가 있어야 한다.
 
@@ -13,7 +18,7 @@
 - 음악: 칩튠은 사실상 모노(옆 성분 −36dB 아래)라 모노로 줄인다(크기 절반). 어쿠스틱 곡은 좌우 폭이 넓어(−1~−3dB)
   스테레오로 둔다(네이티브는 어차피 스테레오 f32로 풀어 메모리는 같다). 처음·끝 5ms를 줄여 고리 이음매의 딸깍을
   없앤다. 평균 크기를 −15dB RMS 근처로 맞추되 봉우리는 −1dBFS를 넘기지 않는다. ogg q4, mp3 V5.
-- 표(SFX·MUSIC)를 고치면 다시 돌리고, sfx.rs·music.rs의 표와 assets/LICENSES.md를 함께 고친다.
+- 표(SFX·MUSIC·OGA_*)를 고치면 그 단계를 다시 돌리고, sfx.rs·music.rs의 표와 assets/LICENSES.md를 함께 고친다.
 """
 import glob
 import os
@@ -26,16 +31,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SR = 44100
 
 # (게임 이름, Kenney 파일 이름들, 최대 길이 초). 같은 이름의 여러 파일 = 무작위로 고르는 변형.
+# 메뉴 이동·확인·적 맞음·상자는 사장이 고른 OpenGameArt 소리로 바꿨다(`OGA_SFX`, 0234).
 SFX = [
-    ("ui_move", ["tick_004"], 0.08),
-    ("ui_confirm", ["select_002"], 0.08),
     ("ui_back", ["back_002"], 0.12),
     ("buy", ["handleCoins2"], 0.40),
     ("deny", ["error_004"], 0.15),
-    ("enemy_hit", ["impactPunch_medium_000", "impactPunch_medium_001", "impactPunch_medium_003"], 0.30),
     ("enemy_die", ["impactSoft_heavy_000", "impactSoft_heavy_002", "impactSoft_heavy_004"], 0.45),
     ("hurt", ["impactPunch_heavy_002", "impactPunch_heavy_004"], 0.40),
-    ("chest", ["creak3"], 0.40),
 ]
 
 # (게임 이름, 출처, 파일 이름). 출처 "chip" = rpgchip 폴더(모노), "acoustic" = 어쿠스틱 폴더(스테레오).
@@ -56,6 +58,46 @@ ACOUSTIC = {
     "lovely_town": "https://opengameart.org/content/lovely-town (fluffclipse, Lovely town_0.ogg)",
     "snowfall_looped": "https://opengameart.org/content/snowfall (Kistol, Snowfall (Looped ver.)_0.ogg)",
 }
+
+# OpenGameArt에서 사장이 듣고 고른 소리(0234, 2026-10-29 듣기 페이지). 모두 페이지 라이선스 칸이 "CC0" 하나뿐인 것만.
+# 출처·작가는 assets/LICENSES.md. 효과음: (게임 이름, slug, 그 폴더 안의 파일들 = 변형, 최대 길이 초).
+JUNKALA = "x/The Essential Retro Video Game Sound Effects Collection [512 sounds] By Juhani Junkala/"
+OGA_SFX = [
+    ("ui_move", "interface-sounds", ["x/Audio/tick_002.ogg"], 0.08),
+    ("ui_confirm", "interface-sounds", ["x/Audio/confirmation_001.ogg"], 0.30),
+    ("enemy_hit", "512-sound-effects-8-bit-style",
+     [JUNKALA + "Weapons/Melee/sfx_wpn_punch2.wav", JUNKALA + "Weapons/Melee/sfx_wpn_punch3.wav"], 0.30),
+    ("chest", "50-rpg-sound-effects", ["x/OGG/doorOpen_1.ogg"], 0.90),
+    ("swing", "rpg-sound-pack", ["x/RPG Sound Pack/battle/swing.wav"], 0.25),
+    ("step", "50-rpg-sound-effects", [f"x/OGG/footstep0{i}.ogg" for i in range(4)], 0.30),
+    ("pickup", "gem-collect-sfx", ["gem-gather-stereo-reverb.wav"], 1.50),
+    ("dodge", "swishes-sound-pack", ["x/swishes/swish-12.wav"], 0.20),
+    ("burrow", "shovel-sound", ["shovel_0.ogg"], 0.90),
+    ("emerge", "jump-landing-sound", ["jumpland.wav"], 0.45),
+]
+# 음악: (게임 이름, slug, 파일). 모두 어쿠스틱 곡처럼 스테레오·−19dB RMS·리미터. 옛 곡은 지우지 않고 같이 쓴다(music.rs).
+OGA_MUSIC = [
+    ("title_light", "first-light-particles-%E2%80%93-cc0-atmospheric-pianoambient", "first_light_particles_0.wav"),
+    ("village_springs", "hot-springs-town", "hot_spring_town_1.ogg"),
+    ("field_overworld", "2-whimsical-rpg-themes", "RPG%20Overworld.flac"),
+    ("camp_calm", "jrpg-pack-4-calm", "x/Calm1 - A Place I Call Home.ogg"),
+    ("roots_explorer", "cave-explorer", "caveexplorer_hq.mp3"),
+    ("deep_pool", "the-seeing-pool", "the_seeing_pool.flac"),
+    ("silk", "the-relic-under-the-ice", "the_relic_under_the_ice_0.wav"),
+    ("boss_rise", "jrpg-pack-5-action", "x/Action1 - Encounter With The Witches.ogg"),
+    ("final", "fantasy-lament-for-a-warriors-soul", "Lament_for_a_Warriors_Soul_REUPLOAD.mp3"),
+    ("ending", "goodbye-to-friends", "TS3.mp3"),
+]
+# 환경음(음악 밑에 깔린다, 모노): (게임 이름, slug, 파일, 모양). "loop" = 그대로 고리,
+# "scatter" = 3초 새소리 조각을 AMB_BED초 바탕 위 `SCATTER` 자리에 흩어 둔다(3초마다 같은 소리가 되풀이되지 않게).
+OGA_AMB = [
+    ("amb_meadow", "bird-chirping-sounds", "birdchirping071414.wav", "scatter"),
+    ("amb_cave", "dripping-water-loop", "atmosbasement.mp3_.flac", "loop"),
+    ("amb_deep", "rumble-fx", "rumble.wav", "loop"),
+]
+AMB_BED = 24.0
+SCATTER = [(0.8, 1.0), (5.6, 0.55), (9.1, 0.85), (14.3, 0.5), (18.4, 0.75)]  # (초, 크기)
+AMB_RMS = -24
 
 PEAK = 10 ** (-1 / 20)
 ACOUSTIC_RMS = -19
@@ -101,21 +143,26 @@ def write_wav(path, a):
     )
 
 
-def make_sfx(kenney):
+def write_sfx(name, sources, max_s):
+    """효과음 하나(변형들): 이 이름의 옛 변형을 지우고 <이름>_<n>.wav로 쓴다."""
     out = os.path.join(ROOT, "assets", "sfx")
     os.makedirs(out, exist_ok=True)
-    for old in glob.glob(os.path.join(out, "*.wav")):
+    for old in glob.glob(os.path.join(out, f"{name}_[0-9]*.wav")):
         os.remove(old)
+    for i, src in enumerate(sources):
+        a = decode(src)
+        # 소리가 시작하기 전 빈 곳과 조용한 꼬리를 자른다.
+        loud = np.nonzero(np.abs(a) > np.abs(a).max() * 0.01)[0]
+        a = a[max(loud[0] - 22, 0):loud[-1] + 1][: int(SR * max_s)]
+        a = fade_edges(a, 0, 5) * (PEAK / np.abs(a).max())
+        path = os.path.join(out, f"{name}_{i}.wav")
+        write_wav(path, a)
+        print(f"{os.path.relpath(path, ROOT)}  {len(a) / SR * 1000:.0f}ms  ← {os.path.basename(src)}")
+
+
+def make_sfx(kenney):
     for name, files, max_s in SFX:
-        for i, f in enumerate(files):
-            a = decode(find(kenney, f))
-            # 소리가 시작하기 전 빈 곳과 조용한 꼬리를 자른다.
-            loud = np.nonzero(np.abs(a) > np.abs(a).max() * 0.01)[0]
-            a = a[max(loud[0] - 22, 0):loud[-1] + 1][: int(SR * max_s)]
-            a = fade_edges(a, 0, 5) * (PEAK / np.abs(a).max())
-            path = os.path.join(out, f"{name}_{i}.wav")
-            write_wav(path, a)
-            print(f"{os.path.relpath(path, ROOT)}  {len(a) / SR * 1000:.0f}ms  ← {f}")
+        write_sfx(name, [find(kenney, f) for f in files], max_s)
 
 
 def limit(a, block=64, attack_db=1.0, release_db=0.03):
@@ -138,35 +185,80 @@ def limit(a, block=64, attack_db=1.0, release_db=0.03):
     return a * (gain.reshape(-1, 1) if a.ndim > 1 else gain)
 
 
-def make_music(chip, acoustic):
+def encode_music(name, a, label):
+    """곡 하나를 ogg(네이티브)·mp3(웹)로. 처음·끝 5ms를 줄여 고리 이음매의 딸깍을 없앤다."""
     out = os.path.join(ROOT, "assets", "music")
     os.makedirs(out, exist_ok=True)
+    ch = 2 if a.ndim > 1 else 1
+    a = fade_edges(a, 5, 5)
+    pcm = (np.clip(a, -1.0, 1.0) * 32767).astype("<i2").tobytes()
+    for ext, args in [("ogg", ["-c:a", "libvorbis", "-q:a", "4"]), ("mp3", ["-c:a", "libmp3lame", "-q:a", "5"])]:
+        path = os.path.join(out, f"{name}.{ext}")
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-f", "s16le", "-ar", str(SR), "-ac", str(ch), "-i", "-",
+             "-map_metadata", "-1", *args, path],
+            input=pcm, check=True,
+        )
+        print(f"{os.path.relpath(path, ROOT)}  {len(a) / SR:.1f}s  {os.path.getsize(path) // 1024}KB  ← {label}")
+
+
+def acoustic_level(a):
+    """어쿠스틱 곡은 봉우리가 드물게 튀어 봉우리로만 맞추면 칩튠보다 5dB까지 작다. 칩튠 크기(−19dB RMS)로
+    올리고 넘는 봉우리만 리미터로 누른다. 크기는 가운데(좌우 평균)로 잰다."""
+    mid = a.mean(axis=1) if a.ndim > 1 else a
+    rms = np.sqrt((mid ** 2).mean())
+    return limit(a * (10 ** (ACOUSTIC_RMS / 20) / rms))
+
+
+def make_music(chip, acoustic):
     for name, src, f in MUSIC:
         ch = 2 if src == "acoustic" else 1
         a = decode(find(acoustic if src == "acoustic" else chip, f), ch)
-        # 크기는 가운데(좌우 평균)로 잰다: 스테레오도 모노 곡과 같은 −15dB RMS 근처에.
-        mid = a.mean(axis=1) if ch > 1 else a
-        rms = np.sqrt((mid ** 2).mean())
         if src == "acoustic":
-            # 어쿠스틱 곡은 봉우리가 드물게 튀어 봉우리로만 맞추면 칩튠보다 5dB까지 작다. 칩튠 크기(−19dB RMS)로
-            # 올리고 넘는 봉우리만 리미터로 누른다.
-            a = limit(a * (10 ** (ACOUSTIC_RMS / 20) / rms))
+            a = acoustic_level(a)
         else:
+            # 크기는 −15dB RMS 근처, 봉우리는 −1dBFS를 넘기지 않는다.
+            rms = np.sqrt((a ** 2).mean())
             a = a * min(10 ** (-15 / 20) / rms, PEAK / np.abs(a).max())
-        a = fade_edges(a, 5, 5)
-        pcm = (np.clip(a, -1.0, 1.0) * 32767).astype("<i2").tobytes()
-        for ext, args in [("ogg", ["-c:a", "libvorbis", "-q:a", "4"]), ("mp3", ["-c:a", "libmp3lame", "-q:a", "5"])]:
-            path = os.path.join(out, f"{name}.{ext}")
-            subprocess.run(
-                ["ffmpeg", "-v", "error", "-y", "-f", "s16le", "-ar", str(SR), "-ac", str(ch), "-i", "-",
-                 "-map_metadata", "-1", *args, path],
-                input=pcm, check=True,
-            )
-            print(f"{os.path.relpath(path, ROOT)}  {len(a) / SR:.1f}s  {os.path.getsize(path) // 1024}KB  ← {f}")
+        encode_music(name, a, f)
+
+
+def oga_path(oga, slug, f):
+    path = os.path.join(oga, slug, f)
+    if not os.path.exists(path):
+        sys.exit(f"없다: {path} (https://opengameart.org/content/{slug} 에서 받는다)")
+    return path
+
+
+def make_oga(oga):
+    for name, slug, files, max_s in OGA_SFX:
+        write_sfx(name, [oga_path(oga, slug, f) for f in files], max_s)
+    for name, slug, f in OGA_MUSIC:
+        encode_music(name, acoustic_level(decode(oga_path(oga, slug, f), 2)), f)
+    for name, slug, f, shape in OGA_AMB:
+        a = decode(oga_path(oga, slug, f))
+        # 크기는 원본 조각으로 잰다(흩어 둔 바탕은 대부분 조용해 평균이 낮다). 물방울처럼 드문 봉우리는 누르지 않고
+        # 봉우리에서 멈춘다(리미터로 누르면 똑 소리가 뭉개진다).
+        a = a * min(10 ** (AMB_RMS / 20) / np.sqrt((a ** 2).mean()), PEAK / np.abs(a).max())
+        if shape == "scatter":
+            bed = np.zeros(int(SR * AMB_BED))
+            for at, gain in SCATTER:
+                i = int(SR * at)
+                n = min(len(a), len(bed) - i)
+                bed[i:i + n] += fade_edges(a[:n], 20, 200) * gain
+            a = bed
+        else:
+            a = fade_edges(a, 30, 30)
+        encode_music(name, a, f)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    step, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
+    if step == "kenney" and len(args) == 1:
+        make_sfx(*args)
+    elif step == "music" and len(args) == 2:
+        make_music(*args)
+    elif step == "oga" and len(args) == 1:
+        make_oga(*args)
+    else:
         sys.exit(__doc__)
-    make_sfx(sys.argv[1])
-    make_music(sys.argv[2], sys.argv[3])

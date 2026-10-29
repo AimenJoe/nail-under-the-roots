@@ -91,7 +91,7 @@
 | 타이틀 바탕(0083) | `tools/art/illust.py`(title), `art.rs`(Art::title), `render.rs`(draw_title_art), `app.rs`(타이틀·슬롯·설정 창) | 지금은 나노바나나 해 질 녘 땅의 단면(0137) + 흐르는 안개 두 겹·반딧불·보라 알갱이. v2 코드 그림(어둠 속 단면·굴 방 비네트)은 원본이 없을 때만 |
 | 프랑스어·스페인어(0084) | `i18n.rs`(FR·ES 표, `Lang::Fr`·`Es`, `fr-*`·`es-*`), `prefs.rs`(언어 값 6·7), `assets/fonts/Galmuri11-Condensed.ttf`(+œŒŸ) | 일곱 언어. 헤드리스로 여섯 화면 넘침 확인·수정 |
 | 콩이의 문·독일어·러시아어(0085) | `illust.py`(kongi_door), `illust.rs`(KongiDoor), `cutscene.rs`(kongi_returns), `app.rs`(앨범 5칸·두 줄 굴리기), `i18n.rs`(DE·RU, kongi_door), `prefs.rs`(8·9) | 콩이가 지키던 문의 컷씬 그림(지금은 나노바나나, 0136)·내레이션, 앨범 스크롤, 아홉 언어 |
-| 소리 파일(0081) | `tools/audio/make_audio.py`, `assets/sfx`·`assets/music`, `sfx.rs`(FILES·변형), `music.rs`(TRACKS·들을 때 읽기·KEEP), `app.rs`(menu_sound) | CC0 효과음(Kenney: 메뉴·사기·안 됨·맞음·쓰러짐·다침·상자)·음악 7곡(칩튠 Aureolus_Omicron 넷 + 쉬는 곳 피아노·바이올린 셋, 0154). 웹 헤드리스로 받기·재생·고리 확인, 네이티브 실제 소리는 미확인 |
+| 소리 파일(0081) | `tools/audio/make_audio.py`, `assets/sfx`·`assets/music`, `sfx.rs`(FILES·변형), `music.rs`(TRACKS·들을 때 읽기·KEEP), `app.rs`(menu_sound) | CC0 효과음(Kenney: 메뉴·사기·안 됨·맞음·쓰러짐·다침·상자)·음악 7곡(칩튠 Aureolus_Omicron 넷 + 쉬는 곳 피아노·바이올린 셋, 0154). 웹 헤드리스로 받기·재생·고리 확인, 네이티브 실제 소리는 미확인. 0234: 사장이 듣기 페이지에서 고른 새 곡 열(옛 곡과 둘 다 — `App::music_track`)·환경음 셋(`Music::ambience`)·효과음 열(발소리·휘두르기·회피·줍기 …), `make_audio.py oga` 단계 |
 | 강공격(0161) | `input.rs`(attack_held), `player.rs`(Charging·Heavy·heavy_strike·parry_heavy), `moveset.rs`(heavy_of), `combat.rs`(StrikeKind::Heavy), `world.rs`, `render.rs`, `tutorial.rs`(Stage::Heavy) | 누르는 순간 평타, 누르고 있으면 활성 구간 뒤 모으기 → 0.45초 뒤 떼면 피해 2 이상·반지름 1.3배 한 방(마지막 타에서 만든다), 콤보는 다음 타로(후딜레이는 못 끊지만 잠금은 없다, 0167). 첫머리 창은 진홍 고리 공격도 받아친다. 튜토리얼 열 단계 중 4번째 |
 | 박자 콤보(0167 → 0174) | `player/`(Queued·beat_clock·beat_at·combo_pending·queue_due·beat_cue·beat_pips), `tuning.rs`(BEAT_PERIOD·BEAT_WINDOW·BEAT_RING_*·BEAT_PIP_SHOW), `world.rs`·`sfx.rs`(Beat(n) 도미솔도), `render/actors.rs`(draw_beat_cue) | 평타는 누르는 순간. 다음 타의 박자는 스윙 시작 0.25초 뒤(스윙·후딜레이가 길면 그 끝). 창 ±0.06초 안이면 그 자리에서 + 덤·퍼지는 고리·오르는 종소리·머리 위 음표, 창 전이면 박자까지 기다렸다(스냅, 덤 없음), 창 뒤면 그 자리에서(덤 없음). 닫히는 고리가 박자를 보여 준다. 강공격 뒤 잠금 없음 |
 | 설정 파일(0175) | `prefs.rs`(store::read_from·write_to·load_all·save_all), `profile.rs`(data_dir) | 데스크톱·Android·iOS도 기록 폴더의 `prefs.txt`에 설정을 남긴다(전엔 켤 때마다 기본값) |
@@ -190,7 +190,7 @@
 ### 판정에서 나온 할 일(2026-10-29, v0.5.x 패치 후보)
 - [x] **떨어진 것 표시**(판정 9, 사장 "줍기 연출이 아니라 떨어진 아이템에 대한 표시"): 줍는 것 모두(꽃잎·산딸기·쥬시 지렁이·씨앗·뿌리 심장·무기)에 같은 "주울 수 있다" 표시 — 발밑 옅은 빛 자리 + 1.2초마다 퍼지는 고리 + 1.6초마다 네 갈래 별, 어두운 지대에선 별을 어둠 위에 한 번 더(`render/props.rs draw_pickup_mark`, `tuning::PICKUP_*`). 개발 "떨어지는 것 확인" 왼쪽 줄로 본다. 사장 확인
 - [x] **터치 아이콘 다듬기**(판정 11): 선으로 그리던 픽토그램을 12×12 점 그림(`render/hud.rs icon_mask`)으로 — 흰 채움 + 어두운 1점 외곽선, 정수 배율로 찍어 흐림이 없다. 열두 아이콘(발톱·발·흙더미·뛰기·드릴·이음·도토리·멀리 뛰기·묻기·산딸기·바꾸기·메뉴), 시험 `touch_icons_are_12_by_12`. 사장 확인
-- [ ] **소리 후보 듣기**(판정 10): 장소·보스·효과음마다 CC0 후보 여럿을 모아 사장이 들어 보고 고르는 페이지(골라 주면 `tools/audio/make_audio.py` 표에)
+- [x] **소리 후보 듣기**(판정 10, 0234): CC0 후보 142개(26칸) 듣기 페이지에서 사장이 다 고름 → 넣음. 음악은 옛 곡과 새 곡을 둘 다(상황으로 가르기·런마다 번갈아, 보스 2단계에서 곡 넘김), 새 칸(실 지대·가장 깊은 곳·엔딩), 환경음 층(들판·굴·깊은 곳), 효과음 열(발소리·회피는 새로). 사장 확인: 크기 균형·발소리·고리 이음매·핸드헬드 메모리
 - [x] **보스 2단계**(판정 5, 0233): 다섯 보스는 체력 반 아래에서 한 번 깨어난다(예고 0.85배·쉬기 1.4배 빨리·걸음 1.15배·멈칫 0.6배, 붉은 발밑 고리·불씨, 막대 반 눈금), 경직은 1단계도 0.35 → 0.3. 모모는 2단계면 첫 만남에도 굴로 숨고 뛰기 두 번. 할매는 매듭 하나 남으면 당기기 두 번. 개발 "보스 2단계: 대장/모모". 사장 확인(수치는 `tuning::BOSS_P2_*`)
 
 ### v0.3.0 마일스톤(0081, 완성도) — 사람 몫

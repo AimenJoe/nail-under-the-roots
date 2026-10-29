@@ -68,20 +68,33 @@ pub enum Id {
     Unbind,
     /// 부술 수 있는 것이 깨졌다(0175): 퍽 + 흙 소음.
     Break,
+    /// 발소리(0234): 두 걸음에 한 번, 흙길 네 변형.
+    Step,
+    /// 깡충·뒤로 뛰기·멀리뛰기의 휘익(0234).
+    Dodge,
+    /// 가방 아이템·무기를 주웠다(0234). 반딧불·씨앗은 오르는 음 `Glowbug` 그대로.
+    Pickup,
 }
 
 /// 파일 소리 표: (이름, 변형 수, 크기). 크기는 MASTER_VOLUME·설정에 곱한다 — 귀로 맞춘다.
 /// 봉우리는 만들 때 모두 −1dBFS로 맞췄다. 자주 나는 메뉴 소리는 작게.
-const FILES: [(&str, usize, f32); 9] = [
+/// 메뉴 이동·확인·적 맞음·상자·휘두르기·발소리·줍기·회피·파고들기·솟구치기는 사장이 듣고 고른 소리(0234).
+const FILES: [(&str, usize, f32); 15] = [
     ("ui_move", 1, 0.35),
-    ("ui_confirm", 1, 0.5),
+    ("ui_confirm", 1, 0.45),
     ("ui_back", 1, 0.5),
     ("buy", 1, 0.7),
     ("deny", 1, 0.55),
-    ("enemy_hit", 3, 0.75),
+    ("enemy_hit", 2, 0.7),
     ("enemy_die", 3, 0.85),
     ("hurt", 2, 0.9),
     ("chest", 1, 0.8),
+    ("swing", 1, 0.45),
+    ("step", 4, 0.18),
+    ("pickup", 1, 0.55),
+    ("dodge", 1, 0.5),
+    ("burrow", 1, 0.6),
+    ("emerge", 1, 0.7),
 ];
 
 /// 이 소리의 파일 표 자리.
@@ -96,6 +109,13 @@ fn file_of(id: Id) -> Option<usize> {
         Id::EnemyDie => 6,
         Id::Hurt => 7,
         Id::Chest => 8,
+        // 마무리 타(2)는 무거운 합성음 그대로.
+        Id::Claw(0 | 1) => 9,
+        Id::Step => 10,
+        Id::Pickup => 11,
+        Id::Dodge => 12,
+        Id::Burrow => 13,
+        Id::Emerge => 14,
         _ => return None,
     })
 }
@@ -488,7 +508,14 @@ impl Sfx {
             Id::DrillWall => &self.drill_wall,
             Id::Parry => &self.parry,
             Id::Buy => &self.glowbug[0],
-            Id::UiMove | Id::UiConfirm | Id::UiBack | Id::Deny | Id::Chest => return None,
+            Id::UiMove
+            | Id::UiConfirm
+            | Id::UiBack
+            | Id::Deny
+            | Id::Chest
+            | Id::Step
+            | Id::Dodge
+            | Id::Pickup => return None,
         })
     }
 }
@@ -669,4 +696,25 @@ fn wav_bytes(samples: &[i16]) -> Vec<u8> {
         v.extend_from_slice(&s.to_le_bytes());
     }
     v
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 파일 소리 표의 변형마다 wav가 있다(`make_audio.py`가 만든 수와 표의 수가 맞는다).
+    #[test]
+    fn every_file_sound_exists() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/");
+        for f in Sfx::files() {
+            assert!(std::path::Path::new(&format!("{dir}{f}")).exists(), "{f}");
+        }
+        for (name, n, _) in FILES {
+            let extra = format!("{dir}sfx/{name}_{n}.wav");
+            assert!(
+                !std::path::Path::new(&extra).exists(),
+                "표보다 변형이 많다: {extra}"
+            );
+        }
+    }
 }

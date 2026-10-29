@@ -78,6 +78,7 @@ impl App {
             0 => {
                 self.settings.volume = (self.settings.volume as i8 + d).clamp(0, 10) as u8;
                 self.sfx.set_volume(self.settings.volume_f());
+                self.amb.set_volume(self.settings.volume_f());
                 self.sfx.play(crate::sfx::Id::EnemyHit);
             }
             1 => {

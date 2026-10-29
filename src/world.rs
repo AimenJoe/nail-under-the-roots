@@ -521,6 +521,8 @@ pub struct Juice {
     pub petals: bool,
     /// 발걸음 먼지(0081): 걸은 거리를 모아 한 걸음마다.
     step_dist: f32,
+    /// 걸음 수: 두 걸음에 한 번 발소리(0234).
+    steps: u32,
 }
 
 pub struct World {
@@ -648,6 +650,7 @@ impl Default for Juice {
             petals: false,
             charge_fx_t: 0.0,
             step_dist: 0.0,
+            steps: 0,
         }
     }
 }
@@ -1059,7 +1062,7 @@ impl World {
                 // 모모(0056): 뛰어오를 때 흙먼지, 내려앉을 때 작은 고리(이어 뛰기는 크게 + 흔들림).
                 player::Event::Hop => {
                     self.stats.burrows += 1;
-                    self.juice.audio.play(sfx::Id::Charge);
+                    self.juice.audio.play(sfx::Id::Dodge);
                     burst(&mut self.juice.fx, self.player.pos, 6, DIRT, 50.0);
                     puff(
                         &mut self.juice.fx,
@@ -1249,7 +1252,7 @@ impl World {
         });
         for (pos, w) in got {
             self.inv.gifts.push(Gift::Weapon(w));
-            self.juice.audio.play(sfx::Id::Emerge);
+            self.juice.audio.play(sfx::Id::Pickup);
             self.juice.fx.push(ring(pos, 4.0, 18.0, 0.3, WHITE));
             burst(&mut self.juice.fx, pos, 14, PROJECTILE, 80.0);
         }
@@ -1293,7 +1296,7 @@ impl World {
             self.juice.audio.play(sfx::Id::Glowbug);
         }
         if items > 0 {
-            self.juice.audio.play(sfx::Id::Claw(0));
+            self.juice.audio.play(sfx::Id::Pickup);
         }
         if hearts > 0 {
             self.inv.root_hearts += hearts;
@@ -2186,15 +2189,21 @@ impl World {
                 self.juice.boss_card = None;
             }
         }
-        // 발걸음 먼지(0081): 걷는 동안 12px마다 발 뒤에 작은 먼지. 효과가 넘치면 건너뛴다.
+        // 발걸음 먼지(0081): 걷는 동안 12px마다 발 뒤에 작은 먼지(효과가 넘치면 건너뛴다), 두 걸음에 한 번 발소리(0234).
         let moved = (self.player.pos - self.player.prev_pos).length();
         if self.player.is_alive() && self.player.on_foot() && moved > 0.2 {
             self.juice.step_dist += moved;
-            if self.juice.step_dist > STEP_DUST_EVERY && self.juice.fx.len() < FX_SOFT_CAP {
+            if self.juice.step_dist > STEP_DUST_EVERY {
                 self.juice.step_dist = 0.0;
-                let back = -(self.player.pos - self.player.prev_pos).normalize_or_zero();
-                let at = self.player.pos + vec2(0.0, 5.0) + back * 3.0;
-                puff(&mut self.juice.fx, at, 1, self.biome.dust(), 3.0, 0.35);
+                self.juice.steps = self.juice.steps.wrapping_add(1);
+                if self.juice.steps.is_multiple_of(2) {
+                    self.juice.audio.play(sfx::Id::Step);
+                }
+                if self.juice.fx.len() < FX_SOFT_CAP {
+                    let back = -(self.player.pos - self.player.prev_pos).normalize_or_zero();
+                    let at = self.player.pos + vec2(0.0, 5.0) + back * 3.0;
+                    puff(&mut self.juice.fx, at, 1, self.biome.dust(), 3.0, 0.35);
+                }
             }
         } else {
             self.juice.step_dist = STEP_DUST_EVERY * 0.6;
