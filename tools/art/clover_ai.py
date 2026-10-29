@@ -22,6 +22,7 @@ from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import walk_ai  # noqa: E402
 from sprite_ai import OUTLINE, Source, Spec, convert, seat  # noqa: E402
 
 CELL, FOOT = 40, 38
@@ -134,8 +135,11 @@ def thread(cell):
 def build():
     spr = convert(SPEC)
     cells = {k: sparkle(seat(spr[k], CELL, FOOT)) for k in NAMES}
-    sheet = np.zeros((CELL * 4, CELL * len(NAMES), 4), np.uint8)
-    for c, k in enumerate(NAMES):
+    # 칸 8~11 = 깡충 네 칸(`clover_walk_v1.png`, 0229)
+    cells.update({k: sparkle(v) for k, v in walk_ai.cells("clover", SPEC.sources[0], CELL, FOOT).items()})
+    order = NAMES + walk_ai.NAMES
+    sheet = np.zeros((CELL * 4, CELL * len(order), 4), np.uint8)
+    for c, k in enumerate(order):
         for r, cell in enumerate((cells[k], thread(taint(cells[k])))):
             sheet[r * CELL:(r + 1) * CELL, c * CELL:(c + 1) * CELL] = cell
             sil = np.zeros_like(cell)

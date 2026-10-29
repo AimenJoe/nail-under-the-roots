@@ -108,6 +108,8 @@ pub const CHIEF_FOOT: f32 = 38.0;
 /// chief.png의 줄: 돌아온 보리 / 물든 대장(보리 줄의 색을 바꾼 것). 실루엣은 + CHIEF_ROWS.
 pub const CHIEF_BORI: u32 = 0;
 pub const CHIEF_TAINTED: u32 = 1;
+/// chief.png 걷기 네 칸의 첫 칸(10~13, `bori_walk_v1.png`, 0229).
+pub const CHIEF_WALK4: u32 = 10;
 pub const CHIEF_ROWS: u32 = 2;
 
 /// chief.png의 칸 사각형.
@@ -483,6 +485,9 @@ pub struct BigSheet {
     pub cell: f32,
     /// 발바닥 줄(칸 위에서).
     pub foot: f32,
+    /// 걷기 네 칸의 첫 칸(따로 받은 걷기 시트를 줄 끝에 붙인 것, 0229). 0이면 없다 — 걷기 칸 2·3을 오간다.
+    /// 시트가 아직 옛것(칸이 모자라면)이어도 걷기 두 칸으로 돌아간다(`Art::walk`).
+    pub walk4: u32,
 }
 
 pub const BIG_SHEETS: [BigSheet; 16] = [
@@ -491,6 +496,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: MOMO_BLOOM_ROW,
         tainted: Some(MOMO_ROW),
         cell: 32.0,
+        walk4: 8,
         foot: 30.0,
     },
     BigSheet {
@@ -498,6 +504,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: DOTO_BACK_ROW,
         tainted: Some(DOTO_ROW),
         cell: 40.0,
+        walk4: 0,
         foot: 38.0,
     },
     BigSheet {
@@ -505,6 +512,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: KONGI_BACK_ROW,
         tainted: Some(KONGI_ROW),
         cell: 32.0,
+        walk4: 8,
         foot: 30.0,
     },
     BigSheet {
@@ -512,6 +520,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: CLOVER_BACK_ROW,
         tainted: Some(CLOVER_ROW),
         cell: 40.0,
+        walk4: 8,
         foot: 38.0,
     },
     BigSheet {
@@ -519,6 +528,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: RACCOON_ROW,
         tainted: None,
         cell: 32.0,
+        walk4: 6,
         foot: 30.0,
     },
     BigSheet {
@@ -526,6 +536,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: SUSU_ROW,
         tainted: None,
         cell: 32.0,
+        walk4: 6,
         foot: 30.0,
     },
     // 잡몹(0221): 24칸(박쥐만 날개 때문에 32), 물든 모습 하나. critters 줄 0 들쥐·1 생쥐·2 시궁쥐·3 다람쥐·4 청설모·
@@ -535,6 +546,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: 0,
         tainted: None,
         cell: 24.0,
+        walk4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -542,6 +554,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: 1,
         tainted: None,
         cell: 24.0,
+        walk4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -549,6 +562,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: 2,
         tainted: None,
         cell: 24.0,
+        walk4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -556,6 +570,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: 3,
         tainted: None,
         cell: 24.0,
+        walk4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -563,6 +578,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: 4,
         tainted: None,
         cell: 24.0,
+        walk4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -570,6 +586,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: SHREW_ROW,
         tainted: None,
         cell: 24.0,
+        walk4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -577,6 +594,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: HEDGEHOG_ROW,
         tainted: None,
         cell: 24.0,
+        walk4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -584,6 +602,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: TOAD_ROW,
         tainted: None,
         cell: 24.0,
+        walk4: 0,
         foot: 22.0,
     },
     BigSheet {
@@ -591,6 +610,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: BAT_ROW,
         tainted: None,
         cell: 32.0,
+        walk4: 0,
         foot: 30.0,
     },
     BigSheet {
@@ -598,6 +618,7 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         back: SPORE_ROW,
         tainted: None,
         cell: 24.0,
+        walk4: 0,
         foot: 22.0,
     },
 ];
@@ -689,6 +710,27 @@ impl Art {
         match self.big_sheet(row % CRITTER_ROWS) {
             Some((_, b, tex, _)) => (tex.width() / b.cell) as u32,
             None => 7,
+        }
+    }
+
+    /// 걷는 칸: `steps`는 걸음 수(옛 두 칸 시절 `time × 빠르기`, 한 칸 = 한 걸음). 걷기 네 칸이 있으면(`BigSheet::walk4`, 0229)
+    /// 한 걸음에 두 칸(디딤·지나감)을 돌아 걸음 박자는 그대로, 없으면 칸 2·3.
+    pub fn walk(&self, row: u32, steps: f32) -> u32 {
+        match self.big_sheet(row % CRITTER_ROWS) {
+            Some((_, b, tex, _)) if b.walk4 > 0 && (tex.width() / b.cell) as u32 >= b.walk4 + 4 => {
+                b.walk4 + (steps * 2.0) as u32 % 4
+            }
+            _ => 2 + steps as u32 % 2,
+        }
+    }
+
+    /// 보리·대장(chief.png)의 걷는 칸(`walk`와 같은 뜻).
+    pub fn chief_walk(&self, steps: f32) -> u32 {
+        match &self.chief {
+            Some(t) if (t.width() / CHIEF_CELL) as u32 >= CHIEF_WALK4 + 4 => {
+                CHIEF_WALK4 + (steps * 2.0) as u32 % 4
+            }
+            _ => 2 + steps as u32 % 2,
         }
     }
 

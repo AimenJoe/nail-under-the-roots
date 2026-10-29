@@ -23,6 +23,7 @@ from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import walk_ai  # noqa: E402
 from sprite_ai import OUTLINE, Source, Spec, convert, seat  # noqa: E402
 
 CELL, FOOT = 32, 30
@@ -42,7 +43,7 @@ SPEC_BALL = Spec(
     palette_ref=(0, "ball_a"),
     body_h=15,      # 공 지름(외곽선 안) → 외곽선까지 16~17
 )
-ORDER = ["idle_a", "idle_b", "walk_a", "walk_b", "ball_a", "ball_b", "hurt", "down"]
+ORDER = ["idle_a", "idle_b", "walk_a", "walk_b", "ball_a", "ball_b", "hurt", "down"] + walk_ai.NAMES   # 8~11 걷기 넷(0229)
 
 # 물든 콩이(0054): 초상화 kongi_tainted_glare — 살갗은 회색 모브, 등딱지는 푸른 회색, 눈은 옅은 파랑으로 빛난다, 보라 실.
 TAINT_SKIN = [(70, 58, 68), (104, 92, 102), (138, 126, 134), (172, 162, 168), (206, 198, 204)]
@@ -198,7 +199,8 @@ def pinkish(c):
 def build():
     spr = convert(SPEC)
     spr.update(convert(SPEC_BALL))
-    cells = {k: seat(spr[k], CELL, FOOT) for k in ORDER}
+    cells = {k: seat(spr[k], CELL, FOOT) for k in ORDER if k not in walk_ai.NAMES}
+    cells.update(walk_ai.cells("kongi", SPEC.sources[0], CELL, FOOT))
     stand = cells["idle_a"]
     pal = {tuple(int(v) for v in p[:3]) for p in stand[stand[..., 3] > 0]} - {OUTLINE}
     for k, box in zip(BALL, BALL_BOXES):

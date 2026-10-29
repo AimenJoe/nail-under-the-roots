@@ -22,6 +22,7 @@ from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import walk_ai  # noqa: E402
 from sprite_ai import OUTLINE, Source, Spec, convert, seat  # noqa: E402
 
 CELL, FOOT = 40, 38
@@ -43,7 +44,7 @@ SPEC = Spec(
     palette_ref=(0, "idle_a"),
     body_h=25,
 )
-ORDER = NAMES
+ORDER = NAMES + walk_ai.NAMES     # 칸 10~13 = 걷기 네 칸(`bori_walk_v1.png`, 0229)
 
 # 물든 대장(0032): 초상화 chief_glare의 회보라 털, 붉게 빛나는 눈, 머리·목의 보라 실. 귓속 분홍·흉터는 그대로.
 TAINT_FUR = [(52, 46, 66), (82, 76, 98), (112, 106, 128), (146, 140, 160), (196, 190, 206)]
@@ -117,6 +118,7 @@ def threads(cell):
 def build():
     spr = convert(SPEC)
     cells = {k: seat(spr[k], CELL, FOOT) for k in NAMES}
+    cells.update(walk_ai.cells("bori", SPEC.sources[0], CELL, FOOT))
     sheet = np.zeros((CELL * 4, CELL * len(ORDER), 4), np.uint8)
     for c, k in enumerate(ORDER):
         for r, cell in enumerate((cells[k], threads(taint(cells[k])))):

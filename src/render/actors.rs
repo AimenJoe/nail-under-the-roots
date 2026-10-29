@@ -584,7 +584,7 @@ pub fn draw_bori_at(art: &Art, pos: Vec2, face_left: bool, moving: bool, time: f
         return;
     };
     let frame = if moving {
-        2 + ((time * 6.0) as u32) % 2
+        art.chief_walk(time * 6.0)
     } else {
         ((time * 1.5) as u32) % 2
     };
@@ -814,12 +814,12 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
         player::State::Run { .. } if moving && art.critter_frames(row) >= 12 => {
             8 + ((time * 14.0) as u32) % 4
         }
-        player::State::Run { .. } if moving => 2 + ((time * 16.0) as u32) % 2,
+        player::State::Run { .. } if moving => art.walk(row, time * 16.0),
         player::State::Attack { .. } | player::State::Heavy { .. } => 5,
         player::State::Charging { .. } => 5,
         player::State::Recover { .. } => 4,
         _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => 6,
-        _ if moving => 2 + ((time * 10.0) as u32) % 2,
+        _ if moving => art.walk(row, time * 10.0),
         _ => ((time * 2.0) as u32) % 2,
     };
     let flash = p.flash > 0.0;
@@ -1074,9 +1074,15 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
         }
     }
     let moving = (e.pos - e.prev_pos).length() > 0.05;
-    let walk = ((time * 8.0 + e.pos.x * 0.05) as u32) % 2;
+    let steps = time * 8.0 + e.pos.x * 0.05;
+    let walk = steps as u32 % 2;
     let mut frame = if moving {
-        2 + walk
+        // 걷기 네 칸이 있는 시트(0229)는 그것을 — 대장은 chief.png, 그 밖은 critters 줄.
+        match art {
+            Some(a) if e.kind == crate::enemy::Kind::Chief => a.chief_walk(steps),
+            Some(a) => a.walk(sp.sheet_row, steps),
+            None => 2 + walk,
+        }
     } else {
         walk.min(1) * ((time * 2.0) as u32 % 2)
     };
@@ -1379,7 +1385,7 @@ pub(super) fn draw_critter_at(
     time: f32,
 ) {
     let frame = if moving {
-        2 + ((time * 8.0) as u32) % 2
+        art.walk(row, time * 8.0)
     } else {
         ((time * 2.0) as u32) % 2
     };

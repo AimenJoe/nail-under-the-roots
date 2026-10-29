@@ -16,6 +16,7 @@ from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import walk_ai  # noqa: E402
 from sprite_ai import OUTLINE, Source, Spec, breathe, convert, seat  # noqa: E402
 
 CELL, FOOT = 32, 30
@@ -181,16 +182,26 @@ def sparkle(cell, mask):
 
 
 def build(name):
-    spr = convert(spec(name))
+    """칸 0~5(`NAMES`) + 걷기 네 칸 6~9(따로 받은 걷기 시트가 있으면, `walk_ai`, 0229)."""
+    sp = spec(name)
+    spr = convert(sp)
     src = np.asarray(Image.open(HERE / "sources" / "ai" / "sprites" / f"{name}_v1.png").convert("RGB")).astype(int)
-    sheet = np.zeros((CELL * 4, CELL * len(NAMES), 4), np.uint8)
-    for c, (k, src_name) in enumerate(zip(NAMES, SHEETS[name]["order"])):
+    # (칸 이름, 줄인 그림, 표지·눈을 옮겨 올 원본, 그 원본의 상자)
+    plan = []
+    for k, src_name in zip(NAMES, SHEETS[name]["order"]):
         base = src_name.lstrip("~")
-        cell = seat(breathe(spr[base]) if src_name.startswith("~") else spr[base], CELL, FOOT)
+        plan.append((k, seat(breathe(spr[base]) if src_name.startswith("~") else spr[base], CELL, FOOT), src,
+                     SHEETS[name]["frames"][base]))
+    if name in walk_ai.WALK and walk_ai.source(name).exists():
+        wsrc = np.asarray(Image.open(walk_ai.source(name)).convert("RGB")).astype(int)
+        walk = walk_ai.cells(name, sp.sources[0], CELL, FOOT, sp.palette_ref[1])
+        plan += [(k, walk[k], wsrc, box) for k, box in zip(walk_ai.NAMES, walk_ai.WALK[name]["boxes"])]
+    sheet = np.zeros((CELL * 4, CELL * len(plan), 4), np.uint8)
+    for c, (k, cell, src, box) in enumerate(plan):
         for pred, ink, hits, *outside in SHEETS[name].get("marks", []):
-            cell = transfer(cell, src, SHEETS[name]["frames"][base], pred, ink, hits, *outside)
+            cell = transfer(cell, src, box, pred, ink, hits, *outside)
         if SHEETS[name].get("eyes"):
-            cell = redraw_eyes(cell, src, SHEETS[name]["frames"][base], k == "happy")
+            cell = redraw_eyes(cell, src, box, k == "happy")
         if "sparkle" in SHEETS[name] and k != "happy":
             cell = sparkle(cell, SHEETS[name]["sparkle"])
         sil = np.zeros_like(cell)
