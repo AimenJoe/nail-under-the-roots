@@ -209,6 +209,7 @@ kbd {
 .play h3 { color: var(--glow); }
 .play p, .play li { color: var(--muted); font-size: .95rem; }
 .play ul { margin: 0; padding-left: 1.1rem; }
+.play .small-note { font-size: .82rem; overflow-wrap: anywhere; }
 .keytable { overflow-x: auto; grid-column: 1 / -1; }
 .keytable table { border-collapse: collapse; width: 100%; font-size: .9rem; }
 .keytable th, .keytable td { text-align: left; padding: .35rem .4rem; border-bottom: 1px solid var(--deep-3); }
