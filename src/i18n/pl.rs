@@ -833,6 +833,7 @@ pub static PL: Strings = Strings {
     stat_hop_cd: "Odnow. skoku",
     stat_leap_cd: "Odnow. odskoku",
     pick_title: "Kto schodzi na dół?",
+    pick_title_dream: "Czyj to będzie sen?",
     pick_nail: "Kombo pazurami. Unik podkopem. Świdrowa szarża.",
     pick_momo: "Kopniaki tylnymi łapami. Unik skokiem. Seria skoków: trzy tupnięcia.",
     pick_doto: "Rzuca żołędziami. Odskakuje do tyłu, by uniknąć. Zakopuje żołędzie, które pękają.",

@@ -833,6 +833,7 @@ pub static PT_BR: Strings = Strings {
     stat_hop_cd: "Rec. pulo",
     stat_leap_cd: "Rec. salto",
     pick_title: "Quem vai descer?",
+    pick_title_dream: "Sonho de quem?",
     pick_nail: "Combos de garra. Cava para desviar. Investida de broca.",
     pick_momo: "Coices. Pula para desviar. Pulo em cadeia: três pisadas.",
     pick_doto: "Atira bolotas. Salta para trás para desviar. Enterra bolotas que explodem.",

@@ -833,6 +833,7 @@ pub static EN: Strings = Strings {
     stat_hop_cd: "Hop cooldown",
     stat_leap_cd: "Leap cooldown",
     pick_title: "Who's going down?",
+    pick_title_dream: "Whose dream?",
     pick_nail: "Claw combos. Burrow to dodge. Drill dash.",
     pick_momo: "Hind-leg kicks. Hop to dodge. Chain-hop for three stomps.",
     pick_doto: "Throw acorns. Leap back to dodge. Bury acorns that burst.",

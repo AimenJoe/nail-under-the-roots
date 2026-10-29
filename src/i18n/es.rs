@@ -833,6 +833,7 @@ pub static ES: Strings = Strings {
     stat_hop_cd: "Recarga de salto",
     stat_leap_cd: "Recarga de salto",
     pick_title: "¿Quién baja?",
+    pick_title_dream: "¿El sueño de quién?",
     pick_nail: "Combos de garras. Cava para esquivar. Taladrazo.",
     pick_momo: "Patadas traseras. Salta para esquivar. Saltos en cadena: tres pisotones.",
     pick_doto: "Lanza bellotas. Salta hacia atrás para esquivar. Entierra bellotas que estallan.",

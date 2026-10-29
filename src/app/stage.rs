@@ -586,6 +586,7 @@ impl App {
             // 고를 수 있는 캐릭터가 둘 이상이면 누구와 내려갈지 고른다(0056·0195).
             Interact::Gate if village && self.pick_list().len() > 1 => {
                 self.char_cursor = self.picked_index();
+                self.pick_for = None;
                 self.world.freeze();
                 self.scene = Scene::CharPick;
             }

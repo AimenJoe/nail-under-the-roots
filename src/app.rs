@@ -330,8 +330,6 @@ enum Hit {
     TreeTab(usize),
     /// 실의 꿈 줄.
     DreamRow(usize),
-    /// 실의 꿈: 누구로 꿀까 ◀(-1)·▶(+1).
-    DreamWho(i8),
     /// 캐릭터 고르기 칸.
     CharCard(usize),
 }
@@ -445,8 +443,8 @@ pub struct App {
     tree_char: Character,
     /// 실의 꿈(0055): 고르기 창의 줄, 꾸고 있는 꿈.
     dream_cursor: usize,
-    /// 실의 꿈을 꿀 캐릭터(고를 수 있는 캐릭터 목록 `pick_list`의 번호).
-    dream_who: usize,
+    /// 캐릭터 고르기 창을 무엇 때문에 열었나: None = 뿌리 길(런), Some(줄) = 실의 꿈 그 줄(0247).
+    pick_for: Option<usize>,
     dream: Option<dream::DreamRun>,
     /// 꿈에서 깬 직후 고르기 창이 입력을 받지 않는 남은 시간(싸우던 연타가 다음 꿈을 열지 않게).
     dream_lock: f32,
@@ -581,7 +579,7 @@ impl App {
             pause_tree_cursor: (0, 0),
             tree_char: Character::Mole,
             dream_cursor: 0,
-            dream_who: 0,
+            pick_for: None,
             dream: None,
             dream_lock: 0.0,
             char_cursor: 0,

@@ -833,6 +833,7 @@ pub static FR: Strings = Strings {
     stat_hop_cd: "Rech. bond",
     stat_leap_cd: "Rech. recul",
     pick_title: "Qui descend?",
+    pick_title_dream: "Le rêve de qui ?",
     pick_nail: "Combos de griffes. Esquive en creusant. Ruée foreuse.",
     pick_momo: "Ruades. Esquive en bondissant. Bonds enchaînés: trois piétinements.",
     pick_doto: "Lance des glands. Bondit en arrière pour esquiver. Enterre des glands qui éclatent.",

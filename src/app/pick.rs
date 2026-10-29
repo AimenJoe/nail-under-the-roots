@@ -1,4 +1,5 @@
 //! 누구와 내려갈까(docs/decisions/0056): 마을 뿌리 길에서 고를 수 있는 캐릭터(표 순서)를 고른다. 고른 것은 기록(`char_pick`)에 남는다.
+//! 실의 꿈도 들어가기 전에 같은 창을 거친다(`App::pick_for`, 0247) — 제목·안내만 다르다.
 
 use macroquad::prelude::*;
 
@@ -46,11 +47,18 @@ impl App {
                 list[self.char_cursor.min(list.len() - 1)].code as u32,
             );
             crate::profile::save(&self.profile);
-            self.start(Scenario::Normal);
+            match self.pick_for.take() {
+                Some(row) => self.begin_dream_run(row),
+                None => self.start(Scenario::Normal),
+            }
             return;
         }
         if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
-            self.scene = Scene::Game;
+            // 꿈에서 왔으면 꿈 고르기 창으로 돌아간다.
+            self.scene = match self.pick_for.take() {
+                Some(_) => Scene::DreamPick,
+                None => Scene::Game,
+            };
         }
     }
 
@@ -77,7 +85,15 @@ impl App {
             i18n::Lang::Ja | i18n::Lang::ZhHans | i18n::Lang::ZhHant
         );
         let hang = if n > 2 && cjk { FONT_PX } else { 0.0 };
-        ui.panel(panel, Some(s.pick_title));
+        let dream = self.pick_for.is_some();
+        ui.panel(
+            panel,
+            Some(if dream {
+                s.pick_title_dream
+            } else {
+                s.pick_title
+            }),
+        );
         self.close_button(ui, panel);
         let cw = (panel.w - 6.0 * (n as f32 + 1.0)) / n as f32;
         for (i, d) in list.iter().enumerate() {
@@ -128,7 +144,10 @@ impl App {
                 ui::TEXT_DIM,
             );
         }
-        let hint = super::vfill(s.pick_hint, &[Verb::Confirm, Verb::Back]);
+        let hint = super::vfill(
+            if dream { s.dream_hint } else { s.pick_hint },
+            &[Verb::Confirm, Verb::Back],
+        );
         ui.hint_strip(&hint, panel, 300.0);
     }
 }

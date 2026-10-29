@@ -833,6 +833,7 @@ pub static KO: Strings = Strings {
     stat_hop_cd: "깡충 대기",
     stat_leap_cd: "뒤로 뛰기 대기",
     pick_title: "누구와 내려갈까?",
+    pick_title_dream: "누구의 꿈을 꿀까?",
     pick_nail: "발톱 콤보. 굴파기로 피하기. 드릴 돌진.",
     pick_momo: "뒷발차기. 깡충 피하기. 이어 뛰기로 세 번 밟기.",
     pick_doto: "도토리 던지기. 뒤로 뛰어 물러나기. 도토리를 묻어 터뜨리기.",

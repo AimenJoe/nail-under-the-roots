@@ -833,6 +833,7 @@ pub static JA: Strings = Strings {
     stat_hop_cd: "ジャンプ待ち",
     stat_leap_cd: "後ろとび待ち",
     pick_title: "だれと下りる？",
+    pick_title_dream: "だれの夢を見る？",
     pick_nail: "ツメのコンボ。穴ほりでよける。ドリルで突進。",
     pick_momo: "後ろ足げり。ジャンプでよける。つづけて三回ふむ。",
     pick_doto: "どんぐりを投げる。後ろにとんでよける。うめたどんぐりがはじける。",

@@ -833,6 +833,7 @@ pub static DE: Strings = Strings {
     stat_hop_cd: "Hüpf-Cooldown",
     stat_leap_cd: "Sprung-Cooldown",
     pick_title: "Wer geht hinab?",
+    pick_title_dream: "Wessen Traum?",
     pick_nail: "Krallen-Kombos. Graben zum Ausweichen. Bohrsturm.",
     pick_momo: "Tritte mit den Hinterbeinen. Hüpfen zum Ausweichen. Kettenhüpfer: drei Stampfer.",
     pick_doto: "Eicheln werfen. Zum Ausweichen zurückspringen. Eicheln vergraben, die platzen.",

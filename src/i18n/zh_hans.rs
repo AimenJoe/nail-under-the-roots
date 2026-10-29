@@ -835,6 +835,7 @@ pub static ZH_HANS: Strings = Strings {
     stat_hop_cd: "跳跃冷却",
     stat_leap_cd: "后跳冷却",
     pick_title: "和谁一起下去？",
+    pick_title_dream: "做谁的梦？",
     pick_nail: "爪子连击。钻地闪避。钻头冲刺。",
     pick_momo: "后腿踢。跳跃闪避。连跳踩三下。",
     pick_doto: "扔橡子。向后跳开闪避。埋下橡子让它炸开。",
