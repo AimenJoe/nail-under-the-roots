@@ -39,6 +39,8 @@ FOOT = 26          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 +
 HEAD = 1.35
 EYE = (9, 11)       # 원본 px 반지름(가로, 세로)
 NO_HEAD = {"dead"}
+THIN = 5            # 머리 안 선 깎기(MinFilter 크기): 양쪽 2px씩 — 1.35배로 굵어진 만큼
+OUTLINE_BAND = 13    # 키운 머리 가장자리에서 이 폭(원본 px, 홀수) 안의 어두운 점 = 외곽선(원본 외곽선 ≈ 6px × 1.35)
 
 
 def _flood(mask, seed):
@@ -106,8 +108,40 @@ def chibi(img, frames):
         L = L.resize((round(L.width * HEAD), round(L.height * HEAD)), Image.NEAREST)
         px, py = round(ax - ax * HEAD), round(ay - ay * HEAD)
         up, side = max(0, -py) + 4, max(0, -px, px + L.width - a.shape[1]) + 4
+        # 원래 머리는 지우고 붙인다 — 남겨 두면 키운 머리 밑으로 옛 턱·주둥이 외곽선이 비져 나와 검은 쐐기가 됐다(사장).
+        body = a.copy()
+        body[head] = (255, 0, 255)
         canvas = Image.new("RGB", (a.shape[1] + 2 * side, a.shape[0] + up), (255, 0, 255))
-        canvas.paste(Image.fromarray(a.astype(np.uint8), "RGB"), (side, up))
+        canvas.paste(Image.fromarray(body.astype(np.uint8), "RGB"), (side, up))
+        # 키운 머리의 외곽선 띠는 뺀다: 몸(털·목도리) 위에 얹히면 목·뒤통수에 선이 두 겹으로 겹쳐 검은 덩어리가 됐다(사장).
+        la = np.array(L)
+        m = la[..., 3] > 0
+        band = m & ~(np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(OUTLINE_BAND))) > 0)
+        dark = la[..., :3].astype(int).sum(-1) < 170
+        # 바탕 쪽 외곽선도 뺀다: 키운 외곽선(≈8px)이 변환기가 걷는 폭(`strip` 6)보다 굵어 남은 선 + 변환기 외곽선이 두 겹이 됐다.
+        # 빼면 머리 가장자리가 털이 되고 변환기가 1px 외곽선을 새로 두른다.
+        la[band & dark, 3] = 0
+        # 머리 안의 선(주둥이와 얼굴 사이·귀)도 1.35배 굵어져 줄이면 검은 쐐기가 됐다 → 안쪽 어두운 선을 한 겹 깎아
+        # 원래 굵기로. 깎인 점은 둘레(7×7)의 밝은 점 평균 색으로 메운다.
+        inner_dark = dark & m & ~band
+        core = np.asarray(Image.fromarray((inner_dark * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(THIN))) > 0
+        shave = inner_dark & ~core
+        if shave.any():
+            light = (m & ~dark).astype(float)
+            col = la[..., :3].astype(float) * light[..., None]
+            win = 7
+            pad = win // 2
+            cs = np.pad(col, ((pad, pad), (pad, pad), (0, 0)))
+            ws = np.pad(light, pad)
+            acc = np.zeros_like(col)
+            wacc = np.zeros_like(light)
+            for dy in range(win):
+                for dx in range(win):
+                    acc += cs[dy:dy + col.shape[0], dx:dx + col.shape[1]]
+                    wacc += ws[dy:dy + col.shape[0], dx:dx + col.shape[1]]
+            fill = shave & (wacc > 0)
+            la[fill, :3] = (acc[fill] / wacc[fill][:, None]).astype(np.uint8)
+        L = Image.fromarray(la, "RGBA")
         canvas.paste(L, (px + side, py + up), L)
         if eye:
             ex, ey = (eye[0] - ax) * HEAD + ax + side, (eye[1] - ay) * HEAD + ay + up
