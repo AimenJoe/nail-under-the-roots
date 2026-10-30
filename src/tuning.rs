@@ -458,6 +458,10 @@ pub const CAM_FOLLOW: f32 = 9.0;
 pub const ENEMY_AGGRO_RADIUS: f32 = 110.0;
 /// 던전 전투방에 들어선 뒤 적이 움직이기 시작하기까지.
 pub const ROOM_WAKE_DELAY: f32 = 0.7;
+/// 방에 나타나기(0257): 땅에서 솟는 데·천장에서 떨어지는 데 걸리는 시간, 떨어지기 시작하는 높이(px).
+pub const BURROW_ARRIVE: f32 = 0.9;
+pub const DROP_ARRIVE: f32 = 0.75;
+pub const DROP_HEIGHT: f32 = 90.0;
 
 // ---- 필살기: 드릴 돌진 (player.rs State::Drill, docs/decisions/0018, 0024) ---------------------
 /// SP 게이지 최대. 발톱이 맞으면 1, 마지막 타는 2 찬다(장신구로 배율).
@@ -602,6 +606,30 @@ pub const ELITE_ESCORTS: usize = 2;
 /// 넓은 굴(0244): 넓은 방을 만들 기회마다 실제로 만들 확률, 싸움방 지형의 누적 확률(굴 그대로·뿌리 기둥·골짜기, 나머지 돌밭).
 pub const HALL_CHANCE: f32 = 0.8;
 pub const LAYOUT_ODDS: [f32; 3] = [0.3, 0.55, 0.78];
+/// 손으로 짠 방 틀(0257, `dungeon::TEMPLATES`)이 나올 확률(나머지는 위 지형).
+pub const TEMPLATE_CHANCE: f32 = 0.35;
+/// 방 짜임(0257): 굴리는 싸움방의 누적 확률 — 다 잡기 · 물결 · 매복, 나머지는 버티기.
+pub const ENCOUNTER_ODDS: [f32; 3] = [0.4, 0.65, 0.85];
+/// 다 잡기·물결 방의 처음 무리가 나타나는 방법의 누적 확률(그 자리에서 깨기 · 땅에서 솟기, 나머지는 천장에서). 들판은 덜 떨어진다.
+pub const ENTRY_ODDS: [f32; 2] = [0.25, 0.75];
+pub const ENTRY_ODDS_MEADOW: [f32; 2] = [0.4, 0.85];
+/// 물결: 남은 적이 이만큼 아래로 줄면 다음 무리.
+pub const WAVE_NEXT_AT: usize = 1;
+/// 버티기: 버티는 시간(초), 한 번에 살아 있는 수, 처음 무리 밖에 더 솟을 수(+ 깊이), 솟는 사이(초).
+pub const HOLD_TIME: f32 = 15.0;
+pub const HOLD_ALIVE: usize = 3;
+pub const HOLD_EXTRA: usize = 4;
+pub const HOLD_SPAWN_EVERY: f32 = 1.2;
+/// 매복: 방 가운데에서 이만큼(px) 안에 오면 잠기고 떨어진다. 떨어지는 자리는 적 자리를 가운데 쪽으로 이만큼 당긴 곳.
+pub const AMBUSH_TRIGGER: f32 = 56.0;
+pub const AMBUSH_PULL: f32 = 0.55;
+/// 곁방 보상(0257): 다 잡기·매복 방에 붙을 확률(물결·버티기는 늘), 버티기 방이 물건(길 무기·장신구)일 확률,
+/// 씨앗·반딧불의 누적 확률(나머지 산딸기), 씨앗·반딧불 수. 한 런 곁방 보상 ≈ 15개 — 씨앗 +12·반딧불 +15쯤(경제 0148을 크게 안 흔든다).
+pub const BOUNTY_CHANCE: f32 = 0.5;
+pub const BOUNTY_GIFT: f32 = 0.3;
+pub const BOUNTY_ODDS: [f32; 2] = [0.4, 0.75];
+pub const BOUNTY_SEEDS: u32 = 2;
+pub const BOUNTY_GLOWBUGS: u32 = 3;
 /// 굴이 넓어져(방이 약 1.6배) 싸움이 늘었으니, 쓰러진 적이 떨어뜨리는 반딧불 한 마리·씨앗이 실제로 나올 확률(0244, 경제 0148을 지킨다).
 pub const KILL_LOOT_KEEP: f32 = 0.65;
 /// 상자에서 물건 대신 나오는 반딧불 한 줌(0250 → 0251). 한 런 ≈ +15마리(런 반딧불 ≈ 242의 6%).

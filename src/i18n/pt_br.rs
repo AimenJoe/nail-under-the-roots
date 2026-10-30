@@ -892,4 +892,13 @@ pub static PT_BR: Strings = Strings {
     h_doto_d: "O Doto luta de longe. O ataque atira bolotas — a terceira sai em leque de três. Segure e solte para uma bolota grande que explode onde cai. O salto para trás empurra quem está perto e mantém a mira. Com a barra cheia, enterra bolotas à frente — explodem logo e só ferem inimigos. A mão do arremesso rebate o que vier voando.",
     h_run: "Correr e salto longo",
     h_run_d: "Momo e Doto: continue segurando o botão de cavar e você corre depois que o pulo ou o salto para trás aterrissa. Correndo, uma marca no chão à frente mostra onde você vai cair — mire e solte para saltar até lá; nada te acerta no ar. a marca da Momo gruda num inimigo à frente e ela o pisoteia ao aterrissar; o Doto arremessa três sozinho no inimigo mais próximo, ainda no ar (sem inimigo ao alcance, para onde você mira). Ataque correndo para golpear na hora.",
+    h_rooms: "Salas da toca",
+    h_rooms_d: "Cada sala luta de um jeito: derrotar todos, ondas (quando sobram poucos, o próximo bando brota do chão), emboscada (chegue ao meio e eles caem ao redor) ou resistir (aguente até a toca desabar e enterrar o resto). O sinal sobre a porta mostra o que você ganha ao limpar aquela sala: sementes, vaga-lumes, uma framboesa ou um baú (arma ou amuleto). Borda vermelha = sala de ondas ou de resistir.",
+    enc_waves: "O chão ronca — vem mais bando!",
+    enc_wave_next: "O próximo bando brota!",
+    enc_ambush: "Emboscada!",
+    enc_hold: "A toca treme — aguente até desabar!",
+    enc_hold_done: "A toca desabou e enterrou o resto!",
+    enc_hold_hud: "Resista {0}",
+    enc_waves_hud: "Bando {0}/{1}",
 };

@@ -30,9 +30,11 @@ pub enum Pic {
     Doto,
     /// 달리기·멀리뛰기(0209): 모모가 깡충 → 달리기 → 멀리뛰기 착지 밟기.
     Run,
+    /// 굴의 방(0257): 땅이 부풀어 무리가 솟고, 문 곁엔 보상 표지.
+    Rooms,
 }
 
-pub const TOPICS: [Topic; 15] = [
+pub const TOPICS: [Topic; 16] = [
     Topic {
         title: |s| s.h_move,
         body: |s| s.h_move_d,
@@ -109,5 +111,11 @@ pub const TOPICS: [Topic; 15] = [
         title: |s| s.h_run,
         body: |s| s.h_run_d,
         pic: Pic::Run,
+    },
+    // 방마다 다른 싸움·곁방 보상 표지(0257).
+    Topic {
+        title: |s| s.h_rooms,
+        body: |s| s.h_rooms_d,
+        pic: Pic::Rooms,
     },
 ];

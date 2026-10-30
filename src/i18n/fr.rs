@@ -892,4 +892,13 @@ pub static FR: Strings = Strings {
     h_doto_d: "Doto combat à distance. L'attaque lance des glands — le troisième en éventail de trois. Maintiens puis relâche pour un gros gland qui éclate à l'impact. Le bond en arrière repousse les ennemis proches et garde ta visée. Jauge pleine, enterre des glands devant toi — ils éclatent vite et ne touchent que les ennemis. La main qui lance renvoie ce qui vole vers toi.",
     h_run: "Course et saut en longueur",
     h_run_d: "Momo et Doto : garde le bouton creuser enfoncé et tu cours une fois le saut ou le bond en arrière retombé. En courant, une marque au sol devant toi montre où tu vas atterrir — oriente-toi, puis relâche pour sauter pile là ; rien ne te touche en l'air. la marque de Momo s'accroche à un ennemi devant elle et elle le piétine en retombant ; Doto en lance trois tout seul sur l'ennemi le plus proche, en l'air (sans ennemi à portée, là où tu vises). Attaque en courant pour frapper aussitôt.",
+    h_rooms: "Salles du terrier",
+    h_rooms_d: "Chaque salle se joue autrement : tout vaincre, vagues (quand il en reste peu, la bande suivante jaillit du sol), embuscade (arrive au milieu et ils tombent autour de toi) ou tenir (tiens bon jusqu'à ce que le terrier s'effondre sur le reste). Le signe au-dessus d'une porte montre ce que rapporte la salle : graines, lucioles, framboise ou coffre (arme ou grigri). Bord rouge = salle de vagues ou à tenir.",
+    enc_waves: "Ça gronde en dessous, d'autres arrivent!",
+    enc_wave_next: "La bande suivante jaillit!",
+    enc_ambush: "Embuscade!",
+    enc_hold: "Le terrier tremble, tiens bon jusqu'à l'effondrement!",
+    enc_hold_done: "Le terrier s'est effondré sur le reste de la bande!",
+    enc_hold_hud: "Tiens bon {0}",
+    enc_waves_hud: "Bande {0}/{1}",
 };

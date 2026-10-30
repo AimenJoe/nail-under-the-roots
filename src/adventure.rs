@@ -18,7 +18,7 @@ use macroquad::prelude::*;
 
 use crate::biome::Biome;
 use crate::depth;
-use crate::dungeon::{self, Dungeon, Goal, Params, RoomKind};
+use crate::dungeon::{self, Bounty, Dungeon, Encounter, Goal, Params, RoomKind};
 use crate::enemy::{Enemy, Kind};
 use crate::field;
 use crate::loot::{Loot, LootKind};
@@ -188,7 +188,7 @@ pub struct Adventure {
     /// 컷씬이 카메라를 잡아 둔 자리(0159): 있으면 플레이어 대신 이 점을 가운데에 둔다.
     pub cam_hold: Option<Vec2>,
     boss_cleared: bool,
-    seed: u64,
+    pub(crate) seed: u64,
     /// 몇 번째 쉼터까지 왔나(0 = 아직 필드).
     pub stage: u32,
     /// 쓰러지면 돌아갈 곳(필드 또는 쉼터). save_pos는 이 장소의 좌표.
@@ -218,6 +218,36 @@ pub struct Adventure {
     pub shown_biome: Option<Biome>,
     /// 지대 이름 카드: (지대, 깊이 m, 남은 시간).
     pub biome_card: Option<(Biome, u32, f32)>,
+    /// 잠긴 방의 물결·버티기(0257). 방이 열리면 없다. HUD가 남은 물결·시간을 그린다.
+    pub fight: Option<Fight>,
+}
+
+/// 잠긴 방에서 아직 남은 싸움(0257).
+#[derive(Debug, Clone)]
+pub struct Fight {
+    pub kind: dungeon::Encounter,
+    /// 물결: 남은 무리(앞에서부터). 버티기: 첫 줄이 솟아날 무리(다 쓰면 처음부터 다시).
+    pub waves: Vec<Vec<(Kind, Vec2)>>,
+    /// 처음 물결 수(HUD "2/3").
+    pub total: usize,
+    /// 버티기: 남은 시간(초)·다음에 솟기까지·솟아날 줄에서 다음 차례.
+    pub left: f32,
+    pub spawn_cd: f32,
+    pub next: usize,
+}
+
+impl Fight {
+    /// 이 싸움이 문을 붙잡고 있나: 물결이 남았거나 버티기 시간이 남았다.
+    pub fn holds(&self) -> bool {
+        match self.kind {
+            dungeon::Encounter::Waves => !self.waves.is_empty(),
+            // 솟아날 줄을 다 쓰고 다 잡았으면 시간 전에도 끝난다(그때는 적이 없어 방이 열린다).
+            dungeon::Encounter::Hold => {
+                self.left > 0.0 && self.next < self.waves.first().map_or(0, Vec::len)
+            }
+            _ => false,
+        }
+    }
 }
 
 impl World {
@@ -1101,6 +1131,7 @@ impl World {
         // 길의 주인에게 쓰러져도 주인은 남는다(0210). 포포의 응원도 주인을 건너뛰게 하지 않는다(0256 — 이야기가 주인을 이겨야 나아간다).
         let strand = self.strands_shown();
         self.clear_fight();
+        self.adv.fight = None;
         if self.adv.place == Place::Deep {
             // 실에 잠겼다(0162): 맡겨 둔 쉼터로 돌아간다. 매듭은 다음에 다시.
             self.deep = None;
@@ -1153,6 +1184,11 @@ impl World {
 
     /// 던전: 방이 바뀌면 들르고, 전투방이면 안에 들어선 순간 잠그고 적을 깨운다. 다 잡으면 열고 보상.
     fn dungeon_rooms(&mut self) {
+        if self.room.doors_locked() {
+            self.fight_tick();
+        } else {
+            self.adv.fight = None;
+        }
         let at = dungeon::room_at(self.player.pos);
         let nest = self.node_kind() == Some(NodeKind::Nest);
         let Some(d) = self.adv.dungeon.as_mut() else {
@@ -1167,10 +1203,12 @@ impl World {
         let partner = d.partner(self.adv.current_room);
         let hall_inside = d.area_interior(self.adv.current_room);
         let mut partner_enemies = Vec::new();
+        let mut partner_reserve = Vec::new();
         if let Some(p) = partner.and_then(|p| d.room_mut(p)) {
             p.visited = true;
             if !p.cleared && !self.room.doors_locked() && hall_inside.contains(self.player.pos) {
                 partner_enemies = std::mem::take(&mut p.enemies);
+                partner_reserve = std::mem::take(&mut p.reserve);
             }
         }
         if let Some(m) = self
@@ -1206,20 +1244,26 @@ impl World {
             }
         }
         let fights = matches!(room.kind, RoomKind::Combat | RoomKind::Boss);
-        if fights
-            && !room.cleared
-            && !self.room.doors_locked()
-            && hall_inside.contains(self.player.pos)
-        {
+        // 매복(0257): 빈 방처럼 보이다가 가운데쯤 와야 잠긴다. 다른 방은 안에 들어서면.
+        let trigger = if room.encounter == Encounter::Ambush {
+            (self.player.pos - hall_inside.center()).length() < t::AMBUSH_TRIGGER
+        } else {
+            hall_inside.contains(self.player.pos)
+        };
+        if fights && !room.cleared && !self.room.doors_locked() && trigger {
             self.room.set_doors_locked(true);
             let elite = room.elite;
             let interior = room.interior();
+            let encounter = room.encounter;
+            let entry = room.entry;
             let mut wake = std::mem::take(&mut room.enemies);
             wake.extend(partner_enemies);
+            let mut reserve = std::mem::take(&mut room.reserve);
+            reserve.extend(partner_reserve);
             for (n, (kind, pos)) in wake.into_iter().enumerate() {
                 for off in crate::species::pack_offsets(kind) {
                     let mut e = Enemy::new(kind, pos + off);
-                    e.wake_delay = t::ROOM_WAKE_DELAY;
+                    arrive(&mut e, entry);
                     if elite && n == 0 {
                         e.make_elite();
                     }
@@ -1240,15 +1284,45 @@ impl World {
                     self.enemies.push(e);
                 }
             }
+            // 물결·버티기(0257): 남은 무리를 들고, 무엇이 오는지 한 줄로 알린다.
+            self.adv.fight = match encounter {
+                Encounter::Waves | Encounter::Hold if !reserve.is_empty() => {
+                    let hold = encounter == Encounter::Hold;
+                    if hold {
+                        // 넓은 방이면 두 방의 솟아날 줄을 하나로.
+                        let all: Vec<(Kind, Vec2)> = reserve.drain(..).flatten().collect();
+                        reserve.push(all);
+                    }
+                    Some(Fight {
+                        kind: encounter,
+                        total: reserve.len() + 1,
+                        waves: reserve,
+                        left: if hold { t::HOLD_TIME } else { 0.0 },
+                        spawn_cd: t::HOLD_SPAWN_EVERY,
+                        next: 0,
+                    })
+                }
+                _ => None,
+            };
+            self.juice.toast = match encounter {
+                Encounter::Waves => Some((|s| s.enc_waves, 2.5)),
+                Encounter::Ambush => Some((|s| s.enc_ambush, 2.0)),
+                Encounter::Hold => Some((|s| s.enc_hold, 3.0)),
+                Encounter::Clear => self.juice.toast.take(),
+            };
             self.juice.audio.play(sfx::Id::WallHit);
             self.juice.feel.add_trauma(0.25);
         }
         let mut gift_at = None;
         let mut hall_cleared = None;
-        if self.room.doors_locked() && self.enemies.is_empty() {
+        let mut bounty = None;
+        let held = self.adv.fight.as_ref().is_some_and(Fight::holds);
+        if self.room.doors_locked() && self.enemies.is_empty() && !held {
             self.room.set_doors_locked(false);
+            self.adv.fight = None;
             room.cleared = true;
             hall_cleared = partner;
+            bounty = room.bounty.take().map(|b| (b, room.interior()));
             self.juice.audio.play(sfx::Id::Emerge);
             if room.kind == RoomKind::Boss {
                 // 보상은 마지막으로 쓰러진 자리(플레이어 곁)에, 출구는 거기와 플레이어에서 떨어진 바닥 칸에.
@@ -1312,10 +1386,94 @@ impl World {
         }
         if let Some(p) = hall_cleared.and_then(|p| self.adv.dungeon.as_mut()?.room_mut(p)) {
             p.cleared = true;
+            bounty = bounty.or(p.bounty.take().map(|b| (b, p.interior())));
+        }
+        if let Some((b, inside)) = bounty {
+            let at = vec2(
+                self.adv
+                    .last_kill
+                    .x
+                    .clamp(inside.x + 8.0, inside.right() - 8.0),
+                self.adv
+                    .last_kill
+                    .y
+                    .clamp(inside.y + 8.0, inside.bottom() - 8.0),
+            );
+            self.pay_bounty(b, at);
         }
         if let Some(at) = gift_at {
             self.charm_gift(at);
         }
+    }
+
+    /// 잠긴 방의 물결·버티기(0257): 물결은 남은 적이 줄면 다음 무리가 솟고, 버티기는 시간 동안 솟다가
+    /// 다 되면 남은 것이 무너지는 흙에 흩어진다(아무것도 떨어뜨리지 않는다).
+    fn fight_tick(&mut self) {
+        let alive = self.enemies.iter().filter(|e| e.alive).count();
+        let Some(f) = self.adv.fight.as_mut() else {
+            return;
+        };
+        let mut spawn = Vec::new();
+        let mut crumble = false;
+        match f.kind {
+            Encounter::Waves if alive <= t::WAVE_NEXT_AT && !f.waves.is_empty() => {
+                spawn = f.waves.remove(0);
+                self.juice.toast = Some((|s| s.enc_wave_next, 2.0));
+            }
+            Encounter::Hold => {
+                f.left -= t::TICK_DT;
+                f.spawn_cd -= t::TICK_DT;
+                let pool = f.waves.first().map_or(&[][..], Vec::as_slice);
+                if f.left <= 0.0 {
+                    crumble = alive > 0;
+                    f.left = 0.0;
+                } else if alive < t::HOLD_ALIVE && f.spawn_cd <= 0.0 && f.next < pool.len() {
+                    spawn.push(pool[f.next]);
+                    f.next += 1;
+                    f.spawn_cd = t::HOLD_SPAWN_EVERY;
+                }
+            }
+            _ => {}
+        }
+        for (kind, pos) in spawn {
+            for off in crate::species::pack_offsets(kind) {
+                let mut e = Enemy::new(kind, pos + off);
+                arrive(&mut e, crate::enemy::Entry::Burrow);
+                self.enemies.push(e);
+            }
+        }
+        if crumble {
+            // 버텼다: 굴이 무너지며 남은 무리는 흙에 묻혀 흩어진다.
+            for e in self.enemies.drain(..) {
+                clods(&mut self.juice.fx, e.pos, 6, DIRT, 60.0);
+                puff(&mut self.juice.fx, e.pos, 2, self.biome.dust(), 8.0, 0.5);
+            }
+            self.juice.audio.play(sfx::Id::WallHit);
+            self.juice.feel.add_trauma(0.35);
+            self.juice.toast = Some((|s| s.enc_hold_done, 2.5));
+        }
+    }
+
+    /// 곁방 보상(0257): 문 위 표지로 보이던 것을 방을 비운 자리에.
+    fn pay_bounty(&mut self, b: Bounty, at: Vec2) {
+        match b {
+            Bounty::Seeds => {
+                for _ in 0..t::BOUNTY_SEEDS {
+                    self.push_loot(Loot::spawn(LootKind::Seed, at));
+                }
+            }
+            Bounty::Glowbugs => {
+                for _ in 0..t::BOUNTY_GLOWBUGS {
+                    self.push_loot(Loot::spawn(LootKind::Glowbug, at));
+                }
+            }
+            Bounty::Berry => self.push_loot(Loot::place(LootKind::Berry, at)),
+            Bounty::Gift => self.chest_gift(true, at),
+        }
+        self.juice.audio.play(sfx::Id::Chest);
+        self.juice
+            .fx
+            .push(ring(at, 3.0, 18.0, 0.4, Color::new(1.0, 0.92, 0.6, 1.0)));
     }
 
     /// 보물 상자를 연다(앱이 확인 버튼으로 부른다, `Interact::Chest`) → 씨앗 한 줌 + 아직 없는 장신구 하나(다 있으면 반딧불).
@@ -1509,6 +1667,16 @@ impl World {
         let c = self.cam_target();
         self.adv.cam_hold = hold;
         c
+    }
+}
+
+/// 방에 나타나는 방법대로 적을 세운다(0257): 그 자리에서 깨기는 예전 `ROOM_WAKE_DELAY`, 솟기·떨어지기는 그 시간.
+fn arrive(e: &mut Enemy, entry: crate::enemy::Entry) {
+    use crate::enemy::Entry;
+    match entry {
+        Entry::Wake => e.wake_delay = t::ROOM_WAKE_DELAY,
+        Entry::Burrow => e.arrive(entry, t::BURROW_ARRIVE),
+        Entry::Drop => e.arrive(entry, t::DROP_ARRIVE),
     }
 }
 
@@ -1798,6 +1966,98 @@ mod tests {
         assert_eq!(w.adv.place, Place::Field);
         assert!((w.player.pos - w.adv.entrance_pos).length() < 40.0);
         assert_eq!(w.adv.depth, 0, "보스를 안 잡았으면 깊이 그대로");
+    }
+
+    /// 굴의 싸움방 하나를 이 짜임으로 고쳐 놓고, 플레이어를 그 방 문 안쪽에 세운다(0257 시험용).
+    fn rig_room(w: &mut World, enc: Encounter) -> (i32, i32) {
+        w.enter_dungeon_now();
+        let d = w.adv.dungeon.as_mut().unwrap();
+        let r = d
+            .rooms
+            .iter_mut()
+            .find(|r| r.kind == RoomKind::Combat && r.hall.is_none())
+            .expect("싸움방");
+        let c = r.interior().center();
+        r.encounter = enc;
+        r.entry = crate::enemy::Entry::Wake;
+        r.bounty = Some(Bounty::Seeds);
+        r.enemies = vec![
+            (Kind::FieldMouse, c + vec2(-40.0, -20.0)),
+            (Kind::FieldMouse, c + vec2(40.0, 20.0)),
+        ];
+        r.reserve = vec![vec![
+            (Kind::SewerRat, c + vec2(-60.0, 0.0)),
+            (Kind::FieldMouse, c + vec2(60.0, 0.0)),
+        ]];
+        let at = r.at;
+        let inside = r.interior();
+        w.adv.current_room = at;
+        // 매복은 가운데, 나머지는 안쪽 가장자리.
+        w.player.pos = if enc == Encounter::Ambush {
+            vec2(inside.x + 8.0, inside.center().y)
+        } else {
+            inside.center() + vec2(-60.0, 0.0)
+        };
+        w.enemies.clear();
+        at
+    }
+
+    /// 물결(0257): 남은 적이 줄면 뒤 무리가 땅에서 솟고(그동안 안 맞는다), 다 잡아야 열리며 곁방 보상이 나온다.
+    #[test]
+    fn waves_rise_from_the_ground_then_the_room_pays() {
+        let mut w = World::field();
+        rig_room(&mut w, Encounter::Waves);
+        w.dungeon_rooms();
+        assert!(w.room.doors_locked() && w.enemies.len() == 2);
+        assert!(w.adv.fight.as_ref().is_some_and(Fight::holds));
+        w.enemies.truncate(1);
+        w.dungeon_rooms();
+        assert_eq!(w.enemies.len(), 3, "하나 남으면 다음 무리");
+        assert!(
+            w.enemies[1].arriving().is_some() && !w.enemies[1].hittable(),
+            "솟는 동안은 안 맞는다"
+        );
+        w.enemies.clear();
+        let seeds = w.loot.len();
+        w.dungeon_rooms();
+        assert!(!w.room.doors_locked() && w.adv.fight.is_none());
+        assert_eq!(w.loot.len(), seeds + t::BOUNTY_SEEDS as usize, "곁방 보상");
+    }
+
+    /// 버티기(0257): 시간 동안 하나씩 솟고, 시간이 다 되면 남은 적은 흙에 묻혀 사라지며 방이 열린다.
+    #[test]
+    fn hold_out_spawns_then_caves_in() {
+        let mut w = World::field();
+        rig_room(&mut w, Encounter::Hold);
+        w.dungeon_rooms();
+        assert!(w.room.doors_locked());
+        w.enemies.truncate(1);
+        for _ in 0..((t::HOLD_SPAWN_EVERY / t::TICK_DT) as usize + 2) {
+            w.dungeon_rooms();
+        }
+        assert_eq!(w.enemies.len(), 2, "살아 있는 수가 모자라면 솟는다");
+        for _ in 0..((t::HOLD_TIME / t::TICK_DT) as usize + 2) {
+            w.dungeon_rooms();
+        }
+        assert!(w.enemies.is_empty(), "무너져 묻혔다");
+        w.dungeon_rooms();
+        assert!(!w.room.doors_locked());
+    }
+
+    /// 매복(0257): 안에 들어서도 가운데에 오기 전엔 잠기지 않고, 오면 떨어진다.
+    #[test]
+    fn ambush_waits_for_the_middle() {
+        let mut w = World::field();
+        let at = rig_room(&mut w, Encounter::Ambush);
+        w.dungeon_rooms();
+        assert!(
+            !w.room.doors_locked() && w.enemies.is_empty(),
+            "가장자리에선 조용"
+        );
+        let c = w.adv.dungeon.as_ref().unwrap().area_interior(at).center();
+        w.player.pos = c;
+        w.dungeon_rooms();
+        assert!(w.room.doors_locked() && w.enemies.len() == 2);
     }
 
     /// 공터: 튜토리얼 전엔 문이 닫혀 있고, 들어서면 싸움, 대장이 쓰러지면 입구 → 쉼터.

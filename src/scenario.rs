@@ -89,6 +89,8 @@ pub enum Scenario {
     BossHalf(Kind),
     /// 넓은 방(0244): 길의 보통 굴에서 넓은 방 안에 바로(들어서면 두 칸의 적이 함께 깬다). 그 캐릭터로.
     Hall(crate::equipment::Character),
+    /// 방 짜임(0257): 시작방 옆 싸움방을 물결(0)·매복(1)·버티기(2)로, 문 곁 표지가 보이는 자리에서.
+    Rooms(u8),
 }
 
 pub struct Entry {
@@ -97,7 +99,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 48] = [
+pub const LIST: [Entry; 51] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -338,6 +340,21 @@ pub const LIST: [Entry; 48] = [
         desc: "넓은 방(0244)을 도토로.",
         scenario: Scenario::Hall(crate::equipment::Character::Doto),
     },
+    Entry {
+        name: "방 짜임: 물결",
+        desc: "시작방 옆 방이 물결(0257): 하나 남으면 다음 무리가 땅에서 솟는다. 문 곁에 씨앗 표지(붉은 테).",
+        scenario: Scenario::Rooms(0),
+    },
+    Entry {
+        name: "방 짜임: 매복",
+        desc: "시작방 옆 방이 매복(0257): 가운데에 오면 둘레에서 떨어진다. 문 곁에 상자 표지.",
+        scenario: Scenario::Rooms(1),
+    },
+    Entry {
+        name: "방 짜임: 버티기",
+        desc: "시작방 옆 방이 버티기(0257): 15초 동안 솟고, 다 되면 무너져 묻힌다. 문 곁에 반딧불 표지.",
+        scenario: Scenario::Rooms(2),
+    },
 ];
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -376,6 +393,7 @@ pub fn build(s: Scenario) -> World {
         }
         Scenario::Spring => spring(),
         Scenario::Hall(_) => hall(),
+        Scenario::Rooms(i) => rooms(i),
         Scenario::Exit => exit(),
         Scenario::Camp => camp(),
         Scenario::Dungeon => {
@@ -501,6 +519,46 @@ fn spring() -> World {
         w.snap_cam();
     }
     w.player.hp = (w.player.stats.max_hp / 2).max(1);
+    w
+}
+
+/// 시나리오 `Scenario::Rooms(_)`의 월드(0257): 시작방 옆 싸움방 하나를 그 짜임으로 고치고, 그 문 앞에 선다.
+fn rooms(i: u8) -> World {
+    use crate::dungeon::{Bounty, Encounter, RoomKind, DIRS};
+    let mut w = World::field();
+    // 같은 굴로(헤드리스 스크린숏을 다시 찍을 수 있게).
+    w.adv.seed = 0x0257;
+    w.enter_dungeon_now();
+    let (enc, bounty) = [
+        (Encounter::Waves, Bounty::Seeds),
+        (Encounter::Ambush, Bounty::Gift),
+        (Encounter::Hold, Bounty::Glowbugs),
+    ][i.min(2) as usize];
+    let d = w.adv.dungeon.as_mut().expect("굴");
+    let s = d.start;
+    let links = d.room(s).map_or([false; 4], |r| r.links);
+    let k = (0..4)
+        .filter(|&k| links[k])
+        .max_by_key(|&k| {
+            let at = (s.0 + DIRS[k].0, s.1 + DIRS[k].1);
+            d.room(at).is_some_and(|r| r.kind == RoomKind::Combat)
+        })
+        .unwrap_or(0);
+    let at = (s.0 + DIRS[k].0, s.1 + DIRS[k].1);
+    if let Some(r) = d.room_mut(at) {
+        r.kind = RoomKind::Combat;
+        r.encounter = enc;
+        r.bounty = Some(bounty);
+        if r.reserve.is_empty() {
+            r.reserve = vec![r.enemies.clone()];
+        }
+    }
+    let c = crate::dungeon::room_rect(s).center();
+    // 옆문은 6·7줄 사이(방 가운데보다 반 칸 아래)라 그 높이에.
+    w.player.pos = c
+        + vec2(DIRS[k].0 as f32, DIRS[k].1 as f32) * 48.0
+        + vec2(0.0, 16.0 * DIRS[k].0.abs() as f32);
+    w.player.prev_pos = w.player.pos;
     w
 }
 

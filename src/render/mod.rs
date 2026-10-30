@@ -906,6 +906,7 @@ impl Renderer {
         }
         draw_boss_bar(ui, w, left_end);
         draw_deep_bar(ui, w, left_end);
+        draw_fight_bar(ui, w, left_end);
         draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
     }
 

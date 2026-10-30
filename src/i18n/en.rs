@@ -892,4 +892,13 @@ pub static EN: Strings = Strings {
     h_doto_d: "Doto fights from afar. Attack throws acorns — the third is a fan of three. Hold and release for a big acorn that bursts where it lands. Leap back shoves nearby foes away and keeps facing your aim. With a full gauge, bury acorns ahead — they pop soon after and only hurt foes. Your throwing hand bats back what flies at you.",
     h_run: "Running and long jump",
     h_run_d: "Momo and Doto: keep holding the burrow button and you run once the hop or leap back lands. While running, a mark on the ground ahead shows where you'll land — steer, then release to jump right there; nothing hits you in the air. Momo's mark snaps onto a foe ahead and she stomps it on landing; Doto throws three at the nearest foe mid-air on its own (with no foe in reach, toward where you aim). Attack while running to strike at once.",
+    h_rooms: "Burrow rooms",
+    h_rooms_d: "Every room fights differently. Clear it, waves (when few are left, the next pack bursts from the ground), ambush (step into the middle and they drop around you), or hold out (last until the burrow caves in and buries the rest). The sign over a door shows what you get for clearing that room: seeds, glowbugs, a berry, or a chest (weapon or charm). A red rim marks a waves or hold-out room.",
+    enc_waves: "Rumbling below — more are coming!",
+    enc_wave_next: "The next pack bursts out!",
+    enc_ambush: "Ambush!",
+    enc_hold: "The burrow shakes — hold out until it caves in!",
+    enc_hold_done: "The burrow caved in and buried the rest!",
+    enc_hold_hud: "Hold out {0}",
+    enc_waves_hud: "Pack {0}/{1}",
 };

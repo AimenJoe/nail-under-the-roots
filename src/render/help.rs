@@ -147,6 +147,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
         Pic::Doto => pic_doto(c),
         Pic::Run => pic_run(c),
         Pic::Village => pic_village(c),
+        Pic::Rooms => pic_rooms(c),
     }
 }
 
@@ -636,6 +637,44 @@ fn pic_gear(c: PicCtx) {
             },
             time,
         );
+    }
+}
+
+fn pic_rooms(c: PicCtx) {
+    let PicCtx {
+        art,
+        w,
+        time,
+        mid,
+        y,
+        gold,
+        ..
+    } = c;
+    // 가운데 Naïl, 오른쪽 땅이 부풀다 들쥐가 솟는다(물결·버티기). 왼쪽 문 곁엔 씨앗 표지가 둥실.
+    let ph = time % 2.4;
+    nail(art, 0, 0, vec2(mid, y), false);
+    let at = vec2(w - 26.0, y);
+    if ph < 1.0 {
+        actors::draw_dig_mound(at, t::MOMO_DIG_TRACK + ph, 1.0, time);
+    } else {
+        let k = ((ph - 1.0) / 0.15).min(1.0);
+        critter(
+            art,
+            Kind::FieldMouse,
+            F::IDLE,
+            at - vec2(0.0, 4.0 * (1.0 - k)),
+            true,
+            WHITE,
+        );
+    }
+    let s = vec2(18.0, y - 10.0 + (time * 2.4).sin().round());
+    draw_circle(s.x, s.y, 8.0, OUTLINE);
+    draw_circle(s.x, s.y, 7.0, gold);
+    draw_circle(s.x, s.y, 6.0, Color::new(0.14, 0.10, 0.12, 1.0));
+    for (ox, oy) in [(-2.0, 0.0), (1.0, -1.0)] {
+        let q = s + vec2(ox, oy);
+        draw_rectangle(q.x - 1.0, q.y - 1.0, 2.0, 3.0, world::SEED);
+        draw_rectangle(q.x, q.y - 2.0, 1.0, 1.0, Color::new(0.45, 0.78, 0.35, 1.0));
     }
 }
 

@@ -1498,8 +1498,10 @@ impl World {
         let mut thumps = Vec::new();
         let mut threads = Vec::new();
         let mut rouse = Vec::new();
+        let mut arrived = Vec::new();
         for ev in &self.enemy_events {
             match ev {
+                enemy::Event::Arrived(entry, at) => arrived.push((*entry, *at)),
                 enemy::Event::Charge => self.juice.audio.play(sfx::Id::Charge),
                 enemy::Event::WallHit => {
                     self.juice.audio.play(sfx::Id::WallHit);
@@ -1527,6 +1529,28 @@ impl World {
         }
         for at in rouse {
             self.rouse_fx(at);
+        }
+        // 방에 나타났다(0257): 솟으면 흙덩이가 튀고, 떨어지면 먼지가 퍼지고 땅이 울린다.
+        for (entry, at) in arrived {
+            match entry {
+                enemy::Entry::Burrow => {
+                    clods(&mut self.juice.fx, at, 6, DIRT, 55.0);
+                    self.juice.audio.play(sfx::Id::Emerge);
+                }
+                enemy::Entry::Drop => {
+                    puff(
+                        &mut self.juice.fx,
+                        at + vec2(0.0, 4.0),
+                        4,
+                        self.biome.dust(),
+                        9.0,
+                        0.45,
+                    );
+                    self.juice.audio.play(sfx::Id::WallHit);
+                    self.juice.feel.add_trauma(0.1);
+                }
+                enemy::Entry::Wake => {}
+            }
         }
         for at in thumps {
             self.thump_at(at);

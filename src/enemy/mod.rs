@@ -105,6 +105,8 @@ pub enum Struck {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Event {
+    /// 방에 나타나기를 마쳤다(땅에서 솟음 / 천장에서 떨어짐, 0257). 흙·먼지는 월드가.
+    Arrived(Entry, Vec2),
     Charge,
     WallHit,
     Shoot,
@@ -126,6 +128,15 @@ pub enum Event {
     Thread(Vec2, Vec2),
     /// 보스가 체력 반 아래에서 2단계로 깨어났다(그 자리, 0233). 한 싸움에 한 번.
     Rouse(Vec2),
+}
+
+/// 방에 나타나는 방법(0257): 그 자리에서 깨기 / 땅에서 솟기 / 천장에서 떨어지기.
+/// 솟기·떨어지기 동안(`wake_delay`)은 맞지도 때리지도 않고 그림만 — 둔덕이 부풀거나 그림자가 커진다.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Entry {
+    Wake,
+    Burrow,
+    Drop,
 }
 
 pub struct Enemy {
@@ -167,6 +178,9 @@ pub struct Enemy {
     pub asleep: bool,
     /// 던전 방: 이 시간 동안 제자리(들어온 플레이어가 자리 잡게).
     pub wake_delay: f32,
+    /// 나타나는 방법과 그 길이(0257, `arrive`). `Wake`면 그냥 깨기를 기다린다.
+    pub entry: Entry,
+    entry_time: f32,
     /// 대장·모모: 다음 공격 차례, 대장이 부른 횟수, 모모가 남은 이어 뛰기.
     pattern: u32,
     summons: u32,
@@ -294,6 +308,8 @@ impl Enemy {
             slammed: false,
             asleep: false,
             wake_delay: 0.0,
+            entry: Entry::Wake,
+            entry_time: 0.0,
             pattern: 0,
             summons: 0,
             chain: 0,
@@ -371,7 +387,20 @@ impl Enemy {
 
     /// 맞을 수 있나(땅속의 모모는 안 맞는다).
     pub fn hittable(&self) -> bool {
-        !matches!(self.state, State::Under { .. })
+        !matches!(self.state, State::Under { .. }) && self.arriving().is_none()
+    }
+
+    /// 방에 나타난다(0257): `time`초 동안 솟거나 떨어지고, 끝나면 `Event::Arrived` 뒤 바로 움직인다.
+    pub fn arrive(&mut self, entry: Entry, time: f32) {
+        self.entry = entry;
+        self.entry_time = time.max(0.01);
+        self.wake_delay = time;
+    }
+
+    /// 나타나는 중이면 (방법, 진행 0..1).
+    pub fn arriving(&self) -> Option<(Entry, f32)> {
+        (self.entry != Entry::Wake && self.wake_delay > 0.0)
+            .then(|| (self.entry, 1.0 - self.wake_delay / self.entry_time))
     }
 
     /// 날고 있다(박쥐, 0146): 솟구치기·솟구침 밀어내기가 닿지 않는다. 발톱·드릴은 닿는다.
@@ -381,6 +410,10 @@ impl Enemy {
 
     /// 체공 높이(그리기용 px). 바닥 = 0. 박쥐는 늘 떠 있고, 내리꽂을 때 낮아진다.
     pub fn height(&self) -> f32 {
+        // 천장에서 떨어지는 중(0257): 가만히 놓은 돌처럼 점점 빨리.
+        if let Some((Entry::Drop, k)) = self.arriving() {
+            return t::DROP_HEIGHT * (1.0 - k * k);
+        }
         match self.state {
             State::Leap { time, .. } => {
                 let k = (time / self.sp().dash_time).clamp(0.0, 1.0);
@@ -431,6 +464,10 @@ impl Enemy {
         }
         if self.wake_delay > 0.0 {
             self.wake_delay -= dt;
+            if self.wake_delay <= 0.0 && self.entry != Entry::Wake {
+                events.push(Event::Arrived(self.entry, self.pos));
+                self.entry = Entry::Wake;
+            }
         }
         if self.asleep || self.wake_delay > 0.0 {
             // 자는 동안은 넉백만.

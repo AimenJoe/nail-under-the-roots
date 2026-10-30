@@ -60,6 +60,51 @@ pub(super) fn draw_boss_bar(ui: &Ui, w: &World, left_end: f32) {
     }
 }
 
+/// 잠긴 방의 물결·버티기(0257): 위쪽 가운데에 "무리 2/3" 또는 "버티기 12" + 남은 시간 막대.
+pub(super) fn draw_fight_bar(ui: &Ui, w: &World, left_end: f32) {
+    use crate::dungeon::Encounter;
+    let Some(f) = w.adv.fight.as_ref().filter(|_| w.room.doors_locked()) else {
+        return;
+    };
+    let s = crate::i18n::s();
+    let (label, k) = match f.kind {
+        Encounter::Waves => (
+            crate::i18n::fill(s.enc_waves_hud, &[&(f.total - f.waves.len()), &f.total]),
+            None,
+        ),
+        Encounter::Hold => (
+            crate::i18n::fill(s.enc_hold_hud, &[&(f.left.ceil() as i32)]),
+            Some((f.left / t::HOLD_TIME).clamp(0.0, 1.0)),
+        ),
+        _ => return,
+    };
+    let nw = ui.text_w(&label, crate::ui::FONT_PX) + 10.0;
+    let dy = top_center_drop(left_end, nw);
+    ui.rect(
+        Rect::new(160.0 - nw / 2.0, dy + 2.0, nw, crate::ui::FONT_PX + 3.0),
+        Color::new(0.07, 0.05, 0.09, 0.75),
+    );
+    ui.text_center(
+        &label,
+        160.0,
+        dy + 3.0,
+        crate::ui::FONT_PX,
+        crate::ui::ACCENT,
+    );
+    if let Some(k) = k {
+        let bar = Rect::new(110.0, dy + 4.0 + crate::ui::FONT_PX + 4.0, 100.0, 3.0);
+        ui.rect(
+            Rect::new(bar.x - 1.0, bar.y - 1.0, bar.w + 2.0, bar.h + 2.0),
+            OUTLINE,
+        );
+        ui.rect(bar, Color::new(0.16, 0.12, 0.10, 1.0));
+        ui.rect(
+            Rect::new(bar.x, bar.y, (bar.w * k).round(), bar.h),
+            Color::new(0.86, 0.66, 0.34, 1.0),
+        );
+    }
+}
+
 /// 가장 깊은 곳(0162)의 위쪽 표시: 할매 이름 + 매듭 셋(남은 것은 보라, 끊은 것은 풀린 흰 실) + 감긴 수(실 고리).
 pub(super) fn draw_deep_bar(ui: &Ui, w: &World, left_end: f32) {
     let Some(d) = &w.deep else {

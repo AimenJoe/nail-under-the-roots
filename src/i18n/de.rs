@@ -892,4 +892,13 @@ pub static DE: Strings = Strings {
     h_doto_d: "Doto kämpft aus der Ferne. Der Angriff wirft Eicheln — der dritte Wurf als Fächer aus drei. Halten und loslassen: eine große Eichel platzt beim Aufprall. Der Rücksprung schubst nahe Gegner weg und behält das Ziel im Blick. Bei voller Leiste vergräbst du Eicheln vor dir — sie platzen bald und treffen nur Gegner. Die werfende Hand schlägt Heranfliegendes zurück.",
     h_run: "Rennen und Weitsprung",
     h_run_d: "Momo und Doto: Halte die Grabtaste weiter, dann rennst du los, sobald Hüpfer oder Rücksprung landen. Beim Rennen zeigt eine Markierung vorn am Boden, wo du landest — richte dich aus und lass los, um genau dorthin zu springen; in der Luft trifft dich nichts. Momos Markierung rastet auf einem Gegner vorn ein, und sie stampft ihn bei der Landung; Doto wirft in der Luft von selbst drei auf den nächsten Gegner (ist keiner in Reichweite, dorthin, wo du zielst). Greif im Rennen an, um sofort zuzuschlagen.",
+    h_rooms: "Räume im Bau",
+    h_rooms_d: "Jeder Raum kämpft anders: alle besiegen, Wellen (sind nur noch wenige übrig, bricht das nächste Rudel aus dem Boden), Hinterhalt (geh in die Mitte, und sie fallen rings um dich herab) oder durchhalten (halte aus, bis der Bau einstürzt und den Rest begräbt). Das Zeichen über einer Tür zeigt, was das Leeren des Raums bringt: Samen, Glühwürmchen, eine Himbeere oder eine Truhe (Waffe oder Anhänger). Roter Rand = Wellen- oder Durchhalteraum.",
+    enc_waves: "Es grollt unten – es kommen mehr!",
+    enc_wave_next: "Das nächste Rudel bricht hervor!",
+    enc_ambush: "Hinterhalt!",
+    enc_hold: "Der Bau bebt – halte durch, bis er einstürzt!",
+    enc_hold_done: "Der Bau ist eingestürzt und hat den Rest begraben!",
+    enc_hold_hud: "Durchhalten {0}",
+    enc_waves_hud: "Rudel {0}/{1}",
 };

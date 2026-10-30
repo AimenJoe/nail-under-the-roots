@@ -14,7 +14,7 @@
 use macroquad::prelude::*;
 
 use crate::biome::Biome;
-use crate::enemy::Kind;
+use crate::enemy::{Entry, Kind};
 use crate::map::{cell_center, Cell, Grid};
 use crate::room::{Prop, PropKind, Room};
 use crate::tuning as t;
@@ -48,6 +48,39 @@ pub struct DRoom {
     pub elite: bool,
     /// 넓은 방(0244)이면 짝 방이 있는 문 방향(`DIRS` 번호). 둘은 함께 잠기고 함께 비워진다.
     pub hall: Option<usize>,
+    /// 싸움 짜임(0257): 다 잡기 · 물결 · 매복 · 버티기.
+    pub encounter: Encounter,
+    /// 뒤에 나오는 무리(0257): 물결이면 물결마다 한 줄, 버티기면 첫 줄이 솟아날 무리.
+    pub reserve: Vec<Vec<(Kind, Vec2)>>,
+    /// 처음 무리가 나타나는 방법(0257).
+    pub entry: Entry,
+    /// 비우면 나오는 곁방 보상(0257). 옆 방의 문 위 표지로 미리 보인다.
+    pub bounty: Option<Bounty>,
+    /// 방 지형(0244·0257).
+    pub layout: Layout,
+}
+
+/// 방의 싸움 짜임(0257, 사장 "방들이 너무 반복되는 느낌"): 늘 "들어서면 잠기고 다 잡으면 열림"이던 것을 넷으로.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Encounter {
+    /// 다 잡기(예전 그대로).
+    Clear,
+    /// 물결: 남은 적이 `WAVE_NEXT_AT` 아래로 줄면 다음 무리가 땅에서 솟는다.
+    Waves,
+    /// 매복: 빈 방처럼 보이다가 가운데쯤 오면 잠기고 둘레에서 떨어진다.
+    Ambush,
+    /// 버티기: `HOLD_TIME` 동안 무리가 계속 솟는다. 시간이 다 되면 남은 것은 무너지는 흙에 흩어진다.
+    Hold,
+}
+
+/// 곁방 보상(0257): 끝방이 아닌 싸움방에 — 옆 방에서 그 문 위 표지로 보인다(Hades의 문 보상).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Bounty {
+    Seeds,
+    Glowbugs,
+    Berry,
+    /// 길 무기·장신구(없으면 반딧불). 버티기 방에서만.
+    Gift,
 }
 
 impl DRoom {
@@ -242,6 +275,11 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
         enemies: Vec::new(),
         elite: false,
         hall: None,
+        encounter: Encounter::Clear,
+        reserve: Vec::new(),
+        entry: Entry::Wake,
+        bounty: None,
+        layout: Layout::Plain,
     }];
     // 가지 뻗기
     let mut guard = 0;
@@ -267,6 +305,11 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             enemies: Vec::new(),
             elite: false,
             hall: None,
+            encounter: Encounter::Clear,
+            reserve: Vec::new(),
+            entry: Entry::Wake,
+            bounty: None,
+            layout: Layout::Plain,
         });
     }
     // 고리 하나: 이웃인데 안 이어진 쌍(큰 굴만)
@@ -340,12 +383,36 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
     }
 
     let goal_at = rooms[boss].at;
+    // 굴 안 세기 곡선(0257): 시작 바로 옆은 작은 싸움, 끝방 바로 앞(끝방과 이어진 방)은 숨 돌리는 작은 싸움, 넓은 방은 큰 싸움.
+    // 들어오는 문 = 시작 쪽 이웃(거리가 하나 적은 방)으로 가는 문. 뒷줄(던지기·혀·포자)은 그 문에서 먼 자리부터.
+    let near_goal: Vec<bool> = (0..rooms.len())
+        .map(|i| {
+            dist[i] + 1 == dist[boss]
+                && (0..4).any(|d| {
+                    rooms[i].links[d]
+                        && (rooms[i].at.0 + DIRS[d].0, rooms[i].at.1 + DIRS[d].1) == goal_at
+                })
+        })
+        .collect();
+    let entry_dir: Vec<Option<usize>> = (0..rooms.len())
+        .map(|i| {
+            (0..4).find(|&d| {
+                rooms[i].links[d]
+                    && rooms
+                        .iter()
+                        .position(|r| {
+                            r.at == (rooms[i].at.0 + DIRS[d].0, rooms[i].at.1 + DIRS[d].1)
+                        })
+                        .is_some_and(|j| dist[j] + 1 == dist[i])
+            })
+        })
+        .collect();
     // 격자
     let mut grid = Grid::filled(GRID as usize * ROOM_W, GRID as usize * ROOM_H, Cell::Wall);
     let mut props = Vec::new();
     let mut thorns = Vec::new();
     let mut webs = Vec::new();
-    for room in &mut rooms {
+    for (ri, room) in rooms.iter_mut().enumerate() {
         let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
         for y in 2..ROOM_H - 1 {
             for x in 1..ROOM_W - 1 {
@@ -385,6 +452,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             }
             _ => Layout::Plain,
         };
+        room.layout = layout;
         shape_room(
             &mut grid,
             ox,
@@ -422,32 +490,123 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                         });
                     }
                 }
+                // 무리(0257): 지대 무리 표에서 하나, 몇 마리인지는 굴 안 세기 곡선으로. 다른 난수라 굴 모양·소품은 그대로.
+                let mut er = rng_at(seed, room.at, 0x5A0D_0257);
+                let goal_room = room.kind == RoomKind::Boss;
+                let small = !goal_room && room.hall.is_none() && (dist[ri] <= 1 || near_goal[ri]);
+                let medium = 2 + depth.min(2) as usize + er.below(2) as usize;
                 let count = match (room.kind, prm.goal) {
                     (RoomKind::Boss, Goal::Boss) => 5 + depth as usize,
                     (RoomKind::Boss, _) => 3 + depth.min(2) as usize + prm.tough as usize,
-                    _ => 2 + depth.min(2) as usize + rng.below(2) as usize,
+                    _ if small => 2 + depth.min(1) as usize,
+                    // 넓은 방(0244)은 둘이 함께 깨어나니 한 방에 하나씩 덜(둘 합쳐 한 방의 1.5배쯤) — 대신 물결이 온다.
+                    _ if room.hall.is_some() => medium.saturating_sub(1).max(2),
+                    _ => medium,
                 };
-                // 넓은 방(0244)은 둘이 함께 깨어나니 한 방에 하나씩 덜(둘 합쳐 한 방의 1.5배쯤).
-                let count = if room.hall.is_some() {
-                    count.saturating_sub(1).max(2)
+                let lvl = depth + prm.tough;
+                let squad = crate::species::squad(er.unit(), lvl, prm.biome);
+                let spots = room_spots(layout);
+                let door = entry_dir[ri];
+                let kinds = squad.members(count, || er.unit(), lvl, prm.biome);
+                room.enemies = place(&kinds, &spots, door, &mut er)
+                    .into_iter()
+                    .map(|(k, (cx, cy))| (k, cell_center(ox + cx, oy + cy)))
+                    .collect();
+                // 싸움 짜임(0257): 끝방은 다 잡기. 시작 옆·숨 돌리는 방은 다 잡기, 넓은 방은 물결, 나머지는 굴린다.
+                room.encounter = if goal_room || small {
+                    Encounter::Clear
+                } else if room.hall.is_some() {
+                    Encounter::Waves
                 } else {
-                    count
+                    let r = er.unit();
+                    let [a, b, c] = t::ENCOUNTER_ODDS;
+                    if r < a {
+                        Encounter::Clear
+                    } else if r < b {
+                        Encounter::Waves
+                    } else if r < c {
+                        Encounter::Ambush
+                    } else {
+                        Encounter::Hold
+                    }
                 };
-                for k in 0..count {
-                    let kind = crate::species::roll(rng.unit(), depth + prm.tough, prm.biome);
-                    // 방 가장자리 쪽에(가운데는 들어오는 플레이어 자리).
-                    let corner = [
-                        (4, 4),
-                        (15, 4),
-                        (4, 9),
-                        (15, 9),
-                        (10, 3),
-                        (10, 10),
-                        (3, 7),
-                        (16, 7),
-                    ];
-                    let (cx, cy) = corner[(k + rng.below(8) as usize) % corner.len()];
-                    room.enemies.push((kind, cell_center(ox + cx, oy + cy)));
+                let wave = |n: usize, er: &mut Rng| -> Vec<(Kind, Vec2)> {
+                    let kinds = squad.members(n, || er.unit(), lvl, prm.biome);
+                    // 뒤 무리는 앞자리(core)를 다시 쓰지 않게 — 무리의 성격(첫 줄)은 처음 무리가 보인다.
+                    place(&kinds, &spots, door, er)
+                        .into_iter()
+                        .map(|(k, (cx, cy))| (k, cell_center(ox + cx, oy + cy)))
+                        .collect()
+                };
+                match room.encounter {
+                    Encounter::Waves => {
+                        room.reserve = vec![wave(2 + depth.min(1) as usize, &mut er)];
+                    }
+                    Encounter::Hold => {
+                        // 처음엔 `HOLD_ALIVE`까지, 나머지와 덤은 솟아날 줄로.
+                        let mut all = std::mem::take(&mut room.enemies);
+                        all.extend(wave(t::HOLD_EXTRA + depth.min(2) as usize, &mut er));
+                        let rest = all.split_off(t::HOLD_ALIVE.min(all.len()));
+                        room.enemies = all;
+                        room.reserve = vec![rest];
+                    }
+                    Encounter::Ambush => {
+                        // 둘레에서 떨어진다: 자리를 방 가운데 쪽으로 당긴다.
+                        // 당긴 자리가 벽(기둥·틀)이면 제자리 그대로.
+                        let c = cell_center(ox + 10, oy + 6) - vec2(8.0, 8.0);
+                        for (_, p) in &mut room.enemies {
+                            let q = c + (*p - c) * t::AMBUSH_PULL;
+                            let (qx, qy) = ((q.x / 16.0) as usize, (q.y / 16.0) as usize);
+                            if grid.get(qx, qy) != Cell::Wall {
+                                *p = q;
+                            }
+                        }
+                    }
+                    Encounter::Clear => {}
+                }
+                room.entry = match room.encounter {
+                    Encounter::Ambush => Entry::Drop,
+                    Encounter::Hold => Entry::Burrow,
+                    _ if goal_room => Entry::Wake,
+                    _ => {
+                        let r = er.unit();
+                        let [w, b] = if prm.biome == Biome::Meadow {
+                            t::ENTRY_ODDS_MEADOW
+                        } else {
+                            t::ENTRY_ODDS
+                        };
+                        if r < w {
+                            Entry::Wake
+                        } else if r < b {
+                            Entry::Burrow
+                        } else {
+                            Entry::Drop
+                        }
+                    }
+                };
+                // 곁방 보상(0257): 끝방·시작 옆 작은 방은 없다. 물결·버티기는 늘(버티기는 물건 기회), 나머지는 반쯤.
+                // 넓은 방은 짝 가운데 한 방(오른쪽·아래에 짝이 있는 방)에만.
+                let first_half = room.hall.is_none_or(|d| d == 1 || d == 2);
+                if !goal_room && !(dist[ri] <= 1 && room.hall.is_none()) && first_half {
+                    let mut br = rng_at(seed, room.at, 0xB0_0257);
+                    let sure = matches!(room.encounter, Encounter::Waves | Encounter::Hold);
+                    if sure || br.chance(t::BOUNTY_CHANCE) {
+                        let r = br.unit();
+                        room.bounty =
+                            Some(if room.encounter == Encounter::Hold && r < t::BOUNTY_GIFT {
+                                Bounty::Gift
+                            } else {
+                                let r = br.unit();
+                                let [a, b] = t::BOUNTY_ODDS;
+                                if r < a {
+                                    Bounty::Seeds
+                                } else if r < b {
+                                    Bounty::Glowbugs
+                                } else {
+                                    Bounty::Berry
+                                }
+                            });
+                    }
                 }
                 // 보스가 정해져 있으면 무리 대신 혼자, 방 가운데 위쪽에. 난수는 위에서 그대로 써서
                 // 같은 시드면 굴 모양이 보스가 있든 없든 같다.
@@ -470,11 +629,19 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                     room.enemies.insert(0, (k, cell_center(ox + 10, oy + 4)));
                     room.elite = true;
                 }
+                // 적이 서는 자리(뒤 무리까지)에는 덤불·그물·부술 것을 두지 않는다(틀 방은 자리가 `KEEP`과 다르다).
+                let spawn_marks: Vec<Vec2> = room
+                    .enemies
+                    .iter()
+                    .chain(room.reserve.iter().flatten())
+                    .map(|(_, p)| *p)
+                    .collect();
                 // 뿌리 지대(0147): 가시뿌리 덤불 무리 1~2개. 굴 모양·적과 다른 난수라 다른 지대의 굴은 그대로다.
                 if prm.biome == Biome::Roots && prm.boss.is_none() {
                     thorn_patches(
                         &grid,
                         &props,
+                        &spawn_marks,
                         ox,
                         oy,
                         seed ^ hash_at(room.at) ^ 0x7407_2A11,
@@ -486,6 +653,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                     thorn_patches(
                         &grid,
                         &props,
+                        &spawn_marks,
                         ox,
                         oy,
                         seed ^ hash_at(room.at) ^ 0x5E1C_0B1A,
@@ -502,9 +670,16 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             RoomKind::Start => 1,
             RoomKind::Treasure => 0,
         } as usize;
+        let marks: Vec<Vec2> = room
+            .enemies
+            .iter()
+            .chain(room.reserve.iter().flatten())
+            .map(|(_, p)| *p)
+            .collect();
         breakables(
             &grid,
             &mut props,
+            &marks,
             &thorns,
             &webs,
             ox,
@@ -553,6 +728,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
 fn thorn_patches(
     grid: &Grid,
     props: &[Prop],
+    avoid: &[Vec2],
     ox: usize,
     oy: usize,
     seed: u64,
@@ -568,6 +744,7 @@ fn thorn_patches(
             && !KEEP.contains(&(x, y))
             && grid.get(ox + x, oy + y) == Cell::Floor
             && !props.iter().any(|p| p.rect.contains(c))
+            && !avoid.iter().any(|a| a.distance(c) < 12.0)
             && !out.contains(&c)
     };
     for _ in 0..1 + rng.below(2) {
@@ -606,6 +783,7 @@ fn rng_at(seed: u64, at: (i32, i32), salt: u64) -> Rng {
 fn breakables(
     grid: &Grid,
     props: &mut Vec<Prop>,
+    avoid: &[Vec2],
     thorns: &[Vec2],
     webs: &[Vec2],
     ox: usize,
@@ -633,6 +811,7 @@ fn breakables(
                 && grid.get(ox + x, oy + y) == Cell::Floor
                 && !props.iter().any(|p| p.rect.contains(c))
                 && !thorns.contains(&c)
+                && !avoid.iter().any(|a| a.distance(c) < 12.0)
                 && !webs.contains(&c);
             if free {
                 let kind = if rng.chance(0.25) {
@@ -648,6 +827,166 @@ fn breakables(
             }
         }
     }
+}
+
+/// 방에 적을 놓는 자리(지형이 틀이 아니면, 0257 전부터): 가장자리 쪽 여덟 — 가운데는 들어오는 플레이어 자리.
+const SPOTS: [(usize, usize); 8] = [
+    (4, 4),
+    (15, 4),
+    (4, 9),
+    (15, 9),
+    (10, 3),
+    (10, 10),
+    (3, 7),
+    (16, 7),
+];
+
+/// 손으로 짠 방 틀(0257, D): 방 안 18×9(x 1..=18, y 2..=10). `#` 벽, `e` 적 자리, `.` 바닥.
+/// 규칙: 문 앞 십자 길 — 가운데 두 열(x 9·10)과 가운데 두 줄(y 6·7) — 은 늘 비우고, 적 자리는 여섯 넘게, 문 곁(두 칸 안)엔 두지 않는다.
+/// 좌우로 뒤집어 둘씩 쓴다(시험 `templates_keep_lanes_spots_and_connect`).
+pub const TEMPLATES: [[&str; 9]; 6] = [
+    // 네 기둥: 큰 기둥 넷 사이로 도는 길.
+    [
+        "..................",
+        ".e..###....###..e.",
+        "....###....###....",
+        "......e....e......",
+        "..................",
+        "..................",
+        "....###....###....",
+        ".e..###....###..e.",
+        "..................",
+    ],
+    // 두 능선: 위아래에서 내려온 능선 사이 좁은 목.
+    [
+        "......#....#......",
+        ".e....#....#....e.",
+        "......#....#.e....",
+        "..##..........##..",
+        "..................",
+        "..................",
+        "..##..........##..",
+        ".e..e.#....#....e.",
+        "......#....#......",
+    ],
+    // 계단 담: 위아래 담장 끝이 꺾여 들어온다.
+    [
+        "..................",
+        ".e.####....####.e.",
+        ".......#..#.......",
+        "...e..........e...",
+        "..................",
+        "..................",
+        "...e..........e...",
+        ".e.####....####.e.",
+        "..................",
+    ],
+    // 네 모서리 비탈: 모서리마다 비스듬한 벽.
+    [
+        ".#..............#.",
+        ".##.e........e.##.",
+        "..##..........##..",
+        "......e...........",
+        "..................",
+        "..................",
+        "..##.......e..##..",
+        ".##.e........e.##.",
+        ".#..............#.",
+    ],
+    // 긴 골짜기: 위·아래 띠가 긴 담으로 갈린다. 가운데로만 오간다.
+    [
+        "..................",
+        ".e....e....e....e.",
+        ".######....######.",
+        "..................",
+        "..................",
+        "..................",
+        ".######....######.",
+        ".e....e....e....e.",
+        "..................",
+    ],
+    // 섬: 작은 바위섬이 흩어진 방.
+    [
+        "..................",
+        "..e..##....##..e..",
+        ".#..............#.",
+        "....e........e....",
+        "..................",
+        "..................",
+        ".#..e........e..#.",
+        "..................",
+        "..e..##....##..e..",
+    ],
+];
+
+/// 틀 `i`의 (x, y) 칸이 벽인가(방 칸, 뒤집기 반영).
+fn template_wall(i: usize, flip: bool, x: usize, y: usize) -> bool {
+    template_cell(i, flip, x, y) == b'#'
+}
+
+fn template_cell(i: usize, flip: bool, x: usize, y: usize) -> u8 {
+    if !(1..=18).contains(&x) || !(2..=10).contains(&y) {
+        return b'#';
+    }
+    let x = if flip { 19 - x } else { x };
+    TEMPLATES[i][y - 2].as_bytes()[x - 1]
+}
+
+/// 그 방 지형의 적 자리(방 칸).
+pub fn room_spots(layout: Layout) -> Vec<(usize, usize)> {
+    match layout {
+        Layout::Template(i, flip) => (2..=10)
+            .flat_map(|y| (1..=18).map(move |x| (x, y)))
+            .filter(|&(x, y)| template_cell(i as usize, flip, x, y) == b'e')
+            .collect(),
+        _ => SPOTS.to_vec(),
+    }
+}
+
+/// 무리를 자리에 놓는다(0257): 뒷줄(던지기·혀·포자, `species::back_row`)은 들어오는 문에서 먼 자리부터, 나머지는 남은 자리를
+/// 섞어서. 자리보다 많으면 처음부터 다시(둘이 한 자리에 — 곧 밀려 갈라선다).
+fn place(
+    kinds: &[Kind],
+    spots: &[(usize, usize)],
+    door: Option<usize>,
+    rng: &mut Rng,
+) -> Vec<(Kind, (usize, usize))> {
+    let door_at = door.map(|d| match d {
+        0 => (9.5, 0.0),
+        1 => (19.0, 6.5),
+        2 => (9.5, 11.0),
+        _ => (0.0, 6.5),
+    });
+    let mut order: Vec<usize> = (0..spots.len()).collect();
+    for i in (1..order.len()).rev() {
+        let j = rng.below(i as u64 + 1) as usize;
+        order.swap(i, j);
+    }
+    let far = |i: usize| {
+        door_at.map_or(0.0, |(dx, dy): (f32, f32)| {
+            let (x, y) = spots[i];
+            (x as f32 - dx).hypot(y as f32 - dy)
+        })
+    };
+    let mut by_far = order.clone();
+    by_far.sort_by(|a, b| far(*b).total_cmp(&far(*a)));
+    let mut used = vec![false; spots.len()];
+    let take = |list: &[usize], used: &mut Vec<bool>| -> usize {
+        if used.iter().all(|u| *u) {
+            used.iter_mut().for_each(|u| *u = false);
+        }
+        let i = *list.iter().find(|&&i| !used[i]).unwrap_or(&list[0]);
+        used[i] = true;
+        i
+    };
+    let mut out = Vec::new();
+    for &k in kinds.iter().filter(|k| crate::species::back_row(**k)) {
+        out.push((k, spots[take(&by_far, &mut used)]));
+    }
+    for &k in kinds.iter().filter(|k| !crate::species::back_row(**k)) {
+        out.push((k, spots[take(&order, &mut used)]));
+    }
+    out
 }
 
 /// 적·보스·상자·출구·시작 자리(방 안 칸). 방 모양이 이 칸과 그 둘레 한 칸을 벽으로 만들지 않는다.
@@ -684,10 +1023,15 @@ pub enum Layout {
     Canyon,
     /// 돌밭: 한 칸짜리 돌 5~8개를 흩는다. 원거리 적의 탄을 막고, 돌진을 끊는다.
     Rubble,
+    /// 손으로 짠 방 틀(0257): `TEMPLATES` 번호, 좌우 뒤집기. 굴 모양(모서리·혹·바위)도 틀이 대신한다.
+    Template(u8, bool),
 }
 
 impl Layout {
     pub fn roll(rng: &mut Rng) -> Self {
+        if rng.chance(t::TEMPLATE_CHANCE) {
+            return Self::Template(rng.below(TEMPLATES.len() as u64) as u8, rng.chance(0.5));
+        }
         let r = rng.unit();
         if r < t::LAYOUT_ODDS[0] {
             Self::Plain
@@ -705,6 +1049,17 @@ impl Layout {
 /// 문 앞 십자 길(가로 5~8줄, 세로 8~11칸)과 `KEEP` 자리(둘레 한 칸까지)는 건드리지 않는다.
 /// 다 만든 뒤 모든 바닥이 방 가운데에서 이어지는지 보고, 안 이어지면 네모로 되돌린다.
 fn shape_room(grid: &mut Grid, ox: usize, oy: usize, kind: RoomKind, layout: Layout, seed: u64) {
+    if let Layout::Template(i, flip) = layout {
+        // 손으로 짠 틀(0257): 틀이 방 모양 전부. 이어짐은 시험이 본다(`templates_keep_lanes_spots_and_connect`).
+        for y in 2..=10 {
+            for x in 1..=18 {
+                if template_wall(i as usize, flip, x, y) {
+                    grid.set(ox + x, oy + y, Cell::Wall);
+                }
+            }
+        }
+        return;
+    }
     let mut rng = Rng::new(seed | 1);
     let lane = |x: usize, y: usize| (8..=11).contains(&x) || (5..=8).contains(&y);
     let kept = |x: usize, y: usize| {
@@ -807,6 +1162,7 @@ fn shape_room(grid: &mut Grid, ox: usize, oy: usize, kind: RoomKind, layout: Lay
                 }
             }
         }
+        Layout::Template(..) => {}
         Layout::Rubble => {
             let n = 5 + rng.below(4);
             for _ in 0..n {
@@ -1041,6 +1397,15 @@ mod tests {
             let g = room.grid.as_ref().unwrap();
             for r in &d.rooms {
                 let (ox, oy) = (r.at.0 as usize * ROOM_W, r.at.1 as usize * ROOM_H);
+                if let Layout::Template(..) = r.layout {
+                    // 틀 방(0257)은 `templates_keep_lanes_spots_and_connect`가 본다. 적은 바닥에.
+                    for (_, p) in r.enemies.iter().chain(r.reserve.iter().flatten()) {
+                        assert_ne!(room.cell_at(*p), Some(Cell::Wall), "틀 방 적은 바닥에");
+                    }
+                    total += 1;
+                    shaped += 1;
+                    continue;
+                }
                 for &(x, y) in &KEEP {
                     assert_ne!(
                         g.get(ox + x, oy + y),
@@ -1195,10 +1560,114 @@ mod tests {
     #[test]
     fn every_layout_appears() {
         let mut seen = std::collections::HashSet::new();
-        for seed in 1..200 {
+        for seed in 1..400 {
             seen.insert(Layout::roll(&mut Rng::new(seed)));
         }
-        assert_eq!(seen.len(), 4);
+        // 지형 넷 + 틀 여섯 × 좌우 뒤집기(0257).
+        assert_eq!(seen.len(), 4 + TEMPLATES.len() * 2);
+    }
+
+    /// 손으로 짠 틀(0257): 18×9, 문 앞 십자(가운데 두 열·두 줄)는 비고, 적 자리는 여섯 넘게 바닥에·문 곁 밖에,
+    /// 뒤집어도 모든 바닥이 한 덩어리로 이어진다.
+    #[test]
+    fn templates_keep_lanes_spots_and_connect() {
+        for i in 0..TEMPLATES.len() {
+            for row in TEMPLATES[i] {
+                assert_eq!(row.len(), 18, "틀 {i} 줄 길이");
+            }
+            for flip in [false, true] {
+                for y in 2..=10 {
+                    for x in 9..=10 {
+                        assert!(!template_wall(i, flip, x, y), "틀 {i} 세로 길 ({x},{y})");
+                    }
+                }
+                for x in 1..=18 {
+                    for y in 6..=7 {
+                        assert!(!template_wall(i, flip, x, y), "틀 {i} 가로 길 ({x},{y})");
+                    }
+                }
+                let spots = room_spots(Layout::Template(i as u8, flip));
+                assert!(spots.len() >= 6, "틀 {i} 자리 {}", spots.len());
+                for &(x, y) in &spots {
+                    let near_door = ((9..=10).contains(&x) && (y <= 3 || y >= 9))
+                        || ((6..=7).contains(&y) && (x <= 2 || x >= 17));
+                    assert!(!near_door, "틀 {i} 자리 ({x},{y})는 문 곁");
+                }
+                let mut seen = std::collections::HashSet::from([(10usize, 6usize)]);
+                let mut q = vec![(10usize, 6usize)];
+                while let Some((x, y)) = q.pop() {
+                    for (dx, dy) in DIRS {
+                        let (nx, ny) = ((x as i32 + dx) as usize, (y as i32 + dy) as usize);
+                        if !template_wall(i, flip, nx, ny) && seen.insert((nx, ny)) {
+                            q.push((nx, ny));
+                        }
+                    }
+                }
+                let floor = (2..=10)
+                    .flat_map(|y| (1..=18).map(move |x| (x, y)))
+                    .filter(|&(x, y)| !template_wall(i, flip, x, y))
+                    .count();
+                assert_eq!(
+                    seen.len(),
+                    floor,
+                    "틀 {i} 뒤집기 {flip}: 바닥이 다 이어진다"
+                );
+            }
+        }
+    }
+
+    /// 방 짜임(0257): 시작 바로 옆·끝방은 다 잡기, 넓은 방은 물결, 물결·버티기는 뒤 무리가 있고 보상이 늘 붙는다,
+    /// 끝방엔 보상이 없다. 여러 굴을 지으면 넷이 다 나오고, 무리 표 덕에 한 방에 같은 종이 둘 넘는 방이 흔하다.
+    #[test]
+    fn encounters_curve_and_bounties() {
+        let mut kinds = std::collections::HashSet::new();
+        let mut paired = 0;
+        let mut fights = 0;
+        for seed in 1..80 {
+            let prm = Params {
+                biome: Biome::Roots,
+                ..Params::classic(2)
+            };
+            let (d, _) = generate(seed, &prm);
+            let dist = distances(&d.rooms, d.start);
+            for (i, r) in d.rooms.iter().enumerate() {
+                match r.kind {
+                    RoomKind::Boss => {
+                        assert_eq!(r.encounter, Encounter::Clear);
+                        assert!(r.bounty.is_none());
+                    }
+                    RoomKind::Combat => {
+                        kinds.insert(r.encounter);
+                        if dist[i] <= 1 && r.hall.is_none() {
+                            assert_eq!(
+                                r.encounter,
+                                Encounter::Clear,
+                                "seed {seed}: 시작 옆은 다 잡기"
+                            );
+                        }
+                        if r.hall.is_some() {
+                            assert_eq!(r.encounter, Encounter::Waves);
+                        }
+                        if matches!(r.encounter, Encounter::Waves | Encounter::Hold) {
+                            assert!(!r.reserve.is_empty() && !r.reserve[0].is_empty());
+                            let half = r.hall.is_none_or(|h| h == 1 || h == 2);
+                            assert_eq!(r.bounty.is_some(), half, "seed {seed}");
+                        }
+                        fights += 1;
+                        let mut c = std::collections::HashMap::new();
+                        for (k, _) in &r.enemies {
+                            *c.entry(*k).or_insert(0) += 1;
+                        }
+                        if c.values().any(|n| *n >= 2) {
+                            paired += 1;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        assert_eq!(kinds.len(), 4, "{kinds:?}");
+        assert!(paired * 3 >= fights, "무리 짜임: {paired}/{fights}");
     }
 
     #[test]

@@ -432,7 +432,7 @@ strings! {
     pick_doto, stat_leap_cd, toast_shell_doto, toast_thorn_doto, toast_web_doto, gauge_acorn, w_acorn, w_acorn_desc, w_briar, w_briar_desc, w_pebble, w_pebble_desc, w_petal, w_petal_desc, w_pine, w_pine_desc, w_walnut, w_walnut_desc, w_chestnut, w_chestnut_desc, w_beetle, w_beetle_desc, gift_weapon, r_weapon, jg_momo2, jg_momo2_d, jg_doto2, jg_doto2_d, kongi_pebble, susu_walnut, tal_leap, tal_leap_a, tal_leap_a_desc, tal_leap_b, tal_leap_b_desc, tal_bury, tal_bury_a, tal_bury_a_desc, tal_bury_b, tal_bury_b_desc, tb_root, tb_branch, tb_leaf, bn_hp, bn_hp_d, bn_berry, bn_berry_d, bn_stun, bn_stun_d, bn_lives, bn_lives_d, bn_knock, bn_knock_d, bn_haste, bn_haste_d, bn_beat, bn_beat_d, bn_charge, bn_charge_d, bn_ki, bn_ki_d, bn_edge, bn_edge_d, bn_speed, bn_speed_d, bn_dodge, bn_dodge_d, bn_bargain, bn_bargain_d, bn_charm, bn_charm_d,
     c_pinecone, c_pinecone_desc, c_acorn_cap, c_acorn_cap_desc, c_maple, c_maple_desc, c_glove, c_glove_desc, c_wormmap, c_wormmap_desc, c_incisor, c_incisor_desc, c_dandelion, c_dandelion_desc, c_dew, c_dew_desc, c_clover_ring, c_clover_ring_desc, c_cheek, c_cheek_desc, c_comb, c_comb_desc, c_resin, c_resin_desc, jg_doto_deep, jg_doto_deep_d,
     set_tells,
-    h_doto, h_doto_d, h_run, h_run_d,
+    h_doto, h_doto_d, h_run, h_run_d, h_rooms, h_rooms_d, enc_waves, enc_wave_next, enc_ambush, enc_hold, enc_hold_done, enc_hold_hud, enc_waves_hud,
     run_doto, seat_doto, nail_v1, nail_v2, nail_v_momo, nail_v_doto, dend_1, dend_2, dend_3, dend_4, doto_t_deep,
 }
 

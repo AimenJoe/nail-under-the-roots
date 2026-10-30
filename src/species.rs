@@ -567,6 +567,161 @@ pub fn roll(r: f32, depth: u32, biome: crate::biome::Biome) -> Kind {
     Kind::FieldMouse
 }
 
+/// 방 하나의 무리(0257, 사장 "방들이 너무 반복되는 느낌"): 한 마리씩 따로 뽑으면 방마다 "쥐 몇 마리"가 되어 먼저 칠 것을
+/// 고를 일이 없었다. 지대마다 손으로 짠 무리 — `core`는 꼭 나오고(앞에서부터), 나머지 자리는 `fill`에서(비면 `roll`).
+/// 짜임마다 먼저 풀 문제가 하나씩: 두꺼비 진지(혀를 피해 뒷줄로), 가시 성벽(강공격으로 연다), 하늘 습격(솟구치기가 안 닿는다) ….
+pub struct Squad {
+    /// 나오는 지대.
+    pub biomes: &'static [crate::biome::Biome],
+    /// 이 깊이(굴 깊이 + 둥지 덤)부터.
+    pub min_depth: u32,
+    pub weight: f32,
+    pub core: &'static [Kind],
+    pub fill: &'static [Kind],
+}
+
+/// 지대마다의 무리 줄. 지대 표(`roll`)에 없는 종은 그 지대 무리에 넣지 않는다.
+pub const SQUADS: &[Squad] = {
+    use crate::biome::Biome::{Deep, Meadow, Roots, Silk};
+    use Kind::*;
+    &[
+        // 섞인 무리: 예전처럼 한 마리씩 지대 표에서.
+        Squad {
+            biomes: &[Meadow, Roots, Deep, Silk],
+            min_depth: 0,
+            weight: 2.0,
+            core: &[],
+            fill: &[],
+        },
+        // 쥐 떼: 시궁쥐가 앞장서고 들쥐·생쥐가 몰려온다.
+        Squad {
+            biomes: &[Meadow, Roots, Deep],
+            min_depth: 0,
+            weight: 3.0,
+            core: &[SewerRat],
+            fill: &[FieldMouse, HouseMouse],
+        },
+        // 도토리 진지: 다람쥐 둘이 뒤에서 던지고 앞을 막는다.
+        Squad {
+            biomes: &[Meadow, Roots],
+            min_depth: 0,
+            weight: 2.0,
+            core: &[Chipmunk, Chipmunk],
+            fill: &[FieldMouse, Shrew],
+        },
+        // 덮치기: 청설모가 뛰어 내려앉는 사이 쥐가 몰려온다.
+        Squad {
+            biomes: &[Meadow, Roots, Deep],
+            min_depth: 0,
+            weight: 2.0,
+            core: &[RedSquirrel],
+            fill: &[FieldMouse, HouseMouse],
+        },
+        // 가시 성벽: 고슴도치가 굴러 오고 다람쥐가 그 뒤에서 던진다.
+        Squad {
+            biomes: &[Meadow, Roots, Deep],
+            min_depth: 1,
+            weight: 1.5,
+            core: &[Hedgehog],
+            fill: &[Chipmunk, FieldMouse],
+        },
+        // 뒤쥐 사냥: 빠르게 두 번 무는 뒤쥐 둘.
+        Squad {
+            biomes: &[Meadow, Roots, Silk],
+            min_depth: 0,
+            weight: 1.5,
+            core: &[Shrew, Shrew],
+            fill: &[FieldMouse],
+        },
+        // 두꺼비 진지: 혀 둘이 뒷줄, 앞은 쥐.
+        Squad {
+            biomes: &[Roots, Deep, Silk],
+            min_depth: 0,
+            weight: 2.0,
+            core: &[Toad, Toad],
+            fill: &[FieldMouse, FieldMouse, SewerRat],
+        },
+        // 독 안개: 실버섯 둘 사이로 쥐가 몰아넣는다.
+        Squad {
+            biomes: &[Roots, Deep, Silk],
+            min_depth: 1,
+            weight: 1.5,
+            core: &[SporeCap, SporeCap],
+            fill: &[SewerRat, FieldMouse],
+        },
+        // 하늘 습격: 박쥐 둘(솟구치기가 안 닿는다) + 땅의 쥐.
+        Squad {
+            biomes: &[Deep, Silk],
+            min_depth: 0,
+            weight: 2.5,
+            core: &[Bat, Bat],
+            fill: &[FieldMouse, SewerRat],
+        },
+        // 시궁쥐 굴: 단단한 시궁쥐 둘, 들쥐나 뒤의 두꺼비.
+        Squad {
+            biomes: &[Deep, Silk],
+            min_depth: 0,
+            weight: 2.0,
+            core: &[SewerRat, SewerRat],
+            fill: &[FieldMouse, Toad],
+        },
+        // 박쥐와 버섯: 위에서 내리꽂고 아래는 포자.
+        Squad {
+            biomes: &[Deep, Silk],
+            min_depth: 1,
+            weight: 1.5,
+            core: &[Bat, SporeCap],
+            fill: &[FieldMouse],
+        },
+    ]
+};
+
+/// 무리 하나를 고른다(`r`은 0..1). 지대·깊이에 맞는 줄 가운데 무게대로.
+pub fn squad(r: f32, depth: u32, biome: crate::biome::Biome) -> &'static Squad {
+    let ok = |q: &&Squad| q.biomes.contains(&biome) && depth >= q.min_depth;
+    let total: f32 = SQUADS.iter().filter(ok).map(|q| q.weight).sum();
+    let mut x = r.clamp(0.0, 0.9999) * total;
+    for q in SQUADS.iter().filter(ok) {
+        if x < q.weight {
+            return q;
+        }
+        x -= q.weight;
+    }
+    &SQUADS[0]
+}
+
+impl Squad {
+    /// `n`마리: 앞자리는 `core`, 나머지는 `fill`(비면 지대 표). `roll`은 0..1 난수.
+    pub fn members(
+        &self,
+        n: usize,
+        mut roll_unit: impl FnMut() -> f32,
+        depth: u32,
+        biome: crate::biome::Biome,
+    ) -> Vec<Kind> {
+        (0..n)
+            .map(|i| {
+                if let Some(k) = self.core.get(i) {
+                    *k
+                } else if self.fill.is_empty() {
+                    roll(roll_unit(), depth, biome)
+                } else {
+                    self.fill
+                        [((roll_unit() * self.fill.len() as f32) as usize).min(self.fill.len() - 1)]
+                }
+            })
+            .collect()
+    }
+}
+
+/// 뒷줄에 서는 종(0257): 던지기·혀·포자. 방에 놓을 때 들어오는 문에서 먼 자리를 먼저 차지한다.
+pub fn back_row(kind: Kind) -> bool {
+    matches!(
+        of(kind).behavior,
+        Behavior::Shooter | Behavior::Tongue | Behavior::Spore
+    )
+}
+
 /// 한 자리에 놓을 때의 위치들(생쥐는 셋이 둘러서 떼로).
 pub fn pack_offsets(kind: Kind) -> Vec<macroquad::prelude::Vec2> {
     use macroquad::prelude::*;
@@ -613,6 +768,26 @@ mod tests {
             .filter(|k| matches!(k, Kind::FieldMouse | Kind::HouseMouse | Kind::SewerRat))
             .count();
         assert!(rats * 2 > n, "쥐가 절반을 넘어야 한다: {rats}");
+    }
+
+    /// 무리 표(0257): 무리의 종은 모두 그 지대 뽑기 표(`roll`)에 있는 종이고, 지대마다 고를 무리가 셋 넘는다.
+    #[test]
+    fn squads_use_only_their_biome_mobs() {
+        use crate::biome::Biome;
+        for b in [Biome::Meadow, Biome::Roots, Biome::Deep, Biome::Silk] {
+            let table: Vec<Kind> = (0..4000).map(|i| roll(i as f32 / 4000.0, 4, b)).collect();
+            let mine: Vec<&Squad> = SQUADS.iter().filter(|q| q.biomes.contains(&b)).collect();
+            assert!(mine.len() > 3, "{b:?} 무리 {}", mine.len());
+            for q in mine {
+                for k in q.core.iter().chain(q.fill) {
+                    assert!(table.contains(k), "{b:?}에 없는 {k:?}");
+                }
+            }
+            let picked: std::collections::HashSet<*const Squad> = (0..200)
+                .map(|i| squad(i as f32 / 200.0, 2, b) as *const Squad)
+                .collect();
+            assert!(picked.len() > 3, "{b:?}: 여러 무리가 나온다");
+        }
     }
 
     /// 바이옴마다 대표 적(0146): 들판엔 박쥐·실버섯이 없고, 심층엔 박쥐·실버섯이 나오며 쥐도 남는다.

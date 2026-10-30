@@ -351,6 +351,7 @@ pub(super) fn draw_grid_art(
             }
         }
     }
+    draw_door_signs(w);
 }
 
 /// 저장 지점: 빛나는 버섯 고리(버섯만, 빛은 `draw_save_lights`). 고리 자국은 짙게(실제 균환처럼).
@@ -801,6 +802,91 @@ fn draw_breakable_code(b: crate::room::Breakable, cx: f32, foot: f32, c: Vec2, t
     ] {
         px(cx + dx, foot + dy, lit);
         px(cx + dx + 1.0, foot + dy, dark);
+    }
+}
+
+/// 곁방 보상 표지(0257, Hades의 문 보상): 지금 방의 문마다, 그 너머 방을 비우면 나오는 것을 동그란 표지로 문 안쪽에.
+/// 물결·버티기 방(더 센 방)은 테가 붉다. 비운 방·보상 없는 방은 표지가 없다.
+fn draw_door_signs(w: &World) {
+    use crate::dungeon::{room_rect, Bounty, Encounter, DIRS};
+    let Some(d) = &w.adv.dungeon else { return };
+    let here = w.adv.current_room;
+    let mut rooms = vec![here];
+    rooms.extend(d.partner(here));
+    for at in rooms {
+        let Some(room) = d.room(at) else { continue };
+        let r = room_rect(at);
+        for (k, (dx, dy)) in DIRS.iter().enumerate() {
+            if !room.links[k] || Some((at.0 + dx, at.1 + dy)) == d.partner(at) {
+                continue;
+            }
+            let Some(next) = d.room((at.0 + dx, at.1 + dy)) else {
+                continue;
+            };
+            let Some(b) = next.bounty.filter(|_| !next.cleared) else {
+                continue;
+            };
+            let p = match k {
+                0 => vec2(r.x + 160.0, r.y + 42.0),
+                1 => vec2(r.right() - 34.0, r.y + 112.0),
+                2 => vec2(r.x + 160.0, r.bottom() - 30.0),
+                _ => vec2(r.x + 34.0, r.y + 112.0),
+            };
+            let bob = (w.time * 2.4 + k as f32).sin().round();
+            let p = vec2(p.x.round(), p.y.round() + bob);
+            let hard = matches!(next.encounter, Encounter::Waves | Encounter::Hold);
+            let rim = if hard {
+                Color::new(0.88, 0.32, 0.30, 1.0)
+            } else {
+                Color::new(0.95, 0.80, 0.45, 1.0)
+            };
+            draw_circle(p.x, p.y, 8.0, OUTLINE);
+            draw_circle(p.x, p.y, 7.0, rim);
+            draw_circle(p.x, p.y, 6.0, Color::new(0.14, 0.10, 0.12, 1.0));
+            match b {
+                Bounty::Seeds => {
+                    for (ox, oy) in [(-2.0, 0.0), (1.0, -1.0)] {
+                        let q = p + vec2(ox, oy);
+                        draw_rectangle(q.x - 1.0, q.y - 1.0, 2.0, 3.0, world::SEED);
+                        draw_rectangle(q.x, q.y - 2.0, 1.0, 1.0, Color::new(0.45, 0.78, 0.35, 1.0));
+                    }
+                }
+                Bounty::Glowbugs => {
+                    let pulse = 0.6 + 0.4 * (w.time * 4.0).sin().abs();
+                    draw_circle(
+                        p.x,
+                        p.y,
+                        3.5,
+                        Color::new(world::GLOW.r, world::GLOW.g, world::GLOW.b, 0.35 * pulse),
+                    );
+                    draw_rectangle(
+                        p.x - 1.0,
+                        p.y - 1.0,
+                        2.0,
+                        2.0,
+                        Color::new(1.0, 1.0, 0.7, 1.0),
+                    );
+                }
+                Bounty::Berry => draw_berry(p.x + 0.5, p.y + 0.5, 1.0, 1.0),
+                Bounty::Gift => {
+                    draw_rectangle(
+                        p.x - 3.0,
+                        p.y - 2.0,
+                        6.0,
+                        5.0,
+                        Color::new(0.62, 0.40, 0.22, 1.0),
+                    );
+                    draw_rectangle(
+                        p.x - 3.0,
+                        p.y - 2.0,
+                        6.0,
+                        1.0,
+                        Color::new(0.80, 0.56, 0.30, 1.0),
+                    );
+                    draw_rectangle(p.x - 1.0, p.y, 2.0, 2.0, Color::new(1.0, 0.85, 0.40, 1.0));
+                }
+            }
+        }
     }
 }
 

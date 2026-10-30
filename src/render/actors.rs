@@ -1189,6 +1189,30 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
         draw_dig_mound(pos, ut, e.windup(), time);
         return;
     }
+    // 방에 나타나는 중(0257): 솟을 땅이 부풀고 떨리거나, 떨어질 자리에 그림자가 커진다.
+    match e.arriving() {
+        Some((enemy::Entry::Burrow, k)) => {
+            draw_dig_mound(pos, t::MOMO_DIG_TRACK + k, 1.0, time);
+            return;
+        }
+        Some((enemy::Entry::Drop, k)) => {
+            if !shadow_pass() {
+                let w = (r + 1.0) * (0.3 + 0.7 * k);
+                draw_ellipse(
+                    pos.x.round(),
+                    (pos.y + r).round(),
+                    w,
+                    w * 0.3,
+                    0.0,
+                    Color::new(0.0, 0.0, 0.0, 0.2 + 0.25 * k),
+                );
+            }
+            if !e.flying() {
+                pos.y -= e.height().round();
+            }
+        }
+        _ => {}
+    }
     let base = sp.color;
     let mut tint = WHITE;
     // 그림자 패스(0106)에서는 몸만: 거품·별·잔상·고리·Z·체력 점은 빛·표시라 그림자를 드리우지 않는다.
