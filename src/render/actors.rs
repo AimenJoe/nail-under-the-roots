@@ -398,6 +398,52 @@ pub(super) fn draw_jump_aim(w: &World, alpha: f32) {
     }
 }
 
+/// 모모 이어 뛰기 조준(0261): 첫 내려앉을 자리의 고리와 가는 길의 점, 적에게 붙으면 그 적에 꺾쇠.
+pub(super) fn draw_chain_aim(w: &World, alpha: f32) {
+    let p = &w.player;
+    let Some((dir, lock)) = p.chain_preview() else {
+        return;
+    };
+    let from = lerp(p.prev_pos, p.pos, alpha);
+    let distance = chain_aim_distance(p.state, alpha);
+    let reach = w.room.ray_len(from, dir, p.radius(), distance);
+    let to = from + dir * reach;
+    let pulse = 0.5 + 0.5 * (w.time * 9.0).sin();
+    let a = 0.7 + 0.3 * pulse;
+    let col = Color::new(1.0, 0.78, 0.86, a);
+    let back = Color::new(0.10, 0.06, 0.10, 0.55 * a);
+    let feet = vec2(0.0, 6.0);
+    let c = (to + feet).round();
+    let r = p.chain_radius();
+    draw_circle_lines(c.x, c.y, r, 2.5, back);
+    draw_circle_lines(c.x, c.y, r, if lock.is_some() { 2.0 } else { 1.0 }, col);
+    for i in 1..((reach / 12.0) as i32) {
+        let q = (from + feet + dir * (i as f32 * 12.0)).round();
+        draw_rectangle(q.x, q.y, 1.0, 1.0, Color::new(col.r, col.g, col.b, 0.5 * a));
+    }
+    if let Some(q) = lock {
+        let q = q.round();
+        let k = 9.0 + 2.0 * (1.0 - pulse);
+        for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+            let c = vec2(q.x + sx * k, q.y + sy * k);
+            let x0 = if sx < 0.0 { c.x } else { c.x - 3.0 };
+            let y0 = if sy < 0.0 { c.y } else { c.y - 3.0 };
+            draw_rectangle(x0, c.y, 4.0, 1.0, col);
+            draw_rectangle(c.x, y0, 1.0, 4.0, col);
+        }
+    }
+}
+
+fn chain_aim_distance(state: player::State, alpha: f32) -> f32 {
+    match state {
+        player::State::Chain { time, .. } => {
+            let elapsed = (time - t::TICK_DT * (1.0 - alpha)).clamp(0.0, t::CHAIN_HOP_TIME);
+            t::CHAIN_HOP_DIST * (1.0 - elapsed / t::CHAIN_HOP_TIME)
+        }
+        _ => t::CHAIN_HOP_DIST,
+    }
+}
+
 /// 다 모인 강공격을 쥐고 있는 동안 몸에 얹는 흰 실루엣의 투명도(0202). 딱 맞춘 창 동안 가장 밝다. 아니면 0.
 fn charge_glow(p: &Player) -> f32 {
     match p.state {
@@ -1709,4 +1755,26 @@ pub(super) fn draw_sector_lines(origin: Vec2, dir: Vec2, r: f32, color: Color) {
         prev = p;
     }
     draw_line(origin.x, origin.y, prev.x, prev.y, 1.0, color);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chain_aim_distance_uses_remaining_interpolated_hop_time() {
+        let state = player::State::Chain {
+            left: 3,
+            time: t::CHAIN_HOP_TIME * 0.5,
+            dir: vec2(1.0, 0.0),
+        };
+        let at_tick = t::CHAIN_HOP_DIST * 0.5;
+        let before_tick = at_tick + t::CHAIN_HOP_DIST * t::TICK_DT / t::CHAIN_HOP_TIME;
+        assert!((chain_aim_distance(state, 1.0) - at_tick).abs() < 1e-4);
+        assert!((chain_aim_distance(state, 0.0) - before_tick).abs() < 1e-4);
+        assert_eq!(
+            chain_aim_distance(player::State::Free, 1.0),
+            t::CHAIN_HOP_DIST
+        );
+    }
 }
