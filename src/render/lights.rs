@@ -263,7 +263,9 @@ fn doorway_lamp_positions(g: &Grid) -> Vec<Vec2> {
             if let Some((px, py)) = peer {
                 center = (center + vec2(px as f32 * 16.0 + 8.0, py as f32 * 16.0 + 8.0)) * 0.5;
             }
-            out.push(center + vec2(nx as f32, ny as f32) * 14.0 + vec2(tx as f32, ty as f32) * 11.0);
+            out.push(
+                center + vec2(nx as f32, ny as f32) * 14.0 + vec2(tx as f32, ty as f32) * 11.0,
+            );
         }
     }
     out
