@@ -1,6 +1,7 @@
 //! 빛: 더하기 섞기 재질, 빛 목록, 월드 빛 겹.
 
 use super::*;
+use crate::map::Grid;
 
 /// 빛 더하기 재질(0076). 섞기만 다르고 셰이더는 macroquad 기본과 같다.
 pub(super) fn light_material() -> Option<Material> {
@@ -197,10 +198,75 @@ pub(super) fn draw_world_lights(
             }
         }
     }
+    // 문마다 내부 길가에 작은 야광버섯을 두어, 열린 입구도 어둠 속에서 찾기 쉽게 한다.
+    if let Some(g) = &w.room.grid {
+        for (i, p) in doorway_lamp_positions(g).into_iter().enumerate() {
+            let pulse = 0.8 + 0.2 * (t * 3.0 + i as f32).sin();
+            draw_circle(
+                p.x.round(),
+                (p.y - 2.0).round(),
+                7.0,
+                Color::new(0.20, 0.68, 0.95, 0.10 * pulse * k),
+            );
+            draw_rectangle(
+                (p.x - 0.5).round(),
+                (p.y - 1.0).round(),
+                1.0,
+                3.0,
+                Color::new(0.35, 0.76, 0.84, 0.8 * k),
+            );
+            draw_rectangle(
+                (p.x - 2.5).round(),
+                (p.y - 3.0).round(),
+                5.0,
+                2.0,
+                Color::new(0.22, 0.76, 0.98, 0.9 * pulse * k),
+            );
+            draw_rectangle(
+                (p.x - 0.5).round(),
+                (p.y - 3.0).round(),
+                1.0,
+                1.0,
+                Color::new(0.82, 0.97, 1.0, 0.95 * pulse * k),
+            );
+        }
+    }
     draw_ambient(w, cam, true);
     if light.is_some() {
         gl_use_default_material();
     }
+}
+
+/// 문짝 두 칸을 한 입구로 묶고, 입구 안쪽 길가의 야광버섯 자리 하나를 돌려준다.
+fn doorway_lamp_positions(g: &Grid) -> Vec<Vec2> {
+    let mut out = Vec::new();
+    for y in 0..g.h as i32 {
+        for x in 0..g.w as i32 {
+            if g.get_i(x, y) != Cell::Door {
+                continue;
+            }
+            let Some((nx, ny)) = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+                .into_iter()
+                .find(|(dx, dy)| g.get_i(x + dx, y + dy) == Cell::Floor)
+            else {
+                continue;
+            };
+            let (tx, ty) = (-ny, nx);
+            let peer = [(tx, ty), (-tx, -ty)]
+                .into_iter()
+                .map(|(dx, dy)| (x + dx, y + dy))
+                .find(|&(px, py)| g.get_i(px, py) == Cell::Door);
+            if peer.is_some_and(|(px, py)| (px, py) < (x, y)) {
+                continue;
+            }
+            let mut center = vec2(x as f32 * 16.0 + 8.0, y as f32 * 16.0 + 8.0);
+            if let Some((px, py)) = peer {
+                center = (center + vec2(px as f32 * 16.0 + 8.0, py as f32 * 16.0 + 8.0)) * 0.5;
+            }
+            out.push(center + vec2(nx as f32, ny as f32) * 14.0 + vec2(tx as f32, ty as f32) * 11.0);
+        }
+    }
+    out
 }
 
 /// 빛 하나(0095): 자리·반지름·세기(0..1, 어둠을 얼마나 빼나).
@@ -282,6 +348,13 @@ pub fn light_sources(w: &World, alpha: f32, cam: Vec2, player_radius: f32) -> Ve
         }
     }
     if let Some(g) = &w.room.grid {
+        for pos in doorway_lamp_positions(g) {
+            v.push(LightSrc {
+                pos,
+                radius: 32.0,
+                strength: 0.5,
+            });
+        }
         let (x0, y0) = (
             (cam.x / 16.0).floor() as i32 - 2,
             (cam.y / 16.0).floor() as i32 - 2,
@@ -311,4 +384,38 @@ pub fn light_sources(w: &World, alpha: f32, cam: Vec2, player_radius: f32) -> Ve
         }
     }
     v
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn doorway_lamps_mark_each_two_tile_entry_once() {
+        let mut g = Grid::filled(9, 9, Cell::Wall);
+        for y in 1..8 {
+            for x in 1..8 {
+                g.set(x, y, Cell::Floor);
+            }
+        }
+        for x in 4..=5 {
+            g.set(x, 0, Cell::Door);
+            g.set(x, 8, Cell::Door);
+        }
+        for y in 3..=4 {
+            g.set(0, y, Cell::Door);
+            g.set(8, y, Cell::Door);
+        }
+
+        let lamps = doorway_lamp_positions(&g);
+        assert_eq!(lamps.len(), 4);
+        for expected in [
+            vec2(69.0, 22.0),
+            vec2(91.0, 122.0),
+            vec2(19.0, 75.0),
+            vec2(125.0, 53.0),
+        ] {
+            assert!(lamps.contains(&expected), "missing lamp at {expected:?}");
+        }
+    }
 }
