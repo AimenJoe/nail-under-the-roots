@@ -200,7 +200,7 @@ pub(super) fn draw_world_lights(
     }
     // 문마다 내부 길가에 작은 야광버섯을 두어, 열린 입구도 어둠 속에서 찾기 쉽게 한다.
     if let Some(g) = &w.room.grid {
-        for (i, p) in doorway_lamp_positions(g).into_iter().enumerate() {
+        for (i, p) in doorway_lamp_positions(g, cam, 8.0).into_iter().enumerate() {
             let pulse = 0.8 + 0.2 * (t * 3.0 + i as f32).sin();
             draw_circle(
                 p.x.round(),
@@ -238,10 +238,15 @@ pub(super) fn draw_world_lights(
 }
 
 /// 문짝 두 칸을 한 입구로 묶고, 입구 안쪽 길가의 야광버섯 자리 하나를 돌려준다.
-fn doorway_lamp_positions(g: &Grid) -> Vec<Vec2> {
+fn doorway_lamp_positions(g: &Grid, cam: Vec2, margin: f32) -> Vec<Vec2> {
     let mut out = Vec::new();
-    for y in 0..g.h as i32 {
-        for x in 0..g.w as i32 {
+    let scan_margin = margin + 16.0;
+    let x0 = (((cam.x - scan_margin) / 16.0).floor() as i32).clamp(0, g.w as i32);
+    let x1 = (((cam.x + t::VIEW_W + scan_margin) / 16.0).ceil() as i32).clamp(0, g.w as i32);
+    let y0 = (((cam.y - scan_margin) / 16.0).floor() as i32).clamp(0, g.h as i32);
+    let y1 = (((cam.y + t::VIEW_H + scan_margin) / 16.0).ceil() as i32).clamp(0, g.h as i32);
+    for y in y0..y1 {
+        for x in x0..x1 {
             if g.get_i(x, y) != Cell::Door {
                 continue;
             }
@@ -263,9 +268,15 @@ fn doorway_lamp_positions(g: &Grid) -> Vec<Vec2> {
             if let Some((px, py)) = peer {
                 center = (center + vec2(px as f32 * 16.0 + 8.0, py as f32 * 16.0 + 8.0)) * 0.5;
             }
-            out.push(
-                center + vec2(nx as f32, ny as f32) * 14.0 + vec2(tx as f32, ty as f32) * 11.0,
-            );
+            let pos =
+                center + vec2(nx as f32, ny as f32) * 14.0 + vec2(tx as f32, ty as f32) * 11.0;
+            if pos.x >= cam.x - margin
+                && pos.x <= cam.x + t::VIEW_W + margin
+                && pos.y >= cam.y - margin
+                && pos.y <= cam.y + t::VIEW_H + margin
+            {
+                out.push(pos);
+            }
         }
     }
     out
@@ -350,7 +361,7 @@ pub fn light_sources(w: &World, alpha: f32, cam: Vec2, player_radius: f32) -> Ve
         }
     }
     if let Some(g) = &w.room.grid {
-        for pos in doorway_lamp_positions(g) {
+        for pos in doorway_lamp_positions(g, cam, 40.0) {
             v.push(LightSrc {
                 pos,
                 radius: 32.0,
@@ -409,7 +420,7 @@ mod tests {
             g.set(8, y, Cell::Door);
         }
 
-        let lamps = doorway_lamp_positions(&g);
+        let lamps = doorway_lamp_positions(&g, Vec2::ZERO, 8.0);
         assert_eq!(lamps.len(), 4);
         for expected in [
             vec2(69.0, 22.0),
@@ -419,5 +430,23 @@ mod tests {
         ] {
             assert!(lamps.contains(&expected), "missing lamp at {expected:?}");
         }
+    }
+
+    #[test]
+    fn doorway_lamps_only_include_entries_near_the_camera() {
+        let mut g = Grid::filled(100, 60, Cell::Wall);
+        for y in 1..59 {
+            for x in 1..99 {
+                g.set(x, y, Cell::Floor);
+            }
+        }
+        for x in [10, 11, 80, 81] {
+            g.set(x, 0, Cell::Door);
+        }
+
+        assert_eq!(
+            doorway_lamp_positions(&g, Vec2::ZERO, 8.0),
+            vec![vec2(165.0, 22.0)]
+        );
     }
 }
