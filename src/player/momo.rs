@@ -86,15 +86,17 @@ impl Player {
         if self.kit.def().special != crate::characters::Special::Chain {
             return None;
         }
-        let aim = match self.state {
-            State::Chain { dir, .. } => dir,
-            State::Free if self.sp_full() => self.facing,
+        let (dir, lock) = match self.state {
+            State::Chain { dir, .. } => (dir, None),
+            State::Free if self.sp_full() => {
+                let lock = chain_assist(self.pos, self.facing, &self.targets);
+                let dir = lock
+                    .and_then(|q| (q - self.pos).try_normalize())
+                    .unwrap_or(self.facing);
+                (dir, lock)
+            }
             _ => return None,
         };
-        let lock = chain_assist(self.pos, aim, &self.targets);
-        let dir = lock
-            .and_then(|q| (q - self.pos).try_normalize())
-            .unwrap_or(aim);
         Some((dir, lock))
     }
 

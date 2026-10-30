@@ -405,7 +405,8 @@ pub(super) fn draw_chain_aim(w: &World, alpha: f32) {
         return;
     };
     let from = lerp(p.prev_pos, p.pos, alpha);
-    let reach = w.room.ray_len(from, dir, p.radius(), t::CHAIN_HOP_DIST);
+    let distance = chain_aim_distance(p.state, alpha);
+    let reach = w.room.ray_len(from, dir, p.radius(), distance);
     let to = from + dir * reach;
     let pulse = 0.5 + 0.5 * (w.time * 9.0).sin();
     let a = 0.7 + 0.3 * pulse;
@@ -430,6 +431,16 @@ pub(super) fn draw_chain_aim(w: &World, alpha: f32) {
             draw_rectangle(x0, c.y, 4.0, 1.0, col);
             draw_rectangle(c.x, y0, 1.0, 4.0, col);
         }
+    }
+}
+
+fn chain_aim_distance(state: player::State, alpha: f32) -> f32 {
+    match state {
+        player::State::Chain { time, .. } => {
+            let elapsed = (time - t::TICK_DT * (1.0 - alpha)).clamp(0.0, t::CHAIN_HOP_TIME);
+            t::CHAIN_HOP_DIST * (1.0 - elapsed / t::CHAIN_HOP_TIME)
+        }
+        _ => t::CHAIN_HOP_DIST,
     }
 }
 
@@ -1744,4 +1755,26 @@ pub(super) fn draw_sector_lines(origin: Vec2, dir: Vec2, r: f32, color: Color) {
         prev = p;
     }
     draw_line(origin.x, origin.y, prev.x, prev.y, 1.0, color);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chain_aim_distance_uses_remaining_interpolated_hop_time() {
+        let state = player::State::Chain {
+            left: 3,
+            time: t::CHAIN_HOP_TIME * 0.5,
+            dir: vec2(1.0, 0.0),
+        };
+        let at_tick = t::CHAIN_HOP_DIST * 0.5;
+        let before_tick = at_tick + t::CHAIN_HOP_DIST * t::TICK_DT / t::CHAIN_HOP_TIME;
+        assert!((chain_aim_distance(state, 1.0) - at_tick).abs() < 1e-4);
+        assert!((chain_aim_distance(state, 0.0) - before_tick).abs() < 1e-4);
+        assert_eq!(
+            chain_aim_distance(player::State::Free, 1.0),
+            t::CHAIN_HOP_DIST
+        );
+    }
 }

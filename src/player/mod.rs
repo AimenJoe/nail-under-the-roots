@@ -1082,14 +1082,23 @@ mod tests {
         let room = Room::new();
         let start = room.center();
         let mut p = Player::new(start);
+        p.kit = crate::equipment::Character::Momo;
+        p.moveset = &moveset::KICKS;
         let foe = start + Vec2::from_angle((-30f32).to_radians()) * 100.0;
         p.targets = vec![foe];
+        p.sp = t::SP_MAX;
+        let Some((preview, Some(lock))) = p.chain_preview() else {
+            panic!("이어 뛰기 미리보기가 없다")
+        };
+        assert!(preview.angle_between(foe - start).abs() < 0.01);
+        assert_eq!(lock, foe);
         p.start_chain(vec2(1.0, 0.0));
         let State::Chain { dir, .. } = p.state else {
             panic!("이어 뛰기가 아니다")
         };
         assert!(dir.angle_between(foe - start).abs() < 0.01);
         p.targets = vec![start + vec2(0.0, 100.0)];
+        assert_eq!(p.chain_preview(), Some((dir, None)));
         p.start_chain(vec2(1.0, 0.0));
         let State::Chain { dir, .. } = p.state else {
             panic!()
