@@ -89,7 +89,9 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                     }
                 }
                 // 물웅덩이는 바닥: 맨 먼저.
-                'W' if ground => draw_puddle(*at, w.time),
+                'W' if ground && w.character == crate::equipment::Character::Mole => {
+                    draw_puddle(*at, w.time)
+                }
                 'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
                 '1'..='9' => {
                     let i = (*c as u8 - b'1') as usize;
