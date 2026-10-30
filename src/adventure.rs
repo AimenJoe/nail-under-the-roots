@@ -148,6 +148,8 @@ pub enum Interact {
     Gate,
     /// 굴의 닫힌 보물 상자(방 소품 번호): 버튼으로 연다(사장 2026-10-29, 예전엔 닿으면 열렸다).
     Chest(usize),
+    /// 굴 출구(내려가는 구멍): 버튼으로 내려간다(사장 2026-10-30, 예전엔 밟으면 내려갔다).
+    Exit,
 }
 
 /// 어두워졌다(반) → 장소를 바꾸고 → 밝아진다(반). 그동안 로직은 멈춘다.
@@ -529,6 +531,9 @@ impl World {
         if let Some(i) = self.chest_near() {
             return Some(Interact::Chest(i));
         }
+        if self.exit_near().is_some() {
+            return Some(Interact::Exit);
+        }
         let hub = matches!(self.adv.place, Place::Camp | Place::Village);
         if !hub {
             return None;
@@ -646,6 +651,9 @@ impl World {
                 consider(q, 16.0);
             }
         }
+        if let Some(q) = self.exit_near() {
+            consider(q, 14.0);
+        }
         self.interactable().and(best.map(|b| b.1))
     }
 
@@ -737,33 +745,49 @@ impl World {
                 {
                     self.start_fade(Transition::EnterCamp)
                 }
-                Some(Cell::Exit) if stepped && self.adv.place == Place::Dungeon => {
-                    match self.adv.node {
-                        None => self.start_fade(Transition::ExitDungeon),
-                        Some(at) => {
-                            let route = self.adv.route.as_ref();
-                            let boss = route.is_some_and(|r| {
-                                matches!(r.node(at).kind, NodeKind::Boss | NodeKind::Warren)
-                            });
-                            let last = route.is_some_and(|r| r.is_final());
-                            if boss && last {
-                                if stepped {
-                                    self.adv.events.push(AdvEvent::Deepest);
-                                }
-                            } else if boss {
-                                self.start_fade(Transition::EnterCamp);
-                            } else if stepped {
-                                self.adv.route_done = Some(at);
-                                self.adv.events.push(AdvEvent::RouteOpen);
-                            }
-                        }
-                    }
-                }
                 Some(Cell::Save) => return self.touch_save(),
                 _ => {}
             }
         }
         false
+    }
+
+    /// 굴 출구(내려가는 구멍) 곁: 밟아도 내려가지 않고 확인 버튼으로 내려간다(사장 2026-10-30).
+    fn exit_near(&self) -> Option<Vec2> {
+        if self.adv.place != Place::Dungeon {
+            return None;
+        }
+        let p = self.player.pos;
+        self.room
+            .grid
+            .as_ref()?
+            .find(Cell::Exit)
+            .into_iter()
+            .find(|q| (*q - p).length() < t::INTERACT_RADIUS)
+    }
+
+    /// 앱이 부른다(`Interact::Exit`): 굴 출구로 내려간다. 길 칸은 길 지도, 보스 칸은 다음 쉼터·가장 깊은 곳.
+    pub fn use_exit(&mut self) {
+        if self.exit_near().is_none() || self.adv.fade.is_some() {
+            return;
+        }
+        match self.adv.node {
+            None => self.start_fade(Transition::ExitDungeon),
+            Some(at) => {
+                let route = self.adv.route.as_ref();
+                let boss = route
+                    .is_some_and(|r| matches!(r.node(at).kind, NodeKind::Boss | NodeKind::Warren));
+                let last = route.is_some_and(|r| r.is_final());
+                if boss && last {
+                    self.adv.events.push(AdvEvent::Deepest);
+                } else if boss {
+                    self.start_fade(Transition::EnterCamp);
+                } else {
+                    self.adv.route_done = Some(at);
+                    self.adv.events.push(AdvEvent::RouteOpen);
+                }
+            }
+        }
     }
 
     /// 공터의 대장: 안으로 들어서면 문을 닫고 깨운다. 쓰러지면 문을 열고 보리가 돌아온다(컷씬은 앱). 낼 소리를 돌려준다.
@@ -2299,10 +2323,13 @@ mod tests {
         if let Some(g) = w.room.grid.as_mut() {
             g.set((p.x / 16.0) as usize, (p.y / 16.0) as usize, Cell::Exit);
         }
-        w.cell_triggers();
+        w.use_exit();
+        assert_eq!(
+            w.interactable(),
+            Some(Interact::Exit),
+            "밟아도 안 내려가고 버튼으로"
+        );
         assert_eq!(w.adv.events, vec![AdvEvent::RouteOpen]);
-        w.cell_triggers();
-        assert_eq!(w.adv.events.len(), 1, "서 있는 동안 다시 열지 않는다");
         // 보스 칸까지 건너뛰고 출구 → 다음 쉼터.
         let r = w.adv.route.as_mut().unwrap();
         let boss = (r.layers.len() - 1, 0);
@@ -2314,7 +2341,7 @@ mod tests {
         if let Some(g) = w.room.grid.as_mut() {
             g.set((p.x / 16.0) as usize, (p.y / 16.0) as usize, Cell::Exit);
         }
-        w.cell_triggers();
+        w.use_exit();
         assert_eq!(w.adv.fade.map(|f| f.kind), Some(Transition::EnterCamp));
         w.enter_camp();
         assert_eq!((w.adv.place, w.adv.stage), (Place::Camp, 2));
@@ -2336,8 +2363,7 @@ mod tests {
         if let Some(g) = w.room.grid.as_mut() {
             g.set((p.x / 16.0) as usize, (p.y / 16.0) as usize, Cell::Exit);
         }
-        w.cell_triggers();
-        w.cell_triggers();
+        w.use_exit();
         assert_eq!(w.adv.events, vec![AdvEvent::Deepest]);
         assert!(w.adv.fade.is_none(), "쉼터로 가지 않는다");
     }
