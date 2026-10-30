@@ -934,7 +934,7 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
         player::State::Attack { idx, time: at, .. } => {
             if p.kit == crate::equipment::Character::Momo {
                 let (a0, a1) = p.moveset.hits[idx].active;
-                if (a0..=a1).contains(&at) {
+                if at >= a0 && at - crate::tuning::TICK_DT * p.stats.attack_speed < a1 {
                     F::STRIKE
                 } else {
                     F::CROUCH
@@ -946,7 +946,7 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
         player::State::Heavy { time: at, .. } => {
             if p.kit == crate::equipment::Character::Momo {
                 let (a0, a1) = p.moveset.heavy().active;
-                if (a0..=a1).contains(&at) {
+                if at >= a0 && at - crate::tuning::TICK_DT * p.stats.attack_speed < a1 {
                     F::STRIKE
                 } else {
                     F::CROUCH
