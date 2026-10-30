@@ -199,10 +199,8 @@ impl App {
         match chosen {
             Some(0) => self.scene = Scene::Game,
             Some(1) => {
-                // 다시 하기·타이틀로: 런이 끝난다. 들고 있던 반딧불은 마을로(0047) — 굴 안이면 잃는다(0210).
-                if self.safe_to_bank() {
-                    self.bank_glowbugs();
-                }
+                // 다시 하기: 런을 버린다. 모은 재화는 잃지 않는다(0259) — 반딧불은 마을로, 남은 씨앗은 마을 씨앗으로.
+                self.keep_run_currency();
                 self.start_game();
             }
             Some(2) => {
@@ -210,10 +208,9 @@ impl App {
                 self.scene = Scene::Settings { back: Back::Pause };
             }
             Some(3) => {
-                if self.safe_to_bank() {
-                    self.bank_glowbugs();
-                }
-                // 쉼터에서 나가면 그 쉼터부터 이어한다(굴 안이면 마지막 쉼터, 0080).
+                // 타이틀로: 런은 이어하기에 남는다. 반딧불은 마을로 보내고(0259), 지금 가방·씨앗까지 적는다 —
+                // 굴 안이면 이어할 때 마지막 쉼터·지나온 길부터(0259), 그 굴의 진행만 다시 한다.
+                self.bank_glowbugs();
                 self.checkpoint_run();
                 self.title_cursor = 0;
                 self.scene = Scene::Title;

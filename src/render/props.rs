@@ -805,10 +805,10 @@ fn draw_breakable_code(b: crate::room::Breakable, cx: f32, foot: f32, c: Vec2, t
     }
 }
 
-/// 곁방 보상 표지(0257, Hades의 문 보상): 지금 방의 문마다, 그 너머 방을 비우면 나오는 것을 동그란 표지로 문 안쪽에.
-/// 물결·버티기 방(더 센 방)은 테가 붉다. 비운 방·보상 없는 방은 표지가 없다.
+/// 곁방 보상 표지(0257, Hades의 문 보상): 지금 방의 문마다, 그 너머 방을 비우면 나오는 것을 문 안쪽 바닥에.
+/// 물결·버티기 방(더 센 방)은 테가 겹이고 홈이 붉다. 비운 방·보상 없는 방은 표지가 없다.
 fn draw_door_signs(w: &World) {
-    use crate::dungeon::{room_rect, Bounty, Encounter, DIRS};
+    use crate::dungeon::{room_rect, Encounter, DIRS};
     let Some(d) = &w.adv.dungeon else { return };
     let here = w.adv.current_room;
     let mut rooms = vec![here];
@@ -832,60 +832,59 @@ fn draw_door_signs(w: &World) {
                 2 => vec2(r.x + 160.0, r.bottom() - 30.0),
                 _ => vec2(r.x + 34.0, r.y + 112.0),
             };
-            let bob = (w.time * 2.4 + k as f32).sin().round();
-            let p = vec2(p.x.round(), p.y.round() + bob);
             let hard = matches!(next.encounter, Encounter::Waves | Encounter::Hold);
-            let rim = if hard {
-                Color::new(0.88, 0.32, 0.30, 1.0)
-            } else {
-                Color::new(0.95, 0.80, 0.45, 1.0)
-            };
-            draw_circle(p.x, p.y, 8.0, OUTLINE);
-            draw_circle(p.x, p.y, 7.0, rim);
-            draw_circle(p.x, p.y, 6.0, Color::new(0.14, 0.10, 0.12, 1.0));
-            match b {
-                Bounty::Seeds => {
-                    for (ox, oy) in [(-2.0, 0.0), (1.0, -1.0)] {
-                        let q = p + vec2(ox, oy);
-                        draw_rectangle(q.x - 1.0, q.y - 1.0, 2.0, 3.0, world::SEED);
-                        draw_rectangle(q.x, q.y - 2.0, 1.0, 1.0, Color::new(0.45, 0.78, 0.35, 1.0));
-                    }
-                }
-                Bounty::Glowbugs => {
-                    let pulse = 0.6 + 0.4 * (w.time * 4.0).sin().abs();
-                    draw_circle(
-                        p.x,
-                        p.y,
-                        3.5,
-                        Color::new(world::GLOW.r, world::GLOW.g, world::GLOW.b, 0.35 * pulse),
-                    );
-                    draw_rectangle(
-                        p.x - 1.0,
-                        p.y - 1.0,
-                        2.0,
-                        2.0,
-                        Color::new(1.0, 1.0, 0.7, 1.0),
-                    );
-                }
-                Bounty::Berry => draw_berry(p.x + 0.5, p.y + 0.5, 1.0, 1.0),
-                Bounty::Gift => {
-                    draw_rectangle(
-                        p.x - 3.0,
-                        p.y - 2.0,
-                        6.0,
-                        5.0,
-                        Color::new(0.62, 0.40, 0.22, 1.0),
-                    );
-                    draw_rectangle(
-                        p.x - 3.0,
-                        p.y - 2.0,
-                        6.0,
-                        1.0,
-                        Color::new(0.80, 0.56, 0.30, 1.0),
-                    );
-                    draw_rectangle(p.x - 1.0, p.y, 2.0, 2.0, Color::new(1.0, 0.85, 0.40, 1.0));
+            draw_floor_sign(p.round(), b, hard);
+        }
+    }
+}
+
+/// 바닥에 새긴 표지(0259, 사장 "아이템처럼 보이면 안 되고 바닥에 새겨진 것처럼"): 줍는 것의 문법(빛 자리·고리·별·떠다님,
+/// `draw_pickup_mark`)을 하나도 쓰지 않는다. 납작한 타원 테 + 가운데 그림을 바닥보다 어두운 홈으로 파고, 홈 아래 가장자리에만
+/// 옅은 빛 한 줄(위에서 오는 빛이 홈의 먼 벽에 닿는다). 색 없이 바닥 위에 반투명으로 얹어 어느 지대 바닥에서도 바닥 결이 비친다.
+/// 센 방은 테가 겹이고 홈이 붉은 기를 띤다(0257의 붉은 테). 움직이지 않는다.
+pub(super) fn draw_floor_sign(p: Vec2, b: crate::dungeon::Bounty, hard: bool) {
+    use crate::dungeon::Bounty;
+    let glyph: &[&str] = match b {
+        Bounty::Seeds => &[".#...#.", "###.###", ".#...#."],
+        Bounty::Glowbugs => &["..#..", "#.#.#", "..#..", ".#.#."],
+        Bounty::Berry => &["..#..", ".#.#.", "#.#.#", ".#.#."],
+        Bounty::Gift => &["#####", "#.#.#", "#####"],
+    };
+    let mut cut: Vec<(i32, i32)> = vec![];
+    // 테: 가로 8·세로 5의 타원(3/4 탑다운이라 바닥의 원이 납작하다).
+    let ring = |cut: &mut Vec<(i32, i32)>, rx: f32, ry: f32, dash: bool| {
+        for y in -(ry as i32) - 1..=(ry as i32) + 1 {
+            for x in -(rx as i32) - 1..=(rx as i32) + 1 {
+                let d = (x as f32 / rx).powi(2) + (y as f32 / ry).powi(2);
+                if (0.80..=1.20).contains(&d) && (!dash || (x + y).rem_euclid(3) != 0) {
+                    cut.push((x, y));
                 }
             }
+        }
+    };
+    ring(&mut cut, 8.0, 5.0, false);
+    if hard {
+        ring(&mut cut, 11.0, 7.0, true);
+    }
+    let gh = glyph.len() as i32;
+    for (j, row) in glyph.iter().enumerate() {
+        let gw = row.len() as i32;
+        for (i, ch) in row.bytes().enumerate() {
+            if ch == b'#' {
+                cut.push((i as i32 - gw / 2, j as i32 - gh / 2));
+            }
+        }
+    }
+    let groove = if hard {
+        Color::new(0.30, 0.02, 0.02, 0.42)
+    } else {
+        Color::new(0.0, 0.0, 0.0, 0.34)
+    };
+    let lip = Color::new(1.0, 0.94, 0.82, 0.13);
+    for &(x, y) in &cut {
+        draw_rectangle(p.x + x as f32, p.y + y as f32, 1.0, 1.0, groove);
+        if !cut.contains(&(x, y + 1)) {
+            draw_rectangle(p.x + x as f32, p.y + y as f32 + 1.0, 1.0, 1.0, lip);
         }
     }
 }

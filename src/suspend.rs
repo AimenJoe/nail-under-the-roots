@@ -2,8 +2,8 @@
 //!
 //! - 슬롯마다 하나(저장 칸 4~6, `profile::load_run`·`save_run`). 형식은 기록(`profile.rs`)과 같은 깃발 + 수 글이라
 //!   사람이 읽을 수 있고, 모르는 키는 무시한다.
-//! - 쉼터에 닿을 때·쉼터에서 가게를 닫을 때·쉼터에서 타이틀로 나갈 때 쓴다. 굴 안에서 끄면 마지막 쉼터부터다
-//!   (쓰러져도 쉼터로 돌아오니, 굴 안에서 얻은 것만 잃는다).
+//! - 쉼터에 닿을 때·쉼터에서 가게를 닫을 때·굴의 출구를 밟아 길 지도가 열릴 때·쓰러져 다시 설 때·타이틀로 나갈 때 쓴다
+//!   (0259). 이어하면 마지막 쉼터에 서고 길은 지난 칸부터 — 굴 안에서 끄면 그 굴의 진행만 다시 한다.
 //! - 런이 끝나면(새 런·마을로 돌아감·가장 깊은 곳) 지운다.
 //!
 //! 이 파일은 월드·앱을 모른다. 앱(`app/run.rs`)이 값을 채우고 되돌린다.
@@ -54,6 +54,10 @@ pub struct RunSave {
     pub equipped: Option<usize>,
     pub charms: Vec<usize>,
     pub charms_found: Vec<usize>,
+    /// 이 길에서 지난 마지막 칸(층, 번호, 0259). 없으면 쉼터에서 길을 처음부터. 없으면 적지 않는다(옛 글과 같다).
+    pub route: Option<(u32, u32)>,
+    /// 길 가운데서 적었을 때의 체력(0259): 이어하기가 쉼터를 다시 세워도 회복 칸이 되지 않게. 0 = 가득(쉼터에서 적음).
+    pub hp: u32,
 }
 
 /// 리스트 칸 키(`slot.3`).
@@ -81,6 +85,13 @@ impl RunSave {
         p.set_count("run_secs", self.run_secs);
         if self.falls > 0 {
             p.set_count("falls", self.falls);
+        }
+        if let Some((l, i)) = self.route {
+            p.set_count("route.layer", l + 1);
+            p.set_count("route.at", i);
+        }
+        if self.hp > 0 {
+            p.set_count("hp", self.hp);
         }
         for (on, key) in [
             (self.heart_sold, "heart_sold"),
@@ -149,7 +160,8 @@ impl RunSave {
             stage: p.count("stage"),
             seed: ((p.count("seed.hi") as u64) << 32) | p.count("seed.lo") as u64,
             depth: p.count("depth"),
-            character: p.count("character").min(1) as u8,
+            // 전에는 `min(1)`이라 도토(2)로 적은 런이 모모로 이어졌다(0259에서 찾음).
+            character: p.count("character").min(u8::MAX as u32) as u8,
             knots: p.count("knots").min(u8::MAX as u32) as u8,
             seeds: p.count("seeds"),
             glowbugs: p.count("glowbugs"),
@@ -173,6 +185,11 @@ impl RunSave {
             },
             charms: list("worn"),
             charms_found: list("found"),
+            route: match p.count("route.layer") {
+                0 => None,
+                l => Some((l - 1, p.count("route.at"))),
+            },
+            hp: p.count("hp"),
         })
     }
 }
@@ -212,6 +229,8 @@ mod tests {
             equipped: Some(4),
             charms: vec![0],
             charms_found: vec![0, 5],
+            route: None,
+            hp: 0,
         }
     }
 
@@ -253,6 +272,22 @@ mod tests {
             },
             RunSave { stats: vec![], ..r }
         );
+    }
+
+    /// 길 가운데서 적은 런(0259): 지난 칸(층 0도)·체력·도토(번호 2)가 그대로 돌아온다.
+    #[test]
+    fn mid_route_save_keeps_route_hp_and_doto() {
+        let r = RunSave {
+            character: 2,
+            route: Some((0, 2)),
+            hp: 3,
+            ..sample()
+        };
+        let back =
+            RunSave::from_profile(&Profile::decode(&r.to_profile().encode()).unwrap()).unwrap();
+        assert_eq!(back.route, Some((0, 2)));
+        assert_eq!(back.hp, 3);
+        assert_eq!(back.character, 2);
     }
 
     /// 빈 기록·다른 형식 번호는 이어하기가 아니다.

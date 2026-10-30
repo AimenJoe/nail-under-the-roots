@@ -49,6 +49,8 @@ pub struct After {
     route: bool,
     /// 마을에서 내려온 런(0226): 첫 쉼터에 닿으면 도착 한마디 대신 길 지도.
     village_run: bool,
+    /// 마을에서 길 지도로 칸을 골라 곧장 굴로 내려간 런(0259): 보이지 않게 세운 첫 쉼터의 도착 한마디·길 지도는 없다.
+    quiet_camp: bool,
 }
 
 impl After {
@@ -73,6 +75,12 @@ impl After {
         self.village_run = true;
     }
 
+    /// 마을에서 고른 칸으로 곧장 내려가는 런(0259): 첫 쉼터는 지나치고, 굴에 닿아 단면이 다 흐르면 런 첫 한마디.
+    pub fn village_node(&mut self) {
+        self.run_start = true;
+        self.quiet_camp = true;
+    }
+
     /// `kind`가 남아 있고 문이 열렸으면 꺼낸다.
     pub fn take(&mut self, kind: Kind, g: Gate) -> Option<Do> {
         let calm = g.settled && g.alive && g.in_game;
@@ -83,7 +91,9 @@ impl After {
             }
             Kind::Camp if calm => {
                 let n = self.camp.take()?;
-                if std::mem::take(&mut self.village_run) {
+                if std::mem::take(&mut self.quiet_camp) {
+                    None
+                } else if std::mem::take(&mut self.village_run) {
                     self.route = true;
                     None
                 } else {
@@ -170,6 +180,19 @@ mod tests {
         assert!(frame(&mut a, talking, false).is_empty());
         assert_eq!(frame(&mut a, OPEN, false), vec![Do::OpenRoute]);
         // 다음 쉼터는 보통 도착 한마디.
+        a.camp(2);
+        assert_eq!(frame(&mut a, OPEN, false), vec![Do::CampArrive(2)]);
+    }
+
+    #[test]
+    fn village_node_skips_camp_line_and_route() {
+        let mut a = After::default();
+        a.village_node();
+        a.camp(1);
+        assert!(frame(&mut a, FADING, false).is_empty());
+        // 굴에 닿아 단면이 끝나면 런 첫 한마디만 — 쉼터 도착 한마디도, 길 지도도 없다(이미 골랐다).
+        assert_eq!(frame(&mut a, OPEN, false), vec![Do::SayRunStart]);
+        assert!(frame(&mut a, OPEN, false).is_empty());
         a.camp(2);
         assert_eq!(frame(&mut a, OPEN, false), vec![Do::CampArrive(2)]);
     }

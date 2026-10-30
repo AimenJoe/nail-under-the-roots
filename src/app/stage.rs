@@ -301,7 +301,17 @@ impl App {
                     // 도착 한마디는 내려가는 단면이 다 흐른 뒤에(0225): 가운데서 대화가 뜨면 월드가 멈춰 단면이 중간 깊이에 섰다.
                     self.after.camp(n);
                 }
-                AdvEvent::RouteOpen => self.open_route(false),
+                AdvEvent::RouteOpen => {
+                    // 굴 하나를 끝냈다(0259): 반딧불은 마을로, 이어하기는 이 칸까지. 전에는 쉼터에서만 적어 굴 몇 개를 잃었다.
+                    if self.bank_glowbugs() > 0 {
+                        self.world.juice.toast = Some((|s| s.toast_node_bank, 3.0));
+                    }
+                    self.save_profile();
+                    self.checkpoint_run();
+                    self.open_route(false);
+                }
+                // 쓰러져 다시 섰다(0259): 감긴 실뿌리까지 이어하기에. 전에는 다음 쉼터까지 옛 글이 남아, 끄고 이으면 실뿌리가 풀렸다.
+                AdvEvent::Woke => self.checkpoint_run(),
                 // 오늘의 굴은 싸움 없이 기록만(0162). 이야기 런은 가장 깊은 곳의 실매듭 끊기로.
                 AdvEvent::Deepest => {
                     if self.current == crate::scenario::Scenario::Daily {
@@ -429,6 +439,7 @@ impl App {
             // 마을의 포포: 마을 꾸미기 가게(0045).
             Interact::Talk(Who::Popo) if village => {
                 self.decor_cursor = 0;
+                self.decor_tab = 0;
                 self.shop_msg = None;
                 self.world.freeze();
                 self.scene = Scene::Decor;
@@ -604,9 +615,18 @@ impl App {
                 self.world.freeze();
                 self.scene = Scene::CharPick;
             }
-            Interact::Gate if village => self.start(crate::scenario::Scenario::Normal),
+            Interact::Gate if village => self.village_route(),
             Interact::Gate => self.open_route(true),
         }
+    }
+
+    /// 마을 뿌리 길(0259): 첫 길 지도를 마을 위에 연다. 칸을 고르면 새 런이 그 굴로 곧장 내려가고, 닫으면 마을에 그대로.
+    pub(super) fn village_route(&mut self) {
+        let seed = (macroquad::miniquad::date::now() * 1000.0) as u64;
+        let warren = self.profile.flag(crate::profile::key::MOMO_BACK);
+        self.world.preview_first_route(seed, warren);
+        self.village_pick = Some(seed);
+        self.open_route(true);
     }
 
     /// 길 지도를 연다. 쉼터의 뿌리 길에서 열면 뒤로 닫을 수 있고, 굴의 출구에서 열면 골라야 한다.
@@ -645,10 +665,22 @@ impl App {
             go = self.route_cursor == i;
             self.route_cursor = i;
         }
+        if go {
+            if let Some(seed) = self.village_pick.take() {
+                // 마을에서(0259): 고른 칸을 들고 새 런을 시작한다 — 첫 장면이 그 굴로 내려간다.
+                self.village_go = Some((seed, choices[self.route_cursor]));
+                self.sfx.play(crate::sfx::Id::Burrow);
+                self.start(crate::scenario::Scenario::Normal);
+                return;
+            }
+        }
         if go && self.world.choose_node(choices[self.route_cursor]) {
             self.sfx.play(crate::sfx::Id::Burrow);
             self.scene = Scene::Game;
         } else if (a.cancel || a.menu || tap_hit == Some(Hit::Close)) && self.route_cancel {
+            if self.village_pick.take().is_some() {
+                self.world.adv.route = None;
+            }
             self.scene = Scene::Game;
         }
     }
@@ -1217,22 +1249,40 @@ impl App {
         ui.text_center(&text, r.center().x, r.y + 2.0, FONT_PX, ui::TEXT);
     }
 
-    /// 마을 꾸미기 가게(마을의 포포, 0045): 위아래로 고르고 확인으로 놓는다. 닫기: 뒤로·✕·바깥.
+    /// 마을 가게(마을의 포포, 0045): 탭 둘(0259) — 꾸미기(놓기)·짐 꾸리기(다음 런 가방). 위아래로 고르고 확인, 좌우로 탭.
+    /// 닫기: 뒤로·✕·바깥.
     pub(super) fn update_decor(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
-        use crate::village::{key_decor, DECOR, KEY_SEEDS};
+        use crate::village::{key_decor, key_pack, DECOR, KEY_SEEDS, PACK};
         if let Some((_, t)) = self.shop_msg.as_mut() {
             *t -= dt;
             if *t <= 0.0 {
                 self.shop_msg = None;
             }
         }
-        let n = DECOR.len();
+        let tab = if a.left || a.right {
+            Some(1 - self.decor_tab.min(1))
+        } else if let Some(Hit::ShopTab(i)) = tap_hit {
+            Some(i)
+        } else {
+            None
+        };
+        if let Some(t) = tab.filter(|&t| t != self.decor_tab) {
+            self.decor_tab = t;
+            self.decor_cursor = 0;
+            self.shop_msg = None;
+        }
+        let n = if self.decor_tab == 0 {
+            DECOR.len()
+        } else {
+            PACK.len()
+        };
         if a.up {
             self.decor_cursor = (self.decor_cursor + n - 1) % n;
         }
         if a.down {
             self.decor_cursor = (self.decor_cursor + 1) % n;
         }
+        self.decor_cursor = self.decor_cursor.min(n - 1);
         let chosen = if a.confirm {
             Some(self.decor_cursor)
         } else if let Some(Hit::ShopItem(i)) = tap_hit {
@@ -1241,24 +1291,43 @@ impl App {
         } else {
             None
         };
-        if let Some(i) = chosen {
-            let owned = self.profile.flag(&key_decor(i));
-            let have = self.profile.count(KEY_SEEDS);
-            if owned {
-                // 이미 놓았다: 아무 일도 없다.
-            } else if have < DECOR[i].price {
-                self.shop_msg = Some((|s| s.decor_poor, 3.0));
-                self.sfx.play(crate::sfx::Id::Deny);
-            } else {
-                self.profile.set_count(KEY_SEEDS, have - DECOR[i].price);
-                self.profile.set(&key_decor(i));
-                crate::profile::save(&self.profile);
-                if let Some(v) = self.world.adv.village.as_mut() {
-                    v.decor[i] = true;
+        let have = self.profile.count(KEY_SEEDS);
+        match chosen {
+            Some(i) if self.decor_tab == 0 => {
+                if self.profile.flag(&key_decor(i)) {
+                    // 이미 놓았다: 아무 일도 없다.
+                } else if have < DECOR[i].price {
+                    self.shop_msg = Some((|s| s.decor_poor, 3.0));
+                    self.sfx.play(crate::sfx::Id::Deny);
+                } else {
+                    self.profile.set_count(KEY_SEEDS, have - DECOR[i].price);
+                    self.profile.set(&key_decor(i));
+                    crate::profile::save(&self.profile);
+                    if let Some(v) = self.world.adv.village.as_mut() {
+                        v.decor[i] = true;
+                    }
+                    self.shop_msg = Some((|s| s.decor_thanks, 2.5));
+                    self.sfx.play(crate::sfx::Id::Buy);
                 }
-                self.shop_msg = Some((|s| s.decor_thanks, 2.5));
-                self.sfx.play(crate::sfx::Id::Buy);
             }
+            Some(i) => {
+                let p = &PACK[i];
+                let packed = self.profile.count(key_pack(p.kind));
+                if packed >= p.max {
+                    self.shop_msg = Some((|s| s.pack_full, 3.0));
+                    self.sfx.play(crate::sfx::Id::Deny);
+                } else if have < p.price {
+                    self.shop_msg = Some((|s| s.decor_poor, 3.0));
+                    self.sfx.play(crate::sfx::Id::Deny);
+                } else {
+                    self.profile.set_count(KEY_SEEDS, have - p.price);
+                    self.profile.set_count(key_pack(p.kind), packed + 1);
+                    crate::profile::save(&self.profile);
+                    self.shop_msg = Some((|s| s.pack_thanks, 2.5));
+                    self.sfx.play(crate::sfx::Id::Buy);
+                }
+            }
+            None => {}
         }
         if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
             self.shop_msg = None;
@@ -1267,14 +1336,17 @@ impl App {
     }
 
     pub(super) fn draw_decor(&mut self, ui: &Ui) {
-        use crate::village::{key_decor, DECOR, KEY_SEEDS};
+        use crate::village::{key_decor, key_pack, DECOR, KEY_SEEDS, PACK};
         let s = i18n::s();
         // 꾸미기 여섯 줄이 창 아래로 넘쳐 조작 안내와 겹쳤다: 창을 위로 늘림(0089).
         let panel = Rect::new(44.0, 6.0, 232.0, 160.0);
-        ui.panel(panel, Some(s.decor_title));
+        let pack = self.decor_tab == 1;
+        // 머리줄이 곧 탭(0259): 꾸미기 · 짐 꾸리기 — 줄 하나를 따로 쓰면 꾸미기 여섯 줄이 창 밖으로 넘쳤다.
+        ui.panel(panel, Some(""));
         self.close_button(ui, panel);
         let have = self.profile.count(KEY_SEEDS);
         let seeds = fill(s.village_seeds, &[&have]);
+        let seeds_w = ui.text_w(&seeds, FONT_PX);
         ui.text_right(
             &seeds,
             panel.right() - 20.0,
@@ -1282,14 +1354,43 @@ impl App {
             FONT_PX,
             ui::TEXT,
         );
+        let tab_w = ((panel.w - 30.0 - seeds_w) / 2.0).max(30.0);
+        for (i, name) in [s.decor_tab, s.pack_tab].iter().enumerate() {
+            let r = Rect::new(
+                panel.x + 3.0 + i as f32 * tab_w,
+                panel.y + 1.0,
+                tab_w - 2.0,
+                FONT_PX + 4.0,
+            );
+            self.hits.push((r, Hit::ShopTab(i)));
+            let on = i == self.decor_tab;
+            if on {
+                ui.rect(r, ui::PANEL_LIGHT);
+            }
+            let label = ui.fit(name, r.w - 4.0, FONT_PX);
+            ui.text_center(
+                &label,
+                r.center().x,
+                panel.y + 3.0,
+                FONT_PX,
+                if on { ui::ACCENT } else { ui::TEXT_DIM },
+            );
+        }
         // 길 무기(0246)까지 물건이 다섯이 되면 넘쳐서 초상화 칸을 44 → 36으로(인사 세 줄 = 36px).
         let face = Rect::new(panel.x + 6.0, panel.y + 22.0, 36.0, 36.0);
         ui.rect(face, ui::PANEL_LIGHT);
-        let happy = self.shop_msg.is_some_and(|(m, _)| tr(m) == s.decor_thanks);
+        let happy = self
+            .shop_msg
+            .is_some_and(|(m, _)| tr(m) == s.decor_thanks || tr(m) == s.pack_thanks);
         let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
         self.renderer.draw_portrait(ui, face, frame);
         ui.rect_lines(face, ui::BORDER);
-        let say = self.shop_msg.map(|(m, _)| tr(m)).unwrap_or(s.decor_hi);
+        // 짐 꾸리기 탭은 고른 짐의 설명을, 말이 있으면 말을.
+        let say = match self.shop_msg {
+            Some((m, _)) => tr(m),
+            None if pack => tr(PACK[self.decor_cursor.min(PACK.len() - 1)].desc),
+            None => s.decor_hi,
+        };
         let tx = face.right() + 6.0;
         for (k, l) in ui::wrap(ui, say, panel.right() - tx - 6.0, FONT_PX)
             .iter()
@@ -1298,9 +1399,37 @@ impl App {
         {
             ui.text(l, tx, face.y + 2.0 + k as f32 * 12.0, FONT_PX, ui::TEXT);
         }
-        let list_y = face.bottom() + 6.0;
         let row_h = FONT_PX + 2.0;
-        for (i, d) in DECOR.iter().enumerate() {
+        let list_y = face.bottom() + 6.0;
+        let rows: Vec<(String, String, bool)> = if pack {
+            PACK.iter()
+                .map(|p| {
+                    let n = self.profile.count(key_pack(p.kind));
+                    let name = if p.kind == crate::village::PackKind::Pouch {
+                        fill(tr(p.name), &[&crate::village::PACK_POUCH_SEEDS])
+                    } else {
+                        tr(p.name).to_string()
+                    };
+                    let right = fill(s.pack_price, &[&n, &p.max, &p.price]);
+                    (name, right, n >= p.max || have < p.price)
+                })
+                .collect()
+        } else {
+            DECOR
+                .iter()
+                .enumerate()
+                .map(|(i, d)| {
+                    let owned = self.profile.flag(&key_decor(i));
+                    let right = if owned {
+                        s.decor_owned.to_string()
+                    } else {
+                        fill(s.shop_price, &[&d.price])
+                    };
+                    (tr(d.name).to_string(), right, owned || have < d.price)
+                })
+                .collect()
+        };
+        for (i, (name, right, dim)) in rows.iter().enumerate() {
             let r = Rect::new(
                 panel.x + 6.0,
                 list_y + i as f32 * row_h,
@@ -1313,34 +1442,60 @@ impl App {
                 ui.rect(r, ui::PANEL_LIGHT);
                 ui.text("▶", r.x + 2.0, ui::mid_y(r), FONT_PX, ui::ACCENT);
             }
-            let owned = self.profile.flag(&key_decor(i));
-            let right = if owned {
-                s.decor_owned.to_string()
-            } else {
-                fill(s.shop_price, &[&d.price])
-            };
-            let c = if owned || have < d.price {
+            let c = if *dim {
                 ui::TEXT_DIM
             } else if on {
                 ui::TEXT
             } else {
                 Color::new(0.78, 0.72, 0.64, 1.0)
             };
-            let pw = ui.text_w(&right, FONT_PX);
-            let name = ui.fit(tr(d.name), r.w - pw - 26.0, FONT_PX);
+            let pw = ui.text_w(right, FONT_PX);
+            let name = ui.fit(name, r.w - pw - 26.0, FONT_PX);
             ui.text(&name, r.x + 14.0, ui::mid_y(r), FONT_PX, c);
-            ui.text_right(&right, r.right() - 4.0, ui::mid_y(r), FONT_PX, c);
+            ui.text_right(right, r.right() - 4.0, ui::mid_y(r), FONT_PX, c);
         }
-        let hint = super::vfill(s.decor_hint, &[Verb::Confirm, Verb::Back]);
+        let hint = super::vfill(s.decor_hint, &[Verb::Confirm, Verb::Change, Verb::Back]);
         let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);
         ui.text_center(&hint, 160.0, panel.bottom() + 1.0, FONT_PX, ui::TEXT_DIM);
     }
 
-    /// 그만둘 때(다시 하기·타이틀로) 들고 있는 반딧불을 마을로 보내도 되나(0210): 굴·가장 깊은 곳 안이면 아니다.
-    /// 쓰러지면 잃는 반딧불을, 쓰러지기 직전에 그만둬서 지키지 못하게. 도움 모드는 늘 보낸다.
-    pub(super) fn safe_to_bank(&self) -> bool {
-        use crate::adventure::Place;
-        self.world.assist || !matches!(self.world.adv.place, Place::Dungeon | Place::Deep)
+    /// 꾸려 둔 짐을 새 런 가방에(0259): 산딸기·지렁이는 가방 한도까지, 씨앗 주머니는 런 씨앗으로. 꺼내면 지운다.
+    pub(super) fn unpack(&mut self) {
+        use crate::village::{key_pack, PackKind, PACK, PACK_POUCH_SEEDS};
+        let mut any = false;
+        for p in &PACK {
+            let n = self.profile.count(key_pack(p.kind));
+            if n == 0 {
+                continue;
+            }
+            any = true;
+            let bag = &mut self.world.inv.bag;
+            match p.kind {
+                PackKind::Berry => {
+                    bag.berries = (bag.berries as u32 + n).min(t::BERRY_MAX as u32) as u8
+                }
+                PackKind::Worm => bag.worms = (bag.worms as u32 + n).min(t::WORM_MAX as u32) as u8,
+                PackKind::Pouch => self.world.inv.seeds += n * PACK_POUCH_SEEDS,
+            }
+            self.profile.set_count(key_pack(p.kind), 0);
+        }
+        if any {
+            crate::profile::save(&self.profile);
+            self.world.juice.toast = Some((|s| s.toast_pack, 3.5));
+        }
+    }
+
+    /// 런이 끝날 때(실뿌리가 다 감김·다시 하기, 0259) 모은 재화를 지킨다: 반딧불은 마을로(`bank_glowbugs`), 이야기 런의
+    /// 남은 씨앗은 마을 씨앗으로(깬 덤 `VILLAGE_SEEDS_CLEAR`은 없다). 전(0210 C)에는 굴 안에서 끝나면 잃었다.
+    pub(super) fn keep_run_currency(&mut self) {
+        self.bank_glowbugs();
+        if self.recording() && self.current == crate::scenario::Scenario::Normal {
+            let n = std::mem::take(&mut self.world.inv.seeds);
+            if n > 0 {
+                self.profile.add(crate::village::KEY_SEEDS, n);
+                crate::profile::save(&self.profile);
+            }
+        }
     }
 
     /// 들고 있는 반딧불을 마을(큰 나무)로 보낸다: 쉼터에 닿을 때·런이 끝날 때(0047). 첫 시작만. 보낸 수.
@@ -1372,6 +1527,17 @@ impl App {
             }
         }
         self.tally = now;
+        // 쌓은 통계는 다른 저장 때 같이 적었는데, 그 사이에 끄면 사라졌다(0259): 바뀐 뒤 몇 초 안에 적는다.
+        if changed && self.stats_unsaved < 0.0 {
+            self.stats_unsaved = 0.0;
+        }
+        if self.stats_unsaved >= 0.0 {
+            self.stats_unsaved += dt;
+            if self.stats_unsaved >= t::STAT_SAVE_EVERY {
+                self.stats_unsaved = -1.0;
+                self.save_profile();
+            }
+        }
         // 깃발(이야기)로 이루는 목표도 있으니 가끔은 그냥 센다.
         self.journal_check -= dt;
         if changed || self.journal_check <= 0.0 {

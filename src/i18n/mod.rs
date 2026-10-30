@@ -397,7 +397,7 @@ strings! {
     // 오늘의 굴(docs/decisions/0044)
     title_daily, daily_best, daily_clear, toast_daily_clear,
     // 마을(docs/decisions/0045)
-    village_name, decor_title, village_seeds, decor_owned, decor_hi, decor_poor, decor_thanks, decor_hint, decor_1, decor_2, decor_3, decor_4, decor_5, decor_6, village_intro, halmae_arrive, ia_decor, ia_descend, ia_knots,
+    village_name, village_seeds, decor_owned, decor_hi, decor_poor, decor_thanks, decor_hint, decor_tab, pack_tab, pack_price, pack_pouch, pack_berry_d, pack_worm_d, pack_pouch_d, pack_full, pack_thanks, toast_pack, toast_node_bank, decor_1, decor_2, decor_3, decor_4, decor_5, decor_6, village_intro, halmae_arrive, ia_decor, ia_descend, ia_knots,
     // 모모(docs/decisions/0046)
     mob_momo, mob_momo_lore, mob_momo_atk, mob_momo_tip, momo_meet_1, momo_meet_1b, momo_meet_2, momo_meet_2b, momo_meet_3, momo_meet_3b, momo_flee_1, momo_flee_2, momo_flee_wait, momo_petal, momo_r6, momo_r7, seat_p1, seat_p2, seat_p3, momo_v1, momo_v2, momo_v3, bori_momo, popo_momo, momo_v4, bori_clover, halmae_clover,
     // 큰 나무의 재주(docs/decisions/0047)

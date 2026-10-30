@@ -118,6 +118,8 @@ pub enum AdvEvent {
     RouteOpen,
     /// 쉼터에 처음 닿음(번호).
     CampArrive(u32),
+    /// 쓰러져 쉼터·저장 지점에서 다시 섰다(0259): 앱이 이어하기를 다시 적는다(감긴 실뿌리까지).
+    Woke,
     /// 마지막 길의 주인을 이기고 출구를 밟았다: 가장 깊은 곳(엔딩은 앱, 0042).
     Deepest,
     /// 길의 주인(`bosses.rs`: 모모 0046·도토 0052·콩이 0054·토끼풀 0165)이 끝 방에 있다 / 이겼다. 장면·기록은 앱.
@@ -189,6 +191,10 @@ pub struct Adventure {
     pub cam_hold: Option<Vec2>,
     boss_cleared: bool,
     pub(crate) seed: u64,
+    /// 지금 쉼터의 길 지도를 짠 시드(0259): 이어하기가 쉼터와 길을 다시 세울 때. 굴에 들어가면 `seed`는 굴마다 바뀐다.
+    pub camp_seed: u64,
+    /// 이 길에서 끝까지 지난 마지막 칸(0259): 굴의 출구를 밟아 길 지도가 열릴 때 적는다. 이어하기가 길을 여기부터 잇는다.
+    pub route_done: Option<(usize, usize)>,
     /// 몇 번째 쉼터까지 왔나(0 = 아직 필드).
     pub stage: u32,
     /// 쓰러지면 돌아갈 곳(필드 또는 쉼터). save_pos는 이 장소의 좌표.
@@ -330,6 +336,36 @@ impl World {
         }
     }
 
+    /// 마을 뿌리 길(0259): 내려가기 전에 첫 길 지도를 마을 위에 보인다. `seed`는 새 런이 쓸 모험 시드 —
+    /// `descend_to_node`가 같은 값으로 첫 쉼터를 세우면 같은 길이 나온다. 마을 월드는 길을 그리기만 한다.
+    pub fn preview_first_route(&mut self, seed: u64, warren: bool) {
+        self.adv.route = Some(Route::generate(
+            seed.wrapping_add(CAMP_SEED_STEP),
+            1,
+            warren,
+        ));
+    }
+
+    /// 마을에서 고른 칸으로 곧장(0259, 사장 "쉼터를 지나지 않고 바로 모험 떠나는 게 더 자연스러움"): 첫 쉼터는 보이지 않게
+    /// 세워 두고(쓰러지면 깨어나는 곳·이어하기 자리) 그 칸의 굴로 내려간다. 단면은 마을(0 m)에서 굴 깊이까지 다 덮인 채 흐른다.
+    /// 길이 어긋나 그 칸을 못 고르면 false — 앱이 예전처럼 쉼터로 내려간다.
+    pub fn descend_to_node(&mut self, seed: u64, at: (usize, usize)) -> bool {
+        self.adv.seed = seed;
+        // 쉼터는 지나치니 "쉼터에 닿았다" 알림은 걷는다(앞에 있던 알림 — 꾸려 둔 짐 — 은 남긴다).
+        let toast = self.juice.toast.take();
+        self.enter_camp();
+        self.juice.toast = toast;
+        if !self.adv.route.as_mut().is_some_and(|r| r.pick(at)) {
+            return false;
+        }
+        self.start_fade(Transition::EnterNode);
+        if let Some(f) = self.adv.fade.as_mut() {
+            f.t = f.kind.half() * 2.0 * 0.2;
+            f.from_m = 0;
+        }
+        true
+    }
+
     pub fn start_near_entrance(&mut self) {
         let at = self.adv.entrance_pos - vec2(0.0, t::FIELD_SHORTCUT_UP);
         self.player.pos = at;
@@ -388,9 +424,20 @@ impl World {
         self.enter_camp();
     }
 
-    /// 지금 모험 시드(쉼터부터 이어하기가 적어 둔다).
+    /// 이어하기(0259): 길을 적어 둔 칸까지 지난 것으로. 그 칸이 이 길에 없으면(형식이 어긋남) 처음부터.
+    pub fn resume_route(&mut self, done: (usize, usize)) {
+        let Some(r) = self.adv.route.as_mut() else {
+            return;
+        };
+        if r.layers.get(done.0).is_some_and(|l| done.1 < l.len()) {
+            r.at = Some(done);
+            self.adv.route_done = Some(done);
+        }
+    }
+
+    /// 이어하기가 적는 시드: 지금 쉼터의 길을 짠 값(쉼터를 다시 세우면 같은 길이 나온다).
     pub fn adv_seed(&self) -> u64 {
-        self.adv.seed
+        self.adv.camp_seed
     }
 
     /// 쉼터에서 시작하는 모험 월드(개발 시나리오).
@@ -703,6 +750,7 @@ impl World {
                             } else if boss {
                                 self.start_fade(Transition::EnterCamp);
                             } else if stepped {
+                                self.adv.route_done = Some(at);
                                 self.adv.events.push(AdvEvent::RouteOpen);
                             }
                         }
@@ -1088,6 +1136,8 @@ impl World {
         self.adv.place = Place::Camp;
         self.adv.heart_sold = false;
         self.adv.seed = self.adv.seed.wrapping_add(CAMP_SEED_STEP);
+        self.adv.camp_seed = self.adv.seed;
+        self.adv.route_done = None;
         self.adv.route = Some(Route::generate(
             self.adv.seed,
             stage,
@@ -1151,6 +1201,8 @@ impl World {
             // 길은 새로 짠다(같은 쉼터에서 다시 고른다).
             let stage = self.adv.stage;
             self.adv.seed = self.adv.seed.wrapping_add(0x7F4A_7C15);
+            self.adv.camp_seed = self.adv.seed;
+            self.adv.route_done = None;
             self.adv.route = Some(Route::generate(
                 self.adv.seed,
                 stage,
@@ -1161,12 +1213,9 @@ impl World {
         self.player.hp = self.player.stats.max_hp;
         self.player.pos = self.adv.save_pos;
         self.player.prev_pos = self.player.pos;
-        // 쉼터에 닿기 전(맡기기 전)에 주운 반딧불(0047): 쓰러지면 다 잃는다(0210). 도움 모드는 예전처럼 30%만.
-        if self.assist {
-            self.inv.glowbugs = self.inv.glowbugs * 7 / 10;
-        } else {
-            self.inv.glowbugs = 0;
-        }
+        // 들고 있던 반딧불·씨앗은 그대로(0259, 사장 "런을 끝내기 전에 모인 재화가 없어지는 게 불합리") — 쓰러짐의 대가는
+        // 실뿌리(0210 A)와 지나온 굴·길(길을 새로 짠다)이다. 0210 C(맡기지 않은 반딧불은 다 잃는다)는 걷었다.
+        self.adv.events.push(AdvEvent::Woke);
         if strand {
             self.adv.falls += 1;
         }
@@ -1730,6 +1779,62 @@ fn exit_cell(
 mod tests {
     use super::*;
 
+    /// 마을 길 지도(0259): 마을에서 미리 본 길과 새 런이 세운 첫 쉼터의 길이 같고, 고른 칸의 굴로 곧장 내려간다.
+    /// 첫 쉼터는 보이지 않게 집이 된다(쓰러지면 거기서 깬다). 단면은 마을(0 m)에서 시작해 처음부터 다 덮여 있다.
+    #[test]
+    fn village_route_descends_straight_into_the_picked_burrow() {
+        let mut v = World::village(crate::village::State::default());
+        v.preview_first_route(0x0259, false);
+        let shown = v.adv.route.as_ref().unwrap();
+        let kinds = |r: &Route| -> Vec<Vec<NodeKind>> {
+            r.layers
+                .iter()
+                .map(|l| l.iter().map(|n| n.kind).collect())
+                .collect()
+        };
+        let shown_kinds = kinds(shown);
+        let at = *shown.choices().last().unwrap();
+        let mut w = World::field();
+        w.open_glade();
+        w.skip_glade_boss();
+        assert!(w.descend_to_node(0x0259, at));
+        assert_eq!(
+            kinds(w.adv.route.as_ref().unwrap()),
+            shown_kinds,
+            "미리 본 길 그대로"
+        );
+        assert_eq!((w.adv.home, w.adv.stage), (Place::Camp, 1));
+        assert!(
+            w.adv.events.contains(&AdvEvent::CampArrive(1)),
+            "앱이 이어하기를 적게"
+        );
+        let d = w.descent().expect("단면");
+        assert!(d.cover > 0.99, "쉼터는 보이지 않는다");
+        assert!(d.depth_m < 1.0, "마을(0 m)에서 내려간다");
+        while w.adv.fade.is_some() {
+            w.adventure_pre();
+        }
+        assert_eq!(w.adv.place, Place::Dungeon);
+        assert_eq!(w.adv.node, Some(at));
+        assert_eq!(
+            w.adv_seed(),
+            0x0259 + CAMP_SEED_STEP,
+            "이어하기는 쉼터의 길 시드를 적는다"
+        );
+        // 굴 하나를 끝내면 길이 거기까지 적히고, 같은 시드로 다시 세운 쉼터가 그 칸부터 잇는다.
+        w.adv.route_done = Some(at);
+        let mut back = World::field();
+        back.resume_camp(1, w.adv_seed(), w.adv.depth);
+        back.resume_route(at);
+        assert_eq!(back.adv.route.as_ref().unwrap().at, Some(at));
+        assert_eq!(kinds(back.adv.route.as_ref().unwrap()), shown_kinds);
+        // 길에 없는 칸이면 무시(처음부터).
+        let mut odd = World::field();
+        odd.resume_camp(1, w.adv_seed(), 0);
+        odd.resume_route((99, 0));
+        assert_eq!(odd.adv.route.as_ref().unwrap().at, None);
+    }
+
     /// 내려가는 전환(0156): 검정 대신 단면이 덮고, 깊이가 쉼터 → 고른 굴로 늘어난다. 새 지대에서만 이름 카드.
     #[test]
     fn ascent_climbs_from_deepest_to_village_and_bursts_out() {
@@ -1916,7 +2021,7 @@ mod tests {
             w.respawn_at_save();
             assert!(w.toss.patches.is_empty());
             assert_eq!(w.adv.falls, n);
-            assert_eq!(w.inv.glowbugs, 0);
+            assert_eq!(w.inv.glowbugs, 5, "쓰러져도 모은 반딧불은 남는다(0259)");
             assert!(w.story.fight(Kind::Momo), "모모에게 쓰러져도 모모는 남는다");
         }
         assert!(w.run_over());
@@ -1942,7 +2047,7 @@ mod tests {
         assert_eq!(w.adv.place, Place::Dungeon);
         assert!(w.enemies.is_empty(), "던전 시작방엔 적이 없다");
         assert_eq!(w.room.cell_at(w.player.pos), Some(Cell::Floor));
-        // 쓰러져서 저장 지점으로: 필드가 돌아오고, 체력 가득, 맡기지 않은 반딧불은 다 잃음(0210).
+        // 쓰러져서 저장 지점으로: 필드가 돌아오고, 체력 가득, 들고 있던 반딧불은 그대로(0259 — 0210 C를 걷음).
         w.inv.glowbugs = 10;
         w.player.hp = 0;
         w.respawn_at_save();
@@ -1951,15 +2056,12 @@ mod tests {
         assert_eq!(w.enemies.len(), field_enemies, "맡겨 둔 필드 적이 돌아온다");
         assert_eq!(w.player.hp, w.player.stats.max_hp);
         assert_eq!(w.player.pos, w.adv.save_pos);
-        assert_eq!(w.inv.glowbugs, 0);
+        assert_eq!(w.inv.glowbugs, 10);
         assert_eq!(w.adv.falls, 0, "쉼터 전(필드)에는 실뿌리를 세지 않는다");
-        // 도움 모드는 예전처럼 30%만.
-        w.assist = true;
-        w.inv.glowbugs = 10;
-        w.player.hp = 0;
-        w.respawn_at_save();
-        assert_eq!(w.inv.glowbugs, 7);
-        w.assist = false;
+        assert!(
+            w.adv.events.contains(&AdvEvent::Woke),
+            "앱이 이어하기를 다시 적게"
+        );
         // 다시 들어갔다 나오면 굴 입구 앞.
         w.enter_dungeon_now();
         w.exit_dungeon();

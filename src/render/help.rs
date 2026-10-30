@@ -647,7 +647,6 @@ fn pic_rooms(c: PicCtx) {
         time,
         mid,
         y,
-        gold,
         ..
     } = c;
     // 가운데 Naïl, 오른쪽 땅이 부풀다 들쥐가 솟는다(물결·버티기). 왼쪽 문 곁엔 씨앗 표지가 둥실.
@@ -667,15 +666,8 @@ fn pic_rooms(c: PicCtx) {
             WHITE,
         );
     }
-    let s = vec2(18.0, y - 10.0 + (time * 2.4).sin().round());
-    draw_circle(s.x, s.y, 8.0, OUTLINE);
-    draw_circle(s.x, s.y, 7.0, gold);
-    draw_circle(s.x, s.y, 6.0, Color::new(0.14, 0.10, 0.12, 1.0));
-    for (ox, oy) in [(-2.0, 0.0), (1.0, -1.0)] {
-        let q = s + vec2(ox, oy);
-        draw_rectangle(q.x - 1.0, q.y - 1.0, 2.0, 3.0, world::SEED);
-        draw_rectangle(q.x, q.y - 2.0, 1.0, 1.0, Color::new(0.45, 0.78, 0.35, 1.0));
-    }
+    // 문 곁 바닥에 새긴 씨앗 표지(0259 — 떠다니지 않는다).
+    props::draw_floor_sign(vec2(18.0, y - 6.0), crate::dungeon::Bounty::Seeds, false);
 }
 
 fn pic_break(c: PicCtx) {

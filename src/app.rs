@@ -315,6 +315,8 @@ enum Hit {
     /// 길 지도: 고를 수 있는 칸(choices 번호).
     RouteNode(usize),
     ShopItem(usize),
+    /// 마을 가게 탭(0259).
+    ShopTab(usize),
     /// 사기 전에 묻는 창의 단추.
     ShopYes,
     ShopNo,
@@ -407,6 +409,12 @@ pub struct App {
     /// 이번 프레임의 굴리기 입력(논리 px 끌기, 칸: 휠·▲▼, 0199).
     scroll_in: (f32, i32),
     journal_check: f32,
+    /// 런 통계를 기록에 쌓았는데 아직 안 적었다(0259): `STAT_SAVE_EVERY`초마다 한 번 적는다.
+    stats_unsaved: f32,
+    /// 마을 뿌리 길에서 길 지도를 보는 중(0259): 새 런이 쓸 모험 시드.
+    village_pick: Option<u64>,
+    /// 마을 길 지도에서 고른 칸(0259): 새 런의 첫 장면이 그 굴로 곧장 내려간다.
+    village_go: Option<(u64, (usize, usize))>,
     inventory: Inventory,
     sfx: Sfx,
     music: crate::music::Music,
@@ -445,6 +453,8 @@ pub struct App {
     after_cutscene: AfterCut,
     /// 마을 꾸미기 가게의 커서.
     decor_cursor: usize,
+    /// 마을 가게 탭(0259): 0 꾸미기, 1 짐 꾸리기.
+    decor_tab: usize,
     /// 재주 창 커서(자리, 갈래).
     tree_cursor: (usize, usize),
     /// 일시정지 재주 탭의 고른 칸(줄, 칸, 0247).
@@ -558,6 +568,9 @@ impl App {
             dev_view: Default::default(),
             scroll_in: (0.0, 0),
             journal_check: 0.0,
+            stats_unsaved: -1.0,
+            village_pick: None,
+            village_go: None,
             inventory: Inventory::new(Character::Mole, &[]),
             gift: None,
             sfx,
@@ -586,6 +599,7 @@ impl App {
             album_rows: Default::default(),
             after_cutscene: AfterCut::Game,
             decor_cursor: 0,
+            decor_tab: 0,
             tree_cursor: (0, 0),
             pause_tree_cursor: (0, 0),
             tree_char: Character::Mole,
@@ -945,10 +959,10 @@ impl App {
         }
     }
 
-    /// 실뿌리가 다 감긴 뒤 또 쓰러졌다(0210): 런이 끝난다. 쉼터 뒤에 주운 반딧불은 마을로 가지 않는다(잃는다).
-    /// 이야기 런은 마을로(뿌리가 데려다 놓는다), 오늘의 굴은 타이틀로. 맡겨 둔 반딧불·기록은 그대로.
+    /// 실뿌리가 다 감겼다(0210): 런이 끝난다. 이야기 런은 마을로(뿌리가 데려다 놓는다), 오늘의 굴은 타이틀로.
+    /// 모은 재화는 잃지 않는다(0259): 들고 있던 반딧불은 마을로, 남은 씨앗은 마을 씨앗으로(깬 덤은 없다).
     fn lose_run(&mut self, to_village: bool) {
-        self.world.inv.glowbugs = 0;
+        self.keep_run_currency();
         self.clear_run();
         if self.recording() {
             self.profile.add(crate::profile::key::RUNS_LOST, 1);
@@ -1024,6 +1038,10 @@ impl App {
         self.apply_assist();
         self.seed_run_from_profile(s, ch);
         self.fill_inventory(s, ch, start, veteran);
+        // 마을에서 꾸려 둔 짐(0259): 새 이야기 런에만(이어하기는 이미 받았다).
+        if s == Scenario::Normal && !self.resuming {
+            self.unpack();
+        }
         self.gift = None;
         self.gift_queue.clear();
         self.apply_equipped();
@@ -1181,12 +1199,18 @@ impl App {
                 }
             }
             flow::First::Descend => {
-                // 마을 뿌리 길에서 첫 쉼터로 곧장 내려간다(0225, 지름길 0151을 대신한다). 런 첫 한마디는 닿은 뒤에.
                 self.world.open_glade();
                 self.world.skip_glade_boss();
-                self.world.descend_to_first_camp();
                 self.scene = Scene::Game;
-                self.after.village_run();
+                // 마을 길 지도에서 칸을 골랐으면 그 굴로 곧장(0259). 런 첫 한마디는 닿은 뒤에.
+                let go = self.village_go.take();
+                if go.is_some_and(|(seed, at)| self.world.descend_to_node(seed, at)) {
+                    self.after.village_node();
+                } else {
+                    // 고르지 않고 시작한 런(다시 하기 등): 첫 쉼터로 내려가 길 지도를 연다(0225·0226).
+                    self.world.descend_to_first_camp();
+                    self.after.village_run();
+                }
             }
             flow::First::Field {
                 skip_boss,

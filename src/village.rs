@@ -71,6 +71,61 @@ pub const DECOR: [Decor; 6] = [
     },
 ];
 
+/// 짐 꾸리기(0259): 마을 씨앗으로 다음 런 가방에 넣어 둘 것. 꾸미기 말고도 마을 씨앗을 쓸 곳(사장 "꾸미기 외에 사용할 수 있어야 함").
+/// 다음 런을 시작할 때 꺼내고 지운다(`App::unpack`). 한 런에 `max`까지.
+pub struct Pack {
+    pub kind: PackKind,
+    pub name: Tr,
+    pub desc: Tr,
+    pub price: u32,
+    pub max: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PackKind {
+    Berry,
+    Worm,
+    /// 씨앗 주머니: 런 씨앗 `PACK_POUCH_SEEDS`(쉼터 가게 돈). 값보다 조금 적게 — 런이 끝나면 남은 씨앗이 다시 마을 씨앗이 되니
+    /// 오가며 불어나지 않게.
+    Pouch,
+}
+
+pub const PACK: [Pack; 3] = [
+    Pack {
+        kind: PackKind::Berry,
+        name: |s| s.it_berry,
+        desc: |s| s.pack_berry_d,
+        price: 3,
+        max: 3,
+    },
+    Pack {
+        kind: PackKind::Worm,
+        name: |s| s.it_worm,
+        desc: |s| s.pack_worm_d,
+        price: 10,
+        max: 1,
+    },
+    Pack {
+        kind: PackKind::Pouch,
+        name: |s| s.pack_pouch,
+        desc: |s| s.pack_pouch_d,
+        price: 6,
+        max: 2,
+    },
+];
+
+/// 씨앗 주머니 하나 = 런 씨앗 다섯.
+pub const PACK_POUCH_SEEDS: u32 = 5;
+
+/// 꾸려 둔 수의 기록 키.
+pub fn key_pack(k: PackKind) -> &'static str {
+    match k {
+        PackKind::Berry => "pack.berry",
+        PackKind::Worm => "pack.worm",
+        PackKind::Pouch => "pack.pouch",
+    }
+}
+
 /// 저널 보상으로만 얻는 꾸미기(번호 6~8, 자리 7~9, docs/decisions/0048): 반딧불 병, 들꽃 화분, 실 그네.
 pub const JOURNAL_DECOR: [Tr; 3] = [|s| s.decor_7, |s| s.decor_8, |s| s.decor_9];
 /// 꾸미기 전체 수(가게 + 저널).

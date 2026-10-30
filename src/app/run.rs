@@ -85,13 +85,25 @@ impl App {
             equipped: self.inventory.equipped,
             charms: w.inv.charms.clone(),
             charms_found: w.inv.charms_found.clone(),
+            route: w.adv.route_done.map(|(l, i)| (l as u32, i as u32)),
+            // 쉼터에서 적으면 0(이어하면 가득). 길 가운데서 적으면 그때의 체력.
+            hp: if w.adv.route_done.is_some() {
+                w.player.hp.max(1) as u32
+            } else {
+                0
+            },
         }
     }
 
-    /// 쉼터에 있으면 지금 런을 적는다(첫 시작 런만, 0080). 굴 안이면 마지막 쉼터 것을 그대로 둔다.
+    /// 지금 런을 적는다(첫 시작 런만, 0080): 쉼터를 지난 런이면 쉼터·굴 어디서든(0259) — 자리는 마지막 쉼터, 길은 지난 칸까지,
+    /// 재화·가방은 지금 것. 가장 깊은 곳·필드(쉼터 전)·쓰러진 동안은 적지 않는다(앞의 것을 그대로 둔다).
     pub(super) fn checkpoint_run(&mut self) {
         let w = &self.world;
-        if !self.recording() || w.adv.place != Place::Camp || !w.player.is_alive() {
+        if !self.recording()
+            || w.adv.home != Place::Camp
+            || !matches!(w.adv.place, Place::Camp | Place::Dungeon)
+            || !w.player.is_alive()
+        {
             return;
         }
         let r = self.capture_run();
@@ -158,6 +170,13 @@ impl App {
         }
         w.refresh_stats();
         w.player.hp = w.player.stats.max_hp;
+        // 길 가운데서 적은 런(0259): 지난 칸부터, 그때의 체력으로.
+        if let Some((l, i)) = r.route {
+            w.resume_route((l as usize, i as usize));
+            if r.hp > 0 {
+                w.player.hp = (r.hp as i32).min(w.player.stats.max_hp);
+            }
+        }
         w.player.sp = r.sp_milli as f32 / 1000.0;
         let mut inv = Inventory::new(w.character, &[]);
         for (slot, s) in inv.slots.iter_mut().zip(&r.slots) {
@@ -175,5 +194,9 @@ impl App {
         self.cutscene = None;
         self.tutorial = None;
         self.scene = Scene::Game;
+        // 길 가운데서 이었으면 곧장 다음 갈래를 고른다(닫으면 쉼터에 선다).
+        if r.route.is_some() {
+            self.open_route(true);
+        }
     }
 }

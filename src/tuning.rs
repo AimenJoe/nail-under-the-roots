@@ -436,6 +436,8 @@ pub const KNOT_BURROW_CD: f32 = 1.25;
 pub const KNOT_GLOW_STEP: f32 = 0.15;
 /// 마을 씨앗(docs/decisions/0045): 가장 깊은 곳에 닿으면 남은 씨앗 + 이것, 새 실뜨기 단계 + 이것, 오늘의 굴 완주 + 이것.
 pub const VILLAGE_SEEDS_CLEAR: u32 = 5;
+/// 런 통계를 쌓은 뒤 이만큼(초) 지나면 기록을 적는다(0259). 저장 칸 쓰기가 잦지 않게, 끄더라도 잃는 건 이만큼.
+pub const STAT_SAVE_EVERY: f32 = 10.0;
 pub const VILLAGE_SEEDS_KNOT: u32 = 10;
 pub const VILLAGE_SEEDS_DAILY: u32 = 5;
 /// 한 런 = 필드 + 길 몇 개. 이 번째 길의 주인을 이기면 가장 깊은 곳(엔딩, docs/decisions/0042).

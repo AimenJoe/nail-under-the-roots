@@ -8,7 +8,6 @@ use crate::characters::CharacterDef;
 use crate::cutscene::Face;
 use crate::i18n::{self, fill};
 use crate::input::{Actions, Verb};
-use crate::scenario::Scenario;
 use crate::ui::{self, Ui, FONT_PX};
 
 impl App {
@@ -49,7 +48,7 @@ impl App {
             crate::profile::save(&self.profile);
             match self.pick_for.take() {
                 Some(row) => self.begin_dream_run(row),
-                None => self.start(Scenario::Normal),
+                None => self.village_route(),
             }
             return;
         }
