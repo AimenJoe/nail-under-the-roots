@@ -602,6 +602,9 @@ impl World {
 
     fn puddle(&self) -> Option<Vec2> {
         self.adv.village?;
+        if self.character != crate::equipment::Character::Mole {
+            return None;
+        }
         self.adv
             .marks
             .iter()
