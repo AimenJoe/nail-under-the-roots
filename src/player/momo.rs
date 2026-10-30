@@ -81,23 +81,17 @@ impl Player {
             .unwrap_or(dir)
     }
 
-    /// 이어 뛰기 조준 표시(0261): (뛰는 방향, 붙은 적 자리). 게이지가 다 찼거나 뛰는 중인 모모에게만.
+    /// 이어 뛰기 조준 표시(0261): 뛰는 중인 모모의 (뛰는 방향, 붙은 적 자리). 쓰기 전에는 없다.
     pub fn chain_preview(&self) -> Option<(Vec2, Option<Vec2>)> {
-        if self.kit.def().special != crate::characters::Special::Chain {
-            return None;
-        }
-        let (dir, lock) = match self.state {
-            State::Chain { dir, .. } => (dir, None),
-            State::Free if self.sp_full() => {
-                let lock = chain_assist(self.pos, self.facing, &self.targets);
-                let dir = lock
-                    .and_then(|q| (q - self.pos).try_normalize())
-                    .unwrap_or(self.facing);
-                (dir, lock)
+        match self.state {
+            State::Chain { dir, .. }
+                if self.kit.def().special == crate::characters::Special::Chain =>
+            {
+                let lock = chain_assist(self.pos, dir, &self.targets);
+                Some((dir, lock))
             }
-            _ => return None,
-        };
-        Some((dir, lock))
+            _ => None,
+        }
     }
 
     pub(super) fn start_chain(&mut self, move_dir: Vec2) {
