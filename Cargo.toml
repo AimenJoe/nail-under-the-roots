@@ -1,6 +1,6 @@
 [package]
 name = "nail"
-version = "0.6.16"
+version = "0.6.17"
 authors = ["Beardworks"]
 edition = "2021"
 description = "Naïl: Under the Roots — 귀여운 탑다운 액션 로그라이트"
@@ -45,7 +45,7 @@ assets = "assets"
 res = "android/res"
 icon = "@mipmap/ic_launcher"
 # 앱 스토어 업데이트 판정용 정수. 배포할 때마다 올린다.
-version_code = 81
+version_code = 82
 
 [package.metadata.android.activity_attributes]
 "android:screenOrientation" = "sensorLandscape"
