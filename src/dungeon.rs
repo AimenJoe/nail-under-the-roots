@@ -642,10 +642,8 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                         &grid,
                         &props,
                         &spawn_marks,
-                        ox,
-                        oy,
+                        room,
                         seed ^ hash_at(room.at) ^ 0x7407_2A11,
-                        room.hall,
                         &mut thorns,
                     );
                 }
@@ -655,10 +653,8 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                         &grid,
                         &props,
                         &spawn_marks,
-                        ox,
-                        oy,
+                        room,
                         seed ^ hash_at(room.at) ^ 0x5E1C_0B1A,
-                        room.hall,
                         &mut webs,
                     );
                 }
@@ -732,18 +728,17 @@ fn thorn_patches(
     grid: &Grid,
     props: &[Prop],
     avoid: &[Vec2],
-    ox: usize,
-    oy: usize,
+    room: &DRoom,
     seed: u64,
-    hall: Option<usize>,
     out: &mut Vec<Vec2>,
 ) {
+    let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
     let mut rng = Rng::new(seed | 1);
     let ok = |x: usize, y: usize, out: &Vec<Vec2>| {
         let c = cell_center(ox + x, oy + y);
         (2..=17).contains(&x)
             && (3..=10).contains(&y)
-            && !passage_lane(x, y, hall)
+            && !passage_lane(x, y, room.hall)
             && !KEEP.contains(&(x, y))
             && grid.get(ox + x, oy + y) == Cell::Floor
             && !props.iter().any(|p| p.rect.contains(c))
