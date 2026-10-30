@@ -855,6 +855,7 @@ impl World {
         self.hit_player(&landed, &popped);
         // 5. 적끼리 겹침 방지
         self.separate_enemies(dt);
+        self.push_enemies_from_player();
         // 6. 정리
         self.cleanup(dt);
         // 7. 모험(입구·출구·저장, 던전 방, 카메라)
@@ -2288,6 +2289,41 @@ impl World {
                 }
             }
         }
+    }
+
+    /// 5b. 플레이어는 걸어 다니는 적을 통과하지 못한다(0261): 땅 위에 있을 때만, 겹친 만큼 둘이 반반 밀려난다(보스는 고정).
+    /// 회피·뛰기·땅속에서는 통과한다. 날아다니는 적과 나타나는 중인 적은 건드리지 않는다.
+    fn push_enemies_from_player(&mut self) {
+        if !self.player.on_foot() {
+            return;
+        }
+        let mut pp = self.player.pos;
+        let pr = self.player.radius();
+        for e in &mut self.enemies {
+            if !e.alive || e.flying() || !e.hittable() {
+                continue;
+            }
+            let d = e.pos - pp;
+            let min = pr + e.radius();
+            let dist2 = d.length_squared();
+            if dist2 >= min * min {
+                continue;
+            }
+            let dir = if dist2 > 1e-4 {
+                d / dist2.sqrt()
+            } else {
+                vec2(1.0, 0.0)
+            };
+            // 겹친 만큼을 반반 나눠 밀린다. 보스는 밀리지 않고 플레이어가 막힌다.
+            let overlap = min - dist2.sqrt();
+            let share = if e.is_boss() { 0.0 } else { 0.5 };
+            e.pos += dir * overlap * share;
+            pp -= dir * overlap * (1.0 - share);
+            let r = e.radius();
+            self.room.resolve_circle(&mut e.pos, r);
+            self.room.resolve_circle(&mut pp, pr);
+        }
+        self.player.pos = pp;
     }
 
     /// 6. 정리: 쓰러진 것 치우기, 효과 시계, 출구·보스 카드 시계, 발걸음 먼지.
