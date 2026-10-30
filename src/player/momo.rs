@@ -44,7 +44,7 @@ impl Player {
             self.events.push(Event::Land(true));
             if left > 1 {
                 // 다음 뛰기: 입력 쪽으로 다시 겨눈다(없으면 그대로).
-                let dir = move_dir.normalize_or(dir);
+                let dir = self.chain_aim(move_dir.normalize_or(dir));
                 self.facing = dir;
                 self.events.push(Event::Hop);
                 self.state = State::Chain {
@@ -74,8 +74,34 @@ impl Player {
         self.events.push(Event::Hop);
     }
 
+    /// 겨눈 쪽 원뿔 안의 적이 있으면 그 적 쪽으로 방향을 맞춘다(0261).
+    fn chain_aim(&self, dir: Vec2) -> Vec2 {
+        chain_assist(self.pos, dir, &self.targets)
+            .and_then(|q| (q - self.pos).try_normalize())
+            .unwrap_or(dir)
+    }
+
+    /// 이어 뛰기 조준 표시(0261): (뛰는 방향, 붙은 적 자리). 게이지가 다 찼거나 뛰는 중인 모모에게만.
+    pub fn chain_preview(&self) -> Option<(Vec2, Option<Vec2>)> {
+        if self.kit.def().special != crate::characters::Special::Chain {
+            return None;
+        }
+        let (dir, lock) = match self.state {
+            State::Chain { dir, .. } => (dir, None),
+            State::Free if self.sp_full() => {
+                let lock = chain_assist(self.pos, self.facing, &self.targets);
+                let dir = lock
+                    .and_then(|q| (q - self.pos).try_normalize())
+                    .unwrap_or(self.facing);
+                (dir, lock)
+            }
+            _ => return None,
+        };
+        Some((dir, lock))
+    }
+
     pub(super) fn start_chain(&mut self, move_dir: Vec2) {
-        let dir = move_dir.normalize_or(self.facing);
+        let dir = self.chain_aim(move_dir.normalize_or(self.facing));
         self.sp = 0.0;
         self.attack_buf = 0.0;
         self.dodge_buf = 0.0;

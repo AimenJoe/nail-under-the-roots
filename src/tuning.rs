@@ -252,6 +252,9 @@ pub const CHAIN_STUN: f32 = 0.5;
 pub const CHAIN_HITSTOP: f32 = 0.06;
 pub const CHAIN_SHAKE: f32 = 0.35;
 pub const CHAIN_RECOVER: f32 = 0.25;
+/// 이어 뛰기 겨누기(0261): 입력 쪽 원뿔 안·이 거리 안의 가장 가까운 방향의 적에게 뛴다.
+pub const CHAIN_ASSIST_CONE: f32 = 0.6;
+pub const CHAIN_ASSIST_RANGE: f32 = 180.0;
 /// 솟구침 범위 공격 반지름. 16이면 적 바로 밑에서만 맞아 "숨는 용도"로만 썼다(첫 바깥 판정, 0090) → 22.
 pub const EMERGE_RADIUS: f32 = 22.0;
 /// 솟구침 동작 시간(이동 불가). 0.12 → 0.15: 튀어 올랐다 내려앉는 그림이 보이게(0160).
