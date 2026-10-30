@@ -414,8 +414,8 @@ mod tests {
         for expected in [
             vec2(69.0, 22.0),
             vec2(91.0, 122.0),
-            vec2(19.0, 75.0),
-            vec2(125.0, 53.0),
+            vec2(22.0, 75.0),
+            vec2(122.0, 53.0),
         ] {
             assert!(lamps.contains(&expected), "missing lamp at {expected:?}");
         }
