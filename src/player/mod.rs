@@ -721,11 +721,25 @@ impl Player {
 
     /// 눌러 둔 다음 타가 지금 나갈 때인가(0174): 박자 창 안에서 누른 것은 바로, 창 전에 누른 것은 박자에.
     /// 받아칠 위협이 가까우면 창 전에 누른 것도 바로(0189, 덤은 없다).
+    /// 새 콤보의 첫 타(다음 자리가 1타)는 박자를 기다리지 않는다(0258, 사장 "첫 공격이 조금 늦게 발동된다 — 즉시 발동되어야
+    /// 패링 손맛이 산다"): 마무리 타·강타 뒤에 누른 것은 후딜레이가 끝나는 순간, 서 있을 때 누른 것은 바로.
     pub(super) fn queue_due(&self) -> bool {
         match self.queued {
             Some(Queued::Beat) => true,
-            Some(Queued::Early) => self.threat || self.beat_clock >= self.beat_at,
+            Some(Queued::Early) => {
+                self.threat || self.beat_clock >= self.beat_at || self.next_is_first()
+            }
             None => false,
+        }
+    }
+
+    /// 다음에 나갈 타가 새 콤보의 1타인가(0258).
+    fn next_is_first(&self) -> bool {
+        match self.state {
+            State::Attack { idx, .. } => idx >= self.moveset.last(),
+            State::Heavy { after, .. } => after > self.moveset.last(),
+            State::Free => self.combo_timer <= 0.0 || self.combo_next == 0,
+            _ => true,
         }
     }
 
@@ -1755,7 +1769,8 @@ mod tests {
             !ev.iter().any(|e| matches!(e, Event::Beat(_))),
             "늦은 눌림은 박자가 아니다"
         );
-        // 마지막 타 뒤의 연타는 1타부터, 타마다 박자(마무리 타는 스윙·후딜레이 끝)에.
+        // 마지막 타 뒤의 연타는 1타부터. 이음은 박자에, 새 콤보의 1타는 박자를 기다리지 않고 마무리 타의 스윙·후딜레이가
+        // 끝나는 순간(0258).
         let mut p = Player::new(room.center());
         let mut swings = vec![];
         for n in 0..200 {
@@ -1779,11 +1794,7 @@ mod tests {
             .windows(2)
             .map(|w| (w[1].0 - w[0].0) as f32 * t::TICK_DT)
             .collect();
-        let want = [
-            beat_at,
-            beat_at,
-            t::BEAT_PERIOD.max(fin.swing + fin.recovery),
-        ];
+        let want = [beat_at, beat_at, fin.swing + fin.recovery];
         for (g, w) in gaps.iter().zip(want) {
             assert!(
                 (g - w).abs() <= t::TICK_DT + 1e-4,

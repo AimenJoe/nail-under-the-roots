@@ -179,7 +179,7 @@ pub static SPROUT: Moveset = Moveset {
             stun: 0.10,
             hitstop: 0.05,
             shake: 0.08,
-            range: 12.0,
+            range: 14.4,
             lunge: 32.0,
             ..BASE
         },
@@ -190,7 +190,7 @@ pub static SPROUT: Moveset = Moveset {
             stun: 0.10,
             hitstop: 0.05,
             shake: 0.08,
-            range: 12.0,
+            range: 14.4,
             lunge: 32.0,
             ..BASE
         },
@@ -201,7 +201,7 @@ pub static SPROUT: Moveset = Moveset {
             stun: 0.10,
             hitstop: 0.05,
             shake: 0.08,
-            range: 12.0,
+            range: 14.4,
             lunge: 32.0,
             ..BASE
         },
@@ -214,7 +214,7 @@ pub static SPROUT: Moveset = Moveset {
             stun: 0.35,
             hitstop: 0.11,
             shake: 0.36,
-            range: 13.0,
+            range: 15.6,
             lunge: 50.0,
             ..BASE
         },
@@ -244,7 +244,7 @@ pub static KICKS: Moveset = Moveset {
             active: (0.02, 0.07),
             knockback: 80.0,
             stun: 0.14,
-            range: 13.0,
+            range: 15.6,
             lunge: 30.0,
             ..BASE
         },
@@ -253,7 +253,7 @@ pub static KICKS: Moveset = Moveset {
             active: (0.03, 0.08),
             knockback: 95.0,
             stun: 0.16,
-            range: 14.0,
+            range: 16.8,
             lunge: 36.0,
             ..BASE
         },
@@ -267,7 +267,7 @@ pub static KICKS: Moveset = Moveset {
             stun: 0.48,
             hitstop: 0.14,
             shake: 0.55,
-            range: 17.0,
+            range: 20.4,
             lunge: 22.0,
             dodge_cancel_after: 0.17,
             ..BASE
@@ -355,7 +355,7 @@ pub static STONE: Moveset = Moveset {
             stun: 0.3,
             hitstop: 0.10,
             shake: 0.3,
-            range: 18.0,
+            range: 21.6,
             lunge: 55.0,
             dodge_cancel_after: 0.18,
             ..BASE
@@ -370,7 +370,7 @@ pub static STONE: Moveset = Moveset {
             stun: 0.6,
             hitstop: 0.18,
             shake: 0.7,
-            range: 20.0,
+            range: 24.0,
             lunge: 75.0,
             dodge_cancel_after: 0.26,
             ..BASE
@@ -470,7 +470,7 @@ pub static BRIAR: Moveset = Moveset {
             stun: 0.10,
             hitstop: 0.05,
             shake: 0.08,
-            range: 13.0,
+            range: 15.6,
             lunge: 30.0,
             ..BASE
         },
@@ -481,7 +481,7 @@ pub static BRIAR: Moveset = Moveset {
             stun: 0.10,
             hitstop: 0.05,
             shake: 0.08,
-            range: 13.0,
+            range: 15.6,
             lunge: 30.0,
             ..BASE
         },
@@ -492,7 +492,7 @@ pub static BRIAR: Moveset = Moveset {
             stun: 0.12,
             hitstop: 0.05,
             shake: 0.1,
-            range: 14.0,
+            range: 16.8,
             lunge: 32.0,
             ..BASE
         },
@@ -504,7 +504,7 @@ pub static BRIAR: Moveset = Moveset {
             stun: 0.35,
             hitstop: 0.11,
             shake: 0.4,
-            range: 16.0,
+            range: 19.2,
             lunge: 24.0,
             dodge_cancel_after: 0.14,
             thorns: true,
@@ -529,7 +529,7 @@ pub static PEBBLE: Moveset = Moveset {
             stun: 0.32,
             hitstop: 0.10,
             shake: 0.32,
-            range: 17.0,
+            range: 20.4,
             lunge: 40.0,
             dodge_cancel_after: 0.16,
             ..BASE
@@ -543,7 +543,7 @@ pub static PEBBLE: Moveset = Moveset {
             stun: 0.6,
             hitstop: 0.18,
             shake: 0.75,
-            range: 19.0,
+            range: 22.8,
             lunge: 30.0,
             dodge_cancel_after: 0.24,
             crush: true,
@@ -565,7 +565,7 @@ pub static PETAL: Moveset = Moveset {
             active: (0.02, 0.07),
             knockback: 70.0,
             stun: 0.12,
-            range: 13.0,
+            range: 15.6,
             lunge: 28.0,
             ..BASE
         },
@@ -574,7 +574,7 @@ pub static PETAL: Moveset = Moveset {
             active: (0.03, 0.08),
             knockback: 85.0,
             stun: 0.14,
-            range: 14.0,
+            range: 16.8,
             lunge: 32.0,
             ..BASE
         },
@@ -587,7 +587,7 @@ pub static PETAL: Moveset = Moveset {
             stun: 0.40,
             hitstop: 0.12,
             shake: 0.45,
-            range: 16.0,
+            range: 19.2,
             lunge: 22.0,
             dodge_cancel_after: 0.16,
             ..BASE

@@ -69,6 +69,9 @@ fn trs(items: &[Tr]) -> Vec<&'static str> {
     items.iter().map(|f| tr(*f)).collect()
 }
 
+/// 런이 끝나는 쓰러짐(0225 → 0258)의 실뿌리 불투명도: 뿌리 너머 장면이 비치게.
+const RUN_LOST_ROOT_ALPHA: f32 = 0.7;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Scene {
     Intro,
@@ -2146,9 +2149,21 @@ impl App {
         let target = self.renderer.to_view(self.world.player.pos);
         for i in 0..14 {
             let a = i as f32 / 14.0 * std::f32::consts::TAU + 0.37;
-            // 가장자리의 출발점: 방향 a로 화면 밖까지 뻗은 자리.
+            // 가장자리의 출발점: 나일에서 방향 a로 화면 테두리(4px 밖)에 닿는 자리(0258). 예전엔 나일이 화면 가운데라고 보고
+            // 거리를 정해, 나일이 가장자리에 있으면 뿌리가 화면 안 허공에서 시작하거나 멀리 밖에서 왔다(사장).
             let dir = vec2(a.cos(), a.sin());
-            let reach = (170.0 / dir.x.abs().max(0.01)).min(100.0 / dir.y.abs().max(0.01));
+            let edge = |p: f32, d: f32, size: f32| {
+                if d > 0.01 {
+                    (size + 4.0 - p) / d
+                } else if d < -0.01 {
+                    (-4.0 - p) / d
+                } else {
+                    f32::MAX
+                }
+            };
+            let reach = edge(target.x, dir.x, 320.0)
+                .min(edge(target.y, dir.y, 180.0))
+                .max(20.0);
             let start = target + dir * reach;
             let end = target + dir * 14.0;
             let n = 18;
@@ -2161,13 +2176,15 @@ impl App {
                 let p = start.lerp(end, f) + side * wob;
                 // 뿌리는 끝으로 갈수록 가늘게(3 → 1.5), 어두운 테두리 위에 보랏빛.
                 let wd = 3.0 - 1.5 * f;
-                let c = Color::new(0.50, 0.30, 0.48, 1.0);
-                ui.line_w(prev, p, wd + 1.5, Color::new(0.10, 0.04, 0.10, 1.0));
+                // 반투명(0258, 사장 "너무 선명하다"): 뿌리 너머 장면이 비친다.
+                let c = Color::new(0.50, 0.30, 0.48, RUN_LOST_ROOT_ALPHA);
+                let rim = Color::new(0.10, 0.04, 0.10, RUN_LOST_ROOT_ALPHA * 0.7);
+                ui.line_w(prev, p, wd + 1.5, rim);
                 ui.line_w(prev, p, wd, c);
                 if j % 6 == 3 {
                     // 곁뿌리 하나.
                     let off = p + side * (if i % 2 == 0 { 5.0 } else { -5.0 }) + dir * 3.0;
-                    ui.line_w(p, off, 2.0, Color::new(0.10, 0.04, 0.10, 1.0));
+                    ui.line_w(p, off, 2.0, rim);
                     ui.line_w(p, off, 1.0, c);
                 }
                 prev = p;
@@ -2185,8 +2202,9 @@ impl App {
                     target + vec2(a.cos() * rx, -6.0 + ry + a.sin() * 3.0)
                 };
                 for k in 0..n {
-                    ui.line_w(at(k), at(k + 1), 2.5, Color::new(0.10, 0.04, 0.10, 1.0));
-                    ui.line_w(at(k), at(k + 1), 1.2, Color::new(0.62, 0.40, 0.60, 1.0));
+                    let a = RUN_LOST_ROOT_ALPHA + 0.1;
+                    ui.line_w(at(k), at(k + 1), 2.5, Color::new(0.10, 0.04, 0.10, a * 0.7));
+                    ui.line_w(at(k), at(k + 1), 1.2, Color::new(0.62, 0.40, 0.60, a));
                 }
             }
         }

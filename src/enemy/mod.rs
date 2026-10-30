@@ -168,6 +168,8 @@ pub struct Enemy {
     pub slam: i32,
     /// 이번 틱에 벽에 박혔다(월드가 소리·파편을 낸다).
     pub slammed: bool,
+    /// 가시뿌리 덤불에 다시 찔리기까지(0258): 걷는 적은 덤불 위에 서 있으면 이 간격으로 찔린다.
+    pub thorn_cd: f32,
     fire_cd: f32,
     /// 남은 독(초)과 다음 독 피해까지 남은 시간.
     pub poison: f32,
@@ -306,6 +308,7 @@ impl Enemy {
             died_of_poison: false,
             slam: 0,
             slammed: false,
+            thorn_cd: 0.0,
             asleep: false,
             wake_delay: 0.0,
             entry: Entry::Wake,
@@ -374,7 +377,21 @@ impl Enemy {
     /// 받아칠 수 있는 공격인가(0160): 곧게 오는 돌진(물기·구르기·내리꽂기도 `Charge`)만. 내려앉기·튀어나오기는
     /// 둘레 공격이라 안 된다. 예고도 띠·점선(황금) ↔ 고리(진홍, ✕)로 갈린다.
     pub fn parryable(&self) -> bool {
-        matches!(self.state, State::Charge { .. })
+        match self.state {
+            State::Charge { .. } => true,
+            // 두꺼비 혀가 뻗는 동안도 곧게 오는 공격(0258) — 받아칠 위협으로 센다(박자 스냅을 건너뛴다).
+            State::Lash { time, .. } => time <= t::TOAD_EXTEND_TIME,
+            _ => false,
+        }
+    }
+
+    /// 곧게 오는 공격의 방향(돌진·혀, 0258): 닿기 직전 받아치기(`PARRY_REACH`)가 다가오는 것인지 본다.
+    pub fn strike_dir(&self) -> Option<Vec2> {
+        match self.state {
+            State::Charge { dir, .. } => Some(dir),
+            State::Lash { dir, time } if time <= t::TOAD_EXTEND_TIME => Some(dir),
+            _ => None,
+        }
     }
 
     /// 피해 판정 반지름(내려앉는·튀어나오는 순간은 둘레까지).
@@ -445,6 +462,7 @@ impl Enemy {
     ) {
         self.prev_pos = self.pos;
         self.flash = (self.flash - dt).max(0.0);
+        self.thorn_cd = (self.thorn_cd - dt).max(0.0);
         self.tick_poison(dt);
         let sp = self.sp();
         if sp.behavior == Behavior::Dummy {
@@ -657,6 +675,8 @@ impl Enemy {
             || (self.flying() && s.kind == StrikeKind::Emerge)
             // 도토의 던지는 손은 적을 때리지 않는다 — 탄이 맞힌다(0195).
             || s.kind == StrikeKind::Toss
+            // 나는 박쥐는 바닥 함정(플레이어가 깐 가시 덤불·묻은 도토리)에도 안 닿는다(0258).
+            || (self.flying() && matches!(s.kind, StrikeKind::Prick | StrikeKind::Burst))
         {
             return Struck::Miss;
         }

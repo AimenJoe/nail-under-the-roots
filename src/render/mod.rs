@@ -338,8 +338,8 @@ impl Renderer {
             if let Some(sp) = &w.spring {
                 draw_spring(sp, w.time);
             }
-            for at in w.story.petals() {
-                draw_left_petal(*at, w.time);
+            for (item, at) in w.story.pickups() {
+                draw_story_pickup(item, at, w.time, false);
             }
             for c in &w.hazards.cocoons {
                 draw_cocoon(*c, w.time);
@@ -372,6 +372,10 @@ impl Renderer {
                 draw_darkness(art, w, alpha, cam);
             }
             draw_gloom(art, w, cam);
+            // 이야기 물건의 반짝임은 어둠·그늘 위에 한 번 더(0258): 바닥에 그린 몸은 어둠에 묻혀도 "놓인 물건"은 보인다.
+            for (item, at) in w.story.pickups() {
+                draw_story_pickup(item, at, w.time, true);
+            }
             draw_save_lights(w, cam, self.light.as_ref());
             draw_world_lights(
                 w,

@@ -454,7 +454,8 @@ impl Story {
     pub fn set_petal_found(&mut self, on: bool) {
         self.petal_found = on;
     }
-    /// 바닥에 남은 시든 꽃잎들(0164·0190).
+    /// 바닥에 남은 시든 꽃잎들(0164·0190). 그리기는 `pickups`.
+    #[cfg(test)]
     pub fn petals(&self) -> &[Vec2] {
         &self.petals
     }
@@ -464,6 +465,19 @@ impl Story {
     pub fn clear_petals(&mut self) {
         self.petals.clear();
     }
+
+    /// 바닥에 놓인 이야기 물건 전부(0258): 렌더는 이것 하나만 돌며 줍는 것 표시(`draw_pickup_mark`)를 붙인다 —
+    /// 어둠·그늘 위에도 반짝임이 남는다. 새 이야기 물건은 `StoryItem`에 한 줄 + 여기에 한 줄.
+    pub fn pickups(&self) -> impl Iterator<Item = (StoryItem, Vec2)> + '_ {
+        self.petals.iter().map(|p| (StoryItem::Petal, *p))
+    }
+}
+
+/// 바닥에 놓이는 이야기 물건(0258). 그림은 `render::fx::draw_story_pickup`이 고른다(`_` 없는 match라 새 줄을 빠뜨리면 컴파일이 안 된다).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum StoryItem {
+    /// 모모가 남긴 시든 꽃잎(0164·0190).
+    Petal,
 }
 
 /// 런 통계(0169 R2): 저널 `stat.*`·튜토리얼 단계가 읽는 수. `app/run.rs`가 저장한다.
@@ -1687,27 +1701,34 @@ impl World {
         landed
     }
 
-    /// 가시뿌리 덤불(0147): 돌진하던 적이 박혀 멈춘다.
+    /// 가시뿌리 덤불(0147 → 0258): 돌진하던 적은 박혀 멈추고, 걷거나 서 있는 적도 덤불 위면 `THORN_ENEMY_PERIOD`마다 찔린다.
     fn thorn_pricks(&mut self, deaths: &mut Vec<(Vec2, Kind)>) {
-        // 가시뿌리 덤불(0147): 돌진하다 덤불에 박으면 찔려 멈춘다. 나는 박쥐·말린 고슴도치·보스는 그대로 지나간다.
+        // 나는 박쥐·말린 고슴도치·보스는 그대로 지나간다(바닥 함정). 나타나는 중(솟기·떨어지기)인 적도.
+        // 예전엔 돌진하던 적만 찔려, 돌진하지 않는 두꺼비·버섯·다람쥐는 덤불 위에 서 있어도 멀쩡했다(사장).
         if !self.room.thorns.is_empty() {
             for e in self.enemies.iter_mut() {
-                let enemy::State::Charge { dir, .. } = e.state else {
-                    continue;
-                };
-                if e.flying() || e.guarding() || e.is_boss() {
+                if !e.alive || e.flying() || e.guarding() || e.is_boss() || !e.hittable() {
                     continue;
                 }
                 let rr = e.radius() + t::THORN_R - 2.0;
-                if !self
+                let Some(c) = self
                     .room
                     .thorns
                     .iter()
-                    .any(|c| (*c - e.pos).length_squared() <= rr * rr)
-                {
+                    .find(|c| (**c - e.pos).length_squared() <= rr * rr)
+                    .copied()
+                else {
+                    continue;
+                };
+                if let enemy::State::Charge { dir, .. } = e.state {
+                    e.hurt(t::THORN_ENEMY_DAMAGE, -dir, 60.0, t::THORN_STUN);
+                } else if e.thorn_cd <= 0.0 {
+                    let away = (e.pos - c).normalize_or(vec2(0.0, 1.0));
+                    e.hurt(t::THORN_ENEMY_DAMAGE, away, 50.0, t::THORN_STAND_STUN);
+                } else {
                     continue;
                 }
-                e.hurt(t::THORN_ENEMY_DAMAGE, -dir, 60.0, t::THORN_STUN);
+                e.thorn_cd = t::THORN_ENEMY_PERIOD;
                 self.juice.audio.play(sfx::Id::EnemyHit);
                 self.juice.fx.push(ring(e.pos, 2.0, 10.0, 0.15, THORN));
                 if !e.alive {
@@ -2072,6 +2093,25 @@ impl World {
             let parry = self.player.parry_dir();
             let mut parried = false;
             for e in &mut self.enemies {
+                // 닿기 직전 받아치기(0258, 사장 "패링 윈도우가 뒤쪽이 아닌 앞쪽에"): 곧게 오는 것(돌진·혀)이 닿기 전에도
+                // 받아치기 창이 열려 있으면 발톱이 먼저 맞받는다 — 돌진은 `PARRY_REACH` 안에서 다가오는 중, 혀는 뻗어 갈 줄 위.
+                // 일찍 누른 손이 닿는 순간까지 창을 붙들 필요가 없다(창 0.12초가 닿는 때보다 앞에 놓인다).
+                if let (Some(d), Some(sd)) = (parry, e.strike_dir()) {
+                    let to = ppos - e.pos;
+                    let from = (-to).normalize_or_zero();
+                    let coming = if matches!(e.state, crate::enemy::State::Lash { .. }) {
+                        e.tongue_path(&self.room, ppos, pr)
+                    } else {
+                        sd.dot(to) > 0.0 && to.length() <= pr + e.contact_radius() + t::PARRY_REACH
+                    };
+                    if coming && d.dot(from) > t::PARRY_FRONT {
+                        let counter = self.player.talents.parry_counter();
+                        e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                        e.on_parried();
+                        parried = true;
+                        break;
+                    }
+                }
                 if let Some(dmg) = e.contact_damage() {
                     let rr = pr + e.contact_radius();
                     if (e.pos - ppos).length_squared() <= rr * rr {
@@ -3519,6 +3559,77 @@ mod tests {
         hit(&mut w);
         w.tick(&Actions::default());
         assert!(!w.player.is_alive());
+    }
+
+    /// 바닥 함정(0258): 가시뿌리 덤불은 돌진하지 않는 두꺼비도 찌르고(간격을 두고), 나는 박쥐는 덤불·플레이어가 깐
+    /// 가시 덤불 어느 것에도 안 다친다.
+    #[test]
+    fn floor_traps_prick_walkers_not_fliers() {
+        use crate::enemy::State;
+        let mut w = World::new();
+        w.enemies.clear();
+        let toad = w.player.pos + vec2(80.0, 0.0);
+        let bat = w.player.pos + vec2(-80.0, 0.0);
+        w.spawn_mob(Kind::Toad, toad);
+        w.spawn_mob(Kind::Bat, bat);
+        w.room.thorns = vec![toad, bat];
+        for e in &mut w.enemies {
+            e.state = State::Rest { time: 5.0 };
+        }
+        let hp: Vec<i32> = w.enemies.iter().map(|e| e.hp).collect();
+        let mut deaths = Vec::new();
+        w.thorn_pricks(&mut deaths);
+        assert!(w.enemies[0].hp < hp[0], "두꺼비도 덤불 위면 찔린다");
+        assert_eq!(w.enemies[1].hp, hp[1], "나는 박쥐는 안 찔린다");
+        let after = w.enemies[0].hp;
+        w.thorn_pricks(&mut deaths);
+        assert_eq!(w.enemies[0].hp, after, "다시 찔리기까지 사이가 있다");
+        // 플레이어가 깐 가시 덤불도 박쥐는 그냥 지나간다.
+        w.room.thorns.clear();
+        w.toss.patches.push(crate::world::toss::Patch {
+            pos: w.enemies[1].pos,
+            left: 3.0,
+            pulse: 0.0,
+        });
+        w.tick_toss(t::TICK_DT, false, &mut deaths);
+        assert_eq!(w.enemies[1].hp, hp[1]);
+    }
+
+    /// 닿기 직전 받아치기(0258): 돌진은 `PARRY_REACH` 안에서 다가오면, 두꺼비 혀는 뻗어 올 줄 위면 — 혀끝·몸이 닿기
+    /// 전에 받아친다(창이 닿는 순간보다 앞에).
+    #[test]
+    fn parry_meets_charges_and_tongues_before_they_land() {
+        use crate::enemy::State;
+        let mut w = World::new();
+        w.enemies.clear();
+        let p = w.player.pos;
+        let right = vec2(1.0, 0.0);
+        let gap = w.player.radius() + 6.0 + t::PARRY_REACH * 0.5;
+        w.spawn_mob(Kind::FieldMouse, p + right * gap);
+        w.enemies[0].state = State::Charge {
+            time: 0.0,
+            dir: -right,
+        };
+        w.player.open_parry_for_test(right);
+        w.hit_player(&[], &[]);
+        assert!(
+            matches!(w.enemies[0].state, State::Stunned { .. }),
+            "닿기 전에 받아쳤다 {:?}",
+            w.enemies[0].state
+        );
+        let mut w = World::new();
+        w.enemies.clear();
+        w.spawn_mob(Kind::Toad, p + right * 60.0);
+        w.enemies[0].state = State::Lash {
+            time: 0.0,
+            dir: -right,
+        };
+        w.player.open_parry_for_test(right);
+        w.hit_player(&[], &[]);
+        assert!(
+            matches!(w.enemies[0].state, State::Stunned { .. }),
+            "혀가 뻗기 시작한 순간에도 받아친다"
+        );
     }
 
     /// 토끼풀이 멈칫하고 아니면 끌려간다.

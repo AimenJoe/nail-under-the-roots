@@ -61,7 +61,7 @@ pub const CLAW_COMBO_WINDOW: f32 = 0.30;
 /// 공격 중 이동 속도 배율.
 pub const CLAW_MOVE_FACTOR: f32 = 0.4;
 /// 히트박스: 전방 반원 반지름.
-pub const CLAW_RANGE: f32 = 14.0;
+pub const CLAW_RANGE: f32 = 17.0; // 0258: 14 → 17(사장 "타격 범위가 좁다", 무기 표의 근접 타 범위도 모두 1.2배)
 /// 스윙 시작 시 전방으로 살짝 전진.
 pub const CLAW_LUNGE: f32 = 45.0;
 pub const CLAW_DAMAGE: [i32; 3] = [1, 1, 2];
@@ -400,6 +400,8 @@ pub const ROOT_HEART_MAX: i32 = 5;
 pub const PARRY_WINDOW: f32 = 0.12;
 /// 앞쪽 판정: 공격 방향과 위협 방향의 내적이 이보다 크면.
 pub const PARRY_FRONT: f32 = 0.2;
+/// 닿기 직전 받아치기(0258): 곧게 돌진해 오는 적이 닿기 이만큼(px) 앞에서도 받아친다 — 창이 닿는 순간보다 앞에 놓인다.
+pub const PARRY_REACH: f32 = 16.0;
 /// 패링 창이 열린 순간부터 다음 창이 열릴 수 있기까지(docs/decisions/0038). 연타로 창을 이어 붙이지 못하게.
 /// 성공하면 바로 다시 열 수 있다(여럿을 연달아 튕겨내는 건 보상).
 /// 0.45 → 0.3(0189): 박자(0.42초)마다 휘두르면 두 번에 한 번은 창이 안 열렸다. 연타는 박자 스냅이 이미 막는다.
@@ -591,6 +593,9 @@ pub const WEB_SLOW: f32 = 0.5;
 /// 돌진하다 덤불에 박은 적: 피해·멈칫.
 pub const THORN_ENEMY_DAMAGE: i32 = 1;
 pub const THORN_STUN: f32 = 0.9;
+/// 걷거나 서 있다 덤불에 찔린 적(0258): 다시 찔리기까지(초)·짧은 멈칫. 덤불 밖으로 조금 밀린다.
+pub const THORN_ENEMY_PERIOD: f32 = 0.8;
+pub const THORN_STAND_STUN: f32 = 0.25;
 /// 심층 싸움방의 무너지는 천장: 다음 돌까지(초, 사이에서 고른다), 떨어지기까지 예고, 맞는 반지름.
 pub const ROCK_EVERY: (f32, f32) = (2.6, 4.2);
 pub const ROCK_FALL: f32 = 1.0;

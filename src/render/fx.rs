@@ -21,9 +21,35 @@ pub(super) fn draw_super_dim(w: &World, cam: Vec2) -> bool {
     true
 }
 
-/// 길의 샘(0159): 돌 테두리의 맑은 웅덩이. 물결 고리가 퍼지고 반짝임이 떠다닌다. 마신 뒤엔 조용해진다.
+/// 바닥의 이야기 물건(0258): 몸 + 줍는 것 표시. `glint_only`면 어둠·그늘 위에 한 번 더 — 반짝임과 옅은 빛만
+/// (반딧불·산딸기 같은 줍는 것과 같은 규칙, 사장 "시든 꽃잎도 다른 아이템처럼 반짝여야 한다").
+pub(super) fn draw_story_pickup(
+    item: crate::world::StoryItem,
+    at: Vec2,
+    time: f32,
+    glint_only: bool,
+) {
+    use crate::world::StoryItem;
+    if glint_only {
+        let (x, y) = (at.x.round(), at.y.round());
+        let bob = ((time * 1.4).sin() * 0.5).round();
+        draw_circle(x + 0.5, y, 3.5, Color::new(1.0, 0.86, 0.90, 0.16));
+        draw_pickup_mark(
+            vec2(x, y + 2.0),
+            vec2(x, y + bob - 3.0),
+            time,
+            x * 0.07,
+            true,
+        );
+        return;
+    }
+    match item {
+        StoryItem::Petal => draw_left_petal(at, time),
+    }
+}
+
 /// 모모가 남긴 시든 꽃잎(0164): 바닥에 놓인 작은 꽃잎, 분홍빛이 조금 남아 가끔 반짝인다.
-pub(super) fn draw_left_petal(at: Vec2, time: f32) {
+fn draw_left_petal(at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round());
     let bob = ((time * 1.4).sin() * 0.5).round();
     // 꽃밭 한가운데라 꽃과 섞였다(사장, 0198): 숨 쉬듯 밝아지는 옅은 빛 자리 위에, 둘레 꽃보다 큰 꽃잎 + 어두운

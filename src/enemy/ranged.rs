@@ -31,6 +31,19 @@ impl Enemy {
                 <= pr + t::TOAD_TONGUE_WIDTH
     }
 
+    /// 혀가 뻗어 갈 줄(다 뻗은 길이까지, 0258)에 `ppos`가 있나: 혀끝이 닿기 전에도 이 줄에서 받아칠 수 있다.
+    pub fn tongue_path(&self, room: &Room, ppos: Vec2, pr: f32) -> bool {
+        let State::Lash { time, dir } = self.state else {
+            return false;
+        };
+        if time > t::TOAD_EXTEND_TIME {
+            return false;
+        }
+        let start = self.pos + dir * self.radius();
+        let reach = room.ray_len(start, dir, 1.0, t::TOAD_TONGUE_REACH);
+        combat::dist_to_segment(ppos, start, start + dir * reach) <= pr + t::TOAD_TONGUE_WIDTH
+    }
+
     /// 거리 두기(던지기·뛰기·혀·포자): 멀면 다가가고 가까우면 물러나며, 때가 되면 겨눈다.
     pub(super) fn tick_keep(&mut self, c: &mut Ctx<'_>) {
         let dt = c.dt;
