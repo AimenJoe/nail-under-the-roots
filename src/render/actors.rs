@@ -931,7 +931,31 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
         // 달리기: 달리기 네 칸(8~11, 도토 바운드 0226)이 있으면 그것을, 없으면 걷기 두 칸을 빠르게.
         player::State::Run { .. } if moving && art.has_run(row) => art.run(row, time * 7.0),
         player::State::Run { .. } if moving => art.walk(row, time * 16.0),
-        player::State::Attack { .. } | player::State::Heavy { .. } => F::STRIKE,
+        player::State::Attack { idx, time: at, .. } => {
+            if p.kit == crate::equipment::Character::Momo {
+                let (a0, a1) = p.moveset.hits[idx].active;
+                if at >= a0 && at - crate::tuning::TICK_DT * p.stats.attack_speed < a1 {
+                    F::STRIKE
+                } else {
+                    F::CROUCH
+                }
+            } else {
+                F::STRIKE
+            }
+        }
+        player::State::Heavy { time: at, .. } => {
+            if p.kit == crate::equipment::Character::Momo {
+                let (a0, a1) = p.moveset.heavy().active;
+                if at >= a0 && at - crate::tuning::TICK_DT * p.stats.attack_speed < a1 {
+                    F::STRIKE
+                } else {
+                    F::CROUCH
+                }
+            } else {
+                F::STRIKE
+            }
+        }
+        player::State::Charging { .. } if p.kit == crate::equipment::Character::Momo => F::CROUCH,
         player::State::Charging { .. } => F::STRIKE,
         player::State::Recover { .. } => F::CROUCH,
         _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => F::HURT,

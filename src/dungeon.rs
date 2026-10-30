@@ -477,7 +477,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                 for _ in 0..n_props {
                     let x = 2 + rng.below(16) as usize;
                     let y = 3 + rng.below(7) as usize;
-                    let lane = (8..=11).contains(&x) || (5..=8).contains(&y);
+                    let lane = passage_lane(x, y, room.hall);
                     // 방 모양이 벽으로 만든 칸에는 놓지 않는다(난수는 그대로 써서 뒤의 적 배치가 같다).
                     if !lane && grid.get(ox + x, oy + y) == Cell::Floor {
                         props.push(Prop {
@@ -642,8 +642,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                         &grid,
                         &props,
                         &spawn_marks,
-                        ox,
-                        oy,
+                        room,
                         seed ^ hash_at(room.at) ^ 0x7407_2A11,
                         &mut thorns,
                     );
@@ -654,8 +653,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                         &grid,
                         &props,
                         &spawn_marks,
-                        ox,
-                        oy,
+                        room,
                         seed ^ hash_at(room.at) ^ 0x5E1C_0B1A,
                         &mut webs,
                     );
@@ -686,6 +684,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             oy,
             seed ^ hash_at(room.at) ^ 0xB4EA_4B1E,
             prm.biome,
+            room.hall,
             n_break,
         );
     }
@@ -729,18 +728,17 @@ fn thorn_patches(
     grid: &Grid,
     props: &[Prop],
     avoid: &[Vec2],
-    ox: usize,
-    oy: usize,
+    room: &DRoom,
     seed: u64,
     out: &mut Vec<Vec2>,
 ) {
+    let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
     let mut rng = Rng::new(seed | 1);
-    let lane = |x: usize, y: usize| (8..=11).contains(&x) || (5..=8).contains(&y);
     let ok = |x: usize, y: usize, out: &Vec<Vec2>| {
         let c = cell_center(ox + x, oy + y);
         (2..=17).contains(&x)
             && (3..=10).contains(&y)
-            && !lane(x, y)
+            && !passage_lane(x, y, room.hall)
             && !KEEP.contains(&(x, y))
             && grid.get(ox + x, oy + y) == Cell::Floor
             && !props.iter().any(|p| p.rect.contains(c))
@@ -773,6 +771,19 @@ fn thorn_patches(
     }
 }
 
+/// 문 앞 십자 길과 넓은 방의 열린 이음새까지 잇는 접근로는 장애물 없이 둔다.
+fn passage_lane(x: usize, y: usize, hall: Option<usize>) -> bool {
+    (8..=11).contains(&x)
+        || (5..=8).contains(&y)
+        || match hall {
+            Some(0) => (3..=4).contains(&y),
+            Some(1) => (15..=17).contains(&x),
+            Some(2) => (9..=10).contains(&y),
+            Some(3) => (2..=4).contains(&x),
+            _ => false,
+        }
+}
+
 fn rng_at(seed: u64, at: (i32, i32), salt: u64) -> Rng {
     Rng::new((seed ^ hash_at(at) ^ salt) | 1)
 }
@@ -790,11 +801,11 @@ fn breakables(
     oy: usize,
     seed: u64,
     biome: Biome,
+    hall: Option<usize>,
     n: usize,
 ) {
     use crate::room::Breakable;
     let mut rng = Rng::new(seed | 1);
-    let lane = |x: usize, y: usize| (8..=11).contains(&x) || (5..=8).contains(&y);
     let local = match biome {
         Biome::Meadow => Breakable::Mound,
         Biome::Roots => Breakable::Gall,
@@ -806,7 +817,7 @@ fn breakables(
             let x = 2 + rng.below(16) as usize;
             let y = 3 + rng.below(8) as usize;
             let c = cell_center(ox + x, oy + y);
-            let free = !lane(x, y)
+            let free = !passage_lane(x, y, hall)
                 && !KEEP.contains(&(x, y))
                 && grid.get(ox + x, oy + y) == Cell::Floor
                 && !props.iter().any(|p| p.rect.contains(c))
@@ -1554,6 +1565,67 @@ mod tests {
             assert!(seen.contains(&to), "seed {seed}: 문 없이 이어진다");
         }
         assert!(with_hall * 10 >= 59 * 6, "넓은 방이 자주: {with_hall}/59");
+    }
+
+    /// 넓은 방(0244)의 열린 이음새와 접근로에는 가시·그물·막는 소품이 생기지 않는다.
+    #[test]
+    fn hall_passages_stay_clear_of_hazards_and_props() {
+        let mut hall_rooms = 0;
+        let mut hall_thorns = 0;
+        let mut hall_webs = 0;
+        for biome in [Biome::Roots, Biome::Silk] {
+            let prm = Params {
+                rooms: 6,
+                halls: 1,
+                biome,
+                ..Params::new(1)
+            };
+            for seed in 1..100 {
+                let (d, room) = generate(seed, &prm);
+                for r in d.rooms.iter().filter(|r| r.hall.is_some()) {
+                    hall_rooms += 1;
+                    let local = |p: Vec2| {
+                        (
+                            (p.x / 16.0) as usize - r.at.0 as usize * ROOM_W,
+                            (p.y / 16.0) as usize - r.at.1 as usize * ROOM_H,
+                        )
+                    };
+                    for p in &room.thorns {
+                        if r.rect().contains(*p) {
+                            hall_thorns += 1;
+                            let (x, y) = local(*p);
+                            assert!(
+                                !passage_lane(x, y, r.hall),
+                                "seed {seed}: 가시가 넓은 방 통로에 있음 ({x}, {y})"
+                            );
+                        }
+                    }
+                    for p in &room.webs {
+                        if r.rect().contains(*p) {
+                            hall_webs += 1;
+                            let (x, y) = local(*p);
+                            assert!(
+                                !passage_lane(x, y, r.hall),
+                                "seed {seed}: 그물이 넓은 방 통로에 있음 ({x}, {y})"
+                            );
+                        }
+                    }
+                    for prop in &room.props {
+                        let p = prop.rect.center();
+                        if r.rect().contains(p) {
+                            let (x, y) = local(p);
+                            assert!(
+                                !passage_lane(x, y, r.hall),
+                                "seed {seed}: 소품이 넓은 방 통로에 있음 ({x}, {y})"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        assert!(hall_rooms > 0);
+        assert!(hall_thorns > 0);
+        assert!(hall_webs > 0);
     }
 
     /// 방 지형(0244): 네 가지가 다 나오고, 어느 것이든 적 자리·길은 막지 않는다(`shaped_rooms_…`가 본다).
