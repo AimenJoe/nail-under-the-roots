@@ -2294,7 +2294,7 @@ impl World {
     /// 5b. 플레이어는 걸어 다니는 적을 통과하지 못한다(0261): 땅 위에 있을 때만, 겹친 만큼 둘이 반반 밀려난다(보스는 고정).
     /// 회피·뛰기·땅속에서는 통과한다. 날아다니는 적과 나타나는 중인 적은 건드리지 않는다.
     fn push_enemies_from_player(&mut self) {
-        if !self.player.on_foot() {
+        if !self.player.on_foot() && !matches!(self.player.state, player::State::Eat { .. }) {
             return;
         }
         let mut pp = self.player.pos;
@@ -3547,6 +3547,132 @@ fn burst(fx: &mut Vec<Fx>, pos: Vec2, n: usize, color: Color, speed: f32) {
 mod tests {
     use super::*;
     use crate::enemy::{Enemy, Kind};
+
+    fn collision_world(player_pos: Vec2) -> World {
+        let mut w = World::new();
+        w.enemies.clear();
+        w.player.pos = player_pos;
+        w
+    }
+
+    #[test]
+    fn player_and_walking_enemy_split_overlap_evenly() {
+        let player_pos = vec2(160.0, 88.0);
+        let mut w = collision_world(player_pos);
+        let mut enemy = Enemy::new(Kind::FieldMouse, player_pos);
+        let distance = w.player.radius() + enemy.radius() - 8.0;
+        enemy.pos = player_pos + vec2(distance, 0.0);
+        let enemy_pos = enemy.pos;
+        let half_overlap = 4.0;
+        w.enemies.push(enemy);
+
+        w.push_enemies_from_player();
+
+        assert!((w.player.pos.x - (player_pos.x - half_overlap)).abs() < 1e-4);
+        assert!((w.enemies[0].pos.x - (enemy_pos.x + half_overlap)).abs() < 1e-4);
+        assert!(
+            (w.enemies[0].pos.distance(w.player.pos) - w.player.radius() - w.enemies[0].radius())
+                .abs()
+                < 1e-4
+        );
+    }
+
+    #[test]
+    fn player_is_pushed_by_boss_but_boss_stays_fixed() {
+        let player_pos = vec2(160.0, 88.0);
+        let mut w = collision_world(player_pos);
+        let mut boss = Enemy::new(Kind::Chief, player_pos);
+        let overlap = 8.0;
+        boss.pos = player_pos + vec2(w.player.radius() + boss.radius() - overlap, 0.0);
+        let boss_pos = boss.pos;
+        w.enemies.push(boss);
+
+        w.push_enemies_from_player();
+
+        assert_eq!(w.enemies[0].pos, boss_pos);
+        assert!((w.player.pos.x - (player_pos.x - overlap)).abs() < 1e-4);
+    }
+
+    #[test]
+    fn eating_player_still_collides_with_walking_enemies() {
+        let player_pos = vec2(160.0, 88.0);
+        let mut w = collision_world(player_pos);
+        w.player.state = player::State::Eat {
+            item: crate::items::Consumable::Berry,
+            time: 0.1,
+        };
+        let mut enemy = Enemy::new(Kind::FieldMouse, player_pos);
+        enemy.pos = player_pos + vec2(w.player.radius() + enemy.radius() - 8.0, 0.0);
+        w.enemies.push(enemy);
+
+        w.push_enemies_from_player();
+
+        assert!(w.player.pos.x < player_pos.x);
+        assert!(w.enemies[0].pos.x > player_pos.x);
+    }
+
+    #[test]
+    fn dodging_or_burrowing_player_passes_through_enemies() {
+        let player_pos = vec2(160.0, 88.0);
+        for state in [
+            player::State::Hop {
+                time: 0.1,
+                dir: vec2(1.0, 0.0),
+            },
+            player::State::Burrow { time: 0.1 },
+        ] {
+            let mut w = collision_world(player_pos);
+            w.player.state = state;
+            let mut enemy = Enemy::new(Kind::FieldMouse, player_pos);
+            enemy.pos = player_pos + vec2(2.0, 0.0);
+            let enemy_pos = enemy.pos;
+            w.enemies.push(enemy);
+
+            w.push_enemies_from_player();
+
+            assert_eq!(w.player.pos, player_pos);
+            assert_eq!(w.enemies[0].pos, enemy_pos);
+        }
+    }
+
+    #[test]
+    fn player_passes_flying_burrowed_and_arriving_enemies() {
+        let player_pos = vec2(160.0, 88.0);
+        let mut w = collision_world(player_pos);
+        let bat = Enemy::new(Kind::Bat, player_pos + vec2(2.0, 0.0));
+        let mut burrowed = Enemy::new(Kind::Momo, player_pos + vec2(0.0, 2.0));
+        burrowed.state = enemy::State::Under { time: 0.1 };
+        let mut arriving = Enemy::new(Kind::FieldMouse, player_pos + vec2(-2.0, 0.0));
+        arriving.arrive(enemy::Entry::Burrow, 0.5);
+        let positions = [bat.pos, burrowed.pos, arriving.pos];
+        w.enemies.extend([bat, burrowed, arriving]);
+
+        w.push_enemies_from_player();
+
+        assert_eq!(w.player.pos, player_pos);
+        for (enemy, pos) in w.enemies.iter().zip(positions) {
+            assert_eq!(enemy.pos, pos);
+        }
+    }
+
+    #[test]
+    fn player_enemy_collision_resolves_against_room_walls() {
+        let mut w = collision_world(vec2(160.0, 88.0));
+        let r = w.room.inner.right();
+        let mut enemy = Enemy::new(Kind::FieldMouse, vec2(r, 88.0));
+        enemy.pos.x = r - enemy.radius() - 1.0;
+        let overlap = 8.0;
+        w.player.pos.x = enemy.pos.x - w.player.radius() - enemy.radius() + overlap;
+        let player_pos = w.player.pos;
+        w.enemies.push(enemy);
+
+        w.push_enemies_from_player();
+
+        assert!((w.enemies[0].pos.x - (r - w.enemies[0].radius())).abs() < 1e-4);
+        assert!((w.player.pos.x - (player_pos.x - overlap / 2.0)).abs() < 1e-4);
+        assert!(!w.room.is_solid(w.enemies[0].pos, w.enemies[0].radius()));
+        assert!(!w.room.is_solid(w.player.pos, w.player.radius()));
+    }
 
     /// 토끼풀(0165): 발 구르기는 충격파 + 플레이어 둘레에 실 그물, 고치는 발톱이 튕기며 한마디, 실 한 가닥은 받아치면
     /// 쥬시 지렁이(0200): 들고 쓰러지면 그 틱에 먹고 일어난다. 없으면 쓰러진 그대로.
