@@ -955,9 +955,7 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
                 F::STRIKE
             }
         }
-        player::State::Charging { .. } if p.kit == crate::equipment::Character::Momo => {
-            F::CROUCH
-        }
+        player::State::Charging { .. } if p.kit == crate::equipment::Character::Momo => F::CROUCH,
         player::State::Charging { .. } => F::STRIKE,
         player::State::Recover { .. } => F::CROUCH,
         _ if p.invuln > t::PLAYER_HURT_INVULN - 0.25 => F::HURT,
