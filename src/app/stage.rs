@@ -436,6 +436,7 @@ impl App {
         let village = self.world.adv.place == crate::adventure::Place::Village;
         match i {
             Interact::Chest(n) => self.world.open_chest(n),
+            Interact::Exit => self.world.use_exit(),
             // 마을의 포포: 마을 꾸미기 가게(0045).
             Interact::Talk(Who::Popo) if village => {
                 self.decor_cursor = 0;
@@ -1216,6 +1217,7 @@ impl App {
             Interact::Gate if village => s.ia_descend,
             Interact::Gate => s.ia_route,
             Interact::Chest(_) => s.ia_open,
+            Interact::Exit => s.ia_descend,
         };
         let text = fill(verb, &[&crate::ui::key(input::prompt(Act::Attack))]);
         let p = (anchor - w.adv.cam).round();
