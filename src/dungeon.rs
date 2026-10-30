@@ -1572,6 +1572,62 @@ mod tests {
         assert!(with_hall * 10 >= 59 * 6, "넓은 방이 자주: {with_hall}/59");
     }
 
+    /// 넓은 방(0244)의 열린 이음새와 접근로에는 가시·그물·막는 소품이 생기지 않는다.
+    #[test]
+    fn hall_passages_stay_clear_of_hazards_and_props() {
+        let prm = Params {
+            rooms: 6,
+            halls: 1,
+            biome: Biome::Roots,
+            ..Params::new(1)
+        };
+        let mut hall_rooms = 0;
+        let mut hall_thorns = 0;
+        for seed in 1..100 {
+            let (d, room) = generate(seed, &prm);
+            for r in d.rooms.iter().filter(|r| r.hall.is_some()) {
+                hall_rooms += 1;
+                let local = |p: Vec2| {
+                    (
+                        (p.x / 16.0) as usize - r.at.0 as usize * ROOM_W,
+                        (p.y / 16.0) as usize - r.at.1 as usize * ROOM_H,
+                    )
+                };
+                for p in &room.thorns {
+                    if r.rect().contains(*p) {
+                        hall_thorns += 1;
+                        let (x, y) = local(*p);
+                        assert!(
+                            !passage_lane(x, y, r.hall),
+                            "seed {seed}: 가시가 넓은 방 통로에 있음 ({x}, {y})"
+                        );
+                    }
+                }
+                for p in &room.webs {
+                    if r.rect().contains(*p) {
+                        let (x, y) = local(*p);
+                        assert!(
+                            !passage_lane(x, y, r.hall),
+                            "seed {seed}: 그물이 넓은 방 통로에 있음 ({x}, {y})"
+                        );
+                    }
+                }
+                for prop in &room.props {
+                    let p = prop.rect.center();
+                    if r.rect().contains(p) {
+                        let (x, y) = local(p);
+                        assert!(
+                            !passage_lane(x, y, r.hall),
+                            "seed {seed}: 소품이 넓은 방 통로에 있음 ({x}, {y})"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(hall_rooms > 0);
+        assert!(hall_thorns > 0);
+    }
+
     /// 방 지형(0244): 네 가지가 다 나오고, 어느 것이든 적 자리·길은 막지 않는다(`shaped_rooms_…`가 본다).
     #[test]
     fn every_layout_appears() {
