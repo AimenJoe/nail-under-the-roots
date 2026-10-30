@@ -928,15 +928,36 @@ impl Player {
 /// 입력이 8방향(키보드·패드·터치)뿐이라 그 사이 각도의 적을 겨눌 수 없었고, 돌진 중에는 반지름 ~170px로만 틀 수 있어
 /// 빗나간 걸 알아도 고치지 못했다. 고르는 것은 시동 동안뿐이다(돌진 중 방향을 바꿔 주면 예측이 안 된다).
 pub fn drill_assist(pos: Vec2, aim: Vec2, targets: &[Vec2]) -> Option<Vec2> {
+    assist_target(
+        pos,
+        aim,
+        targets,
+        t::DRILL_ASSIST_CONE,
+        t::DRILL_ASSIST_RANGE,
+    )
+}
+
+/// 모모 이어 뛰기 겨누기(0261): 같은 규칙, 세 번 뛰어 닿는 거리 안에서.
+pub fn chain_assist(pos: Vec2, aim: Vec2, targets: &[Vec2]) -> Option<Vec2> {
+    assist_target(
+        pos,
+        aim,
+        targets,
+        t::CHAIN_ASSIST_CONE,
+        t::CHAIN_ASSIST_RANGE,
+    )
+}
+
+fn assist_target(pos: Vec2, aim: Vec2, targets: &[Vec2], cone: f32, range: f32) -> Option<Vec2> {
     let mut best: Option<(f32, Vec2)> = None;
     for &q in targets {
         let d = q - pos;
         let dist = d.length();
-        if dist < 1.0 || dist > t::DRILL_ASSIST_RANGE {
+        if dist < 1.0 || dist > range {
             continue;
         }
         let ang = aim.angle_between(d).abs();
-        if ang <= t::DRILL_ASSIST_CONE && best.is_none_or(|(b, _)| ang < b) {
+        if ang <= cone && best.is_none_or(|(b, _)| ang < b) {
             best = Some((ang, q));
         }
     }
@@ -1056,6 +1077,26 @@ mod tests {
     }
 
     /// 드릴 겨누기(0139): 입력 둘레 콘 안·거리 안의 적 가운데 방향이 가장 가까운 적. 콘 밖·멀리·없으면 입력 그대로.
+    #[test]
+    fn momo_chain_hop_aims_at_the_foe_near_the_input() {
+        let room = Room::new();
+        let start = room.center();
+        let mut p = Player::new(start);
+        let foe = start + Vec2::from_angle((-30f32).to_radians()) * 100.0;
+        p.targets = vec![foe];
+        p.start_chain(vec2(1.0, 0.0));
+        let State::Chain { dir, .. } = p.state else {
+            panic!("이어 뛰기가 아니다")
+        };
+        assert!(dir.angle_between(foe - start).abs() < 0.01);
+        p.targets = vec![start + vec2(0.0, 100.0)];
+        p.start_chain(vec2(1.0, 0.0));
+        let State::Chain { dir, .. } = p.state else {
+            panic!()
+        };
+        assert!((dir - vec2(1.0, 0.0)).length() < 1e-4);
+    }
+
     #[test]
     fn drill_assist_picks_the_enemy_closest_to_the_aim() {
         let o = vec2(100.0, 100.0);
