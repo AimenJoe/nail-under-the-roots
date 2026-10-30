@@ -4,7 +4,7 @@
 
 - 공식 페이지: https://aimenjoe.github.io/nail-under-the-roots/ (원본 `site/`, `pages.yml`이 GitHub Pages에 올린다, docs/decisions/0069). 게임은 https://nail-under-the-roots.netlify.app
 - 컨셉: [`docs/concept.md`](docs/concept.md)
-- 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md)의 "구현 상태"·"사람이 할 일"을 본다. 현재 v0.6.15이며, v0.6.0 "팔 수 있는 판"은 PC 빌드와 함께 배포했다. 나머지 판매 준비는 v0.6.x에서 진행한다(0232).
+- 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md)의 "구현 상태"·"사람이 할 일"을 본다. 현재 v0.6.16이며, v0.6.0 "팔 수 있는 판"은 PC 빌드와 함께 배포했다. 나머지 판매 준비는 v0.6.x에서 진행한다(0232).
 - 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 캐릭터·적·이웃·소품·마을 물건 스프라이트, 초상화·일러스트·타이틀은 나노바나나 원본(`tools/art/sources/ai/`)을 코드가 게임 칸으로 옮긴다(공용 변환기 `tools/art/sprite_ai.py` + 그림마다 `*_ai.py`, 걷기 네 칸은 `walk_ai.py`, 0206·0229; 초상화·일러스트는 `ai_portraits.py`·`ai_illust.py`, 새 원본은 먼저 `strip_logo.py`). `python3 tools/art/<이름>.py`로 PNG를 다시 만든다. 대체 타일은 직접 그림(`tiles.py`). 앱 아이콘은 `tools/icons/make_icons.py`. 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
 - 결정 기록: [`docs/decisions/`](docs/decisions/)
 - 기여 규칙: [`CONTRIBUTING.md`](CONTRIBUTING.md) · 배포·릴리스 절차: [`docs/release.md`](docs/release.md) · 코드 건강 점검과 리팩터링 계획: [`docs/decisions/0169`](docs/decisions/0169-code-health-review-and-refactoring-plan.md) · 추상화 수준 판정과 다음 목표(R9~R13): [`docs/decisions/0170`](docs/decisions/0170-abstraction-level-review-and-next-refactoring-targets.md)
