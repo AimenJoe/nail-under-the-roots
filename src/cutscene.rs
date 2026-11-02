@@ -1450,7 +1450,8 @@ mod keeper_tests {
                     "clover_back".into(),
                     keeper_beaten(Kind::Clover, w, won(true)),
                 ),
-                ("halmae".into(), halmae_meet(w)),
+                ("halmae".into(), halmae_meet(w, false)),
+                ("halmae_again".into(), halmae_meet(w, true)),
                 ("camp1".into(), camp_arrive(w, 1)),
                 ("camp2".into(), camp_arrive(w, 2)),
             ];
@@ -2078,12 +2079,19 @@ fn momo_steps(ch: crate::equipment::Character) -> Vec<Step> {
 
 /// 반쪽 엔딩: 가장 깊은 곳에 처음 닿았다. 할매는 실을 거두지만 놓지 않는다.
 /// 가장 깊은 곳에 들어섰다(0162): 이름 카드 + 할매의 말. 그 뒤 실매듭 끊기(월드). 반쪽 엔딩의 첫 두 줄이 여기로 왔다.
-pub fn halmae_meet(w: &World) -> Cutscene {
+/// 이름 카드의 부제(0269 2.1, 사장 D5): 처음엔 자리 이름("가장 깊은 곳")만 — 무엇인지는 보고 짐작한다.
+/// 한 번 놓아준 뒤(`released`, 반쪽·참 엔딩)에야 "오래된 균사"로 확인된다.
+pub fn halmae_meet(w: &World, released: bool) -> Cutscene {
+    let sub: Tr = if released {
+        |s| s.deep_sub
+    } else {
+        |s| s.node_deepest
+    };
     let steps = vec![
         Step::Wait(0.4),
         Step::Card {
             name: i18n::s().name_halmae,
-            sub: |s| s.deep_sub,
+            sub,
             secs: 3.2,
         },
         Step::Narrate(|s| s.half_1),

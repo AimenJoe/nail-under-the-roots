@@ -2183,9 +2183,16 @@ pub(super) fn draw_dark_extras(art: &Art, w: &World, alpha: f32, cam: Vec2) {
 /// 빛나는 버섯. 어둠 지도(0095)가 있으면 바닥 높이(캐릭터 밑)에 그리고 버섯 빛이 둘레를 밝힌다.
 /// 없으면 예전처럼 어둠 위에 한 번 더 그린다(그때는 캐릭터 위에 겹칠 수 있다).
 pub(super) fn draw_mushrooms(art: &Art, w: &World, cam: Vec2) {
+    let deep = matches!(
+        w.biome,
+        crate::biome::Biome::Deep | crate::biome::Biome::Silk
+    );
     for (x, y, d) in floor_decor(w, cam) {
         if d == Decor::Mushroom {
             let pulse = 0.65 + 0.25 * ((w.time * 2.0 + x * 0.1).sin());
+            if deep {
+                draw_mycelium(vec2(x + 8.0, y + 12.0), w.time);
+            }
             // 팩이 있으면 파란 버섯 4칸(0066). 굽기에서는 빼 두었다.
             if let Some(sunny) = &art.sunny {
                 let s = crate::sunny::MUSH_FRAME;
@@ -2217,6 +2224,31 @@ pub(super) fn draw_mushrooms(art: &Art, w: &World, cam: Vec2) {
                 y,
                 Color::new(1.0, 1.0, 1.0, pulse),
             );
+        }
+    }
+}
+
+/// 버섯 밑동에서 바닥으로 뻗는 옅은 보라 실(0269 2.1, 사장 D5 "환경 연출은 작게"): 깊은 곳 전에도 "실은 버섯에서
+/// 나온다"는 단서를 그림으로만 남긴다(글은 없다). 어두운 심층·흰 실 굴에서만, 버섯 셋 가운데 하나쯤, 아주 옅게.
+fn draw_mycelium(base: Vec2, time: f32) {
+    let seed = ((base.x * 7.0 + base.y * 13.0) as i32).rem_euclid(997) as u32;
+    if hash01(seed, 3) > 0.35 {
+        return;
+    }
+    let a = 0.40 + 0.08 * (time * 1.3 + seed as f32).sin();
+    let col = Color::new(0.74, 0.46, 0.92, a);
+    for k in 0..2 {
+        let ang = hash01(seed, 10 + k) * std::f32::consts::TAU;
+        let len = 12.0 + hash01(seed, 20 + k) * 10.0;
+        let dir = vec2(ang.cos(), ang.sin() * 0.5);
+        let side = vec2(-dir.y, dir.x);
+        let mut p = base;
+        for i in 1..=5 {
+            let t = i as f32 / 5.0;
+            let wig = (t * 7.0 + seed as f32 * 0.3).sin() * 1.5;
+            let q = base + dir * len * t + side * wig;
+            draw_line(p.x.round(), p.y.round(), q.x.round(), q.y.round(), 1.0, col);
+            p = q;
         }
     }
 }

@@ -323,7 +323,12 @@ impl App {
                             .start_fade(crate::adventure::Transition::EnterDeep);
                     }
                 }
-                AdvEvent::DeepIntro => self.play(cutscene::halmae_meet(&self.world)),
+                AdvEvent::DeepIntro => {
+                    use crate::profile::key;
+                    let released =
+                        self.profile.flag(key::HALF_ENDING) || self.profile.flag(key::TRUE_ENDING);
+                    self.play(cutscene::halmae_meet(&self.world, released));
+                }
                 AdvEvent::DeepDone => self.reach_deepest(),
                 AdvEvent::PetalFound => {
                     if self.recording() {
