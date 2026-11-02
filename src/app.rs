@@ -188,6 +188,8 @@ enum AfterCut {
     Village,
     /// 실에 잠겼다(0163): 장면이 끝나면 맡겨 둔 쉼터로 되살아난다.
     Respawn,
+    /// 할매의 한마디 뒤 실뜨기 고르기(0270).
+    KnotPick,
     /// 대화 검수에서 틀어 본 줄(0269, 개발판): 끝나면 그 화면으로.
     #[cfg(feature = "dev")]
     Dialogue,
@@ -882,6 +884,7 @@ impl App {
                             AfterCut::Respawn if self.world.run_over() => {
                                 self.lose_run(flow::back_to_village(self.current))
                             }
+                            AfterCut::KnotPick => self.open_knot_pick(),
                             #[cfg(feature = "dev")]
                             AfterCut::Dialogue => self.scene = Scene::Dialogue,
                             AfterCut::Respawn => {
@@ -1911,6 +1914,8 @@ impl App {
         crate::village::State {
             bori: self.profile.flag(key::BORI_BACK),
             halmae: self.profile.flag(key::HALF_ENDING) || self.profile.flag(key::TRUE_ENDING),
+            // 참 엔딩 뒤 할매는 눈을 뜬다(0270): 그림 칸 4·5.
+            halmae_awake: self.profile.flag(key::TRUE_ENDING),
             // 고른 캐릭터로 마을을 걸으면(모모·도토) 그 이웃은 자리에 따로 서 있지 않는다 — 플레이어가 그 자신이다.
             momo: self.profile.flag(key::MOMO_BACK) && self.picked() != Character::Momo,
             doto: self.profile.flag(key::DOTO_MEMORY) && self.picked() != Character::Doto,

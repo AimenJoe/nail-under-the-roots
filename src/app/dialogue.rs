@@ -19,13 +19,17 @@ enum Query {
     Seat,
 }
 
-const QUERIES: [Query; 16] = [
+const QUERIES: [Query; 20] = [
     Query::When(When::Wake),
     Query::When(When::RunStart),
     Query::When(When::Village),
     Query::When(When::TalkBori),
     Query::When(When::TalkMomo),
     Query::When(When::TalkDoto),
+    Query::When(When::TalkKongi),
+    Query::When(When::TalkClover),
+    Query::When(When::TalkSusu),
+    Query::When(When::TalkNail),
     Query::Talk(Who::Popo),
     Query::Talk(Who::Bori),
     Query::Talk(Who::Halmae),
@@ -151,7 +155,7 @@ impl App {
             Query::Talk(who) => match self.route(who) {
                 Talk::Story(w) => story::take(&mut self.dialogue.profile, w, ch)
                     .map(|l| (l.who, l.text, Face::Happy)),
-                Talk::Chatter(t, f) => {
+                Talk::Chatter(t, f) | Talk::ChatterKnots(t, f) => {
                     self.dialogue.turn[story::who_index(who)] += 1;
                     Some((story::speaker(who), t, f))
                 }
@@ -304,6 +308,11 @@ impl App {
                         ),
                         Talk::Chatter(t, _) => format!(
                             "늘 하는 말 {}번째: {}",
+                            self.dialogue.turn[story::who_index(who)] + 1,
+                            tr(t)
+                        ),
+                        Talk::ChatterKnots(t, _) => format!(
+                            "늘 하는 말 {}번째 → 실뜨기 고르기 창: {}",
                             self.dialogue.turn[story::who_index(who)] + 1,
                             tr(t)
                         ),

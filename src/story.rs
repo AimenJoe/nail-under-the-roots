@@ -24,6 +24,11 @@ pub enum When {
     TalkMomo,
     /// 도토에게 말을 걸었다(0053).
     TalkDoto,
+    /// 콩이·토끼풀·수수·집의 Naïl에게 말을 걸었다(0270): 할매를 두고 하는 한 번짜리 줄. 없으면 늘 하는 말.
+    TalkKongi,
+    TalkClover,
+    TalkSusu,
+    TalkNail,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -523,6 +528,113 @@ pub const LINES: &[Line] = &[
         needs: &[Flag(key::TUTORIAL), Flag(key::BORI_BACK)],
         once: false,
     },
+    // 놓아준 뒤(0270, 0269 2.10). 반쪽 뒤의 할매는 와 있되 실은 깊은 데 남았다(D7), 참 뒤엔 눈을 뜬다.
+    Line {
+        id: "halmae_half",
+        when: When::Village,
+        who: Speaker::Halmae,
+        text: |s| s.halmae_half,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::HALF_ENDING),
+            NotFlag(key::TRUE_ENDING),
+            Seen("halmae_arrive"),
+        ],
+        once: true,
+    },
+    Line {
+        id: "halmae_true",
+        when: When::Village,
+        who: Speaker::Halmae,
+        text: |s| s.halmae_true,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::TRUE_ENDING),
+            Seen("halmae_arrive"),
+        ],
+        once: true,
+    },
+    // 아직 할매를 말하지 않던 이웃 다섯: 반쪽 뒤 한 번, 참 뒤 한 번.
+    Line {
+        id: "kongi_t_halmae",
+        when: When::TalkKongi,
+        who: Speaker::Kongi,
+        text: |s| s.kongi_t_halmae,
+        needs: &[Flag(key::HALF_ENDING), NotFlag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "kongi_t_halmae_true",
+        when: When::TalkKongi,
+        who: Speaker::Kongi,
+        text: |s| s.kongi_t_halmae_true,
+        needs: &[Flag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "clover_t_halmae",
+        when: When::TalkClover,
+        who: Speaker::Clover,
+        text: |s| s.clover_t_halmae,
+        needs: &[Flag(key::HALF_ENDING), NotFlag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "clover_t_halmae_true",
+        when: When::TalkClover,
+        who: Speaker::Clover,
+        text: |s| s.clover_t_halmae_true,
+        needs: &[Flag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "susu_t_halmae",
+        when: When::TalkSusu,
+        who: Speaker::Susu,
+        text: |s| s.susu_t_halmae,
+        needs: &[Flag(key::HALF_ENDING), NotFlag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "susu_t_halmae_true",
+        when: When::TalkSusu,
+        who: Speaker::Susu,
+        text: |s| s.susu_t_halmae_true,
+        needs: &[Flag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "doto_t_halmae",
+        when: When::TalkDoto,
+        who: Speaker::Doto,
+        text: |s| s.doto_t_halmae,
+        needs: &[Flag(key::HALF_ENDING), NotFlag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "doto_t_halmae_true",
+        when: When::TalkDoto,
+        who: Speaker::Doto,
+        text: |s| s.doto_t_halmae_true,
+        needs: &[Flag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "nail_t_halmae",
+        when: When::TalkNail,
+        who: Speaker::NailHome,
+        text: |s| s.nail_t_halmae,
+        needs: &[Flag(key::HALF_ENDING), NotFlag(key::TRUE_ENDING)],
+        once: true,
+    },
+    Line {
+        id: "nail_t_halmae_true",
+        when: When::TalkNail,
+        who: Speaker::NailHome,
+        text: |s| s.nail_t_halmae_true,
+        needs: &[Flag(key::TRUE_ENDING)],
+        once: true,
+    },
 ];
 
 /// 이웃의 늘 하는 말(0265): 말 걸 때마다 차례로 셋. 듣는 캐릭터마다 줄이 다르면 캐릭터마다 한 줄씩 둔다 —
@@ -534,6 +646,8 @@ pub struct Chatter {
     pub to: Option<Character>,
     pub lines: [Tr; 3],
     pub face: Face,
+    /// 기록 조건(없으면 늘). 할매는 참 엔딩 전·뒤로 말투가 갈린다(0270).
+    pub need: Option<Cond>,
 }
 
 pub const CHATTER: &[Chatter] = &[
@@ -542,60 +656,70 @@ pub const CHATTER: &[Chatter] = &[
         to: None,
         lines: [|s| s.bori_1, |s| s.bori_2, |s| s.bori_3],
         face: Face::Normal,
+        need: None,
     },
     Chatter {
         who: Who::Susu,
         to: Some(Character::Mole),
         lines: [|s| s.susu_v1, |s| s.susu_v2, |s| s.susu_v3],
         face: Face::Happy,
+        need: None,
     },
     Chatter {
         who: Who::Susu,
         to: Some(Character::Momo),
         lines: [|s| s.susu_v1_momo, |s| s.susu_v2, |s| s.susu_v3],
         face: Face::Happy,
+        need: None,
     },
     Chatter {
         who: Who::Susu,
         to: Some(Character::Doto),
         lines: [|s| s.susu_v1_doto, |s| s.susu_v2, |s| s.susu_v3],
         face: Face::Happy,
+        need: None,
     },
     Chatter {
         who: Who::Kongi,
         to: Some(Character::Mole),
         lines: [|s| s.kongi_v1, |s| s.kongi_v2, |s| s.kongi_v3],
         face: Face::Happy,
+        need: None,
     },
     Chatter {
         who: Who::Kongi,
         to: Some(Character::Momo),
         lines: [|s| s.kongi_v1, |s| s.kongi_v2_momo, |s| s.kongi_v3_momo],
         face: Face::Happy,
+        need: None,
     },
     Chatter {
         who: Who::Kongi,
         to: Some(Character::Doto),
         lines: [|s| s.kongi_v1, |s| s.kongi_v2_doto, |s| s.kongi_v3_doto],
         face: Face::Happy,
+        need: None,
     },
     Chatter {
         who: Who::Clover,
         to: None,
         lines: [|s| s.clover_v1, |s| s.clover_v2, |s| s.clover_v3],
         face: Face::Happy,
+        need: None,
     },
     Chatter {
         who: Who::Doto,
         to: None,
         lines: [|s| s.doto_v1, |s| s.doto_v2, |s| s.doto_v3],
         face: Face::Happy,
+        need: None,
     },
     Chatter {
         who: Who::Momo,
         to: None,
         lines: [|s| s.momo_v1, |s| s.momo_v2, |s| s.momo_v3],
         face: Face::Happy,
+        need: None,
     },
     // 마을에 남은 Naïl(0249): 다른 캐릭터로 걸을 때만 서 있다. 가운데 줄은 지금 걷는 이에게.
     Chatter {
@@ -603,21 +727,68 @@ pub const CHATTER: &[Chatter] = &[
         to: Some(Character::Momo),
         lines: [|s| s.nail_v1, |s| s.nail_v_momo, |s| s.nail_v2],
         face: Face::Happy,
+        need: None,
     },
     Chatter {
         who: Who::Nail,
         to: Some(Character::Doto),
         lines: [|s| s.nail_v1, |s| s.nail_v_doto, |s| s.nail_v2],
         face: Face::Happy,
+        need: None,
+    },
+    // 누룩 할매(0270): 한마디 뒤 실뜨기 고르기. 참 엔딩 전엔 실을 깊은 데 남긴 말투, 뒤엔 눈 뜬 말투.
+    Chatter {
+        who: Who::Halmae,
+        to: Some(Character::Mole),
+        lines: [|s| s.hc_half_nail, |s| s.hc_half_a, |s| s.hc_half_b],
+        face: Face::Normal,
+        need: Some(NotFlag(key::TRUE_ENDING)),
+    },
+    Chatter {
+        who: Who::Halmae,
+        to: Some(Character::Momo),
+        lines: [|s| s.hc_half_momo, |s| s.hc_half_a, |s| s.hc_half_b],
+        face: Face::Normal,
+        need: Some(NotFlag(key::TRUE_ENDING)),
+    },
+    Chatter {
+        who: Who::Halmae,
+        to: Some(Character::Doto),
+        lines: [|s| s.hc_half_doto, |s| s.hc_half_a, |s| s.hc_half_b],
+        face: Face::Normal,
+        need: Some(NotFlag(key::TRUE_ENDING)),
+    },
+    Chatter {
+        who: Who::Halmae,
+        to: Some(Character::Mole),
+        lines: [|s| s.hc_true_nail, |s| s.hc_true_a, |s| s.hc_true_b],
+        face: Face::Happy,
+        need: Some(Flag(key::TRUE_ENDING)),
+    },
+    Chatter {
+        who: Who::Halmae,
+        to: Some(Character::Momo),
+        lines: [|s| s.hc_true_momo, |s| s.hc_true_a, |s| s.hc_true_b],
+        face: Face::Happy,
+        need: Some(Flag(key::TRUE_ENDING)),
+    },
+    Chatter {
+        who: Who::Halmae,
+        to: Some(Character::Doto),
+        lines: [|s| s.hc_true_doto, |s| s.hc_true_a, |s| s.hc_true_b],
+        face: Face::Happy,
+        need: Some(Flag(key::TRUE_ENDING)),
     },
 ];
 
 /// `who`가 `ch`에게 하는 늘 하는 말. 그 캐릭터의 줄이 먼저, 없으면 누구에게나 하는 줄.
-pub fn chatter(who: Who, ch: Character) -> Option<&'static Chatter> {
+pub fn chatter(who: Who, ch: Character, p: &Profile) -> Option<&'static Chatter> {
+    let ok = |c: &&Chatter| c.who == who && c.need.is_none_or(|n| n.holds(p, ch));
     CHATTER
         .iter()
-        .find(|c| c.who == who && c.to == Some(ch))
-        .or_else(|| CHATTER.iter().find(|c| c.who == who && c.to.is_none()))
+        .filter(ok)
+        .find(|c| c.to == Some(ch))
+        .or_else(|| CHATTER.iter().filter(ok).find(|c| c.to.is_none()))
 }
 
 /// 이웃이 지금 걷는 캐릭터 본인에게 주는 무기(0246 → 0265 → 0266): 아직 없으면 말을 걸 때 한 번. 무기는 그 캐릭터 것만.
@@ -760,6 +931,8 @@ pub enum Talk {
     Gift(&'static Gift),
     /// 늘 하는 말 하나(차례).
     Chatter(Tr, Face),
+    /// 할매(0270): 늘 하는 말 하나 뒤에 실뜨기 고르기.
+    ChatterKnots(Tr, Face),
     /// 할매: 실뜨기 고르기.
     KnotPick,
     /// 할 말이 없다.
@@ -792,6 +965,11 @@ pub fn talk_route(who: Who, c: &TalkCtx) -> Talk {
         {
             Some(Talk::SusuMeet)
         }
+        // 할매를 두고 하는 한 번짜리 줄(0270).
+        Who::Susu => story(When::TalkSusu),
+        Who::Kongi => story(When::TalkKongi),
+        Who::Clover => story(When::TalkClover),
+        Who::Nail => story(When::TalkNail),
         _ => None,
     };
     if let Some(t) = first {
@@ -800,8 +978,12 @@ pub fn talk_route(who: Who, c: &TalkCtx) -> Talk {
     if let Some(g) = gift(who, c.ch).filter(|g| !(c.owns)(g.weapon)) {
         return Talk::Gift(g);
     }
-    if let Some(ch) = chatter(who, c.ch) {
-        return Talk::Chatter(ch.lines[c.turn as usize % ch.lines.len()], ch.face);
+    if let Some(ch) = chatter(who, c.ch, c.profile) {
+        let line = ch.lines[c.turn as usize % ch.lines.len()];
+        if who == Who::Halmae {
+            return Talk::ChatterKnots(line, ch.face);
+        }
+        return Talk::Chatter(line, ch.face);
     }
     match who {
         Who::Halmae => Talk::KnotPick,
@@ -911,12 +1093,17 @@ mod route_tests {
             talk_route(Who::Susu, &ctx(&p, Character::Momo, false, &all, 0)),
             Talk::Chatter(..)
         ));
-        // 할매: 늘 하는 말이 없으면 실뜨기.
-        if chatter(Who::Halmae, Character::Mole).is_none() {
-            assert!(matches!(
-                talk_route(Who::Halmae, &ctx(&p, Character::Mole, true, &all, 0)),
-                Talk::KnotPick
-            ));
+        // 할매(0270): 한마디 뒤 실뜨기. 참 엔딩 전·뒤로 말이 갈린다.
+        let half = talk_route(Who::Halmae, &ctx(&p, Character::Mole, true, &all, 0));
+        assert!(matches!(half, Talk::ChatterKnots(..)));
+        let mut q = p.clone();
+        q.set(key::TRUE_ENDING);
+        let after = talk_route(Who::Halmae, &ctx(&q, Character::Mole, true, &all, 0));
+        if let (Talk::ChatterKnots(x, _), Talk::ChatterKnots(y, _)) = (half, after) {
+            let ko = &crate::i18n::KO;
+            assert_ne!(x(ko), y(ko), "참 뒤엔 다른 말투");
+        } else {
+            panic!("할매는 한마디 뒤 실뜨기");
         }
         // 늘 하는 말은 차례대로 돈다.
         let a = talk_route(Who::Bori, &ctx(&p, Character::Mole, true, &all, 0));
@@ -1062,6 +1249,11 @@ mod tests {
             take(&mut p, When::TalkDoto, Character::Momo).unwrap().id,
             "doto_t_deep_momo"
         );
+        // 반쪽 뒤 할매 이야기(0270)는 누구에게나 — 독 발톱 줄은 나일의 것이라 그다음은 없다.
+        assert_eq!(
+            take(&mut p, When::TalkDoto, Character::Momo).unwrap().id,
+            "doto_t_halmae"
+        );
         assert!(
             take(&mut p, When::TalkDoto, Character::Momo).is_none(),
             "독 발톱은 나일의 것"
@@ -1114,8 +1306,8 @@ mod tests {
                 if who == Who::Nail && ch == Character::Mole {
                     continue;
                 }
-                let c =
-                    chatter(who, ch).unwrap_or_else(|| panic!("{who:?}이 {ch:?}에게 할 말이 없다"));
+                let c = chatter(who, ch, &Profile::default())
+                    .unwrap_or_else(|| panic!("{who:?}이 {ch:?}에게 할 말이 없다"));
                 for l in c.lines {
                     let t = l(ko);
                     if ch != Character::Mole {

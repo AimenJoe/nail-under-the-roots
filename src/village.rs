@@ -239,6 +239,8 @@ pub fn decor_price(i: usize) -> Option<u32> {
 pub struct State {
     pub bori: bool,
     pub halmae: bool,
+    /// 참 엔딩 뒤: 할매가 눈을 뜬다(0270, 그림 칸 4 놓아주기·5 기쁨을 숨 쉬듯 번갈아).
+    pub halmae_awake: bool,
     /// 모모가 돌아와 빈 자리에 앉았다(0046).
     pub momo: bool,
     /// 도토가 씨앗 자리를 기억해 내고 마을에 왔다(0052).

@@ -1470,6 +1470,18 @@ mod keeper_tests {
                 v.push(("doto_meet".into(), keeper_meet(Kind::Doto, w)));
                 v.push(("doto_back".into(), keeper_beaten(Kind::Doto, w, won(true))));
             }
+            // 약속이 이뤄진 뒤의 끝(0270).
+            match ch {
+                Character::Momo => {
+                    v.push(("momo_end".into(), ending_momo(w, false)));
+                    v.push(("momo_end_done".into(), ending_momo(w, true)));
+                }
+                Character::Doto => {
+                    v.push(("doto_end".into(), ending_doto(w, false)));
+                    v.push(("doto_end_done".into(), ending_doto(w, true)));
+                }
+                _ => {}
+            }
             v
         };
         for ch in [Character::Momo, Character::Doto] {
@@ -1582,6 +1594,39 @@ mod keeper_tests {
         }
         assert!(seen_between, "빛이 둘 사이를 지나간다");
         assert!((w.juice.gloom.at - bori).length() < 1.0, "끝에는 보리에게");
+    }
+
+    /// 놓아준 뒤(0270): 깊은 곳의 할매는 "남은 실" — 첫 장면만 바뀌고, 캐릭터마다 제 말. 이미 본 엔딩은 짧다.
+    #[test]
+    fn after_release_the_deep_meeting_and_repeat_endings_change() {
+        use crate::equipment::Character;
+        let ko = &crate::i18n::KO;
+        let says = |c: &Cutscene| -> Vec<&'static str> {
+            c.steps
+                .iter()
+                .filter_map(|s| match s {
+                    Step::Say { text, .. } | Step::Narrate(text) => Some(text(ko)),
+                    _ => None,
+                })
+                .collect()
+        };
+        let mut w = World::new();
+        let first = says(&halmae_meet(&w, false));
+        assert!(first.contains(&ko.half_2) && !first.contains(&ko.half_2_again));
+        let again = says(&halmae_meet(&w, true));
+        assert!(again.contains(&ko.half_1_again) && again.contains(&ko.half_2_again));
+        assert!(
+            again.contains(&ko.deep_1_again) && again.contains(&ko.deep_goal),
+            "할 일 안내는 남는다"
+        );
+        w.character = Character::Momo;
+        assert!(says(&halmae_meet(&w, true)).contains(&ko.deep_1_again_momo));
+        let long = says(&ending_true(&w)).len();
+        let short = says(&ending_true_again(&w)).len();
+        assert!(short < long && short == 2);
+        assert_eq!(says(&ending_half_again(&w)), vec![ko.rep_half]);
+        assert!(says(&ending_momo(&w, true)).contains(&ko.mend_3_done));
+        assert!(says(&ending_doto(&w, true)).contains(&ko.dend_4_done));
     }
 
     /// 보스 표(bosses.rs)의 주인마다 만남·이긴 뒤 장면이 있다(표에 줄을 더하고 가지를 빼먹으면 여기서 터진다).
@@ -2082,6 +2127,7 @@ fn momo_steps(ch: crate::equipment::Character) -> Vec<Step> {
 /// 이름 카드의 부제(0269 2.1, 사장 D5): 처음엔 자리 이름("가장 깊은 곳")만 — 무엇인지는 보고 짐작한다.
 /// 한 번 놓아준 뒤(`released`, 반쪽·참 엔딩)에야 "오래된 균사"로 확인된다.
 pub fn halmae_meet(w: &World, released: bool) -> Cutscene {
+    use crate::equipment::Character;
     let sub: Tr = if released {
         |s| s.deep_sub
     } else {
@@ -2094,12 +2140,29 @@ pub fn halmae_meet(w: &World, released: bool) -> Cutscene {
             sub,
             secs: 3.2,
         },
-        Step::Narrate(|s| s.half_1),
-        say(2, Face::Normal, |s| s.half_2),
-        say(0, Face::Determined, |s| s.deep_1),
+    ];
+    // 놓아준 뒤(0270, 사장 D6 "남은 실·기억"): 깊은 곳의 할매는 할매가 두고 간 실이다 — 첫 장면만 바뀐다.
+    let (narr, halmae, own): (Tr, Tr, Tr) = if released {
+        (
+            |s| s.half_1_again,
+            |s| s.half_2_again,
+            match w.character {
+                Character::Momo => |s| s.deep_1_again_momo,
+                Character::Doto => |s| s.deep_1_again_doto,
+                _ => |s| s.deep_1_again,
+            },
+        )
+    } else {
+        (|s| s.half_1, |s| s.half_2, |s| s.deep_1)
+    };
+    let mut steps = steps;
+    steps.extend([
+        Step::Narrate(narr),
+        say(2, Face::Normal, halmae),
+        say(0, Face::Determined, own),
         // 무엇을 칠지(사장 2026-10-29 "불명확"): 매듭 셋만 끊는다. 싸우는 동안은 매듭 위 표시(`draw_knot_mark`).
         Step::Narrate(|s| s.deep_goal),
-    ];
+    ]);
     Cutscene::new(story_actors(w), steps)
 }
 
@@ -2199,13 +2262,52 @@ pub fn ending_half(w: &World) -> Cutscene {
     Cutscene::new(story_actors(w), half_ending_steps())
 }
 
+/// 이미 본 엔딩을 또(0270): 그림 하나 + 내레이션만. 처음 보는 엔딩은 그대로 길게.
+fn short_ending(il: Illust, lines: &[Tr]) -> Vec<Step> {
+    let mut v = vec![
+        Step::Illust(Some(il)),
+        Step::Fade {
+            to_clear: true,
+            secs: 1.0,
+        },
+    ];
+    v.extend(lines.iter().map(|&t| Step::Narrate(t)));
+    v.push(Step::Fade {
+        to_clear: false,
+        secs: 1.0,
+    });
+    v
+}
+
+/// 반쪽 엔딩을 또(참 엔딩 전): 남은 실은 또 물러났고, 할매는 마을에서 기다린다.
+pub fn ending_half_again(w: &World) -> Cutscene {
+    Cutscene::new(
+        story_actors(w),
+        short_ending(Illust::HalmaeDeep, &[|s| s.rep_half]),
+    )
+}
+
+/// 참 엔딩을 또: 남은 실이 흙으로 스며들고 새싹이 조금 더 큰다.
+pub fn ending_true_again(w: &World) -> Cutscene {
+    Cutscene::new(
+        story_actors(w),
+        short_ending(Illust::Sprout, &[|s| s.rep_true_1, |s| s.rep_true_2]),
+    )
+}
+
 /// 참 엔딩 + 에필로그: 참 엔딩 조건(모모·도토)이 다 섰을 때.
 pub fn ending_true(w: &World) -> Cutscene {
     Cutscene::new(story_actors(w), true_ending_steps(w.story.clover_back()))
 }
 
 /// 모모로 가장 깊은 곳에 닿았다(0056): 흰 실 속의 굴토끼 털과 시든 꽃잎. 모모는 꽃잎을 마을로 가져간다.
-pub fn ending_momo(w: &World) -> Cutscene {
+/// 약속이 이뤄진 뒤(0270): 토끼풀 가족이 돌아왔으면(`done`) 끝 두 줄이 바뀐다 — 꽃잎은 할매 몫으로 두고 간다.
+pub fn ending_momo(w: &World, done: bool) -> Cutscene {
+    let (say3, end): (Tr, Tr) = if done {
+        (|s| s.mend_3_done, |s| s.mend_4_done)
+    } else {
+        (|s| s.mend_3, |s| s.mend_4)
+    };
     let steps = vec![
         Step::Illust(Some(Illust::MomoDeep)),
         Step::Fade {
@@ -2214,8 +2316,8 @@ pub fn ending_momo(w: &World) -> Cutscene {
         },
         Step::Narrate(|s| s.mend_1),
         say(0, Face::Worried, |s| s.mend_2),
-        say(0, Face::Normal, |s| s.mend_3),
-        Step::Narrate(|s| s.mend_4),
+        say(0, Face::Normal, say3),
+        Step::Narrate(end),
         Step::Fade {
             to_clear: false,
             secs: 1.0,
@@ -2227,7 +2329,13 @@ pub fn ending_momo(w: &World) -> Cutscene {
 /// 도토로 가장 깊은 곳(0201): 오래전에 묻은 씨앗을 흰 실이 안고 있다. 도토는 곁에 표시를 묻고 돌아간다.
 /// 씨앗을 할매 곁에 묻는 것은 나일의 참 엔딩(true_1)이라 여기서는 하지 않는다(0056: 다른 캐릭터의 끝은 대신하지 않는다).
 /// 그림은 도토의 기억(같은 자리, 오래전) — 새 일러스트가 오면 바꾼다(0191 C).
-pub fn ending_doto(w: &World) -> Cutscene {
+/// 참 엔딩 뒤(`done`, 0270): 싹이 텄으니 이번엔 일부러 자리를 잊는다.
+pub fn ending_doto(w: &World, done: bool) -> Cutscene {
+    let (say3, end): (Tr, Tr) = if done {
+        (|s| s.dend_3_done, |s| s.dend_4_done)
+    } else {
+        (|s| s.dend_3, |s| s.dend_4)
+    };
     let steps = vec![
         Step::Illust(Some(Illust::DotoMemory)),
         Step::Fade {
@@ -2236,8 +2344,8 @@ pub fn ending_doto(w: &World) -> Cutscene {
         },
         Step::Narrate(|s| s.dend_1),
         say(0, Face::Worried, |s| s.dend_2),
-        say(0, Face::Normal, |s| s.dend_3),
-        Step::Narrate(|s| s.dend_4),
+        say(0, Face::Normal, say3),
+        Step::Narrate(end),
         Step::Fade {
             to_clear: false,
             secs: 1.0,

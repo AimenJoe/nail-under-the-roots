@@ -384,6 +384,11 @@ impl App {
         let ch = self.world.character;
         let momo = ch == crate::equipment::Character::Momo;
         let true_end = self.profile.flag(key::MOMO_BACK) && self.profile.flag(key::DOTO_MEMORY);
+        // 이번 끝을 적기 전에 이미 본 엔딩(반쪽, 참) — 되풀이면 짧게(0270).
+        let seen = (
+            self.profile.flag(key::HALF_ENDING),
+            self.profile.flag(key::TRUE_ENDING),
+        );
         if self.recording() {
             self.profile.add(&key::clears(ch), 1);
             // 실뜨기: 열린 가장 높은 단계로 닿았으면 다음 단계를 연다(첫 클리어가 1단계를 연다, 0043).
@@ -415,13 +420,18 @@ impl App {
             }
             self.save_profile();
         }
+        // 이미 본 엔딩은 짧게, 이뤄진 약속은 다른 끝줄로(0270). 깃발은 이번 끝을 적기 전(`seen`)·적은 뒤를 같이 본다.
         let c = if momo {
-            cutscene::ending_momo(&self.world)
+            cutscene::ending_momo(&self.world, self.profile.flag(key::CLOVER_BACK))
         } else if ch == crate::equipment::Character::Doto {
             // 도토의 끝(0201): 씨앗 자리를 찾지만 실이 안고 있다 — 묻는 것은 나일의 참 엔딩에 남긴다.
-            cutscene::ending_doto(&self.world)
+            cutscene::ending_doto(&self.world, self.profile.flag(key::TRUE_ENDING))
+        } else if true_end && seen.1 {
+            cutscene::ending_true_again(&self.world)
         } else if true_end {
             cutscene::ending_true(&self.world)
+        } else if seen.0 {
+            cutscene::ending_half_again(&self.world)
         } else {
             cutscene::ending_half(&self.world)
         };
@@ -433,6 +443,14 @@ impl App {
         } else {
             super::AfterCut::Title
         };
+    }
+
+    /// 실뜨기 고르기 창(누룩 할매, 0043).
+    pub(super) fn open_knot_pick(&mut self) {
+        let open = self.knots_open();
+        self.knot_level = self.knot_level.min(open);
+        self.world.freeze();
+        self.scene = Scene::KnotPick;
     }
 
     pub(super) fn play(&mut self, c: Cutscene) {
@@ -510,13 +528,17 @@ impl App {
                             &[(crate::story::speaker(who), text, face)],
                         ));
                     }
-                    // 누룩 할매: 실뜨기 고르기(마을, 0043·0045).
-                    Talk::KnotPick => {
-                        let open = self.knots_open();
-                        self.knot_level = self.knot_level.min(open);
-                        self.world.freeze();
-                        self.scene = Scene::KnotPick;
+                    // 누룩 할매(0270): 한마디 뒤 실뜨기 고르기(컷씬이 끝나면 `AfterCut::KnotPick`).
+                    Talk::ChatterKnots(text, face) => {
+                        self.talk_n[n] += 1;
+                        self.play(cutscene::talk(
+                            &self.world,
+                            &[(crate::story::speaker(who), text, face)],
+                        ));
+                        self.after_cutscene = super::AfterCut::KnotPick;
                     }
+                    // 누룩 할매: 실뜨기 고르기(마을, 0043·0045).
+                    Talk::KnotPick => self.open_knot_pick(),
                     // 표에 줄이 없는 이웃: 아무 일도 없다. 시험이 이웃마다 줄이 있는지 본다.
                     Talk::Nothing => {}
                 }

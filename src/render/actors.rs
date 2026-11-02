@@ -771,9 +771,15 @@ pub(super) fn draw_dig_mound(pos: Vec2, ut: f32, windup: f32, time: f32) {
 }
 
 /// 누룩 할매(마을, 0045): 흰 실 덩어리 + 버섯 갓 셋 + 감은 눈. 숨 쉰다. 새 그림(0219)이 없으면 코드 그림.
-pub(super) fn draw_halmae_at(art: &Art, pos: Vec2, time: f32) {
+/// 참 엔딩 뒤(`awake`, 0270)엔 눈 뜬 칸 둘(4 놓아주기·5 기쁨)로 숨 쉰다.
+pub(super) fn draw_halmae_at(art: &Art, pos: Vec2, time: f32, awake: bool) {
     if let Some(tex) = &art.halmae {
-        let frame = ((time * 0.9) as u32) % 2;
+        let breath = ((time * 0.9) as u32) % 2;
+        let frame = if awake {
+            art::HALMAE_RELEASE + breath
+        } else {
+            breath
+        };
         art::draw_halmae(
             tex,
             frame,
