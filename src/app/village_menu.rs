@@ -2,7 +2,8 @@
 //! 함수 둘(일시정지 `PauseTab`과 같은 꼴, 0248 R30). 데이터·저장은 합치지 않았다: 꾸미기는 깃발 `decor.<i>`, 짐은 수
 //! `pack.*`, 화폐는 둘 다 마을 씨앗 — 사면 바로 저장, 짐은 새 런 시작 때 `App::unpack`이 꺼낸다(0259 그대로).
 //!
-//! 화면: 위 탭 + 마을 씨앗, 왼쪽 목록(작은 그림 · 이름 · 상태), 오른쪽 자세히(큰 그림 · 포포의 말 또는 설명 · 값·수).
+//! 화면: 위 탭 + 마을 씨앗, 그 아래 왼쪽 위 포포의 초상화와 말(고른 것의 설명, 산 직후엔 한마디 — 쉼터 가게와 같은 자리),
+//! 아래 왼쪽 목록(작은 그림 · 이름 · 상태), 오른쪽 큰 그림 · 이름 · 값·수.
 //! 사기: 키·패드는 확인 = 산다(지금처럼 빠르게). 터치·마우스는 첫 누름 = 고르기, 고른 줄을 다시 누름 = 사기(실수로 사지 않게,
 //! 확인 창을 따로 띄우지 않는다). 짐은 좌우·−+ 단추로 빼고 넣는다(뺀 것은 씨앗을 돌려준다).
 
@@ -14,12 +15,14 @@ use crate::village::{
     PACK, PACK_POUCH_SEEDS,
 };
 
-/// 마을 창의 탭 하나: 이름, 좌우를 탭 안에서 쓰나(짐: 빼기·넣기 — 그때 탭은 Q/E·누르기로), 입력·그림.
+/// 마을 창의 탭 하나: 이름, 좌우를 탭 안에서 쓰나(짐: 빼기·넣기 — 그때 탭은 Q/E·누르기로), 입력·그림,
+/// 포포가 위 말 칸에서 하는 말(고른 줄의 설명 — 산 직후 같은 한마디가 있으면 그게 먼저).
 pub(super) struct VillageTab {
     pub name: Tr,
     pub lr: bool,
     pub update: fn(&mut App, &Actions, Option<Hit>),
     pub draw: fn(&mut App, &Ui, Rect),
+    pub say: fn(&App) -> String,
 }
 
 pub(super) const VILLAGE_TABS: &[VillageTab] = &[
@@ -28,12 +31,14 @@ pub(super) const VILLAGE_TABS: &[VillageTab] = &[
         lr: false,
         update: |app, a, tap| app.update_decor_tab(a, tap),
         draw: |app, ui, r| app.draw_decor_tab(ui, r),
+        say: |app| app.decor_say(),
     },
     VillageTab {
         name: |s| s.pack_tab,
         lr: true,
         update: |app, a, tap| app.update_pack_tab(a, tap),
         draw: |app, ui, r| app.draw_pack_tab(ui, r),
+        say: |app| tr(PACK[app.decor_cursor.min(PACK.len() - 1)].desc).to_string(),
     },
 ];
 
@@ -274,11 +279,33 @@ impl App {
                 if on { ui::ACCENT } else { ui::TEXT_DIM },
             );
         }
+        // 왼쪽 위 포포 + 위쪽 말 칸(사장 2026-11-02: 초상화는 왼쪽 위, 대화는 위). 산 뒤에는 웃는다.
+        let face = Rect::new(PANEL.x + 6.0, PANEL.y + 21.0, 36.0, 36.0);
+        ui.rect(face, ui::PANEL_LIGHT);
+        let happy = self
+            .shop_msg
+            .is_some_and(|(m, _)| tr(m) == s.decor_thanks || tr(m) == s.pack_thanks);
+        let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
+        self.renderer.draw_portrait(ui, face, frame);
+        ui.rect_lines(face, ui::BORDER);
+        let say = match self.shop_msg {
+            Some((m, _)) => tr(m).to_string(),
+            None => (VILLAGE_TABS[self.decor_tab.min(n - 1)].say)(self),
+        };
+        let tx = face.right() + 6.0;
+        for (k, l) in ui::wrap(ui, &say, PANEL.right() - tx - 6.0, FONT_PX)
+            .iter()
+            .take(3)
+            .enumerate()
+        {
+            ui.text(l, tx, face.y + 1.0 + k as f32 * 12.0, FONT_PX, ui::TEXT);
+        }
+        let top = face.bottom() + 5.0;
         let body = Rect::new(
             PANEL.x + 6.0,
-            PANEL.y + 22.0,
+            top,
             PANEL.w - 12.0,
-            PANEL.h - 28.0,
+            PANEL.bottom() - 4.0 - top,
         );
         let tab = self.decor_tab.min(n - 1);
         (VILLAGE_TABS[tab].draw)(self, ui, body);
@@ -339,16 +366,15 @@ impl App {
         }
     }
 
-    /// 오른쪽 자세히 칸: 큰 그림, 이름, 포포의 말(있으면) 또는 설명. 그림 아래 줄 `y`를 돌려준다.
+    /// 오른쪽 칸: 큰 그림, 이름, 그 아래 한 줄(값·놓음·얻는 곳). 그 아래 줄 `y`를 돌려준다(짐은 거기에 −·+).
     fn draw_village_detail(
         &mut self,
         ui: &Ui,
         r: Rect,
         pic: VillagePic,
         name: &str,
-        desc: &str,
+        info: &str,
     ) -> f32 {
-        let s = i18n::s();
         let t = get_time() as f32;
         let glow = self.world.adv.village.map_or(0, |v| v.glow);
         let art = Rect::new(r.x, r.y, 44.0, 44.0);
@@ -356,35 +382,29 @@ impl App {
         self.renderer
             .draw_village_pic(ui, pic, art, t, pic_zoom(pic), glow);
         ui.rect_lines(art, ui::BORDER);
-        // 포포(작은 초상화): 산 뒤에는 웃는다.
-        let face = Rect::new(r.right() - 30.0, r.y, 30.0, 30.0);
-        ui.rect(face, ui::PANEL_LIGHT);
-        let happy = self
-            .shop_msg
-            .is_some_and(|(m, _)| tr(m) == s.decor_thanks || tr(m) == s.pack_thanks);
-        let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
-        self.renderer.draw_portrait(ui, face, frame);
-        ui.rect_lines(face, ui::BORDER);
-        let tx = art.right() + 5.0;
-        let name_w = face.x - tx - 3.0;
-        for (k, l) in ui::wrap(ui, name, name_w, FONT_PX)
-            .iter()
-            .take(2)
-            .enumerate()
-        {
-            ui.text(l, tx, r.y + 2.0 + k as f32 * 12.0, FONT_PX, ui::ACCENT);
-        }
-        // 말이 있으면 말(포포), 없으면 설명.
-        let (say, ink) = match self.shop_msg {
-            Some((m, _)) => (tr(m), ui::TEXT),
-            None => (desc, Color::new(0.78, 0.72, 0.64, 1.0)),
-        };
-        let mut y = art.bottom() + 4.0;
-        for l in ui::wrap(ui, say, r.w, FONT_PX).iter().take(4) {
-            ui.text(l, r.x, y, FONT_PX, ink);
+        let tx = art.right() + 6.0;
+        let mut y = r.y + 2.0;
+        for l in ui::wrap(ui, name, r.right() - tx, FONT_PX).iter().take(2) {
+            ui.text(l, tx, y, FONT_PX, ui::ACCENT);
             y += 12.0;
         }
-        y
+        for l in ui::wrap(ui, info, r.right() - tx, FONT_PX).iter().take(2) {
+            ui.text(l, tx, y + 2.0, FONT_PX, ui::TEXT);
+            y += 12.0;
+        }
+        art.bottom() + 4.0
+    }
+
+    /// 꾸미기 탭에서 포포가 하는 말: 고른 꾸미기의 설명(발자국 꾸미기는 얻는 곳까지).
+    fn decor_say(&self) -> String {
+        let s = i18n::s();
+        let ids = decor_rows();
+        let i = ids[self.decor_cursor.min(ids.len() - 1)];
+        if i >= DECOR.len() && !self.profile.flag(&key_decor(i)) {
+            format!("{} {}", tr(decor_desc(i)), s.decor_journal_d)
+        } else {
+            tr(decor_desc(i)).to_string()
+        }
     }
 
     fn draw_decor_tab(&mut self, ui: &Ui, body: Rect) {
@@ -421,12 +441,15 @@ impl App {
             body.right() - list.right() - 8.0,
             body.h,
         );
-        let desc = if i >= DECOR.len() && !self.profile.flag(&key_decor(i)) {
-            format!("{} {}", tr(decor_desc(i)), s.decor_journal_d)
+        // 이름 아래 한 줄: 놓았다 / 발자국 보상 / 값.
+        let info = if self.profile.flag(&key_decor(i)) {
+            s.decor_owned.to_string()
+        } else if i >= DECOR.len() {
+            s.decor_journal.to_string()
         } else {
-            tr(decor_desc(i)).to_string()
+            fill(s.shop_price, &[&DECOR[i].price])
         };
-        self.draw_village_detail(ui, detail, VillagePic::Decor(i), tr(decor_name(i)), &desc);
+        self.draw_village_detail(ui, detail, VillagePic::Decor(i), tr(decor_name(i)), &info);
     }
 
     fn pack_name(p: &crate::village::Pack) -> String {
@@ -492,7 +515,7 @@ impl App {
             detail,
             VillagePic::Pack(p.kind),
             &Self::pack_name(p),
-            tr(p.desc),
+            &fill(i18n::s().shop_price, &[&p.price]),
         );
         // − 수 + 단추(터치·마우스). 키·패드는 좌우.
         let n = self.profile.count(key_pack(p.kind));
