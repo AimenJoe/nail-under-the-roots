@@ -1,9 +1,9 @@
 // 웹 빌드 연기 시험(0169 R7). 헤드리스 Chromium으로 웹 빌드를 띄워 타이틀 → 개발 메뉴 → 시나리오 몇 개에 들어가
 // 입력을 넣고 몇 초 돌린 뒤 스크린숏을 남긴다. 콘솔 에러·패닉·화면이 한 색으로 멈춤을 잡는다(단위 테스트가 못 보는 wasm·JS 번들·로딩 화면).
 //   cargo build --release --target wasm32-unknown-unknown
-//   (dist/ 조립은 .github/workflows/deploy-web.yml의 "Assemble publish dir"과 같게)
-//   node tools/test/smoke.js dist [출력 폴더] [시나리오 번호,...]
-// CI: .github/workflows/smoke-web.yml. 시나리오 번호는 src/scenario.rs LIST 순서(타이틀 "개발" 목록).
+//   python3 tools/web/assemble.py dist local dev
+//   node tools/test/smoke.js dist [출력 폴더] [개발 목록 이름,...]
+// CI: .github/workflows/smoke-web.yml. 이름은 src/scenario.rs LIST의 name(타이틀 "개발"의 묶음 탭 안 줄).
 const { chromium } = require('playwright');
 const http = require('http');
 const fs = require('fs');
@@ -12,7 +12,21 @@ const path = require('path');
 const DIST = path.resolve(process.argv[2] || 'dist');
 const OUT = path.resolve(process.argv[3] || 'smoke-out');
 // 기본: 튜토리얼 보스·쉼터·필드·던전·적 다섯 종·마지막 쉼터·가장 깊은 곳·마을·토끼풀.
-const SCENARIOS = (process.argv[4] || '1,2,4,5,15,27,28,29,38').split(',').map(Number);
+// 기본: 튜토리얼 보스·쉼터·필드·던전·적 다섯 종·마지막 쉼터·가장 깊은 곳·마을·실타래 굴(흰 실). 이름으로 고른다(0269: 개발 목록이
+// 묶음 탭으로 갈려 번호가 바뀐다 — src/scenario.rs의 LIST에서 묶음과 그 안의 자리를 읽는다).
+const SCENARIOS = (process.argv[4] || '튜토리얼 보스,쉼터,필드(모험),던전 바로,적 다섯 종,마지막 쉼터,가장 깊은 곳,마을,실타래 굴: 흰 실').split(',');
+// 개발 목록의 묶음 순서(scenario::Cat::ALL)와 줄: { 이름 → [묶음 번호, 묶음 안 자리] }.
+const DEV = (() => {
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'scenario.rs'), 'utf8');
+  const all = src.slice(src.indexOf('pub const ALL'), src.indexOf('];', src.indexOf('pub const ALL')));
+  const cats = [...all.matchAll(/Cat::(\w+)/g)].map((m) => m[1]);
+  const list = src.slice(src.indexOf('pub const LIST'));
+  const seen = {}; const out = {};
+  for (const m of list.matchAll(/cat: Cat::(\w+),\s*name: "(.*?)"/g)) {
+    const c = cats.indexOf(m[1]); seen[c] = (seen[c] || 0); out[m[2]] = [c, seen[c]++];
+  }
+  return out;
+})();
 const PORT = 8129;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.wasm': 'application/wasm', '.png': 'image/png',
   '.ttf': 'font/ttf', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown',
@@ -68,13 +82,16 @@ async function run() {
     return { ctx, page, key, shot, errors };
   }
 
-  // 타이틀: 인트로 넘기기 → 첫 항목에서 위로 가면 마지막 항목(개발)으로 감긴다 → 목록에서 idx번째.
-  async function dev(idx) {
-    const s = await open(`s${idx}`);
+  // 타이틀: 인트로 넘기기 → 첫 항목에서 위로 가면 마지막 항목(개발)으로 감긴다 → 묶음 탭(오른쪽) → 그 안의 줄(아래).
+  async function dev(name) {
+    const at = DEV[name];
+    if (!at) throw new Error(`개발 목록에 없다: ${name}`);
+    const s = await open(`s_${at[0]}_${at[1]}`);
     await s.key('Enter', 600);
     await s.key('ArrowUp', 200);
     await s.key('Enter', 700);
-    for (let i = 0; i < idx; i++) await s.key('ArrowDown', 60);
+    for (let i = 0; i < at[0]; i++) await s.key('ArrowRight', 80);
+    for (let i = 0; i < at[1]; i++) await s.key('ArrowDown', 60);
     await s.key('Enter', 1500);
     return s;
   }

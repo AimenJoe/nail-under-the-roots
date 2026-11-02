@@ -1,5 +1,6 @@
-//! 일시정지의 "Lab" 탭(0269 R33, 요구 2.8A, 개발판만): 손잡이(`crate::lab::KNOBS`)를 보고 바꾼다.
-//! 위아래 = 줄 고르기, 좌우 = 한 칸, 확인 = 프리셋 줄에서 실행. 탭을 닫고 이어 하면 바뀐 값으로 바로 돈다.
+//! 손맛 실험실 Lab 화면(0269 R33, 요구 2.8A, 개발판만): 손잡이(`crate::lab::KNOBS`)를 보고 바꾼다.
+//! 개발 메뉴 "도구"의 한 줄이고, 게임 중에는 일시정지 메뉴의 "Lab"으로 연다 — 닫고 이어 하면 바뀐 값으로 바로 돈다.
+//! 위아래 = 줄 고르기, 좌우 = 한 칸, 확인 = 프리셋 줄에서 실행, 뒤로 = 연 곳으로.
 //! 개발 화면이라 번역하지 않는다(0013) — 한국어 + 상수 이름.
 
 use super::*;
@@ -72,7 +73,26 @@ impl App {
         }
     }
 
-    pub(super) fn draw_lab(&mut self, ui: &Ui, c: Rect) {
+    /// 창 하나로(개발 메뉴·일시정지 어디서 열어도 같은 꼴).
+    pub(super) fn draw_lab_screen(&mut self, ui: &Ui) {
+        let panel = Rect::new(8.0, 4.0, 304.0, 172.0);
+        {
+            let base = ui.with_base_font();
+            base.panel(panel, Some("Lab · 손맛 실험실"));
+        }
+        self.close_button(ui, panel);
+        self.draw_lab(
+            ui,
+            Rect::new(
+                panel.x + 6.0,
+                panel.y + 20.0,
+                panel.w - 12.0,
+                panel.h - 24.0,
+            ),
+        );
+    }
+
+    fn draw_lab(&mut self, ui: &Ui, c: Rect) {
         let base = ui.with_base_font();
         let ui = &base;
         let row_h = FONT_PX + 3.0;
@@ -138,7 +158,7 @@ impl App {
             self.hits.push((r, Hit::LabItem(i)));
         }
         let foot = if l.note.is_empty() {
-            "위아래 고르기 · 좌우 한 칸 · 확인 실행 · 운영판엔 없음".to_string()
+            "위아래 고르기 · 좌우 한 칸 · 확인 실행 · 뒤로 닫기 · 운영판엔 없음".to_string()
         } else {
             l.note.clone()
         };

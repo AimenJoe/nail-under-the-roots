@@ -184,62 +184,77 @@ impl App {
         // 개발 화면은 번역하지 않는다(한국어). 언어와 상관없이 한글 폰트로.
         let base = ui.with_base_font();
         let ui = &base;
-        let panel = Rect::new(24.0, 16.0, 272.0, 148.0);
-        ui.panel(panel, Some("개발 시나리오"));
-        // 목록이 패널보다 길다: 고른 줄이 보이게 VISIBLE줄씩 굴린다.
-        const VISIBLE: usize = 7;
-        let n = scenario::LIST.len();
-        let first = self
-            .dev_view
-            .window(self.dev_cursor, n, VISIBLE, FONT_PX + 4.0);
-        let names: Vec<&str> = scenario::LIST
+        let panel = Rect::new(16.0, 8.0, 288.0, 164.0);
+        ui.panel(panel, Some("개발"));
+        // 묶음 탭(0269): 좌우·Q/E·누르기로 바꾼다.
+        let cats = scenario::Cat::ALL;
+        let cat = self.dev_cat.min(cats.len() - 1);
+        let mut tx = panel.x + 6.0;
+        let ty = panel.y + 20.0;
+        for (i, c) in cats.iter().enumerate() {
+            let w = ui.text_w(c.name(), FONT_PX) + 8.0;
+            let r = Rect::new(tx, ty, w, FONT_PX + 4.0);
+            if i == cat {
+                ui.rect(r, ui::PANEL_LIGHT);
+                ui.rect_lines(r, ui::ACCENT);
+            }
+            ui.text(
+                c.name(),
+                r.x + 4.0,
+                ui::mid_y(r),
+                FONT_PX,
+                if i == cat { ui::ACCENT } else { ui::TEXT_DIM },
+            );
+            self.hits.push((r, Hit::DevTab(i)));
+            tx += w + 2.0;
+        }
+        // 탭 안의 줄: 고른 줄이 보이게 굴린다(여섯 줄 — 일곱째는 아래 안내 줄과 겹쳤다).
+        const VISIBLE: usize = 6;
+        let items = cats[cat].entries();
+        let n = items.len();
+        let cursor = self.dev_cursor.min(n.saturating_sub(1));
+        let first = self.dev_view.window(cursor, n, VISIBLE, FONT_PX + 4.0);
+        let names: Vec<&str> = items
             .iter()
             .skip(first)
             .take(VISIBLE)
-            .map(|e| e.name)
+            .map(|&i| scenario::LIST[i].name)
             .collect();
-        let rects = ui.menu_list(
-            &names,
-            self.dev_cursor - first,
-            panel.x + 6.0,
-            panel.y + 24.0,
-            110.0,
-        );
-        for (i, r) in rects.into_iter().enumerate() {
-            self.hits.push((r, Hit::DevItem(first + i)));
+        let ly = ty + FONT_PX + 10.0;
+        let rects = ui.menu_list(&names, cursor - first, panel.x + 6.0, ly, 118.0);
+        for (k, r) in rects.into_iter().enumerate() {
+            self.hits.push((r, Hit::DevItem(first + k)));
         }
         if first > 0 {
-            ui.text("▲", panel.x + 112.0, panel.y + 24.0, FONT_PX, ui::TEXT_DIM);
+            ui.text("▲", panel.x + 120.0, ly, FONT_PX, ui::TEXT_DIM);
         }
         if first + VISIBLE < n {
             ui.text(
                 "▼",
-                panel.x + 112.0,
-                panel.y + 24.0 + 6.0 * (FONT_PX + 4.0),
+                panel.x + 120.0,
+                ly + (VISIBLE - 1) as f32 * (FONT_PX + 4.0),
                 FONT_PX,
                 ui::TEXT_DIM,
             );
         }
-        let e = &scenario::LIST[self.dev_cursor];
-        let dx = panel.x + 126.0;
-        ui.text(e.name, dx, panel.y + 26.0, FONT_PX, ui::ACCENT);
-        for (i, l) in ui::wrap(ui, e.desc, panel.right() - dx - 6.0, FONT_PX)
-            .iter()
-            .enumerate()
-        {
-            ui.text(l, dx, panel.y + 42.0 + i as f32 * 14.0, FONT_PX, ui::TEXT);
+        if let Some(&i) = items.get(cursor) {
+            let e = &scenario::LIST[i];
+            let dx = panel.x + 134.0;
+            ui.text(e.name, dx, ly + 2.0, FONT_PX, ui::ACCENT);
+            for (k, l) in ui::wrap(ui, e.desc, panel.right() - dx - 6.0, FONT_PX)
+                .iter()
+                .take(7)
+                .enumerate()
+            {
+                ui.text(l, dx, ly + 18.0 + k as f32 * 13.0, FONT_PX, ui::TEXT);
+            }
         }
-        for (i, l) in ["확인: 시작 · 뒤로: 타이틀", "적 구성은 src/scenario.rs"]
-            .iter()
-            .enumerate()
-        {
-            ui.text(
-                l,
-                dx,
-                panel.bottom() - 30.0 + i as f32 * 13.0,
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
-        }
+        ui.text(
+            "좌우: 묶음 · 위아래: 고르기 · 확인: 시작 · 뒤로: 타이틀",
+            panel.x + 6.0,
+            panel.bottom() - 12.0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
     }
 }

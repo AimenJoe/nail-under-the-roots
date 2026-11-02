@@ -51,6 +51,8 @@ pub enum Scenario {
     LabRange,
     /// 대화 검수 화면(0269 R34): 월드가 아니라 화면(`app/dialogue.rs`).
     DialogueCheck,
+    /// 손맛 실험실 Lab(0269 R33): 월드가 아니라 화면(`app/lab.rs`).
+    LabScreen,
     /// 환경 확인: 지정 환경에서 돌격형 1 + 원거리형 1.
     InBiome(Biome),
     /// 반딧불·산딸기 줍기 확인(docs/decisions/0016).
@@ -97,277 +99,384 @@ pub enum Scenario {
     Rooms(u8),
 }
 
+/// 개발 목록의 묶음(0269: 53줄 한 목록이 중구난방이라 탭으로 가른다). 화면 위 탭 순서 = 이 순서.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cat {
+    /// 개발 도구(대화 검수·Lab 등 — 월드가 아니라 화면인 것 포함).
+    Tools,
+    Story,
+    Places,
+    Rooms,
+    Bosses,
+    Combat,
+    Items,
+}
+
+impl Cat {
+    pub const ALL: [Cat; 7] = [
+        Cat::Tools,
+        Cat::Story,
+        Cat::Places,
+        Cat::Rooms,
+        Cat::Bosses,
+        Cat::Combat,
+        Cat::Items,
+    ];
+
+    /// 탭 이름(개발 화면이라 번역하지 않는다, 0013).
+    pub fn name(self) -> &'static str {
+        match self {
+            Cat::Tools => "도구",
+            Cat::Story => "이야기",
+            Cat::Places => "장소",
+            Cat::Rooms => "방·환경",
+            Cat::Bosses => "보스",
+            Cat::Combat => "전투·적",
+            Cat::Items => "아이템",
+        }
+    }
+
+    /// 이 묶음의 줄(목록 번호).
+    pub fn entries(self) -> Vec<usize> {
+        LIST.iter()
+            .enumerate()
+            .filter(|(_, e)| e.cat == self)
+            .map(|(i, _)| i)
+            .collect()
+    }
+}
+
 pub struct Entry {
+    pub cat: Cat,
     pub name: &'static str,
     pub desc: &'static str,
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 53] = [
+pub const LIST: [Entry; 54] = [
     Entry {
+        cat: Cat::Tools,
         name: "대화 검수",
         desc: "한마디 표·말 걸기·빈 자리 말을 미리 짠 기록(또는 지금 슬롯 복사본)·캐릭터마다 본다. 왜 나오고 왜 안 나오는지, 확인으로 실제 대화창(복사본에만 봄이 남는다).",
         scenario: Scenario::DialogueCheck,
     },
     Entry {
-        name: "튜토리얼 보스",
-        desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
-        scenario: Scenario::Boss,
+        cat: Cat::Tools,
+        name: "Lab: 손맛 실험실",
+        desc: "손맛 수치(흔들림·피격 등급·공격·이동·박자) 37개를 보고 바꾼다. 프리셋 칸 셋(진행 기록과 따로). 게임 중에는 일시정지 메뉴의 \"Lab\"으로도 연다.",
+        scenario: Scenario::LabScreen,
     },
     Entry {
-        name: "쉼터",
-        desc: "첫 쉼터, 씨앗 40. 포포 가게·보리·빈 자리, 아래 뿌리 길에서 길 지도.",
-        scenario: Scenario::Camp,
-    },
-    Entry {
-        name: "쉼터: 둘째",
-        desc: "둘째 쉼터 지도(뿌리 동굴). 오른쪽 아래 바위 너머 숨은 자리에 반딧불·씨앗. 셋째는 \"마지막 쉼터\".",
-        scenario: Scenario::Camp2,
-    },
-    Entry {
-        name: "필드(모험)",
-        desc: "컷씬·튜토리얼 없이 필드에서. 남쪽 굴 입구로 던전, 저장 지점(초록 버섯 고리).",
-        scenario: Scenario::Field,
-    },
-    Entry {
-        name: "던전 바로",
-        desc: "새로 생성한 던전 시작방에서. 전투방은 들어서면 문이 닫힌다. 보스를 잡으면 출구.",
-        scenario: Scenario::Dungeon,
-    },
-    Entry {
-        name: "아레나 웨이브",
-        desc: "예전 첫 시작: 방 하나에서 웨이브 1부터(손맛 시험장).",
-        scenario: Scenario::Arena,
-    },
-    Entry {
-        name: "환경: 꽃 핀 입구",
-        desc: "밝고 꽃이 많은 첫 환경. 돌격형 1 + 원거리형 1.",
-        scenario: Scenario::InBiome(Biome::Meadow),
-    },
-    Entry {
-        name: "환경: 뿌리 지대",
-        desc: "꽃이 줄고 뿌리가 드러난다. 가장자리가 어두워진다.",
-        scenario: Scenario::InBiome(Biome::Roots),
-    },
-    Entry {
-        name: "환경: 어두운 심층",
-        desc: "빛은 나일 주변뿐. 이끼와 빛나는 버섯.",
-        scenario: Scenario::InBiome(Biome::Deep),
-    },
-    Entry {
-        name: "튜토리얼",
-        desc: "컷씬 없이 플레이 튜토리얼만(이동→3연타→굴파기→솟구침).",
-        scenario: Scenario::Tutorial,
-    },
-    Entry {
-        name: "무기 비교",
-        desc: "고른 캐릭터의 무기가 다 가방에(Naïl 발톱 넷, 모모·도토 넷씩, 0246), 빈 방에 허수아비 셋. 메뉴 → 가방에서 확인으로 바꿔 낀다.",
-        scenario: Scenario::AllClaws,
-    },
-    Entry {
+        cat: Cat::Tools,
         name: "Lab 연습장",
         desc: "피격 등급 비교(0269): 들쥐(보통·돌진은 센 공격), 두꺼비 혀(센 공격), 포자버섯(구름), 왼쪽 가시 덤불(바닥). 일시정지 Lab 탭에서 값을 바꾸고 다시 맞아 본다.",
         scenario: Scenario::LabRange,
     },
     Entry {
-        name: "떨어지는 것 확인",
-        desc: "체력 2/5. 반딧불 12마리와 산딸기 2개가 튀어나온다. 왼쪽엔 산딸기·지렁이·씨앗·뿌리 심장·장신구가 놓여 있다(주울 수 있다 표시).",
-        scenario: Scenario::Loot,
-    },
-    Entry {
-        name: "장신구·필살기 확인",
-        desc: "장신구 5개가 가방에, 산딸기 3·지렁이 2, 분노 가득, 뿌리 심장 하나. 들쥐 2마리. L/B 드릴, I/Y 먹기, Q·E/LB·RB 넘기기.",
-        scenario: Scenario::Gear,
-    },
-    Entry {
-        name: "적 다섯 종",
-        desc: "들쥐·생쥐 떼·시궁쥐·다람쥐·청설모. 도감 탭에 차례로 적힌다.",
-        scenario: Scenario::AllSpecies,
-    },
-    Entry {
-        name: "새 졸개 다섯",
-        desc: "땃쥐(두 번 물기)·고슴도치(가시 공)·두꺼비(혀)·박쥐(솟구치기 안 닿음)·포자버섯(구름). 심층에서.",
-        scenario: Scenario::NewMobs,
-    },
-    Entry {
-        name: "실타래 굴: 뿌리",
-        desc: "방 셋, 싸움방마다 가시뿌리 덤불. 끝방에 엘리트 + 졸개 둘, 이기면 장신구.",
-        scenario: Scenario::Tangle(Biome::Roots),
-    },
-    Entry {
-        name: "실타래 굴: 심층",
-        desc: "방 셋, 싸움하는 동안 천장에서 돌이 떨어진다. 끝방에 엘리트 + 졸개 둘.",
-        scenario: Scenario::Tangle(Biome::Deep),
-    },
-    Entry {
+        cat: Cat::Tools,
         name: "빈 방",
         desc: "적 없음. 이동·굴파기 손맛만 본다.",
         scenario: Scenario::Empty,
     },
     Entry {
-        name: "들쥐 1마리",
-        desc: "예고→돌진→멈춤 타이밍 확인.",
-        scenario: Scenario::Chargers(1),
-    },
-    Entry {
-        name: "다람쥐 1마리",
-        desc: "거리 유지·투사체. 솟구침으로 투사체 지우기.",
-        scenario: Scenario::Shooters(1),
-    },
-    Entry {
-        name: "들쥐 3마리",
-        desc: "판정 2: 위치 선정을 생각하게 되는가.",
-        scenario: Scenario::Chargers(3),
-    },
-    Entry {
-        name: "1+1",
-        desc: "들쥐 1 + 다람쥐 1. 다음 웨이브 없음.",
-        scenario: Scenario::OneEach,
-    },
-    Entry {
-        name: "웨이브 3부터",
-        desc: "4마리(종류는 무작위)부터 자동 웨이브.",
-        scenario: Scenario::FromWave(3),
-    },
-    Entry {
+        cat: Cat::Story,
         name: "오프닝 컷씬",
         desc: "컷씬 재생 확인. 끝나면 빈 방.",
         scenario: Scenario::CutsceneOnly,
     },
     Entry {
+        cat: Cat::Story,
+        name: "튜토리얼",
+        desc: "컷씬 없이 플레이 튜토리얼만(이동→3연타→굴파기→솟구침).",
+        scenario: Scenario::Tutorial,
+    },
+    Entry {
+        cat: Cat::Story,
         name: "이야기 일러스트",
         desc: "모모가 돌아옴 → 반쪽 엔딩 → 참 엔딩·에필로그. 아직 게임에 자리가 없는 장면(임시 그림).",
         scenario: Scenario::StoryPreview,
     },
     Entry {
-        name: "마지막 쉼터",
-        desc: "마지막 길(길 지도의 끝이 가장 깊은 곳). 씨앗 40.",
-        scenario: Scenario::LastCamp,
-    },
-    Entry {
+        cat: Cat::Story,
         name: "가장 깊은 곳",
         desc: "런의 끝: 할매와 실매듭 셋(0162). 셋 다 끊으면 반쪽 엔딩을 보고 타이틀로. 세 번 감기면 쉼터로.",
         scenario: Scenario::Deepest,
     },
     Entry {
-        name: "마을",
-        desc: "큰 나무 아래 마을(지금 기록의 모습).",
-        scenario: Scenario::Village,
-    },
-    Entry {
+        cat: Cat::Story,
         name: "마을로 올라오기",
         desc: "엔딩 뒤처럼 가장 깊은 곳(130m)에서 땅 위까지 올라와 뿌리 길 곁으로 튀어나온다(0204).",
         scenario: Scenario::Ascent,
     },
     Entry {
-        name: "모모 첫 만남",
-        desc: "첫 길 끝 굴에서 시작. 끝방의 모모: 높이 뛰기·뒷발 차기. 이기면 달아나는 장면.",
-        scenario: Scenario::Momo(0),
+        cat: Cat::Places,
+        name: "필드(모험)",
+        desc: "컷씬·튜토리얼 없이 필드에서. 남쪽 굴 입구로 던전, 저장 지점(초록 버섯 고리).",
+        scenario: Scenario::Field,
     },
     Entry {
-        name: "모모 세 번째",
-        desc: "굴로 숨기·이어 뛰기까지. 이기면 모모가 돌아오는 장면(기록은 남기지 않는다).",
-        scenario: Scenario::Momo(2),
+        cat: Cat::Places,
+        name: "쉼터",
+        desc: "첫 쉼터, 씨앗 40. 포포 가게·보리·빈 자리, 아래 뿌리 길에서 길 지도.",
+        scenario: Scenario::Camp,
     },
     Entry {
-        name: "도토",
-        desc: "둘째 길 끝 굴. 끝방의 도토: 도토리 부채꼴·높이 뛰기·도토리 묻기. 이기면 기억해 내는 장면(기록은 남기지 않는다).",
-        scenario: Scenario::Doto,
+        cat: Cat::Places,
+        name: "쉼터: 둘째",
+        desc: "둘째 쉼터 지도(뿌리 동굴). 오른쪽 아래 바위 너머 숨은 자리에 반딧불·씨앗. 셋째는 \"마지막 쉼터\".",
+        scenario: Scenario::Camp2,
     },
     Entry {
-        name: "길의 샘",
-        desc: "길의 샘 칸. 쉼방 가운데 샘에 발을 담그면 가득 회복(0159).",
-        scenario: Scenario::Spring,
+        cat: Cat::Places,
+        name: "마지막 쉼터",
+        desc: "마지막 길(길 지도의 끝이 가장 깊은 곳). 씨앗 40.",
+        scenario: Scenario::LastCamp,
     },
     Entry {
-        name: "출구",
-        desc: "적 없는 한 방 굴. 들어서면 내려가는 출구가 열린다(0159, 화면 밖이면 가장자리 표시).",
-        scenario: Scenario::Exit,
-    },
-    Entry {
-        name: "콩이",
-        desc: "셋째 길 끝 굴. 끝방의 콩이: 굴러 튕기기·웅크려 버티기(발톱은 튕김, 솟구치기·드릴은 뚫음). 이기면 바위 발톱.",
-        scenario: Scenario::Kongi,
-    },
-    Entry {
-        name: "환경: 흰 실 굴",
-        desc: "굴토끼 옛 굴의 지대(0165). 보랏빛 흙에 흰 실 얼룩, 보풀.",
-        scenario: Scenario::InBiome(Biome::Silk),
-    },
-    Entry {
-        name: "실타래 굴: 흰 실",
-        desc: "흰 실 굴 3방 + 흰 실 그물(걸으면 느림, 발톱으로 끊김).",
-        scenario: Scenario::Tangle(Biome::Silk),
-    },
-    Entry {
-        name: "토끼풀",
-        desc: "굴토끼 옛 굴(흰 실 굴). 끝방의 토끼풀: 발 구르기(충격파·실 그물)·두 번 차기·내려앉기, 반 아래면 품기(실 한 가닥). 고치는 못 때린다.",
-        scenario: Scenario::Clover,
-    },
-    Entry {
-        name: "부술 수 있는 것 넷",
-        desc: "흙더미·뿌리혹·돌무더기·실뭉치. 쳐서 깨면 운에 따라 씨앗·산딸기·반딧불·지렁이(0177).",
-        scenario: Scenario::Breakables,
-    },
-    Entry {
-        name: "도토: 아레나",
-        desc: "도토로 웨이브(0195). 던지기 3타·강타(큰 도토리)·뒤로 뛰기·묻기(게이지 가득). 받아치기는 던지는 순간.",
-        scenario: Scenario::DotoArena,
-    },
-    Entry {
-        name: "도토: 새 졸개",
-        desc: "도토로 새 졸개 다섯(어두운 심층). 박쥐도 도토리는 닿는다. 고슴도치 가시는 큰 도토리·묻은 도토리로.",
-        scenario: Scenario::DotoMobs,
-    },
-    Entry {
-        name: "모모: 아레나",
-        desc: "모모로 웨이브(0056). 뒷발 차기 콤보·깡충 회피·이어 뛰기(게이지 가득). 기록과 상관없이 바로.",
-        scenario: Scenario::MomoArena,
-    },
-    Entry {
+        cat: Cat::Places,
         name: "쉼터: 실뿌리 둘",
         desc: "실뿌리 둘이 감긴 채 체력 1, 곁에 들쥐(0225). 맞으면 셋째가 감기며 런이 끝나는 연출 → 확인으로 마을.",
         scenario: Scenario::LastRootlet,
     },
     Entry {
-        name: "보스 2단계: 대장",
-        desc: "빈 방에 들쥐 대장, 체력 반(0233). 깨자마자 2단계 — 붉은 발밑 고리, 빨라진 예고·걸음, 덜 멈칫.",
-        scenario: Scenario::BossHalf(Kind::Chief),
+        cat: Cat::Places,
+        name: "마을",
+        desc: "큰 나무 아래 마을(지금 기록의 모습).",
+        scenario: Scenario::Village,
     },
     Entry {
-        name: "보스 2단계: 모모",
-        desc: "첫 만남 모모, 체력 반(0233). 2단계면 첫 만남에도 굴로 숨고 뛰기를 두 번 잇는다.",
-        scenario: Scenario::BossHalf(Kind::Momo),
+        cat: Cat::Places,
+        name: "던전 바로",
+        desc: "새로 생성한 던전 시작방에서. 전투방은 들어서면 문이 닫힌다. 보스를 잡으면 출구.",
+        scenario: Scenario::Dungeon,
     },
     Entry {
+        cat: Cat::Places,
+        name: "길의 샘",
+        desc: "길의 샘 칸. 쉼방 가운데 샘에 발을 담그면 가득 회복(0159).",
+        scenario: Scenario::Spring,
+    },
+    Entry {
+        cat: Cat::Places,
+        name: "출구",
+        desc: "적 없는 한 방 굴. 들어서면 내려가는 출구가 열린다(0159, 화면 밖이면 가장자리 표시).",
+        scenario: Scenario::Exit,
+    },
+    Entry {
+        cat: Cat::Places,
+        name: "실타래 굴: 뿌리",
+        desc: "방 셋, 싸움방마다 가시뿌리 덤불. 끝방에 엘리트 + 졸개 둘, 이기면 장신구.",
+        scenario: Scenario::Tangle(Biome::Roots),
+    },
+    Entry {
+        cat: Cat::Places,
+        name: "실타래 굴: 심층",
+        desc: "방 셋, 싸움하는 동안 천장에서 돌이 떨어진다. 끝방에 엘리트 + 졸개 둘.",
+        scenario: Scenario::Tangle(Biome::Deep),
+    },
+    Entry {
+        cat: Cat::Places,
+        name: "실타래 굴: 흰 실",
+        desc: "흰 실 굴 3방 + 흰 실 그물(걸으면 느림, 발톱으로 끊김).",
+        scenario: Scenario::Tangle(Biome::Silk),
+    },
+    Entry {
+        cat: Cat::Rooms,
         name: "넓은 방",
         desc: "둘째 길의 보통 굴, 화면 두 칸짜리 넓은 방 안(0244). 카메라가 방 안을 따라가고 두 칸의 적이 함께 깬다. 방마다 지형(기둥·골짜기·돌밭).",
         scenario: Scenario::Hall(crate::equipment::Character::Mole),
     },
     Entry {
+        cat: Cat::Rooms,
         name: "넓은 방: 모모",
         desc: "넓은 방(0244)을 모모로.",
         scenario: Scenario::Hall(crate::equipment::Character::Momo),
     },
     Entry {
+        cat: Cat::Rooms,
         name: "넓은 방: 도토",
         desc: "넓은 방(0244)을 도토로.",
         scenario: Scenario::Hall(crate::equipment::Character::Doto),
     },
     Entry {
+        cat: Cat::Rooms,
         name: "방 짜임: 물결",
         desc: "시작방 옆 방이 물결(0257): 하나 남으면 다음 무리가 땅에서 솟는다. 문 곁에 씨앗 표지(붉은 테).",
         scenario: Scenario::Rooms(0),
     },
     Entry {
+        cat: Cat::Rooms,
         name: "방 짜임: 매복",
         desc: "시작방 옆 방이 매복(0257): 가운데에 오면 둘레에서 떨어진다. 문 곁에 상자 표지.",
         scenario: Scenario::Rooms(1),
     },
     Entry {
+        cat: Cat::Rooms,
         name: "방 짜임: 버티기",
         desc: "시작방 옆 방이 버티기(0257): 15초 동안 솟고, 다 되면 무너져 묻힌다. 문 곁에 반딧불 표지.",
         scenario: Scenario::Rooms(2),
+    },
+    Entry {
+        cat: Cat::Rooms,
+        name: "환경: 꽃 핀 입구",
+        desc: "밝고 꽃이 많은 첫 환경. 돌격형 1 + 원거리형 1.",
+        scenario: Scenario::InBiome(Biome::Meadow),
+    },
+    Entry {
+        cat: Cat::Rooms,
+        name: "환경: 뿌리 지대",
+        desc: "꽃이 줄고 뿌리가 드러난다. 가장자리가 어두워진다.",
+        scenario: Scenario::InBiome(Biome::Roots),
+    },
+    Entry {
+        cat: Cat::Rooms,
+        name: "환경: 어두운 심층",
+        desc: "빛은 나일 주변뿐. 이끼와 빛나는 버섯.",
+        scenario: Scenario::InBiome(Biome::Deep),
+    },
+    Entry {
+        cat: Cat::Rooms,
+        name: "환경: 흰 실 굴",
+        desc: "굴토끼 옛 굴의 지대(0165). 보랏빛 흙에 흰 실 얼룩, 보풀.",
+        scenario: Scenario::InBiome(Biome::Silk),
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "튜토리얼 보스",
+        desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
+        scenario: Scenario::Boss,
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "모모 첫 만남",
+        desc: "첫 길 끝 굴에서 시작. 끝방의 모모: 높이 뛰기·뒷발 차기. 이기면 달아나는 장면.",
+        scenario: Scenario::Momo(0),
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "모모 세 번째",
+        desc: "굴로 숨기·이어 뛰기까지. 이기면 모모가 돌아오는 장면(기록은 남기지 않는다).",
+        scenario: Scenario::Momo(2),
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "도토",
+        desc: "둘째 길 끝 굴. 끝방의 도토: 도토리 부채꼴·높이 뛰기·도토리 묻기. 이기면 기억해 내는 장면(기록은 남기지 않는다).",
+        scenario: Scenario::Doto,
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "콩이",
+        desc: "셋째 길 끝 굴. 끝방의 콩이: 굴러 튕기기·웅크려 버티기(발톱은 튕김, 솟구치기·드릴은 뚫음). 이기면 바위 발톱.",
+        scenario: Scenario::Kongi,
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "토끼풀",
+        desc: "굴토끼 옛 굴(흰 실 굴). 끝방의 토끼풀: 발 구르기(충격파·실 그물)·두 번 차기·내려앉기, 반 아래면 품기(실 한 가닥). 고치는 못 때린다.",
+        scenario: Scenario::Clover,
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "보스 2단계: 대장",
+        desc: "빈 방에 들쥐 대장, 체력 반(0233). 깨자마자 2단계 — 붉은 발밑 고리, 빨라진 예고·걸음, 덜 멈칫.",
+        scenario: Scenario::BossHalf(Kind::Chief),
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "보스 2단계: 모모",
+        desc: "첫 만남 모모, 체력 반(0233). 2단계면 첫 만남에도 굴로 숨고 뛰기를 두 번 잇는다.",
+        scenario: Scenario::BossHalf(Kind::Momo),
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "아레나 웨이브",
+        desc: "예전 첫 시작: 방 하나에서 웨이브 1부터(손맛 시험장).",
+        scenario: Scenario::Arena,
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "웨이브 3부터",
+        desc: "4마리(종류는 무작위)부터 자동 웨이브.",
+        scenario: Scenario::FromWave(3),
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "적 다섯 종",
+        desc: "들쥐·생쥐 떼·시궁쥐·다람쥐·청설모. 도감 탭에 차례로 적힌다.",
+        scenario: Scenario::AllSpecies,
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "새 졸개 다섯",
+        desc: "땃쥐(두 번 물기)·고슴도치(가시 공)·두꺼비(혀)·박쥐(솟구치기 안 닿음)·포자버섯(구름). 심층에서.",
+        scenario: Scenario::NewMobs,
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "들쥐 1마리",
+        desc: "예고→돌진→멈춤 타이밍 확인.",
+        scenario: Scenario::Chargers(1),
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "다람쥐 1마리",
+        desc: "거리 유지·투사체. 솟구침으로 투사체 지우기.",
+        scenario: Scenario::Shooters(1),
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "들쥐 3마리",
+        desc: "판정 2: 위치 선정을 생각하게 되는가.",
+        scenario: Scenario::Chargers(3),
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "1+1",
+        desc: "들쥐 1 + 다람쥐 1. 다음 웨이브 없음.",
+        scenario: Scenario::OneEach,
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "모모: 아레나",
+        desc: "모모로 웨이브(0056). 뒷발 차기 콤보·깡충 회피·이어 뛰기(게이지 가득). 기록과 상관없이 바로.",
+        scenario: Scenario::MomoArena,
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "도토: 아레나",
+        desc: "도토로 웨이브(0195). 던지기 3타·강타(큰 도토리)·뒤로 뛰기·묻기(게이지 가득). 받아치기는 던지는 순간.",
+        scenario: Scenario::DotoArena,
+    },
+    Entry {
+        cat: Cat::Combat,
+        name: "도토: 새 졸개",
+        desc: "도토로 새 졸개 다섯(어두운 심층). 박쥐도 도토리는 닿는다. 고슴도치 가시는 큰 도토리·묻은 도토리로.",
+        scenario: Scenario::DotoMobs,
+    },
+    Entry {
+        cat: Cat::Items,
+        name: "무기 비교",
+        desc: "고른 캐릭터의 무기가 다 가방에(Naïl 발톱 넷, 모모·도토 넷씩, 0246), 빈 방에 허수아비 셋. 메뉴 → 가방에서 확인으로 바꿔 낀다.",
+        scenario: Scenario::AllClaws,
+    },
+    Entry {
+        cat: Cat::Items,
+        name: "떨어지는 것 확인",
+        desc: "체력 2/5. 반딧불 12마리와 산딸기 2개가 튀어나온다. 왼쪽엔 산딸기·지렁이·씨앗·뿌리 심장·장신구가 놓여 있다(주울 수 있다 표시).",
+        scenario: Scenario::Loot,
+    },
+    Entry {
+        cat: Cat::Items,
+        name: "장신구·필살기 확인",
+        desc: "장신구 5개가 가방에, 산딸기 3·지렁이 2, 분노 가득, 뿌리 심장 하나. 들쥐 2마리. L/B 드릴, I/Y 먹기, Q·E/LB·RB 넘기기.",
+        scenario: Scenario::Gear,
+    },
+    Entry {
+        cat: Cat::Items,
+        name: "부술 수 있는 것 넷",
+        desc: "흙더미·뿌리혹·돌무더기·실뭉치. 쳐서 깨면 운에 따라 씨앗·산딸기·반딧불·지렁이(0177).",
+        scenario: Scenario::Breakables,
     },
 ];
 
@@ -430,7 +539,7 @@ pub fn build(s: Scenario) -> World {
         // 무기 비교(0246): 빈 방 + 오른쪽에 허수아비 셋(쓰러지지 않는다) — 탄·가시·조각을 그대로 본다.
         Scenario::AllClaws => all_claws(),
         Scenario::LabRange => lab_range(),
-        Scenario::DialogueCheck => World::empty(),
+        Scenario::DialogueCheck | Scenario::LabScreen => World::empty(),
         Scenario::Breakables => breakables(),
         Scenario::Gear => gear(),
         Scenario::BossHalf(kind) => boss_half(kind),
@@ -831,6 +940,28 @@ mod tests {
     use macroquad::math::Vec2;
 
     /// 개발 시나리오 전부: 가만히 서서 600틱(10초)을 돌려도 panic이 없고 플레이어가 살아 있거나 쓰러졌거나 둘 중 하나다.
+    /// 0269: 개발 목록의 묶음 탭마다 줄이 있고, 이름이 겹치지 않는다(연기 시험이 이름으로 고른다).
+    #[test]
+    fn dev_list_is_grouped_and_names_are_unique() {
+        for c in Cat::ALL {
+            assert!(!c.entries().is_empty(), "{c:?} 탭이 비었다");
+        }
+        let mut names: Vec<&str> = LIST.iter().map(|e| e.name).collect();
+        names.sort();
+        let n = names.len();
+        names.dedup();
+        assert_eq!(names.len(), n, "개발 목록에 같은 이름이 있다");
+        // 묶음은 목록 안에서 이어져 있다(탭 순서 = 목록 순서, 읽는 사람이 헷갈리지 않게).
+        let cats: Vec<Cat> = LIST.iter().map(|e| e.cat).collect();
+        let mut order = cats.clone();
+        order.dedup();
+        assert_eq!(
+            order,
+            Cat::ALL.to_vec(),
+            "목록의 묶음이 탭 순서대로 이어져 있지 않다"
+        );
+    }
+
     #[test]
     fn every_dev_scenario_runs_ten_seconds_without_panicking() {
         let idle = Actions::default();

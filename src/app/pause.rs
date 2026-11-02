@@ -1,4 +1,4 @@
-//! 일시정지 메뉴의 탭 여덟(메뉴·상태·재주·가방·발자국·도감·지도·안내, 안내는 0180, 재주는 0247) + 개발판의 Lab(0269).
+//! 일시정지 메뉴의 탭 여덟(메뉴·상태·재주·가방·발자국·도감·지도·안내, 안내는 0180, 재주는 0247).
 
 use super::*;
 
@@ -81,25 +81,17 @@ pub(super) const PAUSE_TABS: &[PauseTab] = &[
         },
         draw: |app, ui, c| app.draw_help_body(ui, c),
     },
-    // 손맛 실험실(0269 R33): 개발판에만. 좌우는 값 한 칸이라 탭 넘기기는 Q·E·탭 누르기로.
-    #[cfg(feature = "dev")]
-    PauseTab {
-        name: |_| "Lab",
-        lr: true,
-        update: |app, a, tap, _| {
-            app.update_lab(a, tap);
-            None
-        },
-        draw: |app, ui, c| app.draw_lab(ui, c),
-    },
 ];
 /// 지도 탭 번호(지도 버튼으로 바로 연다).
 pub(super) const TAB_MAP: usize = 6;
-pub(super) const PAUSE_MENU: [Tr; 4] = [
+/// 메뉴 탭의 줄. 개발판은 끝에 "Lab"(0269 — 개발 도구는 개발 메뉴에 모으고, 게임 중에는 여기서 연다).
+pub(super) const PAUSE_MENU: &[Tr] = &[
     |s| s.pm_resume,
     |s| s.pm_restart,
     |s| s.pm_settings,
     |s| s.pm_title,
+    #[cfg(feature = "dev")]
+    |_| "Lab",
 ];
 /// 가방 칸의 발톱 아이콘: 크림/무기 색 발톱 세 개.
 pub(super) fn draw_claw_icon(ui: &Ui, r: Rect, color: Color) {
@@ -225,6 +217,9 @@ impl App {
                 self.title_cursor = 0;
                 self.scene = Scene::Title;
             }
+            // 손맛 실험실(0269, 개발판): 값을 바꾸고 닫으면 이 일시정지로 — 이어 하면 바로 느낀다.
+            #[cfg(feature = "dev")]
+            Some(4) => self.scene = Scene::Lab { from_pause: true },
             _ => {}
         }
     }
@@ -360,7 +355,7 @@ impl App {
     /// 메뉴 탭 그림.
     fn draw_pause_menu(&mut self, ui: &Ui, content: Rect) {
         let rects = ui.menu_list(
-            &trs(&PAUSE_MENU),
+            &trs(PAUSE_MENU),
             self.pause_cursor,
             content.x + 90.0,
             content.y + 12.0,
@@ -1331,7 +1326,7 @@ fn draw_reward_icon(ui: &Ui, r: crate::journal::Reward, x: f32, y: f32) {
 mod tests {
     use super::*;
 
-    /// 탭 표(0248 R30): 지도 버튼이 여는 번호가 지도 탭이고, 좌우를 칸에 쓰는 탭은 가방·재주 둘뿐(개발판은 + Lab, 0269).
+    /// 탭 표(0248 R30): 지도 버튼이 여는 번호가 지도 탭이고, 좌우를 칸에 쓰는 탭은 가방·재주 둘뿐.
     #[test]
     fn pause_tab_table_matches_its_numbers() {
         let ko = &crate::i18n::KO;
@@ -1341,10 +1336,6 @@ mod tests {
             .filter(|t| t.lr)
             .map(|t| (t.name)(ko))
             .collect();
-        let mut want = vec![ko.tab_talents, ko.tab_bag];
-        if cfg!(feature = "dev") {
-            want.push("Lab");
-        }
-        assert_eq!(lr, want);
+        assert_eq!(lr, vec![ko.tab_talents, ko.tab_bag]);
     }
 }

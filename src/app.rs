@@ -101,6 +101,11 @@ enum Scene {
     /// 대화 검수(0269 R34, 개발판만).
     #[cfg(feature = "dev")]
     Dialogue,
+    /// 손맛 실험실 Lab(0269 R33, 개발판만): 개발 메뉴의 도구, 게임 중에는 일시정지 메뉴에서. 닫으면 연 곳으로.
+    #[cfg(feature = "dev")]
+    Lab {
+        from_pause: bool,
+    },
     /// 컷씬. 끝나면 게임.
     Cutscene,
     Game,
@@ -145,6 +150,14 @@ impl Scene {
             Scene::Title | Scene::Slots | Scene::Dev => Layer::TitleArt,
             #[cfg(feature = "dev")]
             Scene::Dialogue => Layer::TitleArt,
+            #[cfg(feature = "dev")]
+            Scene::Lab { from_pause } => {
+                if from_pause {
+                    Layer::World
+                } else {
+                    Layer::TitleArt
+                }
+            }
             Scene::Settings { back }
             | Scene::Controls { back }
             | Scene::Assist { back }
@@ -323,7 +336,9 @@ enum Hit {
     HelpPage,
     /// 상태 탭 ▲(-1)·▼(+1).
     StatusScroll(i8),
+    /// 개발 목록: 지금 탭 안의 줄 / 탭(0269).
     DevItem(usize),
+    DevTab(usize),
     /// Lab 탭(0269, 개발판): 줄, 값 한 칸 내림·올림(손잡이 번호, ±1).
     #[cfg(feature = "dev")]
     LabItem(usize),
@@ -400,6 +415,8 @@ pub struct App {
     controls_col: usize,
     rebind: Option<f32>,
     dev_cursor: usize,
+    /// 개발 목록의 탭(`scenario::Cat::ALL` 번호, 0269).
+    dev_cat: usize,
     /// 지금 플레이 중인 시나리오. "다시 시작"은 이걸 다시 만든다.
     current: Scenario,
     cutscene: Option<Cutscene>,
@@ -582,6 +599,7 @@ impl App {
             controls_col: 0,
             rebind: None,
             dev_cursor: 0,
+            dev_cat: 0,
             current: Scenario::Normal,
             cutscene: None,
             skip_hold: 0.0,
@@ -1105,6 +1123,11 @@ impl App {
             self.open_dialogue();
             return;
         }
+        #[cfg(feature = "dev")]
+        if s == Scenario::LabScreen {
+            self.scene = Scene::Lab { from_pause: false };
+            return;
+        }
         if s == Scenario::Ascent {
             self.story_after_ascent = Some(0.0);
             self.start(Scenario::Village);
@@ -1460,8 +1483,34 @@ impl App {
             }
             #[cfg(feature = "dev")]
             Scene::Dialogue => self.update_dialogue(a, tap_hit),
+            #[cfg(feature = "dev")]
+            Scene::Lab { from_pause } => {
+                if a.cancel || a.menu || matches!(tap_hit, Some(Hit::Close)) {
+                    self.scene = if from_pause { Scene::Pause } else { Scene::Dev };
+                    return;
+                }
+                self.update_lab(a, tap_hit);
+            }
             Scene::Dev => {
-                let n = scenario::LIST.len();
+                // 묶음 탭(0269): 좌우 = 탭, 위아래 = 그 탭의 줄. `dev_cursor`는 탭 안의 번호.
+                let cats = scenario::Cat::ALL;
+                let mut cat = self.dev_cat.min(cats.len() - 1);
+                if a.left || a.tab_prev {
+                    cat = (cat + cats.len() - 1) % cats.len();
+                }
+                if a.right || a.tab_next {
+                    cat = (cat + 1) % cats.len();
+                }
+                if let Some(Hit::DevTab(i)) = tap_hit {
+                    cat = i;
+                }
+                if cat != self.dev_cat {
+                    self.dev_cat = cat;
+                    self.dev_cursor = 0;
+                    self.dev_view.first = 0;
+                }
+                let items = cats[cat].entries();
+                let n = items.len();
                 if a.up {
                     self.dev_cursor = (self.dev_cursor + n - 1) % n;
                 }
@@ -1481,7 +1530,7 @@ impl App {
                 } else {
                     None
                 };
-                if let Some(i) = chosen {
+                if let Some(i) = chosen.and_then(|k| items.get(k).copied()) {
                     // 개발 판(0269 B3): 여기서 연 판은 슬롯에 쓰지 않는다. 타이틀로 돌아오면 슬롯을 다시 읽는다.
                     crate::profile::set_sandbox(true);
                     self.start(scenario::LIST[i].scenario);
@@ -1671,6 +1720,8 @@ impl App {
             Scene::Dev => self.draw_dev(&ui),
             #[cfg(feature = "dev")]
             Scene::Dialogue => self.draw_dialogue(&ui),
+            #[cfg(feature = "dev")]
+            Scene::Lab { .. } => self.draw_lab_screen(&ui),
             Scene::Cutscene => {
                 self.draw_letterbox(&ui);
                 self.draw_cutscene(&ui);
