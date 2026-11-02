@@ -62,6 +62,7 @@ mod tuning;
 mod tutorial;
 mod ui;
 mod village;
+mod village_notes;
 mod web;
 mod world;
 

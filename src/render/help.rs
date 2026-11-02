@@ -146,8 +146,14 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
         Pic::Break => pic_break(c),
         Pic::Doto => pic_doto(c),
         Pic::Run => pic_run(c),
-        Pic::Village => pic_village(c),
         Pic::Rooms => pic_rooms(c),
+        Pic::Signs => pic_signs(c),
+        Pic::Road => pic_road(c),
+        Pic::Hazards => pic_hazards(c),
+        Pic::Nodes => pic_nodes(c),
+        Pic::Tree => pic_tree(c),
+        Pic::Journal => pic_journal(c),
+        Pic::Knot => pic_knot(c),
     }
 }
 
@@ -649,7 +655,7 @@ fn pic_rooms(c: PicCtx) {
         y,
         ..
     } = c;
-    // 가운데 Naïl, 오른쪽 땅이 부풀다 들쥐가 솟는다(물결·버티기). 왼쪽 문 곁엔 씨앗 표지가 둥실.
+    // 가운데 Naïl, 오른쪽 땅이 부풀다 들쥐가 솟는다(물결·버티기 — 솟는 동안은 맞지 않는다). 왼쪽 문 안쪽 바닥엔 씨앗 표지.
     let ph = time % 2.4;
     nail(art, 0, 0, vec2(mid, y), false);
     let at = vec2(w - 26.0, y);
@@ -881,7 +887,7 @@ fn pic_run(c: PicCtx) {
     }
 }
 
-fn pic_village(c: PicCtx) {
+fn pic_tree(c: PicCtx) {
     let PicCtx {
         art, w, time, y, ..
     } = c;
@@ -901,4 +907,185 @@ fn pic_village(c: PicCtx) {
         let l = still_loot(loot::LootKind::Glowbug, p, i as f32 * 0.23);
         props::draw_loot(&l, 1.0, time, false);
     }
+}
+
+fn pic_signs(c: PicCtx) {
+    use crate::dungeon::Bounty;
+    let PicCtx { w, time, .. } = c;
+    // 문 안쪽 바닥에 새긴 표지 넷(0259·0263): 씨앗·반딧불·산딸기·상자. 뒤의 둘은 붉은 겹테(물결·버티기 방).
+    // 상자 표지는 버티기 방에만 — 그래서 늘 겹테.
+    for (i, (b, hard)) in [
+        (Bounty::Seeds, false),
+        (Bounty::Glowbugs, false),
+        (Bounty::Berry, true),
+        (Bounty::Gift, true),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        // 겹테(반지름 14)가 서로 닿지 않게 뒤의 둘은 조금 더 벌린다.
+        let x = (w * [0.12, 0.34, 0.6, 0.86][i]).round();
+        props::draw_floor_sign(vec2(x, 20.0), b, hard, time);
+    }
+}
+
+fn pic_road(c: PicCtx) {
+    let PicCtx {
+        art, w, time, y, ..
+    } = c;
+    // 샘(밟으면 다 낫는다) · 상자(곁에서 공격 버튼) · 끝방의 내려가는 구멍(곁에서 버튼).
+    let ph = time % 3.0;
+    let spring = world::Spring {
+        pos: vec2(25.0, y - 6.0),
+        drunk: false,
+    };
+    props::draw_spring(&spring, time);
+    let chest = Rect::new(58.0, y - 12.0, 16.0, 16.0);
+    let open = ph > 1.2;
+    props::draw_chest(art.and_then(|a| a.props.as_ref()), chest, open, time);
+    // Naïl은 상자 오른쪽에서 왼쪽을 보고 친다(열기). 열린 뒤엔 서 있다.
+    let hit = (0.8..1.2).contains(&ph);
+    nail(art, 0, u32::from(hit), vec2(84.0, y), true);
+    props::draw_exit(vec2(w - 18.0, y - 5.0), time, true);
+}
+
+fn pic_hazards(c: PicCtx) {
+    let PicCtx {
+        w, time, mid, y, ..
+    } = c;
+    // 가시뿌리 덤불 · 무너지는 천장(떨어질 자리가 진해지다 돌) · 흰 실 그물.
+    fx::draw_thorn(vec2(20.0, y - 6.0), time, 1.0);
+    let k = (time % 1.6 / 1.3).min(1.0);
+    let at = vec2(mid, y - 6.0);
+    draw_ellipse(
+        at.x,
+        at.y,
+        11.0 * (0.35 + 0.65 * k),
+        7.7 * (0.35 + 0.65 * k),
+        0.0,
+        Color::new(0.0, 0.0, 0.0, 0.18 + 0.27 * k),
+    );
+    fx::draw_tele_disk(at, 10.0, k);
+    if k > 0.6 {
+        // 위에서 떨어지는 돌(칸 안에서만).
+        let h = ((1.0 - k) / 0.4) * (at.y - 6.0);
+        let p = vec2(at.x, at.y - 3.0 - h).round();
+        draw_circle(p.x, p.y, 4.0, OUTLINE);
+        draw_circle(p.x, p.y, 3.0, Color::new(0.46, 0.42, 0.44, 1.0));
+    }
+    fx::draw_web(vec2(w - 20.0, y - 6.0), time, 0.6);
+}
+
+/// 길 지도의 칸 하나(그림 전용, 지도 화면의 `draw_node_icon`과 같은 색).
+fn route_dot(p: Vec2, kind: crate::route::NodeKind, time: f32) {
+    use crate::route::NodeKind;
+    let big = kind == NodeKind::Boss;
+    let r = if big { 8.0 } else { 6.0 };
+    draw_circle(p.x, p.y, r + 1.0, Color::new(0.17, 0.11, 0.16, 1.0));
+    draw_circle(p.x, p.y, r, Color::new(0.30, 0.22, 0.20, 1.0));
+    let px = |x: f32, y: f32, w: f32, h: f32, c: Color| draw_rectangle(p.x + x, p.y + y, w, h, c);
+    match kind {
+        NodeKind::Spring => {
+            let c = Color::new(0.45, 0.75, 1.0, 1.0);
+            draw_circle(p.x, p.y + 1.0, 2.5, c);
+            px(-1.0, -3.0, 2.0, 2.0, c);
+        }
+        NodeKind::Elite => {
+            let c = Color::new(0.75, 0.50, 0.95, 1.0);
+            draw_circle_lines(p.x, p.y, 4.0, 1.0, c);
+            for (dx, dy) in [(-3.0, -1.0), (-2.0, 1.0), (1.0, -3.0), (2.0, 2.0)] {
+                px(dx, dy, 2.0, 1.0, c);
+            }
+            px(-1.0, -1.0, 2.0, 2.0, Color::new(1.0, 0.25, 0.4, 1.0));
+        }
+        NodeKind::Boss => {
+            let c = Color::new(0.6, 0.35, 0.7, 1.0);
+            for dx in [-4.0, -1.0, 2.0] {
+                px(dx, -5.0, 2.0, 3.0, c);
+            }
+            let blink = 0.7 + 0.3 * (time * 3.0).sin();
+            px(-2.0, 0.0, 4.0, 2.0, Color::new(1.0, 0.25 * blink, 0.4, 1.0));
+        }
+        _ => {
+            px(-3.0, -1.0, 6.0, 3.0, Color::new(0.05, 0.03, 0.06, 1.0));
+            px(-4.0, 2.0, 8.0, 1.0, Color::new(0.55, 0.40, 0.28, 1.0));
+        }
+    }
+}
+
+fn pic_nodes(c: PicCtx) {
+    use crate::route::NodeKind;
+    let PicCtx { w, time, .. } = c;
+    // 왼쪽 위에서 오른쪽 아래로(0156): 굴 → 샘 · 실타래 갈래 → 길의 주인. 지나간 길이 금빛으로 차오른다.
+    let a = vec2(14.0, 10.0);
+    let b1 = vec2(w * 0.40, 8.0);
+    let b2 = vec2(w * 0.40, 30.0);
+    let boss = vec2(w - 18.0, 22.0);
+    let line = Color::new(0.55, 0.42, 0.32, 1.0);
+    for (p, q) in [(a, b1), (a, b2), (b1, boss), (b2, boss)] {
+        draw_line(p.x, p.y, q.x, q.y, 1.0, line);
+    }
+    // 고른 길(굴 → 실타래)이 차오른다.
+    let k = (time % 2.4 / 1.6).min(1.0);
+    let q = a + (b2 - a) * k;
+    draw_line(a.x, a.y, q.x, q.y, 2.0, c.gold);
+    route_dot(a, NodeKind::Burrow, time);
+    route_dot(b1, NodeKind::Spring, time);
+    route_dot(b2, NodeKind::Elite, time);
+    route_dot(boss, NodeKind::Boss, time);
+}
+
+fn pic_journal(c: PicCtx) {
+    let PicCtx {
+        art, w, time, y, ..
+    } = c;
+    // 발자국이 하나씩 찍히고(목표), 끝에 짐 꾸러미(산딸기)가 놓인다.
+    let ph = time % 3.0;
+    let steps = ((ph / 0.3) as usize).min(6);
+    let foot = Color::new(0.95, 0.85, 0.65, 0.8);
+    for i in 0..steps {
+        let x = 30.0 + i as f32 * 11.0;
+        let yy = y - 4.0 - if i % 2 == 0 { 0.0 } else { 5.0 };
+        draw_ellipse(x, yy, 2.5, 1.6, 0.0, foot);
+        for t in 0..3 {
+            draw_rectangle(x - 2.0 + t as f32 * 1.5, yy - 3.0, 1.0, 1.0, foot);
+        }
+    }
+    nail(art, ((time * 2.0) as u32) % 2, 0, vec2(16.0, y), false);
+    // 짐 꾸러미: 자루 + 산딸기.
+    let bx = w - 22.0;
+    draw_ellipse(bx, y - 4.0, 8.0, 7.0, 0.0, OUTLINE);
+    draw_ellipse(
+        bx,
+        y - 4.0,
+        7.0,
+        6.0,
+        0.0,
+        Color::new(0.62, 0.48, 0.32, 1.0),
+    );
+    draw_rectangle(
+        bx - 3.0,
+        y - 12.0,
+        6.0,
+        2.0,
+        Color::new(0.48, 0.34, 0.22, 1.0),
+    );
+    if ph > 1.8 {
+        props::draw_berry(bx + 8.0, y - 2.0, 1.0, 1.0);
+    }
+}
+
+fn pic_knot(c: PicCtx) {
+    let PicCtx {
+        art, time, mid, y, ..
+    } = c;
+    // 실 고리 곁에 선다(실뜨기 단계 · 실의 꿈).
+    props::draw_dream_loop(vec2(mid + 14.0, y), time);
+    nail(
+        art,
+        ((time * 2.0) as u32) % 2,
+        0,
+        vec2(mid - 18.0, y),
+        false,
+    );
 }

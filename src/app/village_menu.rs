@@ -1,4 +1,4 @@
-//! 마을 창(0269 R35, 요구 2.5): 마을의 포포에게 말을 걸면 연다. 탭 표 `VILLAGE_TABS`(꾸미기 · 짐 꾸리기) — 새 탭 = 표 한 줄 +
+//! 마을 창(0269 R35, 요구 2.5·2.7): 마을의 포포에게 말을 걸면 연다. 탭 표 `VILLAGE_TABS`(꾸미기 · 짐 꾸리기 · 마을 수첩) — 새 탭 = 표 한 줄 +
 //! 함수 둘(일시정지 `PauseTab`과 같은 꼴, 0248 R30). 데이터·저장은 합치지 않았다: 꾸미기는 깃발 `decor.<i>`, 짐은 수
 //! `pack.*`, 화폐는 둘 다 마을 씨앗 — 사면 바로 저장, 짐은 새 런 시작 때 `App::unpack`이 꺼낸다(0259 그대로).
 //!
@@ -40,6 +40,17 @@ pub(super) const VILLAGE_TABS: &[VillageTab] = &[
         draw: |app, ui, r| app.draw_pack_tab(ui, r),
         say: |app| tr(PACK[app.decor_cursor.min(PACK.len() - 1)].desc).to_string(),
     },
+    // 마을 수첩(0269 2.7): 장소·이웃 이야기. 사는 것이 없다 — 고르면 포포가 위 말 칸에서 읽어 준다.
+    VillageTab {
+        name: |s| s.notes_tab,
+        lr: false,
+        update: |app, a, tap| {
+            let n = crate::village_notes::visible(&app.profile).len();
+            app.village_pick(a, tap, n);
+        },
+        draw: |app, ui, r| app.draw_notes_tab(ui, r),
+        say: |app| app.note_say(),
+    },
 ];
 
 /// 꾸미기 탭의 줄: 가게 꾸미기(더한 것 포함) + 저널 꾸미기, 지운 1번 등·6번 병은 빼고(0269).
@@ -56,6 +67,8 @@ fn pic_zoom(p: VillagePic) -> f32 {
     match p {
         VillagePic::Decor(_) => 1.0,
         VillagePic::Pack(_) => 2.0,
+        VillagePic::Spot(crate::village_notes::Spot::Tree) => 0.5,
+        VillagePic::Spot(_) => 1.5,
     }
 }
 
@@ -443,6 +456,58 @@ impl App {
             s.decor_journal.to_string()
         };
         self.draw_village_detail(ui, detail, VillagePic::Decor(i), tr(decor_name(i)), &info);
+    }
+
+    /// 수첩 탭에서 고른 줄(표 번호).
+    fn note_at(&self) -> &'static crate::village_notes::Note {
+        let vis = crate::village_notes::visible(&self.profile);
+        &crate::village_notes::NOTES[vis[self.decor_cursor.min(vis.len() - 1)]]
+    }
+
+    fn note_say(&self) -> String {
+        tr(self.note_at().body).to_string()
+    }
+
+    fn draw_notes_tab(&mut self, ui: &Ui, body: Rect) {
+        use crate::village_notes::{Spot, NOTES};
+        let rows: Vec<(VillagePic, String, String, bool)> =
+            crate::village_notes::visible(&self.profile)
+                .iter()
+                .map(|&i| {
+                    let n = &NOTES[i];
+                    (
+                        VillagePic::Spot(n.spot),
+                        tr(n.title).to_string(),
+                        String::new(),
+                        false,
+                    )
+                })
+                .collect();
+        let list = Rect::new(body.x, body.y, LIST_W, body.h - 4.0);
+        self.draw_village_list(ui, list, &rows);
+        let note = self.note_at();
+        let detail = Rect::new(
+            list.right() + 8.0,
+            body.y,
+            body.right() - list.right() - 8.0,
+            body.h,
+        );
+        self.draw_village_detail(ui, detail, VillagePic::Spot(note.spot), tr(note.title), "");
+        // 이웃은 그림 칸에 초상화.
+        let portrait = match note.spot {
+            Spot::Stall => Some(cutscene::Portrait::POPO),
+            Spot::Bori => Some(cutscene::Portrait::BORI),
+            Spot::Momo => Some(cutscene::Portrait::MOMO),
+            Spot::Doto => Some(cutscene::Portrait::DOTO),
+            Spot::Kongi => Some(cutscene::Portrait::KONGI),
+            Spot::Clover => Some(cutscene::Portrait::CLOVER),
+            Spot::Halmae => Some(cutscene::Portrait::HALMAE),
+            _ => None,
+        };
+        if let Some(p) = portrait.filter(|_| note.spot.neighbor()) {
+            let art = Rect::new(detail.x + 4.0, detail.y + 4.0, 36.0, 36.0);
+            self.renderer.draw_portrait(ui, art, p.frame(Face::Normal));
+        }
     }
 
     fn pack_name(p: &crate::village::Pack) -> String {

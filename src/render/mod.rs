@@ -41,6 +41,8 @@ use props::*;
 pub enum VillagePic {
     Decor(usize),
     Pack(crate::village::PackKind),
+    /// 마을 수첩의 장소(0269 2.7). 이웃은 그림 칸 대신 초상화(`app/village_menu.rs`) — 여기서는 아무것도 그리지 않는다.
+    Spot(crate::village_notes::Spot),
 }
 pub use shadow::*;
 use sorted::*;
@@ -965,10 +967,40 @@ impl Renderer {
                     draw_loot(&l, 1.0, t, false);
                 }
             }
+            VillagePic::Spot(spot) => self.draw_note_spot(spot, foot, t),
         }
         let gl = unsafe { get_internal_gl() };
         gl.quad_gl.pop_model_matrix();
         gl.quad_gl.scissor(None);
+    }
+
+    /// 수첩 장소 그림: 마을 지도에서 쓰는 그림 그대로(발밑 `foot`).
+    fn draw_note_spot(&self, spot: crate::village_notes::Spot, foot: Vec2, t: f32) {
+        use crate::village_notes::Spot;
+        let art = self.art.as_ref();
+        match spot {
+            Spot::Tree => match art.and_then(|a| a.tree.as_ref()) {
+                Some(tex) => art::draw_tree(tex, 4, foot),
+                None => draw_great_tree(foot - vec2(0.0, 8.0), 4, t),
+            },
+            Spot::Fire => {
+                let r = Rect::new(foot.x - 8.0, foot.y - 14.0, 16.0, 16.0);
+                match art.and_then(|a| a.sunny.as_ref()) {
+                    Some(sunny) => {
+                        draw_campfire_sunny(sunny, art.and_then(|a| a.hub.as_ref()), r, t)
+                    }
+                    None => draw_campfire(r, t),
+                }
+            }
+            Spot::Gate => match art.and_then(|a| a.hub.as_ref()) {
+                Some(h) => art::draw_hub(h, art::HUB_GATE, foot + vec2(-5.0, 4.0), WHITE),
+                None => draw_exit(foot - vec2(0.0, 6.0), t, true),
+            },
+            Spot::Puddle => draw_puddle(foot - vec2(0.0, 6.0), t),
+            Spot::Seat => draw_seat(Rect::new(foot.x - 8.0, foot.y - 14.0, 16.0, 16.0), 0),
+            Spot::Loop => draw_dream_loop(foot - vec2(0.0, 2.0), t),
+            _ => {}
+        }
     }
 
     /// 도감 그림(대장): chief.png 물든 대장 줄의 `frame`칸을 `r`에 몸 자리 맞춤으로.
