@@ -187,7 +187,7 @@ impl World {
                 src: 0,
             };
             self.juice.audio.play(sfx::Id::Emerge);
-            self.juice.feel.add_trauma(0.15);
+            self.juice.feel.add_trauma(t::TOSS_MINE_SHAKE);
             self.juice.fx.push(ring(at, 3.0, r + 2.0, 0.25, ACORN));
             burst(&mut self.juice.fx, at, 12, DIRT, 110.0);
             self.touch_world(&s);

@@ -37,6 +37,7 @@ mod input;
 mod items;
 mod journal;
 mod knots;
+mod lab;
 mod loading;
 mod loot;
 mod map;

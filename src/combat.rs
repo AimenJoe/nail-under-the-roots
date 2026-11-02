@@ -108,6 +108,77 @@ impl Strike {
     }
 }
 
+/// 플레이어가 맞은 근원의 등급(0269, 요구 2.3): 손맛 한 벌(`tuning::HURT_*`)을 고른다.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HurtTier {
+    /// 보통 잡몹의 몸통·탄.
+    Light,
+    /// 곧게 오는 센 공격(돌진·혀)·피해 2 이상.
+    Heavy,
+    /// 길의 주인·엘리트·토끼풀 충격파.
+    Boss,
+    /// 덤불·떨어진 돌·묻은 도토리.
+    Hazard,
+    /// 포자 구름(스며드는 피해).
+    Seep,
+}
+
+impl HurtTier {
+    /// 몸으로 부딪힌 적의 등급: 보스·엘리트 > 곧게 오는 공격·센 피해 > 보통.
+    pub fn of_contact(boss: bool, straight: bool, dmg: i32) -> Self {
+        if boss {
+            HurtTier::Boss
+        } else if straight || dmg >= 2 {
+            HurtTier::Heavy
+        } else {
+            HurtTier::Light
+        }
+    }
+
+    /// 이 등급의 지금 손맛(개발판은 Lab 덮어쓰기).
+    pub fn feel(self) -> tuning::HurtFeel {
+        use crate::lab::{tun, K};
+        let f = |hitstop, shake, kick, edge| tuning::HurtFeel {
+            hitstop: tun(hitstop),
+            shake: tun(shake),
+            kick: tun(kick),
+            edge: tun(edge),
+        };
+        match self {
+            HurtTier::Light => f(
+                K::HURT_LIGHT_HITSTOP,
+                K::HURT_LIGHT_SHAKE,
+                K::HURT_LIGHT_KICK,
+                K::HURT_LIGHT_EDGE,
+            ),
+            HurtTier::Heavy => f(
+                K::HURT_HEAVY_HITSTOP,
+                K::HURT_HEAVY_SHAKE,
+                K::HURT_HEAVY_KICK,
+                K::HURT_HEAVY_EDGE,
+            ),
+            HurtTier::Boss => f(
+                K::HURT_BOSS_HITSTOP,
+                K::HURT_BOSS_SHAKE,
+                K::HURT_BOSS_KICK,
+                K::HURT_BOSS_EDGE,
+            ),
+            HurtTier::Hazard => f(
+                K::HURT_HAZARD_HITSTOP,
+                K::HURT_HAZARD_SHAKE,
+                K::HURT_HAZARD_KICK,
+                K::HURT_HAZARD_EDGE,
+            ),
+            HurtTier::Seep => tuning::HurtFeel {
+                hitstop: 0.0,
+                shake: tun(K::HURT_SEEP_SHAKE),
+                kick: 0.0,
+                edge: tun(K::HURT_SEEP_EDGE),
+            },
+        }
+    }
+}
+
 /// 전투감 상태. 수치는 tuning.rs.
 #[derive(Default)]
 pub struct Feel {
@@ -128,14 +199,15 @@ pub struct Feel {
 impl Feel {
     /// 매 틱, 히트스톱 여부와 무관하게 호출.
     pub fn tick(&mut self, dt: f32) {
-        self.trauma = (self.trauma - tuning::SHAKE_DECAY * dt).max(0.0);
+        use crate::lab::{tun, K};
+        self.trauma = (self.trauma - tun(K::SHAKE_DECAY) * dt).max(0.0);
         self.flash = (self.flash - dt).max(0.0);
         self.hurt = (self.hurt - dt).max(0.0);
-        self.kick *= (-tuning::KICK_DECAY * dt).exp();
+        self.kick *= (-tun(K::KICK_DECAY) * dt).exp();
         if self.kick.length_squared() < 0.04 {
             self.kick = Vec2::ZERO;
         }
-        let amount = tuning::SHAKE_MAX_OFFSET * self.trauma * self.trauma;
+        let amount = tun(K::SHAKE_MAX_OFFSET) * self.trauma * self.trauma;
         self.shake_offset = if amount < 0.5 {
             Vec2::ZERO
         } else {
@@ -152,6 +224,11 @@ impl Feel {
 
     pub fn add_trauma(&mut self, t: f32) {
         self.trauma = (self.trauma + t).min(1.0);
+    }
+
+    /// 외상을 적어도 `t`로(더하지 않는다): 맞은 흔들림이 다른 흔들림(적이 쓰러짐·벽 쿵)과 쌓여 길게 남지 않게(0269).
+    pub fn raise_trauma(&mut self, t: f32) {
+        self.trauma = self.trauma.max(t.min(1.0));
     }
 
     /// 카메라를 `dir` 쪽으로 `px`만큼 찬다(큰 쪽이 남는다).
@@ -180,4 +257,33 @@ pub fn dist_to_segment(p: Vec2, a: Vec2, b: Vec2) -> f32 {
         0.0
     };
     (a + ab * k - p).length()
+}
+
+#[cfg(test)]
+mod hurt_tests {
+    use super::*;
+
+    #[test]
+    fn contact_tier_prefers_boss_then_straight_or_big_hits() {
+        assert_eq!(HurtTier::of_contact(true, false, 1), HurtTier::Boss);
+        assert_eq!(HurtTier::of_contact(true, true, 2), HurtTier::Boss);
+        assert_eq!(HurtTier::of_contact(false, true, 1), HurtTier::Heavy);
+        assert_eq!(HurtTier::of_contact(false, false, 2), HurtTier::Heavy);
+        assert_eq!(HurtTier::of_contact(false, false, 1), HurtTier::Light);
+        // 등급이 셀수록 손맛도 세다(포자는 멈춤·킥 없음).
+        let [l, h, b] = [HurtTier::Light, HurtTier::Heavy, HurtTier::Boss].map(|t| t.feel());
+        assert!(l.shake < h.shake && h.shake < b.shake && l.kick < h.kick && h.kick < b.kick);
+        let s = HurtTier::Seep.feel();
+        assert_eq!((s.hitstop, s.kick), (0.0, 0.0));
+    }
+
+    #[test]
+    fn hurt_shake_does_not_pile_up() {
+        let mut f = Feel::default();
+        f.trauma = 0.3;
+        f.raise_trauma(0.5);
+        assert_eq!(f.trauma, 0.5);
+        f.raise_trauma(0.2);
+        assert_eq!(f.trauma, 0.5);
+    }
 }

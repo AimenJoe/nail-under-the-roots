@@ -235,7 +235,9 @@ mod store {
             0 => "slot.txt".to_string(),
             1 => "profile.txt".to_string(),
             n if n <= super::SLOTS as u32 => format!("profile-{n}.txt"),
-            n => format!("run-{}.txt", n - super::SLOTS as u32),
+            n if n <= 2 * super::SLOTS as u32 => format!("run-{}.txt", n - super::SLOTS as u32),
+            // Lab 프리셋 칸(0269, 개발판만 쓴다).
+            n => format!("lab-{}.txt", n - 2 * super::SLOTS as u32),
         }
     }
 
@@ -442,6 +444,22 @@ pub fn load_run(i: usize) -> Option<Profile> {
     get(run_cell(i))
         .and_then(|s| Profile::decode(&s))
         .filter(|p| !p.is_empty())
+}
+
+/// Lab 프리셋 칸 수(0269 R33). 진행 기록·설정과 따로: 웹 `nail.lab.N`, 네이티브 `lab-N.txt`.
+#[cfg(feature = "dev")]
+pub const LAB_SLOTS: usize = 3;
+
+/// Lab 프리셋 칸 `n`(0부터)을 읽는다. 진행 기록 칸이 아니라 "아는 글"·개발 판 막기를 거치지 않는다.
+#[cfg(feature = "dev")]
+pub fn lab_read(n: usize) -> String {
+    store::read((CELLS + n.min(LAB_SLOTS - 1)) as u32).unwrap_or_default()
+}
+
+/// Lab 프리셋 칸 `n`에 쓴다. 실패하면 false.
+#[cfg(feature = "dev")]
+pub fn lab_write(n: usize, text: &str) -> bool {
+    store::write((CELLS + n.min(LAB_SLOTS - 1)) as u32, text)
 }
 
 /// 진행 중인 런을 쓰거나(Some) 지운다(None = 빈 글). 바뀐 것이 없으면 쓰지 않는다. 실패하면 false.

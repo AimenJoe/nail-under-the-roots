@@ -1030,7 +1030,7 @@ pub fn clover_returns(w: &World, at: Vec2) -> Cutscene {
             cue: Cue::Hatch,
             at: c0,
         },
-        Step::Shake(0.15),
+        Step::Shake(crate::tuning::CUT_SHAKE_SMALL),
         Step::Wait(0.6),
         Step::Show { actor: 2, at: c0 },
         Step::Show { actor: 3, at: c1 },
@@ -1293,7 +1293,7 @@ fn tainted_meet_steps(w: &World, at: Vec2, sub: Tr, lines: Vec<Step>) -> Vec<Ste
             secs: 0.9,
         },
         Step::Cue { cue: Cue::Rise, at },
-        Step::Shake(0.2),
+        Step::Shake(crate::tuning::CUT_SHAKE),
         Step::Wait(0.6),
         Step::Card {
             name: "???",
@@ -1658,7 +1658,7 @@ pub fn momo_meet(w: &World, level: u8, at: Vec2) -> Cutscene {
         },
         Step::Wait(0.5),
         Step::Cue { cue: Cue::Rise, at },
-        Step::Shake(0.2),
+        Step::Shake(crate::tuning::CUT_SHAKE),
         Step::Wait(0.6),
         Step::Card {
             name: "???",
@@ -1703,7 +1703,7 @@ fn unbind_steps(at: Vec2, actor: usize, bloom: bool) -> Vec<Step> {
             cue: Cue::Unbind,
             at,
         },
-        Step::Shake(0.15),
+        Step::Shake(crate::tuning::CUT_SHAKE_SMALL),
         Step::Wait(0.7),
     ];
     if bloom {
@@ -1745,7 +1745,7 @@ pub fn momo_flee(w: &World, at: Vec2, wins: u32) -> Cutscene {
             cue: Cue::Petals(false),
             at,
         },
-        Step::Shake(0.15),
+        Step::Shake(crate::tuning::CUT_SHAKE_SMALL),
         Step::Move {
             actor: 1,
             to: hole,
@@ -1901,7 +1901,7 @@ pub fn opening(w: &World) -> Cutscene {
             at: vec2(230.0, 80.0),
         },
         Step::Wait(0.5),
-        Step::Shake(0.15),
+        Step::Shake(crate::tuning::CUT_SHAKE_SMALL),
         Step::Gloom {
             to: 0.8,
             actor: 0,
@@ -1948,7 +1948,7 @@ pub fn opening(w: &World) -> Cutscene {
             cue: Cue::Rise,
             at: vec2(118.0, 90.0),
         },
-        Step::Shake(0.35),
+        Step::Shake(crate::tuning::CUT_SHAKE_BIG),
         Step::Move {
             actor: 0,
             to: vec2(92.0, 90.0),
@@ -1966,7 +1966,7 @@ pub fn opening(w: &World) -> Cutscene {
             cue: Cue::Petals(false),
             at: vec2(128.0, 90.0),
         },
-        Step::Shake(0.4),
+        Step::Shake(crate::tuning::CUT_SHAKE_HUGE),
         Step::Hide { actor: 1 },
         Step::Cue {
             cue: Cue::Leave,
@@ -2108,7 +2108,7 @@ pub fn deep_sleep(w: &World) -> Cutscene {
             secs: 0.9,
         },
         Step::Cue { cue: Cue::Wrap, at },
-        Step::Shake(0.2),
+        Step::Shake(crate::tuning::CUT_SHAKE),
         Step::Wait(0.5),
         Step::Gloom {
             to: 1.0,

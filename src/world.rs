@@ -1081,7 +1081,7 @@ impl World {
                     // 파고들기(0160): 흙이 확 튀고 화면이 살짝 — 톡 한 번이 "동작"으로 읽히게.
                     self.stats.burrows += 1;
                     self.juice.audio.play(sfx::Id::Burrow);
-                    self.juice.feel.add_trauma(0.12);
+                    self.juice.feel.add_trauma(t::BURROW_SHAKE);
                     self.juice
                         .fx
                         .push(ring(self.player.pos, 4.0, 18.0, 0.22, DIRT));
@@ -1158,7 +1158,7 @@ impl World {
                     let p = self.player.pos;
                     self.juice.fx.push(ring(p, 4.0, 22.0, 0.25, WHITE));
                     burst(&mut self.juice.fx, p, 14, DIRT, 120.0);
-                    self.juice.feel.add_trauma(0.35);
+                    self.juice.feel.add_trauma(t::DRILL_START_SHAKE);
                 }
                 player::Event::DrillWall => {
                     self.stats.slams += 1;
@@ -1202,7 +1202,7 @@ impl World {
                     if *big {
                         let r = self.player.chain_radius();
                         self.juice.audio.play(sfx::Id::WallHit);
-                        self.juice.feel.add_trauma(0.25);
+                        self.juice.feel.add_trauma(t::CHAIN_LAND_SHAKE);
                         self.juice.fx.push(ring(p, 4.0, r + 4.0, 0.25, PETAL));
                         self.juice.fx.push(ring(p, 2.0, r, 0.2, DIRT));
                         burst(&mut self.juice.fx, p, 12, DIRT, 110.0);
@@ -1237,7 +1237,7 @@ impl World {
                 player::Event::Stamp => {
                     let p = self.player.pos;
                     self.juice.audio.play(sfx::Id::Emerge);
-                    self.juice.feel.add_trauma(0.1);
+                    self.juice.feel.add_trauma(t::STAMP_SHAKE);
                     self.juice
                         .fx
                         .push(ring(p, 2.0, t::TAL_STAMP_RADIUS, 0.18, PETAL));
@@ -1249,7 +1249,7 @@ impl World {
                     if *stomp {
                         let r = self.player.jump_stomp_radius();
                         self.juice.audio.play(sfx::Id::WallHit);
-                        self.juice.feel.add_trauma(0.18);
+                        self.juice.feel.add_trauma(t::JUMP_STOMP_SHAKE);
                         self.juice.fx.push(ring(p, 3.0, r + 3.0, 0.22, PETAL));
                         self.juice.fx.push(ring(p, 2.0, r, 0.18, DIRT));
                         burst(&mut self.juice.fx, p, 9, DIRT, 95.0);
@@ -1569,7 +1569,7 @@ impl World {
                     }
                     self.juice.audio.play(sfx::Id::Impact);
                     self.juice.feel.add_hitstop(t::BOWL_HITSTOP);
-                    self.juice.feel.add_trauma(0.2);
+                    self.juice.feel.add_trauma(t::BOWL_SHAKE);
                     self.juice.fx.push(ring(mid, 3.0, 14.0, 0.18, WHITE));
                     spray(&mut self.juice.fx, mid, dir, 5, WHITE, 150.0);
                     if !b.alive {
@@ -1672,20 +1672,20 @@ impl World {
                 enemy::Event::Charge => self.juice.audio.play(sfx::Id::Charge),
                 enemy::Event::WallHit => {
                     self.juice.audio.play(sfx::Id::WallHit);
-                    self.juice.feel.add_trauma(0.2);
+                    self.juice.feel.add_trauma(t::ENEMY_WALL_SHAKE);
                 }
                 enemy::Event::Shoot => self.juice.audio.play(sfx::Id::Shoot),
                 enemy::Event::Leap => self.juice.audio.play(sfx::Id::Charge),
                 enemy::Event::Land => {
                     self.juice.audio.play(sfx::Id::WallHit);
-                    self.juice.feel.add_trauma(0.12);
+                    self.juice.feel.add_trauma(t::ENEMY_LAND_SHAKE);
                 }
                 enemy::Event::Summon => summon = true,
                 enemy::Event::Bury(n) => bury = *n,
                 enemy::Event::Dig => self.juice.audio.play(sfx::Id::Burrow),
                 enemy::Event::Pop => {
                     self.juice.audio.play(sfx::Id::Emerge);
-                    self.juice.feel.add_trauma(0.25);
+                    self.juice.feel.add_trauma(t::ENEMY_POP_SHAKE);
                 }
                 enemy::Event::Tongue => self.juice.audio.play(sfx::Id::Shoot),
                 enemy::Event::Spore => self.juice.audio.play(sfx::Id::Burrow),
@@ -1714,7 +1714,7 @@ impl World {
                         0.45,
                     );
                     self.juice.audio.play(sfx::Id::WallHit);
-                    self.juice.feel.add_trauma(0.1);
+                    self.juice.feel.add_trauma(t::ENEMY_ARRIVE_SHAKE);
                 }
                 enemy::Entry::Wake => {}
             }
@@ -1825,7 +1825,7 @@ impl World {
         self.hazards.rocks.retain(|r| r.time < t::ROCK_FALL);
         for &p in &landed {
             self.juice.audio.play(sfx::Id::WallHit);
-            self.juice.feel.add_trauma(0.18);
+            self.juice.feel.add_trauma(t::ROCK_LAND_SHAKE);
             self.juice
                 .fx
                 .push(ring(p, 3.0, t::ROCK_R + 3.0, 0.25, DIRT));
@@ -1904,7 +1904,7 @@ impl World {
         // 대장이 울부짖으면 양옆에 생쥐 떼(셋).
         if summon {
             self.juice.audio.play(sfx::Id::Shoot);
-            self.juice.feel.add_trauma(0.2);
+            self.juice.feel.add_trauma(t::SUMMON_SHAKE);
             let chief: Vec<Vec2> = self
                 .enemies
                 .iter()
@@ -1976,7 +1976,7 @@ impl World {
         self.hazards.mines.retain(|m| m.time < m.fuse);
         for &p in &popped {
             self.juice.audio.play(sfx::Id::Emerge);
-            self.juice.feel.add_trauma(0.15);
+            self.juice.feel.add_trauma(t::MINE_POP_SHAKE);
             self.juice
                 .fx
                 .push(ring(p, 3.0, t::DOTO_MINE_RADIUS + 2.0, 0.25, PROJECTILE));
@@ -2166,8 +2166,10 @@ impl World {
                         .recoil(from, t::KONGI_RECOIL, t::KONGI_RECOIL_LOCK);
                 }
                 self.juice.audio.play(sfx::Id::WallHit);
-                self.juice.feel.add_hitstop(t::PARRY_HITSTOP * 0.6);
-                self.juice.feel.add_trauma(0.2);
+                self.juice
+                    .feel
+                    .add_hitstop(crate::lab::tun(crate::lab::K::PARRY_HITSTOP) * 0.6);
+                self.juice.feel.add_trauma(t::GUARD_BOUNCE_SHAKE);
                 let p = (self.player.pos + from) * 0.5;
                 self.juice.fx.push(ring(p, 2.0, 14.0, 0.2, SHELL));
                 burst(&mut self.juice.fx, p, 8, SHELL, 100.0);
@@ -2182,7 +2184,7 @@ impl World {
             }
             if let Some(at) = broke_at {
                 self.juice.audio.play(sfx::Id::DrillWall);
-                self.juice.feel.add_trauma(0.3);
+                self.juice.feel.add_trauma(t::DRILL_BREAK_SHAKE);
                 self.juice.fx.push(ring(at, 4.0, 24.0, 0.3, SHELL));
                 burst(&mut self.juice.fx, at, 14, SHELL, 130.0);
                 self.juice.toast = Some((|s| s.toast_guard_break, 2.0));
@@ -2304,7 +2306,12 @@ impl World {
                             break;
                         }
                         e.on_hit_player();
-                        hurt_from = Some((e.pos, dmg));
+                        let tier = crate::combat::HurtTier::of_contact(
+                            e.is_boss() || e.elite,
+                            e.strike_dir().is_some(),
+                            dmg,
+                        );
+                        hurt_from = Some((e.pos, dmg, tier));
                         break;
                     }
                 }
@@ -2326,7 +2333,7 @@ impl World {
                         parried = true;
                         break;
                     }
-                    hurt_from = Some((e.pos, 1));
+                    hurt_from = Some((e.pos, 1, crate::combat::HurtTier::Heavy));
                     pull = Some(from * t::TOAD_PULL);
                     break;
                 }
@@ -2339,7 +2346,7 @@ impl World {
                 if let Some(c) = self.hazards.clouds.iter().find(|c| {
                     c.time >= t::SPORE_CLOUD_GRACE && (c.pos - ppos).length_squared() <= rr * rr
                 }) {
-                    hurt_from = Some((c.pos, 1));
+                    hurt_from = Some((c.pos, 1, crate::combat::HurtTier::Seep));
                     seep = true;
                 }
             }
@@ -2349,7 +2356,7 @@ impl World {
                     .iter()
                     .find(|p| (**p - ppos).length_squared() <= rr * rr)
                 {
-                    hurt_from = Some((*p, 1));
+                    hurt_from = Some((*p, 1, crate::combat::HurtTier::Hazard));
                 }
             }
             // 토끼풀의 충격파(0165): 퍼지는 고리가 지나는 순간 한 번, 멀리 밀린다. 땅속·깡충·드릴은 안 맞는다.
@@ -2362,7 +2369,7 @@ impl World {
                     let d = (ppos - wv.pos).length();
                     if d <= r + pr && d >= r - 10.0 {
                         wv.hit = true;
-                        hurt_from = Some((wv.pos, 1));
+                        hurt_from = Some((wv.pos, 1, crate::combat::HurtTier::Boss));
                         pull = Some(
                             (ppos - wv.pos).normalize_or(vec2(0.0, 1.0)) * t::CLOVER_WAVE_KNOCK,
                         );
@@ -2380,7 +2387,7 @@ impl World {
                     .iter()
                     .find(|c| (**c - ppos).length_squared() <= rr * rr)
                 {
-                    hurt_from = Some((*c, 1));
+                    hurt_from = Some((*c, 1, crate::combat::HurtTier::Hazard));
                     thorned = true;
                 }
             }
@@ -2390,7 +2397,7 @@ impl World {
                     .iter()
                     .find(|p| (**p - ppos).length_squared() <= rr * rr)
                 {
-                    hurt_from = Some((*p, 1));
+                    hurt_from = Some((*p, 1, crate::combat::HurtTier::Hazard));
                 }
             }
             if hurt_from.is_none() && !parried {
@@ -2398,12 +2405,13 @@ impl World {
                     let rr = pr + p.radius();
                     if p.alive && !p.friendly && (p.pos - ppos).length_squared() <= rr * rr {
                         p.alive = false;
-                        hurt_from = Some((p.pos, t::PROJECTILE_DAMAGE));
+                        hurt_from =
+                            Some((p.pos, t::PROJECTILE_DAMAGE, crate::combat::HurtTier::Light));
                         break;
                     }
                 }
             }
-            if let Some((from, dmg)) = hurt_from {
+            if let Some((from, dmg, tier)) = hurt_from {
                 let dmg = if self.no_damage { 0 } else { dmg };
                 let took = if seep {
                     self.player.take_seep(from, dmg)
@@ -2418,13 +2426,17 @@ impl World {
                         self.story.thorn_told = true;
                         self.juice.toast = Some((self.character.def().toast_thorn, 2.5));
                     }
-                    if !seep {
-                        // 히트스톱은 로직 시계를 멈춰 걸음·동작이 끊기고, 킥은 밀친 쪽으로 화면을 민다 — 구름엔 없다.
-                        self.juice.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
-                        self.juice.feel.add_kick(ppos - from, t::PLAYER_HURT_KICK);
+                    // 근원의 등급마다 손맛 한 벌(0269): 히트스톱은 로직 시계를 멈춰 걸음·동작이 끊기고, 킥은 밀친 쪽으로
+                    // 화면을 민다(구름엔 둘 다 없다). 흔들림은 더하지 않고 "적어도" — 다른 흔들림과 쌓여 길게 남지 않게.
+                    let f = tier.feel();
+                    if f.hitstop > 0.0 {
+                        self.juice.feel.add_hitstop(f.hitstop);
                     }
-                    self.juice.feel.add_trauma(t::PLAYER_HURT_SHAKE);
-                    self.juice.feel.hurt = t::PLAYER_HURT_EDGE;
+                    if f.kick > 0.0 {
+                        self.juice.feel.add_kick(ppos - from, f.kick);
+                    }
+                    self.juice.feel.raise_trauma(f.shake);
+                    self.juice.feel.hurt = f.edge;
                     self.juice.audio.play(sfx::Id::Ouch);
                     self.juice
                         .fx
@@ -2575,8 +2587,12 @@ impl World {
     fn parry_feedback(&mut self) {
         self.stats.parries += 1;
         self.player.on_parry();
-        self.juice.feel.add_hitstop(t::PARRY_HITSTOP);
-        self.juice.feel.add_trauma(t::PARRY_SHAKE);
+        self.juice
+            .feel
+            .add_hitstop(crate::lab::tun(crate::lab::K::PARRY_HITSTOP));
+        self.juice
+            .feel
+            .add_trauma(crate::lab::tun(crate::lab::K::PARRY_SHAKE));
         let p = self.player.pos + self.player.facing * 8.0;
         self.juice.fx.push(ring(p, 2.0, 18.0, 0.22, WHITE));
         self.juice.fx.push(ring(p, 2.0, 10.0, 0.15, PROJECTILE));
@@ -2657,8 +2673,8 @@ impl World {
                 .fx
                 .push(glint(pos + vec2(a.cos(), a.sin()) * 10.0, WHITE, 0.4));
         }
-        self.juice.feel.add_trauma(0.5);
-        self.juice.feel.add_hitstop(0.08);
+        self.juice.feel.add_trauma(t::WORM_RISE_SHAKE);
+        self.juice.feel.add_hitstop(t::WORM_RISE_HITSTOP);
         self.juice.toast = Some((|s| s.toast_revive, 2.5));
     }
 
@@ -2755,7 +2771,7 @@ impl World {
         match cue {
             Cue::Unbind => {
                 self.juice.audio.play(sfx::Id::Unbind);
-                self.juice.feel.add_trauma(0.3);
+                self.juice.feel.add_trauma(t::CUE_UNBIND_SHAKE);
                 self.juice.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
                 self.juice.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
                 unravel(&mut self.juice.fx, at, 14.0);
@@ -2782,7 +2798,7 @@ impl World {
             }
             Cue::Rise => {
                 self.juice.audio.play(sfx::Id::Rumble);
-                self.juice.feel.add_trauma(0.4);
+                self.juice.feel.add_trauma(t::CUE_RISE_SHAKE);
                 self.juice.fx.push(ring(at, 26.0, 4.0, 0.5, THREAD));
                 self.juice
                     .fx
@@ -2799,7 +2815,7 @@ impl World {
             }
             Cue::Vanish => {
                 self.juice.audio.play(sfx::Id::Burrow);
-                self.juice.feel.add_trauma(0.15);
+                self.juice.feel.add_trauma(t::CUE_VANISH_SHAKE);
                 self.juice.fx.push(ring(at, 16.0, 2.0, 0.35, THREAD));
                 puff(
                     &mut self.juice.fx,
@@ -2814,7 +2830,7 @@ impl World {
             }
             Cue::Wrap => {
                 self.juice.audio.play(sfx::Id::Rumble);
-                self.juice.feel.add_trauma(0.35);
+                self.juice.feel.add_trauma(t::CUE_WRAP_SHAKE);
                 for (k, r) in [48.0, 36.0, 24.0].into_iter().enumerate() {
                     let mut f = ring(at, r, 3.0, 0.7, THREAD);
                     f.time = -0.18 * k as f32;
@@ -2914,8 +2930,8 @@ impl World {
     /// 토끼풀이 발을 굴렀다(0165): 충격파 고리 + 흙·흔들림, 플레이어 둘레에 흰 실 그물이 몇 개 떨어진다.
     fn thump_at(&mut self, at: Vec2) {
         self.juice.audio.play(sfx::Id::Impact);
-        self.juice.feel.add_trauma(0.45);
-        self.juice.feel.add_hitstop(0.03);
+        self.juice.feel.add_trauma(t::CLOVER_THUMP_SHAKE);
+        self.juice.feel.add_hitstop(t::CLOVER_THUMP_HITSTOP);
         self.hazards.waves.push(Wave {
             pos: at,
             time: 0.0,
@@ -2989,7 +3005,9 @@ impl World {
             self.player.on_parry();
             self.juice.audio.play(sfx::Id::Parry);
             self.juice.toast = Some((|s| s.toast_parry, 0.8));
-            self.juice.feel.add_hitstop(t::PARRY_HITSTOP);
+            self.juice
+                .feel
+                .add_hitstop(crate::lab::tun(crate::lab::K::PARRY_HITSTOP));
             self.juice.fx.push(ring(ppos, 4.0, 18.0, 0.2, WHITE));
             unravel(&mut self.juice.fx, ppos + from * 8.0, 10.0);
             return;
@@ -3002,7 +3020,7 @@ impl World {
         );
         self.player.vel = from * t::CLOVER_PULL;
         self.juice.audio.play(sfx::Id::Rumble);
-        self.juice.feel.add_trauma(0.25);
+        self.juice.feel.add_trauma(t::CLOVER_PULL_SHAKE);
         self.juice.fx.push(ring(ppos, 6.0, 18.0, 0.3, THREAD));
     }
 
@@ -3022,7 +3040,7 @@ impl World {
         };
         self.hazards.cocoon_bounce_id = s.id;
         self.juice.audio.play(sfx::Id::WallHit);
-        self.juice.feel.add_hitstop(0.04);
+        self.juice.feel.add_hitstop(t::COCOON_BOUNCE_HITSTOP);
         self.juice.fx.push(ring(c, 4.0, 14.0, 0.2, WHITE));
         puff(
             &mut self.juice.fx,
@@ -3096,7 +3114,7 @@ impl World {
             };
             clods(&mut self.juice.fx, at, 5, chunk, 70.0);
             puff(&mut self.juice.fx, at, 4, dust, 5.0, 0.45);
-            self.juice.feel.add_trauma(0.08);
+            self.juice.feel.add_trauma(t::PROP_BREAK_SHAKE);
             if self.dream {
                 continue;
             }
@@ -3334,7 +3352,9 @@ impl World {
                         self.player.on_parry();
                         self.juice.audio.play(sfx::Id::Parry);
                         self.juice.toast = Some((|s| s.toast_parry, 0.8));
-                        self.juice.feel.add_hitstop(t::PARRY_HITSTOP);
+                        self.juice
+                            .feel
+                            .add_hitstop(crate::lab::tun(crate::lab::K::PARRY_HITSTOP));
                         self.juice.fx.push(ring(pp, 4.0, 18.0, 0.2, WHITE));
                         unravel(&mut self.juice.fx, pp + from * 8.0, 10.0);
                         if p.big {
@@ -3343,8 +3363,8 @@ impl World {
                             d.pull = None;
                             self.juice.gloom.amount = 0.0;
                             self.juice.audio.play(sfx::Id::Unbind);
-                            self.juice.feel.add_hitstop(0.12);
-                            self.juice.feel.add_trauma(0.5);
+                            self.juice.feel.add_hitstop(t::DEEP_FINAL_HITSTOP);
+                            self.juice.feel.add_trauma(t::DEEP_FINAL_SHAKE);
                             self.juice.toast = Some((self.character.def().deep_warm, 3.5));
                             return;
                         }
@@ -3381,7 +3401,7 @@ impl World {
             d.next_sweep = t::DEEP_SWEEP_EVERY;
             self.player.recoil(pp - from, 0.0, wrap);
             self.juice.audio.play(sfx::Id::Rumble);
-            self.juice.feel.add_trauma(0.3);
+            self.juice.feel.add_trauma(t::DEEP_SWEEP_SHAKE);
             self.juice.fx.push(ring(pp, 6.0, 20.0, 0.3, THREAD));
             // 가장 가까운 안 끊긴 매듭이 다시 조여진다.
             if let Some(k) = d.knots.iter_mut().filter(|k| !k.cut).min_by(|x, y| {
@@ -3475,7 +3495,7 @@ impl World {
         let white = Color::new(0.98, 0.96, 1.0, 1.0);
         if crossed(0.4) {
             self.juice.audio.play(sfx::Id::Unbind);
-            self.juice.feel.add_trauma(0.25);
+            self.juice.feel.add_trauma(t::DEEP_RELEASE_SHAKE);
             self.juice.fx.push(ring(c, 10.0, 60.0, 0.7, WHITE));
             self.juice.fx.push(ring(c, 6.0, 40.0, 0.5, THREAD));
             for dx in [-30.0, 0.0, 30.0] {
@@ -3487,7 +3507,7 @@ impl World {
         }
         if crossed(1.6) {
             self.juice.audio.play(sfx::Id::Unbind);
-            self.juice.feel.add_trauma(0.2);
+            self.juice.feel.add_trauma(t::DEEP_RELEASE_SHAKE_2);
             self.juice.fx.push(ring(c, 20.0, 90.0, 0.9, WHITE));
             unravel(&mut self.juice.fx, c, 46.0);
             unravel(&mut self.juice.fx, c + vec2(0.0, 12.0), 34.0);
@@ -3545,7 +3565,7 @@ impl World {
             let at = d.knots[i].pos;
             let n = d.cut_count();
             self.juice.audio.play(sfx::Id::Unbind);
-            self.juice.feel.add_trauma(0.35);
+            self.juice.feel.add_trauma(t::DEEP_KNOT_SHAKE);
             self.juice.fx.push(ring(at, 4.0, 30.0, 0.5, WHITE));
             self.juice.fx.push(ring(at, 2.0, 18.0, 0.35, THREAD));
             unravel(&mut self.juice.fx, at, 14.0);
@@ -3715,16 +3735,18 @@ fn strike_feel(feel: &mut Feel, player: &Player, s: &Strike, dir: Vec2) {
     let beat = if player.on_beat { t::KICK_BONUS } else { 0.0 };
     let kick = match s.kind {
         crate::combat::StrikeKind::Heavy => {
-            t::KICK_HEAVY
+            crate::lab::tun(crate::lab::K::KICK_HEAVY)
                 + if matches!(player.state, player::State::Heavy { perfect: true, .. }) {
                     t::KICK_BONUS
                 } else {
                     0.0
                 }
         }
-        crate::combat::StrikeKind::Claw(_) if s.finisher => t::KICK_FINISHER + beat,
-        crate::combat::StrikeKind::Claw(_) => t::KICK_LIGHT + beat,
-        crate::combat::StrikeKind::Emerge => t::KICK_FINISHER,
+        crate::combat::StrikeKind::Claw(_) if s.finisher => {
+            crate::lab::tun(crate::lab::K::KICK_FINISHER) + beat
+        }
+        crate::combat::StrikeKind::Claw(_) => crate::lab::tun(crate::lab::K::KICK_LIGHT) + beat,
+        crate::combat::StrikeKind::Emerge => crate::lab::tun(crate::lab::K::KICK_FINISHER),
         _ => 0.0,
     };
     if kick > 0.0 {
@@ -3750,7 +3772,7 @@ fn enemy_down(
     *kills += 1;
     deaths.push((e.pos, e.kind));
     audio.play(sfx::Id::EnemyDie);
-    feel.add_trauma(t::ENEMY_DIE_SHAKE);
+    feel.add_trauma(crate::lab::tun(crate::lab::K::ENEMY_DIE_SHAKE));
     fx.push(ring(e.pos, e.radius(), e.radius() * 3.0, 0.25, ring_color));
     burst(fx, e.pos, 12, enemy_color(e.kind), 110.0);
     unravel(fx, e.pos, e.radius());

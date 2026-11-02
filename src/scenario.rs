@@ -47,6 +47,8 @@ pub enum Scenario {
     Tutorial,
     /// 발톱 4종을 가방에 넣고 웨이브 1부터. 가방에서 바꿔 끼며 비교.
     AllClaws,
+    /// 손맛 실험실 연습장(0269): 피격 등급마다 때리는 것 하나씩.
+    LabRange,
     /// 환경 확인: 지정 환경에서 돌격형 1 + 원거리형 1.
     InBiome(Biome),
     /// 반딧불·산딸기 줍기 확인(docs/decisions/0016).
@@ -99,7 +101,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 51] = [
+pub const LIST: [Entry; 52] = [
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -154,6 +156,11 @@ pub const LIST: [Entry; 51] = [
         name: "무기 비교",
         desc: "고른 캐릭터의 무기가 다 가방에(Naïl 발톱 넷, 모모·도토 넷씩, 0246), 빈 방에 허수아비 셋. 메뉴 → 가방에서 확인으로 바꿔 낀다.",
         scenario: Scenario::AllClaws,
+    },
+    Entry {
+        name: "Lab 연습장",
+        desc: "피격 등급 비교(0269): 들쥐(보통·돌진은 센 공격), 두꺼비 혀(센 공격), 포자버섯(구름), 왼쪽 가시 덤불(바닥). 일시정지 Lab 탭에서 값을 바꾸고 다시 맞아 본다.",
+        scenario: Scenario::LabRange,
     },
     Entry {
         name: "떨어지는 것 확인",
@@ -415,6 +422,7 @@ pub fn build(s: Scenario) -> World {
         | Scenario::Tutorial => World::empty(),
         // 무기 비교(0246): 빈 방 + 오른쪽에 허수아비 셋(쓰러지지 않는다) — 탄·가시·조각을 그대로 본다.
         Scenario::AllClaws => all_claws(),
+        Scenario::LabRange => lab_range(),
         Scenario::Breakables => breakables(),
         Scenario::Gear => gear(),
         Scenario::BossHalf(kind) => boss_half(kind),
@@ -617,6 +625,21 @@ fn all_claws() -> World {
         e.hp = 999;
     }
     w.player.pos = c - vec2(40.0, 0.0);
+    w
+}
+
+/// 시나리오 `Scenario::LabRange`(0269): 맞는 근원마다 하나씩 — 같은 상황을 되풀이해 Lab 값을 비교한다.
+fn lab_range() -> World {
+    let mut w = World::empty();
+    w.biome = Biome::Deep;
+    let c = w.room.center();
+    w.spawn_mob(Kind::FieldMouse, c + vec2(70.0, -30.0));
+    w.spawn_mob(Kind::Toad, c + vec2(80.0, 25.0));
+    w.spawn_mob(Kind::SporeCap, c + vec2(20.0, 40.0));
+    for i in 0..3 {
+        w.room.thorns.push(c + vec2(-70.0, -10.0 + i as f32 * 10.0));
+    }
+    w.player.pos = c - vec2(30.0, 0.0);
     w
 }
 

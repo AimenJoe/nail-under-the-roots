@@ -29,12 +29,54 @@ pub const QUICK_FLASH: f32 = 1.2;
 /// 피격 후 무적 시간.
 pub const PLAYER_HURT_INVULN: f32 = 0.8;
 pub const PLAYER_HURT_KNOCKBACK: f32 = 170.0;
-pub const PLAYER_HURT_HITSTOP: f32 = 0.12;
-pub const PLAYER_HURT_SHAKE: f32 = 0.7;
-/// 맞으면 화면을 밀려난 쪽으로 차는 킥(px). 흔들림은 세기²라 0.55로는 1px 남짓 0.1초뿐이었다 — 작은 타격은 킥이 맡는다(0168).
-pub const PLAYER_HURT_KICK: f32 = 5.0;
-/// 맞음 테두리(화면 가장자리 붉은 번쩍임) 길이(초).
+/// 맞음 테두리(화면 가장자리 붉은 번쩍임)가 가장 진한 길이(초). 등급의 `edge`가 이보다 길면 그만큼 진하게 머문다(렌더가 나눈다).
 pub const PLAYER_HURT_EDGE: f32 = 0.35;
+
+/// 맞은 쪽(플레이어)의 손맛 한 벌(0269, 요구 2.3): 히트스톱(초)·흔들림 외상(0..1, 흔들림 = `SHAKE_MAX_OFFSET` × 외상²)·
+/// 킥(px, 밀려난 쪽으로)·붉은 테두리(초). 전엔 모든 근원이 0.12 / 0.7 / 5 / 0.35 하나였다.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HurtFeel {
+    pub hitstop: f32,
+    pub shake: f32,
+    pub kick: f32,
+    pub edge: f32,
+}
+
+/// 보통 잡몹의 몸통·탄. 외상 0.35 → 흔들림 0.49px라 반올림에서 0 — 작은 타격은 킥이 맡는다(KB melee-light…: 제곱 곡선).
+pub const HURT_LIGHT: HurtFeel = HurtFeel {
+    hitstop: 0.08,
+    shake: 0.35,
+    kick: 3.0,
+    edge: 0.30,
+};
+/// 곧게 오는 센 공격(돌진·혀)·피해 2 이상.
+pub const HURT_HEAVY: HurtFeel = HurtFeel {
+    hitstop: 0.12,
+    shake: 0.55,
+    kick: 5.0,
+    edge: 0.40,
+};
+/// 길의 주인·엘리트·토끼풀 충격파.
+pub const HURT_BOSS: HurtFeel = HurtFeel {
+    hitstop: 0.14,
+    shake: 0.70,
+    kick: 6.0,
+    edge: 0.45,
+};
+/// 바닥·천장의 것(덤불·떨어진 돌·묻은 도토리): 짧게 — 걸음이 덜 끊기게.
+pub const HURT_HAZARD: HurtFeel = HurtFeel {
+    hitstop: 0.06,
+    shake: 0.30,
+    kick: 2.0,
+    edge: 0.30,
+};
+/// 포자 구름(0264, 스며드는 피해): 멈춤·킥 없음 — 테두리와 아주 옅은 흔들림만.
+pub const HURT_SEEP: HurtFeel = HurtFeel {
+    hitstop: 0.0,
+    shake: 0.12,
+    kick: 0.0,
+    edge: 0.25,
+};
 /// 입력 버퍼. 이 시간 안에 들어온 공격/굴파기 입력은 가능해지는 순간 실행된다.
 pub const INPUT_BUFFER: f32 = 0.10;
 /// 스틱 데드존(반지름). 데스크톱·웹 패드와 Android 패드 축(0143)이 같이 쓴다.
@@ -910,3 +952,82 @@ pub const TAL_TOSS_COUNT: u8 = 2;
 pub const TAL_SPIT_COUNT: u8 = 3;
 pub const TAL_TOSS_SPREAD: f32 = 0.3;
 pub const TAL_TOSS_REACH: f32 = 120.0;
+
+// ── 사건 흔들림·멈춤(0269 R32): 예전엔 부르는 자리에 숫자로 있었다. 값은 그대로, 이름만. ──
+/// 파고들기(0160).
+pub const BURROW_SHAKE: f32 = 0.12;
+/// 드릴 출발.
+pub const DRILL_START_SHAKE: f32 = 0.35;
+/// 모모 이어 뛰기 큰 착지.
+pub const CHAIN_LAND_SHAKE: f32 = 0.25;
+/// 발 구르기.
+pub const STAMP_SHAKE: f32 = 0.1;
+/// 멀리뛰기 내려찍기.
+pub const JUMP_STOMP_SHAKE: f32 = 0.18;
+/// 볼링 부딪힘(0267).
+pub const BOWL_SHAKE: f32 = 0.2;
+/// 적이 벽에 부딪힘.
+pub const ENEMY_WALL_SHAKE: f32 = 0.2;
+/// 적 내려앉기.
+pub const ENEMY_LAND_SHAKE: f32 = 0.12;
+/// 땅에서 솟는 적.
+pub const ENEMY_POP_SHAKE: f32 = 0.25;
+/// 방에 떨어져 나타남(0257).
+pub const ENEMY_ARRIVE_SHAKE: f32 = 0.1;
+/// 무너지는 천장 돌.
+pub const ROCK_LAND_SHAKE: f32 = 0.18;
+/// 대장의 생쥐 부르기.
+pub const SUMMON_SHAKE: f32 = 0.2;
+/// 묻은 도토리 터짐.
+pub const MINE_POP_SHAKE: f32 = 0.15;
+/// 콩이 말린 등딱지에 튕김.
+pub const GUARD_BOUNCE_SHAKE: f32 = 0.2;
+/// 드릴로 부숨.
+pub const DRILL_BREAK_SHAKE: f32 = 0.3;
+/// 지렁이로 일어남(0243).
+pub const WORM_RISE_SHAKE: f32 = 0.5;
+/// 지렁이로 일어남(0243).
+pub const WORM_RISE_HITSTOP: f32 = 0.08;
+/// 컷씬 묶음: 실이 풀림.
+pub const CUE_UNBIND_SHAKE: f32 = 0.3;
+/// 컷씬 묶음: 솟아오름.
+pub const CUE_RISE_SHAKE: f32 = 0.4;
+/// 컷씬 묶음: 사라짐.
+pub const CUE_VANISH_SHAKE: f32 = 0.15;
+/// 컷씬 묶음: 실에 감김.
+pub const CUE_WRAP_SHAKE: f32 = 0.35;
+/// 토끼풀 발 구르기(0165).
+pub const CLOVER_THUMP_SHAKE: f32 = 0.45;
+/// 토끼풀 발 구르기(0165).
+pub const CLOVER_THUMP_HITSTOP: f32 = 0.03;
+/// 토끼풀 품기(당김).
+pub const CLOVER_PULL_SHAKE: f32 = 0.25;
+/// 고치에 튕김.
+pub const COCOON_BOUNCE_HITSTOP: f32 = 0.04;
+/// 부술 것 깨짐(0177).
+pub const PROP_BREAK_SHAKE: f32 = 0.08;
+/// 가장 깊은 곳: 굵은 실 받아침.
+pub const DEEP_FINAL_HITSTOP: f32 = 0.12;
+/// 가장 깊은 곳: 굵은 실 받아침.
+pub const DEEP_FINAL_SHAKE: f32 = 0.5;
+/// 가장 깊은 곳: 둘레 실에 감김.
+pub const DEEP_SWEEP_SHAKE: f32 = 0.3;
+/// 가장 깊은 곳: 놓아주기 첫 풀림.
+pub const DEEP_RELEASE_SHAKE: f32 = 0.25;
+/// 가장 깊은 곳: 놓아주기 둘째 풀림.
+pub const DEEP_RELEASE_SHAKE_2: f32 = 0.2;
+/// 가장 깊은 곳: 매듭 끊음.
+pub const DEEP_KNOT_SHAKE: f32 = 0.35;
+/// 플레이어가 묻은 것 터짐.
+pub const TOSS_MINE_SHAKE: f32 = 0.15;
+/// 보스 싸움 시작.
+pub const BOSS_INTRO_SHAKE: f32 = 0.35;
+/// 잠긴 방 싸움 시작(0257).
+pub const ENCOUNTER_SHAKE: f32 = 0.25;
+/// 버티기 끝: 굴이 무너짐.
+pub const HOLD_BURY_SHAKE: f32 = 0.35;
+/// 컷씬 `Step::Shake`의 세기 넷(작게·보통·크게·아주 크게).
+pub const CUT_SHAKE_SMALL: f32 = 0.15;
+pub const CUT_SHAKE: f32 = 0.2;
+pub const CUT_SHAKE_BIG: f32 = 0.35;
+pub const CUT_SHAKE_HUGE: f32 = 0.4;

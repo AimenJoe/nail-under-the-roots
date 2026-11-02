@@ -1013,7 +1013,9 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
         player::State::Charging { .. } if p.kit == crate::equipment::Character::Momo => F::CROUCH,
         player::State::Charging { .. } => F::STRIKE,
         player::State::Recover { .. } => F::CROUCH,
-        _ if p.knocked && p.invuln > t::PLAYER_HURT_INVULN - 0.25 => F::HURT,
+        _ if p.knocked && p.invuln > crate::lab::tun(crate::lab::K::PLAYER_HURT_INVULN) - 0.25 => {
+            F::HURT
+        }
         // 걷기: 도토는 낮은 바운드 네 칸(2026-10-29)이라 달리기(14칸/초)보다 느리게, 모모 깡충은 그대로.
         _ if moving && p.kit == crate::equipment::Character::Doto => art.walk(row, time * 4.5),
         _ if moving => art.walk(row, time * 10.0),
@@ -1162,7 +1164,9 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
             };
             (col, 1)
         }
-        _ if p.knocked && p.invuln > t::PLAYER_HURT_INVULN - 0.25 => (3, 1),
+        _ if p.knocked && p.invuln > crate::lab::tun(crate::lab::K::PLAYER_HURT_INVULN) - 0.25 => {
+            (3, 1)
+        }
         _ if moving => (2 + ((time * 10.0) as u32) % 4, 0),
         _ => (((time * 2.0) as u32) % 2, 0),
     };

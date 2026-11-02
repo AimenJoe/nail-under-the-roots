@@ -13,7 +13,7 @@ impl Player {
         // 정한 시간까지는 빠르게 파고 가고(대시), 힘을 모으는 동안은 느리다(0160).
         let base = self.talents.burrow_time();
         let factor = if was < base {
-            t::BURROW_DASH_FACTOR
+            crate::lab::tun(crate::lab::K::BURROW_DASH_FACTOR)
         } else {
             t::BURROW_CHARGE_FACTOR
         };

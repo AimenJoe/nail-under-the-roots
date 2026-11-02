@@ -17,6 +17,8 @@ mod tree;
 // 0169 R4: 장면별로 나눴다. 자식은 `use super::*`로 부모의 가져오기·App 필드를 함께 쓴다.
 mod album;
 mod help;
+#[cfg(feature = "dev")]
+mod lab;
 mod pause;
 mod settings;
 mod title;
@@ -312,6 +314,11 @@ enum Hit {
     /// 상태 탭 ▲(-1)·▼(+1).
     StatusScroll(i8),
     DevItem(usize),
+    /// Lab 탭(0269, 개발판): 줄, 값 한 칸 내림·올림(손잡이 번호, ±1).
+    #[cfg(feature = "dev")]
+    LabItem(usize),
+    #[cfg(feature = "dev")]
+    LabNudge(usize, i8),
     /// 길 지도: 고를 수 있는 칸(choices 번호).
     RouteNode(usize),
     ShopItem(usize),
@@ -406,6 +413,9 @@ pub struct App {
     assist_cursor: usize,
     bestiary_view: crate::ui::ListView,
     dev_view: crate::ui::ListView,
+    /// 일시정지 Lab 탭(0269, 개발판).
+    #[cfg(feature = "dev")]
+    lab: lab::LabUi,
     /// 이번 프레임의 굴리기 입력(논리 px 끌기, 칸: 휠·▲▼, 0199).
     scroll_in: (f32, i32),
     journal_check: f32,
@@ -568,6 +578,8 @@ impl App {
             assist_cursor: 0,
             bestiary_view: Default::default(),
             dev_view: Default::default(),
+            #[cfg(feature = "dev")]
+            lab: Default::default(),
             scroll_in: (0.0, 0),
             journal_check: 0.0,
             village_pick: None,
@@ -1721,7 +1733,7 @@ impl App {
             use crate::input::TouchKind;
             let p = &self.world.player;
             let bag = &self.world.inv.bag;
-            let burrow = crate::tuning::BURROW_COOLDOWN * p.stats.burrow_cd;
+            let burrow = crate::lab::tun(crate::lab::K::BURROW_COOLDOWN) * p.stats.burrow_cd;
             // 모든 행동에 대기 표시(사장 2026-10-29): 공격은 휘두르는 동안, 회피는 대기, 필살기는 게이지, 아이템은 먹은 뒤 대기.
             o.button_mut(TouchKind::Attack).ready = p.attack_ready();
             o.button_mut(TouchKind::Dodge).ready = 1.0 - p.burrow_cd / burrow;

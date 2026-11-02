@@ -812,7 +812,7 @@ impl World {
                 }
                 self.adv.boss = BossFight::Fight;
                 self.adv.events.push(AdvEvent::BossIntro);
-                self.juice.feel.add_trauma(0.35);
+                self.juice.feel.add_trauma(t::BOSS_INTRO_SHAKE);
                 return Some(sfx::Id::WallHit);
             }
             BossFight::Fight => {
@@ -1395,7 +1395,7 @@ impl World {
                 Encounter::Clear => self.juice.toast.take(),
             };
             self.juice.audio.play(sfx::Id::WallHit);
-            self.juice.feel.add_trauma(0.25);
+            self.juice.feel.add_trauma(t::ENCOUNTER_SHAKE);
         }
         let mut gift_at = None;
         let mut hall_cleared = None;
@@ -1534,7 +1534,7 @@ impl World {
                 puff(&mut self.juice.fx, e.pos, 2, self.biome.dust(), 8.0, 0.5);
             }
             self.juice.audio.play(sfx::Id::WallHit);
-            self.juice.feel.add_trauma(0.35);
+            self.juice.feel.add_trauma(t::HOLD_BURY_SHAKE);
             self.juice.toast = Some((|s| s.enc_hold_done, 2.5));
         }
     }

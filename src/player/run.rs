@@ -27,7 +27,11 @@ impl Player {
         let a = c.a;
         let moving = c.move_dir != Vec2::ZERO;
         let time = if moving { time + c.dt } else { time };
-        self.pos += c.move_dir * self.speed() * t::RUN_SPEED * self.talents.run_mul() * c.dt;
+        self.pos += c.move_dir
+            * self.speed()
+            * crate::lab::tun(crate::lab::K::RUN_SPEED)
+            * self.talents.run_mul()
+            * c.dt;
         if self.special_ready() {
             self.burrow_cd = self.burrow_cd_full();
             self.start_special(c.move_dir);
@@ -310,7 +314,14 @@ mod tests {
         let x = p.pos.x;
         p.update(&act(false, true, false), &room, t::TICK_DT);
         let step = p.pos.x - x;
-        assert!((step - t::PLAYER_SPEED * t::RUN_SPEED * t::TICK_DT).abs() < 0.01);
+        assert!(
+            (step
+                - crate::lab::tun(crate::lab::K::PLAYER_SPEED)
+                    * crate::lab::tun(crate::lab::K::RUN_SPEED)
+                    * t::TICK_DT)
+                .abs()
+                < 0.01
+        );
 
         for run in [t::RUN_MIN, 0.35, 0.6] {
             let (_, ev, d) = hold_run_release(&mut player(Character::Doto).0, &room, run);

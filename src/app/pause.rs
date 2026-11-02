@@ -1,4 +1,4 @@
-//! 일시정지 메뉴의 탭 여덟(메뉴·상태·재주·가방·발자국·도감·지도·안내, 안내는 0180, 재주는 0247).
+//! 일시정지 메뉴의 탭 여덟(메뉴·상태·재주·가방·발자국·도감·지도·안내, 안내는 0180, 재주는 0247) + 개발판의 Lab(0269).
 
 use super::*;
 
@@ -13,7 +13,7 @@ pub(super) struct PauseTab {
     pub draw: fn(&mut App, &Ui, Rect),
 }
 
-pub(super) const PAUSE_TABS: [PauseTab; 8] = [
+pub(super) const PAUSE_TABS: &[PauseTab] = &[
     PauseTab {
         name: |s| s.tab_menu,
         lr: false,
@@ -80,6 +80,17 @@ pub(super) const PAUSE_TABS: [PauseTab; 8] = [
             None
         },
         draw: |app, ui, c| app.draw_help_body(ui, c),
+    },
+    // 손맛 실험실(0269 R33): 개발판에만. 좌우는 값 한 칸이라 탭 넘기기는 Q·E·탭 누르기로.
+    #[cfg(feature = "dev")]
+    PauseTab {
+        name: |_| "Lab",
+        lr: true,
+        update: |app, a, tap, _| {
+            app.update_lab(a, tap);
+            None
+        },
+        draw: |app, ui, c| app.draw_lab(ui, c),
     },
 ];
 /// 지도 탭 번호(지도 버튼으로 바로 연다).
@@ -1320,7 +1331,7 @@ fn draw_reward_icon(ui: &Ui, r: crate::journal::Reward, x: f32, y: f32) {
 mod tests {
     use super::*;
 
-    /// 탭 표(0248 R30): 지도 버튼이 여는 번호가 지도 탭이고, 좌우를 칸에 쓰는 탭은 가방·재주 둘뿐.
+    /// 탭 표(0248 R30): 지도 버튼이 여는 번호가 지도 탭이고, 좌우를 칸에 쓰는 탭은 가방·재주 둘뿐(개발판은 + Lab, 0269).
     #[test]
     fn pause_tab_table_matches_its_numbers() {
         let ko = &crate::i18n::KO;
@@ -1330,6 +1341,10 @@ mod tests {
             .filter(|t| t.lr)
             .map(|t| (t.name)(ko))
             .collect();
-        assert_eq!(lr, vec![ko.tab_talents, ko.tab_bag]);
+        let mut want = vec![ko.tab_talents, ko.tab_bag];
+        if cfg!(feature = "dev") {
+            want.push("Lab");
+        }
+        assert_eq!(lr, want);
     }
 }

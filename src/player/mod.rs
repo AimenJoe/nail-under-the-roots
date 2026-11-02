@@ -341,7 +341,7 @@ impl Player {
     /// 걷는 속도: 흰 실 그물에 걸렸으면 느리다(0165).
     /// 큰 나무 "가벼운 발"(0246)이 곱해진다.
     fn speed(&self) -> f32 {
-        let base = t::PLAYER_SPEED * self.stats.speed;
+        let base = crate::lab::tun(crate::lab::K::PLAYER_SPEED) * self.stats.speed;
         if self.slow {
             base * t::WEB_SLOW
         } else {
@@ -459,7 +459,10 @@ impl Player {
 
     /// 굴파기 대기 한 번의 길이(장신구 × 재주 × 실뜨기). 상태 탭·HUD 막대도 이 값을 쓴다.
     pub fn burrow_cd_full(&self) -> f32 {
-        t::BURROW_COOLDOWN * self.stats.burrow_cd * self.talents.burrow_cd_mul() * self.burrow_knot
+        crate::lab::tun(crate::lab::K::BURROW_COOLDOWN)
+            * self.stats.burrow_cd
+            * self.talents.burrow_cd_mul()
+            * self.burrow_knot
     }
 
     /// 패링 창이 열려 있으면 공격 방향. 스윙 시작 직후 PARRY_WINDOW 동안(실뜨기 8단계면 짧다).
@@ -500,7 +503,7 @@ impl Player {
             State::Attack { dir, .. } | State::Heavy { dir, .. }
                 if self.parry_open
                     && self.swing_age
-                        < t::PARRY_WINDOW
+                        < crate::lab::tun(crate::lab::K::PARRY_WINDOW)
                             * self.parry_mul
                             * self.parry_assist
                             * self.talents.parry_window_mul() =>
@@ -554,15 +557,15 @@ impl Player {
     /// 박자 창(±초). 무기마다 배율(꽃잎 발목끈은 넓다), 큰 나무 "박자 귀"(0246).
     pub fn beat_window(&self) -> f32 {
         // 창은 박자 길이에 비례(0267): 빠른 무기의 창이 박자의 절반을 넘지 않게.
-        t::BEAT_WINDOW
-            * (self.moveset.beat / t::BEAT_PERIOD)
+        crate::lab::tun(crate::lab::K::BEAT_WINDOW)
+            * (self.moveset.beat * crate::lab::tun(crate::lab::K::BEAT_SCALE) / t::BEAT_PERIOD)
             * self.moveset.beat_window
             * self.stats.beat
     }
 
     /// 강공격을 다 모으는 시간(장신구·큰 나무로 짧아진다, 0246).
     pub fn charge_time(&self) -> f32 {
-        t::HEAVY_CHARGE * self.stats.charge
+        crate::lab::tun(crate::lab::K::HEAVY_CHARGE) * self.stats.charge
     }
 
     /// 모으는 자세로 들어갈 때인가(0255): 지금 스윙을 낸 누름을 `HEAVY_HOLD_START` 넘게 쥐고 있다. 들어설 때의 모으기 시계
@@ -700,21 +703,21 @@ impl Player {
                     } else if d <= self.beat_window() {
                         self.queued = Some(Queued::Beat);
                     } else {
-                        self.attack_buf = t::INPUT_BUFFER;
+                        self.attack_buf = crate::lab::tun(crate::lab::K::INPUT_BUFFER);
                     }
                 }
             } else {
-                self.attack_buf = t::INPUT_BUFFER;
+                self.attack_buf = crate::lab::tun(crate::lab::K::INPUT_BUFFER);
             }
         }
         if a.dodge {
-            self.dodge_buf = t::INPUT_BUFFER;
+            self.dodge_buf = crate::lab::tun(crate::lab::K::INPUT_BUFFER);
         }
         if a.special {
-            self.special_buf = t::INPUT_BUFFER;
+            self.special_buf = crate::lab::tun(crate::lab::K::INPUT_BUFFER);
         }
         if a.use_item {
-            self.item_buf = t::INPUT_BUFFER;
+            self.item_buf = crate::lab::tun(crate::lab::K::INPUT_BUFFER);
         }
     }
 
@@ -1002,7 +1005,7 @@ impl Player {
             dmg
         };
         self.hp -= dmg;
-        self.invuln = t::PLAYER_HURT_INVULN;
+        self.invuln = crate::lab::tun(crate::lab::K::PLAYER_HURT_INVULN);
         self.flash = t::HIT_FLASH;
         self.knocked = knock;
         if knock {
@@ -1491,7 +1494,7 @@ mod tests {
             }
         }
         let frac = open as f32 / ticks as f32;
-        let most = t::PARRY_WINDOW / t::PARRY_COOLDOWN + 0.05;
+        let most = crate::lab::tun(crate::lab::K::PARRY_WINDOW) / t::PARRY_COOLDOWN + 0.05;
         assert!(frac <= most, "연타 창 비율 {frac} > {most}");
         assert!(open > 0, "연타해도 가끔은 걸린다");
 
@@ -1574,7 +1577,7 @@ mod tests {
         };
         tick(&mut p, &room, &atk);
         assert_eq!(p.parry_dir(), Some(vec2(1.0, 0.0)));
-        let ticks = (t::PARRY_WINDOW / t::TICK_DT).ceil() as usize + 1;
+        let ticks = (crate::lab::tun(crate::lab::K::PARRY_WINDOW) / t::TICK_DT).ceil() as usize + 1;
         for _ in 0..ticks {
             tick(&mut p, &room, &Actions::default());
         }
@@ -1691,7 +1694,7 @@ mod tests {
             p.state
         );
         let mut ready = false;
-        for _ in 0..((t::HEAVY_CHARGE / t::TICK_DT) as usize + 2) {
+        for _ in 0..((crate::lab::tun(crate::lab::K::HEAVY_CHARGE) / t::TICK_DT) as usize + 2) {
             let (s, ev) = tick(&mut p, &room, &hold);
             assert!(s.is_none(), "모으는 동안 판정은 없다");
             ready |= ev.contains(&Event::HeavyReady);
@@ -1799,7 +1802,9 @@ mod tests {
             tick(&mut p, &room, &hold);
             n += 1;
         }
-        for _ in 0..(((t::HEAVY_CHARGE + t::HEAVY_PERFECT + 0.06) / t::TICK_DT) as usize) {
+        for _ in 0..(((crate::lab::tun(crate::lab::K::HEAVY_CHARGE) + t::HEAVY_PERFECT + 0.06)
+            / t::TICK_DT) as usize)
+        {
             tick(&mut p, &room, &hold);
         }
         let (_, ev) = tick(&mut p, &room, &release);
@@ -1938,7 +1943,7 @@ mod tests {
         for n in 1..60 {
             // 눌림은 틱 머리에서 보니, 그때의 박자 시계는 (n-1)틱.
             let clock = (n - 1) as f32 * t::TICK_DT;
-            let a = if clock >= beat_at - t::BEAT_WINDOW && !pressed {
+            let a = if clock >= beat_at - crate::lab::tun(crate::lab::K::BEAT_WINDOW) && !pressed {
                 pressed = true;
                 &tap
             } else {
@@ -1952,7 +1957,9 @@ mod tests {
             }
         }
         assert!(ticks > 0, "2타가 나간다");
-        let pressed_at = ((beat_at - t::BEAT_WINDOW) / t::TICK_DT).ceil() as usize + 1;
+        let pressed_at = ((beat_at - crate::lab::tun(crate::lab::K::BEAT_WINDOW)) / t::TICK_DT)
+            .ceil() as usize
+            + 1;
         assert_eq!(ticks, pressed_at, "누른 틱에 바로 이어진다");
         assert!(p.beat_cue().is_some(), "콤보 중엔 박자 고리가 보인다");
         // 연타: 매 틱 누른다 → 첫 눌림이 창 전이라 박자에야 2타, Beat 없음.
@@ -1996,7 +2003,9 @@ mod tests {
         // 늦은 눌림(창 뒤, 콤보 창 안): 그 자리에서 2타, Beat 없음.
         let mut p = Player::new(room.center());
         tick(&mut p, &room, &tap);
-        let late = ((beat_at + t::BEAT_WINDOW) / t::TICK_DT).ceil() as usize + 2;
+        let late = ((beat_at + crate::lab::tun(crate::lab::K::BEAT_WINDOW)) / t::TICK_DT).ceil()
+            as usize
+            + 2;
         for _ in 0..late {
             tick(&mut p, &room, &none);
         }
@@ -2246,7 +2255,7 @@ mod tests {
             dash > crawl * 3.0,
             "대시 {dash} 는 모으는 동안 {crawl} 보다 훨씬 멀리"
         );
-        let plain = t::PLAYER_SPEED * t::BURROW_MAX_TIME;
+        let plain = crate::lab::tun(crate::lab::K::PLAYER_SPEED) * t::BURROW_MAX_TIME;
         assert!(dash > plain * 1.8, "걷기보다 훨씬 빠르다 {dash} vs {plain}");
     }
 

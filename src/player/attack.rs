@@ -242,7 +242,8 @@ impl Player {
     /// 박자 시계를 되감고 다음 타의 박자를 정한다(0174): 스윙 시작부터 `BEAT_PERIOD`, 스윙·후딜레이가 더 길면 그 끝.
     fn set_beat(&mut self, hit: crate::moveset::Hit) {
         self.beat_clock = 0.0;
-        self.beat_at = self.moveset.beat.max(hit.swing + hit.recovery);
+        self.beat_at = (self.moveset.beat * crate::lab::tun(crate::lab::K::BEAT_SCALE))
+            .max(hit.swing + hit.recovery);
     }
 
     /// 콤보의 이음을 모두 박자에 맞춘 마무리 타인가(0168·0189): 넉백 `FULL_BEAT_KNOCK`배 + 피해 `FULL_BEAT_DAMAGE`.
