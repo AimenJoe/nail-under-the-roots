@@ -79,6 +79,10 @@ pub struct CharacterDef {
     /// 고르기 창의 초상화(털빛을 받는다)와 소개.
     pub portrait: fn(u8) -> Portrait,
     pub pick_text: Tr,
+    /// 회피 동작의 이름(0265): 터치 안내(`input::prompt`)와 조작 설정 줄. 예전엔 모두 "굴파기(회피)"였다.
+    pub act_dodge: Tr,
+    /// 마을 물웅덩이에 비친 모습(0265). Naïl은 털빛을 바꿔 보고(저널 보상, 0048) 새 털빛이 없을 때 이 글.
+    pub reflection: Tr,
     /// 상태 탭의 회피 대기 이름, 등딱지·덤불·그물에 처음 걸렸을 때의 한마디(캐릭터마다 말투).
     pub stat_dodge_cd: Tr,
     pub toast_shell: Tr,
@@ -115,6 +119,8 @@ pub static ALL: [CharacterDef; 3] = [
         talent_keys: ["burrow", "parry", "drill", "eat"],
         portrait: Portrait::nail,
         pick_text: |s| s.pick_nail,
+        act_dodge: |s| s.act_dodge,
+        reflection: |s| s.puddle_none,
         stat_dodge_cd: |s| s.stat_dig_cd,
         toast_shell: |s| s.toast_shell,
         toast_thorn: |s| s.toast_thorn,
@@ -143,6 +149,8 @@ pub static ALL: [CharacterDef; 3] = [
         talent_keys: ["hop", "momo_parry", "chain", "momo_eat"],
         portrait: |_| Portrait::MOMO,
         pick_text: |s| s.pick_momo,
+        act_dodge: |s| s.act_dodge_momo,
+        reflection: |s| s.puddle_momo,
         stat_dodge_cd: |s| s.stat_hop_cd,
         toast_shell: |s| s.toast_shell_momo,
         toast_thorn: |s| s.toast_thorn_momo,
@@ -171,6 +179,8 @@ pub static ALL: [CharacterDef; 3] = [
         talent_keys: ["leap", "doto_parry", "bury", "doto_eat"],
         portrait: |_| Portrait::DOTO,
         pick_text: |s| s.pick_doto,
+        act_dodge: |s| s.act_dodge_doto,
+        reflection: |s| s.puddle_doto,
         stat_dodge_cd: |s| s.stat_leap_cd,
         toast_shell: |s| s.toast_shell_doto,
         toast_thorn: |s| s.toast_thorn_doto,

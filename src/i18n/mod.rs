@@ -436,6 +436,8 @@ strings! {
     run_doto, seat_doto, nail_v1, nail_v2, nail_v_momo, nail_v_doto, dend_1, dend_2, dend_3, dend_4, doto_t_deep,
     // 캐릭터마다 다른 필살기 설명·대사(0264)
     special_desc_momo, special_desc_doto, momo_meet_1_doto, momo_meet_1b_doto, momo_meet_2b_doto, momo_meet_3b_doto, momo_r3_doto, clover_b3_doto, deep_k3_momo, deep_k3_doto, deep_wrap_momo, deep_wrap_doto, momo_t_doto_self, momo_t_true_doto, bori_t_doto_self, bori_t_momo_self, doto_t_deep_momo, toast_save_failed,
+    // 이웃이 캐릭터마다 하는 말·주는 것, 물웅덩이, 회피 이름(0265)
+    susu_v1_momo, susu_v1_doto, kongi_v2_momo, kongi_v2_doto, kongi_v3_momo, kongi_v3_doto, kongi_b4_momo, kongi_b4_doto, kongi_stone, puddle_momo, puddle_doto, act_dodge_momo, act_dodge_doto,
 }
 
 #[cfg(test)]

@@ -456,10 +456,6 @@ pub const KNOT_BURROW_CD: f32 = 1.25;
 pub const KNOT_GLOW_STEP: f32 = 0.15;
 /// 마을 씨앗(docs/decisions/0045): 가장 깊은 곳에 닿으면 남은 씨앗 + 이것, 새 실뜨기 단계 + 이것, 오늘의 굴 완주 + 이것.
 pub const VILLAGE_SEEDS_CLEAR: u32 = 5;
-/// 주기 저장(0264, 0259의 런 통계 10초를 대신함): 게임 화면에서 이만큼(초)마다 기록·이어하기를 적는다. 글이 같으면
-/// 저장소를 건드리지 않으니(`profile::put`) 쓰기는 바뀐 때만. 앱이 갑자기 꺼져도 잃는 건 이만큼의 진행.
-/// 5초: 한 번 적는 데 글 몇 KB 만들기 + 비교(1ms 아래)라 끊김이 없고, 방 하나 싸움(수십 초)보다 훨씬 짧다.
-pub const AUTOSAVE_EVERY: f32 = 5.0;
 pub const VILLAGE_SEEDS_KNOT: u32 = 10;
 pub const VILLAGE_SEEDS_DAILY: u32 = 5;
 /// 한 런 = 필드 + 길 몇 개. 이 번째 길의 주인을 이기면 가장 깊은 곳(엔딩, docs/decisions/0042).

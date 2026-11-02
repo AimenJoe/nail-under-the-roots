@@ -18,8 +18,6 @@ pub struct Boss {
     /// 이기면(돌아오면) 세우는 기록 깃발. `wins_key`가 있으면 이긴 수를 세고 돌아온 때(`BossBeaten::back`)만 세운다(모모, 0046).
     pub back_flag: &'static str,
     pub wins_key: Option<&'static str>,
-    /// 돌아올 때 덤으로 세우는 깃발(콩이: 바위 발톱, 0054).
-    pub extra_flags: &'static [&'static str],
 }
 
 pub static ALL: [Boss; 4] = [
@@ -30,7 +28,6 @@ pub static ALL: [Boss; 4] = [
         petals: true,
         back_flag: key::MOMO_BACK,
         wins_key: Some(key::MOMO_WINS),
-        extra_flags: &[],
     },
     Boss {
         kind: Kind::Doto,
@@ -39,7 +36,6 @@ pub static ALL: [Boss; 4] = [
         petals: false,
         back_flag: key::DOTO_MEMORY,
         wins_key: None,
-        extra_flags: &[],
     },
     Boss {
         kind: Kind::Kongi,
@@ -48,7 +44,6 @@ pub static ALL: [Boss; 4] = [
         petals: false,
         back_flag: key::KONGI_BACK,
         wins_key: None,
-        extra_flags: &[key::STONE],
     },
     Boss {
         kind: Kind::Clover,
@@ -57,7 +52,6 @@ pub static ALL: [Boss; 4] = [
         petals: false,
         back_flag: key::CLOVER_BACK,
         wins_key: None,
-        extra_flags: &[],
     },
 ];
 
@@ -74,9 +68,6 @@ impl Boss {
         }
         if r.back {
             p.set(self.back_flag);
-            for f in self.extra_flags {
-                p.set(f);
-            }
         }
     }
 }
@@ -113,7 +104,8 @@ mod tests {
                 back: true,
             },
         );
-        assert!(p.flag("kongi") && p.flag("weapon.stone"));
+        // 바위 발톱은 덤 깃발이 아니라 콩이가 이긴 캐릭터에게 주는 선물(0265, `cutscene::kongi_returns`) — 받을 때 무기 깃발.
+        assert!(p.flag("kongi") && !p.flag("weapon.stone"));
         of(Kind::Doto).unwrap().record(
             &mut p,
             BossBeaten {

@@ -409,8 +409,6 @@ pub struct App {
     /// 이번 프레임의 굴리기 입력(논리 px 끌기, 칸: 휠·▲▼, 0199).
     scroll_in: (f32, i32),
     journal_check: f32,
-    /// 주기 저장(0264)까지 남은 시간을 세는 시계(게임 화면에서만 흐른다).
-    autosave_t: f32,
     /// 마을 뿌리 길에서 길 지도를 보는 중(0259): 새 런이 쓸 모험 시드.
     village_pick: Option<u64>,
     /// 마을 길 지도에서 고른 칸(0259): 새 런의 첫 장면이 그 굴로 곧장 내려간다.
@@ -572,7 +570,6 @@ impl App {
             dev_view: Default::default(),
             scroll_in: (0.0, 0),
             journal_check: 0.0,
-            autosave_t: 0.0,
             village_pick: None,
             village_go: None,
             inventory: Inventory::new(Character::Mole, &[]),
@@ -647,20 +644,16 @@ impl App {
         crate::profile::save(&self.profile);
     }
 
-    /// 주기 저장(0264): 게임 화면에서 `AUTOSAVE_EVERY`초마다 기록(통계·도감)과 이어하기(가방·재화·체력)를 적는다.
-    /// 바뀐 것이 없으면 쓰지 않고, 장소를 바꾸는 중(어두워졌다 밝아짐)에는 이어하기를 건너뛴다. 무엇을 언제 적을 수 있는지
-    /// (쉼터를 지난 이야기 런·살아 있을 때)는 `checkpoint_run` 한 곳.
-    fn autosave(&mut self, dt: f32) {
-        self.autosave_t += dt;
-        if self.autosave_t < t::AUTOSAVE_EVERY {
-            return;
-        }
-        self.autosave_t = 0.0;
+    /// 이벤트 저장(0265, 0264의 5초 주기 저장을 대신함): 굴의 방 경계(방을 비움·다음 방으로 넘어섬)·상자·물건 받기·일시정지에서
+    /// 기록(통계·도감)과 이어하기(가방·재화·체력)를 적는다. 바뀐 것이 없으면 쓰지 않는다(`profile::put`).
+    /// `run`이 거짓이면(싸움 중 일시정지) 기록만 — 싸움 한가운데의 체력을 이어하기에 적지 않는다. 장소를 바꾸는 중이면 이어하기를
+    /// 건너뛴다. 무엇을 언제 적을 수 있는지(쉼터를 지난 이야기 런·살아 있을 때)는 `checkpoint_run` 한 곳.
+    pub(super) fn save_progress(&mut self, run: bool) {
         if !self.recording() {
             return;
         }
         self.save_profile();
-        if self.world.adv.fade.is_none() {
+        if run && self.world.adv.fade.is_none() {
             self.checkpoint_run();
         }
     }
@@ -765,7 +758,6 @@ impl App {
             Scene::Game => {
                 let heard = self.sfx.played();
                 self.update_game(dt);
-                self.autosave(dt);
                 if let (Some(w), None) = (self.story_after_ascent, self.world.adv.fade) {
                     let w = w + dt;
                     self.story_after_ascent = if w >= t::ASCENT_STORY_DELAY {
@@ -1046,6 +1038,9 @@ impl App {
     }
 
     fn open_pause(&mut self) {
+        // 일시정지는 끄기 전에 흔히 누르는 곳(0265): 기록은 늘, 이어하기는 싸움 중(문이 잠긴 방)이 아닐 때.
+        let fighting = self.world.room.doors_locked();
+        self.save_progress(!fighting);
         self.world.freeze();
         self.pause_tab = 0;
         self.pause_cursor = 0;
@@ -1083,6 +1078,7 @@ impl App {
         let ch = flow::character(s, self.picked());
         self.world.character = ch;
         self.world.player.kit = ch;
+        crate::input::set_dodge_name(ch.def().act_dodge);
         // 무기는 스토리를 따라 하나씩(docs/decisions/0012). 첫 시작·튜토리얼은 맨손에서 출발해
         // 튜토리얼에서 두더지 발톱을 줍는다. 개발 시나리오는 테스트를 위해 기본 발톱(또는 전부)을 들고 시작.
         let start = ch.starting_weapon();
@@ -2068,6 +2064,8 @@ impl App {
             }
             crate::world::Gift::Charm(c) => self.inventory.add_charm(c),
         }
+        // 물건을 받았다(0265): 가방까지 이어하기에.
+        self.save_progress(true);
         self.world.freeze();
         self.gift = Some(Gift { item, t: 0.0 });
     }

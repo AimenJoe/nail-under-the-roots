@@ -313,13 +313,13 @@ pub const SLOTS: usize = 3;
 const CELLS: usize = 1 + 2 * SLOTS;
 
 /// 칸마다 저장소에 있다고 아는 글(0264): 읽거나 쓰는 데 성공한 글. 같은 글을 다시 쓰라고 하면 건너뛴다 —
-/// 주기 저장(`tuning::AUTOSAVE_EVERY`)이 바뀐 것이 없을 때 디스크·localStorage를 건드리지 않게. 쓰기에 실패하면 비워
+/// 저장을 부르는 곳이 많아도(이야기 사건·방 경계·일시정지, 0265) 바뀐 것이 없으면 디스크·localStorage를 건드리지 않게. 쓰기에 실패하면 비워
 /// 다음 저장 때 다시 쓴다(대기 중이라는 이유로 잃지 않게).
 static KNOWN: std::sync::Mutex<[Option<String>; CELLS]> =
     std::sync::Mutex::new([const { None }; CELLS]);
 
 /// 쓰기 상태(0264): 0 = 마지막 쓰기 성공, 1 = 실패했고 아직 안 알림, 2 = 실패를 알림. 실패가 이어지는 동안은 한 번만
-/// 알리고(주기 저장마다 알림이 뜨지 않게), 한 번 성공하면 다시 0.
+/// 알리고(저장할 때마다 알림이 뜨지 않게), 한 번 성공하면 다시 0.
 static FAILED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 /// 칸을 읽고 그 글을 기억한다.

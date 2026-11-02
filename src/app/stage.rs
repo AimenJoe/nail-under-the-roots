@@ -310,6 +310,8 @@ impl App {
                     self.checkpoint_run();
                     self.open_route(false);
                 }
+                // 굴의 방 경계(0265): 방을 비웠을 때·문이 열린 채 다음 방으로 넘어설 때. 바뀐 것이 없으면 쓰지 않는다.
+                AdvEvent::RoomEntered | AdvEvent::RoomCleared => self.save_progress(true),
                 // 쓰러져 다시 섰다(0259): 감긴 실뿌리까지 이어하기에. 전에는 다음 쉼터까지 옛 글이 남아, 끄고 이으면 실뿌리가 풀렸다.
                 AdvEvent::Woke => self.checkpoint_run(),
                 // 오늘의 굴은 싸움 없이 기록만(0162). 이야기 런은 가장 깊은 곳의 실매듭 끊기로.
@@ -436,7 +438,10 @@ impl App {
     pub(super) fn interact(&mut self, i: Interact) {
         let village = self.world.adv.place == crate::adventure::Place::Village;
         match i {
-            Interact::Chest(n) => self.world.open_chest(n),
+            Interact::Chest(n) => {
+                self.world.open_chest(n);
+                self.save_progress(true);
+            }
             Interact::Exit => self.world.use_exit(),
             // 마을의 포포: 마을 꾸미기 가게(0045).
             Interact::Talk(Who::Popo) if village => {
@@ -457,15 +462,6 @@ impl App {
             Interact::Talk(Who::Bori) if self.say_story(crate::story::When::TalkBori) => {}
             Interact::Talk(Who::Momo) if self.say_story(crate::story::When::TalkMomo) => {}
             Interact::Talk(Who::Doto) if self.say_story(crate::story::When::TalkDoto) => {}
-            Interact::Talk(Who::Bori) => {
-                let lines: [Tr; 3] = [|s| s.bori_1, |s| s.bori_2, |s| s.bori_3];
-                let text = lines[self.talk_n as usize % lines.len()];
-                self.talk_n += 1;
-                self.play(cutscene::talk(
-                    &self.world,
-                    &[(Speaker::Bori, text, Face::Normal)],
-                ));
-            }
             // 빈 자리: 모모를 이긴 만큼 꽃잎이 물들어 있다(0046). 모모로 왔으면 제 자리라 1인칭으로, 나일이 있는 곳도 말한다(0067).
             Interact::Seat => {
                 let ch = self.world.character;
@@ -483,17 +479,6 @@ impl App {
                 // Speaker::Nail = 이번 런의 플레이어 배우(모모 런이면 모모).
                 self.play(cutscene::talk(&self.world, &[(Speaker::Nail, line, face)]));
             }
-            // 수수가 도토에게 호두를 다듬어 준다(0246). 받은 건 기록에 남는다(`take_gifts`).
-            Interact::Talk(Who::Susu)
-                if self.world.character == crate::equipment::Character::Doto
-                    && !self.owns_weapon(crate::equipment::WALNUT) =>
-            {
-                self.play(cutscene::talk_give(
-                    &self.world,
-                    &[(Speaker::Susu, |s| s.susu_walnut, Face::Happy)],
-                    crate::equipment::WALNUT,
-                ));
-            }
             // 수수: 처음엔 새싹 발톱을 만들어 준다(0053). 개발 시나리오는 기록 없이 이번 런에만.
             // 같은 "파는 손"을 알아보는 장면이라 나일에게만(0264): 모모·도토에게 "어이, 두더지 꼬마!"라 했다. 발톱은 다음 나일 런에.
             Interact::Talk(Who::Susu)
@@ -507,74 +492,26 @@ impl App {
                 }
                 self.play(cutscene::susu_meet(&self.world));
             }
-            Interact::Talk(Who::Susu) => {
-                let lines: [Tr; 3] = [|s| s.susu_v1, |s| s.susu_v2, |s| s.susu_v3];
-                let text = lines[self.talk_n as usize % lines.len()];
-                self.talk_n += 1;
-                self.play(cutscene::talk(
-                    &self.world,
-                    &[(Speaker::Susu, text, Face::Happy)],
-                ));
-            }
-            // 콩이가 모모에게 조약돌 덧신을 만들어 준다(0246).
-            Interact::Talk(Who::Kongi)
-                if self.world.character == crate::equipment::Character::Momo
-                    && !self.owns_weapon(crate::equipment::PEBBLE) =>
+            // 이웃이 지금 걷는 캐릭터 본인에게 주는 무기(표 `story::GIFTS`, 0265): 아직 없을 때 한 번. 받은 건 기록에 남는다(`take_gifts`).
+            Interact::Talk(who)
+                if crate::story::gift(who, self.world.character)
+                    .is_some_and(|g| !self.owns_weapon(g.weapon)) =>
             {
+                let g = crate::story::gift(who, self.world.character).expect("가드에서 찾았다");
                 self.play(cutscene::talk_give(
                     &self.world,
-                    &[(Speaker::Kongi, |s| s.kongi_pebble, Face::Happy)],
-                    crate::equipment::PEBBLE,
+                    &[(crate::story::speaker(who), g.line, Face::Happy)],
+                    g.weapon,
                 ));
             }
-            Interact::Talk(Who::Kongi) => {
-                let lines: [Tr; 3] = [|s| s.kongi_v1, |s| s.kongi_v2, |s| s.kongi_v3];
-                let text = lines[self.talk_n as usize % lines.len()];
+            // 늘 하는 말(표 `story::CHATTER`, 0265): 차례로 셋, 지금 걷는 캐릭터에게 하는 줄.
+            Interact::Talk(who) if crate::story::chatter(who, self.world.character).is_some() => {
+                let c = crate::story::chatter(who, self.world.character).expect("가드에서 찾았다");
+                let text = c.lines[self.talk_n as usize % c.lines.len()];
                 self.talk_n += 1;
                 self.play(cutscene::talk(
                     &self.world,
-                    &[(Speaker::Kongi, text, Face::Happy)],
-                ));
-            }
-            Interact::Talk(Who::Clover) => {
-                let lines: [Tr; 3] = [|s| s.clover_v1, |s| s.clover_v2, |s| s.clover_v3];
-                let text = lines[self.talk_n as usize % lines.len()];
-                self.talk_n += 1;
-                self.play(cutscene::talk(
-                    &self.world,
-                    &[(Speaker::Clover, text, Face::Happy)],
-                ));
-            }
-            Interact::Talk(Who::Doto) => {
-                let lines: [Tr; 3] = [|s| s.doto_v1, |s| s.doto_v2, |s| s.doto_v3];
-                let text = lines[self.talk_n as usize % lines.len()];
-                self.talk_n += 1;
-                self.play(cutscene::talk(
-                    &self.world,
-                    &[(Speaker::Doto, text, Face::Happy)],
-                ));
-            }
-            // 다른 캐릭터로 걸을 때 큰 나무 곁의 Naïl(0249): 둘은 함께, 하나는 지금 걷는 이에게.
-            Interact::Talk(Who::Nail) => {
-                let own: Tr = match self.world.character {
-                    crate::equipment::Character::Doto => |s| s.nail_v_doto,
-                    _ => |s| s.nail_v_momo,
-                };
-                let lines: [Tr; 3] = [|s| s.nail_v1, own, |s| s.nail_v2];
-                let text = lines[self.talk_n as usize % lines.len()];
-                self.talk_n += 1;
-                self.play(cutscene::talk(
-                    &self.world,
-                    &[(Speaker::NailHome, text, Face::Happy)],
-                ));
-            }
-            Interact::Talk(Who::Momo) => {
-                let lines: [Tr; 3] = [|s| s.momo_v1, |s| s.momo_v2, |s| s.momo_v3];
-                let text = lines[self.talk_n as usize % lines.len()];
-                self.talk_n += 1;
-                self.play(cutscene::talk(
-                    &self.world,
-                    &[(Speaker::Momo, text, Face::Happy)],
+                    &[(crate::story::speaker(who), text, c.face)],
                 ));
             }
             // 누룩 할매: 실뜨기 고르기(마을, 0043·0045).
@@ -584,9 +521,16 @@ impl App {
                 self.world.freeze();
                 self.scene = Scene::KnotPick;
             }
+            // 표에 줄이 없는 이웃(지금 걷는 캐릭터에게 할 말이 없다): 아무 일도 없다. 시험이 이웃마다 줄이 있는지 본다.
+            Interact::Talk(_) => {}
             // 물웅덩이: 열린 털빛을 차례로 비춰 본다(저널 보상, 0048).
             // 실 고리: 실의 꿈 고르기(0055).
             Interact::Dream => self.open_dream(),
+            // 모모·도토는 제 모습만 비친다(0265): 털빛은 Naïl의 것이라 바꾸지 않는다.
+            Interact::Puddle if self.world.character != crate::equipment::Character::Mole => {
+                self.world.juice.toast = Some((self.world.character.def().reflection, 2.5));
+                self.sfx.play(crate::sfx::Id::Glowbug);
+            }
             Interact::Puddle => {
                 let n = crate::journal::next_fur(&self.profile, self.world.inv.fur);
                 let none = n == self.world.inv.fur;
@@ -595,7 +539,7 @@ impl App {
                 crate::profile::save(&self.profile);
                 self.world.juice.toast = Some((
                     if none {
-                        |s| s.puddle_none
+                        self.world.character.def().reflection
                     } else {
                         crate::journal::fur_name(n)
                     },
@@ -1533,7 +1477,7 @@ impl App {
             }
         }
         self.tally = now;
-        // 쌓은 통계는 주기 저장(`App::autosave`, 0264 — 0259의 "바뀐 뒤 10초"를 대신함)이 적는다.
+        // 쌓은 통계는 이벤트 저장(`App::save_progress`: 방 경계·일시정지·물건, 0265 — 0259의 "바뀐 뒤 10초"를 대신함)이 적는다.
         // 깃발(이야기)로 이루는 목표도 있으니 가끔은 그냥 센다.
         self.journal_check -= dt;
         if changed || self.journal_check <= 0.0 {

@@ -385,6 +385,26 @@ pub fn set_bindings(b: Bindings) {
     }
 }
 
+fn burrow_name(s: &crate::i18n::Strings) -> &'static str {
+    s.act_dodge
+}
+
+/// 회피 동작의 이름(0265): 지금 캐릭터의 회피(굴파기·깡충·뒤로 뛰기). 앱이 런을 시작할 때 캐릭터 표에서 넣는다 —
+/// 입력은 캐릭터를 모른다.
+static DODGE_NAME: RwLock<crate::i18n::Tr> = RwLock::new(burrow_name);
+
+pub fn set_dodge_name(t: crate::i18n::Tr) {
+    if let Ok(mut g) = DODGE_NAME.write() {
+        *g = t;
+    }
+}
+
+/// 지금 캐릭터의 회피 이름(조작 설정 줄도 이것).
+pub fn dodge_name() -> &'static str {
+    let t = DODGE_NAME.read().map(|g| *g).unwrap_or(burrow_name);
+    t(crate::i18n::s())
+}
+
 /// 화면 안내용 버튼 이름: 지금 쓰는 장치(키·패드·터치 버튼 글자)에 맞춰.
 pub fn prompt(a: Act) -> &'static str {
     let b = bindings();
@@ -396,7 +416,7 @@ pub fn prompt(a: Act) -> &'static str {
             let s = crate::i18n::s();
             match a {
                 Act::Attack => s.act_attack,
-                Act::Dodge => s.act_dodge,
+                Act::Dodge => dodge_name(),
                 Act::Special => s.act_special,
                 Act::UseItem => s.act_use_item,
                 Act::ItemPrev | Act::ItemNext => "◀▶",

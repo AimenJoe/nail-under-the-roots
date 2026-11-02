@@ -70,7 +70,8 @@ fn setting_group(i: usize) -> usize {
 /// 조작 설정의 줄: 동작들(input::ACTS) + 기본값 + 돌아가기.
 pub(super) const CONTROL_NAMES: [Tr; 7] = [
     |s| s.act_attack,
-    |s| s.act_dodge,
+    // 지금 캐릭터의 회피 이름(0265).
+    |_| crate::input::dodge_name(),
     |s| s.act_special,
     |s| s.act_use_item,
     |s| s.act_item_prev,

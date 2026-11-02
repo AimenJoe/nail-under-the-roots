@@ -1106,8 +1106,15 @@ pub fn kongi_meet(w: &World) -> Cutscene {
     Cutscene::new(actors, tainted_meet_steps(w, at, |s| s.mob_kongi, lines))
 }
 
-/// 콩이를 이겼다(0054): 맑은 눈으로 돌아와 이름을 말하고, 붙잡는 것만이 지키는 게 아니었다며 바위 발톱을 준다. 먼저 마을로 간다.
+/// 콩이를 이겼다(0054): 맑은 눈으로 돌아와 이름을 말하고, 붙잡는 것만이 지키는 게 아니었다며 선물을 준다. 먼저 마을로 간다.
+/// 선물은 이긴 캐릭터 본인의 무거운 무기(0265): Naïl 바위 발톱·모모 조약돌 덧신·도토 호두. 다른 캐릭터는 마을에서(`story::GIFTS`).
 pub fn kongi_returns(w: &World, at: Vec2) -> Cutscene {
+    use crate::equipment::Character;
+    let (gift_line, gift): (Tr, usize) = match w.character {
+        Character::Mole => (|s| s.kongi_b4, crate::equipment::STONE_CLAW),
+        Character::Momo => (|s| s.kongi_b4_momo, crate::equipment::PEBBLE),
+        Character::Doto => (|s| s.kongi_b4_doto, crate::equipment::WALNUT),
+    };
     let mut kongi = kongi_actor(at);
     kongi.visible = false;
     kongi.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
@@ -1138,11 +1145,11 @@ pub fn kongi_returns(w: &World, at: Vec2) -> Cutscene {
     steps.extend([
         Step::Narrate(|s| s.kongi_door),
         say(1, Face::Normal, |s| s.kongi_b3),
-        say(1, Face::Normal, |s| s.kongi_b4),
+        say(1, Face::Normal, gift_line),
     ]);
     steps.extend(cut_to(None));
     steps.extend([
-        Step::Give(crate::equipment::STONE_CLAW),
+        Step::Give(gift),
         say(0, Face::Happy, |s| s.kongi_b5),
         say(1, Face::Happy, |s| s.kongi_b6),
         Step::Move {
@@ -1514,6 +1521,37 @@ mod keeper_tests {
             },
         ));
         assert!(clover.iter().any(|(_, t)| *t == ko.clover_b3));
+    }
+
+    /// 콩이의 선물은 이긴 캐릭터 본인의 무기(0265): 바위 발톱·조약돌 덧신·호두. 예전엔 누가 이겨도 Naïl의 바위 발톱이었다.
+    #[test]
+    fn kongi_gives_the_winner_their_own_weapon() {
+        use crate::enemy::Kind;
+        use crate::equipment::WEAPONS;
+        use crate::world::BossBeaten;
+        for d in &crate::characters::ALL {
+            let mut w = World::new();
+            w.character = d.id;
+            w.player.kit = d.id;
+            let c = keeper_beaten(
+                Kind::Kongi,
+                &w,
+                BossBeaten {
+                    wins: 1,
+                    back: true,
+                },
+            );
+            let given: Vec<usize> = c
+                .steps
+                .iter()
+                .filter_map(|s| match s {
+                    Step::Give(i) => Some(*i),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(given.len(), 1, "{:?}", d.id);
+            assert_eq!(WEAPONS[given[0]].kind, d.weapon_kind, "{:?}", d.id);
+        }
     }
 
     /// 보리의 등장(0190): 빛은 한 번에 뛰지 않고 Naïl에서 보리로 건너간다 — 가운데쯤엔 둘 사이에 있다.

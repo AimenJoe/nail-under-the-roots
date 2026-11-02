@@ -5,10 +5,11 @@
 //! `once` 줄은 한 번 보면 기록(`line.<id>`)에 남아 다시 안 나온다. 맞는 줄이 없으면 아무 말도 안 한다.
 //! 지는 사람도 이야기를 보게 쓰러진 횟수도 조건으로 쓴다.
 
-use crate::cutscene::Speaker;
+use crate::cutscene::{Face, Speaker};
 use crate::equipment::Character;
 use crate::i18n::Tr;
 use crate::profile::{key, Profile};
+use crate::world::Who;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum When {
@@ -501,6 +502,150 @@ pub const LINES: &[Line] = &[
     },
 ];
 
+/// 이웃의 늘 하는 말(0265): 말 걸 때마다 차례로 셋. 듣는 캐릭터마다 줄이 다르면 캐릭터마다 한 줄씩 둔다 —
+/// 요령(무기·회피)이나 겪은 일을 말하는 줄은 그 캐릭터의 것으로(수수의 무기 바꾸기·콩이의 등딱지·Naïl의 배웅).
+/// 예전엔 `app/stage.rs`에 이웃마다 배열이 흩어져 있어, Naïl의 요령이 모모·도토에게도 나왔다.
+pub struct Chatter {
+    pub who: Who,
+    /// 누구에게(None = 누구에게나).
+    pub to: Option<Character>,
+    pub lines: [Tr; 3],
+    pub face: Face,
+}
+
+pub const CHATTER: &[Chatter] = &[
+    Chatter {
+        who: Who::Bori,
+        to: None,
+        lines: [|s| s.bori_1, |s| s.bori_2, |s| s.bori_3],
+        face: Face::Normal,
+    },
+    Chatter {
+        who: Who::Susu,
+        to: Some(Character::Mole),
+        lines: [|s| s.susu_v1, |s| s.susu_v2, |s| s.susu_v3],
+        face: Face::Happy,
+    },
+    Chatter {
+        who: Who::Susu,
+        to: Some(Character::Momo),
+        lines: [|s| s.susu_v1_momo, |s| s.susu_v2, |s| s.susu_v3],
+        face: Face::Happy,
+    },
+    Chatter {
+        who: Who::Susu,
+        to: Some(Character::Doto),
+        lines: [|s| s.susu_v1_doto, |s| s.susu_v2, |s| s.susu_v3],
+        face: Face::Happy,
+    },
+    Chatter {
+        who: Who::Kongi,
+        to: Some(Character::Mole),
+        lines: [|s| s.kongi_v1, |s| s.kongi_v2, |s| s.kongi_v3],
+        face: Face::Happy,
+    },
+    Chatter {
+        who: Who::Kongi,
+        to: Some(Character::Momo),
+        lines: [|s| s.kongi_v1, |s| s.kongi_v2_momo, |s| s.kongi_v3_momo],
+        face: Face::Happy,
+    },
+    Chatter {
+        who: Who::Kongi,
+        to: Some(Character::Doto),
+        lines: [|s| s.kongi_v1, |s| s.kongi_v2_doto, |s| s.kongi_v3_doto],
+        face: Face::Happy,
+    },
+    Chatter {
+        who: Who::Clover,
+        to: None,
+        lines: [|s| s.clover_v1, |s| s.clover_v2, |s| s.clover_v3],
+        face: Face::Happy,
+    },
+    Chatter {
+        who: Who::Doto,
+        to: None,
+        lines: [|s| s.doto_v1, |s| s.doto_v2, |s| s.doto_v3],
+        face: Face::Happy,
+    },
+    Chatter {
+        who: Who::Momo,
+        to: None,
+        lines: [|s| s.momo_v1, |s| s.momo_v2, |s| s.momo_v3],
+        face: Face::Happy,
+    },
+    // 마을에 남은 Naïl(0249): 다른 캐릭터로 걸을 때만 서 있다. 가운데 줄은 지금 걷는 이에게.
+    Chatter {
+        who: Who::Nail,
+        to: Some(Character::Momo),
+        lines: [|s| s.nail_v1, |s| s.nail_v_momo, |s| s.nail_v2],
+        face: Face::Happy,
+    },
+    Chatter {
+        who: Who::Nail,
+        to: Some(Character::Doto),
+        lines: [|s| s.nail_v1, |s| s.nail_v_doto, |s| s.nail_v2],
+        face: Face::Happy,
+    },
+];
+
+/// `who`가 `ch`에게 하는 늘 하는 말. 그 캐릭터의 줄이 먼저, 없으면 누구에게나 하는 줄.
+pub fn chatter(who: Who, ch: Character) -> Option<&'static Chatter> {
+    CHATTER
+        .iter()
+        .find(|c| c.who == who && c.to == Some(ch))
+        .or_else(|| CHATTER.iter().find(|c| c.who == who && c.to.is_none()))
+}
+
+/// 이웃이 지금 걷는 캐릭터 본인에게 주는 무기(0246 → 0265): 아직 없으면 말을 걸 때 한 번. 무기는 그 캐릭터 것만.
+/// 콩이는 길의 주인을 이긴 캐릭터에게 그 자리에서 주고(`cutscene::kongi_returns`), 다른 캐릭터는 마을에서 받는다.
+pub struct Gift {
+    pub who: Who,
+    pub to: Character,
+    pub weapon: usize,
+    pub line: Tr,
+}
+
+pub const GIFTS: &[Gift] = &[
+    Gift {
+        who: Who::Susu,
+        to: Character::Doto,
+        weapon: crate::equipment::WALNUT,
+        line: |s| s.susu_walnut,
+    },
+    Gift {
+        who: Who::Kongi,
+        to: Character::Momo,
+        weapon: crate::equipment::PEBBLE,
+        line: |s| s.kongi_pebble,
+    },
+    Gift {
+        who: Who::Kongi,
+        to: Character::Mole,
+        weapon: crate::equipment::STONE_CLAW,
+        line: |s| s.kongi_stone,
+    },
+];
+
+pub fn gift(who: Who, ch: Character) -> Option<&'static Gift> {
+    GIFTS.iter().find(|g| g.who == who && g.to == ch)
+}
+
+/// 이웃의 화자(대화창 이름·초상화).
+pub fn speaker(who: Who) -> Speaker {
+    match who {
+        Who::Popo => Speaker::Popo,
+        Who::Bori => Speaker::Bori,
+        Who::Halmae => Speaker::Halmae,
+        Who::Momo => Speaker::Momo,
+        Who::Doto => Speaker::Doto,
+        Who::Susu => Speaker::Susu,
+        Who::Kongi => Speaker::Kongi,
+        Who::Clover => Speaker::Clover,
+        Who::Nail => Speaker::NailHome,
+    }
+}
+
 /// 지금 할 한마디. `ch`는 지금 걷는 캐릭터(말을 듣는 이). 고른 `once` 줄은 기록에 남긴다(저장은 부른 쪽이).
 pub fn take(p: &mut Profile, when: When, ch: Character) -> Option<&'static Line> {
     let mut best: Option<&'static Line> = None;
@@ -623,6 +768,53 @@ mod tests {
             take(&mut p, When::TalkBori, Character::Mole).unwrap().id,
             "bori_t_momo"
         );
+    }
+
+    /// 이웃의 늘 하는 말·선물(0265): 표에 줄이 있는 이웃은 캐릭터 셋 모두에게 할 말이 있고(마을의 Naïl은 다른 캐릭터에게만),
+    /// 모모·도토가 듣는 줄에는 Naïl의 동사·무기(발톱·굴·솟구치기·두더지)가 없다. 선물은 받는 캐릭터 본인의 무기 종류.
+    #[test]
+    fn neighbor_talk_is_written_for_each_character() {
+        use crate::equipment::WEAPONS;
+        let ko = &crate::i18n::KO;
+        let naily = ["발톱", "굴로", "솟구", "두더지", "나일이"];
+        let neighbors: Vec<Who> = {
+            let mut v: Vec<Who> = CHATTER.iter().map(|c| c.who).collect();
+            v.dedup();
+            v
+        };
+        for who in neighbors {
+            for d in &crate::characters::ALL {
+                let ch = d.id;
+                if who == Who::Nail && ch == Character::Mole {
+                    continue;
+                }
+                let c =
+                    chatter(who, ch).unwrap_or_else(|| panic!("{who:?}이 {ch:?}에게 할 말이 없다"));
+                for l in c.lines {
+                    let t = l(ko);
+                    if ch != Character::Mole {
+                        assert!(
+                            !naily.iter().any(|w| t.contains(w)),
+                            "{who:?} → {ch:?}: Naïl의 말 {t}"
+                        );
+                    }
+                }
+            }
+        }
+        for g in GIFTS {
+            assert_eq!(
+                WEAPONS[g.weapon].kind,
+                g.to.def().weapon_kind,
+                "{:?}가 {:?}에게 남의 무기를 준다",
+                g.who,
+                g.to
+            );
+        }
+        // 콩이는 셋 모두에게(마을에서), 수수는 Naïl에게는 첫 만남 장면이 따로 있다.
+        for ch in [Character::Mole, Character::Momo] {
+            assert!(gift(Who::Kongi, ch).is_some());
+        }
+        assert!(gift(Who::Susu, Character::Doto).is_some());
     }
 
     /// 캐릭터로 가른 줄은 나일이 듣는 차례를 바꾸지 않는다: 캐릭터 조건은 구체성에 세지 않는다.

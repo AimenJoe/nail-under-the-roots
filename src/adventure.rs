@@ -131,6 +131,10 @@ pub enum AdvEvent {
     DeepSleep,
     /// 모모가 남긴 시든 꽃잎을 주웠다(0164): 기록에 남기고 도감 '???' 칸.
     PetalFound,
+    /// 굴에서 문이 열린 채 다른 방으로 넘어섰다(0265): 앱이 기록·이어하기를 적는다 — 지난 방에서 주운 것까지.
+    RoomEntered,
+    /// 싸움방을 비웠다(문이 열렸다, 0265): 앱이 기록·이어하기를 적는다(통계·처음 본 이웃·싸움 뒤 체력).
+    RoomCleared,
 }
 
 /// 확인 버튼으로 하는 일(쉼터).
@@ -1272,6 +1276,10 @@ impl World {
         };
         if at != self.adv.current_room && d.room(at).is_some() {
             self.adv.current_room = at;
+            // 저장 경계(0265): 잠긴 싸움 한가운데가 아니라 방과 방 사이.
+            if !self.room.doors_locked() {
+                self.adv.events.push(AdvEvent::RoomEntered);
+            }
         }
         let goal = d.goal;
         let named = d.boss;
@@ -1397,6 +1405,7 @@ impl World {
             self.room.set_doors_locked(false);
             self.adv.fight = None;
             room.cleared = true;
+            self.adv.events.push(AdvEvent::RoomCleared);
             hall_cleared = partner;
             bounty = room.bounty.take().map(|b| (b, room.interior()));
             self.juice.audio.play(sfx::Id::Emerge);
@@ -2151,6 +2160,52 @@ mod tests {
         w.dungeon_rooms();
         assert!(!w.room.doors_locked() && w.adv.fight.is_none());
         assert_eq!(w.loot.len(), seeds + t::BOUNTY_SEEDS as usize, "곁방 보상");
+    }
+
+    /// 저장 경계(0265): 방을 비우면 `RoomCleared`, 문이 열린 채 다른 방으로 넘어서면 `RoomEntered`. 잠긴 싸움 한가운데에서는
+    /// 아무것도 내지 않는다(앱이 싸움 중 체력을 이어하기에 적지 않게).
+    #[test]
+    fn room_boundaries_are_save_points() {
+        let mut w = World::field();
+        let at = rig_room(&mut w, Encounter::Clear);
+        w.adv.events.clear();
+        w.dungeon_rooms();
+        assert!(w.room.doors_locked());
+        assert!(
+            !w.adv.events.contains(&AdvEvent::RoomCleared)
+                && !w.adv.events.contains(&AdvEvent::RoomEntered),
+            "싸움이 시작될 때는 저장하지 않는다"
+        );
+        w.enemies.clear();
+        w.dungeon_rooms();
+        assert!(!w.room.doors_locked());
+        assert!(w.adv.events.contains(&AdvEvent::RoomCleared));
+        // 다른 방으로 넘어선다(문이 열려 있다).
+        w.adv.events.clear();
+        let other = w
+            .adv
+            .dungeon
+            .as_ref()
+            .unwrap()
+            .rooms
+            .iter()
+            .find(|r| r.at != at && !matches!(r.kind, RoomKind::Combat | RoomKind::Boss))
+            .map(|r| r.interior().center())
+            .expect("다른 방");
+        w.player.pos = other;
+        w.dungeon_rooms();
+        assert_eq!(
+            w.adv
+                .events
+                .iter()
+                .filter(|e| **e == AdvEvent::RoomEntered)
+                .count(),
+            1
+        );
+        // 같은 방에 머물면 더 내지 않는다.
+        w.adv.events.clear();
+        w.dungeon_rooms();
+        assert!(!w.adv.events.contains(&AdvEvent::RoomEntered));
     }
 
     /// 버티기(0257): 시간 동안 하나씩 솟고, 시간이 다 되면 남은 적은 흙에 묻혀 사라지며 방이 열린다.
