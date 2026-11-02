@@ -14,6 +14,7 @@ mod run;
 mod slots;
 mod stage;
 mod tree;
+mod village_menu;
 // 0169 R4: 장면별로 나눴다. 자식은 `use super::*`로 부모의 가져오기·App 필드를 함께 쓴다.
 mod album;
 #[cfg(feature = "dev")]
@@ -352,6 +353,8 @@ enum Hit {
     ShopItem(usize),
     /// 마을 가게 탭(0259).
     ShopTab(usize),
+    /// 마을 창 짐 −·+ 단추(짐 번호, ±1, 0269).
+    PackStep(usize, i8),
     /// 사기 전에 묻는 창의 단추.
     ShopYes,
     ShopNo,
@@ -497,6 +500,8 @@ pub struct App {
     decor_cursor: usize,
     /// 마을 가게 탭(0259): 0 꾸미기, 1 짐 꾸리기.
     decor_tab: usize,
+    /// 마을 창 목록의 창(0269).
+    village_view: crate::ui::ListView,
     /// 재주 창 커서(자리, 갈래).
     tree_cursor: (usize, usize),
     /// 일시정지 재주 탭의 고른 칸(줄, 칸, 0247).
@@ -654,6 +659,7 @@ impl App {
             after_cutscene: AfterCut::Game,
             decor_cursor: 0,
             decor_tab: 0,
+            village_view: Default::default(),
             tree_cursor: (0, 0),
             pause_tree_cursor: (0, 0),
             tree_char: Character::Mole,
@@ -1639,7 +1645,7 @@ impl App {
             Scene::Album => self.update_album(a, tap_hit, dt),
             Scene::Slots => self.update_slots(a, tap_hit),
             Scene::KnotPick => self.update_knot_pick(a, tap_hit),
-            Scene::Decor => self.update_decor(a, tap_hit, dt),
+            Scene::Decor => self.update_village_menu(a, tap_hit, dt),
             Scene::Tree => self.update_tree(a, tap_hit, dt),
             Scene::DreamPick => self.update_dream_pick(a, tap_hit, dt),
             Scene::CharPick => self.update_char_pick(a, tap_hit),
@@ -1703,7 +1709,7 @@ impl App {
             }
             Scene::Decor => {
                 ui.dim();
-                self.draw_decor(&ui);
+                self.draw_village_menu(&ui);
             }
             Scene::Tree => {
                 ui.dim();

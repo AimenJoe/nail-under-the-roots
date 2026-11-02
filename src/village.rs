@@ -38,35 +38,42 @@ pub fn parse() -> Parsed {
     map::parse(&ROWS)
 }
 
-/// 꾸미기 하나: 이름, 마을 씨앗 값.
+/// 꾸미기 하나: 이름, 한 줄 설명(마을 창 자세히 칸, 0269), 마을 씨앗 값.
 pub struct Decor {
     pub name: Tr,
+    pub desc: Tr,
     pub price: u32,
 }
 
 pub const DECOR: [Decor; 6] = [
     Decor {
         name: |s| s.decor_1,
+        desc: |s| s.decor_1_d,
         price: 5,
     },
     Decor {
         name: |s| s.decor_2,
+        desc: |s| s.decor_2_d,
         price: 8,
     },
     Decor {
         name: |s| s.decor_3,
+        desc: |s| s.decor_3_d,
         price: 8,
     },
     Decor {
         name: |s| s.decor_4,
+        desc: |s| s.decor_4_d,
         price: 6,
     },
     Decor {
         name: |s| s.decor_5,
+        desc: |s| s.decor_5_d,
         price: 10,
     },
     Decor {
         name: |s| s.decor_6,
+        desc: |s| s.decor_6_d,
         price: 12,
     },
 ];
@@ -130,6 +137,10 @@ pub fn key_pack(k: PackKind) -> &'static str {
 /// 6번 반딧불 병은 0269에서 지웠다(코드 그림이 주변 그림과 맞지 않았다) — 지도 자리 '7'도 없고 어디서도 주지 않는다.
 /// 번호는 기록 키(`decor.<i>`)라 줄은 자리만 남긴다(빼면 7·8번이 6·7번으로 밀린다).
 pub const JOURNAL_DECOR: [Tr; 3] = [|s| s.decor_7, |s| s.decor_8, |s| s.decor_9];
+/// 저널 꾸미기의 설명(6번 자리는 지운 병이라 비움).
+pub const JOURNAL_DECOR_DESC: [Tr; 3] = [|_| "", |s| s.decor_8_d, |s| s.decor_9_d];
+/// 마을 창에 보이는 저널 꾸미기 번호(지운 6번 병은 빼고, 0269).
+pub const JOURNAL_SHOWN: [usize; 2] = [7, 8];
 /// 꾸미기 전체 수(가게 + 저널).
 pub const DECOR_ALL: usize = DECOR.len() + JOURNAL_DECOR.len();
 

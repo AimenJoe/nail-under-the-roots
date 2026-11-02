@@ -35,6 +35,13 @@ use fx::*;
 pub use hud::*;
 pub use lights::*;
 use props::*;
+
+/// 마을 창 그림 하나(0269).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VillagePic {
+    Decor(usize),
+    Pack(crate::village::PackKind),
+}
 pub use shadow::*;
 use sorted::*;
 
@@ -915,6 +922,53 @@ impl Renderer {
         draw_deep_bar(ui, w, left_end);
         draw_fight_bar(ui, w, left_end);
         draw_hud_screen(w, ui.scale, ui.ox, ui.oy, gamepad_count);
+    }
+
+    /// 마을 창 그림(0269, 요구 2.5): 꾸미기·짐을 월드에서 그리는 그 함수 그대로 `r` 안에 `zoom`배로(그림 두 벌을 두지 않는다).
+    /// 바닥 발 줄은 `r` 아래쪽 4px 위. `glow`는 반딧불 등의 밝기 단계.
+    pub fn draw_village_pic(&self, ui: &Ui, pic: VillagePic, r: Rect, t: f32, zoom: f32, glow: u8) {
+        let o = ui.px(vec2(r.x, r.y));
+        let k = ui.scale * zoom;
+        let gl = unsafe { get_internal_gl() };
+        // 칸 밖으로 넘치지 않게 자른다(팩 그림·꽃밭은 칸보다 크다). 가위는 실제 화면 픽셀(dpi 배율) 기준.
+        let d = miniquad::window::dpi_scale();
+        gl.quad_gl.scissor(Some((
+            (o.x * d) as i32,
+            (o.y * d) as i32,
+            (r.w * ui.scale * d).ceil() as i32,
+            (r.h * ui.scale * d).ceil() as i32,
+        )));
+        gl.quad_gl
+            .push_model_matrix(Mat4::from_scale_rotation_translation(
+                vec3(k, k, 1.0),
+                Quat::IDENTITY,
+                vec3(o.x.round(), o.y.round(), 0.0),
+            ));
+        // 그림 좌표(게임 px): 칸 가운데 아래.
+        let foot = vec2(r.w / zoom / 2.0, r.h / zoom - 4.0);
+        match pic {
+            VillagePic::Decor(i) => match self.art.as_ref().and_then(|a| a.sunny.as_ref()) {
+                Some(sunny) if matches!(i, 0 | 2 | 3 | 7) => {
+                    draw_decor_sunny(sunny, i, foot - vec2(0.0, 4.0), t)
+                }
+                _ => draw_decor(i, foot - vec2(0.0, 4.0), t, glow),
+            },
+            VillagePic::Pack(crate::village::PackKind::Berry) => {
+                draw_berry(foot.x, foot.y - 5.0, 1.0, 1.0)
+            }
+            VillagePic::Pack(crate::village::PackKind::Worm) => {
+                actors::draw_worm(foot - vec2(0.0, 3.0), t * 6.0, 0.9)
+            }
+            VillagePic::Pack(crate::village::PackKind::Pouch) => {
+                for (dx, dy) in [(-3.0, 0.0), (3.0, 0.0), (0.0, -3.0)] {
+                    let l = loot::Loot::place(loot::LootKind::Seed, foot + vec2(dx, dy - 2.0));
+                    draw_loot(&l, 1.0, t, false);
+                }
+            }
+        }
+        let gl = unsafe { get_internal_gl() };
+        gl.quad_gl.pop_model_matrix();
+        gl.quad_gl.scissor(None);
     }
 
     /// 도감 그림(대장): chief.png 물든 대장 줄의 `frame`칸을 `r`에 몸 자리 맞춤으로.
