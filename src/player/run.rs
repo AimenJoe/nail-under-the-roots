@@ -81,7 +81,9 @@ impl Player {
     }
 
     fn start_jump(&mut self) {
-        let to = self.jump_lock().unwrap_or(self.facing * self.talents.jump_dist());
+        let to = self
+            .jump_lock()
+            .unwrap_or(self.facing * self.talents.jump_dist());
         self.attack_buf = 0.0;
         self.dodge_buf = 0.0;
         self.combo_timer = 0.0;

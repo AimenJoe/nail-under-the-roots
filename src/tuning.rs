@@ -851,7 +851,6 @@ pub const TREE_CHARGE: f32 = 0.8;
 pub const TREE_KI: f32 = 1.15;
 pub const TREE_SPEED: f32 = 1.06;
 pub const TREE_DODGE: f32 = 0.88;
-pub const TREE_BARGAIN: f32 = 0.85;
 /// 캐릭터마다 다른 덤(0260): Naïl 땅속 +초·솟구침 둘레 +px·땅울림 멈춤 +초·드릴 더 멀리 비율·받아치기 게이지(SP),
 /// 모모·도토 거리 +비율(깡충·멀리뛰기·뒤로 뛰기)·이어 뛰기 쿵 둘레 +px, 도토 달리기 +비율·묻은 도토리 둘레 +px·터지는 시간 배율.
 pub const TREE_DEEP_BREATH: f32 = 0.25;

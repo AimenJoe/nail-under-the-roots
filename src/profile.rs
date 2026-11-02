@@ -328,6 +328,11 @@ pub fn set_slot(i: usize) {
 pub fn load_slot(i: usize) -> Profile {
     store::read(i as u32 + 1)
         .and_then(|s| Profile::decode(&s))
+        .map(|mut p| {
+            // 옛 기록을 지금 꼴로(빈 슬롯은 건드리지 않는다 — 빈 칸으로 보여야 한다).
+            crate::talents::migrate(&mut p);
+            p
+        })
         .unwrap_or_default()
 }
 
@@ -469,6 +474,8 @@ mod tests {
         let mut p = Profile::default();
         p.set(key::BORI_BACK);
         p.add(key::RUNS, 4);
+        // 읽을 때 옛 기록을 지금 꼴로 옮긴다(0260 — 한 번 했다는 깃발이 붙는다).
+        crate::talents::migrate(&mut p);
         save(&p);
         assert_eq!(load(), p);
         let _ = std::fs::remove_dir_all(&dir);

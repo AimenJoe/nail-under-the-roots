@@ -204,6 +204,33 @@ pub fn all_awake_keys() -> Vec<String> {
 }
 pub const KEY_LIGHT: &str = "glowbugs_banked";
 
+/// 0260 옮기기: 받아치기·먹기 자리는 세 캐릭터가 같은 키(`talent.parry.*`·`talent.eat.*`)였다. 이제 모모·도토는 제 키.
+/// 이미 깨운 것은 그 캐릭터에 남는다(사장 "이미 깨운 재주는 캐릭터에 귀속") — 옛 키로 깬 것을 모모·도토의 같은 자리에도 깨워 두고,
+/// 고른 쪽도 옮긴다. Naïl은 옛 키 그대로. 기록을 읽을 때 한 번(`profile::load_slot`).
+pub fn migrate(p: &mut crate::profile::Profile) {
+    const DONE: &str = "mig.0260";
+    if p.flag(DONE) {
+        return;
+    }
+    for (old, news) in [
+        ("parry", ["momo_parry", "doto_parry"]),
+        ("eat", ["momo_eat", "doto_eat"]),
+    ] {
+        for new in news {
+            for side in ["a", "b"] {
+                if p.flag(&format!("talent.{old}.{side}")) {
+                    p.set(&format!("talent.{new}.{side}"));
+                }
+            }
+            let pick = p.count(&format!("talent_pick.{old}"));
+            if pick > 0 {
+                p.set_count(&format!("talent_pick.{new}"), pick);
+            }
+        }
+    }
+    p.set(DONE);
+}
+
 /// 이번 런에 낀 재주. 자리마다 0 = 없음, 1 = A, 2 = B. 자리 1·3은 `who`의 표(0142·0195).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Talents {
@@ -305,15 +332,16 @@ impl Talents {
     /// 회피 대기 배율. 모모는 깡충(A 멀리뛰기·B 발 구르기 모두 길어진다), 도토는 뒤로 뛰기(A 길게·B 짧게).
     pub fn burrow_cd_mul(self) -> f32 {
         let quick = Self::pow(t::TREE_DODGE, self.n(Boon::QuickHop) + self.n(Boon::Nimble));
-        quick * match (self.who, self.side(Slot::Burrow)) {
-            (Character::Mole, 1) => t::TAL_DEEP_CD,
-            (Character::Mole, 2) => t::TAL_SHALLOW_CD,
-            (Character::Momo, 1) => t::TAL_LEAP_CD,
-            (Character::Momo, 2) => t::TAL_STAMP_CD,
-            (Character::Doto, 1) => t::TAL_DROP_CD,
-            (Character::Doto, 2) => t::TAL_LIGHT_CD,
-            _ => 1.0,
-        }
+        quick
+            * match (self.who, self.side(Slot::Burrow)) {
+                (Character::Mole, 1) => t::TAL_DEEP_CD,
+                (Character::Mole, 2) => t::TAL_SHALLOW_CD,
+                (Character::Momo, 1) => t::TAL_LEAP_CD,
+                (Character::Momo, 2) => t::TAL_STAMP_CD,
+                (Character::Doto, 1) => t::TAL_DROP_CD,
+                (Character::Doto, 2) => t::TAL_LIGHT_CD,
+                _ => 1.0,
+            }
     }
     pub fn emerge_radius(self) -> f32 {
         let base = match self.mole(Slot::Burrow) {
@@ -914,7 +942,10 @@ pub fn plus_rank(ch: Character, branch: usize, depth: usize) -> usize {
     let Node::Plus(b) = nodes[depth] else {
         return 0;
     };
-    nodes[..depth].iter().filter(|n| **n == Node::Plus(b)).count()
+    nodes[..depth]
+        .iter()
+        .filter(|n| **n == Node::Plus(b))
+        .count()
 }
 
 // ---- 큰 나무 셈(0248 R28): 기록만 보고 계산하는 순수한 쪽. 앱은 그리기·입력만 ----------------
@@ -1133,7 +1164,7 @@ mod tests {
         let v = TreeView { p: &p, ch };
         let sig_cell = TreeView::cells(1)
             .iter()
-            .position(|&(d, _)| BRANCHES[1].1[d] == Node::Sig)
+            .position(|&(d, _)| NAIL_TREE[1].1[d] == Node::Sig)
             .unwrap();
         let (n, cost) = v.path(1, sig_cell);
         // 고르기 깊이 하나(싼 쪽) + 덤 다섯 + 고유 재주 = 일곱 칸.
@@ -1194,7 +1225,7 @@ mod tests {
     /// 고유 재주(0247): 세 캐릭터 모두 같은 칸 자리(가지 갈래 하나), 내용만 다르다. 깨우기 전엔 아무것도 없다.
     #[test]
     fn signature_is_one_cell_per_character_with_its_own_effect() {
-        let sig_cells: Vec<(usize, usize)> = BRANCHES
+        let sig_cells: Vec<(usize, usize)> = NAIL_TREE
             .iter()
             .enumerate()
             .flat_map(|(b, (_, nodes))| {
@@ -1331,54 +1362,168 @@ mod tests {
         assert_eq!(key_awake(Character::Momo, Slot::Burrow, 0), "talent.hop.a");
         assert_eq!(key_pick(Character::Momo, Slot::Drill), "talent_pick.chain");
         // 패링·먹기는 함께.
-        assert_eq!(key_pick(Character::Momo, Slot::Parry), "talent_pick.parry");
+        // 받아치기·먹기도 캐릭터마다(0260, 옛 키는 Naïl이 그대로).
+        assert_eq!(
+            key_pick(Character::Momo, Slot::Parry),
+            "talent_pick.momo_parry"
+        );
+        assert_eq!(
+            key_awake(Character::Doto, Slot::Eat, 0),
+            "talent.doto_eat.a"
+        );
         assert_eq!(key_awake(Character::Doto, Slot::Burrow, 1), "talent.leap.b");
         assert_eq!(key_pick(Character::Doto, Slot::Drill), "talent_pick.bury");
-        assert_eq!(all_awake_keys().len(), 16 + 3 * 20);
+        assert_eq!(all_awake_keys().len(), 3 * 8 + 3 * 20);
         assert_eq!(key_plus(Character::Doto, 2, 7), "tree.Doto.2.7");
     }
 
-    /// 큰 나무(0246): 갈래 셋 × 깊이 여덟, 옛 고르기 자리 넷이 한 번씩, 덤 값은 깊을수록 오른다.
+    /// 큰 나무(0246 → 0260): 캐릭터마다 갈래 셋 × 깊이 여덟, 고르기 자리 넷이 한 번씩, 고르기·고유 재주 칸 자리는 세 나무가 같다
+    /// (칸 모양 하나). 덤은 캐릭터마다 제 것 — 한 덤이 두 캐릭터의 나무에 나오지 않는다. 덤 값은 깊을수록 오른다.
     #[test]
-    fn three_branches_eight_deep_keep_the_old_picks() {
-        for (_, nodes) in BRANCHES.iter() {
-            assert_eq!(nodes.len(), DEPTH);
-            assert!(
-                matches!(nodes[0], Node::Pick(_)),
-                "갈래 첫 칸은 고르기(옛 깨움이 바로 이어진다)"
-            );
+    fn each_character_has_its_own_tree_of_the_same_shape() {
+        let chars = [Character::Mole, Character::Momo, Character::Doto];
+        for ch in chars {
+            for (b, (_, nodes)) in tree(ch).iter().enumerate() {
+                assert!(matches!(nodes[0], Node::Pick(_)), "갈래 첫 칸은 고르기");
+                for (d, n) in nodes.iter().enumerate() {
+                    let shape = NAIL_TREE[b].1[d];
+                    assert_eq!(
+                        std::mem::discriminant(n),
+                        std::mem::discriminant(&shape),
+                        "{ch:?} {b} {d}: 칸 모양이 같다"
+                    );
+                    if let (Node::Pick(x), Node::Pick(y)) = (n, shape) {
+                        assert_eq!(*x, y);
+                    }
+                }
+            }
+            for slot in SLOTS {
+                let n = tree(ch)
+                    .iter()
+                    .flat_map(|(_, nodes)| nodes.iter())
+                    .filter(|n| **n == Node::Pick(slot))
+                    .count();
+                assert_eq!(n, 1, "{ch:?} {slot:?}");
+            }
         }
-        for slot in SLOTS {
-            let n = BRANCHES
+        // 덤은 한 캐릭터만.
+        for b in BOONS {
+            let owners = chars
                 .iter()
-                .flat_map(|(_, nodes)| nodes.iter())
-                .filter(|n| **n == Node::Pick(slot))
+                .filter(|&&ch| {
+                    tree(ch)
+                        .iter()
+                        .any(|(_, nodes)| nodes.contains(&Node::Plus(b)))
+                })
                 .count();
-            assert_eq!(n, 1, "{slot:?}");
+            assert_eq!(owners, 1, "{b:?}");
+        }
+        // 고르기 표도 캐릭터마다(받아치기·먹기까지 이름이 다르다).
+        for slot in SLOTS {
+            let names: Vec<String> = chars
+                .iter()
+                .map(|&ch| (table(ch)[slot.index()].0)(crate::i18n::Lang::Ko.strings()).to_string())
+                .collect();
+            assert!(
+                names
+                    .iter()
+                    .enumerate()
+                    .all(|(i, n)| !names[..i].contains(n)),
+                "{slot:?} {names:?}"
+            );
         }
         for d in 2..DEPTH {
             assert!(plus_cost(d) > plus_cost(d - 1));
         }
-        assert_eq!(plus_rank(0, 4), 1, "뿌리의 둘째 질긴 가죽 = II");
-        assert_eq!(plus_rank(0, 7), 2);
+        assert_eq!(
+            plus_rank(Character::Mole, 0, 4),
+            1,
+            "뿌리의 둘째 깊은 숨 = II"
+        );
     }
 
-    /// 깨운 덤은 `Mods`로 모인다: 체력은 더하기, 배율은 곱.
+    /// 0260 옮기기: 옛 받아치기·먹기 키로 깬 것은 모모·도토의 같은 자리에도 남고, 고른 쪽도 옮긴다. 한 번만.
     #[test]
-    fn boons_add_up_into_mods() {
+    fn shared_parry_and_eat_keys_move_to_each_character() {
+        let mut p = crate::profile::Profile::default();
+        p.set("talent.parry.b");
+        p.set_count("talent_pick.parry", 2);
+        p.set("talent.eat.a");
+        migrate(&mut p);
+        for ch in [Character::Momo, Character::Doto] {
+            assert!(p.flag(&key_awake(ch, Slot::Parry, 1)));
+            assert_eq!(p.count(&key_pick(ch, Slot::Parry)), 2);
+            assert!(p.flag(&key_awake(ch, Slot::Eat, 0)));
+        }
+        assert!(
+            p.flag(&key_awake(Character::Mole, Slot::Parry, 1)),
+            "Naïl은 옛 키"
+        );
+        // 옮긴 뒤 Naïl이 새로 깬 것은 다른 캐릭터에 번지지 않는다.
+        p.set("talent.eat.b");
+        migrate(&mut p);
+        assert!(!p.flag(&key_awake(Character::Momo, Slot::Eat, 1)));
+    }
+
+    /// 깨운 덤은 `Mods`(모두 곱·더하기)와 캐릭터 동작 수치로 간다.
+    #[test]
+    fn boons_reach_mods_and_kit_numbers() {
         let mut k = Talents::default();
         assert_eq!(
             crate::equipment::Stats::compute(&[], 0, &k.mods()),
             crate::equipment::Stats::BASE
         );
-        k.boons[Boon::Hp.index()] = 3;
         k.boons[Boon::Haste.index()] = 2;
-        k.boons[Boon::Charm.index()] = 1;
+        k.boons[Boon::Edge.index()] = 1;
         let m = k.mods();
-        assert_eq!(m.max_hp, 3);
         assert!((m.attack_speed - t::TREE_HASTE * t::TREE_HASTE).abs() < 1e-5);
-        let st = crate::equipment::Stats::compute(&[], 0, &m);
-        assert_eq!(st.charm_slots(), crate::equipment::CHARM_SLOTS + 1);
-        assert_eq!(st.max_hp, t::PLAYER_HP + 3);
+        assert_eq!(m.damage, 1);
+        let mut n = Talents::default();
+        n.boons[Boon::DeepBreath.index()] = 2;
+        n.boons[Boon::Quake.index()] = 1;
+        n.boons[Boon::DrillEdge.index()] = 1;
+        assert!((n.burrow_time() - (t::BURROW_MAX_TIME + 2.0 * t::TREE_DEEP_BREATH)).abs() < 1e-5);
+        assert!(n.emerge_radius() > t::EMERGE_RADIUS && n.drill_damage_add() == 1);
+        let mut m2 = Talents {
+            who: Character::Momo,
+            ..Talents::default()
+        };
+        m2.boons[Boon::ExtraHop.index()] = 1;
+        m2.boons[Boon::Spring.index()] = 1;
+        assert_eq!(m2.chain_hops(), t::CHAIN_HOPS + 1);
+        assert!(m2.jump_dist() > t::JUMP_DIST);
+        let mut d = Talents {
+            who: Character::Doto,
+            ..Talents::default()
+        };
+        d.boons[Boon::Cache.index()] = 2;
+        d.boons[Boon::Fuse.index()] = 1;
+        d.boons[Boon::BigNut.index()] = 1;
+        assert_eq!(d.bury_count(), t::BURY_COUNT + 2);
+        assert!(d.bury_fuse() < t::BURY_FUSE && d.heavy_damage_add() == 2);
+    }
+
+    /// 받아치기·먹기 고르기(0260): 모모·도토 것은 제 캐릭터에만, Naïl의 옛 수치는 다른 캐릭터가 먹지 않는다.
+    #[test]
+    fn parry_and_eat_picks_are_per_character() {
+        assert!(momo(Slot::Parry, 1).parry_rewinds_dodge());
+        assert!(momo(Slot::Parry, 2).parry_stun_mul() > 1.0);
+        assert_eq!(
+            momo(Slot::Parry, 2).parry_counter(),
+            0,
+            "Naïl 되받아치기 아님"
+        );
+        assert!(doto(Slot::Parry, 1).parry_toss());
+        assert!(doto(Slot::Parry, 2).parry_window_mul() > 1.0);
+        assert!(momo(Slot::Eat, 1).eat_rewinds_dodge());
+        assert!(momo(Slot::Eat, 2).eat_hidden() && momo(Slot::Eat, 2).eat_time_mul() > 1.0);
+        assert!(doto(Slot::Eat, 1).eat_ki() > 0.0);
+        assert!(doto(Slot::Eat, 2).eat_spit());
+        assert_eq!(
+            doto(Slot::Eat, 1).berry_heal(),
+            t::BERRY_HEAL,
+            "Naïl 꼭꼭 씹기 아님"
+        );
+        assert!(!with(Slot::Parry, 1).parry_rewinds_dodge() && !with(Slot::Eat, 2).eat_spit());
     }
 }
