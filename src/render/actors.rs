@@ -1557,7 +1557,7 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
             );
         }
     }
-    // 실 그림자(0260): 보랏빛 반투명, 풀리기 전에 옅어진다.
+    // 실 그림자(0263): 보랏빛 반투명, 풀리기 전에 옅어진다.
     if e.shade > 0.0 {
         let fade = (e.shade / 0.8).min(1.0);
         tint = Color::new(tint.r * 0.80, tint.g * 0.70, tint.b, 0.62 * fade);

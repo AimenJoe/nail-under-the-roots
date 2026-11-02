@@ -222,9 +222,9 @@ pub struct Pull {
     pub dir: Vec2,
     pub len: f32,
     pub time: f32,
-    /// 부채꼴 세 가닥(0260, 매듭 하나를 끊은 뒤).
+    /// 부채꼴 세 가닥(0263, 매듭 하나를 끊은 뒤).
     pub fan: bool,
-    /// 마지막 굵은 실(0260): 셋째 매듭 뒤, 받아쳐야 풀린다.
+    /// 마지막 굵은 실(0263): 셋째 매듭 뒤, 받아쳐야 풀린다.
     pub big: bool,
     /// 뻗는 틱에 판정을 한 번만.
     pub judged: bool,
@@ -264,7 +264,7 @@ impl Pull {
     }
 }
 
-/// 둘째 매듭 뒤 할매 둘레를 도는 실(0260): 한쪽 끝은 할매, 바늘처럼 반 바퀴를 쓴다.
+/// 둘째 매듭 뒤 할매 둘레를 도는 실(0263): 한쪽 끝은 할매, 바늘처럼 반 바퀴를 쓴다.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Sweep {
     /// 시작 각(라디안)과 도는 쪽(+1/-1).
@@ -286,7 +286,7 @@ impl Sweep {
 }
 
 /// 가장 깊은 곳(0162): 할매는 때릴 수 없고, 매듭 셋을 끊으면 놓아준다. 세 번 감기면 실에 잠긴다(쉼터로).
-/// 0260(사장 "마지막 누룩할매 전투는 좀 밍밍해"): 매듭마다 단계가 바뀐다 — 첫 매듭 뒤 부채꼴 세 가닥 + 바닥 실 그물 +
+/// 0263(사장 "마지막 누룩할매 전투는 좀 밍밍해"): 매듭마다 단계가 바뀐다 — 첫 매듭 뒤 부채꼴 세 가닥 + 바닥 실 그물 +
 /// 길의 주인(도토)의 실 그림자, 둘째 매듭 뒤 둘레를 쓰는 실 + 어둠 + 콩이의 그림자, 셋째 매듭 뒤 가장 굵은 실 하나 —
 /// 받아쳐야 풀린다.
 #[derive(Debug, Clone, PartialEq)]
@@ -307,10 +307,10 @@ pub struct Deep {
     hinted: bool,
     /// 방금 당기기가 2단계의 둘째(곧바로 오는) 당기기로 예약됐다(0233).
     echo: bool,
-    /// 둘레를 쓰는 실(0260, 둘째 매듭 뒤).
+    /// 둘레를 쓰는 실(0263, 둘째 매듭 뒤).
     pub sweep: Option<Sweep>,
     next_sweep: f32,
-    /// 셋 다 끊었다 — 마지막 굵은 실을 받아쳐야 풀린다(0260).
+    /// 셋 다 끊었다 — 마지막 굵은 실을 받아쳐야 풀린다(0263).
     pub last_thread: bool,
 }
 
@@ -2550,7 +2550,7 @@ impl World {
 
     /// 쓰러진 적이 떨어뜨린다: 반딧불 몇 마리 + 확률로 산딸기(loot::berry_chance).
     fn drop_loot(&mut self, pos: Vec2, kind: Kind) {
-        // 꿈(0055)과 가장 깊은 곳의 실 그림자(0260)는 아무것도 떨어뜨리지 않는다.
+        // 꿈(0055)과 가장 깊은 곳의 실 그림자(0263)는 아무것도 떨어뜨리지 않는다.
         if self.dream || self.deep.is_some() {
             return;
         }
@@ -3116,7 +3116,7 @@ impl World {
             }
             return;
         }
-        // 둘째 매듭 뒤(0260): 어둠이 내려앉고(Naïl 둘레만 밝다), 실이 할매 둘레를 쓴다.
+        // 둘째 매듭 뒤(0263): 어둠이 내려앉고(Naïl 둘레만 밝다), 실이 할매 둘레를 쓴다.
         let phase = d.cut_count();
         if phase >= 2 && !d.last_thread {
             self.juice.gloom.amount = (self.juice.gloom.amount + dt * 0.25).min(t::DEEP_GLOOM);
@@ -3224,7 +3224,7 @@ impl World {
                         self.juice.fx.push(ring(pp, 4.0, 18.0, 0.2, WHITE));
                         unravel(&mut self.juice.fx, pp + from * 8.0, 10.0);
                         if p.big {
-                            // 마지막 굵은 실을 받아쳤다(0260 D): 다 풀린다.
+                            // 마지막 굵은 실을 받아쳤다(0263 D): 다 풀린다.
                             d.done_t = Some(0.0);
                             d.pull = None;
                             self.juice.gloom.amount = 0.0;
@@ -3289,7 +3289,7 @@ impl World {
         self.tick_shades(dt);
     }
 
-    /// 길의 주인의 실 그림자(0260 B): 정해진 시간이 지나면 풀려 사라진다(떨어뜨리는 것 없음).
+    /// 길의 주인의 실 그림자(0263 B): 정해진 시간이 지나면 풀려 사라진다(떨어뜨리는 것 없음).
     fn tick_shades(&mut self, dt: f32) {
         for e in self.enemies.iter_mut().filter(|e| e.shade > 0.0) {
             e.shade -= dt;
@@ -3301,7 +3301,7 @@ impl World {
         }
     }
 
-    /// 매듭이 끊길 때 할매가 붙잡고 있던 길의 주인이 실 그림자로 한 번 나온다(0260 B): 첫 매듭 = 도토, 둘째 = 콩이.
+    /// 매듭이 끊길 때 할매가 붙잡고 있던 길의 주인이 실 그림자로 한 번 나온다(0263 B): 첫 매듭 = 도토, 둘째 = 콩이.
     /// 때릴 수 있고(체력 적음), `DEEP_SHADE_TIME` 뒤엔 저절로 풀린다. 첫 매듭엔 바닥에 실 그물도 떨어진다.
     fn deep_phase_up(&mut self, n: usize, at: Vec2) {
         let kind = match n {
@@ -3446,7 +3446,7 @@ impl World {
                 3.5,
             ));
             if d.all_cut() {
-                // 마지막 굵은 실(0260 D): 바로 풀리지 않는다 — 할매가 마지막 한 가닥을 당기고, 받아쳐야 풀린다.
+                // 마지막 굵은 실(0263 D): 바로 풀리지 않는다 — 할매가 마지막 한 가닥을 당기고, 받아쳐야 풀린다.
                 d.last_thread = true;
                 d.pull = None;
                 d.sweep = None;
@@ -4255,7 +4255,7 @@ mod tests {
             }
         }
         assert!(w.deep.as_ref().unwrap().all_cut());
-        // 0260: 매듭 둘을 끊는 동안 길의 주인 그림자(도토·콩이)가 나왔다 — 떨어뜨리는 것 없이 시간이 되면 풀린다.
+        // 0263: 매듭 둘을 끊는 동안 길의 주인 그림자(도토·콩이)가 나왔다 — 떨어뜨리는 것 없이 시간이 되면 풀린다.
         let shades: Vec<Kind> = w
             .enemies
             .iter()
@@ -4264,7 +4264,7 @@ mod tests {
             .collect();
         assert_eq!(shades, vec![Kind::Doto, Kind::Kongi]);
         assert!(!w.room.webs.is_empty(), "첫 매듭 뒤 바닥에 실 그물");
-        // 셋째 매듭 뒤에는 바로 풀리지 않는다: 가장 굵은 실을 받아쳐야(0260 D).
+        // 셋째 매듭 뒤에는 바로 풀리지 않는다: 가장 굵은 실을 받아쳐야(0263 D).
         assert!(w.deep.as_ref().unwrap().last_thread);
         for _ in 0..((t::DEEP_DONE_DELAY / t::TICK_DT) as usize + 2) {
             w.deep_tick(t::TICK_DT);

@@ -37,7 +37,7 @@ impl Player {
         self.state = State::Attack { idx, time, dir };
 
         if self.special_ready() && time >= hit.dodge_cancel_after {
-            // 필살기도 회피처럼 후딜레이를 끊는다(0260, 사장 "땅파기로 캔슬되듯이"): 같은 캔슬 자리, 눌러 둔 것도 받는다.
+            // 필살기도 회피처럼 후딜레이를 끊는다(0263, 사장 "땅파기로 캔슬되듯이"): 같은 캔슬 자리, 눌러 둔 것도 받는다.
             self.start_special(move_dir);
         } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
             // 굴파기(깡충) 캔슬: 후딜레이를 끊고 다음 콤보로 섞는다.

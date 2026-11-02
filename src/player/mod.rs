@@ -228,9 +228,9 @@ pub struct Player {
     pub armed: bool,
     attack_buf: f32,
     dodge_buf: f32,
-    /// 특기 누름 버퍼(0260): 후딜레이 캔슬을 회피처럼 — 활성 구간 중에 눌러도 캔슬 자리가 오면 나간다.
+    /// 특기 누름 버퍼(0263): 후딜레이 캔슬을 회피처럼 — 활성 구간 중에 눌러도 캔슬 자리가 오면 나간다.
     special_buf: f32,
-    /// 다음 틱에 도토리를 던진다(도토 되던지기 0260 — 받아치기는 월드가 틱 뒤에 알려 준다).
+    /// 다음 틱에 도토리를 던진다(도토 되던지기 0263 — 받아치기는 월드가 틱 뒤에 알려 준다).
     toss_next: bool,
     item_buf: f32,
     /// 다음 패링 창이 열릴 수 있기까지. 지금 스윙에 창이 있나는 `parry_open`.
@@ -408,7 +408,7 @@ impl Player {
         4.0 * h * k * (1.0 - k)
     }
 
-    /// 특기를 낼 수 있게 눌러 뒀다(0260: 버퍼 — 회피 캔슬과 같은 꼴).
+    /// 특기를 낼 수 있게 눌러 뒀다(0263: 버퍼 — 회피 캔슬과 같은 꼴).
     pub(super) fn special_ready(&self) -> bool {
         self.special_buf > 0.0 && self.armed && self.sp_full()
     }
@@ -488,7 +488,7 @@ impl Player {
     pub fn on_parry(&mut self) {
         self.sp = (self.sp + self.talents.parry_sp()).min(t::SP_MAX);
         self.parry_cd = 0.0;
-        // 모모 깡충 되감기·도토 되던지기(0260).
+        // 모모 깡충 되감기·도토 되던지기(0263).
         if self.talents.parry_rewinds_dodge() {
             self.burrow_cd = 0.0;
         }
@@ -782,7 +782,7 @@ impl Player {
         } else if time >= item.eat_time() * self.talents.eat_time_mul() {
             self.events.push(Event::Ate(item));
             self.state = State::Free;
-            // 캐릭터마다 다른 먹기(0260): 모모 먹고 깡충, 도토 까먹기·씨 뱉기.
+            // 캐릭터마다 다른 먹기(0263): 모모 먹고 깡충, 도토 까먹기·씨 뱉기.
             if self.talents.eat_rewinds_dodge() {
                 self.burrow_cd = 0.0;
             }
@@ -1061,7 +1061,7 @@ mod tests {
         assert_eq!(p.state, State::Free);
     }
 
-    /// 필살기 캔슬(0260): 땅파기처럼 휘두른 뒤 캔슬 자리부터 후딜레이를 끊고, 활성 구간 중에 눌러 둔 것도 받는다.
+    /// 필살기 캔슬(0263): 땅파기처럼 휘두른 뒤 캔슬 자리부터 후딜레이를 끊고, 활성 구간 중에 눌러 둔 것도 받는다.
     #[test]
     fn special_cancels_the_recovery_like_burrow() {
         let room = Room::new();

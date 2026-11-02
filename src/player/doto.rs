@@ -32,7 +32,7 @@ pub enum Spawn {
 
 impl Player {
     /// 던지는 타의 활성 구간 첫 틱에 탄을 낸다(평타·강타 공통). `strike`는 그 타의 근접 수치(피해·멈춤·박자 덤).
-    /// 도토의 재주가 던지는 작은 도토리(0260 되던지기·씨 뱉기): 바라보는 쪽 부채꼴로 `n`개, 첫 타의 피해.
+    /// 도토의 재주가 던지는 작은 도토리(0263 되던지기·씨 뱉기): 바라보는 쪽 부채꼴로 `n`개, 첫 타의 피해.
     pub(super) fn snack_toss(&mut self, n: u8) {
         let dir = self.facing.normalize_or(vec2(1.0, 0.0));
         self.swing_id += 1;

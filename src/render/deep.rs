@@ -50,7 +50,7 @@ pub(super) fn draw_deep(art: &Art, d: &world::Deep, w: &World, alpha: f32) {
             }
         }
     }
-    // 둘레를 쓰는 실(0260): 할매에서 뻗어 반 바퀴를 쓴다.
+    // 둘레를 쓰는 실(0263): 할매에서 뻗어 반 바퀴를 쓴다.
     if let Some(sw) = d.sweep.filter(|s| s.active()) {
         let dir = Vec2::from_angle(sw.angle());
         draw_thread(c, c + dir * t::DEEP_PULL_REACH, t * 4.0, 1.0);

@@ -92,7 +92,7 @@ pub const DEEP_WRAP_TIME: f32 = 1.3;
 pub const DEEP_WRAPS: u32 = 3;
 /// 셋 다 끊은 뒤 엔딩까지: 놓아주기 이펙트(0163, 실이 풀리고 흰 꽃잎, 빛이 커진다)를 본다.
 pub const DEEP_DONE_DELAY: f32 = 3.4;
-/// 단계(0260): 첫 매듭 뒤 부채꼴 세 가닥의 벌어짐(라디안)·바닥 실 그물 수.
+/// 단계(0263): 첫 매듭 뒤 부채꼴 세 가닥의 벌어짐(라디안)·바닥 실 그물 수.
 pub const DEEP_FAN_SPREAD: f32 = 0.32;
 pub const DEEP_WEBS: usize = 4;
 /// 둘째 매듭 뒤: 둘레를 쓰는 실(사이·예고·반 바퀴 시간), 어둠(덮는 정도·Naïl 둘레 빛 반지름).
@@ -101,10 +101,10 @@ pub const DEEP_SWEEP_WINDUP: f32 = 1.0;
 pub const DEEP_SWEEP_TIME: f32 = 2.0;
 pub const DEEP_GLOOM: f32 = 0.45;
 pub const DEEP_GLOOM_RADIUS: f32 = 70.0;
-/// 길의 주인의 실 그림자(0260 B): 남는 시간·체력.
+/// 길의 주인의 실 그림자(0263 B): 남는 시간·체력.
 pub const DEEP_SHADE_TIME: f32 = 9.0;
 pub const DEEP_SHADE_HP: i32 = 6;
-/// 마지막 굵은 실(0260 D): 셋째 매듭 뒤 첫 당기기까지, 예고(길게), 반폭, 못 받아쳤을 때 다음까지.
+/// 마지막 굵은 실(0263 D): 셋째 매듭 뒤 첫 당기기까지, 예고(길게), 반폭, 못 받아쳤을 때 다음까지.
 pub const DEEP_FINAL_DELAY: f32 = 1.2;
 pub const DEEP_FINAL_WINDUP: f32 = 1.3;
 pub const DEEP_FINAL_W: f32 = 9.0;
@@ -854,7 +854,7 @@ pub const TREE_CHARGE: f32 = 0.8;
 pub const TREE_KI: f32 = 1.15;
 pub const TREE_SPEED: f32 = 1.06;
 pub const TREE_DODGE: f32 = 0.88;
-/// 캐릭터마다 다른 덤(0260): Naïl 땅속 +초·솟구침 둘레 +px·땅울림 멈춤 +초·드릴 더 멀리 비율·받아치기 게이지(SP),
+/// 캐릭터마다 다른 덤(0263): Naïl 땅속 +초·솟구침 둘레 +px·땅울림 멈춤 +초·드릴 더 멀리 비율·받아치기 게이지(SP),
 /// 모모·도토 거리 +비율(깡충·멀리뛰기·뒤로 뛰기)·이어 뛰기 쿵 둘레 +px, 도토 달리기 +비율·묻은 도토리 둘레 +px·터지는 시간 배율.
 pub const TREE_DEEP_BREATH: f32 = 0.25;
 pub const TREE_QUAKE: f32 = 5.0;
@@ -866,13 +866,13 @@ pub const TREE_STOMP: f32 = 4.0;
 pub const TREE_SCAMPER: f32 = 0.08;
 pub const TREE_BLAST: f32 = 4.0;
 pub const TREE_FUSE: f32 = 0.85;
-/// 캐릭터마다 다른 받아치기·먹기 고르기(0260): 모모 넘어뜨리기 멈춤 배율, 도토 다람쥐 눈 창 배율,
+/// 캐릭터마다 다른 받아치기·먹기 고르기(0263): 모모 넘어뜨리기 멈춤 배율, 도토 다람쥐 눈 창 배율,
 /// 모모 풀잎 숨기 먹는 시간 배율, 도토 까먹기 게이지(SP 비율).
 pub const TAL_TRIP_STUN: f32 = 1.6;
 pub const TAL_SQUIRREL_EYE: f32 = 1.4;
 pub const TAL_HIDE_EAT_TIME: f32 = 1.3;
 pub const TAL_SNACK_KI: f32 = 0.25;
-/// 도토 되던지기·씨 뱉기(0260): 도토리 수, 부채 벌어짐(라디안), 닿는 거리.
+/// 도토 되던지기·씨 뱉기(0263): 도토리 수, 부채 벌어짐(라디안), 닿는 거리.
 pub const TAL_TOSS_COUNT: u8 = 2;
 pub const TAL_SPIT_COUNT: u8 = 3;
 pub const TAL_TOSS_SPREAD: f32 = 0.3;

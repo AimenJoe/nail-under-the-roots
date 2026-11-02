@@ -686,13 +686,13 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
             .filter(|p| p.time < p.windup())
             .map(|p| (d.center, p))
     }) {
-        // 부채꼴이면 세 가닥, 마지막 굵은 실은 넓은 띠(0260).
+        // 부채꼴이면 세 가닥, 마지막 굵은 실은 넓은 띠(0263).
         let k = crate::enemy::tele_progress(p.time, p.windup());
         for dir in p.dirs() {
             draw_tele_lane(c, c + dir * p.len, if p.big { 5.0 } else { 2.5 }, k);
         }
     }
-    // 둘레를 쓰는 실(0260): 예고 동안 시작 자리에 띠 + 쓸어 갈 쪽으로 옅은 부채.
+    // 둘레를 쓰는 실(0263): 예고 동안 시작 자리에 띠 + 쓸어 갈 쪽으로 옅은 부채.
     if let Some((c, sw)) = w
         .deep
         .as_ref()

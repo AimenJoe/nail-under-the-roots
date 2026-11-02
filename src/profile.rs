@@ -474,7 +474,7 @@ mod tests {
         let mut p = Profile::default();
         p.set(key::BORI_BACK);
         p.add(key::RUNS, 4);
-        // 읽을 때 옛 기록을 지금 꼴로 옮긴다(0260 — 한 번 했다는 깃발이 붙는다).
+        // 읽을 때 옛 기록을 지금 꼴로 옮긴다(0263 — 한 번 했다는 깃발이 붙는다).
         crate::talents::migrate(&mut p);
         save(&p);
         assert_eq!(load(), p);

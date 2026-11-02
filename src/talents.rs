@@ -41,7 +41,7 @@ const fn talent(name: Tr, desc: Tr, cost: u32) -> Talent {
     }
 }
 
-/// 자리 2·4(받아치기·먹기)도 캐릭터마다 따로(0260, 사장 "각자 어울리는 재주 셋으로 서로 공유하지 않아야") — 전에는
+/// 자리 2·4(받아치기·먹기)도 캐릭터마다 따로(0263, 사장 "각자 어울리는 재주 셋으로 서로 공유하지 않아야") — 전에는
 /// 세 캐릭터가 같은 표·같은 키(0142)였다. Naïl은 옛 것 그대로(되받아치기·빛 모으기 / 꼭꼭 씹기·한입에).
 const PARRY: (Tr, [Talent; 2]) = (
     |s| s.tal_parry,
@@ -204,11 +204,11 @@ pub fn all_awake_keys() -> Vec<String> {
 }
 pub const KEY_LIGHT: &str = "glowbugs_banked";
 
-/// 0260 옮기기: 받아치기·먹기 자리는 세 캐릭터가 같은 키(`talent.parry.*`·`talent.eat.*`)였다. 이제 모모·도토는 제 키.
+/// 0263 옮기기: 받아치기·먹기 자리는 세 캐릭터가 같은 키(`talent.parry.*`·`talent.eat.*`)였다. 이제 모모·도토는 제 키.
 /// 이미 깨운 것은 그 캐릭터에 남는다(사장 "이미 깨운 재주는 캐릭터에 귀속") — 옛 키로 깬 것을 모모·도토의 같은 자리에도 깨워 두고,
 /// 고른 쪽도 옮긴다. Naïl은 옛 키 그대로. 기록을 읽을 때 한 번(`profile::load_slot`).
 pub fn migrate(p: &mut crate::profile::Profile) {
-    const DONE: &str = "mig.0260";
+    const DONE: &str = "mig.0263";
     if p.flag(DONE) {
         return;
     }
@@ -351,21 +351,21 @@ impl Talents {
         };
         base + t::TREE_QUAKE * self.n(Boon::Quake) as f32
     }
-    /// 솟구쳐 맞힌 적이 더 멈추는 시간(Naïl 덤 "땅울림", 0260).
+    /// 솟구쳐 맞힌 적이 더 멈추는 시간(Naïl 덤 "땅울림", 0263).
     pub fn emerge_stun_add(self) -> f32 {
         t::TREE_TREMOR * self.n(Boon::Tremor) as f32
     }
-    /// 드릴 피해 더하기(Naïl 덤 "드릴 날", 0260).
+    /// 드릴 피해 더하기(Naïl 덤 "드릴 날", 0263).
     pub fn drill_damage_add(self) -> i32 {
         self.n(Boon::DrillEdge) as i32
     }
-    /// 큰 도토리(강타) 피해 더하기(도토 덤 "묵직한 도토리", 0260).
+    /// 큰 도토리(강타) 피해 더하기(도토 덤 "묵직한 도토리", 0263).
     pub fn heavy_damage_add(self) -> i32 {
         2 * self.n(Boon::BigNut) as i32
     }
 
     /// 패링 A 되받아치기: 튕겨낸 돌격에 피해(게이지는 안 찬다). B 빛 모으기: 게이지가 크게 찬다.
-    /// Naïl만(0260). 덤 "빛 받기"는 받아칠 때마다 게이지를 더 채운다.
+    /// Naïl만(0263). 덤 "빛 받기"는 받아칠 때마다 게이지를 더 채운다.
     pub fn parry_sp(self) -> f32 {
         let base = match self.mole(Slot::Parry) {
             1 => 0.0,
@@ -382,11 +382,11 @@ impl Talents {
         }
     }
 
-    /// 모모 받아차기 A 깡충 되감기: 받아치면 회피 대기가 바로 끝난다(0260).
+    /// 모모 받아차기 A 깡충 되감기: 받아치면 회피 대기가 바로 끝난다(0263).
     pub fn parry_rewinds_dodge(self) -> bool {
         self.momo_side(Slot::Parry) == 1
     }
-    /// 받아친 적이 멈추는 시간 배율: 모모 받아차기 B 넘어뜨리기(0260).
+    /// 받아친 적이 멈추는 시간 배율: 모모 받아차기 B 넘어뜨리기(0263).
     pub fn parry_stun_mul(self) -> f32 {
         if self.momo_side(Slot::Parry) == 2 {
             t::TAL_TRIP_STUN
@@ -394,11 +394,11 @@ impl Talents {
             1.0
         }
     }
-    /// 도토 볼 받기 A 되던지기: 받아치면 바라보는 쪽으로 도토리 둘(0260).
+    /// 도토 볼 받기 A 되던지기: 받아치면 바라보는 쪽으로 도토리 둘(0263).
     pub fn parry_toss(self) -> bool {
         self.doto_side(Slot::Parry) == 1
     }
-    /// 받아치기 창 배율: 도토 볼 받기 B 다람쥐 눈(0260).
+    /// 받아치기 창 배율: 도토 볼 받기 B 다람쥐 눈(0263).
     pub fn parry_window_mul(self) -> f32 {
         if self.doto_side(Slot::Parry) == 2 {
             t::TAL_SQUIRREL_EYE
@@ -436,11 +436,11 @@ impl Talents {
         };
         base * (1.0 + t::TREE_FAR * self.n(Boon::FarHop) as f32)
     }
-    /// 멀리뛰기 거리(모모 덤 "용수철 다리", 0260). 도토는 늘 `JUMP_DIST`.
+    /// 멀리뛰기 거리(모모 덤 "용수철 다리", 0263). 도토는 늘 `JUMP_DIST`.
     pub fn jump_dist(self) -> f32 {
         t::JUMP_DIST * (1.0 + t::TREE_FAR * self.n(Boon::Spring) as f32)
     }
-    /// 달리기 배율(도토 덤 "종종걸음", 0260).
+    /// 달리기 배율(도토 덤 "종종걸음", 0263).
     pub fn run_mul(self) -> f32 {
         1.0 + t::TREE_SCAMPER * self.n(Boon::Scamper) as f32
     }
@@ -516,7 +516,7 @@ impl Talents {
     }
 
     /// 먹기 A 꼭꼭 씹기: 오래 먹고 산딸기가 더 채운다. B 한입에: 빨리 먹는다.
-    /// Naïl 꼭꼭 씹기·한입에, 모모 풀잎 숨기(오래 먹는다, 0260).
+    /// Naïl 꼭꼭 씹기·한입에, 모모 풀잎 숨기(오래 먹는다, 0263).
     pub fn eat_time_mul(self) -> f32 {
         match (self.mole(Slot::Eat), self.momo_side(Slot::Eat)) {
             (1, _) => t::TAL_CHEW_TIME,
@@ -525,15 +525,15 @@ impl Talents {
             _ => 1.0,
         }
     }
-    /// 모모 풀 뜯기 A 먹고 깡충: 다 먹으면 회피 대기가 끝난다(0260).
+    /// 모모 풀 뜯기 A 먹고 깡충: 다 먹으면 회피 대기가 끝난다(0263).
     pub fn eat_rewinds_dodge(self) -> bool {
         self.momo_side(Slot::Eat) == 1
     }
-    /// 모모 풀 뜯기 B 풀잎 숨기: 먹는 동안 맞지 않는다(0260).
+    /// 모모 풀 뜯기 B 풀잎 숨기: 먹는 동안 맞지 않는다(0263).
     pub fn eat_hidden(self) -> bool {
         self.momo_side(Slot::Eat) == 2
     }
-    /// 도토 볼주머니 A 까먹기: 다 먹으면 게이지가 이만큼(0..1 비율) 찬다(0260).
+    /// 도토 볼주머니 A 까먹기: 다 먹으면 게이지가 이만큼(0..1 비율) 찬다(0263).
     pub fn eat_ki(self) -> f32 {
         if self.doto_side(Slot::Eat) == 1 {
             t::TAL_SNACK_KI
@@ -541,7 +541,7 @@ impl Talents {
             0.0
         }
     }
-    /// 도토 볼주머니 B 씨 뱉기: 다 먹으면 바라보는 쪽으로 도토리 셋(0260).
+    /// 도토 볼주머니 B 씨 뱉기: 다 먹으면 바라보는 쪽으로 도토리 셋(0263).
     pub fn eat_spit(self) -> bool {
         self.doto_side(Slot::Eat) == 2
     }
@@ -556,7 +556,7 @@ impl Talents {
 
 // ---- 큰 나무 갈래 셋 × 깊이 여덟(0246) -----------------------------------------
 
-/// 깨우면 늘 켜지는 덤(0246 → 0260). 캐릭터마다 제 덤만 — 한 덤은 한 캐릭터의 나무에만 나온다(시험이 본다).
+/// 깨우면 늘 켜지는 덤(0246 → 0263). 캐릭터마다 제 덤만 — 한 덤은 한 캐릭터의 나무에만 나온다(시험이 본다).
 /// 체력·실뿌리·장신구 칸·가게 할인 같은 "누구나 같은" 덤은 뺐다(사장 "캐릭 기본 없이"). 수치는 `apply`(장신구와 같은
 /// `Mods`)이거나 그 캐릭터의 동작 수치(`Talents`의 게터)다.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -784,7 +784,7 @@ pub enum Node {
 pub const DEPTH: usize = 8;
 
 /// 한 캐릭터의 큰 나무: 갈래 셋(뿌리 = 몸, 가지 = 싸움, 잎 = 길) × 깊이 여덟. 고르기·고유 재주 칸의 자리는 세 나무가 같다
-/// (칸 모양 `cells`가 하나 — 시험이 본다). 덤은 캐릭터마다 제 것(0260).
+/// (칸 모양 `cells`가 하나 — 시험이 본다). 덤은 캐릭터마다 제 것(0263).
 pub type Tree = [(Tr, [Node; DEPTH]); 3];
 pub const BRANCH_COUNT: usize = 3;
 
@@ -1362,7 +1362,7 @@ mod tests {
         assert_eq!(key_awake(Character::Momo, Slot::Burrow, 0), "talent.hop.a");
         assert_eq!(key_pick(Character::Momo, Slot::Drill), "talent_pick.chain");
         // 패링·먹기는 함께.
-        // 받아치기·먹기도 캐릭터마다(0260, 옛 키는 Naïl이 그대로).
+        // 받아치기·먹기도 캐릭터마다(0263, 옛 키는 Naïl이 그대로).
         assert_eq!(
             key_pick(Character::Momo, Slot::Parry),
             "talent_pick.momo_parry"
@@ -1377,7 +1377,7 @@ mod tests {
         assert_eq!(key_plus(Character::Doto, 2, 7), "tree.Doto.2.7");
     }
 
-    /// 큰 나무(0246 → 0260): 캐릭터마다 갈래 셋 × 깊이 여덟, 고르기 자리 넷이 한 번씩, 고르기·고유 재주 칸 자리는 세 나무가 같다
+    /// 큰 나무(0246 → 0263): 캐릭터마다 갈래 셋 × 깊이 여덟, 고르기 자리 넷이 한 번씩, 고르기·고유 재주 칸 자리는 세 나무가 같다
     /// (칸 모양 하나). 덤은 캐릭터마다 제 것 — 한 덤이 두 캐릭터의 나무에 나오지 않는다. 덤 값은 깊을수록 오른다.
     #[test]
     fn each_character_has_its_own_tree_of_the_same_shape() {
@@ -1442,7 +1442,7 @@ mod tests {
         );
     }
 
-    /// 0260 옮기기: 옛 받아치기·먹기 키로 깬 것은 모모·도토의 같은 자리에도 남고, 고른 쪽도 옮긴다. 한 번만.
+    /// 0263 옮기기: 옛 받아치기·먹기 키로 깬 것은 모모·도토의 같은 자리에도 남고, 고른 쪽도 옮긴다. 한 번만.
     #[test]
     fn shared_parry_and_eat_keys_move_to_each_character() {
         let mut p = crate::profile::Profile::default();
@@ -1503,7 +1503,7 @@ mod tests {
         assert!(d.bury_fuse() < t::BURY_FUSE && d.heavy_damage_add() == 2);
     }
 
-    /// 받아치기·먹기 고르기(0260): 모모·도토 것은 제 캐릭터에만, Naïl의 옛 수치는 다른 캐릭터가 먹지 않는다.
+    /// 받아치기·먹기 고르기(0263): 모모·도토 것은 제 캐릭터에만, Naïl의 옛 수치는 다른 캐릭터가 먹지 않는다.
     #[test]
     fn parry_and_eat_picks_are_per_character() {
         assert!(momo(Slot::Parry, 1).parry_rewinds_dodge());
