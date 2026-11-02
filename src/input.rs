@@ -969,6 +969,24 @@ impl Input {
         read_gamepads(&self.pads)
     }
 
+    /// 패드 진동(0269): 연결된 패드 모두를 `strength`(0..1)로 `ms` 동안. 웹은 `vibrationActuator`(지원하는 브라우저만),
+    /// PC는 gilrs 힘 되돌림. Android(패치한 miniquad에 진동 없음)·iOS(패드 없음)는 아무것도 안 한다.
+    pub fn rumble(&mut self, strength: f32, ms: u32) {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            if strength <= 0.0 {
+                return;
+            }
+            let s = strength.min(1.0);
+            let ids: Vec<_> = self.pads.all().map(|p| p.id()).collect();
+            for id in ids {
+                self.pads.rumble(id, ms, 0, s, s * 0.6);
+            }
+        }
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        let _ = (strength, ms);
+    }
+
     /// 다시 붙이기용: 이번 프레임에 눌린 키(표 안) 또는 패드 버튼. 이동·Enter·Esc는 돌려주지 않는다.
     pub fn capture(&self) -> Option<Captured> {
         if let Some(k) = get_last_key_pressed() {
@@ -1118,7 +1136,8 @@ fn read_keyboard() -> Actions {
         tab_prev: is_key_pressed(KeyCode::Q),
         tab_next: is_key_pressed(KeyCode::E),
         toggle_debug: is_key_pressed(KeyCode::F1),
-        toggle_hitboxes: is_key_pressed(KeyCode::F2),
+        // 판정 상자는 개발판만(0269 D14): 운영판에서 F2는 아무 일도 하지 않는다.
+        toggle_hitboxes: cfg!(feature = "dev") && is_key_pressed(KeyCode::F2),
         // 눌렀다 뗀 것이 한 프레임 안에 끝나도 메뉴 탐색은 한 칸 움직여야 한다(is_key_down만 보면 놓친다).
         up: is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W),
         down: is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S),

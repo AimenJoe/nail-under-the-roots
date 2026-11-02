@@ -255,8 +255,9 @@ impl Renderer {
     }
 
     /// 월드 패스(내부 해상도). `w`가 없으면 타이틀 배경만 그린다.
-    /// `alpha`: 마지막 틱 이후 지난 비율(0..1), 위치 보간. `shake_mul`: 설정의 흔들림 배율.
-    pub fn begin_world(&mut self, w: Option<&World>, alpha: f32, shake_mul: f32) {
+    /// `alpha`: 마지막 틱 이후 지난 비율(0..1), 위치 보간. `shake_mul`: 설정의 흔들림 배율(흔들림·킥),
+    /// `flash_mul`: 설정의 번쩍임 배율(벽 쿵 번쩍임·맞음 테두리, 0269 — 전엔 흔들림 하나가 둘 다였다).
+    pub fn begin_world(&mut self, w: Option<&World>, alpha: f32, shake_mul: f32, flash_mul: f32) {
         let center = vec2(RW / 2.0, RH / 2.0);
         // 흔들림 + 카메라 킥(0168), 둘 다 설정 배율을 따른다.
         let shake = w
@@ -421,13 +422,13 @@ impl Renderer {
         self.cam.target = center;
         set_camera(&self.cam);
         if w.juice.feel.flash > 0.0 {
-            // 벽 쿵 번쩍임. 흔들림 설정을 따른다(0이면 끈다: 눈이 예민한 사람).
-            let k = (w.juice.feel.flash / t::DRILL_WALL_FLASH).min(1.0) * shake_mul.min(1.0);
+            // 벽 쿵 번쩍임. 번쩍임 설정을 따른다(0이면 끈다: 눈이 예민한 사람).
+            let k = (w.juice.feel.flash / t::DRILL_WALL_FLASH).min(1.0) * flash_mul.min(1.0);
             draw_rectangle(0.0, 0.0, RW, RH, Color::new(1.0, 0.97, 0.9, 0.55 * k));
         }
         if w.juice.feel.hurt > 0.0 {
-            // 맞음 테두리: 가장자리부터 안으로 옅어지는 붉은 띠. 흔들림 설정을 따른다(번쩍임과 같다).
-            let k = (w.juice.feel.hurt / t::PLAYER_HURT_EDGE).min(1.0) * shake_mul.min(1.0);
+            // 맞음 테두리: 가장자리부터 안으로 옅어지는 붉은 띠. 번쩍임 설정을 따른다(흔들림 0이어도 맞은 건 보이게, 0269).
+            let k = (w.juice.feel.hurt / t::PLAYER_HURT_EDGE).min(1.0) * flash_mul.min(1.0);
             for i in 0..8 {
                 let a = 0.6 * k * (1.0 - i as f32 / 8.0);
                 let inset = i as f32 * 2.0;

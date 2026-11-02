@@ -30,6 +30,8 @@ pub static RU: Strings = Strings {
     set_sound: "Звуки",
     set_music: "Музыка",
     set_shake: "Тряска экрана",
+    set_flash: "Вспышки экрана",
+    set_rumble: "Вибрация геймпада",
     set_effects: "Частицы",
     set_tells: "Замах врага",
     set_debug: "Отладка",

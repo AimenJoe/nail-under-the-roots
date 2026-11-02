@@ -2,45 +2,99 @@
 
 use super::*;
 
-/// 설정 줄. 데스크톱은 값 줄 끝에 "전체 화면"이 하나 더 있다(0240) — 그 뒤 줄 번호가 하나씩 밀린다(`D`).
-pub(super) const SETTING_ROWS: &[Tr] = if crate::DESKTOP {
-    &[
-        |s| s.set_sound,
-        |s| s.set_music,
-        |s| s.set_shake,
-        |s| s.set_effects,
-        |s| s.set_tells,
-        |s| s.set_debug,
-        |s| s.set_language,
-        |s| s.set_assist,
-        |s| s.set_fullscreen,
-        |s| s.set_controls,
-        |s| s.set_licenses,
-        |s| s.set_erase,
-    ]
-} else {
-    &[
-        |s| s.set_sound,
-        |s| s.set_music,
-        |s| s.set_shake,
-        |s| s.set_effects,
-        |s| s.set_tells,
-        |s| s.set_debug,
-        |s| s.set_language,
-        |s| s.set_assist,
-        |s| s.set_controls,
-        |s| s.set_licenses,
-        |s| s.set_erase,
-    ]
-};
-const D: usize = crate::DESKTOP as usize;
-/// 설정의 "포포의 응원"·"전체 화면"(데스크톱)·"조작 설정"·"라이선스"·"기록 지우기" 줄. 돌아가기 줄은 없다 — 닫기 단추·뒤로(Esc·B)·창 밖 탭(0239).
-pub(super) const SETTING_ASSIST: usize = 7;
-/// 데스크톱에서만 있는 줄(다른 빌드에서는 이 번호가 조작 설정이라 `crate::DESKTOP`과 같이 본다).
-pub(super) const SETTING_FULLSCREEN: usize = 8;
-pub(super) const SETTING_CONTROLS: usize = 8 + D;
-pub(super) const SETTING_LICENSES: usize = 9 + D;
-pub(super) const SETTING_ERASE: usize = 10 + D;
+/// 설정 줄(0269: 번호 대신 이름 — 줄이 플랫폼마다 달라 번호를 상수로 맞추던 것이 줄을 더할 때마다 밀렸다).
+// 빌드마다 없는 줄이 있다(진동은 Android·iOS에 없고, 전체 화면은 데스크톱만) — 그 빌드에선 만들지 않는 갈래.
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Row {
+    Sound,
+    Music,
+    Shake,
+    /// 번쩍임·맞음 테두리(0269, 흔들림과 따로).
+    Flash,
+    /// 패드 진동(0269, 웹·PC만 — Android 패드는 패치한 miniquad에 진동이 없다, iOS는 패드가 아직 없다).
+    Rumble,
+    Effects,
+    Tells,
+    Debug,
+    Language,
+    /// 포포의 응원 창(0256).
+    Assist,
+    /// 전체 화면(데스크톱 0240).
+    Fullscreen,
+    Controls,
+    Licenses,
+    Erase,
+}
+
+/// 이 빌드의 설정 줄, 보이는 순서대로. 값 줄 | 다른 화면으로 가는 줄 | 기록 지우기.
+pub(super) const ROWS: &[Row] = &[
+    Row::Sound,
+    Row::Music,
+    Row::Shake,
+    Row::Flash,
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    Row::Rumble,
+    Row::Effects,
+    Row::Tells,
+    Row::Debug,
+    Row::Language,
+    Row::Assist,
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
+    Row::Fullscreen,
+    Row::Controls,
+    Row::Licenses,
+    Row::Erase,
+];
+
+impl Row {
+    pub(super) fn label(self) -> Tr {
+        match self {
+            Row::Sound => |s| s.set_sound,
+            Row::Music => |s| s.set_music,
+            Row::Shake => |s| s.set_shake,
+            Row::Flash => |s| s.set_flash,
+            Row::Rumble => |s| s.set_rumble,
+            Row::Effects => |s| s.set_effects,
+            Row::Tells => |s| s.set_tells,
+            Row::Debug => |s| s.set_debug,
+            Row::Language => |s| s.set_language,
+            Row::Assist => |s| s.set_assist,
+            Row::Fullscreen => |s| s.set_fullscreen,
+            Row::Controls => |s| s.set_controls,
+            Row::Licenses => |s| s.set_licenses,
+            Row::Erase => |s| s.set_erase,
+        }
+    }
+
+    /// 값이 아니라 누르는 줄(좌우로 바뀌지 않는다).
+    pub(super) fn is_button(self) -> bool {
+        matches!(
+            self,
+            Row::Assist | Row::Controls | Row::Licenses | Row::Erase
+        )
+    }
+
+    /// 몇째 묶음인가: 0 = 값(전체 화면·응원 포함), 1 = 다른 화면(조작·라이선스), 2 = 기록 지우기.
+    fn group(self) -> usize {
+        match self {
+            Row::Erase => 2,
+            Row::Controls | Row::Licenses => 1,
+            _ => 0,
+        }
+    }
+}
+
+/// 설정 줄 `i`(없으면 마지막 줄).
+pub(super) fn row_at(i: usize) -> Row {
+    ROWS[i.min(ROWS.len() - 1)]
+}
+
+/// 줄 `r`의 번호(이 빌드에 없으면 0).
+pub(super) fn row_index(r: Row) -> usize {
+    ROWS.iter().position(|x| *x == r).unwrap_or(0)
+}
+
 /// 설정 창에 한 번에 보이는 줄. 줄이 더 많으면 고른 줄이 보이게 굴린다(입자 줄을 더해 열 줄이 됐다, 0141).
 pub(super) const SETTING_VISIBLE: usize = 9;
 /// 줄 간격과 묶음 사이 틈(0239): 값 줄 | 다른 화면으로 가는 줄 | 기록 지우기. 아홉 줄 + 틈 둘이 창 안에 든다.
@@ -52,21 +106,6 @@ const GROUP_LINE: Color = Color::new(0.55, 0.40, 0.28, 0.5);
 const SCROLL_SHUT: Color = Color::new(0.52, 0.48, 0.46, 0.3);
 /// 기록 지우기(되돌릴 수 없는 줄)의 글자색. 색만으로 알리지 않는다 — 맨 끝 따로 묶음 + 한 번 더 묻기.
 const ERASE_INK: Color = Color::new(0.86, 0.47, 0.42, 1.0);
-/// 값이 아니라 누르는 줄(좌우로 바뀌지 않는다).
-pub(super) fn setting_is_button(i: usize) -> bool {
-    matches!(
-        i,
-        SETTING_ASSIST | SETTING_CONTROLS | SETTING_LICENSES | SETTING_ERASE
-    )
-}
-/// 줄이 몇째 묶음인가: 0 = 값(전체 화면 포함), 1 = 다른 화면(조작·라이선스), 2 = 기록 지우기.
-fn setting_group(i: usize) -> usize {
-    match i {
-        SETTING_ERASE => 2,
-        SETTING_CONTROLS | SETTING_LICENSES => 1,
-        _ => 0,
-    }
-}
 /// 조작 설정의 줄: 동작들(input::ACTS) + 기본값 + 돌아가기.
 pub(super) const CONTROL_NAMES: [Tr; 7] = [
     |s| s.act_attack,
@@ -89,6 +128,10 @@ pub struct Settings {
     /// 음악 크기(0..=10, 효과음과 따로, 0081).
     pub music: u8,
     pub shake: u8,
+    /// 번쩍임·맞음 테두리(0..=10, 0269 — 흔들림 0이어도 맞은 표시는 남길 수 있게).
+    pub flash: u8,
+    /// 패드 진동(0..=10, 0269, 웹·PC).
+    pub rumble: u8,
     /// 입자 효과(0..=10, 0141). 0이면 먼지·불똥·환경 입자를 그리지 않는다(공격 범위 고리는 남긴다).
     pub effects: u8,
     /// 공격 예고 진하기(1..=10, 0198). 7이 0196·0197의 투명도, 기본 5.
@@ -107,6 +150,12 @@ impl Settings {
     pub(super) fn shake_f(&self) -> f32 {
         self.shake as f32 / 10.0
     }
+    pub(super) fn flash_f(&self) -> f32 {
+        self.flash as f32 / 10.0
+    }
+    pub(super) fn rumble_f(&self) -> f32 {
+        self.rumble as f32 / 10.0
+    }
     pub(super) fn effects_f(&self) -> f32 {
         self.effects as f32 / 10.0
     }
@@ -118,32 +167,39 @@ impl Settings {
 
 impl App {
     pub(super) fn adjust_setting(&mut self, row: usize, d: i8) {
-        match row {
-            0 => {
-                self.settings.volume = (self.settings.volume as i8 + d).clamp(0, 10) as u8;
+        let step = |v: u8, lo: i8| (v as i8 + d).clamp(lo, 10) as u8;
+        match row_at(row) {
+            Row::Sound => {
+                self.settings.volume = step(self.settings.volume, 0);
                 self.sfx.set_volume(self.settings.volume_f());
                 self.amb.set_volume(self.settings.volume_f());
                 self.sfx.play(crate::sfx::Id::EnemyHit);
             }
-            1 => {
-                self.settings.music = (self.settings.music as i8 + d).clamp(0, 10) as u8;
+            Row::Music => {
+                self.settings.music = step(self.settings.music, 0);
                 self.music.set_volume(self.settings.music as f32 / 10.0);
             }
-            2 => self.settings.shake = (self.settings.shake as i8 + d).clamp(0, 10) as u8,
-            3 => self.settings.effects = (self.settings.effects as i8 + d).clamp(0, 10) as u8,
+            Row::Shake => self.settings.shake = step(self.settings.shake, 0),
+            Row::Flash => self.settings.flash = step(self.settings.flash, 0),
+            Row::Rumble => {
+                self.settings.rumble = step(self.settings.rumble, 0);
+                // 바꾼 세기를 바로 느끼게 한 번 떤다.
+                self.input.rumble(0.4 * self.settings.rumble_f(), 120);
+            }
+            Row::Effects => self.settings.effects = step(self.settings.effects, 0),
             // 0은 두지 않는다: 예고는 놀이 정보라 아예 끄지는 못한다.
-            4 => self.settings.tells = (self.settings.tells as i8 + d).clamp(1, 10) as u8,
-            5 => {
+            Row::Tells => self.settings.tells = step(self.settings.tells, 1),
+            Row::Debug => {
                 self.settings.debug_overlay = !self.settings.debug_overlay;
                 self.world.debug.overlay = self.settings.debug_overlay;
             }
-            6 => {
+            Row::Language => {
                 let l = i18n::lang().cycle(d);
                 i18n::set_lang(l);
                 self.settings.lang = Some(l);
             }
-            SETTING_FULLSCREEN if crate::DESKTOP => self.toggle_fullscreen(),
-            _ => {}
+            Row::Fullscreen => self.toggle_fullscreen(),
+            Row::Assist | Row::Controls | Row::Licenses | Row::Erase => {}
         }
     }
 
@@ -159,6 +215,8 @@ impl App {
             volume: self.settings.volume,
             music: self.settings.music,
             shake: self.settings.shake,
+            flash: self.settings.flash,
+            rumble: self.settings.rumble,
             effects: self.settings.effects,
             tells: self.settings.tells,
             lang: self.settings.lang,
@@ -239,36 +297,28 @@ impl App {
         ui.panel(panel, Some(s.settings));
         // 터치로도 나갈 수 있게 닫기 단추(0198): 돌아가기 줄이 가려져 있으면 손가락만으로는 나갈 길이 없었다.
         self.close_button(ui, panel);
-        let mut values = vec![
-            format!("{}%", self.settings.volume * 10),
-            format!("{}%", self.settings.music * 10),
-            format!("{}%", self.settings.shake * 10),
-            format!("{}%", self.settings.effects * 10),
-            format!("{}%", self.settings.tells * 10),
-            if self.settings.debug_overlay {
-                s.on
-            } else {
-                s.off
-            }
-            .to_string(),
-            s.lang_name.to_string(),
-            // 포포의 응원은 창으로 가는 줄(0256).
-            String::new(),
-        ];
-        if crate::DESKTOP {
-            values.push(
-                if self.settings.fullscreen {
-                    s.on
-                } else {
-                    s.off
-                }
-                .to_string(),
-            );
-        }
-        values.resize(SETTING_ROWS.len(), String::new());
+        let pct = |v: u8| format!("{}%", v * 10);
+        let on_off = |b: bool| if b { s.on } else { s.off }.to_string();
+        let values: Vec<String> = ROWS
+            .iter()
+            .map(|r| match r {
+                Row::Sound => pct(self.settings.volume),
+                Row::Music => pct(self.settings.music),
+                Row::Shake => pct(self.settings.shake),
+                Row::Flash => pct(self.settings.flash),
+                Row::Rumble => pct(self.settings.rumble),
+                Row::Effects => pct(self.settings.effects),
+                Row::Tells => pct(self.settings.tells),
+                Row::Debug => on_off(self.settings.debug_overlay),
+                Row::Language => s.lang_name.to_string(),
+                Row::Fullscreen => on_off(self.settings.fullscreen),
+                // 다른 창으로 가는 줄은 값이 없다.
+                Row::Assist | Row::Controls | Row::Licenses | Row::Erase => String::new(),
+            })
+            .collect();
         let row_h = SETTING_ROW_H;
         // 줄이 창보다 많다: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
-        let n = SETTING_ROWS.len();
+        let n = ROWS.len();
         let first = self
             .settings_view
             .window(self.settings_cursor, n, SETTING_VISIBLE, row_h);
@@ -276,25 +326,21 @@ impl App {
         let x = panel.x + 6.0;
         let w = panel.w - 12.0;
         let mut y = panel.y + 18.0;
-        for (i, label) in trs(SETTING_ROWS)
-            .into_iter()
-            .enumerate()
-            .skip(first)
-            .take(SETTING_VISIBLE)
-        {
-            if i > first && setting_group(i) != setting_group(i - 1) {
+        for (i, row) in ROWS.iter().enumerate().skip(first).take(SETTING_VISIBLE) {
+            let label = tr(row.label());
+            if i > first && row.group() != ROWS[i - 1].group() {
                 let ly = (y + SETTING_GAP * 0.5).round();
                 ui.line(vec2(x + 4.0, ly), vec2(x + w - 4.0, ly), GROUP_LINE);
                 y += SETTING_GAP;
             }
             let selected = self.settings_cursor == i;
-            if setting_is_button(i) {
+            if row.is_button() {
                 let r = Rect::new(x, y, w, FONT_PX + 4.0);
                 if selected {
                     ui.rect(r, ui::PANEL_LIGHT);
                 }
                 let ty = ui::mid_y(r);
-                let erase = i == SETTING_ERASE;
+                let erase = *row == Row::Erase;
                 let label = if erase && self.erase_armed {
                     s.set_erase_confirm
                 } else {

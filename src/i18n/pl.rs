@@ -30,6 +30,8 @@ pub static PL: Strings = Strings {
     set_sound: "Dźwięki",
     set_music: "Muzyka",
     set_shake: "Wstrząsy ekranu",
+    set_flash: "Błyski ekranu",
+    set_rumble: "Wibracje pada",
     set_effects: "Cząsteczki",
     set_tells: "Zamach wroga",
     set_debug: "Debugowanie",

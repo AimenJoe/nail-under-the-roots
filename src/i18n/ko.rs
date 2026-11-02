@@ -30,6 +30,8 @@ pub static KO: Strings = Strings {
     set_sound: "효과음",
     set_music: "음악",
     set_shake: "화면 흔들림",
+    set_flash: "화면 번쩍임",
+    set_rumble: "패드 진동",
     set_effects: "입자 효과",
     set_tells: "공격 예고",
     set_debug: "디버그 정보",

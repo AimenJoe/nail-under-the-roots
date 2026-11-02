@@ -30,6 +30,8 @@ pub static PT_BR: Strings = Strings {
     set_sound: "Efeitos",
     set_music: "Música",
     set_shake: "Tremor da tela",
+    set_flash: "Clarões na tela",
+    set_rumble: "Vibração do controle",
     set_effects: "Partículas",
     set_tells: "Aviso do inimigo",
     set_debug: "Info de depuração",

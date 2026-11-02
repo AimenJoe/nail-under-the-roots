@@ -509,6 +509,10 @@ impl App {
             volume: saved.map(|p| p.volume).unwrap_or(7),
             music: saved.map(|p| p.music).unwrap_or(7),
             shake: saved.map(|p| p.shake).unwrap_or(10),
+            flash: saved.map(|p| p.flash).unwrap_or(10),
+            rumble: saved
+                .map(|p| p.rumble)
+                .unwrap_or(crate::prefs::RUMBLE_DEFAULT),
             effects: saved.map(|p| p.effects).unwrap_or(10),
             tells: saved
                 .map(|p| p.tells)
@@ -926,6 +930,12 @@ impl App {
             self.world.juice.tells = self.settings.tells_f();
             self.world.tick(&a);
             self.sfx.flush(&mut self.world.juice.audio);
+            // 맞은 진동(0269): 세기는 등급의 흔들림 × 설정 "진동", 길이는 세기에 따라 0.08~0.2초.
+            let r = std::mem::take(&mut self.world.juice.rumble);
+            if r > 0.0 {
+                self.input
+                    .rumble(r * self.settings.rumble_f(), (80.0 + 170.0 * r) as u32);
+            }
             self.acc -= t::TICK_DT;
         }
         if self.world.player.is_alive() {
@@ -1444,7 +1454,7 @@ impl App {
                 }
             }
             Scene::Settings { back } => {
-                let n = SETTING_ROWS.len();
+                let n = ROWS.len();
                 if a.up {
                     self.settings_cursor = (self.settings_cursor + n - 1) % n;
                     self.erase_armed = false;
@@ -1479,44 +1489,44 @@ impl App {
                     }
                     Some(Hit::SettingRow(i)) => {
                         row = i;
-                        adjust = if setting_is_button(i) { 0 } else { 1 };
+                        adjust = if row_at(i).is_button() { 0 } else { 1 };
                     }
                     _ => {}
                 }
-                if adjust != 0 && !setting_is_button(row) {
+                if adjust != 0 && !row_at(row).is_button() {
                     self.settings_cursor = row;
                     self.adjust_setting(row, adjust);
                 }
-                let open_licenses = (a.confirm && self.settings_cursor == SETTING_LICENSES)
-                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_LICENSES)));
+                let open_licenses = (a.confirm && row_at(self.settings_cursor) == Row::Licenses)
+                    || matches!(tap_hit, Some(Hit::SettingRow(i)) if row_at(i) == Row::Licenses);
                 if open_licenses {
-                    self.settings_cursor = SETTING_LICENSES;
+                    self.settings_cursor = row_index(Row::Licenses);
                     self.license_view.first = 0;
                     self.scene = Scene::Licenses { back };
                     return;
                 }
-                let open_assist = (a.confirm && self.settings_cursor == SETTING_ASSIST)
-                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_ASSIST)));
+                let open_assist = (a.confirm && row_at(self.settings_cursor) == Row::Assist)
+                    || matches!(tap_hit, Some(Hit::SettingRow(i)) if row_at(i) == Row::Assist);
                 if open_assist {
-                    self.settings_cursor = SETTING_ASSIST;
+                    self.settings_cursor = row_index(Row::Assist);
                     self.assist_cursor = 0;
                     self.scene = Scene::Assist { back };
                     return;
                 }
-                let open_controls = (a.confirm && self.settings_cursor == SETTING_CONTROLS)
-                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_CONTROLS)));
+                let open_controls = (a.confirm && row_at(self.settings_cursor) == Row::Controls)
+                    || matches!(tap_hit, Some(Hit::SettingRow(i)) if row_at(i) == Row::Controls);
                 if open_controls {
-                    self.settings_cursor = SETTING_CONTROLS;
+                    self.settings_cursor = row_index(Row::Controls);
                     self.controls_cursor = 0;
                     self.rebind = None;
                     self.scene = Scene::Controls { back };
                     return;
                 }
                 // 기록 지우기: 한 번 누르면 묻고, 한 번 더 누르면 지운다.
-                let erase = (a.confirm && self.settings_cursor == SETTING_ERASE)
-                    || matches!(tap_hit, Some(Hit::SettingRow(SETTING_ERASE)));
+                let erase = (a.confirm && row_at(self.settings_cursor) == Row::Erase)
+                    || matches!(tap_hit, Some(Hit::SettingRow(i)) if row_at(i) == Row::Erase);
                 if erase {
-                    self.settings_cursor = SETTING_ERASE;
+                    self.settings_cursor = row_index(Row::Erase);
                     if self.erase_armed {
                         self.erase_armed = false;
                         self.profile = crate::profile::Profile::default();
@@ -1566,6 +1576,7 @@ impl App {
             if in_world { Some(&self.world) } else { None },
             alpha,
             self.settings.shake_f(),
+            self.settings.flash_f(),
         );
         if let Some(c) = &self.cutscene {
             for (i, actor) in c.actors.iter().enumerate().skip(1) {

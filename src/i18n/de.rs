@@ -30,6 +30,8 @@ pub static DE: Strings = Strings {
     set_sound: "Soundeffekte",
     set_music: "Musik",
     set_shake: "Bildwackeln",
+    set_flash: "Bildblitze",
+    set_rumble: "Controller-Vibration",
     set_effects: "Partikel",
     set_tells: "Ankündigungen",
     set_debug: "Debug-Infos",

@@ -3,7 +3,8 @@
 //! 줄 하나로 적는다(0175. 전엔 저장하지 않아 켤 때마다 기본값이었다 — 사장: "업데이트하면 언어가 사라진다").
 //!
 //! 칸: 0 표식(MAGIC), 1 소리+1, 2 흔들림+1, 3 언어(0 = 기기 언어), 4..11 키 번호+1, 11..18 패드 번호+1,
-//! 18 음악+1(0081), 19 입자 효과+1(0141), 20 공격 예고 진하기+1(0198), 21 전체 화면+1(데스크톱, 0240). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
+//! 18 음악+1(0081), 19 입자 효과+1(0141), 20 공격 예고 진하기+1(0198), 21 전체 화면+1(데스크톱, 0240),
+//! 22 번쩍임+1·23 패드 진동+1(0269). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
 //! 0은 "없음"(플러그인이 없거나 저장 전). 표식이 다르면 통째로 무시한다(형식이 바뀌면 MAGIC을 올린다).
 
 use crate::i18n::Lang;
@@ -11,15 +12,21 @@ use crate::input::Bindings;
 
 const MAGIC: u32 = 0x4E41_0001;
 /// 저장 칸 수.
-const CELLS: usize = 22;
+const CELLS: usize = 24;
 /// 공격 예고 진하기 기본값(1..=10, 0198).
 pub const TELLS_DEFAULT: u8 = 5;
+/// 패드 진동 기본값(0..=10, 0269).
+pub const RUMBLE_DEFAULT: u8 = 7;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Prefs {
     pub volume: u8,
     pub music: u8,
     pub shake: u8,
+    /// 번쩍임·맞음 테두리(0..=10, 0269).
+    pub flash: u8,
+    /// 패드 진동(0..=10, 0269).
+    pub rumble: u8,
     /// 입자 효과(0..=10, 0141). 접근성: 먼지·불똥·환경 입자를 줄인다.
     pub effects: u8,
     /// 공격 예고 진하기(1..=10, 0198).
@@ -78,6 +85,8 @@ fn encode(p: &Prefs) -> [u32; CELLS] {
     v[19] = p.effects as u32 + 1;
     v[20] = p.tells as u32 + 1;
     v[21] = p.fullscreen as u32 + 1;
+    v[22] = p.flash as u32 + 1;
+    v[23] = p.rumble as u32 + 1;
     for i in 0..7 {
         v[4 + i] = p.bindings.keys[i] as u32 + 1;
         v[11 + i] = p.bindings.pads[i] as u32 + 1;
@@ -103,6 +112,17 @@ fn decode(v: &[u32; CELLS]) -> Option<Prefs> {
             (v[18] - 1).min(10) as u8
         },
         shake: (v[2].saturating_sub(1) as u8).min(10),
+        // 번쩍임 칸이 없던 옛 저장(0)은 흔들림과 같은 값 — 전엔 흔들림 하나가 번쩍임까지 줄였다(0269).
+        flash: if v[22] == 0 {
+            (v[2].saturating_sub(1) as u8).min(10)
+        } else {
+            (v[22] - 1).min(10) as u8
+        },
+        rumble: if v[23] == 0 {
+            RUMBLE_DEFAULT
+        } else {
+            (v[23] - 1).min(10) as u8
+        },
         // 입자 칸이 없던 옛 저장(0)은 기본 10(전부).
         effects: if v[19] == 0 {
             10
@@ -229,6 +249,8 @@ mod tests {
             volume: 3,
             music: 2,
             shake: 0,
+            flash: 6,
+            rumble: 4,
             effects: 5,
             tells: 3,
             lang: Some(Lang::Pl),
@@ -280,6 +302,8 @@ mod tests {
         v[19] = 0;
         let old = decode(&v).unwrap();
         assert_eq!((old.music, old.effects), (7, 10));
+        // 번쩍임·진동 칸(22·23, 0269)도 없었다: 번쩍임은 흔들림 값(전엔 흔들림이 번쩍임까지 줄였다), 진동은 기본.
+        assert_eq!((old.flash, old.rumble), (0, RUMBLE_DEFAULT));
     }
 
     #[test]
@@ -293,6 +317,8 @@ mod tests {
             volume: 3,
             music: 9,
             shake: 0,
+            flash: 10,
+            rumble: 0,
             effects: 4,
             tells: 9,
             lang: Some(Lang::Ja),

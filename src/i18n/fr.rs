@@ -30,6 +30,8 @@ pub static FR: Strings = Strings {
     set_sound: "Effets sonores",
     set_music: "Musique",
     set_shake: "Secousse écran",
+    set_flash: "Flashs écran",
+    set_rumble: "Vibration manette",
     set_effects: "Particules",
     set_tells: "Signes ennemis",
     set_debug: "Infos debug",

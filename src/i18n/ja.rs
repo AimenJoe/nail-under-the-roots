@@ -30,6 +30,8 @@ pub static JA: Strings = Strings {
     set_sound: "効果音",
     set_music: "音楽",
     set_shake: "画面のゆれ",
+    set_flash: "画面のフラッシュ",
+    set_rumble: "パッドの振動",
     set_effects: "パーティクル",
     set_tells: "敵の予告",
     set_debug: "デバッグ表示",

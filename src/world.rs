@@ -618,6 +618,8 @@ pub struct Juice {
     pub audio: sfx::Queue,
     pub boss_card: Option<(&'static str, Tr, f32)>,
     pub petals: bool,
+    /// 이번 틱에 낼 패드 진동 세기(0..1, 0269): 앱이 꺼내 설정 "진동"을 곱해 낸다. 로직은 패드를 모른다(소리와 같다).
+    pub rumble: f32,
     /// 발걸음 먼지(0081): 걸은 거리를 모아 한 걸음마다.
     step_dist: f32,
     /// 걸음 수: 두 걸음에 한 번 발소리(0234).
@@ -766,6 +768,7 @@ impl Default for Juice {
             hush: false,
             gloom: Gloom::NONE,
             petals: false,
+            rumble: 0.0,
             charge_fx_t: 0.0,
             step_dist: 0.0,
             steps: 0,
@@ -2437,6 +2440,8 @@ impl World {
                     }
                     self.juice.feel.raise_trauma(f.shake);
                     self.juice.feel.hurt = f.edge;
+                    // 패드 진동은 흔들림 세기를 따라 간다(웹·PC, 0269).
+                    self.juice.rumble = self.juice.rumble.max(f.shake);
                     self.juice.audio.play(sfx::Id::Ouch);
                     self.juice
                         .fx
