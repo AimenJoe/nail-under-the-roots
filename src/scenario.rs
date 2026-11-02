@@ -49,6 +49,8 @@ pub enum Scenario {
     AllClaws,
     /// 손맛 실험실 연습장(0269): 피격 등급마다 때리는 것 하나씩.
     LabRange,
+    /// 대화 검수 화면(0269 R34): 월드가 아니라 화면(`app/dialogue.rs`).
+    DialogueCheck,
     /// 환경 확인: 지정 환경에서 돌격형 1 + 원거리형 1.
     InBiome(Biome),
     /// 반딧불·산딸기 줍기 확인(docs/decisions/0016).
@@ -101,7 +103,12 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 52] = [
+pub const LIST: [Entry; 53] = [
+    Entry {
+        name: "대화 검수",
+        desc: "한마디 표·말 걸기·빈 자리 말을 미리 짠 기록(또는 지금 슬롯 복사본)·캐릭터마다 본다. 왜 나오고 왜 안 나오는지, 확인으로 실제 대화창(복사본에만 봄이 남는다).",
+        scenario: Scenario::DialogueCheck,
+    },
     Entry {
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
@@ -423,6 +430,7 @@ pub fn build(s: Scenario) -> World {
         // 무기 비교(0246): 빈 방 + 오른쪽에 허수아비 셋(쓰러지지 않는다) — 탄·가시·조각을 그대로 본다.
         Scenario::AllClaws => all_claws(),
         Scenario::LabRange => lab_range(),
+        Scenario::DialogueCheck => World::empty(),
         Scenario::Breakables => breakables(),
         Scenario::Gear => gear(),
         Scenario::BossHalf(kind) => boss_half(kind),

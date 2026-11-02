@@ -42,7 +42,21 @@ pub enum Cond {
 }
 
 impl Cond {
-    fn holds(self, p: &Profile, ch: Character) -> bool {
+    /// 대화 검수 화면에 쓰는 짧은 글(개발 화면이라 번역하지 않는다, 0013).
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))]
+    pub fn describe(self) -> String {
+        match self {
+            Cond::DeathsAtLeast(n) => format!("쓰러짐 ≥ {n}"),
+            Cond::CountAtLeast(k, n) => format!("{k} ≥ {n}"),
+            Cond::As(c) => format!("캐릭터 = {c:?}"),
+            Cond::NotAs(c) => format!("캐릭터 ≠ {c:?}"),
+            Cond::Flag(k) => k.to_string(),
+            Cond::NotFlag(k) => format!("!{k}"),
+            Cond::Seen(id) => format!("봄 {id}"),
+        }
+    }
+
+    pub fn holds(self, p: &Profile, ch: Character) -> bool {
         match self {
             Cond::DeathsAtLeast(n) => p.count(key::DEATHS) >= n,
             Cond::CountAtLeast(k, n) => p.count(k) >= n,
@@ -669,8 +683,44 @@ pub fn speaker(who: Who) -> Speaker {
     }
 }
 
-/// 지금 할 한마디. `ch`는 지금 걷는 캐릭터(말을 듣는 이). 고른 `once` 줄은 기록에 남긴다(저장은 부른 쪽이).
-pub fn take(p: &mut Profile, when: When, ch: Character) -> Option<&'static Line> {
+/// 한 줄이 지금 왜 나오거나 안 나오는가(0269 R34, 대화 검수): 조건마다 맞는지, 이미 봤는지, 구체성, 골랐는지.
+#[cfg_attr(not(feature = "dev"), allow(dead_code))]
+pub struct Candidate {
+    pub line: &'static Line,
+    pub conds: Vec<(Cond, bool)>,
+    /// `once`가 아니거나 아직 안 봤다.
+    pub fresh: bool,
+    pub specificity: usize,
+    /// 조건이 다 맞고 fresh.
+    pub ok: bool,
+    /// 이 줄이 나온다.
+    pub chosen: bool,
+}
+
+/// `when`의 모든 줄을 기록을 바꾸지 않고 따져 본다. 고르는 규칙은 `pick`과 같다(한 곳).
+#[cfg_attr(not(feature = "dev"), allow(dead_code))]
+pub fn candidates(p: &Profile, when: When, ch: Character) -> Vec<Candidate> {
+    let chosen = pick(p, when, ch).map(|l| l.id);
+    LINES
+        .iter()
+        .filter(|l| l.when == when)
+        .map(|l| {
+            let conds: Vec<(Cond, bool)> = l.needs.iter().map(|c| (*c, c.holds(p, ch))).collect();
+            let fresh = !l.once || !p.flag(&key::line(l.id));
+            Candidate {
+                line: l,
+                ok: fresh && conds.iter().all(|(_, ok)| *ok),
+                conds,
+                fresh,
+                specificity: l.specificity(),
+                chosen: chosen == Some(l.id),
+            }
+        })
+        .collect()
+}
+
+/// 지금 할 한마디를 고른다(기록은 바꾸지 않는다): 조건이 다 맞는 줄 가운데 가장 구체적인 것, 같으면 표에서 앞의 것.
+pub fn pick(p: &Profile, when: When, ch: Character) -> Option<&'static Line> {
     let mut best: Option<&'static Line> = None;
     for l in LINES {
         let fresh = !l.once || !p.flag(&key::line(l.id));
@@ -682,10 +732,254 @@ pub fn take(p: &mut Profile, when: When, ch: Character) -> Option<&'static Line>
             best = Some(l);
         }
     }
+    best
+}
+
+/// 지금 할 한마디. `ch`는 지금 걷는 캐릭터(말을 듣는 이). 고른 `once` 줄은 기록에 남긴다(저장은 부른 쪽이).
+pub fn take(p: &mut Profile, when: When, ch: Character) -> Option<&'static Line> {
+    let best = pick(p, when, ch);
     if let Some(l) = best.filter(|l| l.once) {
         p.set(&key::line(l.id));
     }
     best
+}
+
+/// 이웃에게 말을 걸면 무엇이 일어나는가(0269 R34): 앱의 말 걸기 갈림을 순수 함수 하나로 — 앱은 결과를 실행만 하고,
+/// 대화 검수 화면·시험은 같은 함수로 미리 본다. 순서가 곧 우선순위다.
+#[derive(Clone, Copy)]
+pub enum Talk {
+    /// 마을의 포포: 꾸미기·짐 창.
+    Decor,
+    /// 쉼터의 포포: 가게.
+    Shop,
+    /// 진행에 맞는 한 번짜리(또는 늘) 한마디(`take`로 실제로 고른다).
+    Story(When),
+    /// 수수의 첫 만남(나일만, 새싹 발톱).
+    SusuMeet,
+    /// 이웃이 지금 캐릭터 본인에게 주는 무기.
+    Gift(&'static Gift),
+    /// 늘 하는 말 하나(차례).
+    Chatter(Tr, Face),
+    /// 할매: 실뜨기 고르기.
+    KnotPick,
+    /// 할 말이 없다.
+    Nothing,
+}
+
+/// 말 걸기의 상황. `owns`: 그 무기를 이미 가졌나. `turn`: 이 이웃에게 몇 번째로 말 거나(늘 하는 말 차례).
+pub struct TalkCtx<'a> {
+    pub profile: &'a Profile,
+    pub ch: Character,
+    pub village: bool,
+    pub owns: &'a dyn Fn(usize) -> bool,
+    pub turn: u32,
+}
+
+pub fn talk_route(who: Who, c: &TalkCtx) -> Talk {
+    let story = |w: When| pick(c.profile, w, c.ch).is_some().then_some(Talk::Story(w));
+    let first = match who {
+        Who::Popo if c.village => Some(Talk::Decor),
+        Who::Popo => Some(Talk::Shop),
+        // 보리·모모·도토: 진행에 맞는 말이 있으면 그것부터(0051).
+        Who::Bori => story(When::TalkBori),
+        Who::Momo => story(When::TalkMomo),
+        Who::Doto => story(When::TalkDoto),
+        // 수수의 첫 만남은 같은 "파는 손"을 알아보는 장면이라 나일에게만(0264). 발톱이 이미 있으면 건너뛴다.
+        Who::Susu
+            if c.ch == Character::Mole
+                && !c.profile.flag(key::SPROUT)
+                && !(c.owns)(crate::equipment::SPROUT_CLAW) =>
+        {
+            Some(Talk::SusuMeet)
+        }
+        _ => None,
+    };
+    if let Some(t) = first {
+        return t;
+    }
+    if let Some(g) = gift(who, c.ch).filter(|g| !(c.owns)(g.weapon)) {
+        return Talk::Gift(g);
+    }
+    if let Some(ch) = chatter(who, c.ch) {
+        return Talk::Chatter(ch.lines[c.turn as usize % ch.lines.len()], ch.face);
+    }
+    match who {
+        Who::Halmae => Talk::KnotPick,
+        _ => Talk::Nothing,
+    }
+}
+
+/// 이웃 번호(이웃마다 늘 하는 말 차례를 따로 센다).
+pub fn who_index(who: Who) -> usize {
+    who as usize
+}
+
+/// 이웃 수.
+pub const WHO_COUNT: usize = 9;
+
+/// 대화 검수 화면·시험의 미리 짠 기록(0269 R34): 진행 순서대로 쌓인다. 진짜 슬롯과 상관없는 값이다.
+#[cfg(any(test, feature = "dev"))]
+pub fn presets() -> Vec<(&'static str, Profile)> {
+    let mut v = Vec::new();
+    let mut p = Profile::default();
+    v.push(("처음(튜토리얼 전)", p.clone()));
+    p.set(key::TUTORIAL);
+    p.set(&key::line("village_intro"));
+    v.push(("튜토리얼 뒤", p.clone()));
+    p.set(key::BORI_BACK);
+    p.add(key::DEATHS, 3);
+    v.push(("보리 돌아옴·쓰러짐 3", p.clone()));
+    p.add(key::MOMO_WINS, 3);
+    p.set(key::MOMO_BACK);
+    v.push(("모모 돌아옴", p.clone()));
+    p.set(key::DOTO_MEMORY);
+    p.set(key::KONGI_BACK);
+    v.push(("도토 기억·콩이 돌아옴", p.clone()));
+    p.set(key::HALF_ENDING);
+    v.push(("반쪽 엔딩", p.clone()));
+    p.set(key::TRUE_ENDING);
+    v.push(("참 엔딩", p.clone()));
+    p.set(key::CLOVER_BACK);
+    p.set(key::MOMO_DEEP);
+    p.set(key::DOTO_DEEP);
+    v.push(("토끼풀 가족·셋 다 끝", p.clone()));
+    v
+}
+
+/// 쉼터의 빈 자리(0046·0067·0201): 모모를 이긴 만큼 꽃잎이 물들어 있다. 모모로 왔으면 제 자리라 1인칭으로.
+pub fn seat_line(ch: Character, momo_wins: u32) -> (Tr, Face) {
+    match momo_wins {
+        _ if ch == Character::Momo => (|s| s.seat_momo, Face::Happy),
+        // 도토(0201): 남의 자리 곁에 도토리 하나 — 잊지 않게 묻는 버릇.
+        _ if ch == Character::Doto => (|s| s.seat_doto, Face::Normal),
+        0 => (|s| s.seat_1, Face::Worried),
+        1 => (|s| s.seat_p1, Face::Worried),
+        2 => (|s| s.seat_p2, Face::Worried),
+        _ => (|s| s.seat_p3, Face::Worried),
+    }
+}
+
+#[cfg(test)]
+mod route_tests {
+    use super::*;
+
+    fn ctx<'a>(
+        p: &'a Profile,
+        ch: Character,
+        village: bool,
+        owns: &'a dyn Fn(usize) -> bool,
+        turn: u32,
+    ) -> TalkCtx<'a> {
+        TalkCtx {
+            profile: p,
+            ch,
+            village,
+            owns,
+            turn,
+        }
+    }
+
+    /// 0269 R34: 말 걸기 갈림이 앱에 있던 순서 그대로인지.
+    #[test]
+    fn talk_route_keeps_the_old_order() {
+        let none = |_: usize| false;
+        let all = |_: usize| true;
+        let mut p = Profile::default();
+        p.set(key::TUTORIAL);
+        assert!(matches!(
+            talk_route(Who::Popo, &ctx(&p, Character::Mole, true, &none, 0)),
+            Talk::Decor
+        ));
+        assert!(matches!(
+            talk_route(Who::Popo, &ctx(&p, Character::Mole, false, &none, 0)),
+            Talk::Shop
+        ));
+        // 수수: 나일에게만 첫 만남, 발톱이 있으면 늘 하는 말.
+        assert!(matches!(
+            talk_route(Who::Susu, &ctx(&p, Character::Mole, false, &none, 0)),
+            Talk::SusuMeet
+        ));
+        assert!(matches!(
+            talk_route(Who::Susu, &ctx(&p, Character::Mole, false, &all, 0)),
+            Talk::Chatter(..)
+        ));
+        // 모모로 수수: 새싹 짚신 선물, 가졌으면 늘 하는 말.
+        assert!(
+            matches!(talk_route(Who::Susu, &ctx(&p, Character::Momo, false, &none, 0)), Talk::Gift(g) if g.weapon == crate::equipment::SANDALS)
+        );
+        assert!(matches!(
+            talk_route(Who::Susu, &ctx(&p, Character::Momo, false, &all, 0)),
+            Talk::Chatter(..)
+        ));
+        // 할매: 늘 하는 말이 없으면 실뜨기.
+        if chatter(Who::Halmae, Character::Mole).is_none() {
+            assert!(matches!(
+                talk_route(Who::Halmae, &ctx(&p, Character::Mole, true, &all, 0)),
+                Talk::KnotPick
+            ));
+        }
+        // 늘 하는 말은 차례대로 돈다.
+        let a = talk_route(Who::Bori, &ctx(&p, Character::Mole, true, &all, 0));
+        let b = talk_route(Who::Bori, &ctx(&p, Character::Mole, true, &all, 1));
+        if let (Talk::Chatter(x, _), Talk::Chatter(y, _)) = (a, b) {
+            let ko = &crate::i18n::KO;
+            assert_ne!(x(ko), y(ko));
+        }
+    }
+
+    /// 0269 R34: 어느 줄도 영영 가려지지 않는다 — 제 조건만 채운 기록에서, 앞을 막는 줄이 `once`면 보고 넘어가며
+    /// 언젠가 그 줄이 나와야 한다(늘 하는 줄이 늘 이기면 그 줄은 죽은 글이다).
+    #[test]
+    fn no_line_is_shadowed_forever() {
+        for l in LINES {
+            let mut p = Profile::default();
+            let mut ch = Character::Mole;
+            for c in l.needs {
+                match *c {
+                    Cond::DeathsAtLeast(n) => p.add(key::DEATHS, n),
+                    Cond::CountAtLeast(k, n) => p.add(k, n),
+                    Cond::As(c) => ch = c,
+                    Cond::Flag(k) => {
+                        p.set(k);
+                    }
+                    Cond::Seen(id) => {
+                        p.set(&key::line(id));
+                    }
+                    Cond::NotAs(_) | Cond::NotFlag(_) => {}
+                }
+            }
+            if l.needs
+                .iter()
+                .any(|c| matches!(c, Cond::NotAs(x) if *x == ch))
+            {
+                ch = [Character::Mole, Character::Momo, Character::Doto]
+                    .into_iter()
+                    .find(|x| {
+                        !l.needs
+                            .iter()
+                            .any(|c| matches!(c, Cond::NotAs(y) if y == x))
+                    })
+                    .unwrap();
+            }
+            assert!(
+                l.needs.iter().all(|c| c.holds(&p, ch)),
+                "{}: 제 조건끼리 어긋난다",
+                l.id
+            );
+            let mut shown = false;
+            for _ in 0..LINES.len() {
+                match take(&mut p, l.when, ch) {
+                    Some(w) if w.id == l.id => {
+                        shown = true;
+                        break;
+                    }
+                    Some(w) if w.once => {}
+                    other => panic!("{}: {:?}이(가) 늘 먼저 나온다", l.id, other.map(|w| w.id)),
+                }
+            }
+            assert!(shown, "{}: 나오지 않는다", l.id);
+        }
+    }
 }
 
 #[cfg(test)]

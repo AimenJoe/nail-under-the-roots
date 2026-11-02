@@ -16,6 +16,8 @@ mod stage;
 mod tree;
 // 0169 R4: 장면별로 나눴다. 자식은 `use super::*`로 부모의 가져오기·App 필드를 함께 쓴다.
 mod album;
+#[cfg(feature = "dev")]
+mod dialogue;
 mod help;
 #[cfg(feature = "dev")]
 mod lab;
@@ -96,6 +98,9 @@ enum Scene {
     /// 개발용 시나리오 목록. 운영 빌드(`--no-default-features`)에는 들어가는 길이 없다(0193).
     #[cfg_attr(not(feature = "dev"), allow(dead_code))]
     Dev,
+    /// 대화 검수(0269 R34, 개발판만).
+    #[cfg(feature = "dev")]
+    Dialogue,
     /// 컷씬. 끝나면 게임.
     Cutscene,
     Game,
@@ -138,6 +143,8 @@ impl Scene {
         match self {
             Scene::Intro | Scene::Album => Layer::Title,
             Scene::Title | Scene::Slots | Scene::Dev => Layer::TitleArt,
+            #[cfg(feature = "dev")]
+            Scene::Dialogue => Layer::TitleArt,
             Scene::Settings { back }
             | Scene::Controls { back }
             | Scene::Assist { back }
@@ -167,6 +174,9 @@ enum AfterCut {
     Village,
     /// 실에 잠겼다(0163): 장면이 끝나면 맡겨 둔 쉼터로 되살아난다.
     Respawn,
+    /// 대화 검수에서 틀어 본 줄(0269, 개발판): 끝나면 그 화면으로.
+    #[cfg(feature = "dev")]
+    Dialogue,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -317,6 +327,9 @@ enum Hit {
     /// Lab 탭(0269, 개발판): 줄, 값 한 칸 내림·올림(손잡이 번호, ±1).
     #[cfg(feature = "dev")]
     LabItem(usize),
+    /// 대화 검수 줄(0269, 개발판).
+    #[cfg(feature = "dev")]
+    DialogueItem(usize),
     #[cfg(feature = "dev")]
     LabNudge(usize, i8),
     /// 길 지도: 고를 수 있는 칸(choices 번호).
@@ -416,6 +429,9 @@ pub struct App {
     /// 일시정지 Lab 탭(0269, 개발판).
     #[cfg(feature = "dev")]
     lab: lab::LabUi,
+    /// 대화 검수 화면(0269, 개발판).
+    #[cfg(feature = "dev")]
+    dialogue: dialogue::DialogueUi,
     /// 이번 프레임의 굴리기 입력(논리 px 끌기, 칸: 휠·▲▼, 0199).
     scroll_in: (f32, i32),
     journal_check: f32,
@@ -448,7 +464,8 @@ pub struct App {
     /// 사기 전에 묻는 중: (물건 줄, "사기"에 커서가 있나).
     shop_ask: Option<(usize, bool)>,
     /// 보리에게 말 건 횟수(말이 돌아간다).
-    talk_n: u32,
+    /// 이웃마다 늘 하는 말 차례(0269 R34: 전엔 하나를 같이 써서 이웃 사이를 오가면 순서가 튀었다).
+    talk_n: [u32; crate::story::WHO_COUNT],
     /// 런을 넘어 남는 기록(docs/decisions/0041).
     profile: crate::profile::Profile,
     /// 이번 쓰러짐을 이미 셌나.
@@ -584,6 +601,8 @@ impl App {
             dev_view: Default::default(),
             #[cfg(feature = "dev")]
             lab: Default::default(),
+            #[cfg(feature = "dev")]
+            dialogue: Default::default(),
             scroll_in: (0.0, 0),
             journal_check: 0.0,
             village_pick: None,
@@ -606,7 +625,7 @@ impl App {
             shop_cursor: 0,
             shop_msg: None,
             shop_ask: None,
-            talk_n: 0,
+            talk_n: [0; crate::story::WHO_COUNT],
             profile: crate::profile::load(),
             death_noted: false,
             after: after::After::default(),
@@ -834,6 +853,8 @@ impl App {
                             AfterCut::Respawn if self.world.run_over() => {
                                 self.lose_run(flow::back_to_village(self.current))
                             }
+                            #[cfg(feature = "dev")]
+                            AfterCut::Dialogue => self.scene = Scene::Dialogue,
                             AfterCut::Respawn => {
                                 self.scene = Scene::Game;
                                 self.world.start_fade(crate::adventure::Transition::Respawn);
@@ -1073,6 +1094,12 @@ impl App {
     /// 시나리오로 새 런을 시작한다. Normal과 CutsceneOnly는 오프닝 컷씬을 먼저 재생한다.
     fn start(&mut self, s: Scenario) {
         // 개발(0204): 엔딩 뒤 마을로 올라오는 장면만.
+        // 개발(0269): 대화 검수는 월드가 아니라 화면 하나.
+        #[cfg(feature = "dev")]
+        if s == Scenario::DialogueCheck {
+            self.open_dialogue();
+            return;
+        }
         if s == Scenario::Ascent {
             self.story_after_ascent = Some(0.0);
             self.start(Scenario::Village);
@@ -1426,6 +1453,8 @@ impl App {
                     None => {}
                 }
             }
+            #[cfg(feature = "dev")]
+            Scene::Dialogue => self.update_dialogue(a, tap_hit),
             Scene::Dev => {
                 let n = scenario::LIST.len();
                 if a.up {
@@ -1635,6 +1664,8 @@ impl App {
                 self.draw_char_pick(&ui);
             }
             Scene::Dev => self.draw_dev(&ui),
+            #[cfg(feature = "dev")]
+            Scene::Dialogue => self.draw_dialogue(&ui),
             Scene::Cutscene => {
                 self.draw_letterbox(&ui);
                 self.draw_cutscene(&ui);

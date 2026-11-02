@@ -123,6 +123,12 @@ impl Profile {
     }
 
     /// 모든 수 칸(키 순서).
+    /// 선 깃발들(대화 검수 화면, 0269 R34).
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))]
+    pub fn flags(&self) -> impl Iterator<Item = &str> {
+        self.flags.iter().map(|k| k.as_str())
+    }
+
     pub fn counts(&self) -> impl Iterator<Item = (&str, u32)> {
         self.counts.iter().map(|(k, v)| (k.as_str(), *v))
     }

@@ -446,86 +446,81 @@ impl App {
                 self.save_progress(true);
             }
             Interact::Exit => self.world.use_exit(),
-            // 마을의 포포: 마을 꾸미기 가게(0045).
-            Interact::Talk(Who::Popo) if village => {
-                self.decor_cursor = 0;
-                self.decor_tab = 0;
-                self.shop_msg = None;
-                self.world.freeze();
-                self.scene = Scene::Decor;
-            }
-            Interact::Talk(Who::Popo) => {
-                self.shop_cursor = 0;
-                self.shop_ask = None;
-                self.shop_msg = None;
-                self.world.freeze();
-                self.scene = Scene::Shop;
-            }
-            // 보리·모모: 진행에 맞는 한 번짜리 말이 있으면 그것부터(0051).
-            Interact::Talk(Who::Bori) if self.say_story(crate::story::When::TalkBori) => {}
-            Interact::Talk(Who::Momo) if self.say_story(crate::story::When::TalkMomo) => {}
-            Interact::Talk(Who::Doto) if self.say_story(crate::story::When::TalkDoto) => {}
-            // 빈 자리: 모모를 이긴 만큼 꽃잎이 물들어 있다(0046). 모모로 왔으면 제 자리라 1인칭으로, 나일이 있는 곳도 말한다(0067).
+            // 빈 자리: 모모를 이긴 만큼 꽃잎이 물들어 있다(0046). 줄은 `story::seat_line`(0269 R34).
             Interact::Seat => {
-                let ch = self.world.character;
-                let momo = ch == crate::equipment::Character::Momo;
-                let doto = ch == crate::equipment::Character::Doto;
-                let (line, face): (Tr, Face) = match self.world.story.momo_wins() {
-                    _ if momo => (|s| s.seat_momo, Face::Happy),
-                    // 도토(0201): 남의 자리 곁에 도토리 하나 — 잊지 않게 묻는 버릇.
-                    _ if doto => (|s| s.seat_doto, Face::Normal),
-                    0 => (|s| s.seat_1, Face::Worried),
-                    1 => (|s| s.seat_p1, Face::Worried),
-                    2 => (|s| s.seat_p2, Face::Worried),
-                    _ => (|s| s.seat_p3, Face::Worried),
-                };
+                let (line, face) = crate::story::seat_line(
+                    self.world.character,
+                    self.world.story.momo_wins() as u32,
+                );
                 // Speaker::Nail = 이번 런의 플레이어 배우(모모 런이면 모모).
                 self.play(cutscene::talk(&self.world, &[(Speaker::Nail, line, face)]));
             }
-            // 수수: 처음엔 새싹 발톱을 만들어 준다(0053). 개발 시나리오는 기록 없이 이번 런에만.
-            // 같은 "파는 손"을 알아보는 장면이라 나일에게만(0264): 모모·도토에게 "어이, 두더지 꼬마!"라 했다. 발톱은 다음 나일 런에.
-            Interact::Talk(Who::Susu)
-                if self.world.character == crate::equipment::Character::Mole
-                    && !self.profile.flag(crate::profile::key::SPROUT)
-                    && !self.inventory.has(crate::equipment::SPROUT_CLAW) =>
-            {
-                if self.recording() {
-                    self.profile.set(crate::profile::key::SPROUT);
-                    self.save_profile();
+            // 이웃에게 말 걸기(0269 R34): 무엇이 일어날지는 `story::talk_route` 한 곳 — 앱은 결과를 실행만 한다.
+            Interact::Talk(who) => {
+                use crate::story::Talk;
+                let n = crate::story::who_index(who);
+                let owns = |w: usize| self.owns_weapon(w);
+                let route = crate::story::talk_route(
+                    who,
+                    &crate::story::TalkCtx {
+                        profile: &self.profile,
+                        ch: self.world.character,
+                        village,
+                        owns: &owns,
+                        turn: self.talk_n[n],
+                    },
+                );
+                match route {
+                    Talk::Decor => {
+                        self.decor_cursor = 0;
+                        self.decor_tab = 0;
+                        self.shop_msg = None;
+                        self.world.freeze();
+                        self.scene = Scene::Decor;
+                    }
+                    Talk::Shop => {
+                        self.shop_cursor = 0;
+                        self.shop_ask = None;
+                        self.shop_msg = None;
+                        self.world.freeze();
+                        self.scene = Scene::Shop;
+                    }
+                    Talk::Story(when) => {
+                        self.say_story(when);
+                    }
+                    // 수수: 처음엔 새싹 발톱을 만들어 준다(0053). 개발 시나리오는 기록 없이 이번 런에만.
+                    Talk::SusuMeet => {
+                        if self.recording() {
+                            self.profile.set(crate::profile::key::SPROUT);
+                            self.save_profile();
+                        }
+                        self.play(cutscene::susu_meet(&self.world));
+                    }
+                    // 이웃이 지금 걷는 캐릭터 본인에게 주는 무기(표 `story::GIFTS`, 0265). 받은 건 기록에 남는다(`take_gifts`).
+                    Talk::Gift(g) => self.play(cutscene::talk_give(
+                        &self.world,
+                        &[(crate::story::speaker(who), g.line, Face::Happy)],
+                        g.weapon,
+                    )),
+                    // 늘 하는 말(표 `story::CHATTER`, 0265): 이웃마다 차례로 셋.
+                    Talk::Chatter(text, face) => {
+                        self.talk_n[n] += 1;
+                        self.play(cutscene::talk(
+                            &self.world,
+                            &[(crate::story::speaker(who), text, face)],
+                        ));
+                    }
+                    // 누룩 할매: 실뜨기 고르기(마을, 0043·0045).
+                    Talk::KnotPick => {
+                        let open = self.knots_open();
+                        self.knot_level = self.knot_level.min(open);
+                        self.world.freeze();
+                        self.scene = Scene::KnotPick;
+                    }
+                    // 표에 줄이 없는 이웃: 아무 일도 없다. 시험이 이웃마다 줄이 있는지 본다.
+                    Talk::Nothing => {}
                 }
-                self.play(cutscene::susu_meet(&self.world));
             }
-            // 이웃이 지금 걷는 캐릭터 본인에게 주는 무기(표 `story::GIFTS`, 0265): 아직 없을 때 한 번. 받은 건 기록에 남는다(`take_gifts`).
-            Interact::Talk(who)
-                if crate::story::gift(who, self.world.character)
-                    .is_some_and(|g| !self.owns_weapon(g.weapon)) =>
-            {
-                let g = crate::story::gift(who, self.world.character).expect("가드에서 찾았다");
-                self.play(cutscene::talk_give(
-                    &self.world,
-                    &[(crate::story::speaker(who), g.line, Face::Happy)],
-                    g.weapon,
-                ));
-            }
-            // 늘 하는 말(표 `story::CHATTER`, 0265): 차례로 셋, 지금 걷는 캐릭터에게 하는 줄.
-            Interact::Talk(who) if crate::story::chatter(who, self.world.character).is_some() => {
-                let c = crate::story::chatter(who, self.world.character).expect("가드에서 찾았다");
-                let text = c.lines[self.talk_n as usize % c.lines.len()];
-                self.talk_n += 1;
-                self.play(cutscene::talk(
-                    &self.world,
-                    &[(crate::story::speaker(who), text, c.face)],
-                ));
-            }
-            // 누룩 할매: 실뜨기 고르기(마을, 0043·0045).
-            Interact::Talk(Who::Halmae) => {
-                let open = self.knots_open();
-                self.knot_level = self.knot_level.min(open);
-                self.world.freeze();
-                self.scene = Scene::KnotPick;
-            }
-            // 표에 줄이 없는 이웃(지금 걷는 캐릭터에게 할 말이 없다): 아무 일도 없다. 시험이 이웃마다 줄이 있는지 본다.
-            Interact::Talk(_) => {}
             // 물웅덩이: 열린 털빛을 차례로 비춰 본다(저널 보상, 0048).
             // 실 고리: 실의 꿈 고르기(0055).
             Interact::Dream => self.open_dream(),
