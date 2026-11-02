@@ -511,6 +511,9 @@ impl Cutscene {
         }
         // 입자 효과(실·꽃잎·반짝임)와 이름 카드는 컷씬 동안에도 흐른다(0159). 로직은 멈춘다.
         w.tick_fx(dt);
+        // 흔들림·킥·번쩍임 시계도(0269 B2): `Step::Shake`가 컷씬 동안 흔들리고, 끝난 뒤 한꺼번에 몰아 흔들리지 않게.
+        // `Feel::tick`은 히트스톱을 건드리지 않는다.
+        w.juice.feel.tick(dt);
         w.time += dt;
         if let Some((_, _, left)) = &mut w.juice.boss_card {
             *left -= dt;

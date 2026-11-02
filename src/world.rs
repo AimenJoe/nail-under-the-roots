@@ -870,7 +870,8 @@ impl World {
         let dt = t::TICK_DT;
         self.time += dt;
         if self.adventure_pre() {
-            // 장소를 바꾸는 중(어두워졌다 밝아짐): 로직은 멈춘다.
+            // 장소를 바꾸는 중(어두워졌다 밝아짐): 로직은 멈춘다. 흔들림은 잦아든다(0269 B2: 멈춘 오프셋이 남지 않게).
+            self.juice.feel.tick(dt);
             self.freeze_interp();
             return;
         }

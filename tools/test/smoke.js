@@ -99,6 +99,9 @@ async function run() {
     const size = await s.shot('end');
     check(size > MIN_SHOT_BYTES, `scenario ${idx}: 화면이 그려진다 (${size}B)`);
     check(s.errors.length === 0, `scenario ${idx}: 콘솔 에러·패닉 없음 ${JSON.stringify(s.errors)}`);
+    // 개발 메뉴에서 연 판은 슬롯에 쓰지 않는다(0269 B3): 마을의 한마디·꾸미기·일시정지 저장이 진짜 기록을 바꾸지 않는다.
+    const kept = await s.page.evaluate(() => localStorage.getItem('nail.profile'));
+    check(kept === PROFILE, `scenario ${idx}: 개발 판이 슬롯 기록을 바꾸지 않는다`);
     await s.ctx.close();
   }
   await browser.close();

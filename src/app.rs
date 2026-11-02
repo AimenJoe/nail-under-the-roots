@@ -1349,6 +1349,12 @@ impl App {
                 }
             }
             Scene::Title => {
+                if crate::profile::sandbox() {
+                    // 개발 판이 끝났다(0269 B3): 메모리에서 바뀐 기록을 버리고 슬롯 그대로 읽는다.
+                    crate::profile::set_sandbox(false);
+                    self.profile = crate::profile::load();
+                    self.apply_assist();
+                }
                 let items = self.title_items();
                 let n = items.len();
                 self.title_cursor = self.title_cursor.min(n - 1);
@@ -1420,6 +1426,8 @@ impl App {
                     None
                 };
                 if let Some(i) = chosen {
+                    // 개발 판(0269 B3): 여기서 연 판은 슬롯에 쓰지 않는다. 타이틀로 돌아오면 슬롯을 다시 읽는다.
+                    crate::profile::set_sandbox(true);
                     self.start(scenario::LIST[i].scenario);
                 }
             }

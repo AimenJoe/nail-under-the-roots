@@ -398,13 +398,16 @@ impl App {
                 self.world.inv.seeds + t::VILLAGE_SEEDS_CLEAR,
             );
             // 모모·도토의 끝은 Naïl의 이야기 엔딩을 대신하지 않는다(0056).
-            self.profile.set(if let Some(f) = ch.def().deep_flag {
-                f
-            } else if true_end {
-                key::TRUE_ENDING
+            // Naïl의 참 엔딩은 반쪽 엔딩을 품는다(0269 B1): 첫 끝이 곧바로 참 엔딩이어도 할매가 마을에 온 뒤의
+            // 한마디·저널("가장 깊은 곳")은 반쪽 엔딩 깃발을 본다.
+            if let Some(f) = ch.def().deep_flag {
+                self.profile.set(f);
             } else {
-                key::HALF_ENDING
-            });
+                self.profile.set(key::HALF_ENDING);
+                if true_end {
+                    self.profile.set(key::TRUE_ENDING);
+                }
+            }
             self.save_profile();
         }
         let c = if momo {

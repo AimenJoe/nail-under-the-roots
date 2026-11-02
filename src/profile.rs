@@ -331,8 +331,24 @@ fn get(cell: u32) -> Option<String> {
     text
 }
 
-/// 칸에 쓴다. 이미 같은 글이면 쓰지 않는다. 실패하면 false, 앱이 `take_failure`로 알린다.
+/// 개발 메뉴에서 연 판(0269 B3): 켜져 있으면 어떤 칸에도 쓰지 않는다. 개발 시나리오(마을·컷씬·한마디 …)가
+/// 진짜 슬롯의 씨앗·꾸미기·`once` 한마디를 바꾸지 않게. 기록은 메모리에서만 바뀌고, 타이틀로 돌아오면 앱이 슬롯을 다시 읽는다.
+static SANDBOX: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 개발 판을 켜고 끈다(`App`: 개발 메뉴에서 시나리오를 열 때 켜고, 타이틀로 돌아오면 끈다).
+pub fn set_sandbox(on: bool) {
+    SANDBOX.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn sandbox() -> bool {
+    SANDBOX.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// 칸에 쓴다. 이미 같은 글이면 쓰지 않는다. 실패하면 false, 앱이 `take_failure`로 알린다. 개발 판이면 쓰지 않고 true.
 fn put(cell: u32, text: &str) -> bool {
+    if sandbox() {
+        return true;
+    }
     let Ok(mut k) = KNOWN.lock() else {
         return store::write(cell, text);
     };
@@ -381,6 +397,14 @@ pub fn set_slot(i: usize) {
     put(0, &(i + 1).to_string());
 }
 
+/// 참 엔딩은 반쪽 엔딩을 품는다(0269 B1). v0.6.21까지는 첫 끝이 곧바로 참 엔딩이면 반쪽 엔딩 깃발이 서지 않아
+/// 할매의 마을 한마디·저널 "가장 깊은 곳"이 영영 열리지 않았다 — 그런 기록을 읽을 때 메운다(몇 번을 해도 같다).
+pub fn migrate_endings(p: &mut Profile) {
+    if p.flag(key::TRUE_ENDING) && !p.flag(key::HALF_ENDING) {
+        p.set(key::HALF_ENDING);
+    }
+}
+
 /// 슬롯 하나의 기록. 비었거나 읽을 수 없으면 빈 기록.
 pub fn load_slot(i: usize) -> Profile {
     get(i as u32 + 1)
@@ -388,6 +412,7 @@ pub fn load_slot(i: usize) -> Profile {
         .map(|mut p| {
             // 옛 기록을 지금 꼴로(빈 슬롯은 건드리지 않는다 — 빈 칸으로 보여야 한다).
             crate::talents::migrate(&mut p);
+            migrate_endings(&mut p);
             p
         })
         .unwrap_or_default()
@@ -522,6 +547,27 @@ mod tests {
         let q = Profile::decode(&p.encode()).unwrap();
         assert!(q.flag("future.thing"));
         assert_eq!(q.count("future.n"), 9);
+    }
+
+    #[test]
+    fn true_ending_alone_also_counts_as_the_half_ending() {
+        // 0269 B1: 참 엔딩만 적힌 옛 기록 → 반쪽 엔딩도. 없으면 그대로.
+        let mut p = Profile::default();
+        p.set(key::TRUE_ENDING);
+        migrate_endings(&mut p);
+        assert!(p.flag(key::HALF_ENDING));
+        let mut q = Profile::default();
+        migrate_endings(&mut q);
+        assert!(q.is_empty());
+        // 그 기록에서 할매가 마을에 온 첫 한마디가 나온다.
+        p.set(key::TUTORIAL);
+        p.set(&key::line("village_intro"));
+        let l = crate::story::take(
+            &mut p,
+            crate::story::When::Village,
+            crate::equipment::Character::Mole,
+        );
+        assert_eq!(l.map(|l| l.id), Some("halmae_arrive"));
     }
 
     #[test]
