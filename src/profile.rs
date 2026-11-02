@@ -216,9 +216,12 @@ mod store {
         String::from_utf8(buf).ok()
     }
 
-    pub fn write(cell: u32, s: &str) {
+    /// 쓰고 되읽어 같은지 본다(0264): localStorage는 칸이 차면(QuotaExceededError) 쓰기를 버리는데 JS가 예외를 삼켜
+    /// 실패를 몰랐다. 되읽기는 같은 플러그인으로 — index.html을 바꾸지 않아 캐시된 옛 페이지와도 맞는다.
+    pub fn write(cell: u32, s: &str) -> bool {
         // SAFETY: JS는 이 호출 동안만 그 범위를 읽는다.
         unsafe { nail_save_write(cell, s.as_ptr(), s.len() as u32) }
+        read(cell).unwrap_or_default() == s
     }
 }
 
@@ -271,16 +274,22 @@ mod store {
         std::fs::read_to_string(path(cell)?).ok()
     }
 
-    /// 임시 파일에 쓰고 이름을 바꾼다(쓰다 꺼져도 옛 저장이 남는다).
-    pub fn write(cell: u32, s: &str) {
-        let Some(p) = path(cell) else { return };
-        if let Some(d) = p.parent() {
-            let _ = std::fs::create_dir_all(d);
+    /// 임시 파일에 쓰고 이름을 바꾼다(쓰다 꺼져도 옛 저장이 남는다). 어느 단계든 실패하면 false — 전에는 결과를
+    /// 버려서 실패를 성공처럼 지나갔다(0264). 폴더를 못 찾으면(HOME 없음 등) 저장소가 없는 것이라 실패다.
+    pub fn write(cell: u32, s: &str) -> bool {
+        let Some(p) = path(cell) else { return false };
+        let result = (|| {
+            if let Some(d) = p.parent() {
+                std::fs::create_dir_all(d)?;
+            }
+            let tmp = p.with_extension("tmp");
+            std::fs::write(&tmp, s)?;
+            std::fs::rename(&tmp, &p)
+        })();
+        if let Err(e) = &result {
+            eprintln!("저장 실패 {}: {e}", p.display());
         }
-        let tmp = p.with_extension("tmp");
-        if std::fs::write(&tmp, s).is_ok() {
-            let _ = std::fs::rename(&tmp, &p);
-        }
+        result.is_ok()
     }
 }
 
@@ -300,6 +309,54 @@ pub extern "C" fn nail_save_crate_version() -> u32 {
 /// 저장 슬롯 수(0078).
 pub const SLOTS: usize = 3;
 
+/// 저장 칸 수: 0 = 마지막 슬롯 번호, 1~3 = 슬롯, 4~6 = 슬롯마다 진행 중인 런.
+const CELLS: usize = 1 + 2 * SLOTS;
+
+/// 칸마다 저장소에 있다고 아는 글(0264): 읽거나 쓰는 데 성공한 글. 같은 글을 다시 쓰라고 하면 건너뛴다 —
+/// 주기 저장(`tuning::AUTOSAVE_EVERY`)이 바뀐 것이 없을 때 디스크·localStorage를 건드리지 않게. 쓰기에 실패하면 비워
+/// 다음 저장 때 다시 쓴다(대기 중이라는 이유로 잃지 않게).
+static KNOWN: std::sync::Mutex<[Option<String>; CELLS]> =
+    std::sync::Mutex::new([const { None }; CELLS]);
+
+/// 쓰기 상태(0264): 0 = 마지막 쓰기 성공, 1 = 실패했고 아직 안 알림, 2 = 실패를 알림. 실패가 이어지는 동안은 한 번만
+/// 알리고(주기 저장마다 알림이 뜨지 않게), 한 번 성공하면 다시 0.
+static FAILED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// 칸을 읽고 그 글을 기억한다.
+fn get(cell: u32) -> Option<String> {
+    let text = store::read(cell);
+    if let Ok(mut k) = KNOWN.lock() {
+        k[cell as usize] = Some(text.clone().unwrap_or_default());
+    }
+    text
+}
+
+/// 칸에 쓴다. 이미 같은 글이면 쓰지 않는다. 실패하면 false, 앱이 `take_failure`로 알린다.
+fn put(cell: u32, text: &str) -> bool {
+    let Ok(mut k) = KNOWN.lock() else {
+        return store::write(cell, text);
+    };
+    let known = &mut k[cell as usize];
+    if known.as_deref() == Some(text) {
+        return true;
+    }
+    let ok = store::write(cell, text);
+    *known = ok.then(|| text.to_string());
+    use std::sync::atomic::Ordering::Relaxed;
+    if ok {
+        FAILED.store(0, Relaxed);
+    } else {
+        let _ = FAILED.compare_exchange(0, 1, Relaxed, Relaxed);
+    }
+    ok
+}
+
+/// 저장이 막 실패하기 시작했으면 한 번 true(알릴 차례). 실패가 이어져도 다음 성공 전까지는 다시 true가 아니다.
+pub fn take_failure() -> bool {
+    use std::sync::atomic::Ordering::Relaxed;
+    FAILED.compare_exchange(1, 2, Relaxed, Relaxed).is_ok()
+}
+
 /// 지금 쓰는 슬롯(0부터). 처음 물을 때 저장된 "마지막 슬롯"을 읽는다.
 static SLOT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(usize::MAX);
 
@@ -309,7 +366,7 @@ pub fn slot() -> usize {
     if s != usize::MAX {
         return s;
     }
-    let s = store::read(0)
+    let s = get(0)
         .and_then(|t| t.trim().parse::<usize>().ok())
         .filter(|n| (1..=SLOTS).contains(n))
         .map_or(0, |n| n - 1);
@@ -321,12 +378,12 @@ pub fn slot() -> usize {
 pub fn set_slot(i: usize) {
     let i = i.min(SLOTS - 1);
     SLOT.store(i, std::sync::atomic::Ordering::Relaxed);
-    store::write(0, &(i + 1).to_string());
+    put(0, &(i + 1).to_string());
 }
 
 /// 슬롯 하나의 기록. 비었거나 읽을 수 없으면 빈 기록.
 pub fn load_slot(i: usize) -> Profile {
-    store::read(i as u32 + 1)
+    get(i as u32 + 1)
         .and_then(|s| Profile::decode(&s))
         .map(|mut p| {
             // 옛 기록을 지금 꼴로(빈 슬롯은 건드리지 않는다 — 빈 칸으로 보여야 한다).
@@ -341,13 +398,13 @@ pub fn load() -> Profile {
     load_slot(slot())
 }
 
-/// 지금 슬롯에 쓴다.
-pub fn save(p: &Profile) {
-    save_slot(slot(), p);
+/// 지금 슬롯에 쓴다. 바뀐 것이 없으면 쓰지 않는다. 실패하면 false.
+pub fn save(p: &Profile) -> bool {
+    save_slot(slot(), p)
 }
 
-pub fn save_slot(i: usize, p: &Profile) {
-    store::write(i.min(SLOTS - 1) as u32 + 1, &p.encode());
+pub fn save_slot(i: usize, p: &Profile) -> bool {
+    put(i.min(SLOTS - 1) as u32 + 1, &p.encode())
 }
 
 /// 슬롯 `i`의 진행 중인 런 칸(0080).
@@ -357,14 +414,14 @@ fn run_cell(i: usize) -> u32 {
 
 /// 슬롯 `i`에 진행 중인 런이 있으면 그 글(깃발 + 수).
 pub fn load_run(i: usize) -> Option<Profile> {
-    store::read(run_cell(i))
+    get(run_cell(i))
         .and_then(|s| Profile::decode(&s))
         .filter(|p| !p.is_empty())
 }
 
-/// 진행 중인 런을 쓰거나(Some) 지운다(None = 빈 글).
-pub fn save_run(i: usize, p: Option<&Profile>) {
-    store::write(run_cell(i), &p.map(|p| p.encode()).unwrap_or_default());
+/// 진행 중인 런을 쓰거나(Some) 지운다(None = 빈 글). 바뀐 것이 없으면 쓰지 않는다. 실패하면 false.
+pub fn save_run(i: usize, p: Option<&Profile>) -> bool {
+    put(run_cell(i), &p.map(|p| p.encode()).unwrap_or_default())
 }
 
 /// Android 앱의 패키지 이름. `/proc/self/cmdline`의 첫 칸이 프로세스 이름이고, 앱 프로세스는 패키지 이름을 쓴다.
@@ -476,8 +533,37 @@ mod tests {
         p.add(key::RUNS, 4);
         // 읽을 때 옛 기록을 지금 꼴로 옮긴다(0263 — 한 번 했다는 깃발이 붙는다).
         crate::talents::migrate(&mut p);
-        save(&p);
+        assert!(save(&p));
         assert_eq!(load(), p);
+        // 같은 글은 다시 쓰지 않는다(0264): 파일을 지운 뒤 같은 기록을 저장해도 저장소를 건드리지 않는다(주기 저장의 바탕).
+        let file = dir.join("profile.txt");
+        std::fs::remove_file(&file).unwrap();
+        assert!(save(&p));
+        assert!(!file.exists(), "바뀐 것이 없으면 쓰지 않는다");
+        // 바뀌면 쓴다. 임시 파일은 남지 않는다(임시 파일 → 이름 바꾸기).
+        p.add(key::RUNS, 1);
+        assert!(save(&p));
+        assert_eq!(load(), p);
+        assert!(!dir.join("profile.tmp").exists());
+        // 실패는 실패로(0264): 폴더 자리에 파일이 있으면 못 쓴다 → false, 알림은 한 번.
+        let blocked = dir.join("blocked");
+        std::fs::write(&blocked, "x").unwrap();
+        std::env::set_var("NAIL_SAVE_DIR", blocked.join("sub"));
+        p.add(key::RUNS, 1);
+        assert!(!save(&p));
+        assert!(take_failure());
+        assert!(!save(&p), "이어지는 실패");
+        assert!(!take_failure(), "실패가 이어지는 동안은 한 번만 알린다");
+        // 저장소가 돌아오면 같은 글도 다시 쓴다: 실패한 글을 써 둔 것으로 치지 않았다.
+        std::env::set_var("NAIL_SAVE_DIR", &dir);
+        assert!(save(&p));
+        assert_eq!(load(), p);
+        assert!(!take_failure());
+        // 이어하기 칸도 같은 길(쓰기·지우기, 0080).
+        assert!(save_run(0, Some(&p)));
+        assert_eq!(load_run(0).as_ref(), Some(&p));
+        assert!(save_run(0, None));
+        assert!(load_run(0).is_none());
         let _ = std::fs::remove_dir_all(&dir);
         std::env::remove_var("NAIL_SAVE_DIR");
     }

@@ -1000,7 +1000,8 @@ pub(super) fn draw_light_shafts(w: &World, cam: Vec2, k: f32) {
 }
 
 /// 위에서 떨어지는 것: 뿌리 지대는 흙 알갱이, 심층은 물방울. 바닥 그림자가 커지다 닿으면 부서지거나 퍼진다.
-/// 상태 없이 시간으로 정한다(같은 번호·같은 주기 = 같은 자리).
+/// 상태 없이 시간으로 정한다(같은 칸·같은 주기 = 같은 자리). 자리는 월드 칸(`FALL_CELL`)에 붙는다 — 화면 기준으로
+/// 뽑았을 때는 떨어지는 0.8초 동안 카메라가 움직이면 물방울이 화면에 붙어 따라다녔다(빛줄기·떠다니는 입자처럼 월드에).
 pub(super) fn draw_overhead_falls(w: &World, cam: Vec2) {
     let drip = match w.biome {
         Biome::Roots | Biome::Silk => false,
@@ -1010,30 +1011,13 @@ pub(super) fn draw_overhead_falls(w: &World, cam: Vec2) {
     if w.room.grid.is_none() {
         return;
     }
-    const FALL: f32 = 0.45;
-    const LAND: f32 = 0.35;
-    for i in 0..6u32 {
-        if !keep_share(i as usize, w.juice.effects) {
-            continue;
-        }
-        let period = 2.4 + hash01(i, 61) * 2.2;
-        let tt = w.time + hash01(i, 62) * period;
-        let cyc = (tt / period).floor() as u32;
-        let since = tt - cyc as f32 * period;
-        if since > FALL + LAND {
-            continue;
-        }
-        let p = vec2(
-            cam.x + 12.0 + hash01(i ^ cyc.wrapping_mul(7919), 63) * (RW - 24.0),
-            cam.y + 24.0 + hash01(i ^ cyc.wrapping_mul(104_729), 64) * (RH - 40.0),
-        )
-        .round();
+    for (p, since) in overhead_falls(w.time, cam, w.juice.effects) {
         if w.room.is_solid(p, 3.0) {
             continue;
         }
         if since < FALL {
             let f = since / FALL;
-            let h = 46.0 * (1.0 - f * f);
+            let h = FALL_HEIGHT * (1.0 - f * f);
             // 그림자: 떨어질수록 진하고 크다.
             draw_ellipse(
                 p.x,
@@ -1071,5 +1055,86 @@ pub(super) fn draw_overhead_falls(w: &World, cam: Vec2) {
                 draw_rectangle(p.x + dx, p.y + dy - 1.0, 1.0, 1.0, c);
             }
         }
+    }
+}
+
+/// 떨어지는 것 하나가 머무는 월드 칸(px). 화면(320×180)에 칸 여섯쯤 — 예전 화면당 여섯 줄기와 같은 밀도.
+const FALL_CELL: f32 = 96.0;
+/// 떨어지는 시간·바닥에서 퍼지는 시간(초).
+const FALL: f32 = 0.45;
+const LAND: f32 = 0.35;
+/// 떨어지기 시작하는 높이(px). 화면 아래 끝 밖의 자리도 이만큼은 위에서 보인다.
+const FALL_HEIGHT: f32 = 46.0;
+
+/// 지금 보이는 떨어지는 것들: (바닥 자리 — 월드 좌표, 이번 주기에 떨어지기 시작한 뒤 지난 초). 카메라는 어느 칸을
+/// 볼지만 정하고 자리·때는 칸과 시간만으로 정한다. 입자 효과 설정(0141)만큼 칸을 남긴다.
+pub(super) fn overhead_falls(time: f32, cam: Vec2, effects: f32) -> Vec<(Vec2, f32)> {
+    let mut out = Vec::new();
+    if effects <= 0.0 {
+        return out;
+    }
+    let cell = |v: f32| (v / FALL_CELL).floor() as i32;
+    for cy in cell(cam.y)..=cell(cam.y + RH + FALL_HEIGHT) {
+        for cx in cell(cam.x)..=cell(cam.x + RW) {
+            let id = (cx as u32).wrapping_mul(73_856_093) ^ (cy as u32).wrapping_mul(19_349_663);
+            if hash01(id, 60) > effects {
+                continue;
+            }
+            let period = 2.4 + hash01(id, 61) * 2.2;
+            let tt = time + hash01(id, 62) * period;
+            let cyc = (tt / period).floor() as u32;
+            let since = tt - cyc as f32 * period;
+            if since > FALL + LAND {
+                continue;
+            }
+            // 주기마다 칸 안의 다른 자리(같은 데만 계속 떨어지지 않게).
+            let p = vec2(
+                cx as f32 * FALL_CELL
+                    + 8.0
+                    + hash01(id ^ cyc.wrapping_mul(7919), 63) * (FALL_CELL - 16.0),
+                cy as f32 * FALL_CELL
+                    + 8.0
+                    + hash01(id ^ cyc.wrapping_mul(104_729), 64) * (FALL_CELL - 16.0),
+            )
+            .round();
+            out.push((p, since));
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 떨어지는 것은 월드에 붙는다: 카메라가 움직여도 같은 때의 같은 물방울은 같은 월드 자리(화면 기준이면 카메라를
+    /// 따라 옮겨 갔다). 두 화면이 겹치는 곳에서는 같은 것을 같은 자리에 본다.
+    #[test]
+    fn overhead_falls_stay_in_the_world_when_the_camera_moves() {
+        let mut seen = 0;
+        for i in 0..400 {
+            let time = i as f32 * 0.05;
+            let a = overhead_falls(time, vec2(0.0, 0.0), 1.0);
+            // 떨어지는 동안 카메라가 오른쪽 아래로 40·24px 옮겨 갔다.
+            let b = overhead_falls(time, vec2(40.0, 24.0), 1.0);
+            for &(p, since) in &a {
+                let in_b = p.x >= 40.0 && p.x <= 40.0 + RW && p.y >= 24.0 && p.y <= 24.0 + RH;
+                if in_b {
+                    assert!(
+                        b.contains(&(p, since)),
+                        "t={time}: {p:?}가 카메라를 따라 움직였다"
+                    );
+                    seen += 1;
+                }
+            }
+        }
+        assert!(seen > 50, "겹치는 곳에서 본 것: {seen}");
+        // 입자 효과 0이면 없다(0141). 화면에 한꺼번에 보이는 것은 몇 개뿐(예전 밀도: 여섯 줄기 중 일부).
+        assert!(overhead_falls(1.0, Vec2::ZERO, 0.0).is_empty());
+        let most = (0..400)
+            .map(|i| overhead_falls(i as f32 * 0.05, Vec2::ZERO, 1.0).len())
+            .max()
+            .unwrap();
+        assert!((1..=8).contains(&most), "{most}");
     }
 }

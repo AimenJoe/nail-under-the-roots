@@ -189,6 +189,8 @@ pub struct Player {
     pub sp: f32,
     pub invuln: f32,
     pub flash: f32,
+    /// 마지막 피해가 몸을 밀친 피해였나(맞은 자세는 그때만). 독구름처럼 스며드는 피해는 false(0264).
+    pub knocked: bool,
     pub state: State,
     pub burrow_cd: f32,
     /// 다음 먹기까지 남은 시간(먹기 시작 순간부터 ITEM_COOLDOWN).
@@ -278,6 +280,7 @@ impl Player {
             sp: 0.0,
             invuln: 0.0,
             flash: 0.0,
+            knocked: false,
             state: State::Free,
             burrow_cd: 0.0,
             item_cd: 0.0,
@@ -920,13 +923,23 @@ impl Player {
         strike
     }
 
-    /// 피해를 입힌다. 무적이면 false.
+    /// 피해를 입힌다. 무적이면 false. 밀려나고 하던 것(공격·모으기·먹기·솟구침)이 끊긴다.
     pub fn take_damage(&mut self, from: Vec2, dmg: i32) -> bool {
+        self.take_hit(from, dmg, Recoil::Knock)
+    }
+
+    /// 스며드는 피해(독구름, 0264): 체력·무적·번쩍임은 같고, 밀리지도 하던 것이 끊기지도 않는다.
+    pub fn take_seep(&mut self, from: Vec2, dmg: i32) -> bool {
+        self.take_hit(from, dmg, Recoil::Seep)
+    }
+
+    fn take_hit(&mut self, from: Vec2, dmg: i32, recoil: Recoil) -> bool {
         if self.is_invulnerable() {
             return false;
         }
+        let knock = recoil == Recoil::Knock;
         // 모으다 맞으면 끊긴다(0161).
-        if matches!(self.state, State::Charging { .. }) {
+        if knock && matches!(self.state, State::Charging { .. }) {
             self.state = State::Free;
         }
         // 도움 모드: 피해를 비율만큼 줄인다. 소수는 모아 두었다가 1이 되면 깎는다(맞은 반응은 그대로).
@@ -941,25 +954,38 @@ impl Player {
         self.hp -= dmg;
         self.invuln = t::PLAYER_HURT_INVULN;
         self.flash = t::HIT_FLASH;
-        let away = (self.pos - from).normalize_or_zero();
-        let away = if away == Vec2::ZERO {
-            -self.facing
-        } else {
-            away
-        };
-        self.vel = away * t::PLAYER_HURT_KNOCKBACK;
+        self.knocked = knock;
+        if knock {
+            let away = (self.pos - from).normalize_or_zero();
+            let away = if away == Vec2::ZERO {
+                -self.facing
+            } else {
+                away
+            };
+            self.vel = away * t::PLAYER_HURT_KNOCKBACK;
+        }
         if self.hp <= 0 {
             self.hp = 0;
             self.state = State::Dead;
             self.events.push(Event::Die);
         } else {
-            // 공격·솟구침·먹기 중이었으면 끊긴다(먹던 것은 먹지 않은 것으로).
-            self.state = State::Free;
-            self.combo_timer = 0.0;
+            if knock {
+                // 공격·솟구침·먹기 중이었으면 끊긴다(먹던 것은 먹지 않은 것으로).
+                self.state = State::Free;
+                self.combo_timer = 0.0;
+            }
             self.events.push(Event::Hurt);
         }
         true
     }
+}
+
+/// 맞은 반응(0264). 몸으로 받는 공격은 밀리고 하던 것이 끊긴다(`Knock`). 독구름처럼 스며드는 피해는 체력만 깎는다
+/// (`Seep`) — 구름 속에서 밀리고 멈추면 빠져나오려던 걸음이 도로 구름 안으로 밀리거나 끊겼다.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Recoil {
+    Knock,
+    Seep,
 }
 
 /// 돌진 속도: 시동 뒤 `dash_t`초. 처음엔 붙고(DRILL_ACCEL), 그 뒤 최고 속도.

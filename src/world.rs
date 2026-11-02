@@ -2208,6 +2208,8 @@ impl World {
             }
             // 두꺼비 혀(0146): 내민 틱에 혀 줄에 걸리면 맞고 두꺼비 쪽으로 끌려간다. 받아치면 두꺼비가 멈칫한다.
             let mut pull = None;
+            // 독구름(포자 구름)은 스며드는 피해(0264): 밀리지도·멈추지도(히트스톱)·하던 것이 끊기지도 않는다.
+            let mut seep = false;
             if hurt_from.is_none() && !parried {
                 for e in &mut self.enemies {
                     if !e.tongue_reaches(&self.room, ppos, pr) {
@@ -2235,6 +2237,7 @@ impl World {
                     c.time >= t::SPORE_CLOUD_GRACE && (c.pos - ppos).length_squared() <= rr * rr
                 }) {
                     hurt_from = Some((c.pos, 1));
+                    seep = true;
                 }
             }
             if hurt_from.is_none() && !parried {
@@ -2299,7 +2302,12 @@ impl World {
             }
             if let Some((from, dmg)) = hurt_from {
                 let dmg = if self.no_damage { 0 } else { dmg };
-                if self.player.take_damage(from, dmg) {
+                let took = if seep {
+                    self.player.take_seep(from, dmg)
+                } else {
+                    self.player.take_damage(from, dmg)
+                };
+                if took {
                     if let Some(v) = pull {
                         self.player.vel = v;
                     }
@@ -2307,9 +2315,12 @@ impl World {
                         self.story.thorn_told = true;
                         self.juice.toast = Some((self.character.def().toast_thorn, 2.5));
                     }
-                    self.juice.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
+                    if !seep {
+                        // 히트스톱은 로직 시계를 멈춰 걸음·동작이 끊기고, 킥은 밀친 쪽으로 화면을 민다 — 구름엔 없다.
+                        self.juice.feel.add_hitstop(t::PLAYER_HURT_HITSTOP);
+                        self.juice.feel.add_kick(ppos - from, t::PLAYER_HURT_KICK);
+                    }
                     self.juice.feel.add_trauma(t::PLAYER_HURT_SHAKE);
-                    self.juice.feel.add_kick(ppos - from, t::PLAYER_HURT_KICK);
                     self.juice.feel.hurt = t::PLAYER_HURT_EDGE;
                     self.juice.audio.play(sfx::Id::Ouch);
                     self.juice
@@ -3231,7 +3242,7 @@ impl World {
                             self.juice.audio.play(sfx::Id::Unbind);
                             self.juice.feel.add_hitstop(0.12);
                             self.juice.feel.add_trauma(0.5);
-                            self.juice.toast = Some((|s| s.deep_k3, 3.5));
+                            self.juice.toast = Some((self.character.def().deep_warm, 3.5));
                             return;
                         }
                     } else if caught {
@@ -3283,7 +3294,7 @@ impl World {
                 self.juice.toast = Some((|s| s.deep_final_hint, 3.0));
             } else if !d.hinted {
                 d.hinted = true;
-                self.juice.toast = Some((|s| s.deep_wrap, 3.5));
+                self.juice.toast = Some((self.character.def().toast_wrap, 3.5));
             }
         }
         self.tick_shades(dt);
@@ -4413,6 +4424,73 @@ mod tests {
             w.tick(&crate::input::Actions::default());
         }
         assert!(w.player.hp < hp, "그 뒤 구름 안이면 아프다");
+    }
+
+    /// 독구름은 스며드는 피해(0264): 체력은 깎이고 무적이 붙지만, 밀리지 않고(넉백) 로직 시계도 멈추지 않으며(히트스톱)
+    /// 걷던 걸음·휘두르던 타가 끊기지 않는다. 같은 자리의 가시 덤불(몸으로 받는 위험)은 여전히 밀치고 멈춘다.
+    #[test]
+    fn spore_cloud_hurts_without_knockback_or_stagger() {
+        use crate::input::Actions;
+        let walk = Actions {
+            move_dir: vec2(1.0, 0.0),
+            ..Default::default()
+        };
+        let mut w = World::new();
+        w.no_damage = false;
+        let hp = w.player.hp;
+        let at = w.player.pos;
+        w.hazards.clouds.push(Cloud {
+            pos: at,
+            time: t::SPORE_CLOUD_GRACE + 0.05,
+        });
+        w.tick(&walk);
+        assert_eq!(w.player.hp, hp - 1, "구름의 피해는 그대로");
+        assert!(
+            w.player.invuln > 0.0,
+            "구름 속에서 매 틱 맞지 않게 무적은 그대로"
+        );
+        assert!(
+            w.player.vel.length() < 1.0,
+            "밀리지 않는다: {:?}",
+            w.player.vel
+        );
+        assert!(w.juice.feel.hitstop <= 0.0, "로직 시계를 멈추지 않는다");
+        assert!(!w.player.knocked, "맞은 자세(경직 그림)도 없다");
+        let x = w.player.pos.x;
+        w.tick(&walk);
+        assert!(w.player.pos.x > x, "걸음이 이어진다");
+
+        // 휘두르던 타는 끊기지 않는다.
+        let mut w = World::new();
+        w.no_damage = false;
+        w.tick(&Actions {
+            attack: true,
+            ..Default::default()
+        });
+        assert!(matches!(w.player.state, player::State::Attack { .. }));
+        let at = w.player.pos;
+        w.hazards.clouds.push(Cloud {
+            pos: at,
+            time: t::SPORE_CLOUD_GRACE + 0.05,
+        });
+        let hp = w.player.hp;
+        w.tick(&Actions::default());
+        assert_eq!(w.player.hp, hp - 1);
+        assert!(
+            matches!(w.player.state, player::State::Attack { .. }),
+            "{:?}",
+            w.player.state
+        );
+
+        // 몸으로 받는 위험(덤불)은 예전대로 밀치고 멈춘다.
+        let mut w = World::new();
+        w.no_damage = false;
+        let at = w.player.pos;
+        w.room.thorns.push(at);
+        w.tick(&Actions::default());
+        assert!(w.player.vel.length() > 100.0, "덤불은 밀친다");
+        assert!(w.juice.feel.hitstop > 0.0, "덤불은 멈춘다");
+        assert!(w.player.knocked);
     }
 
     /// 혀 줄 맞기(0146): 선분까지 거리.

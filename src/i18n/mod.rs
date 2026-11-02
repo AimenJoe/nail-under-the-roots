@@ -434,6 +434,8 @@ strings! {
     set_tells,
     h_doto, h_doto_d, h_run, h_run_d, h_rooms, h_rooms_d, enc_waves, enc_wave_next, enc_ambush, enc_hold, enc_hold_done, enc_hold_hud, enc_waves_hud,
     run_doto, seat_doto, nail_v1, nail_v2, nail_v_momo, nail_v_doto, dend_1, dend_2, dend_3, dend_4, doto_t_deep,
+    // 캐릭터마다 다른 필살기 설명·대사(0264)
+    special_desc_momo, special_desc_doto, momo_meet_1_doto, momo_meet_1b_doto, momo_meet_2b_doto, momo_meet_3b_doto, momo_r3_doto, clover_b3_doto, deep_k3_momo, deep_k3_doto, deep_wrap_momo, deep_wrap_doto, momo_t_doto_self, momo_t_true_doto, bori_t_doto_self, bori_t_momo_self, doto_t_deep_momo, toast_save_failed,
 }
 
 #[cfg(test)]

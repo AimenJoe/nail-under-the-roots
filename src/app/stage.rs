@@ -365,7 +365,8 @@ impl App {
             self.profile
                 .add(crate::village::KEY_SEEDS, t::VILLAGE_SEEDS_DAILY);
             self.profile.add(crate::journal::stat::DAILY_CLEARS, 1);
-            crate::profile::save(&self.profile);
+            // 타이틀로 가기 전에 이번 런에서 본 이웃까지(0264).
+            self.save_profile();
             self.title_cursor = 0;
             self.title_note = Some((|s| s.toast_daily_clear, 5.0));
             self.scene = Scene::Title;
@@ -494,8 +495,10 @@ impl App {
                 ));
             }
             // 수수: 처음엔 새싹 발톱을 만들어 준다(0053). 개발 시나리오는 기록 없이 이번 런에만.
+            // 같은 "파는 손"을 알아보는 장면이라 나일에게만(0264): 모모·도토에게 "어이, 두더지 꼬마!"라 했다. 발톱은 다음 나일 런에.
             Interact::Talk(Who::Susu)
-                if !self.profile.flag(crate::profile::key::SPROUT)
+                if self.world.character == crate::equipment::Character::Mole
+                    && !self.profile.flag(crate::profile::key::SPROUT)
                     && !self.inventory.has(crate::equipment::SPROUT_CLAW) =>
             {
                 if self.recording() {
@@ -1495,8 +1498,9 @@ impl App {
             let n = std::mem::take(&mut self.world.inv.seeds);
             if n > 0 {
                 self.profile.add(crate::village::KEY_SEEDS, n);
-                crate::profile::save(&self.profile);
             }
+            // 런을 버리기 전에 이번 런의 기록(통계·처음 본 이웃)까지(0264): 재화가 0이면 저장을 건너뛰던 자리.
+            self.save_profile();
         }
     }
 
@@ -1529,17 +1533,7 @@ impl App {
             }
         }
         self.tally = now;
-        // 쌓은 통계는 다른 저장 때 같이 적었는데, 그 사이에 끄면 사라졌다(0259): 바뀐 뒤 몇 초 안에 적는다.
-        if changed && self.stats_unsaved < 0.0 {
-            self.stats_unsaved = 0.0;
-        }
-        if self.stats_unsaved >= 0.0 {
-            self.stats_unsaved += dt;
-            if self.stats_unsaved >= t::STAT_SAVE_EVERY {
-                self.stats_unsaved = -1.0;
-                self.save_profile();
-            }
-        }
+        // 쌓은 통계는 주기 저장(`App::autosave`, 0264 — 0259의 "바뀐 뒤 10초"를 대신함)이 적는다.
         // 깃발(이야기)로 이루는 목표도 있으니 가끔은 그냥 센다.
         self.journal_check -= dt;
         if changed || self.journal_check <= 0.0 {

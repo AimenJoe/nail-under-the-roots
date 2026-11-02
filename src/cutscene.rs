@@ -126,6 +126,38 @@ mod device_tests {
         )));
     }
 
+    /// 오프닝의 첫 걸음: 걷는 동안 플레이어 그림이 걷기 칸을 고르도록 `pos - prev_pos`가 남고(렌더의 걷기 판정),
+    /// 다 걸으면 얼어 서 있는 칸으로 돌아간다. 컷씬이 매 프레임 월드를 얼려 Naïl이 서 있는 칸으로 미끄러졌다.
+    #[test]
+    fn player_walks_in_cutscene_move() {
+        let mut w = World::field();
+        w.player.pos = vec2(40.0, 90.0);
+        w.snap_cam();
+        let mut c = opening(&w);
+        let mut walked = 0;
+        let mut was_walking = false;
+        for f in 0..3000 {
+            let walking = matches!(c.steps.get(c.idx), Some(Step::Move { actor: 0, speed, .. }) if *speed < 100.0);
+            let a = Actions {
+                confirm: f % 40 == 0,
+                ..Default::default()
+            };
+            c.update(&a, 1.0 / 60.0, &mut w);
+            let moving = (w.player.pos - w.player.prev_pos).length() > 0.05;
+            if walking && c.moving(0) {
+                assert!(moving, "f{f}: 걷는 중인데 그림은 서 있다");
+                walked += 1;
+            }
+            if was_walking && !c.moving(0) {
+                assert!(!moving, "다 걸으면 선다");
+                assert_eq!(w.player.pos, vec2(110.0, 90.0));
+                break;
+            }
+            was_walking = walking;
+        }
+        assert!(walked > 30, "첫 걸음 약 70px를 60px/s로: {walked}프레임");
+    }
+
     /// 오프닝의 모모(0164): 눈빛 → 등장 → 카드 → 덮침(Naïl이 밀려남) → 멈춤·착각 → 사라지며 시든 꽃잎을 남긴다
     /// → 포포가 굳는다. 끝까지 돌리면 꽃잎이 바닥에 있고, 밟으면 줍는다.
     #[test]
@@ -491,6 +523,7 @@ impl Cutscene {
             return;
         };
         let fresh = std::mem::replace(&mut self.fresh, false);
+        let before = w.player.pos;
         self.t += dt;
         self.age += dt;
         self.illust_t += dt;
@@ -606,6 +639,10 @@ impl Cutscene {
                 true
             }
         };
+        let walked_from = match step {
+            Step::Move { actor: 0, .. } if !advance => Some(before),
+            _ => None,
+        };
         if advance {
             self.idx += 1;
             self.t = 0.0;
@@ -616,6 +653,12 @@ impl Cutscene {
             }
         }
         w.freeze();
+        // 플레이어(배우 0)는 월드의 그림을 쓰고, 그 그림은 `pos - prev_pos`로 걷는지 고른다. 다 얼리면 걷는 동안에도
+        // 서 있는 칸으로 미끄러졌다(오프닝의 첫 걸음). 걷는 중이면 이번 프레임에 온 자리를 남긴다 — 컷씬은 보간을
+        // 쓰지 않아(alpha 1) 그리는 자리는 그대로고, 걷기가 끝나는 프레임에는 얼린다.
+        if let Some(p) = walked_from {
+            w.player.prev_pos = p;
+        }
     }
 
     /// 글이 한 자씩 찍힌다. 다 찍히기 전에 누르면 전부, 다 찍힌 뒤 누르면 다음(true).
@@ -997,8 +1040,11 @@ pub fn clover_returns(w: &World, at: Vec2) -> Cutscene {
             at: c1,
         },
         Step::Wait(0.6),
+        // 고맙다는 말은 눈앞의 아이에게(0264): 도토 런에 "두더지야"라고 했다.
         if momo {
             say(1, Face::Happy, |s| s.clover_b3_momo)
+        } else if w.character == crate::equipment::Character::Doto {
+            say(1, Face::Happy, |s| s.clover_b3_doto)
         } else {
             say(1, Face::Happy, |s| s.clover_b3)
         },
@@ -1364,6 +1410,112 @@ pub fn keeper_beaten(kind: crate::enemy::Kind, w: &World, r: crate::world::BossB
 mod keeper_tests {
     use super::*;
 
+    /// 대사 검수(0264): 모모·도토로 갈 수 있는 이야기 장면을 다 만들어, 플레이어 배우(0)가 나일 이름을 대거나 발톱을
+    /// 말하지 않고, 누구도 눈앞의 아이를 "두더지"라 부르지 않는지 본다(한국어 표). 나일로는 원래 줄 그대로.
+    #[test]
+    fn story_scenes_speak_as_and_to_the_current_character() {
+        use crate::enemy::Kind;
+        use crate::equipment::Character;
+        use crate::world::BossBeaten;
+        let ko = &crate::i18n::KO;
+        let lines_of = |c: &Cutscene| -> Vec<(usize, &'static str)> {
+            c.steps
+                .iter()
+                .filter_map(|s| match s {
+                    Step::Say { actor, text, .. } => Some((*actor, text(ko))),
+                    _ => None,
+                })
+                .collect()
+        };
+        let scenes = |w: &World, ch: Character| -> Vec<(String, Cutscene)> {
+            let won = |back| BossBeaten { wins: 3, back };
+            let mut v = vec![
+                ("kongi_meet".into(), keeper_meet(Kind::Kongi, w)),
+                (
+                    "kongi_back".into(),
+                    keeper_beaten(Kind::Kongi, w, won(true)),
+                ),
+                ("clover_meet".into(), keeper_meet(Kind::Clover, w)),
+                (
+                    "clover_back".into(),
+                    keeper_beaten(Kind::Clover, w, won(true)),
+                ),
+                ("halmae".into(), halmae_meet(w)),
+                ("camp1".into(), camp_arrive(w, 1)),
+                ("camp2".into(), camp_arrive(w, 2)),
+            ];
+            // 모모 런에는 모모 보스가 없고(0056), 도토 런에는 도토 보스가 없다(0201).
+            if ch != Character::Momo {
+                for level in 1..=3 {
+                    v.push((
+                        format!("momo_meet{level}"),
+                        momo_meet(w, level, w.player.pos),
+                    ));
+                }
+                v.push(("momo_flee".into(), momo_flee(w, w.player.pos, 1)));
+                v.push(("momo_back".into(), keeper_beaten(Kind::Momo, w, won(true))));
+            }
+            if ch != Character::Doto {
+                v.push(("doto_meet".into(), keeper_meet(Kind::Doto, w)));
+                v.push(("doto_back".into(), keeper_beaten(Kind::Doto, w, won(true))));
+            }
+            v
+        };
+        for ch in [Character::Momo, Character::Doto] {
+            let mut w = World::new();
+            w.character = ch;
+            w.player.kit = ch;
+            for (name, c) in scenes(&w, ch) {
+                for (actor, text) in lines_of(&c) {
+                    assert!(!text.contains("두더지"), "{ch:?} {name}: {text}");
+                    if actor == 0 {
+                        assert!(
+                            !text.contains("나일이야") && !text.contains("발톱"),
+                            "{ch:?} {name}: 플레이어가 나일의 말을 한다: {text}"
+                        );
+                    }
+                }
+            }
+        }
+        // 도토로 모모를 만나면 첫 만남의 "돌아가라고 했잖아"(오프닝에서 나일이 들은 말)는 없고, 답은 도토의 말.
+        let mut w = World::new();
+        w.character = Character::Doto;
+        let first = lines_of(&momo_meet(&w, 1, w.player.pos));
+        assert_eq!(first[0].1, ko.momo_meet_1_doto);
+        assert_eq!(first[1].1, ko.momo_meet_1b_doto);
+        let back = lines_of(&keeper_beaten(
+            Kind::Momo,
+            &w,
+            BossBeaten {
+                wins: 3,
+                back: true,
+            },
+        ));
+        assert!(back.iter().any(|(a, t)| *a == 0 && *t == ko.momo_r3_doto));
+        // 나일로는 원래 줄.
+        let w = World::new();
+        let first = lines_of(&momo_meet(&w, 1, w.player.pos));
+        assert_eq!((first[0].1, first[1].1), (ko.momo_meet_1, ko.momo_meet_1b));
+        let back = lines_of(&keeper_beaten(
+            Kind::Momo,
+            &w,
+            BossBeaten {
+                wins: 3,
+                back: true,
+            },
+        ));
+        assert!(back.iter().any(|(a, t)| *a == 0 && *t == ko.momo_r3));
+        let clover = lines_of(&keeper_beaten(
+            Kind::Clover,
+            &w,
+            BossBeaten {
+                wins: 1,
+                back: true,
+            },
+        ));
+        assert!(clover.iter().any(|(_, t)| *t == ko.clover_b3));
+    }
+
     /// 보리의 등장(0190): 빛은 한 번에 뛰지 않고 Naïl에서 보리로 건너간다 — 가운데쯤엔 둘 사이에 있다.
     #[test]
     fn the_light_slides_from_nail_to_bori() {
@@ -1409,11 +1561,23 @@ mod keeper_tests {
 /// 시든 꽃잎이 흩날리고 모모가 일어선다(땅 울림) → '???' 카드 → 말 → 빛과 카메라가 돌아오고 보스 곡.
 /// `at`은 모모가 선 자리(월드의 적을 그대로 그린다, 배우는 안 보인다).
 pub fn momo_meet(w: &World, level: u8, at: Vec2) -> Cutscene {
-    let lines: [(Tr, Tr); 3] = [
-        (|s| s.momo_meet_1, |s| s.momo_meet_1b),
-        (|s| s.momo_meet_2, |s| s.momo_meet_2b),
-        (|s| s.momo_meet_3, |s| s.momo_meet_3b),
-    ];
+    // 도토로 내려가도 모모가 아직 안 돌아왔으면 첫 길 끝에서 만난다(모모 런만 모모 보스가 없다, 0056). 답은 도토의 말로,
+    // 첫 만남의 "또 너야. 돌아가라고 했잖아."는 오프닝에서 그 말을 들은 나일에게만(0264). 이긴 수는 기록 하나라 둘째·셋째
+    // 만남의 모모 말(아래엔 아무도 없어·그 목소리가 데려갈 거야)은 누구에게나 그대로.
+    let doto = w.character == crate::equipment::Character::Doto;
+    let lines: [(Tr, Tr); 3] = if doto {
+        [
+            (|s| s.momo_meet_1_doto, |s| s.momo_meet_1b_doto),
+            (|s| s.momo_meet_2, |s| s.momo_meet_2b_doto),
+            (|s| s.momo_meet_3, |s| s.momo_meet_3b_doto),
+        ]
+    } else {
+        [
+            (|s| s.momo_meet_1, |s| s.momo_meet_1b),
+            (|s| s.momo_meet_2, |s| s.momo_meet_2b),
+            (|s| s.momo_meet_3, |s| s.momo_meet_3b),
+        ]
+    };
     let (momo, nail) = lines[(level.max(1) as usize - 1).min(2)];
     let face = if level >= 3 {
         Face::Worried
@@ -1846,8 +2010,13 @@ fn story_actors(w: &World) -> Vec<Actor> {
     vec![nail_actor(w), momo_actor(), halmae_actor()]
 }
 
-/// 모모가 돌아온다: 세 번째 승리 뒤(0037). 꽃이 피고 이름을 말한다.
-fn momo_steps() -> Vec<Step> {
+/// 모모가 돌아온다: 세 번째 승리 뒤(0037). 꽃이 피고 이름을 말한다. 플레이어 배우는 이번 런의 캐릭터라
+/// 제 이름을 댄다 — 도토 런에서도 "나는 나일이야"라고 했다(0264).
+fn momo_steps(ch: crate::equipment::Character) -> Vec<Step> {
+    let me: Tr = match ch {
+        crate::equipment::Character::Doto => |s| s.momo_r3_doto,
+        _ => |s| s.momo_r3,
+    };
     let mut v = vec![
         Step::Illust(Some(Illust::MomoBloom)),
         Step::Fade {
@@ -1856,7 +2025,7 @@ fn momo_steps() -> Vec<Step> {
         },
         Step::Narrate(|s| s.momo_r1),
         say(1, Face::Normal, |s| s.momo_r2),
-        say(0, Face::Worried, |s| s.momo_r3),
+        say(0, Face::Worried, me),
         say(1, Face::Normal, |s| s.momo_r4),
         say(1, Face::Happy, |s| s.momo_r5),
         say(0, Face::Happy, |s| s.momo_r6),
@@ -1972,7 +2141,7 @@ pub fn momo_returns(w: &World, at: Vec2) -> Cutscene {
         to_clear: false,
         secs: 0.5,
     });
-    steps.extend(momo_steps());
+    steps.extend(momo_steps(w.character));
     Cutscene::new(story_actors(w), steps)
 }
 
@@ -2030,7 +2199,7 @@ pub fn ending_doto(w: &World) -> Cutscene {
 
 /// 개발: 아직 게임에 자리가 없는 이야기 장면을 이어서(모모 → 반쪽 엔딩 → 참 엔딩·에필로그).
 pub fn story_preview(w: &World) -> Cutscene {
-    let mut steps = momo_steps();
+    let mut steps = momo_steps(w.character);
     steps.extend(half_ending_steps());
     steps.extend(true_ending_steps(true));
     Cutscene::new(story_actors(w), steps)

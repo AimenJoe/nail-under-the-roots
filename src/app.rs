@@ -409,8 +409,8 @@ pub struct App {
     /// 이번 프레임의 굴리기 입력(논리 px 끌기, 칸: 휠·▲▼, 0199).
     scroll_in: (f32, i32),
     journal_check: f32,
-    /// 런 통계를 기록에 쌓았는데 아직 안 적었다(0259): `STAT_SAVE_EVERY`초마다 한 번 적는다.
-    stats_unsaved: f32,
+    /// 주기 저장(0264)까지 남은 시간을 세는 시계(게임 화면에서만 흐른다).
+    autosave_t: f32,
     /// 마을 뿌리 길에서 길 지도를 보는 중(0259): 새 런이 쓸 모험 시드.
     village_pick: Option<u64>,
     /// 마을 길 지도에서 고른 칸(0259): 새 런의 첫 장면이 그 굴로 곧장 내려간다.
@@ -492,6 +492,10 @@ impl App {
         fonts: render::Fonts,
         art: Option<Art>,
     ) -> Self {
+        // PC의 창 닫기(✕·Alt+F4)는 바로 끝내지 않고 앱이 받는다: 런을 적은 뒤 끈다(`frame`, 0264).
+        if crate::DESKTOP {
+            macroquad::input::prevent_quit();
+        }
         let saved = crate::prefs::load();
         let settings = Settings {
             volume: saved.map(|p| p.volume).unwrap_or(7),
@@ -568,7 +572,7 @@ impl App {
             dev_view: Default::default(),
             scroll_in: (0.0, 0),
             journal_check: 0.0,
-            stats_unsaved: -1.0,
+            autosave_t: 0.0,
             village_pick: None,
             village_go: None,
             inventory: Inventory::new(Character::Mole, &[]),
@@ -635,12 +639,50 @@ impl App {
         })
     }
 
-    /// 기록을 저장한다. 이번 런에서 만난 이웃도 함께 남긴다.
+    /// 기록을 저장한다. 이번 런에서 만난 이웃도 함께 남긴다. 바뀐 것이 없으면 쓰지 않는다(`profile::put`).
     fn save_profile(&mut self) {
         for k in &self.world.seen {
             self.profile.set(&crate::profile::key::mob(k));
         }
         crate::profile::save(&self.profile);
+    }
+
+    /// 주기 저장(0264): 게임 화면에서 `AUTOSAVE_EVERY`초마다 기록(통계·도감)과 이어하기(가방·재화·체력)를 적는다.
+    /// 바뀐 것이 없으면 쓰지 않고, 장소를 바꾸는 중(어두워졌다 밝아짐)에는 이어하기를 건너뛴다. 무엇을 언제 적을 수 있는지
+    /// (쉼터를 지난 이야기 런·살아 있을 때)는 `checkpoint_run` 한 곳.
+    fn autosave(&mut self, dt: f32) {
+        self.autosave_t += dt;
+        if self.autosave_t < t::AUTOSAVE_EVERY {
+            return;
+        }
+        self.autosave_t = 0.0;
+        if !self.recording() {
+            return;
+        }
+        self.save_profile();
+        if self.world.adv.fade.is_none() {
+            self.checkpoint_run();
+        }
+    }
+
+    /// 런을 멈추고 나간다(타이틀로·창 닫기, 0264): 반딧불은 마을로(0259), 기록은 늘, 런은 이어하기에.
+    /// 전에는 반딧불이 0이면 기록을 적지 않아 그 사이의 통계·처음 본 이웃이 타이틀로 나가며 사라질 수 있었다.
+    pub(super) fn suspend_run(&mut self) {
+        self.bank_glowbugs();
+        if self.recording() {
+            self.save_profile();
+        }
+        self.checkpoint_run();
+    }
+
+    /// 저장 실패를 한 번 알린다(0264): 게임 중이면 토스트, 타이틀 쪽이면 타이틀 알림.
+    fn notify_save_failed(&mut self) {
+        let note: (Tr, f32) = (|s| s.toast_save_failed, 4.0);
+        if self.scene.layer() == Layer::World {
+            self.world.juice.toast = Some(note);
+        } else {
+            self.title_note = Some(note);
+        }
     }
 
     /// 첫 시작(Normal)만 이야기 기록을 남긴다. 개발 시나리오는 기록을 건드리지 않는다.
@@ -675,7 +717,7 @@ impl App {
     /// 짧은 한마디(런 사이). 맞는 줄이 있으면 대화 컷씬.
     /// 표에서 지금 할 한마디를 골라 튼다. 말했으면 true.
     fn say_story(&mut self, when: crate::story::When) -> bool {
-        let Some(l) = crate::story::take(&mut self.profile, when) else {
+        let Some(l) = crate::story::take(&mut self.profile, when, self.world.character) else {
             return false;
         };
         crate::profile::save(&self.profile);
@@ -709,10 +751,21 @@ impl App {
         let heard = self.music_track();
         self.music.update(heard.music, heard.ducked, dt);
         self.amb.update(heard.ambience, heard.ducked, dt);
+        // PC에서 창을 닫으면(0264): 끄기 전에 타이틀로 나갈 때처럼 런을 적는다(`App::new`의 `prevent_quit`).
+        if crate::DESKTOP && macroquad::input::is_quit_requested() {
+            if self.scene.layer() == Layer::World {
+                self.suspend_run();
+            }
+            macroquad::miniquad::window::order_quit();
+        }
+        if crate::profile::take_failure() {
+            self.notify_save_failed();
+        }
         match self.scene {
             Scene::Game => {
                 let heard = self.sfx.played();
                 self.update_game(dt);
+                self.autosave(dt);
                 if let (Some(w), None) = (self.story_after_ascent, self.world.adv.fade) {
                     let w = w + dt;
                     self.story_after_ascent = if w >= t::ASCENT_STORY_DELAY {
@@ -1016,6 +1069,8 @@ impl App {
         if s != Scenario::Dream {
             self.dream = None;
         }
+        // 여기서 기록을 적지 않는다(0264): 슬롯을 바꿔 이어할 때는 기록이 이미 새 슬롯 것이라, 옛 월드의 도감을 섞어 쓴다.
+        // 런을 버리는 길(다시 하기·실뿌리·엔딩·타이틀로)이 저마다 그 런의 기록을 적고 들어온다.
         self.current = s;
         self.world = scenario::build(s);
         if s == Scenario::Village {

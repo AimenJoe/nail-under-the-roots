@@ -210,8 +210,7 @@ impl App {
             Some(3) => {
                 // 타이틀로: 런은 이어하기에 남는다. 반딧불은 마을로 보내고(0259), 지금 가방·씨앗까지 적는다 —
                 // 굴 안이면 이어할 때 마지막 쉼터·지나온 길부터(0259), 그 굴의 진행만 다시 한다.
-                self.bank_glowbugs();
-                self.checkpoint_run();
+                self.suspend_run();
                 self.title_cursor = 0;
                 self.scene = Scene::Title;
             }
@@ -513,14 +512,20 @@ impl App {
             }
             *y += 2.0;
         };
+        // 이번 런 캐릭터의 필살기(0264): 이름·초상화·회피 대기 이름과 같은 표의 줄에서.
         let desc = fill(
-            s.special_desc,
+            (w.character.def().special_desc)(s),
             &[
                 &tr(gauge.name()),
                 &ui::key(crate::input::prompt(crate::input::Act::Special)),
             ],
         );
-        labeled(&mut y, s.special_name, gauge.color(), &desc);
+        labeled(
+            &mut y,
+            (w.character.def().special_name)(s),
+            gauge.color(),
+            &desc,
+        );
         labeled(&mut y, s.charms_label, ui::ACCENT, &charms);
         // 낀 재주(0047): 자리 순서로. 없으면 어디서 깨우는지.
         let picked: Vec<&str> = crate::talents::table(self.world.character)

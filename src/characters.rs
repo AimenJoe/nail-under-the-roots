@@ -84,6 +84,14 @@ pub struct CharacterDef {
     pub toast_shell: Tr,
     pub toast_thorn: Tr,
     pub toast_web: Tr,
+    /// 가장 깊은 곳에서 실에 처음 감겼을 때의 안내(피하는 동작이 캐릭터마다, 0264).
+    pub toast_wrap: Tr,
+    /// 상태 탭의 필살기 이름·설명(0264). 전에는 Naïl의 "드릴 돌진"과 그 설명 하나라 모모·도토 런에도 드릴이 나왔다.
+    /// 이름은 큰 나무의 특기 칸과 같은 글.
+    pub special_name: Tr,
+    pub special_desc: Tr,
+    /// 가장 굵은 실을 받아쳤을 때 할매의 한마디(0264): 무엇이 따뜻한지(발톱·발·앞발).
+    pub deep_warm: Tr,
     /// 파 내려가는 전환(`draw_descent`)의 그림 줄. None = Naïl의 털빛 줄.
     pub dig_row: Option<u32>,
     /// 터치 버튼 그림: 공격·회피·특기(0172).
@@ -111,6 +119,10 @@ pub static ALL: [CharacterDef; 3] = [
         toast_shell: |s| s.toast_shell,
         toast_thorn: |s| s.toast_thorn,
         toast_web: |s| s.toast_web,
+        toast_wrap: |s| s.deep_wrap,
+        special_name: |s| s.special_name,
+        special_desc: |s| s.special_desc,
+        deep_warm: |s| s.deep_k3,
         dig_row: None,
         touch: [Icon::Claw, Icon::Mound, Icon::Drill],
     },
@@ -135,6 +147,10 @@ pub static ALL: [CharacterDef; 3] = [
         toast_shell: |s| s.toast_shell_momo,
         toast_thorn: |s| s.toast_thorn_momo,
         toast_web: |s| s.toast_web_momo,
+        toast_wrap: |s| s.deep_wrap_momo,
+        special_name: |s| s.tal_chain,
+        special_desc: |s| s.special_desc_momo,
+        deep_warm: |s| s.deep_k3_momo,
         dig_row: Some(4),
         touch: [Icon::Paw, Icon::Hop, Icon::Chain],
     },
@@ -159,6 +175,10 @@ pub static ALL: [CharacterDef; 3] = [
         toast_shell: |s| s.toast_shell_doto,
         toast_thorn: |s| s.toast_thorn_doto,
         toast_web: |s| s.toast_web_doto,
+        toast_wrap: |s| s.deep_wrap_doto,
+        special_name: |s| s.tal_bury,
+        special_desc: |s| s.special_desc_doto,
+        deep_warm: |s| s.deep_k3_doto,
         dig_row: Some(5),
         touch: [Icon::Acorn, Icon::Leap, Icon::Bury],
     },
@@ -219,5 +239,52 @@ mod tests {
         );
         let p = Profile::default();
         assert_eq!(available(&p).count(), 1, "모모·도토는 돌아온 뒤에만");
+    }
+
+    /// 상태 탭의 필살기 설명은 캐릭터마다 제 특기(0264): 전에는 Naïl의 드릴 설명 하나라 모모·도토로 걸어도 드릴이었다.
+    /// 캐릭터 이름·초상화·회피 이름과 같은 줄에서 읽으니, 고른 캐릭터가 바뀌면 같이 바뀐다.
+    #[test]
+    fn status_text_follows_the_character() {
+        use crate::i18n::Lang;
+        for &l in Lang::ALL {
+            let s = l.strings();
+            for f in [
+                |d: &CharacterDef| d.special_desc,
+                |d: &CharacterDef| d.special_name,
+            ] {
+                let v: Vec<&str> = ALL.iter().map(|d| f(d)(s)).collect();
+                assert!(
+                    v[0] != v[1] && v[1] != v[2] && v[0] != v[2],
+                    "{l:?}: 필살기 이름·설명이 겹친다 {v:?}"
+                );
+            }
+            for d in &ALL {
+                let other = |f: fn(&CharacterDef) -> Tr| {
+                    ALL.iter()
+                        .filter(|o| o.id != d.id)
+                        .all(|o| f(o)(s) != f(d)(s))
+                };
+                assert!(
+                    other(|d| d.toast_wrap) && other(|d| d.deep_warm),
+                    "{l:?} {:?}",
+                    d.id
+                );
+            }
+        }
+        let ko = &crate::i18n::KO;
+        let desc = |c: Character| (c.def().special_desc)(ko);
+        assert!(desc(Character::Mole).contains("돌진"));
+        assert!(desc(Character::Momo).contains("이어 뛰"));
+        assert!(desc(Character::Doto).contains("묻는다"));
+        assert!(!desc(Character::Momo).contains("돌진") && !desc(Character::Doto).contains("돌진"));
+        let name = |c: Character| (c.def().special_name)(ko);
+        assert_eq!(
+            [
+                name(Character::Mole),
+                name(Character::Momo),
+                name(Character::Doto)
+            ],
+            ["드릴 돌진", "이어 뛰기", "도토리 묻기"]
+        );
     }
 }

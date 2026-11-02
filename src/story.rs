@@ -6,6 +6,7 @@
 //! 지는 사람도 이야기를 보게 쓰러진 횟수도 조건으로 쓴다.
 
 use crate::cutscene::Speaker;
+use crate::equipment::Character;
 use crate::i18n::Tr;
 use crate::profile::{key, Profile};
 
@@ -29,8 +30,10 @@ pub enum Cond {
     DeathsAtLeast(u32),
     /// 기록의 수가 이만큼 이상(모모를 이긴 수 등).
     CountAtLeast(&'static str, u32),
-    /// 기록의 수가 꼭 이만큼(고른 캐릭터 번호 `char_pick` 등, 0201).
-    CountIs(&'static str, u32),
+    /// 지금 걷는 캐릭터가 이것이다 / 아니다(0264). 이웃이 눈앞의 캐릭터를 제삼자로 말하지 않게, 다른 캐릭터의 일을
+    /// 제 일처럼 말하지 않게 가른다. 전에는 기록의 고른 번호(`char_pick`)를 봤다(0201) — 지금은 그 런의 캐릭터를 바로.
+    As(Character),
+    NotAs(Character),
     Flag(&'static str),
     NotFlag(&'static str),
     /// 다른 줄을 이미 봤다(순서 잇기).
@@ -38,11 +41,12 @@ pub enum Cond {
 }
 
 impl Cond {
-    fn holds(self, p: &Profile) -> bool {
+    fn holds(self, p: &Profile, ch: Character) -> bool {
         match self {
             Cond::DeathsAtLeast(n) => p.count(key::DEATHS) >= n,
             Cond::CountAtLeast(k, n) => p.count(k) >= n,
-            Cond::CountIs(k, n) => p.count(k) == n,
+            Cond::As(c) => ch == c,
+            Cond::NotAs(c) => ch != c,
             Cond::Flag(k) => p.flag(k),
             Cond::NotFlag(k) => !p.flag(k),
             Cond::Seen(id) => p.flag(&key::line(id)),
@@ -57,6 +61,17 @@ pub struct Line {
     pub text: Tr,
     pub needs: &'static [Cond],
     pub once: bool,
+}
+
+impl Line {
+    /// 조건이 얼마나 구체적인가. 캐릭터 조건(`As`·`NotAs`)은 누가 듣는지만 거르고 세지 않는다(0264) — 같은 이야기를
+    /// 캐릭터마다 갈라 쓴 줄이 다른 줄보다 먼저 나오지 않게(나일이 듣는 순서는 그대로).
+    fn specificity(&self) -> usize {
+        self.needs
+            .iter()
+            .filter(|c| !matches!(c, Cond::As(_) | Cond::NotAs(_)))
+            .count()
+    }
 }
 
 use Cond::*;
@@ -253,7 +268,15 @@ pub const LINES: &[Line] = &[
         when: When::TalkBori,
         who: Speaker::Bori,
         text: |s| s.bori_t_momo,
-        needs: &[Flag(key::MOMO_BACK)],
+        needs: &[Flag(key::MOMO_BACK), NotAs(Character::Momo)],
+        once: true,
+    },
+    Line {
+        id: "bori_t_momo_self",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_t_momo_self,
+        needs: &[Flag(key::MOMO_BACK), As(Character::Momo)],
         once: true,
     },
     Line {
@@ -269,7 +292,8 @@ pub const LINES: &[Line] = &[
         when: When::TalkBori,
         who: Speaker::Bori,
         text: |s| s.bori_t_falls,
-        needs: &[DeathsAtLeast(5)],
+        // "발톱을 휘두르는 첫머리에 맞받으면" — 나일의 손에 맞춘 요령이라 나일에게만(0264).
+        needs: &[DeathsAtLeast(5), As(Character::Mole)],
         once: true,
     },
     Line {
@@ -310,7 +334,16 @@ pub const LINES: &[Line] = &[
         when: When::TalkMomo,
         who: Speaker::Momo,
         text: |s| s.momo_t_true,
-        needs: &[Flag(key::TRUE_ENDING)],
+        needs: &[Flag(key::TRUE_ENDING), NotAs(Character::Doto)],
+        once: true,
+    },
+    // 도토에게는 도토를 "도토가"라 하지 않는다(0264).
+    Line {
+        id: "momo_t_true_doto",
+        when: When::TalkMomo,
+        who: Speaker::Momo,
+        text: |s| s.momo_t_true_doto,
+        needs: &[Flag(key::TRUE_ENDING), As(Character::Doto)],
         once: true,
     },
     Line {
@@ -318,16 +351,34 @@ pub const LINES: &[Line] = &[
         when: When::TalkDoto,
         who: Speaker::Doto,
         text: |s| s.doto_t_venom,
-        needs: &[Flag(key::VENOM)],
+        // "네 발톱에서 쌉쌀한 냄새" — 독은 나일의 고유 재주(0247)라 나일에게만(0264).
+        needs: &[Flag(key::VENOM), As(Character::Mole)],
         once: true,
     },
     // 도토로 가장 깊은 곳에 닿았다(0201): 씨앗은 실이 안고 있다 — 묻어 줄 것은 나일(참 엔딩 true_1).
+    // "나일, …네 손"이라 부르는 줄이라 나일에게만, 모모에게는 나일에게 전해 달라고(0264).
     Line {
         id: "doto_t_deep",
         when: When::TalkDoto,
         who: Speaker::Doto,
         text: |s| s.doto_t_deep,
-        needs: &[Flag(key::DOTO_DEEP), NotFlag(key::TRUE_ENDING)],
+        needs: &[
+            Flag(key::DOTO_DEEP),
+            NotFlag(key::TRUE_ENDING),
+            As(Character::Mole),
+        ],
+        once: true,
+    },
+    Line {
+        id: "doto_t_deep_momo",
+        when: When::TalkDoto,
+        who: Speaker::Doto,
+        text: |s| s.doto_t_deep_momo,
+        needs: &[
+            Flag(key::DOTO_DEEP),
+            NotFlag(key::TRUE_ENDING),
+            As(Character::Momo),
+        ],
         once: true,
     },
     Line {
@@ -343,7 +394,17 @@ pub const LINES: &[Line] = &[
         when: When::TalkBori,
         who: Speaker::Bori,
         text: |s| s.bori_t_doto,
-        needs: &[Flag(key::DOTO_MEMORY)],
+        needs: &[Flag(key::DOTO_MEMORY), NotAs(Character::Doto)],
+        once: true,
+    },
+    // 돌아온 이웃 본인에게는 그 이웃을 제삼자로 말하지 않는다(0264): 도토로 와서 보리·모모에게 말을 걸면
+    // "도토가 돌아왔다고?"·"도토가 도토리를 줬어"가 눈앞의 도토에게 나왔다.
+    Line {
+        id: "bori_t_doto_self",
+        when: When::TalkBori,
+        who: Speaker::Bori,
+        text: |s| s.bori_t_doto_self,
+        needs: &[Flag(key::DOTO_MEMORY), As(Character::Doto)],
         once: true,
     },
     Line {
@@ -351,7 +412,15 @@ pub const LINES: &[Line] = &[
         when: When::TalkMomo,
         who: Speaker::Momo,
         text: |s| s.momo_t_doto,
-        needs: &[Flag(key::DOTO_MEMORY)],
+        needs: &[Flag(key::DOTO_MEMORY), NotAs(Character::Doto)],
+        once: true,
+    },
+    Line {
+        id: "momo_t_doto_self",
+        when: When::TalkMomo,
+        who: Speaker::Momo,
+        text: |s| s.momo_t_doto_self,
+        needs: &[Flag(key::DOTO_MEMORY), As(Character::Doto)],
         once: true,
     },
     Line {
@@ -376,10 +445,13 @@ pub const LINES: &[Line] = &[
         when: When::RunStart,
         who: Speaker::Popo,
         text: |s| s.run_after_half,
+        // "가장 깊은 곳까지 갔었다며?" — 반쪽 엔딩은 나일의 것(0056)이라 나일 런에(0264). 전에는 다음 런이 모모면
+        // 모모에게(배웅 줄과 조건 수가 같아 표에서 앞선 이 줄이 이겼다).
         needs: &[
             Flag(key::TUTORIAL),
             Flag(key::HALF_ENDING),
             NotFlag(key::TRUE_ENDING),
+            As(Character::Mole),
         ],
         once: true,
     },
@@ -392,7 +464,7 @@ pub const LINES: &[Line] = &[
         needs: &[Flag(key::TUTORIAL)],
         once: false,
     },
-    // 모모와 내려갈 때(0056): 포포가 모모를 배웅한다. 줄이 셋이라 again_bori보다 앞선다.
+    // 모모와 내려갈 때(0056): 포포가 모모를 배웅한다. again_bori와 조건 수가 같아 표에서 앞선 이 줄이 이긴다.
     Line {
         id: "again_momo",
         when: When::RunStart,
@@ -401,8 +473,8 @@ pub const LINES: &[Line] = &[
         needs: &[
             Flag(key::TUTORIAL),
             Flag(key::MOMO_BACK),
-            // 1 = 모모. "1 이상"이면 도토(2) 런에도 모모를 배웅했다(0201).
-            CountIs(key::CHAR_PICK, 1),
+            // "고른 번호 1 이상"이면 도토 런에도 모모를 배웅했다(0201) → 이번 런의 캐릭터로(0264).
+            As(Character::Momo),
         ],
         once: false,
     },
@@ -415,7 +487,7 @@ pub const LINES: &[Line] = &[
         needs: &[
             Flag(key::TUTORIAL),
             Flag(key::DOTO_MEMORY),
-            CountIs(key::CHAR_PICK, 2),
+            As(Character::Doto),
         ],
         once: false,
     },
@@ -429,15 +501,15 @@ pub const LINES: &[Line] = &[
     },
 ];
 
-/// 지금 할 한마디. 고른 `once` 줄은 기록에 남긴다(저장은 부른 쪽이).
-pub fn take(p: &mut Profile, when: When) -> Option<&'static Line> {
+/// 지금 할 한마디. `ch`는 지금 걷는 캐릭터(말을 듣는 이). 고른 `once` 줄은 기록에 남긴다(저장은 부른 쪽이).
+pub fn take(p: &mut Profile, when: When, ch: Character) -> Option<&'static Line> {
     let mut best: Option<&'static Line> = None;
     for l in LINES {
         let fresh = !l.once || !p.flag(&key::line(l.id));
         if l.when == when
             && fresh
-            && l.needs.iter().all(|c| c.holds(p))
-            && best.is_none_or(|b| l.needs.len() > b.needs.len())
+            && l.needs.iter().all(|c| c.holds(p, ch))
+            && best.is_none_or(|b| l.specificity() > b.specificity())
         {
             best = Some(l);
         }
@@ -450,23 +522,120 @@ pub fn take(p: &mut Profile, when: When) -> Option<&'static Line> {
 
 #[cfg(test)]
 mod tests {
-    /// 포포의 배웅(0201): 고른 캐릭터마다 제 줄. 예전엔 "char_pick ≥ 1"이라 도토 런에도 모모를 배웅했다.
+    /// 포포의 배웅(0201): 이번 런의 캐릭터마다 제 줄. 예전엔 "char_pick ≥ 1"이라 도토 런에도 모모를 배웅했다.
     #[test]
     fn run_start_line_follows_picked_character() {
         let mut p = Profile::default();
         p.set(key::TUTORIAL);
         p.set(key::MOMO_BACK);
         p.set(key::DOTO_MEMORY);
-        p.set_count(key::CHAR_PICK, 1);
-        assert_eq!(take(&mut p, When::RunStart).unwrap().id, "again_momo");
-        p.set_count(key::CHAR_PICK, 2);
-        assert_eq!(take(&mut p, When::RunStart).unwrap().id, "again_doto");
-        p.set_count(key::CHAR_PICK, 0);
-        let id = take(&mut p, When::RunStart).unwrap().id;
+        assert_eq!(
+            take(&mut p, When::RunStart, Character::Momo).unwrap().id,
+            "again_momo"
+        );
+        assert_eq!(
+            take(&mut p, When::RunStart, Character::Doto).unwrap().id,
+            "again_doto"
+        );
+        let id = take(&mut p, When::RunStart, Character::Mole).unwrap().id;
         assert!(id != "again_momo" && id != "again_doto", "{id}");
         // 도토로 끝까지 닿은 뒤 마을의 도토는 한 번 씨앗 이야기를 한다(참 엔딩 전에만).
         p.set(key::DOTO_DEEP);
-        assert_eq!(take(&mut p, When::TalkDoto).unwrap().id, "doto_t_deep");
+        assert_eq!(
+            take(&mut p, When::TalkDoto, Character::Mole).unwrap().id,
+            "doto_t_deep"
+        );
+    }
+
+    /// 말을 듣는 이(0264): 이웃은 눈앞의 캐릭터를 제삼자로 말하지 않고, 다른 캐릭터의 일을 그에게 하지 않는다.
+    /// 도토로 걸으면 보리·모모는 "도토가 …"가 아니라 도토에게 말하고, 나일에게 하던 줄은 나일에게 남는다.
+    #[test]
+    fn neighbors_speak_to_the_character_in_front_of_them() {
+        let doto_run = |p: &mut Profile, when| take(p, when, Character::Doto).map(|l| l.id);
+        let mut p = Profile::default();
+        p.set(key::DOTO_MEMORY);
+        p.set(key::DOTO_DEEP);
+        assert_eq!(doto_run(&mut p, When::TalkMomo), Some("momo_t_doto_self"));
+        assert_eq!(
+            doto_run(&mut p, When::TalkMomo),
+            None,
+            "도토에게 '도토가 …' 줄은 없다"
+        );
+        assert_eq!(doto_run(&mut p, When::TalkBori), Some("bori_t_doto_self"));
+        // 같은 기록을 나일로: 나일에게 하던 줄은 그대로 남아 있다(한 번씩).
+        assert_eq!(
+            take(&mut p, When::TalkMomo, Character::Mole).unwrap().id,
+            "momo_t_doto"
+        );
+        assert_eq!(
+            take(&mut p, When::TalkBori, Character::Mole).unwrap().id,
+            "bori_t_doto"
+        );
+        // 참 엔딩 뒤 꽃잎 이야기도 도토에게는 "네가 그러랬잖아".
+        p.set(key::TRUE_ENDING);
+        assert_eq!(doto_run(&mut p, When::TalkMomo), Some("momo_t_true_doto"));
+
+        // 모모로: 보리는 모모에게 직접, 도토의 씨앗 이야기는 "나일한테 전해 줄래?", 나일의 독·쓰러짐 요령·반쪽 엔딩 말은 없다.
+        let mut p = Profile::default();
+        p.set(key::TUTORIAL);
+        p.set(key::MOMO_BACK);
+        p.set(key::DOTO_DEEP);
+        p.set(key::VENOM);
+        p.set(key::HALF_ENDING);
+        p.add(key::DEATHS, 9);
+        assert_eq!(
+            take(&mut p, When::TalkBori, Character::Momo).unwrap().id,
+            "bori_t_momo_self"
+        );
+        assert_eq!(
+            take(&mut p, When::TalkDoto, Character::Momo).unwrap().id,
+            "doto_t_deep_momo"
+        );
+        assert!(
+            take(&mut p, When::TalkDoto, Character::Momo).is_none(),
+            "독 발톱은 나일의 것"
+        );
+        let bori: Vec<_> = std::iter::from_fn(|| take(&mut p, When::TalkBori, Character::Momo))
+            .map(|l| l.id)
+            .collect();
+        assert!(
+            !bori.contains(&"bori_t_falls") && !bori.contains(&"bori_t_momo"),
+            "{bori:?}"
+        );
+        assert_eq!(
+            take(&mut p, When::RunStart, Character::Momo).unwrap().id,
+            "again_momo"
+        );
+        assert_eq!(
+            take(&mut p, When::RunStart, Character::Mole).unwrap().id,
+            "after_half"
+        );
+        // 나일이 들을 줄은 나일에게 남았다.
+        assert_eq!(
+            take(&mut p, When::TalkDoto, Character::Mole).unwrap().id,
+            "doto_t_deep"
+        );
+        assert_eq!(
+            take(&mut p, When::TalkDoto, Character::Mole).unwrap().id,
+            "doto_t_venom"
+        );
+        assert_eq!(
+            take(&mut p, When::TalkBori, Character::Mole).unwrap().id,
+            "bori_t_momo"
+        );
+    }
+
+    /// 캐릭터로 가른 줄은 나일이 듣는 차례를 바꾸지 않는다: 캐릭터 조건은 구체성에 세지 않는다.
+    #[test]
+    fn character_conditions_do_not_reorder_lines() {
+        let mut p = Profile::default();
+        p.set(key::CLOVER_BACK);
+        p.set(key::DOTO_MEMORY);
+        p.set(key::BORI_BACK);
+        let order: Vec<_> = std::iter::from_fn(|| take(&mut p, When::TalkMomo, Character::Mole))
+            .map(|l| l.id)
+            .collect();
+        assert_eq!(order, ["momo_clover", "momo_t_doto", "momo_t_bori"]);
     }
 
     use super::*;
@@ -479,24 +648,36 @@ mod tests {
     fn most_specific_line_wins_and_once_lines_do_not_repeat() {
         let mut p = Profile::default();
         assert!(
-            take(&mut p, When::Wake).is_none(),
+            take(&mut p, When::Wake, Character::Mole).is_none(),
             "쓰러진 적이 없으면 말이 없다"
         );
         died(&mut p, 1);
-        assert_eq!(take(&mut p, When::Wake).unwrap().id, "first_wake");
+        assert_eq!(
+            take(&mut p, When::Wake, Character::Mole).unwrap().id,
+            "first_wake"
+        );
         assert!(
-            take(&mut p, When::Wake).is_none(),
+            take(&mut p, When::Wake, Character::Mole).is_none(),
             "한 번 본 줄은 다시 안 나온다"
         );
         died(&mut p, 1);
         p.set(key::BORI_BACK);
-        assert_eq!(take(&mut p, When::Wake).unwrap().id, "bori_fall");
+        assert_eq!(
+            take(&mut p, When::Wake, Character::Mole).unwrap().id,
+            "bori_fall"
+        );
         died(&mut p, 1);
-        assert_eq!(take(&mut p, When::Wake).unwrap().id, "roots_again");
+        assert_eq!(
+            take(&mut p, When::Wake, Character::Mole).unwrap().id,
+            "roots_again"
+        );
         died(&mut p, 2);
-        assert_eq!(take(&mut p, When::Wake).unwrap().id, "assist_hint");
+        assert_eq!(
+            take(&mut p, When::Wake, Character::Mole).unwrap().id,
+            "assist_hint"
+        );
         died(&mut p, 10);
-        assert_eq!(take(&mut p, When::Wake).unwrap().id, "ten");
+        assert_eq!(take(&mut p, When::Wake, Character::Mole).unwrap().id, "ten");
     }
 
     #[test]
@@ -506,7 +687,7 @@ mod tests {
         p.set(&key::line("first_wake"));
         p.set(&key::line("roots_again"));
         p.set(key::ASSIST);
-        assert!(take(&mut p, When::Wake).is_none());
+        assert!(take(&mut p, When::Wake, Character::Mole).is_none());
     }
 
     #[test]
@@ -514,56 +695,92 @@ mod tests {
         let mut p = Profile::default();
         p.set(key::TUTORIAL);
         p.set(key::BORI_BACK);
-        assert_eq!(take(&mut p, When::Village).unwrap().id, "village_intro");
-        assert!(take(&mut p, When::Village).is_none());
+        assert_eq!(
+            take(&mut p, When::Village, Character::Mole).unwrap().id,
+            "village_intro"
+        );
+        assert!(take(&mut p, When::Village, Character::Mole).is_none());
         p.add(key::MOMO_WINS, 1);
-        assert_eq!(take(&mut p, When::Village).unwrap().id, "bori_momo");
+        assert_eq!(
+            take(&mut p, When::Village, Character::Mole).unwrap().id,
+            "bori_momo"
+        );
         p.add(key::MOMO_WINS, 2);
         p.set(key::MOMO_BACK);
-        assert_eq!(take(&mut p, When::Village).unwrap().id, "popo_momo");
-        assert!(take(&mut p, When::Village).is_none());
+        assert_eq!(
+            take(&mut p, When::Village, Character::Mole).unwrap().id,
+            "popo_momo"
+        );
+        assert!(take(&mut p, When::Village, Character::Mole).is_none());
     }
 
     #[test]
     fn talk_lines_follow_progress_once_then_fall_back() {
         let mut p = Profile::default();
         assert!(
-            take(&mut p, When::TalkBori).is_none(),
+            take(&mut p, When::TalkBori, Character::Mole).is_none(),
             "진행이 없으면 늘 하는 말"
         );
         p.set(key::HALF_ENDING);
         p.set(key::MOMO_BACK);
-        assert_eq!(take(&mut p, When::TalkBori).unwrap().id, "bori_t_momo");
-        assert_eq!(take(&mut p, When::TalkBori).unwrap().id, "bori_t_halmae");
-        assert!(take(&mut p, When::TalkBori).is_none());
-        assert_eq!(take(&mut p, When::TalkMomo).unwrap().id, "momo_t_deep");
+        assert_eq!(
+            take(&mut p, When::TalkBori, Character::Mole).unwrap().id,
+            "bori_t_momo"
+        );
+        assert_eq!(
+            take(&mut p, When::TalkBori, Character::Mole).unwrap().id,
+            "bori_t_halmae"
+        );
+        assert!(take(&mut p, When::TalkBori, Character::Mole).is_none());
+        assert_eq!(
+            take(&mut p, When::TalkMomo, Character::Mole).unwrap().id,
+            "momo_t_deep"
+        );
     }
 
     /// 0053: 도토의 말은 독 발톱·참 엔딩을 따르고, 실뜨기 셋째 단계가 열리면 모모가 한마디.
     #[test]
     fn later_progress_lines_play_once() {
         let mut p = Profile::default();
-        assert!(take(&mut p, When::TalkDoto).is_none());
+        assert!(take(&mut p, When::TalkDoto, Character::Mole).is_none());
         p.set(key::VENOM);
-        assert_eq!(take(&mut p, When::TalkDoto).unwrap().id, "doto_t_venom");
-        assert!(take(&mut p, When::TalkDoto).is_none());
+        assert_eq!(
+            take(&mut p, When::TalkDoto, Character::Mole).unwrap().id,
+            "doto_t_venom"
+        );
+        assert!(take(&mut p, When::TalkDoto, Character::Mole).is_none());
         p.add(crate::journal::KNOTS_OPEN, 3);
-        assert_eq!(take(&mut p, When::TalkMomo).unwrap().id, "momo_t_knot");
+        assert_eq!(
+            take(&mut p, When::TalkMomo, Character::Mole).unwrap().id,
+            "momo_t_knot"
+        );
         p.set(key::TRUE_ENDING);
-        assert_eq!(take(&mut p, When::TalkDoto).unwrap().id, "doto_t_true");
+        assert_eq!(
+            take(&mut p, When::TalkDoto, Character::Mole).unwrap().id,
+            "doto_t_true"
+        );
     }
 
     #[test]
     fn run_start_lines_repeat_and_follow_bori() {
         let mut p = Profile::default();
         assert!(
-            take(&mut p, When::RunStart).is_none(),
+            take(&mut p, When::RunStart, Character::Mole).is_none(),
             "튜토리얼 전엔 오프닝이 한다"
         );
         p.set(key::TUTORIAL);
-        assert_eq!(take(&mut p, When::RunStart).unwrap().id, "again");
-        assert_eq!(take(&mut p, When::RunStart).unwrap().id, "again");
+        assert_eq!(
+            take(&mut p, When::RunStart, Character::Mole).unwrap().id,
+            "again"
+        );
+        assert_eq!(
+            take(&mut p, When::RunStart, Character::Mole).unwrap().id,
+            "again"
+        );
         p.set(key::BORI_BACK);
-        assert_eq!(take(&mut p, When::RunStart).unwrap().id, "again_bori");
+        assert_eq!(
+            take(&mut p, When::RunStart, Character::Mole).unwrap().id,
+            "again_bori"
+        );
     }
 }
