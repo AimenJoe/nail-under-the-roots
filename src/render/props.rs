@@ -833,58 +833,95 @@ fn draw_door_signs(w: &World) {
                 _ => vec2(r.x + 34.0, r.y + 112.0),
             };
             let hard = matches!(next.encounter, Encounter::Waves | Encounter::Hold);
-            draw_floor_sign(p.round(), b, hard);
+            draw_floor_sign(p.round(), b, hard, w.time);
         }
     }
 }
 
 /// 바닥에 새긴 표지(0259, 사장 "아이템처럼 보이면 안 되고 바닥에 새겨진 것처럼"): 줍는 것의 문법(빛 자리·고리·별·떠다님,
-/// `draw_pickup_mark`)을 하나도 쓰지 않는다. 납작한 타원 테 + 가운데 그림을 바닥보다 어두운 홈으로 파고, 홈 아래 가장자리에만
-/// 옅은 빛 한 줄(위에서 오는 빛이 홈의 먼 벽에 닿는다). 색 없이 바닥 위에 반투명으로 얹어 어느 지대 바닥에서도 바닥 결이 비친다.
-/// 센 방은 테가 겹이고 홈이 붉은 기를 띤다(0257의 붉은 테). 움직이지 않는다.
-pub(super) fn draw_floor_sign(p: Vec2, b: crate::dungeon::Bounty, hard: bool) {
+/// `draw_pickup_mark`)을 하나도 쓰지 않는다. 납작한 타원 테를 바닥보다 어두운 홈으로 파고, 가운데 그림은 홈에 색 흙을 메운 것처럼
+/// (0260, 사장 "잘 구분이 안 됨" — 색 없는 홈은 종류가 안 갈렸다): 씨앗 초록·반딧불 노랑(숨 쉬듯 밝아짐)·산딸기 빨강·상자 금빛.
+/// 홈 아래 가장자리에만 옅은 빛 한 줄. 센 방은 바깥 테가 하나 더(점선)이고 붉다(0257의 붉은 테). 움직이지 않는다.
+pub(super) fn draw_floor_sign(p: Vec2, b: crate::dungeon::Bounty, hard: bool, time: f32) {
     use crate::dungeon::Bounty;
-    let glyph: &[&str] = match b {
-        Bounty::Seeds => &[".#...#.", "###.###", ".#...#."],
-        Bounty::Glowbugs => &["..#..", "#.#.#", "..#..", ".#.#."],
-        Bounty::Berry => &["..#..", ".#.#.", "#.#.#", ".#.#."],
-        Bounty::Gift => &["#####", "#.#.#", "#####"],
+    let (glyph, inlay): (&[&str], Color) = match b {
+        Bounty::Seeds => (
+            &["..#...#..", ".###.###.", ".###.###.", "..#...#.."],
+            Color::new(0.50, 0.82, 0.36, 0.85),
+        ),
+        Bounty::Glowbugs => {
+            let k = 0.75 + 0.25 * (time * 2.2).sin();
+            (
+                &["#.....#", ".#.#.#.", "..###..", ".#.#.#.", "#.....#"],
+                Color::new(1.0, 0.92 * k + 0.05, 0.45 * k, 0.9),
+            )
+        }
+        Bounty::Berry => (
+            &["...#...", "..###..", ".#####.", ".#####.", "..###.."],
+            Color::new(0.92, 0.30, 0.38, 0.85),
+        ),
+        Bounty::Gift => (
+            &["#######", "#######", "#..#..#", "#######"],
+            Color::new(0.96, 0.74, 0.32, 0.85),
+        ),
     };
-    let mut cut: Vec<(i32, i32)> = vec![];
-    // 테: 가로 8·세로 5의 타원(3/4 탑다운이라 바닥의 원이 납작하다).
-    let ring = |cut: &mut Vec<(i32, i32)>, rx: f32, ry: f32, dash: bool| {
+    let mut ring: Vec<(i32, i32)> = vec![];
+    // 테: 가로 11·세로 7의 타원(3/4 탑다운이라 바닥의 원이 납작하다).
+    let oval = |ring: &mut Vec<(i32, i32)>, rx: f32, ry: f32, dash: bool| {
         for y in -(ry as i32) - 1..=(ry as i32) + 1 {
             for x in -(rx as i32) - 1..=(rx as i32) + 1 {
                 let d = (x as f32 / rx).powi(2) + (y as f32 / ry).powi(2);
-                if (0.80..=1.20).contains(&d) && (!dash || (x + y).rem_euclid(3) != 0) {
-                    cut.push((x, y));
+                if (0.82..=1.18).contains(&d) && (!dash || (x + y).rem_euclid(3) != 0) {
+                    ring.push((x, y));
                 }
             }
         }
     };
-    ring(&mut cut, 8.0, 5.0, false);
+    oval(&mut ring, 11.0, 7.0, false);
+    let mut outer = vec![];
     if hard {
-        ring(&mut cut, 11.0, 7.0, true);
+        oval(&mut outer, 14.0, 9.0, true);
     }
+    let mut fill: Vec<(i32, i32)> = vec![];
     let gh = glyph.len() as i32;
     for (j, row) in glyph.iter().enumerate() {
         let gw = row.len() as i32;
         for (i, ch) in row.bytes().enumerate() {
             if ch == b'#' {
-                cut.push((i as i32 - gw / 2, j as i32 - gh / 2));
+                fill.push((i as i32 - gw / 2, j as i32 - gh / 2));
             }
         }
     }
-    let groove = if hard {
-        Color::new(0.30, 0.02, 0.02, 0.42)
-    } else {
-        Color::new(0.0, 0.0, 0.0, 0.34)
-    };
-    let lip = Color::new(1.0, 0.94, 0.82, 0.13);
-    for &(x, y) in &cut {
-        draw_rectangle(p.x + x as f32, p.y + y as f32, 1.0, 1.0, groove);
-        if !cut.contains(&(x, y + 1)) {
-            draw_rectangle(p.x + x as f32, p.y + y as f32 + 1.0, 1.0, 1.0, lip);
+    let groove = Color::new(0.0, 0.0, 0.0, 0.42);
+    let red = Color::new(0.55, 0.06, 0.06, 0.6);
+    let lip = Color::new(1.0, 0.94, 0.82, 0.16);
+    let px = |x: i32, y: i32, c: Color| draw_rectangle(p.x + x as f32, p.y + y as f32, 1.0, 1.0, c);
+    let all: Vec<(i32, i32)> = ring.iter().chain(&outer).chain(&fill).copied().collect();
+    for &(x, y) in &ring {
+        px(x, y, if hard { red } else { groove });
+    }
+    for &(x, y) in &outer {
+        px(x, y, red);
+    }
+    // 메운 그림: 테두리 한 줄은 홈(어둡게), 속은 색 흙.
+    for &(x, y) in &fill {
+        let edge = [(0, -1), (-1, 0), (1, 0)]
+            .iter()
+            .any(|(dx, dy)| !fill.contains(&(x + dx, y + dy)));
+        px(x, y, groove);
+        if !edge || fill.len() < 16 {
+            px(x, y, inlay);
+        } else {
+            px(
+                x,
+                y,
+                Color::new(inlay.r * 0.7, inlay.g * 0.7, inlay.b * 0.7, inlay.a),
+            );
+        }
+    }
+    for &(x, y) in &all {
+        if !all.contains(&(x, y + 1)) {
+            px(x, y + 1, lip);
         }
     }
 }

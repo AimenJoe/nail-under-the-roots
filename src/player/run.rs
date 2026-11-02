@@ -27,8 +27,8 @@ impl Player {
         let a = c.a;
         let moving = c.move_dir != Vec2::ZERO;
         let time = if moving { time + c.dt } else { time };
-        self.pos += c.move_dir * self.speed() * t::RUN_SPEED * c.dt;
-        if a.special && self.armed && self.sp_full() {
+        self.pos += c.move_dir * self.speed() * t::RUN_SPEED * self.talents.run_mul() * c.dt;
+        if self.special_ready() {
             self.burrow_cd = self.burrow_cd_full();
             self.start_special(c.move_dir);
         } else if self.armed && self.no_attack <= 0.0 && self.attack_buf > 0.0 {
@@ -57,7 +57,7 @@ impl Player {
         let ready = time >= t::RUN_MIN;
         Some(match self.jump_lock() {
             Some(d) => (d, ready, true),
-            None => (self.facing * t::JUMP_DIST, ready, false),
+            None => (self.facing * self.talents.jump_dist(), ready, false),
         })
     }
 
@@ -68,7 +68,7 @@ impl Player {
         if self.kit.def().dodge != crate::characters::Dodge::Hop {
             return None;
         }
-        let plain = self.facing * t::JUMP_DIST;
+        let plain = self.facing * self.talents.jump_dist();
         self.targets
             .iter()
             .map(|q| *q - self.pos)
@@ -81,7 +81,9 @@ impl Player {
     }
 
     fn start_jump(&mut self) {
-        let to = self.jump_lock().unwrap_or(self.facing * t::JUMP_DIST);
+        let to = self
+            .jump_lock()
+            .unwrap_or(self.facing * self.talents.jump_dist());
         self.attack_buf = 0.0;
         self.dodge_buf = 0.0;
         self.combo_timer = 0.0;

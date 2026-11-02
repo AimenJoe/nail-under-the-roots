@@ -128,7 +128,7 @@ pub static ALL: [CharacterDef; 3] = [
         special: Special::Chain,
         talents: &crate::talents::MOMO_TABLE,
         signature: crate::talents::Signature::Thorns,
-        talent_keys: ["hop", "parry", "chain", "eat"],
+        talent_keys: ["hop", "momo_parry", "chain", "momo_eat"],
         portrait: |_| Portrait::MOMO,
         pick_text: |s| s.pick_momo,
         stat_dodge_cd: |s| s.stat_hop_cd,
@@ -152,7 +152,7 @@ pub static ALL: [CharacterDef; 3] = [
         special: Special::Bury,
         talents: &crate::talents::DOTO_TABLE,
         signature: crate::talents::Signature::Split,
-        talent_keys: ["leap", "parry", "bury", "eat"],
+        talent_keys: ["leap", "doto_parry", "bury", "doto_eat"],
         portrait: |_| Portrait::DOTO,
         pick_text: |s| s.pick_doto,
         stat_dodge_cd: |s| s.stat_leap_cd,
@@ -211,11 +211,11 @@ mod tests {
         );
         assert_eq!(
             Character::Momo.def().talent_keys,
-            ["hop", "parry", "chain", "eat"]
+            ["hop", "momo_parry", "chain", "momo_eat"]
         );
         assert_eq!(
             Character::Doto.def().talent_keys,
-            ["leap", "parry", "bury", "eat"]
+            ["leap", "doto_parry", "bury", "doto_eat"]
         );
         let p = Profile::default();
         assert_eq!(available(&p).count(), 1, "모모·도토는 돌아온 뒤에만");

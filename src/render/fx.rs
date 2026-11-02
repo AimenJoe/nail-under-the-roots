@@ -683,11 +683,34 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
     // 가장 깊은 곳(0162): 할매의 당기기 예고 — 받아칠 수 있으니 띠.
     if let Some((c, p)) = w.deep.as_ref().and_then(|d| {
         d.pull
-            .filter(|p| p.time < t::DEEP_PULL_WINDUP)
+            .filter(|p| p.time < p.windup())
             .map(|p| (d.center, p))
     }) {
-        let k = crate::enemy::tele_progress(p.time, t::DEEP_PULL_WINDUP);
-        draw_tele_lane(c, c + p.dir * p.len, 2.5, k);
+        // 부채꼴이면 세 가닥, 마지막 굵은 실은 넓은 띠(0260).
+        let k = crate::enemy::tele_progress(p.time, p.windup());
+        for dir in p.dirs() {
+            draw_tele_lane(c, c + dir * p.len, if p.big { 5.0 } else { 2.5 }, k);
+        }
+    }
+    // 둘레를 쓰는 실(0260): 예고 동안 시작 자리에 띠 + 쓸어 갈 쪽으로 옅은 부채.
+    if let Some((c, sw)) = w
+        .deep
+        .as_ref()
+        .and_then(|d| d.sweep.filter(|s| !s.active()).map(|s| (d.center, s)))
+    {
+        let k = crate::enemy::tele_progress(sw.time, t::DEEP_SWEEP_WINDUP);
+        let dir = Vec2::from_angle(sw.from);
+        draw_tele_lane(c, c + dir * t::DEEP_PULL_REACH, 2.5, k);
+        for i in 1..=4 {
+            let a = sw.from + sw.turn * 0.35 * i as f32;
+            let q = c + Vec2::from_angle(a) * t::DEEP_PULL_REACH * 0.92;
+            draw_circle(
+                q.x.round(),
+                q.y.round(),
+                1.5,
+                Color::new(0.95, 0.35, 0.40, 0.5 * k * (1.0 - i as f32 * 0.18)),
+            );
+        }
     }
     TELE_INK.with(|c| c.set(TELE_INK_GLOW));
 }

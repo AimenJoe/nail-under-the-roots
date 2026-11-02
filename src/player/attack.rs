@@ -36,8 +36,8 @@ impl Player {
         self.pos += move_dir * self.speed() * ms.move_factor * dt;
         self.state = State::Attack { idx, time, dir };
 
-        if a.special && self.sp_full() && time >= a1 {
-            // 필살기도 휘두른 뒤(활성 구간 뒤)라면 캔슬로 낼 수 있다.
+        if self.special_ready() && time >= hit.dodge_cancel_after {
+            // 필살기도 회피처럼 후딜레이를 끊는다(0260, 사장 "땅파기로 캔슬되듯이"): 같은 캔슬 자리, 눌러 둔 것도 받는다.
             self.start_special(move_dir);
         } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
             // 굴파기(깡충) 캔슬: 후딜레이를 끊고 다음 콤보로 섞는다.
@@ -83,7 +83,7 @@ impl Player {
             self.events.push(Event::HeavyReady);
         }
         self.state = State::Charging { time, dir, after };
-        if a.special && self.armed && self.sp_full() {
+        if self.special_ready() {
             self.start_special(move_dir);
         } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
             self.start_dodge(move_dir);
@@ -154,7 +154,9 @@ impl Player {
             after,
             perfect,
         };
-        if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
+        if self.special_ready() && time >= hit.dodge_cancel_after {
+            self.start_special(move_dir);
+        } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 && time >= hit.dodge_cancel_after {
             self.start_dodge(move_dir);
         } else if time >= hit.swing + hit.recovery {
             // 강공격의 후딜레이는 끊지 못한다(0167: 0161 덧붙임의 0.3초 잠금은 뺐다). 박자 창 안에서 눌러 뒀으면
@@ -175,6 +177,10 @@ impl Player {
     /// 후딜레이.
     pub(super) fn tick_recover(&mut self, c: &Ctx<'_>, time: f32) -> Option<Strike> {
         let dt = c.dt;
+        if self.special_ready() {
+            self.start_special(c.move_dir);
+            return None;
+        }
         let time = time - dt;
         self.state = if time <= 0.0 {
             State::Free
@@ -252,7 +258,9 @@ impl Player {
 
     /// 강타: 무기 강타에 고유 재주를 얹은 것.
     pub(super) fn heavy_hit(&self) -> crate::moveset::Hit {
-        self.talents.with_signature(self.moveset.heavy(), true)
+        let mut h = self.talents.with_signature(self.moveset.heavy(), true);
+        h.damage += self.talents.heavy_damage_add();
+        h
     }
 
     /// 이번 틱의 손 타격. 던지는 타면 손앞의 짧은 판정(`Toss`: 적은 안 맞고 받아치기·탄 베기만, 0195).

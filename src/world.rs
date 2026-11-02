@@ -222,13 +222,73 @@ pub struct Pull {
     pub dir: Vec2,
     pub len: f32,
     pub time: f32,
+    /// 부채꼴 세 가닥(0260, 매듭 하나를 끊은 뒤).
+    pub fan: bool,
+    /// 마지막 굵은 실(0260): 셋째 매듭 뒤, 받아쳐야 풀린다.
+    pub big: bool,
     /// 뻗는 틱에 판정을 한 번만.
     pub judged: bool,
     /// 받아쳐 끊겼다(남은 시간 동안 끊긴 실을 그린다).
     pub snapped: bool,
 }
 
+impl Pull {
+    /// 예고 길이: 굵은 실은 더 길게(받아칠 때를 잡게).
+    pub fn windup(&self) -> f32 {
+        if self.big {
+            t::DEEP_FINAL_WINDUP
+        } else {
+            t::DEEP_PULL_WINDUP
+        }
+    }
+
+    /// 실의 반폭.
+    pub fn width(&self) -> f32 {
+        if self.big {
+            t::DEEP_FINAL_W
+        } else {
+            t::DEEP_THREAD_W
+        }
+    }
+
+    /// 가닥들의 방향(부채꼴이면 셋).
+    pub fn dirs(&self) -> Vec<Vec2> {
+        if self.fan {
+            [-t::DEEP_FAN_SPREAD, 0.0, t::DEEP_FAN_SPREAD]
+                .iter()
+                .map(|a| Vec2::from_angle(*a).rotate(self.dir))
+                .collect()
+        } else {
+            vec![self.dir]
+        }
+    }
+}
+
+/// 둘째 매듭 뒤 할매 둘레를 도는 실(0260): 한쪽 끝은 할매, 바늘처럼 반 바퀴를 쓴다.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Sweep {
+    /// 시작 각(라디안)과 도는 쪽(+1/-1).
+    pub from: f32,
+    pub turn: f32,
+    pub time: f32,
+}
+
+impl Sweep {
+    /// 지금 각. 예고 동안은 시작 각에 머문다.
+    pub fn angle(&self) -> f32 {
+        let k = ((self.time - t::DEEP_SWEEP_WINDUP) / t::DEEP_SWEEP_TIME).clamp(0.0, 1.0);
+        self.from + self.turn * std::f32::consts::PI * k
+    }
+
+    pub fn active(&self) -> bool {
+        self.time >= t::DEEP_SWEEP_WINDUP
+    }
+}
+
 /// 가장 깊은 곳(0162): 할매는 때릴 수 없고, 매듭 셋을 끊으면 놓아준다. 세 번 감기면 실에 잠긴다(쉼터로).
+/// 0260(사장 "마지막 누룩할매 전투는 좀 밍밍해"): 매듭마다 단계가 바뀐다 — 첫 매듭 뒤 부채꼴 세 가닥 + 바닥 실 그물 +
+/// 길의 주인(도토)의 실 그림자, 둘째 매듭 뒤 둘레를 쓰는 실 + 어둠 + 콩이의 그림자, 셋째 매듭 뒤 가장 굵은 실 하나 —
+/// 받아쳐야 풀린다.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Deep {
     pub center: Vec2,
@@ -247,6 +307,11 @@ pub struct Deep {
     hinted: bool,
     /// 방금 당기기가 2단계의 둘째(곧바로 오는) 당기기로 예약됐다(0233).
     echo: bool,
+    /// 둘레를 쓰는 실(0260, 둘째 매듭 뒤).
+    pub sweep: Option<Sweep>,
+    next_sweep: f32,
+    /// 셋 다 끊었다 — 마지막 굵은 실을 받아쳐야 풀린다(0260).
+    pub last_thread: bool,
 }
 
 impl Deep {
@@ -277,6 +342,9 @@ impl Deep {
             asleep: false,
             hinted: false,
             echo: false,
+            sweep: None,
+            next_sweep: t::DEEP_SWEEP_EVERY,
+            last_thread: false,
         }
     }
 
@@ -2107,7 +2175,8 @@ impl World {
                     };
                     if coming && d.dot(from) > t::PARRY_FRONT {
                         let counter = self.player.talents.parry_counter();
-                        e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                        let trip = self.player.talents.parry_stun_mul();
+                        e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN * trip);
                         e.on_parried();
                         parried = true;
                         break;
@@ -2125,7 +2194,8 @@ impl World {
                             // 패링: 돌진을 받아쳐 크게 멈칫하게 한다. 피해 없음.
                             // 되받아치기(재주, 0047)면 피해도 준다.
                             let counter = self.player.talents.parry_counter();
-                            e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                            let trip = self.player.talents.parry_stun_mul();
+                            e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN * trip);
                             e.on_parried();
                             parried = true;
                             break;
@@ -2146,7 +2216,8 @@ impl World {
                     let from = (e.pos - ppos).normalize_or_zero();
                     if parry.is_some_and(|d| d.dot(from) > t::PARRY_FRONT) {
                         let counter = self.player.talents.parry_counter();
-                        e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                        let trip = self.player.talents.parry_stun_mul();
+                        e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN * trip);
                         parried = true;
                         break;
                     }
@@ -2479,7 +2550,8 @@ impl World {
 
     /// 쓰러진 적이 떨어뜨린다: 반딧불 몇 마리 + 확률로 산딸기(loot::berry_chance).
     fn drop_loot(&mut self, pos: Vec2, kind: Kind) {
-        if self.dream {
+        // 꿈(0055)과 가장 깊은 곳의 실 그림자(0260)는 아무것도 떨어뜨리지 않는다.
+        if self.dream || self.deep.is_some() {
             return;
         }
         let (lo, hi) = loot::glowbugs_for(kind);
@@ -2794,8 +2866,9 @@ impl World {
             .is_some_and(|d| d.dot(from) > t::PARRY_FRONT)
         {
             let counter = self.player.talents.parry_counter();
+            let trip = self.player.talents.parry_stun_mul();
             if let Some(e) = self.enemies.iter_mut().find(|e| e.kind == Kind::Clover) {
-                e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN);
+                e.hurt(counter, from, t::PARRY_KNOCKBACK, t::PARRY_STUN * trip);
                 e.on_parried();
             }
             self.hazards.thread_lash = Some((at, ppos, 0.1));
@@ -3043,16 +3116,82 @@ impl World {
             }
             return;
         }
+        // 둘째 매듭 뒤(0260): 어둠이 내려앉고(Naïl 둘레만 밝다), 실이 할매 둘레를 쓴다.
+        let phase = d.cut_count();
+        if phase >= 2 && !d.last_thread {
+            self.juice.gloom.amount = (self.juice.gloom.amount + dt * 0.25).min(t::DEEP_GLOOM);
+        }
+        self.juice.gloom.at = self.player.pos;
+        self.juice.gloom.radius = t::DEEP_GLOOM_RADIUS;
+        let center = d.center;
+        let mut caught_by = None;
+        if phase >= 2 && !d.last_thread {
+            match d.sweep.as_mut() {
+                None => {
+                    d.next_sweep -= dt;
+                    if d.next_sweep <= 0.0 {
+                        let to = self.player.pos - center;
+                        // Naïl의 조금 옆에서 시작해 Naïl 쪽으로 쓴다 — 예고를 보고 뛰거나 파고들 틈.
+                        let turn = if rand::gen_range(0, 2) == 0 {
+                            1.0
+                        } else {
+                            -1.0
+                        };
+                        d.sweep = Some(Sweep {
+                            from: to.y.atan2(to.x) - turn * 0.9,
+                            turn,
+                            time: 0.0,
+                        });
+                    }
+                }
+                Some(sw) => {
+                    let before = sw.angle();
+                    sw.time += dt;
+                    let now = sw.angle();
+                    if sw.active() && self.player.is_alive() && !self.player.is_invulnerable() {
+                        let to = self.player.pos - center;
+                        let dist = to.length();
+                        let ang = to.y.atan2(to.x);
+                        // 이번 틱에 쓴 각 사이에 Naïl이 있었나(각의 차를 -π..π로).
+                        let rel = |x: f32| {
+                            (x - before + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+                                - std::f32::consts::PI
+                        };
+                        let swept = now - before;
+                        let r = rel(ang);
+                        let inside = if swept >= 0.0 {
+                            r >= -0.05 && r <= swept + 0.05
+                        } else {
+                            r <= 0.05 && r >= swept - 0.05
+                        };
+                        if inside && dist <= t::DEEP_PULL_REACH && dist > 20.0 {
+                            caught_by = Some(false);
+                        }
+                    }
+                    if sw.time >= t::DEEP_SWEEP_WINDUP + t::DEEP_SWEEP_TIME {
+                        d.sweep = None;
+                        d.next_sweep = t::DEEP_SWEEP_EVERY;
+                    }
+                }
+            }
+        }
         match d.pull.as_mut() {
             None => {
                 d.next_pull -= dt;
                 if d.next_pull <= 0.0 {
-                    let to = self.player.pos - d.center;
+                    let to = self.player.pos - center;
                     let dir = to.normalize_or(vec2(0.0, 1.0));
+                    let big = d.last_thread;
                     d.pull = Some(Pull {
                         dir,
-                        len: (to.length() + 24.0).min(t::DEEP_PULL_REACH),
+                        len: if big {
+                            t::DEEP_PULL_REACH * 1.4
+                        } else {
+                            (to.length() + 24.0).min(t::DEEP_PULL_REACH)
+                        },
                         time: 0.0,
+                        fan: phase >= 1 && !big,
+                        big,
                         judged: false,
                         snapped: false,
                     });
@@ -3060,64 +3199,157 @@ impl World {
             }
             Some(p) => {
                 p.time += dt;
-                if p.time >= t::DEEP_PULL_WINDUP && !p.judged {
+                if p.time >= p.windup() && !p.judged {
                     p.judged = true;
                     // 뻗는 틱: 실 줄에 걸렸나. 땅속·무적이면 안 걸린다. 받아치면 끊긴다.
-                    let (a, b) = (d.center, d.center + p.dir * p.len);
                     let pp = self.player.pos;
                     let caught = self.player.is_alive()
                         && !self.player.is_invulnerable()
-                        && dist_to_segment(pp, a, b) <= self.player.radius() + t::DEEP_THREAD_W;
-                    if caught {
-                        let from = (d.center - pp).normalize_or_zero();
-                        if self
+                        && p.dirs().iter().any(|dir| {
+                            dist_to_segment(pp, center, center + *dir * p.len)
+                                <= self.player.radius() + p.width()
+                        });
+                    let from = (center - pp).normalize_or_zero();
+                    let parried = caught
+                        && self
                             .player
                             .parry_dir()
-                            .is_some_and(|dir| dir.dot(from) > t::PARRY_FRONT)
-                        {
-                            p.snapped = true;
-                            self.player.on_parry();
-                            self.juice.audio.play(sfx::Id::Parry);
-                            self.juice.toast = Some((|s| s.toast_parry, 0.8));
-                            self.juice.feel.add_hitstop(t::PARRY_HITSTOP);
-                            self.juice.fx.push(ring(pp, 4.0, 18.0, 0.2, WHITE));
-                            unravel(&mut self.juice.fx, pp + from * 8.0, 10.0);
-                        } else {
-                            d.wraps += 1;
-                            let wrap = t::DEEP_WRAP_TIME * self.player.stats.wrap_mul;
-                            d.wrapped = wrap;
-                            self.player.recoil(pp - from, 0.0, wrap);
-                            self.juice.audio.play(sfx::Id::Rumble);
-                            self.juice.feel.add_trauma(0.3);
-                            self.juice.fx.push(ring(pp, 6.0, 20.0, 0.3, THREAD));
-                            // 가장 가까운 안 끊긴 매듭이 다시 조여진다.
-                            if let Some(k) = d.knots.iter_mut().filter(|k| !k.cut).min_by(|x, y| {
-                                (x.pos - pp)
-                                    .length_squared()
-                                    .total_cmp(&(y.pos - pp).length_squared())
-                            }) {
-                                k.hp = t::DEEP_KNOT_HP;
-                                k.shake = 0.5;
-                                self.juice.fx.push(ring(k.pos, 16.0, 4.0, 0.4, THREAD));
-                            }
-                            if !d.hinted {
-                                d.hinted = true;
-                                self.juice.toast = Some((|s| s.deep_wrap, 3.5));
-                            }
+                            .is_some_and(|dir| dir.dot(from) > t::PARRY_FRONT);
+                    if parried {
+                        p.snapped = true;
+                        self.player.on_parry();
+                        self.juice.audio.play(sfx::Id::Parry);
+                        self.juice.toast = Some((|s| s.toast_parry, 0.8));
+                        self.juice.feel.add_hitstop(t::PARRY_HITSTOP);
+                        self.juice.fx.push(ring(pp, 4.0, 18.0, 0.2, WHITE));
+                        unravel(&mut self.juice.fx, pp + from * 8.0, 10.0);
+                        if p.big {
+                            // 마지막 굵은 실을 받아쳤다(0260 D): 다 풀린다.
+                            d.done_t = Some(0.0);
+                            d.pull = None;
+                            self.juice.gloom.amount = 0.0;
+                            self.juice.audio.play(sfx::Id::Unbind);
+                            self.juice.feel.add_hitstop(0.12);
+                            self.juice.feel.add_trauma(0.5);
+                            self.juice.toast = Some((|s| s.deep_k3, 3.5));
+                            return;
                         }
+                    } else if caught {
+                        caught_by = Some(p.big);
+                    } else if p.big {
+                        self.juice.toast = Some((|s| s.deep_final_hint, 3.0));
                     }
                 }
-                if p.time >= t::DEEP_PULL_WINDUP + t::DEEP_PULL_TIME {
+                if p.time >= p.windup() + t::DEEP_PULL_TIME {
+                    let big = p.big;
                     d.pull = None;
                     // 2단계(0233): 매듭이 하나 남으면 한 번 더 곧바로.
                     let last = d.cut_count() + 1 >= d.knots.len();
-                    d.echo = last && !d.echo;
-                    d.next_pull = if d.echo {
+                    d.echo = last && !d.echo && !big;
+                    d.next_pull = if big {
+                        t::DEEP_FINAL_GAP
+                    } else if d.echo {
                         t::DEEP_ECHO_GAP
                     } else {
                         d.pull_every()
                     };
                 }
+            }
+        }
+        if let Some(big) = caught_by {
+            let pp = self.player.pos;
+            let from = (center - pp).normalize_or_zero();
+            let d = self.deep.as_mut().expect("deep");
+            d.wraps += 1;
+            let wrap = t::DEEP_WRAP_TIME * self.player.stats.wrap_mul;
+            d.wrapped = wrap;
+            d.sweep = None;
+            d.next_sweep = t::DEEP_SWEEP_EVERY;
+            self.player.recoil(pp - from, 0.0, wrap);
+            self.juice.audio.play(sfx::Id::Rumble);
+            self.juice.feel.add_trauma(0.3);
+            self.juice.fx.push(ring(pp, 6.0, 20.0, 0.3, THREAD));
+            // 가장 가까운 안 끊긴 매듭이 다시 조여진다.
+            if let Some(k) = d.knots.iter_mut().filter(|k| !k.cut).min_by(|x, y| {
+                (x.pos - pp)
+                    .length_squared()
+                    .total_cmp(&(y.pos - pp).length_squared())
+            }) {
+                k.hp = t::DEEP_KNOT_HP;
+                k.shake = 0.5;
+                self.juice.fx.push(ring(k.pos, 16.0, 4.0, 0.4, THREAD));
+            }
+            if big {
+                self.juice.toast = Some((|s| s.deep_final_hint, 3.0));
+            } else if !d.hinted {
+                d.hinted = true;
+                self.juice.toast = Some((|s| s.deep_wrap, 3.5));
+            }
+        }
+        self.tick_shades(dt);
+    }
+
+    /// 길의 주인의 실 그림자(0260 B): 정해진 시간이 지나면 풀려 사라진다(떨어뜨리는 것 없음).
+    fn tick_shades(&mut self, dt: f32) {
+        for e in self.enemies.iter_mut().filter(|e| e.shade > 0.0) {
+            e.shade -= dt;
+            if e.shade <= 0.0 && e.alive {
+                e.alive = false;
+                unravel(&mut self.juice.fx, e.pos, e.radius() + 6.0);
+                self.juice.fx.push(ring(e.pos, 4.0, 22.0, 0.4, THREAD));
+            }
+        }
+    }
+
+    /// 매듭이 끊길 때 할매가 붙잡고 있던 길의 주인이 실 그림자로 한 번 나온다(0260 B): 첫 매듭 = 도토, 둘째 = 콩이.
+    /// 때릴 수 있고(체력 적음), `DEEP_SHADE_TIME` 뒤엔 저절로 풀린다. 첫 매듭엔 바닥에 실 그물도 떨어진다.
+    fn deep_phase_up(&mut self, n: usize, at: Vec2) {
+        let kind = match n {
+            1 => Kind::Doto,
+            2 => Kind::Kongi,
+            _ => return,
+        };
+        let c = self.deep.as_ref().map(|d| d.center).unwrap_or(at);
+        let pos = at + (at - c).normalize_or(vec2(0.0, 1.0)) * 18.0;
+        let mut e = Enemy::new(kind, pos);
+        e.shade = t::DEEP_SHADE_TIME;
+        e.hp = t::DEEP_SHADE_HP;
+        e.max_hp = t::DEEP_SHADE_HP;
+        e.roused = true;
+        e.wake_delay = 0.6;
+        self.juice.fx.push(ring(pos, 4.0, 26.0, 0.5, THREAD));
+        unravel(&mut self.juice.fx, pos, 16.0);
+        self.enemies.push(e);
+        if n == 1 {
+            let mut placed = 0;
+            for k in 0..20 {
+                if placed >= t::DEEP_WEBS {
+                    break;
+                }
+                let ang = k as f32 * 2.4;
+                let r = 50.0 + (k % 3) as f32 * 22.0;
+                let p = c + vec2(ang.cos() * r * 1.4, ang.sin() * r * 0.8 + 30.0);
+                if self.room.is_solid(p, t::WEB_R)
+                    || !self.room.inner.contains(p)
+                    || (p - self.player.pos).length() < 24.0
+                    || self
+                        .room
+                        .webs
+                        .iter()
+                        .any(|w| (*w - p).length() < t::WEB_R * 2.0)
+                {
+                    continue;
+                }
+                self.room.webs.push(p);
+                puff(
+                    &mut self.juice.fx,
+                    p,
+                    4,
+                    Color::new(0.92, 0.90, 0.98, 1.0),
+                    6.0,
+                    0.5,
+                );
+                placed += 1;
             }
         }
     }
@@ -3163,7 +3395,7 @@ impl World {
         let Some(d) = self.deep.as_mut() else {
             return;
         };
-        if d.done_t.is_some() || d.wrapped > 0.0 {
+        if d.done_t.is_some() || d.wrapped > 0.0 || d.last_thread {
             return;
         }
         let mut cut_now = None;
@@ -3209,13 +3441,20 @@ impl World {
                 match n {
                     1 => |s| s.deep_k1,
                     2 => |s| s.deep_k2,
-                    _ => |s| s.deep_k3,
+                    _ => |s| s.deep_last,
                 },
                 3.5,
             ));
             if d.all_cut() {
-                d.done_t = Some(0.0);
+                // 마지막 굵은 실(0260 D): 바로 풀리지 않는다 — 할매가 마지막 한 가닥을 당기고, 받아쳐야 풀린다.
+                d.last_thread = true;
                 d.pull = None;
+                d.sweep = None;
+                d.next_pull = t::DEEP_FINAL_DELAY;
+            }
+            let last = d.last_thread;
+            if !last {
+                self.deep_phase_up(n, at);
             }
         }
     }
@@ -3982,6 +4221,8 @@ mod tests {
                 dir,
                 len: t::DEEP_PULL_REACH,
                 time: t::DEEP_PULL_WINDUP - 0.001,
+                fan: false,
+                big: false,
                 judged: false,
                 snapped: false,
             });
@@ -4014,6 +4255,57 @@ mod tests {
             }
         }
         assert!(w.deep.as_ref().unwrap().all_cut());
+        // 0260: 매듭 둘을 끊는 동안 길의 주인 그림자(도토·콩이)가 나왔다 — 떨어뜨리는 것 없이 시간이 되면 풀린다.
+        let shades: Vec<Kind> = w
+            .enemies
+            .iter()
+            .filter(|e| e.shade > 0.0)
+            .map(|e| e.kind)
+            .collect();
+        assert_eq!(shades, vec![Kind::Doto, Kind::Kongi]);
+        assert!(!w.room.webs.is_empty(), "첫 매듭 뒤 바닥에 실 그물");
+        // 셋째 매듭 뒤에는 바로 풀리지 않는다: 가장 굵은 실을 받아쳐야(0260 D).
+        assert!(w.deep.as_ref().unwrap().last_thread);
+        for _ in 0..((t::DEEP_DONE_DELAY / t::TICK_DT) as usize + 2) {
+            w.deep_tick(t::TICK_DT);
+            if w.deep.as_ref().unwrap().wrapped > 0.0 {
+                break;
+            }
+        }
+        assert!(
+            !w.adv.events.contains(&AdvEvent::DeepDone),
+            "피하기만 해서는 안 풀린다"
+        );
+        let mut w = World::new();
+        let mut d = Deep::new(c);
+        for k in &mut d.knots {
+            k.cut = true;
+        }
+        d.last_thread = true;
+        d.next_pull = 0.0;
+        w.deep = Some(d);
+        w.player.pos = c + vec2(0.0, 60.0);
+        w.deep_tick(t::TICK_DT);
+        let p = w.deep.as_ref().unwrap().pull.expect("굵은 실");
+        assert!(
+            p.big && !p.fan && p.windup() > t::DEEP_PULL_WINDUP,
+            "예고가 더 길다"
+        );
+        while w
+            .deep
+            .as_ref()
+            .unwrap()
+            .pull
+            .is_some_and(|p| p.time < p.windup() - t::TICK_DT)
+        {
+            w.deep_tick(t::TICK_DT);
+        }
+        w.player.open_parry_for_test(vec2(0.0, -1.0));
+        w.deep_tick(t::TICK_DT);
+        assert!(
+            w.deep.as_ref().unwrap().done_t.is_some(),
+            "받아치면 다 풀린다"
+        );
         for _ in 0..((t::DEEP_DONE_DELAY / t::TICK_DT) as usize + 2) {
             w.deep_tick(t::TICK_DT);
         }

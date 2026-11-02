@@ -158,6 +158,8 @@ pub struct Enemy {
     pub knotted: bool,
     /// 보스 2단계(0233): 체력 반 아래에서 한 번 깨어났다 — 예고·쉬기·걸음이 빨라지고 덜 멈칫한다.
     pub roused: bool,
+    /// 가장 깊은 곳의 실 그림자(0260): 남은 시간(초). 0이면 보통 적.
+    pub shade: f32,
     pub state: State,
     pub facing: Vec2,
     pub flash: f32,
@@ -297,6 +299,7 @@ impl Enemy {
             speed_mul: 1.0,
             knotted: false,
             roused: false,
+            shade: 0.0,
             state,
             facing: vec2(-1.0, 0.0),
             flash: 0.0,
