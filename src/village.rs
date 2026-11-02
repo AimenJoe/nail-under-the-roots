@@ -159,6 +159,20 @@ pub struct State {
     pub growth: u8,
     /// 맡긴 반딧불로 깨울 수 있는 재주가 있다: 밑동이 빛난다(0061).
     pub tree_ready: bool,
+    /// 맡긴(아직 쓰지 않은) 반딧불의 단계 0..4(`glow_level`): 반딧불 병·등이 그만큼 찬다(0269, 요구 2.9 A).
+    pub glow: u8,
+}
+
+/// 맡긴 반딧불 수 → 병의 단계(0 = 빈 병, 4 = 가득). 큰 나무를 다 깨운 뒤에도 쌓이는 빛이 마을에 보이게(0269 2.9 A).
+/// 기준은 재주 한 칸 값(120~495, 0246)과 런 하나에 모이는 양(약 240, 0236)에서: 한 런·두 런·나무 한 칸 넘게·많이.
+pub fn glow_level(banked: u32) -> u8 {
+    match banked {
+        0 => 0,
+        1..=119 => 1,
+        120..=399 => 2,
+        400..=999 => 3,
+        _ => 4,
+    }
 }
 
 /// 기록 키.
@@ -209,5 +223,23 @@ mod tests {
         assert_eq!(growth(0), 0);
         assert_eq!(growth(2), 2);
         assert_eq!(growth(99), 4);
+    }
+}
+
+#[cfg(test)]
+mod glow_tests {
+    /// 0269 2.9 A: 맡긴 빛이 많을수록 병이 찬다 — 빈 병 → 가득, 거꾸로 가지 않는다.
+    #[test]
+    fn jar_fills_with_banked_light() {
+        assert_eq!(super::glow_level(0), 0);
+        assert_eq!(super::glow_level(1), 1);
+        assert_eq!(super::glow_level(240), 2);
+        assert_eq!(super::glow_level(5000), 4);
+        let mut last = 0;
+        for n in (0..3000).step_by(7) {
+            let g = super::glow_level(n);
+            assert!(g >= last);
+            last = g;
+        }
     }
 }

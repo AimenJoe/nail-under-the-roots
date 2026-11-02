@@ -413,7 +413,7 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
         }
         Drawable::Decor(i, at) => match &art.sunny {
             Some(sunny) if matches!(i, 0 | 2 | 3 | 7) => draw_decor_sunny(sunny, i, at, w.time),
-            _ => draw_decor(i, at, w.time),
+            _ => draw_decor(i, at, w.time, w.adv.village.map_or(0, |v| v.glow)),
         },
         Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
     }
