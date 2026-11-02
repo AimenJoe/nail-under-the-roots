@@ -1928,6 +1928,7 @@ impl App {
                     + u32::from(self.profile.flag(key::CLOVER_BACK)),
             ),
             tree_ready: self.tree_affordable(),
+            glow: crate::village::glow_level(self.profile.count(crate::talents::KEY_LIGHT)),
         }
     }
 

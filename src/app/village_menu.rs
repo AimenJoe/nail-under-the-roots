@@ -11,8 +11,8 @@ use super::*;
 use crate::cutscene::Face;
 use crate::render::VillagePic;
 use crate::village::{
-    decor_name, key_decor, key_pack, PackKind, DECOR, JOURNAL_DECOR_DESC, JOURNAL_SHOWN, KEY_SEEDS,
-    PACK, PACK_POUCH_SEEDS,
+    decor_desc, decor_name, decor_price, key_decor, key_pack, PackKind, DECOR, EXTRA_DECOR,
+    EXTRA_FIRST, JOURNAL_SHOWN, KEY_SEEDS, PACK, PACK_POUCH_SEEDS,
 };
 
 /// 마을 창의 탭 하나: 이름, 좌우를 탭 안에서 쓰나(짐: 빼기·넣기 — 그때 탭은 Q/E·누르기로), 입력·그림,
@@ -42,19 +42,13 @@ pub(super) const VILLAGE_TABS: &[VillageTab] = &[
     },
 ];
 
-/// 꾸미기 탭의 줄: 가게 꾸미기 + 저널 꾸미기(지운 1번 등·6번 병은 빼고, 0269).
+/// 꾸미기 탭의 줄: 가게 꾸미기(더한 것 포함) + 저널 꾸미기, 지운 1번 등·6번 병은 빼고(0269).
 fn decor_rows() -> Vec<usize> {
     (0..DECOR.len())
+        .chain(EXTRA_FIRST..EXTRA_FIRST + EXTRA_DECOR.len())
         .chain(JOURNAL_SHOWN)
         .filter(|i| !crate::village::REMOVED_DECOR.contains(i))
         .collect()
-}
-
-fn decor_desc(i: usize) -> Tr {
-    match i.checked_sub(DECOR.len()) {
-        Some(j) => JOURNAL_DECOR_DESC[j.min(JOURNAL_DECOR_DESC.len() - 1)],
-        None => DECOR[i].desc,
-    }
 }
 
 /// 자세히 칸(44px)에 그릴 배율: 꾸미기는 1배(팩 그림 꽃밭이 36px쯤), 짐(산딸기·지렁이·씨앗)은 작아서 2배. 목록 칸은 이 반.
@@ -159,24 +153,17 @@ impl App {
     }
 
     fn decor_can_buy(&self, i: usize) -> bool {
-        i < DECOR.len()
-            && !self.profile.flag(&key_decor(i))
-            && self.profile.count(KEY_SEEDS) >= DECOR[i].price
+        decor_price(i).is_some_and(|p| {
+            !self.profile.flag(&key_decor(i)) && self.profile.count(KEY_SEEDS) >= p
+        })
     }
 
     fn place_decor(&mut self, i: usize) {
         let have = self.profile.count(KEY_SEEDS);
         if self.profile.flag(&key_decor(i)) {
             // 이미 놓았다: 아무 일도 없다.
-        } else if i >= DECOR.len() {
-            // 저널 꾸미기는 사지 않는다 — 발자국 목표의 보상.
-            self.shop_msg = Some((|s| s.decor_journal_d, 3.0));
-            self.sfx.play(crate::sfx::Id::Deny);
-        } else if have < DECOR[i].price {
-            self.shop_msg = Some((|s| s.decor_poor, 3.0));
-            self.sfx.play(crate::sfx::Id::Deny);
-        } else {
-            self.profile.set_count(KEY_SEEDS, have - DECOR[i].price);
+        } else if let Some(price) = decor_price(i).filter(|p| have >= *p) {
+            self.profile.set_count(KEY_SEEDS, have - price);
             self.profile.set(&key_decor(i));
             crate::profile::save(&self.profile);
             if let Some(v) = self.world.adv.village.as_mut() {
@@ -184,6 +171,13 @@ impl App {
             }
             self.shop_msg = Some((|s| s.decor_thanks, 2.5));
             self.sfx.play(crate::sfx::Id::Buy);
+        } else if decor_price(i).is_none() {
+            // 저널 꾸미기는 사지 않는다 — 발자국 목표의 보상.
+            self.shop_msg = Some((|s| s.decor_journal_d, 3.0));
+            self.sfx.play(crate::sfx::Id::Deny);
+        } else {
+            self.shop_msg = Some((|s| s.decor_poor, 3.0));
+            self.sfx.play(crate::sfx::Id::Deny);
         }
     }
 
@@ -401,7 +395,7 @@ impl App {
         let s = i18n::s();
         let ids = decor_rows();
         let i = ids[self.decor_cursor.min(ids.len() - 1)];
-        if i >= DECOR.len() && !self.profile.flag(&key_decor(i)) {
+        if decor_price(i).is_none() && !self.profile.flag(&key_decor(i)) {
             format!("{} {}", tr(decor_desc(i)), s.decor_journal_d)
         } else {
             tr(decor_desc(i)).to_string()
@@ -416,15 +410,13 @@ impl App {
             .iter()
             .map(|&i| {
                 let owned = self.profile.flag(&key_decor(i));
-                let journal = i >= DECOR.len();
-                let right = if owned {
-                    s.decor_owned.to_string()
-                } else if journal {
-                    s.decor_journal.to_string()
-                } else {
-                    fill(s.shop_price, &[&DECOR[i].price])
+                let price = decor_price(i);
+                let right = match price {
+                    _ if owned => s.decor_owned.to_string(),
+                    None => s.decor_journal.to_string(),
+                    Some(p) => fill(s.shop_price, &[&p]),
                 };
-                let dim = !owned && (journal || have < DECOR[i].price);
+                let dim = !owned && price.is_none_or(|p| have < p);
                 (
                     VillagePic::Decor(i),
                     tr(decor_name(i)).to_string(),
@@ -445,10 +437,10 @@ impl App {
         // 이름 아래 한 줄: 놓았다 / 발자국 보상 / 값.
         let info = if self.profile.flag(&key_decor(i)) {
             s.decor_owned.to_string()
-        } else if i >= DECOR.len() {
-            s.decor_journal.to_string()
+        } else if let Some(p) = decor_price(i) {
+            fill(s.shop_price, &[&p])
         } else {
-            fill(s.shop_price, &[&DECOR[i].price])
+            s.decor_journal.to_string()
         };
         self.draw_village_detail(ui, detail, VillagePic::Decor(i), tr(decor_name(i)), &info);
     }
@@ -543,11 +535,11 @@ impl App {
 mod tests {
     use super::*;
 
-    /// 마을 창의 꾸미기 줄: 가게 다섯 + 저널 둘, 지운 반딧불 등(1)·병(6)은 없다. 설명이 다 있다.
+    /// 마을 창의 꾸미기 줄: 가게 다섯 + 더한 셋 + 저널 둘, 지운 반딧불 등(1)·병(6)은 없다. 설명이 다 있다.
     #[test]
     fn decor_rows_skip_removed_decor_and_have_descriptions() {
         let rows = decor_rows();
-        assert_eq!(rows.len(), 7);
+        assert_eq!(rows.len(), 10);
         assert!(!rows.contains(&1) && !rows.contains(&6));
         let ko = &crate::i18n::KO;
         for i in rows {

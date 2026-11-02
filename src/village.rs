@@ -23,13 +23,13 @@ pub const ROWS: [&str; 16] = [
     "#..T.......#######..8..R.#",
     "#.....1....###Y###...g...#",
     "#.......W................#",
-    "#..k.K....n.........H....#",
+    "#..k.K....n.........H..p.#",
     "#..........F....b........#",
     "#....3............4...X..#",
     "#...M..j.................#",
     "#.......5..........6.T...#",
-    "#..R........PG.......d...#",
-    "#...................9....#",
+    "#..R........PG.......d.h.#",
+    "#.....u.............9....#",
     "##########################",
     "##########################",
 ];
@@ -168,15 +168,70 @@ pub const JOURNAL_DECOR: [Tr; 3] = [|s| s.decor_7, |s| s.decor_8, |s| s.decor_9]
 pub const JOURNAL_DECOR_DESC: [Tr; 3] = [|_| "", |s| s.decor_8_d, |s| s.decor_9_d];
 /// 마을 창에 보이는 저널 꾸미기 번호(지운 6번 병은 빼고, 0269).
 pub const JOURNAL_SHOWN: [usize; 2] = [7, 8];
-/// 꾸미기 전체 수(가게 + 저널).
-pub const DECOR_ALL: usize = DECOR.len() + JOURNAL_DECOR.len();
+/// 저널 꾸미기 뒤에 더한 가게 꾸미기(0269, 번호 9부터 — 팩 그림: 돌 우물·해바라기·작은 소나무). 지도 자리는 `EXTRA_SLOTS`.
+pub const EXTRA_DECOR: [Decor; 3] = [
+    Decor {
+        name: |s| s.decor_10,
+        desc: |s| s.decor_10_d,
+        price: 15,
+    },
+    Decor {
+        name: |s| s.decor_11,
+        desc: |s| s.decor_11_d,
+        price: 7,
+    },
+    Decor {
+        name: |s| s.decor_12,
+        desc: |s| s.decor_12_d,
+        price: 6,
+    },
+];
+/// 더한 꾸미기의 지도 글자(`ROWS`): 우물 `u`, 해바라기 `h`, 작은 소나무 `p`. 가게·저널 꾸미기는 `1`~`9`(번호 + 1).
+pub const EXTRA_SLOTS: [char; 3] = ['u', 'h', 'p'];
+/// 더한 꾸미기의 첫 번호.
+pub const EXTRA_FIRST: usize = DECOR.len() + JOURNAL_DECOR.len();
+/// 꾸미기 전체 수(가게 + 저널 + 더한 것).
+pub const DECOR_ALL: usize = EXTRA_FIRST + EXTRA_DECOR.len();
+
+/// 지도 글자 → 꾸미기 번호.
+pub fn slot_decor(c: char) -> Option<usize> {
+    match c {
+        '1'..='9' => Some((c as u8 - b'1') as usize),
+        _ => EXTRA_SLOTS
+            .iter()
+            .position(|x| *x == c)
+            .map(|k| EXTRA_FIRST + k),
+    }
+}
 
 /// 꾸미기 이름(가게 것이든 저널 것이든).
 pub fn decor_name(i: usize) -> Tr {
+    if i >= EXTRA_FIRST {
+        return EXTRA_DECOR[(i - EXTRA_FIRST).min(EXTRA_DECOR.len() - 1)].name;
+    }
     match i.checked_sub(DECOR.len()) {
         Some(j) => JOURNAL_DECOR[j.min(JOURNAL_DECOR.len() - 1)],
         None => DECOR[i].name,
     }
+}
+
+/// 꾸미기 설명.
+pub fn decor_desc(i: usize) -> Tr {
+    if i >= EXTRA_FIRST {
+        return EXTRA_DECOR[(i - EXTRA_FIRST).min(EXTRA_DECOR.len() - 1)].desc;
+    }
+    match i.checked_sub(DECOR.len()) {
+        Some(j) => JOURNAL_DECOR_DESC[j.min(JOURNAL_DECOR_DESC.len() - 1)],
+        None => DECOR[i].desc,
+    }
+}
+
+/// 꾸미기 값(마을 씨앗). 저널 꾸미기는 None(사지 않고 받는다).
+pub fn decor_price(i: usize) -> Option<u32> {
+    if i >= EXTRA_FIRST {
+        return EXTRA_DECOR.get(i - EXTRA_FIRST).map(|d| d.price);
+    }
+    DECOR.get(i).map(|d| d.price)
 }
 
 /// 마을 모습(앱이 기록에서 만들어 월드에 준다. 월드는 그리기·이웃 배치에만 쓴다).
@@ -199,6 +254,20 @@ pub struct State {
     pub growth: u8,
     /// 맡긴 반딧불로 깨울 수 있는 재주가 있다: 밑동이 빛난다(0061).
     pub tree_ready: bool,
+    /// 맡긴(아직 쓰지 않은) 반딧불의 단계 0..4(`glow_level`): 돌 우물 위에 그만큼 반딧불이 떠다닌다(0269, 요구 2.9 A).
+    pub glow: u8,
+}
+
+/// 맡긴 반딧불 수 → 우물 위 반딧불 단계(0 = 없음, 4 = 많이). 큰 나무를 다 깨운 뒤에도 쌓이는 빛이 마을에 보이게(0269 2.9 A).
+/// 기준은 재주 한 칸 값(120~495, 0246)과 런 하나에 모이는 양(약 240, 0236)에서: 조금·한 런·나무 한 칸 넘게·많이.
+pub fn glow_level(banked: u32) -> u8 {
+    match banked {
+        0 => 0,
+        1..=119 => 1,
+        120..=399 => 2,
+        400..=999 => 3,
+        _ => 4,
+    }
 }
 
 /// 기록 키.
@@ -279,5 +348,22 @@ mod refund_tests {
         let mut q = crate::profile::Profile::default();
         migrate_removed_decor(&mut q);
         assert!(q.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod glow_tests {
+    /// 0269 2.9 A: 맡긴 빛이 많을수록 우물 위 반딧불이 는다 — 거꾸로 가지 않는다.
+    #[test]
+    fn well_fireflies_grow_with_banked_light() {
+        assert_eq!(super::glow_level(0), 0);
+        assert_eq!(super::glow_level(240), 2);
+        assert_eq!(super::glow_level(5000), 4);
+        let mut last = 0;
+        for n in (0..3000).step_by(7) {
+            let g = super::glow_level(n);
+            assert!(g >= last);
+            last = g;
+        }
     }
 }

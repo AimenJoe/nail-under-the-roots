@@ -93,9 +93,9 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                     draw_puddle(*at, w.time)
                 }
                 'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
-                '1'..='9' => {
-                    let i = (*c as u8 - b'1') as usize;
-                    if v.decor[i] {
+                c if crate::village::slot_decor(*c).is_some() => {
+                    let i = crate::village::slot_decor(*c).unwrap_or(0);
+                    if v.decor.get(i).copied().unwrap_or(false) {
                         list.push((at.y + 6.0, Drawable::Decor(i, *at)));
                     }
                 }
@@ -411,10 +411,16 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
                 draw_tree_motes(at + vec2(0.0, 14.0), w.time);
             }
         }
-        Drawable::Decor(i, at) => match &art.sunny {
-            Some(sunny) if matches!(i, 0 | 2 | 3 | 7) => draw_decor_sunny(sunny, i, at, w.time),
-            _ => draw_decor(i, at, w.time),
-        },
+        Drawable::Decor(i, at) => {
+            match &art.sunny {
+                Some(sunny) if decor_uses_pack(i) => draw_decor_sunny(sunny, i, at, w.time),
+                _ => draw_decor(i, at, w.time),
+            }
+            // 돌 우물 위의 반딧불: 맡긴 빛의 단계만큼(0269 2.9 A). 그림자 패스에는 넣지 않는다.
+            if i == crate::village::EXTRA_FIRST && !shadow_pass() {
+                draw_well_fireflies(at, w.time, w.adv.village.map_or(0, |v| v.glow));
+            }
+        }
         Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
     }
 }

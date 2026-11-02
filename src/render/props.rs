@@ -1465,6 +1465,39 @@ pub(super) fn draw_great_tree(at: Vec2, growth: u8, time: f32) {
 
 /// 마을 꾸미기(0045): 0 꽃밭, 1 반딧불 등, 2 빛나는 버섯, 3 통나무 의자, 4 바람종, 5 깃발 줄.
 /// 마을 꾸미기, 팩 그림판(0066): 0 꽃밭 = 열매·꽃 덤불 + 들꽃, 2 빛나는 버섯 = 파란 버섯 셋(움직임).
+/// 돌 우물 위를 천천히 떠도는 반딧불(0269 2.9 A): 맡긴 반딧불 단계 `glow`(0..4)마다 둘씩, 빛은 숨 쉬듯.
+pub(super) fn draw_well_fireflies(at: Vec2, time: f32, glow: u8) {
+    let n = glow.min(4) as usize * 2;
+    for k in 0..n {
+        let ph = k as f32 * 2.399;
+        let a = time * (0.35 + 0.05 * (k % 3) as f32) + ph;
+        // 우물 테두리보다 위 허공에서(풀 위 점과 섞이지 않게).
+        let p = vec2(
+            at.x + a.cos() * (6.0 + (k % 2) as f32 * 5.0),
+            at.y - 22.0 + (a * 1.7).sin() * 4.0 - (k % 3) as f32 * 4.0,
+        )
+        .round();
+        let on = 0.5 + 0.5 * (time * 2.1 + ph).sin();
+        // 낮에도 보이게: 따뜻한 노란 점 + 십자 모양으로 번지는 빛(풀의 초록 점과 모양·색 둘 다 다르게).
+        let halo = Color::new(1.0, 0.92, 0.35, 0.35 * on);
+        for (dx, dy) in [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)] {
+            draw_rectangle(p.x + dx, p.y + dy, 1.0, 1.0, halo);
+        }
+        draw_rectangle(
+            p.x,
+            p.y,
+            1.0,
+            1.0,
+            Color::new(1.0, 1.0, 0.75, 0.55 + 0.45 * on),
+        );
+    }
+}
+
+/// 이 꾸미기를 팩 그림으로 그리나(팩이 있을 때). 아니면 `draw_decor`의 코드 그림.
+pub(super) fn decor_uses_pack(i: usize) -> bool {
+    matches!(i, 0 | 2 | 3 | 7 | 9 | 10 | 11)
+}
+
 pub(super) fn draw_decor_sunny(sunny: &art::Sunny, i: usize, at: Vec2, time: f32) {
     use crate::sunny as sn;
     let foot = vec2(at.x.round(), at.y.round() + 6.0);
@@ -1481,6 +1514,32 @@ pub(super) fn draw_decor_sunny(sunny: &art::Sunny, i: usize, at: Vec2, time: f32
         3 => {
             draw_ellipse(foot.x, foot.y - 1.0, 12.0, 2.5, 0.0, SHADOW_SOFT);
             sn::draw_at_foot(&sunny.sheet, sn::BENCH, foot, WHITE);
+        }
+        // 9 돌 우물·10 해바라기·11 작은 소나무(0269, 팩 타일셋).
+        // 팩 우물은 위에서 본 동그라미라 3/4 시점(0006)에서 둥둥 떠 보였다(사장): 세로를 줄로 덜어 내 80%로 눌러 그린다
+        // (정수 위치·가장 가까운 점 고르기라 돌 모양이 번지지 않는다 — 헤드리스로 높이 22·20·18을 비교해 20).
+        9 => {
+            let src = sn::rect(sn::WELL);
+            let h = (src.h * sn::WELL_SQUASH).round();
+            draw_texture_ex(
+                &sunny.sheet,
+                (foot.x - src.w / 2.0).round(),
+                (foot.y - h).round(),
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(vec2(src.w, h)),
+                    source: Some(src),
+                    ..Default::default()
+                },
+            );
+        }
+        10 => {
+            draw_ellipse(foot.x, foot.y - 1.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+            sn::draw_at_foot(&sunny.sheet, sn::SUNFLOWER, foot, WHITE);
+        }
+        11 => {
+            draw_ellipse(foot.x, foot.y - 1.0, 8.0, 2.5, 0.0, SHADOW_SOFT);
+            sn::draw_at_foot(&sunny.sheet, sn::PINE_SMALL, foot, WHITE);
         }
         7 => {
             draw_ellipse(foot.x - 2.0, foot.y - 1.0, 8.0, 2.0, 0.0, SHADOW_SOFT);
@@ -1651,6 +1710,30 @@ pub(super) fn draw_decor(i: usize, at: Vec2, time: f32) {
                     Color::new(0.40, 0.65, 0.30, 1.0),
                 );
                 draw_rectangle(x + dx + sway - 1.0, y - h - 1.0, 3.0, 3.0, cols[k]);
+            }
+        }
+        // 9~11(0269): 팩이 없는 빌드의 대신 그림 — 돌 우물(회색 고리 + 어두운 물), 해바라기(줄기 + 노란 꽃), 작은 소나무(세모 셋).
+        9 => {
+            draw_ellipse(x, y - 4.0, 9.0, 5.0, 0.0, OUTLINE);
+            draw_ellipse(x, y - 4.0, 8.0, 4.0, 0.0, Color::new(0.58, 0.60, 0.64, 1.0));
+            draw_ellipse(x, y - 5.0, 5.0, 2.5, 0.0, Color::new(0.16, 0.20, 0.26, 1.0));
+        }
+        10 => {
+            draw_rectangle(x, y - 14.0, 1.0, 14.0, Color::new(0.36, 0.58, 0.32, 1.0));
+            draw_circle(x + 0.5, y - 15.0, 4.0, Color::new(0.98, 0.80, 0.25, 1.0));
+            draw_circle(x + 0.5, y - 15.0, 1.5, Color::new(0.45, 0.30, 0.18, 1.0));
+        }
+        11 => {
+            let g = Color::new(0.22, 0.48, 0.30, 1.0);
+            draw_rectangle(x - 1.0, y - 4.0, 2.0, 4.0, wood);
+            for (k, w) in [7.0f32, 5.5, 4.0].into_iter().enumerate() {
+                let top = y - 10.0 - k as f32 * 6.0;
+                draw_triangle(
+                    vec2(x - w, top + 7.0),
+                    vec2(x + w, top + 7.0),
+                    vec2(x, top),
+                    g,
+                );
             }
         }
         // 8 실 그네: 두 기둥에 흰 실, 천천히 흔들린다.
