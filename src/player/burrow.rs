@@ -109,6 +109,7 @@ impl Player {
                 finisher: false,
                 poison: 0.0,
                 crush: false,
+                src: 0,
             });
         }
         self.state =
@@ -174,6 +175,18 @@ impl Player {
         self.swing_id += 1;
         self.state = State::Emerge { time: 0.0, charge };
         self.events.push(Event::Emerge);
+        // 여진·흙 묻은 발톱(0267, 큰 나무).
+        let quake = self.talents.aftershock();
+        if quake > 0 {
+            self.spawns.push(super::doto::Spawn::Bury {
+                at: self.pos,
+                fuse: t::TREE_AFTERSHOCK_DELAY,
+                radius: self.emerge_radius_for(charge) * t::TREE_AFTERSHOCK_RADIUS,
+                damage: quake,
+                kind: StrikeKind::Emerge,
+            });
+        }
+        self.earth_claw = self.earth_claw.max(self.talents.earth_claw_time());
         Strike {
             id: self.swing_id,
             kind: StrikeKind::Emerge,
@@ -189,6 +202,7 @@ impl Player {
             finisher: false,
             poison: 0.0,
             crush: false,
+            src: 0,
         }
     }
 }

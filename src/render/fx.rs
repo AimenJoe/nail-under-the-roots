@@ -389,6 +389,15 @@ pub(super) fn draw_mine(m: &world::Mine, time: f32) {
 
 /// 플레이어 도토가 묻은 도토리(0195): 같은 그림, 고리는 따뜻한 금빛(적의 붉은 것과 다르다 — 내 것은 안 아프다).
 pub(super) fn draw_buried(b: &world::toss::Buried, time: f32) {
+    if b.kind == crate::combat::StrikeKind::Emerge {
+        // 여진(0267): 도토리 없이 땅에 번지는 금 — 닫히는 고리가 다 닫히면 울린다.
+        let k = (b.time / b.fuse.max(0.01)).clamp(0.0, 1.0);
+        let c = Color::new(0.86, 0.70, 0.46, 0.25 + 0.4 * k);
+        let (x, y) = (b.pos.x.round(), b.pos.y.round());
+        draw_circle_lines(x, y, b.radius, 1.0, c);
+        draw_circle_lines(x, y, (b.radius * (1.0 - k)).max(2.0), 1.0, c);
+        return;
+    }
     draw_buried_at(b.pos, b.time, b.fuse, b.radius, true, time);
 }
 

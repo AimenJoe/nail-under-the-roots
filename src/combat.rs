@@ -67,6 +67,8 @@ pub enum StrikeKind {
     Shove,
     /// 가시 덤불이 찌름(0246): 피해 작게, 등딱지에는 튕긴다.
     Prick,
+    /// 볼링(0267): 모모가 날려 보낸 적이 다른 적에 부딪힘. 등딱지에는 튕기고, 맞은 적도 날아가 벽에 박힐 수 있다.
+    Bowl,
 }
 
 /// 플레이어가 이번 틱에 휘두르는 공격 하나.
@@ -87,9 +89,19 @@ pub struct Strike {
     pub poison: f32,
     /// 등딱지에 튕기지 않고 연다(조약돌 덧신 마무리, 0246).
     pub crush: bool,
+    /// 필살기 게이지를 버는 단위(0267): 0이면 `id`. 탄은 던진 스윙 번호를 지녀(조각·부채꼴 모두) 한 번 던지기 = 한 번 벌기.
+    pub src: u32,
 }
 
 impl Strike {
+    /// 게이지를 버는 단위 번호.
+    pub fn sp_key(&self) -> u32 {
+        if self.src != 0 {
+            self.src
+        } else {
+            self.id
+        }
+    }
     /// 공격이 향한 쪽(원형이면 `fallback`).
     pub fn shape_dir_or(&self, fallback: Vec2) -> Vec2 {
         self.shape.dir().unwrap_or(fallback)

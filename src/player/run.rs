@@ -187,6 +187,7 @@ impl Player {
             finisher: false,
             poison: 0.0,
             crush: false,
+            src: 0,
         }
     }
 
@@ -372,18 +373,17 @@ mod tests {
             }
             shots
         };
-        assert_eq!(air(vec![], true).len(), 3, "누르면 한 번(부채꼴 셋)");
+        assert_eq!(air(vec![], true).len(), 2, "누르면 한 번(부채꼴 둘, 0267)");
         // 0250: 닿는 적이 없어도 꼭대기에서 저절로, 겨눈 쪽(아무 입력 없으면 뛰는 쪽 = 오른쪽)으로.
         let plain = air(vec![], false);
-        assert_eq!(plain.len(), 3, "적이 없어도 꼭대기에서 한 번");
-        assert!(
-            plain[1].1.normalize().dot(vec2(1.0, 0.0)) > 0.99,
-            "뛰는 쪽으로"
-        );
+        assert_eq!(plain.len(), 2, "적이 없어도 꼭대기에서 한 번");
+        // 둘의 가운데 = 겨눈 쪽.
+        let mid_of = |v: &[(Vec2, Vec2)]| (v[0].1.normalize() + v[1].1.normalize()).normalize();
+        assert!(mid_of(&plain).dot(vec2(1.0, 0.0)) > 0.99, "뛰는 쪽으로");
         let foe = vec2(24.0 + 200.0, 60.0);
         let shots = air(vec![foe], false);
-        assert_eq!(shots.len(), 3, "꼭대기에서 저절로 한 번");
-        let (from, mid) = (shots[1].0, shots[1].1);
+        assert_eq!(shots.len(), 2, "꼭대기에서 저절로 한 번");
+        let (from, mid) = (shots[0].0, mid_of(&shots));
         assert!(
             mid.normalize().dot((foe - from).normalize()) > 0.99,
             "가장 가까운 적 쪽으로"

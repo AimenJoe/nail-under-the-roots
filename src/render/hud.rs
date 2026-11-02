@@ -649,6 +649,7 @@ pub(super) fn draw_hitboxes(w: &World, alpha: f32) {
             StrikeKind::Burst => BROWN,
             StrikeKind::Shove => WHITE,
             StrikeKind::Prick => GREEN,
+            StrikeKind::Bowl => VIOLET,
         };
         match s.shape {
             Shape::Circle { center, r } => draw_circle_lines(center.x, center.y, r, 1.0, col),

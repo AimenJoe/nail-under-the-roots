@@ -560,6 +560,8 @@ pub struct RunStats {
     pub chests: u32,
     pub springs: u32,
     pub slams: u32,
+    /// 볼링으로 부딪힌 수(0267).
+    pub bowls: u32,
     pub kills: u32,
     /// 솟구침으로 잡은 수(저널용).
     pub emerge_kills: u32,
@@ -679,6 +681,8 @@ pub struct World {
     respawn_timer: f32,
     /// 달리며 모으기의 땅울림이 켜져 있나(0215): 켜지고 꺼지는 틱에 소리를 낸다/멈춘다.
     run_rumble: bool,
+    /// 볼링 타격 번호(0267, 맞은 적이 같은 부딪힘에 두 번 맞지 않게).
+    bowl_id: u32,
     enemy_events: Vec<enemy::Event>,
 }
 
@@ -812,6 +816,7 @@ impl World {
             last_strike: None,
             respawn_timer: t::WAVE_RESPAWN_DELAY,
             run_rumble: false,
+            bowl_id: 0,
             enemy_events: Vec::new(),
         };
         w.next_wave();
@@ -907,6 +912,7 @@ impl World {
         let mut deaths: Vec<(Vec2, Kind)> = Vec::new();
         self.tick_enemies(dt);
         self.tick_deaths(&mut deaths);
+        self.bowl(&mut deaths);
         self.charge_dust(dt);
         let (summon, bury) = self.enemy_events();
         self.enemy_dirt(dt, frozen);
@@ -1510,6 +1516,83 @@ impl World {
         }
     }
 
+    /// 볼링(0267): 날려 보낸 적(`Enemy::launched`)이 빠르게 날다 다른 적에 닿으면 그 적을 친다. 맞은 적도 날아가
+    /// 다음 적을 칠 수 있고(공은 `BOWL_KEEP`배로 느려진다), 벽에 박히면 벽 쿵. 타격 규칙은 적이 정한다(`Enemy::receive`).
+    fn bowl(&mut self, deaths: &mut Vec<(Vec2, Kind)>) {
+        let n = self.enemies.len();
+        for i in 0..n {
+            let ball = &self.enemies[i];
+            if !ball.alive || ball.launched <= 0.0 || ball.vel.length() < t::LAUNCH_MIN_SPEED {
+                continue;
+            }
+            let (from, vel, r) = (ball.pos, ball.vel, ball.radius());
+            let Some(j) = (0..n).find(|&j| {
+                let b = &self.enemies[j];
+                j != i
+                    && b.alive
+                    && b.hittable()
+                    && b.bowl_cd <= 0.0
+                    && (b.pos - from).length() <= r + b.radius() + 1.0
+            }) else {
+                continue;
+            };
+            self.bowl_id = self.bowl_id.wrapping_add(1);
+            let at = self.enemies[j].pos;
+            let dir = vel.normalize_or_zero();
+            let s = Strike {
+                id: 0x4000_0000 | (self.bowl_id & 0x3fff_ffff),
+                kind: crate::combat::StrikeKind::Bowl,
+                shape: crate::combat::Shape::Circle { center: at, r: 1.0 },
+                damage: t::BOWL_DAMAGE + self.player.talents.bowl_bonus(),
+                knockback: t::BOWL_KNOCK,
+                stun: t::BOWL_STUN,
+                hitstop: t::BOWL_HITSTOP,
+                shake: 0.2,
+                finisher: false,
+                poison: 0.0,
+                crush: false,
+                src: 0,
+            };
+            // 공 쪽에서 날던 쪽으로 민다(옆으로 흩지 않게 날던 쪽을 섞는다).
+            let origin = at - (dir * 2.0 + (at - from).normalize_or(dir)).normalize_or(dir) * 8.0;
+            self.enemies[i].bowl_cd = t::BOWL_CD;
+            self.enemies[i].vel *= t::BOWL_KEEP;
+            let b = &mut self.enemies[j];
+            b.bowl_cd = t::BOWL_CD;
+            let mid = (from + at) * 0.5;
+            match b.receive(&s, origin, dir) {
+                enemy::Struck::Hit { .. } => {
+                    self.stats.bowls += 1;
+                    if b.alive && !b.is_boss() {
+                        b.launched = t::LAUNCH_TIME * self.player.talents.launch_mul();
+                    }
+                    self.juice.audio.play(sfx::Id::Impact);
+                    self.juice.feel.add_hitstop(t::BOWL_HITSTOP);
+                    self.juice.feel.add_trauma(0.2);
+                    self.juice.fx.push(ring(mid, 3.0, 14.0, 0.18, WHITE));
+                    spray(&mut self.juice.fx, mid, dir, 5, WHITE, 150.0);
+                    if !b.alive {
+                        enemy_down(
+                            &mut self.juice.fx,
+                            &mut self.juice.audio,
+                            &mut self.juice.feel,
+                            &mut self.stats.kills,
+                            deaths,
+                            b,
+                            WHITE,
+                        );
+                    }
+                }
+                enemy::Struck::Deflected => {
+                    // 등딱지에 튕겼다: 공이 되튄다.
+                    self.enemies[i].vel = -self.enemies[i].vel;
+                    self.juice.audio.play(sfx::Id::Impact);
+                }
+                _ => {}
+            }
+        }
+    }
+
     /// 적 틱 안에서 쓰러진 적(독·벽 쿵). 떨어뜨릴 것은 `deaths`에 모았다가 `settle_deaths`에서.
     fn tick_deaths(&mut self, deaths: &mut Vec<(Vec2, Kind)>) {
         // 쓰러진 적(독·공격). 떨어뜨릴 것은 루프가 끝난 뒤에.
@@ -1965,6 +2048,11 @@ impl World {
             let mut hit_any = false;
             // 마무리 타·솟구치기가 맞힌 첫 자리(0090): 한 번만 쿵 소리와 충격 고리.
             let mut impact_at = None;
+            // 볼링(0267): 모모의 마무리 차기·강타는 맞은 적을 날려 보낸다(보스는 안 날아간다).
+            let launch = !ranged
+                && self.character.def().launch
+                && (s.kind == crate::combat::StrikeKind::Heavy
+                    || (s.finisher && matches!(s.kind, crate::combat::StrikeKind::Claw(_))));
             for e in &mut self.enemies {
                 // 닿나·튕기나·얼마나 밀리나는 적이 정한다(0170 R10). 월드는 결과로 연출·통계만.
                 let dir = match e.receive(&s, origin, facing) {
@@ -1996,10 +2084,24 @@ impl World {
                     s.kind,
                     crate::combat::StrikeKind::Claw(_) | crate::combat::StrikeKind::Heavy
                 ) {
-                    self.player.gain_sp(s.finisher);
+                    self.player.gain_sp(s.finisher, s.sp_key());
+                }
+                if matches!(
+                    s.kind,
+                    crate::combat::StrikeKind::Drill
+                        | crate::combat::StrikeKind::DrillWall
+                        | crate::combat::StrikeKind::Stomp
+                        | crate::combat::StrikeKind::Burst
+                ) {
+                    self.player.gain_special_sp();
                 }
                 if s.kind == crate::combat::StrikeKind::Heavy {
                     self.stats.heavy_hits += 1;
+                }
+                if launch && e.alive && !e.is_boss() {
+                    e.launched = t::LAUNCH_TIME * self.player.talents.launch_mul();
+                    e.bowl_cd = t::BOWL_CD;
+                    e.slam = e.slam.max(t::WALL_SLAM_DAMAGE);
                 }
                 if s.finisher {
                     self.stats.finisher_hits += 1;
@@ -4070,6 +4172,7 @@ mod tests {
             finisher: false,
             poison: 0.0,
             crush: false,
+            src: 0,
         });
         assert!(w.juice.toast.is_some(), "고치는 때릴 수 없다");
         assert!(w.juice.audio.played(sfx::Id::WallHit));
@@ -4138,6 +4241,7 @@ mod tests {
             finisher: false,
             poison: 0.0,
             crush: false,
+            src: 0,
         });
         assert!(w.room.webs.is_empty(), "발톱이 그물을 끊는다");
         assert!(w.juice.audio.played(sfx::Id::Unbind));
@@ -4201,6 +4305,7 @@ mod tests {
             finisher: false,
             poison: 0.0,
             crush: false,
+            src: 0,
         };
         let k1 = w.deep.as_ref().unwrap().knots[1].pos;
         let s0 = strike(1, StrikeKind::Claw(0), k1, 1);
@@ -4565,6 +4670,7 @@ mod tests {
             finisher: false,
             poison: 0.0,
             crush: false,
+            src: 0,
         };
         let brk = |w: &World| {
             w.room

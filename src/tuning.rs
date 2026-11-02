@@ -157,6 +157,13 @@ pub const TELE_FULL_HOLD: f32 = 0.1;
 /// 0.25초(초당 4타)는 귀로 박자를 잡기엔 빨랐다(사장, 0183) → 0.36초도 "아직 조금 빠르다"(0184) → 0.42초(약 143 BPM,
 /// 사람이 편하게 두드리는 간격 0.45~0.6초의 바로 아래), 창 ±0.09초.
 pub const BEAT_PERIOD: f32 = 0.42;
+/// 무기 무게마다 박자(0267, 사장 "무기의 공격속도에 따라 박자가 달라지는게 맞아"). `BEAT_PERIOD`는 보통 무기(두더지 발톱·뒷발).
+/// 가벼운 4연타(새싹 발톱·가시덩굴 각반·새싹 짚신)는 빨리, 무거운 2연타(바위 발톱·조약돌 덧신·호두)는 느리게, 던지기는 조금 느리게.
+/// 창(`BEAT_WINDOW`)은 박자 길이에 비례한다. 초당 피해(한 대상): 가벼움 3.3 · 보통 3.2 · 던지기 2.9 · 무거움 3.7(등딱지·넉백의 값).
+pub const BEAT_LIGHT: f32 = 0.30;
+pub const BEAT_LIGHT_THROW: f32 = 0.36;
+pub const BEAT_THROW: f32 = 0.46;
+pub const BEAT_HEAVY: f32 = 0.68;
 pub const BEAT_WINDOW: f32 = 0.09;
 /// 박자 고리(0174): 스윙 시작에 `BEAT_RING_START` 반지름에서 박자에 `BEAT_RING_END`(과녁 고리)로 닫힌다. 창 안이면 밝게.
 pub const BEAT_RING_START: f32 = 18.0;
@@ -185,6 +192,16 @@ pub const HEAVY_READY_FLASH: f32 = 0.03;
 /// 벽 쿵(0168): 강공격 넉백으로 이 속도(px/s) 넘게 벽에 박히면 피해 +1 + 파편 + 긴 멈춤.
 pub const WALL_SLAM_DAMAGE: i32 = 1;
 pub const WALL_SLAM_SPEED: f32 = 120.0;
+/// 볼링(0267, 모모): 마무리 차기·강타에 맞은 적이 `LAUNCH_TIME`초 동안 `LAUNCH_MIN_SPEED`보다 빠르게 날면 부딪는 적을 친다 —
+/// 피해 `BOWL_DAMAGE`, 공이 날던 쪽으로 `BOWL_KNOCK`(맞은 적도 날아가 다음 적을 칠 수 있다), 공은 `BOWL_KEEP`배로 느려진다.
+pub const LAUNCH_TIME: f32 = 0.45;
+pub const LAUNCH_MIN_SPEED: f32 = 110.0;
+pub const BOWL_DAMAGE: i32 = 1;
+pub const BOWL_KNOCK: f32 = 170.0;
+pub const BOWL_STUN: f32 = 0.3;
+pub const BOWL_KEEP: f32 = 0.6;
+pub const BOWL_CD: f32 = 0.4;
+pub const BOWL_HITSTOP: f32 = 0.05;
 pub const WALL_SLAM_HITSTOP: f32 = 0.12;
 pub const WALL_SLAM_SHAKE: f32 = 0.5;
 /// 모으는 동안 발 쪽으로 빨려 드는 먼지: 간격(초)·반지름.
@@ -490,6 +507,11 @@ pub const DROP_HEIGHT: f32 = 90.0;
 pub const SP_MAX: f32 = 12.0;
 pub const SP_PER_HIT: f32 = 1.0;
 pub const SP_FINISHER_BONUS: f32 = 1.0;
+/// 같은 스윙·같은 던지기가 둘째 적부터 버는 몫(0267). 도토 부채꼴·호두 조각이 한 번에 몇 칸씩 채우던 것을 막는다.
+pub const SP_CROWD: f32 = 0.25;
+/// 필살기가 적을 맞힐 때마다 되찾는 게이지와, 한 번 쓴 필살기로 되찾는 끝(0267). 꽉 찬 게이지 12의 4분의 1까지.
+pub const SPECIAL_SP_PER_HIT: f32 = 0.5;
+pub const SPECIAL_SP_CAP: f32 = 3.0;
 /// 시동(부아아…): 제자리에서 돌며 힘을 모은다. 이동 없음·무적, 적·투사체는 멈춘다(필살기 정지 연출).
 /// 이 동안은 방향을 마음대로 고른다.
 pub const DRILL_REV: f32 = 0.3;
@@ -852,6 +874,13 @@ pub const TREE_STUN: f32 = 0.1;
 pub const TREE_KNOCK: f32 = 1.2;
 pub const TREE_HASTE: f32 = 1.08;
 pub const TREE_BEAT: f32 = 1.25;
+/// 여진(0267, Naïl): 솟구친 뒤 몇 초에, 솟구침 둘레의 몇 배로 다시 울리나.
+pub const TREE_AFTERSHOCK_DELAY: f32 = 0.45;
+pub const TREE_AFTERSHOCK_RADIUS: f32 = 1.2;
+/// 흙 묻은 발톱(0267, Naïl): 솟구친 뒤 발톱 피해 +1이 남는 시간(깨운 한 칸마다).
+pub const TREE_EARTH_CLAW: f32 = 1.2;
+/// 볼링 핀(0267, 모모): 날아가는 시간 배율(한 칸마다 더하는 몫).
+pub const TREE_PINS_LAUNCH: f32 = 0.5;
 pub const TREE_CHARGE: f32 = 0.8;
 pub const TREE_KI: f32 = 1.15;
 pub const TREE_SPEED: f32 = 1.06;

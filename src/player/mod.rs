@@ -232,6 +232,12 @@ pub struct Player {
     dodge_buf: f32,
     /// 특기 누름 버퍼(0263): 후딜레이 캔슬을 회피처럼 — 활성 구간 중에 눌러도 캔슬 자리가 오면 나간다.
     special_buf: f32,
+    /// 마지막으로 게이지를 번 타의 단위(`Strike::sp_key`, 0267): 같은 스윙·같은 던지기가 둘째 적부터는 `SP_CROWD`배.
+    sp_key: u32,
+    /// 이번 필살기가 타격으로 되찾은 게이지(0267, `SPECIAL_SP_CAP`까지).
+    special_sp: f32,
+    /// 흙 묻은 발톱(0267): 솟구친 뒤 발톱 피해 +1이 남은 시간.
+    pub earth_claw: f32,
     /// 다음 틱에 도토리를 던진다(도토 되던지기 0263 — 받아치기는 월드가 틱 뒤에 알려 준다).
     toss_next: bool,
     item_buf: f32,
@@ -304,6 +310,9 @@ impl Player {
             attack_buf: 0.0,
             dodge_buf: 0.0,
             special_buf: 0.0,
+            sp_key: u32::MAX,
+            special_sp: 0.0,
+            earth_claw: 0.0,
             toss_next: false,
             item_buf: 0.0,
             parry_cd: 0.0,
@@ -428,6 +437,7 @@ impl Player {
     /// 특기 시작(캐릭터마다): 드릴 / 이어 뛰기 / 도토리 묻기.
     fn start_special(&mut self, move_dir: Vec2) {
         self.special_buf = 0.0;
+        self.special_sp = 0.0;
         match self.kit.def().special {
             crate::characters::Special::Chain => self.start_chain(move_dir),
             crate::characters::Special::Drill => self.start_drill(move_dir),
@@ -453,6 +463,25 @@ impl Player {
     }
 
     /// 패링 창이 열려 있으면 공격 방향. 스윙 시작 직후 PARRY_WINDOW 동안(실뜨기 8단계면 짧다).
+    /// 테스트용: `idx`타의 타격(새 스윙 번호로).
+    #[cfg(test)]
+    pub fn hit_strike_for_test(&mut self, idx: usize, dir: Vec2) -> Strike {
+        self.swing_id += 1;
+        self.hit_strike(idx, dir)
+    }
+
+    /// 테스트용: `idx`타의 탄을 낸다.
+    #[cfg(test)]
+    pub fn throw_shots_for_test(&mut self, idx: usize, dir: Vec2, strike: Strike) {
+        self.throw_shots(self.hit_of(idx).throw, dir, strike);
+    }
+
+    /// 테스트용: 이번 필살기로 되찾은 몫을 비운다.
+    #[cfg(test)]
+    pub fn special_sp_reset_for_test(&mut self) {
+        self.special_sp = 0.0;
+    }
+
     /// 테스트용: 이 방향으로 받아치기 창을 연다(월드 테스트가 받아치기 길을 밟아 본다).
     #[cfg(test)]
     pub fn open_parry_for_test(&mut self, dir: Vec2) {
@@ -524,7 +553,11 @@ impl Player {
 
     /// 박자 창(±초). 무기마다 배율(꽃잎 발목끈은 넓다), 큰 나무 "박자 귀"(0246).
     pub fn beat_window(&self) -> f32 {
-        t::BEAT_WINDOW * self.moveset.beat_window * self.stats.beat
+        // 창은 박자 길이에 비례(0267): 빠른 무기의 창이 박자의 절반을 넘지 않게.
+        t::BEAT_WINDOW
+            * (self.moveset.beat / t::BEAT_PERIOD)
+            * self.moveset.beat_window
+            * self.stats.beat
     }
 
     /// 강공격을 다 모으는 시간(장신구·큰 나무로 짧아진다, 0246).
@@ -543,8 +576,10 @@ impl Player {
             })
     }
 
-    /// 발톱이 적을 맞혔다: SP를 채운다(드릴 자체는 채우지 않는다). 박자에 맞춘 타는 무기의 `beat_sp`배(0246).
-    pub fn gain_sp(&mut self, finisher: bool) {
+    /// 발톱·탄이 적을 맞혔다: SP를 채운다. 박자에 맞춘 타는 무기의 `beat_sp`배(0246).
+    /// 한 번 휘두르기·한 번 던지기(`key` = `Strike::sp_key`)가 버는 것은 첫 적이 다 — 둘째 적부터는 `SP_CROWD`배(0267:
+    /// 부채꼴·조각·광역이 한 번에 게이지를 몇 칸씩 채우지 않게).
+    pub fn gain_sp(&mut self, finisher: bool, key: u32) {
         let mut g = t::SP_PER_HIT;
         if finisher {
             g += t::SP_FINISHER_BONUS;
@@ -552,7 +587,20 @@ impl Player {
         if self.on_beat {
             g *= self.moveset.beat_sp * self.stats.beat_sp;
         }
+        if key == self.sp_key {
+            g *= t::SP_CROWD;
+        }
+        self.sp_key = key;
         self.sp = (self.sp + g * self.stats.sp_gain * self.talents.sp_gain_mul()).min(t::SP_MAX);
+    }
+
+    /// 필살기(드릴·이어 뛰기 착지·묻은 도토리)가 적을 맞혔다(0267): 맞힐 때마다 `SPECIAL_SP_PER_HIT`, 한 번 쓴 필살기로는
+    /// `SPECIAL_SP_CAP`까지 — 잘 맞힌 필살기는 다음 필살기를 조금 당겨 준다.
+    pub fn gain_special_sp(&mut self) {
+        let room = (t::SPECIAL_SP_CAP - self.special_sp).max(0.0);
+        let g = (t::SPECIAL_SP_PER_HIT * self.stats.sp_gain * self.talents.sp_gain_mul()).min(room);
+        self.special_sp += g;
+        self.sp = (self.sp + g).min(t::SP_MAX);
     }
 
     /// 장비가 바뀌었다. 최대 체력이 줄면 체력도 따라 줄인다.
@@ -815,6 +863,7 @@ impl Player {
         self.item_cd = (self.item_cd - dt).max(0.0);
         self.parry_cd = (self.parry_cd - dt).max(0.0);
         self.no_attack = (self.no_attack - dt).max(0.0);
+        self.earth_claw = (self.earth_claw - dt).max(0.0);
         self.swing_age += dt;
         self.hold = if a.attack_held { self.hold + dt } else { 0.0 };
         // 박자를 지나는 틱인가(0180): 콤보 중일 때만. 타가 나가 시계가 되감기면 그 소리가 박자다.
@@ -914,6 +963,7 @@ impl Player {
                     finisher: false,
                     poison: 0.0,
                     crush: false,
+                    src: 0,
                 });
             }
         }
@@ -1269,6 +1319,40 @@ mod tests {
             tick(&mut p, &room, &hold);
         }
         assert_eq!(p.drill_lock, None);
+    }
+
+    /// 0267 큰 나무: 여진은 솟구친 자리에 늦게 울리는 둘레를 남기고, 흙 묻은 발톱은 솟구친 뒤 잠깐 발톱 피해 +1.
+    #[test]
+    fn aftershock_and_earth_claws_follow_the_emerge() {
+        use crate::talents::Boon;
+        let room = Room::new();
+        let mut p = Player::new(room.center());
+        let plain = p.hit_strike(0, vec2(1.0, 0.0)).damage;
+        p.start_emerge(0.0);
+        assert!(p.spawns.is_empty(), "재주가 없으면 여진도 없다");
+        assert_eq!(p.hit_strike(0, vec2(1.0, 0.0)).damage, plain);
+        p.talents.boons[Boon::Aftershock.index()] = 1;
+        p.talents.boons[Boon::EarthClaw.index()] = 1;
+        p.start_emerge(0.0);
+        assert!(matches!(
+            p.spawns.as_slice(),
+            [doto::Spawn::Bury {
+                kind: StrikeKind::Emerge,
+                damage: 1,
+                ..
+            }]
+        ));
+        assert_eq!(
+            p.hit_strike(0, vec2(1.0, 0.0)).damage,
+            plain + 1,
+            "솟구친 뒤 +1"
+        );
+        p.earth_claw = 0.0;
+        assert_eq!(
+            p.hit_strike(0, vec2(1.0, 0.0)).damage,
+            plain,
+            "시간이 지나면 그대로"
+        );
     }
 
     /// 필살기: SP가 차야 나가고, 벽에 부딪히면 충격파(DrillWall) + 경직.
@@ -2023,9 +2107,17 @@ mod tests {
             ("stone", &moveset::STONE),
             ("venom", &moveset::VENOM),
             ("acorns", &moveset::ACORNS),
+            ("pebble", &moveset::PEBBLE),
+            ("walnut", &moveset::WALNUT),
+            ("sandals", &moveset::SANDALS),
+            ("seeds", &moveset::SEEDS),
         ] {
-            // 박자 창 안 어디서 누르든(이른 끝·한가운데·늦은 끝).
-            let edge = t::BEAT_WINDOW - t::TICK_DT * 1.5;
+            // 박자 창 안 어디서 누르든(이른 끝·한가운데·늦은 끝). 창은 무기의 박자 길이에 비례한다(0267).
+            let edge = {
+                let mut q = Player::new(room.center());
+                q.moveset = ms;
+                q.beat_window() - t::TICK_DT * 1.5
+            };
             for (hold, off) in [1usize, 3, 5, 6, 7, 8, 10, 12, 15]
                 .into_iter()
                 .flat_map(|h| [(h, -edge), (h, 0.0), (h, edge)])

@@ -98,6 +98,8 @@ pub struct CharacterDef {
     pub dig_row: Option<u32>,
     /// 터치 버튼 그림: 공격·회피·특기(0172).
     pub touch: [Icon; 3],
+    /// 볼링(0267): 마무리 타·강타에 맞은 적이 날아가 다른 적을 치고 벽에 박힌다(모모의 차기).
+    pub launch: bool,
 }
 
 pub static ALL: [CharacterDef; 3] = [
@@ -128,6 +130,7 @@ pub static ALL: [CharacterDef; 3] = [
         deep_warm: |s| s.deep_k3,
         dig_row: None,
         touch: [Icon::Claw, Icon::Mound, Icon::Drill],
+        launch: false,
     },
     // 돌아온 모모(0046) → 플레이어블(0056): 발차기 3연타, 깡충, 이어 뛰기(기 게이지). 자리 1·3의 재주는 제 것(0142).
     CharacterDef {
@@ -157,6 +160,7 @@ pub static ALL: [CharacterDef; 3] = [
         deep_warm: |s| s.deep_k3_momo,
         dig_row: Some(4),
         touch: [Icon::Paw, Icon::Hop, Icon::Chain],
+        launch: true,
     },
     // 돌아온 도토(0052) → 플레이어블(0195): 도토리 던지기 3타, 뒤로 뛰기, 도토리 묻기. 멀리서 던지고 물러나는 동사.
     CharacterDef {
@@ -186,6 +190,7 @@ pub static ALL: [CharacterDef; 3] = [
         deep_warm: |s| s.deep_k3_doto,
         dig_row: Some(5),
         touch: [Icon::Acorn, Icon::Leap, Icon::Bury],
+        launch: false,
     },
 ];
 

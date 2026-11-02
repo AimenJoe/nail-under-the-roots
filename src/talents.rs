@@ -279,7 +279,32 @@ impl Talents {
             }
             _ => {}
         }
+        // 튕기는 마무리(0267): 마무리 던지기가 벽에 한 번 튕긴다.
+        if finisher && self.n(Boon::Ricochet) > 0 {
+            if let Throw::Shot { bounce, .. } = &mut h.throw {
+                *bounce = (*bounce).max(1);
+            }
+        }
         h
+    }
+
+    /// 여진(0267): 솟구친 자리에서 다시 울리는 피해(0 = 없음).
+    pub fn aftershock(self) -> i32 {
+        self.n(Boon::Aftershock) as i32
+    }
+
+    /// 흙 묻은 발톱(0267): 솟구친 뒤 발톱 피해 +1이 남는 시간(초, 0 = 없음).
+    pub fn earth_claw_time(self) -> f32 {
+        t::TREE_EARTH_CLAW * self.n(Boon::EarthClaw) as f32
+    }
+
+    /// 볼링 핀(0267): 부딪힌 적이 더 입는 피해와 날아가는 시간 배율.
+    pub fn bowl_bonus(self) -> i32 {
+        self.n(Boon::Pins) as i32
+    }
+
+    pub fn launch_mul(self) -> f32 {
+        1.0 + t::TREE_PINS_LAUNCH * self.n(Boon::Pins) as f32
     }
 
     fn side(self, slot: Slot) -> u8 {
@@ -615,9 +640,17 @@ pub enum Boon {
     Nimble,
     /// 달리기 8% 빨리(도토).
     Scamper,
+    /// 여진(0267, Naïl): 솟구친 자리에서 잠시 뒤 한 번 더 땅이 울린다(깨운 수만큼 피해).
+    Aftershock,
+    /// 흙 묻은 발톱(0267, Naïl): 솟구친 뒤 잠깐 발톱 피해 +1(깨운 수만큼 길게).
+    EarthClaw,
+    /// 볼링 핀(0267, 모모): 날려 보낸 적이 더 오래 날고 부딪힌 적이 더 아프다.
+    Pins,
+    /// 튕기는 마무리(0267, 도토): 마무리 던지기·큰 도토리가 벽에 한 번 튕긴다.
+    Ricochet,
 }
 
-pub const BOONS: [Boon; 27] = [
+pub const BOONS: [Boon; 31] = [
     Boon::DeepBreath,
     Boon::Quake,
     Boon::Tremor,
@@ -645,6 +678,10 @@ pub const BOONS: [Boon; 27] = [
     Boon::Bound,
     Boon::Nimble,
     Boon::Scamper,
+    Boon::Aftershock,
+    Boon::EarthClaw,
+    Boon::Pins,
+    Boon::Ricochet,
 ];
 
 impl Boon {
@@ -696,6 +733,10 @@ impl Boon {
             Boon::Bound => |s| s.bn_bound,
             Boon::Nimble => |s| s.bn_nimble,
             Boon::Scamper => |s| s.bn_scamper,
+            Boon::Aftershock => |s| s.bn_aftershock,
+            Boon::EarthClaw => |s| s.bn_earth_claw,
+            Boon::Pins => |s| s.bn_pins,
+            Boon::Ricochet => |s| s.bn_ricochet,
         }
     }
 
@@ -728,6 +769,10 @@ impl Boon {
             Boon::Bound => |s| s.bn_bound_d,
             Boon::Nimble => |s| s.bn_nimble_d,
             Boon::Scamper => |s| s.bn_scamper_d,
+            Boon::Aftershock => |s| s.bn_aftershock_d,
+            Boon::EarthClaw => |s| s.bn_earth_claw_d,
+            Boon::Pins => |s| s.bn_pins_d,
+            Boon::Ricochet => |s| s.bn_ricochet_d,
         }
     }
 }
@@ -797,7 +842,7 @@ pub const NAIL_TREE: Tree = [
             Node::Plus(Boon::DeepBreath),
             Node::Pick(Slot::Eat),
             Node::Plus(Boon::ParryLight),
-            Node::Plus(Boon::DeepBreath),
+            Node::Plus(Boon::EarthClaw),
             Node::Plus(Boon::Tremor),
             Node::Plus(Boon::ParryLight),
             Node::Plus(Boon::Quake),
@@ -807,10 +852,10 @@ pub const NAIL_TREE: Tree = [
         |s| s.tb_branch,
         [
             Node::Pick(Slot::Drill),
-            Node::Plus(Boon::BeatClaw),
+            Node::Plus(Boon::Aftershock),
             Node::Plus(Boon::DrillEdge),
             Node::Plus(Boon::Ki),
-            Node::Plus(Boon::BeatClaw),
+            Node::Plus(Boon::EarthClaw),
             Node::Plus(Boon::LongBore),
             Node::Sig,
             Node::Plus(Boon::Edge),
@@ -825,13 +870,13 @@ pub const NAIL_TREE: Tree = [
             Node::Plus(Boon::LongBore),
             Node::Plus(Boon::Tremor),
             Node::Plus(Boon::DrillEdge),
-            Node::Plus(Boon::Quake),
+            Node::Plus(Boon::Aftershock),
             Node::Plus(Boon::DeepBreath),
         ],
     ),
 ];
 
-/// 모모(굴토끼): 깡충·차기·이어 뛰기·멀리뛰기.
+/// 모모(굴토끼): 깡충·차기·이어 뛰기·멀리뛰기. 박자 귀는 모모의 것(0267: 발 구르는 토끼, 박자 무기 꽃잎 발목끈).
 pub const MOMO_TREE: Tree = [
     (
         |s| s.tb_root,
@@ -840,7 +885,7 @@ pub const MOMO_TREE: Tree = [
             Node::Plus(Boon::Fleet),
             Node::Pick(Slot::Eat),
             Node::Plus(Boon::QuickHop),
-            Node::Plus(Boon::Fleet),
+            Node::Plus(Boon::BeatClaw),
             Node::Plus(Boon::FarHop),
             Node::Plus(Boon::QuickHop),
             Node::Plus(Boon::Spring),
@@ -867,8 +912,8 @@ pub const MOMO_TREE: Tree = [
             Node::Plus(Boon::FarHop),
             Node::Plus(Boon::Stomp),
             Node::Plus(Boon::Knock),
-            Node::Plus(Boon::Daze),
-            Node::Plus(Boon::Spring),
+            Node::Plus(Boon::Pins),
+            Node::Plus(Boon::BeatClaw),
             Node::Plus(Boon::Fleet),
         ],
     ),
@@ -895,7 +940,7 @@ pub const DOTO_TREE: Tree = [
             Node::Pick(Slot::Drill),
             Node::Plus(Boon::Charge),
             Node::Plus(Boon::BigNut),
-            Node::Plus(Boon::Heft),
+            Node::Plus(Boon::Ricochet),
             Node::Plus(Boon::Charge),
             Node::Plus(Boon::BigNut),
             Node::Sig,
@@ -1436,10 +1481,53 @@ mod tests {
             assert!(plus_cost(d) > plus_cost(d - 1));
         }
         assert_eq!(
-            plus_rank(Character::Mole, 0, 4),
+            plus_rank(Character::Mole, 0, 6),
             1,
-            "뿌리의 둘째 깊은 숨 = II"
+            "뿌리의 둘째 받아치기 빛 = II"
         );
+    }
+
+    /// 0267: 한 나무에서 같은 덤은 두 칸까지(셋·넷이 겹쳐 고를 맛이 없던 것), 동작을 바꾸는 덤이 캐릭터마다 있다.
+    #[test]
+    fn no_boon_fills_more_than_two_cells_of_a_tree() {
+        for ch in [Character::Mole, Character::Momo, Character::Doto] {
+            for b in BOONS {
+                let n = tree(ch)
+                    .iter()
+                    .flat_map(|(_, nodes)| nodes.iter())
+                    .filter(|&&nd| nd == Node::Plus(b))
+                    .count();
+                assert!(n <= 2, "{ch:?} {b:?} ×{n}");
+            }
+        }
+        let has =
+            |ch: Character, b: Boon| tree(ch).iter().any(|(_, ns)| ns.contains(&Node::Plus(b)));
+        assert!(has(Character::Mole, Boon::Aftershock) && has(Character::Mole, Boon::EarthClaw));
+        assert!(has(Character::Momo, Boon::Pins) && has(Character::Momo, Boon::BeatClaw));
+        assert!(has(Character::Doto, Boon::Ricochet));
+        assert!(!has(Character::Mole, Boon::BeatClaw), "박자 귀는 모모로");
+    }
+
+    /// 튕기는 마무리(0267): 마무리 던지기만 벽에 한 번 튕긴다. 볼링 핀은 볼링 피해·날아가는 시간을 늘린다.
+    #[test]
+    fn ricochet_bounces_only_the_finisher_and_pins_scale_the_bowl() {
+        let mut tal = Talents::default();
+        tal.boons[Boon::Ricochet.index()] = 1;
+        let ms = &crate::moveset::ACORNS;
+        let bounce = |h: Hit| match h.throw {
+            Throw::Shot { bounce, .. } => bounce,
+            Throw::None => 99,
+        };
+        assert_eq!(bounce(tal.with_signature(ms.hits[0], false)), 0);
+        assert_eq!(bounce(tal.with_signature(ms.hits[2], true)), 1);
+        assert_eq!(
+            bounce(Talents::default().with_signature(ms.hits[2], true)),
+            0
+        );
+        let mut pins = Talents::default();
+        assert_eq!((pins.bowl_bonus(), pins.launch_mul()), (0, 1.0));
+        pins.boons[Boon::Pins.index()] = 1;
+        assert!(pins.bowl_bonus() == 1 && pins.launch_mul() > 1.0);
     }
 
     /// 0263 옮기기: 옛 받아치기·먹기 키로 깬 것은 모모·도토의 같은 자리에도 남고, 고른 쪽도 옮긴다. 한 번만.

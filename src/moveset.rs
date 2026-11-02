@@ -74,6 +74,10 @@ pub struct Moveset {
     pub beat_window: f32,
     /// 박자에 맞춘 타가 게이지를 채우는 배율(0246).
     pub beat_sp: f32,
+    /// 박자 길이(초, 0267): 다음 타의 박자는 스윙 시작부터 이만큼(스윙·후딜레이가 더 길면 그 끝). 무기의 무게를 따른다 —
+    /// 가벼움 `BEAT_LIGHT`·보통 `BEAT_PERIOD`·던지기 `BEAT_THROW`·무거움 `BEAT_HEAVY`. 예전엔 모두 0.42초라 연타는 박자보다
+    /// 빠를 수 없어서 "가볍고 빠른 4연타"가 빠르지 않고 약하기만 했다.
+    pub beat: f32,
 }
 
 impl Moveset {
@@ -228,6 +232,7 @@ pub static SPROUT: Moveset = Moveset {
     mark: Color::new(0.80, 0.98, 0.70, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_LIGHT,
 };
 
 /// 두더지 발톱(기본): 1·2타 빠름, 3타 느리고 묵직. 언제든 굴파기로 끊는다.
@@ -238,6 +243,7 @@ pub static CLAWS: Moveset = Moveset {
     mark: Color::new(0.97, 0.93, 0.85, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_PERIOD,
 };
 
 /// 모모의 뒷발(0056): 앞발 톡톡 둘 + 몸을 돌려 뒷발 차기(보스 모모의 차기). 마지막 타가 멀리 밀친다.
@@ -282,9 +288,10 @@ pub static KICKS: Moveset = Moveset {
     mark: Color::new(1.0, 0.82, 0.88, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_PERIOD,
 };
 
-/// 도토의 던지기(0195): 1·2타는 곧게 하나, 3타는 부채꼴 셋. 손앞의 짧은 판정(`range`)은 받아치기용.
+/// 도토의 던지기(0195): 1·2타는 곧게 하나, 3타는 부채꼴 둘(0267: 셋이던 것 — 먼 거리에서 너무 셌다). 손앞의 짧은 판정(`range`)은 받아치기용.
 /// 던지는 동안 잘 걷는다(멀리서 싸우는 몸짓). 1·2타는 가볍고(피해 1), 가까운 적은 뒤로 뛰기로 떼어 낸다.
 const fn acorn(count: u8, spread: f32) -> Throw {
     Throw::Shot {
@@ -338,7 +345,7 @@ pub static ACORNS: Moveset = Moveset {
             range: t::ACORN_HAND,
             lunge: 0.0,
             dodge_cancel_after: 0.14,
-            throw: acorn(3, t::ACORN_FAN_SPREAD),
+            throw: acorn(2, t::ACORN_FAN_SPREAD),
             ..BASE
         },
     ],
@@ -347,6 +354,7 @@ pub static ACORNS: Moveset = Moveset {
     mark: Color::new(0.86, 0.62, 0.32, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_THROW,
 };
 
 /// 바위 발톱(무거움): 2타. 느리고 넓고, 활성 구간이 끝나야 굴파기로 끊는다.
@@ -386,6 +394,7 @@ pub static STONE: Moveset = Moveset {
     mark: Color::new(0.78, 0.76, 0.74, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_HEAVY,
 };
 
 /// 딱정벌레 발톱(Naïl의 길 무기, 0251): 단단한 날개껍질을 씌운 3연타. 모든 타가 등딱지에 튕기지 않고 연다.
@@ -418,6 +427,7 @@ pub static BEETLE: Moveset = Moveset {
     mark: Color::new(0.52, 0.74, 0.70, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_THROW,
 };
 
 /// 독 발톱: 3연타, 한 방은 가볍지만 맞은 적에게 독. 마지막 타는 독이 길다.
@@ -461,6 +471,7 @@ pub static VENOM: Moveset = Moveset {
     mark: Color::new(0.62, 0.92, 0.40, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_PERIOD,
 };
 
 // ---- 모모·도토 무기 셋씩(0246) -------------------------------------------------
@@ -521,6 +532,7 @@ pub static BRIAR: Moveset = Moveset {
     mark: Color::new(0.62, 0.84, 0.46, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_LIGHT,
 };
 
 /// 모모 조약돌 덧신: 느리고 무거운 2연타. 마무리 차기는 등딱지에 튕기지 않고 연다.
@@ -560,6 +572,7 @@ pub static PEBBLE: Moveset = Moveset {
     mark: Color::new(0.74, 0.72, 0.70, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_HEAVY,
 };
 
 /// 모모 꽃잎 발목끈: 가벼운 3연타. 박자 창이 넓고, 박자에 맞춘 차기가 기를 두 배로 채운다.
@@ -603,6 +616,7 @@ pub static PETAL: Moveset = Moveset {
     mark: Color::new(1.0, 0.72, 0.84, 1.0),
     beat_window: t::PETAL_BEAT_WINDOW,
     beat_sp: t::PETAL_BEAT_SP,
+    beat: t::BEAT_PERIOD,
 };
 
 /// 탄 하나 모양(도토 무기 공용): `acorn`을 바탕으로 속도·사거리·크기·튕김·갈라짐·가시만 바꾼다.
@@ -680,7 +694,7 @@ const SEED_TOSS: Hit = Hit {
     ..BASE
 };
 
-/// 도토 해바라기씨(0266, 수수가 준다): 가벼움. 작은 씨를 세 번 빠르게, 넷째는 셋으로 퍼진다. 한 알은 약하다.
+/// 도토 해바라기씨(0266, 수수가 준다): 가벼움. 작은 씨를 세 번 빠르게, 넷째는 둘로 퍼진다(0267). 한 알은 약하다.
 /// Naïl의 새싹 발톱·모모의 새싹 짚신과 같은 자리(수수의 가벼운 무기).
 pub static SEEDS: Moveset = Moveset {
     hits: &[
@@ -698,7 +712,7 @@ pub static SEEDS: Moveset = Moveset {
             range: t::ACORN_HAND,
             lunge: 0.0,
             dodge_cancel_after: 0.12,
-            throw: seed(3, t::ACORN_FAN_SPREAD),
+            throw: seed(2, t::ACORN_FAN_SPREAD),
             ..BASE
         },
     ],
@@ -707,6 +721,7 @@ pub static SEEDS: Moveset = Moveset {
     mark: Color::new(0.92, 0.86, 0.50, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_LIGHT_THROW,
 };
 
 /// 가벼운 차기 한 타(새싹 짚신 1~3타).
@@ -747,6 +762,7 @@ pub static SANDALS: Moveset = Moveset {
     mark: Color::new(0.80, 0.98, 0.70, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_LIGHT,
 };
 
 /// 도토 솔방울: 가볍고 멀리 난다. 벽에 한 번 튕긴다. 3타는 둘.
@@ -796,6 +812,7 @@ pub static PINECONE: Moveset = Moveset {
     mark: Color::new(0.62, 0.44, 0.26, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_THROW,
 };
 
 const fn splitting(t: Throw, n: u8) -> Throw {
@@ -851,7 +868,8 @@ pub static WALNUT: Moveset = Moveset {
             swing: 0.32,
             active: (0.12, 0.18),
             recovery: 0.16,
-            damage: 3,
+            // 0267: 3 → 2. 멀리서 맞히고 조각까지 튀니 바위 발톱(2·3)보다 한 눈금 아래.
+            damage: 2,
             knockback: 220.0,
             stun: 0.45,
             hitstop: 0.12,
@@ -871,6 +889,7 @@ pub static WALNUT: Moveset = Moveset {
     mark: Color::new(0.72, 0.58, 0.40, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_HEAVY,
 };
 
 const fn spiky(t: Throw) -> Throw {
@@ -955,4 +974,5 @@ pub static CHESTNUT: Moveset = Moveset {
     mark: Color::new(0.56, 0.36, 0.22, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,
+    beat: t::BEAT_THROW,
 };

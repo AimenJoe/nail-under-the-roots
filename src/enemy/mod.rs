@@ -170,6 +170,10 @@ pub struct Enemy {
     pub slam: i32,
     /// 이번 틱에 벽에 박혔다(월드가 소리·파편을 낸다).
     pub slammed: bool,
+    /// 볼링(0267): 모모의 마무리 차기·강타에 날려 가는 남은 시간. 이 동안 빠르게 날면 부딪는 적을 친다(`World::bowl`).
+    pub launched: f32,
+    /// 볼링에 다시 맞기까지(같은 공에 몇 번씩 맞지 않게, 공 자신도 되받지 않게).
+    pub bowl_cd: f32,
     /// 가시뿌리 덤불에 다시 찔리기까지(0258): 걷는 적은 덤불 위에 서 있으면 이 간격으로 찔린다.
     pub thorn_cd: f32,
     fire_cd: f32,
@@ -311,6 +315,8 @@ impl Enemy {
             died_of_poison: false,
             slam: 0,
             slammed: false,
+            launched: 0.0,
+            bowl_cd: 0.0,
             thorn_cd: 0.0,
             asleep: false,
             wake_delay: 0.0,
@@ -545,6 +551,8 @@ impl Enemy {
             State::Aim { time } => self.tick_aim(&mut c, time),
         }
 
+        self.launched = (self.launched - dt).max(0.0);
+        self.bowl_cd = (self.bowl_cd - dt).max(0.0);
         let before = self.vel;
         self.pos += self.vel * dt;
         combat::apply_friction(&mut self.vel, dt);
@@ -694,7 +702,13 @@ impl Enemy {
         // 콩이의 등딱지(0054): 발톱은 튕긴다(패링 거울). 솟구치기(아래 배)·드릴은 뚫고 연다.
         // 강공격은 튕기지 않고 자세를 깬다(0168: 모으기 = 자세 깨기).
         let guarded = self.guarding();
-        if guarded && matches!(s.kind, StrikeKind::Claw(_) | StrikeKind::Prick) && !s.crush {
+        if guarded
+            && matches!(
+                s.kind,
+                StrikeKind::Claw(_) | StrikeKind::Prick | StrikeKind::Bowl
+            )
+            && !s.crush
+        {
             self.shell_hit();
             return Struck::Deflected;
         }
@@ -716,7 +730,7 @@ impl Enemy {
             self.apply_poison(s.poison);
         }
         // 벽 쿵(0168): 강공격 넉백으로 벽에 박히면 한 번 더.
-        if s.kind == StrikeKind::Heavy && self.alive {
+        if matches!(s.kind, StrikeKind::Heavy | StrikeKind::Bowl) && self.alive {
             self.slam = t::WALL_SLAM_DAMAGE;
         }
         Struck::Hit { dir, broke_guard }
@@ -851,6 +865,7 @@ mod tests {
             finisher: false,
             poison: 0.0,
             crush: false,
+            src: 0,
         };
         let got = e.receive(&s, vec2(50.0, 50.0), vec2(1.0, 0.0));
         assert!(matches!(got, Struck::Shoved { dir } if dir.x > 0.99));
@@ -909,6 +924,7 @@ mod tests {
             finisher: false,
             poison: 0.0,
             crush: false,
+            src: 0,
         }
     }
 

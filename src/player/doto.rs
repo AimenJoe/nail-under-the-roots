@@ -28,6 +28,8 @@ pub enum Spawn {
         fuse: f32,
         radius: f32,
         damage: i32,
+        /// 터질 때의 타격 종류: 묻은 도토리 `Burst`, Naïl의 여진 `Emerge`(0267, 도토리 그림 없이 땅 금만).
+        kind: StrikeKind,
     },
 }
 
@@ -116,6 +118,7 @@ impl Player {
                 fuse: t::TAL_DROP_FUSE,
                 radius: t::BURY_RADIUS * 0.8 * self.stats.blast,
                 damage: t::TAL_DROP_DAMAGE + self.stats.damage,
+                kind: StrikeKind::Burst,
             });
         }
         self.state = State::Leap { time: 0.0, dir };
@@ -160,6 +163,7 @@ impl Player {
                 fuse: self.talents.bury_fuse(),
                 radius: self.talents.bury_radius() * self.stats.blast,
                 damage: t::BURY_DAMAGE + self.stats.damage,
+                kind: StrikeKind::Burst,
             });
         }
         self.state = State::Recover {

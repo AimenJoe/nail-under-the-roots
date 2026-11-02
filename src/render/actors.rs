@@ -465,7 +465,7 @@ fn draw_beat_cue(p: &Player, pos: Vec2) {
         let r = t::BEAT_RING_START + (t::BEAT_RING_END - t::BEAT_RING_START) * k;
         // 박자가 지난 뒤는 창 하나만큼에 걸쳐 사라진다.
         let fade = if c.k > 1.0 {
-            (1.0 - (c.k - 1.0) * t::BEAT_PERIOD / (p.beat_window() * 2.0)).clamp(0.0, 1.0)
+            (1.0 - (c.k - 1.0) * p.moveset.beat / (p.beat_window() * 2.0)).clamp(0.0, 1.0)
         } else {
             1.0
         };

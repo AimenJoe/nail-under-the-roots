@@ -34,6 +34,8 @@ pub struct Buried {
     pub fuse: f32,
     pub radius: f32,
     pub damage: i32,
+    /// `Burst`(도토리) 또는 `Emerge`(Naïl의 여진, 0267).
+    pub kind: StrikeKind,
 }
 
 /// 가시 덤불(가시덩굴 각반·밤송이, 0246): `left`초 남아 `THORN_PATCH_PERIOD`마다 둘레의 적을 찌른다(적만).
@@ -98,9 +100,11 @@ impl World {
                     split,
                     thorns,
                     seed,
-                    strike,
+                    mut strike,
                 } => {
                     let id = self.toss.id();
+                    // 한 번 던지기 = 한 번 벌기(0267): 탄·조각은 던진 스윙의 번호를 지닌다.
+                    strike.src = strike.sp_key();
                     self.toss.shots.push(Shot {
                         pos: from,
                         prev: from,
@@ -127,6 +131,7 @@ impl World {
                     fuse,
                     radius,
                     damage,
+                    kind,
                 } => {
                     let mut p = at;
                     self.room.resolve_circle(&mut p, 4.0);
@@ -136,8 +141,11 @@ impl World {
                         fuse,
                         radius,
                         damage,
+                        kind,
                     });
-                    clods(&mut self.juice.fx, p, 5, DIRT, 50.0);
+                    if kind == StrikeKind::Burst {
+                        clods(&mut self.juice.fx, p, 5, DIRT, 50.0);
+                    }
                 }
             }
         }
@@ -158,15 +166,15 @@ impl World {
         for b in &mut self.toss.buried {
             b.time += dt;
             if b.time >= b.fuse {
-                popped.push((b.pos, b.radius, b.damage));
+                popped.push((b.pos, b.radius, b.damage, b.kind));
             }
         }
         self.toss.buried.retain(|b| b.time < b.fuse);
-        for (at, r, damage) in popped {
+        for (at, r, damage, kind) in popped {
             let id = self.toss.id();
             let s = Strike {
                 id,
-                kind: StrikeKind::Burst,
+                kind,
                 shape: Shape::Circle { center: at, r },
                 damage,
                 knockback: t::BURY_KNOCKBACK,
@@ -176,6 +184,7 @@ impl World {
                 finisher: false,
                 poison: 0.0,
                 crush: false,
+                src: 0,
             };
             self.juice.audio.play(sfx::Id::Emerge);
             self.juice.feel.add_trauma(0.15);
@@ -220,6 +229,7 @@ impl World {
                 finisher: false,
                 poison: 0.0,
                 crush: false,
+                src: 0,
             };
             self.resolve_strike(s, at, Vec2::ZERO, true, deaths);
         }
@@ -430,9 +440,9 @@ mod tests {
         assert!(w.toss.shots.is_empty());
     }
 
-    /// 3타는 부채꼴 셋, 다 날면(사거리 끝) 떨어진다.
+    /// 3타는 부채꼴 둘(0267), 다 날면(사거리 끝) 떨어진다.
     #[test]
-    fn the_third_throw_is_a_fan_of_three_that_drops_at_its_reach() {
+    fn the_third_throw_is_a_fan_of_two_that_drops_at_its_reach() {
         let mut w = doto();
         let mut most = 0;
         for _ in 0..3 {
@@ -442,7 +452,7 @@ mod tests {
                 most = most.max(w.toss.shots.len());
             }
         }
-        assert_eq!(most, 3, "마지막 타는 셋");
+        assert_eq!(most, 2, "마지막 타는 둘");
         run(&mut w, &Actions::default(), 60);
         assert!(w.toss.shots.is_empty(), "사거리 끝에서 떨어진다");
     }
@@ -554,14 +564,16 @@ mod tests {
     }
 
     /// 한 콤보(타 수만큼 누르고 기다리기)를 끝까지.
+    /// 무기의 박자마다 누른다(0267: 박자는 무기 무게를 따른다).
     fn combo(w: &mut World) {
+        let gap = (w.player.moveset.beat / t::TICK_DT).round() as usize - 1;
         for _ in 0..w.player.moveset.hits.len() {
             w.tick(&press());
-            run(w, &Actions::default(), 26);
+            run(w, &Actions::default(), gap);
         }
     }
 
-    /// 해바라기씨(0266, 수수가 도토에게): 씨앗 그림의 작은 탄을 세 번 하나씩, 넷째는 셋. 맞히면 적이 깎인다.
+    /// 해바라기씨(0266, 수수가 도토에게): 씨앗 그림의 작은 탄을 세 번 하나씩, 넷째는 둘(0267). 맞히면 적이 깎인다.
     #[test]
     fn sunflower_seeds_fly_in_fours() {
         let mut w = doto();
@@ -590,7 +602,7 @@ mod tests {
         assert!(matches!(
             last,
             crate::moveset::Throw::Shot {
-                count: 3,
+                count: 2,
                 seed: true,
                 ..
             }
@@ -675,6 +687,126 @@ mod tests {
         );
     }
 
+    /// 볼링(0267): 모모의 마무리 차기에 맞은 적이 날아가 뒤의 적을 친다. 같은 자리에서 Naïl의 마무리는 날려 보내지 않는다.
+    #[test]
+    fn momo_finisher_bowls_the_foe_into_the_one_behind() {
+        let behind_hit = |ch: Character, weapon: usize| {
+            let mut w = doto();
+            arm(&mut w, ch, weapon);
+            w.player.pos = w.room.center() - vec2(60.0, 0.0);
+            let a = dummy(&mut w, vec2(12.0, 0.0));
+            let b = dummy(&mut w, vec2(42.0, 0.0));
+            let hp = w.enemies[b].hp;
+            combo(&mut w);
+            run(&mut w, &Actions::default(), 40);
+            assert!(w.enemies[a].hp < 99, "앞의 적은 맞았다");
+            (hp - w.enemies[b].hp, w.stats.bowls)
+        };
+        let (momo, bowls) = behind_hit(Character::Momo, 4);
+        assert!(
+            momo >= t::BOWL_DAMAGE && bowls >= 1,
+            "모모: 뒤의 적이 볼링에 맞았다 ({momo}, {bowls})"
+        );
+        let (nail, bowls) = behind_hit(Character::Mole, crate::equipment::STONE_CLAW);
+        assert_eq!((nail, bowls), (0, 0), "Naïl의 마무리는 날려 보내지 않는다");
+    }
+
+    /// 볼링 한 번: 날아가는 적이 닿은 적은 한 번만 맞고(공도 되받지 않는다), 맞은 적도 날아간다. 느리면 치지 않는다.
+    #[test]
+    fn a_launched_foe_hits_what_it_touches_once() {
+        let mut w = doto();
+        w.player.pos = w.room.center() - vec2(60.0, 0.0);
+        let a = dummy(&mut w, vec2(30.0, 0.0));
+        let b = dummy(&mut w, vec2(46.0, 0.0));
+        w.enemies[a].launched = t::LAUNCH_TIME;
+        w.enemies[a].vel = vec2(260.0, 0.0);
+        run(&mut w, &Actions::default(), 20);
+        assert_eq!(w.enemies[b].hp, 99 - t::BOWL_DAMAGE, "한 번만");
+        assert_eq!(w.enemies[a].hp, 99, "공은 되받지 않는다");
+        assert_eq!(w.stats.bowls, 1);
+        // 느린 적은 공이 아니다.
+        let mut w = doto();
+        let a = dummy(&mut w, vec2(30.0, 0.0));
+        let b = dummy(&mut w, vec2(46.0, 0.0));
+        w.enemies[a].launched = t::LAUNCH_TIME;
+        w.enemies[a].vel = vec2(t::LAUNCH_MIN_SPEED * 0.5, 0.0);
+        run(&mut w, &Actions::default(), 20);
+        assert_eq!(w.enemies[b].hp, 99);
+    }
+
+    /// 한 번 던지기 = 한 번 벌기(0267): 부채꼴 둘이 같은 적 하나를 맞혀도 게이지는 한 타 몫 + 둘째의 `SP_CROWD`만.
+    #[test]
+    fn one_throw_earns_the_gauge_once_however_many_shots_land() {
+        let mut w = doto();
+        let e = dummy(&mut w, vec2(40.0, 0.0));
+        let hp = w.enemies[e].hp;
+        // 3타(부채꼴)만 보려고 2타까지 지나간 콤보 자리에서 시작.
+        w.player.sp = 0.0;
+        w.player.on_beat = false;
+        let strike = w.player.hit_strike_for_test(2, vec2(1.0, 0.0));
+        w.player.throw_shots_for_test(2, vec2(1.0, 0.0), strike);
+        w.take_spawns();
+        assert_eq!(w.toss.shots.len(), 2);
+        w.player.pos = w.enemies[e].pos - vec2(14.0, 0.0);
+        for s in &mut w.toss.shots {
+            s.pos = w.player.pos;
+            s.prev = s.pos;
+            s.vel = vec2(t::ACORN_SPEED, 0.0);
+        }
+        run(&mut w, &Actions::default(), 20);
+        assert!(hp - w.enemies[e].hp >= 2, "둘 다 맞았다");
+        let one = t::SP_PER_HIT + t::SP_FINISHER_BONUS;
+        assert!(
+            (w.player.sp - one * (1.0 + t::SP_CROWD)).abs() < 1e-3,
+            "게이지 {} — 한 타 몫 + 덤 {}",
+            w.player.sp,
+            one * (1.0 + t::SP_CROWD)
+        );
+    }
+
+    /// 필살기 타격으로 게이지 되찾기(0267): 묻은 도토리가 터져 맞히면 맞힌 적마다 `SPECIAL_SP_PER_HIT`, 한 번에 `SPECIAL_SP_CAP`까지.
+    #[test]
+    fn special_hits_refund_some_gauge_up_to_a_cap() {
+        let mut w = doto();
+        for i in 0..10 {
+            dummy(&mut w, vec2(30.0, -20.0 + i as f32 * 4.0));
+        }
+        w.player.sp = 0.0;
+        w.player.special_sp_reset_for_test();
+        w.toss.buried.push(Buried {
+            pos: w.player.pos + vec2(30.0, 0.0),
+            time: 0.0,
+            fuse: 0.01,
+            radius: 40.0,
+            damage: 1,
+            kind: StrikeKind::Burst,
+        });
+        run(&mut w, &Actions::default(), 3);
+        assert!(
+            (w.player.sp - t::SPECIAL_SP_CAP).abs() < 1e-3,
+            "열 마리를 맞혀도 끝까지만: {}",
+            w.player.sp
+        );
+        // 한 마리면 한 몫.
+        let mut w = doto();
+        dummy(&mut w, vec2(30.0, 0.0));
+        w.player.sp = 0.0;
+        w.toss.buried.push(Buried {
+            pos: w.player.pos + vec2(30.0, 0.0),
+            time: 0.0,
+            fuse: 0.01,
+            radius: 20.0,
+            damage: 1,
+            kind: StrikeKind::Burst,
+        });
+        run(&mut w, &Actions::default(), 3);
+        assert!(
+            (w.player.sp - t::SPECIAL_SP_PER_HIT).abs() < 1e-3,
+            "{}",
+            w.player.sp
+        );
+    }
+
     /// 꽃잎 발목끈(0246): 박자 창이 넓고, 박자에 맞춘 타는 기를 두 배로 채운다.
     #[test]
     fn petal_anklet_widens_the_beat_and_doubles_ki() {
@@ -683,11 +815,11 @@ mod tests {
         assert!(w.player.beat_window() > t::BEAT_WINDOW * 1.5);
         w.player.sp = 0.0;
         w.player.on_beat = false;
-        w.player.gain_sp(false);
+        w.player.gain_sp(false, 1);
         let off = w.player.sp;
         w.player.sp = 0.0;
         w.player.on_beat = true;
-        w.player.gain_sp(false);
+        w.player.gain_sp(false, 2);
         assert!((w.player.sp - off * t::PETAL_BEAT_SP).abs() < 1e-4);
     }
 

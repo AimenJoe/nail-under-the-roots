@@ -242,7 +242,7 @@ impl Player {
     /// 박자 시계를 되감고 다음 타의 박자를 정한다(0174): 스윙 시작부터 `BEAT_PERIOD`, 스윙·후딜레이가 더 길면 그 끝.
     fn set_beat(&mut self, hit: crate::moveset::Hit) {
         self.beat_clock = 0.0;
-        self.beat_at = t::BEAT_PERIOD.max(hit.swing + hit.recovery);
+        self.beat_at = self.moveset.beat.max(hit.swing + hit.recovery);
     }
 
     /// 콤보의 이음을 모두 박자에 맞춘 마무리 타인가(0168·0189): 넉백 `FULL_BEAT_KNOCK`배 + 피해 `FULL_BEAT_DAMAGE`.
@@ -276,6 +276,11 @@ impl Player {
         }
     }
 
+    /// 흙 묻은 발톱(0267): 솟구친 뒤 잠깐 발톱·강타 피해 +1.
+    fn earth_edge(&self) -> i32 {
+        i32::from(self.earth_claw > 0.0)
+    }
+
     /// 그 타의 수치로 만든 타격(근접 타 그대로, 던지는 타면 탄이 맞힐 때 쓴다).
     pub(super) fn hit_strike(&self, idx: usize, dir: Vec2) -> Strike {
         let h = self.hit_of(idx);
@@ -289,6 +294,7 @@ impl Player {
             },
             damage: h.damage
                 + self.stats.damage
+                + self.earth_edge()
                 + if self.full_beat(idx) {
                     t::FULL_BEAT_DAMAGE
                 } else {
@@ -322,6 +328,7 @@ impl Player {
             finisher: idx == self.moveset.last(),
             poison: h.poison,
             crush: h.crush,
+            src: 0,
         }
     }
 
@@ -366,7 +373,10 @@ impl Player {
                 dir,
                 r: h.range,
             },
-            damage: h.damage + self.stats.damage + bonus * t::HEAVY_PERFECT_DAMAGE,
+            damage: h.damage
+                + self.stats.damage
+                + self.earth_edge()
+                + bonus * t::HEAVY_PERFECT_DAMAGE,
             knockback: h.knockback * self.stats.finisher_knockback,
             stun: h.stun + self.stats.stun,
             hitstop: h.hitstop + bonus as f32 * t::HEAVY_PERFECT_HITSTOP,
@@ -374,6 +384,7 @@ impl Player {
             finisher: true,
             poison: h.poison,
             crush: h.crush,
+            src: 0,
         }
     }
 }

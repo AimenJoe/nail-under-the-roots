@@ -132,6 +132,7 @@ impl Player {
             finisher: false,
             poison: 0.0,
             crush: false,
+            src: 0,
         }
     }
 
