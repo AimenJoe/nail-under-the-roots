@@ -988,10 +988,11 @@ pub static EN: Strings = Strings {
     act_dodge_momo: "Hop (dodge)",
     act_dodge_doto: "Back Leap (dodge)",
     w_sandal: "Sprout Sandals",
-    w_sandal_desc: "Light. A quick, snappy 4-kick combo. Each kick is weak.",
+    w_sandal_desc: "Light. You keep walking at nearly full speed while kicking, and the last kick flies in from afar. Each kick is weak.",
     w_seeds: "Sunflower Seeds",
     w_seeds_desc: "Light. Toss tiny seeds three times fast; the fourth spreads into three. Each seed is weak.",
     susu_sandal: "Momo, I wove you sandals from sprout stems. They're light, so your feet will be quick. There are plenty of quick ones down below.",
     susu_seeds: "Doto, I shelled some sunflower seeds for you. Small but fast — good for throwing one after another. There are plenty of quick ones down below.",
     kongi_walnut: "Doto, take these. Walnuts I picked up while rolling around. Holding on isn't the only way to protect. Shells as hard as mine — throw one and it splits.",
+    doto_t_true_momo: "That seed sprouted? All thanks to me forgetting it. …Heh, just kidding. Tell Naïl I said thanks.",
 };

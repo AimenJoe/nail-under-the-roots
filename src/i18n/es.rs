@@ -988,10 +988,11 @@ pub static ES: Strings = Strings {
     act_dodge_momo: "Salto (esquivar)",
     act_dodge_doto: "Salto atrás (esq.)",
     w_sandal: "Sandalias de brote",
-    w_sandal_desc: "Ligeras. Combo de 4 patadas rápido y ágil. Cada patada es débil.",
+    w_sandal_desc: "Ligeras. Caminas casi a toda velocidad mientras pateas, y la última patada vuela desde lejos. Cada patada es débil.",
     w_seeds: "Pipas de girasol",
     w_seeds_desc: "Ligeras. Lanza pipas tres veces rápido; la cuarta se abre en tres. Cada pipa es débil.",
     susu_sandal: "Momo, te tejí unas sandalias con tallos de brote. Son ligeras, tus patas irán más rápido. Ahí abajo hay muchos bichos rápidos.",
     susu_seeds: "Doto, te pelé unas pipas de girasol. Pequeñas pero rápidas: buenas para lanzar una tras otra. Ahí abajo hay muchos bichos rápidos.",
     kongi_walnut: "Doto, llévate esto. Nueces que recogí rodando. Aferrarse no es la única forma de proteger. Su cáscara es tan dura como yo: lánzalas y se parten.",
+    doto_t_true_momo: "¿Esa semilla brotó? Todo gracias a que me olvidé de ella. …Je, je, es broma. Dale las gracias a Naïl de mi parte.",
 };

@@ -988,10 +988,11 @@ pub static PT_BR: Strings = Strings {
     act_dodge_momo: "Pulo (esquiva)",
     act_dodge_doto: "Recuo (esquiva)",
     w_sandal: "Sandálias de broto",
-    w_sandal_desc: "Leves. Combo rápido de 4 chutes. Cada chute é fraco.",
+    w_sandal_desc: "Leves. Você anda quase na velocidade normal enquanto chuta, e o último chute voa de longe. Cada chute é fraco.",
     w_seeds: "Sementes de girassol",
     w_seeds_desc: "Leves. Atire sementinhas três vezes rápido; a quarta se espalha em três. Cada semente é fraca.",
     susu_sandal: "Momo, trancei sandálias com brotos pra você. São leves, seus pés vão ficar ligeiros. Lá embaixo tem muita criatura ligeira.",
     susu_seeds: "Doto, descasquei umas sementes de girassol pra você. Pequenas mas rápidas — boas pra atirar uma atrás da outra. Lá embaixo tem muita criatura ligeira.",
     kongi_walnut: "Doto, leva isto. Nozes que achei rolando por aí. Segurar não é o único jeito de proteger. A casca é dura como a minha — atire e elas racham.",
+    doto_t_true_momo: "Aquela semente brotou? Graças a eu ter esquecido. …Hehe, brincadeira. Diz pro Naïl que eu agradeci.",
 };

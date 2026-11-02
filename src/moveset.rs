@@ -722,7 +722,8 @@ const SANDAL_KICK: Hit = Hit {
     ..BASE
 };
 
-/// 모모 새싹 짚신(0266, 수수가 새싹 줄기로 엮었다): 가벼움. 4연타가 짧고 빠르게, 한 방은 약하다. 새싹 발톱과 같은 자리.
+/// 모모 새싹 짚신(0266, 수수가 새싹 줄기로 엮었다): 가벼움. 차는 동안에도 거의 제 빠르기로 걷고(`move_factor`),
+/// 마지막 차기는 멀리 날아든다(`lunge`). 같은 4연타인 가시덩굴 각반(길, 덤불을 남긴다)과 겹치지 않게 기동으로 가른다.
 pub static SANDALS: Moveset = Moveset {
     hits: &[
         SANDAL_KICK,
@@ -737,12 +738,12 @@ pub static SANDALS: Moveset = Moveset {
             hitstop: 0.11,
             shake: 0.36,
             range: 17.0,
-            lunge: 30.0,
+            lunge: 64.0,
             ..BASE
         },
     ],
     combo_window: 0.28,
-    move_factor: 0.6,
+    move_factor: 0.9,
     mark: Color::new(0.80, 0.98, 0.70, 1.0),
     beat_window: 1.0,
     beat_sp: 1.0,

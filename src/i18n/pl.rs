@@ -988,10 +988,11 @@ pub static PL: Strings = Strings {
     act_dodge_momo: "Skok (unik)",
     act_dodge_doto: "Odskok (unik)",
     w_sandal: "Kiełkowe sandały",
-    w_sandal_desc: "Lekkie. Szybkie, zwinne kombo z 4 kopnięć. Każde kopnięcie jest słabe.",
+    w_sandal_desc: "Lekkie. Kopiąc, idziesz niemal pełną prędkością, a ostatnie kopnięcie to wyskok z daleka. Każde kopnięcie jest słabe.",
     w_seeds: "Pestki słonecznika",
     w_seeds_desc: "Lekkie. Rzuć trzy razy szybko małymi pestkami; czwarty rzut rozsypuje się na trzy. Każda pestka jest słaba.",
     susu_sandal: "Momo, uplotłem ci sandały z łodyżek kiełków. Są lekkie, łapki będą szybsze. Na dole jest pełno szybkich stworków.",
     susu_seeds: "Doto, obrałem ci pestki słonecznika. Małe, ale szybkie — dobre do rzucania jedna za drugą. Na dole jest pełno szybkich stworków.",
     kongi_walnut: "Doto, weź je. Orzechy, które zebrałem, tocząc się. Trzymanie to nie jedyny sposób, by chronić. Skorupka twarda jak ja — rzuć, a pęknie.",
+    doto_t_true_momo: "To nasionko wykiełkowało? Wszystko dzięki temu, że o nim zapomniałem. …Hehe, żartuję. Podziękuj ode mnie Naïlowi.",
 };

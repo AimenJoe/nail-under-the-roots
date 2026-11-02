@@ -988,10 +988,11 @@ pub static DE: Strings = Strings {
     act_dodge_momo: "Hüpfen (Ausw.)",
     act_dodge_doto: "Rücksprung (Ausw.)",
     w_sandal: "Sprosssandalen",
-    w_sandal_desc: "Leicht. Eine flinke, zackige 4er-Trittkombo. Jeder Tritt ist schwach.",
+    w_sandal_desc: "Leicht. Beim Treten läufst du fast mit voller Geschwindigkeit, und der letzte Tritt fliegt von weit heran. Jeder Tritt ist schwach.",
     w_seeds: "Sonnenblumenkerne",
     w_seeds_desc: "Leicht. Wirf dreimal schnell kleine Kerne; der vierte Wurf fächert sich in drei. Jeder Kern ist schwach.",
     susu_sandal: "Momo, ich hab dir Sandalen aus Sprossstängeln geflochten. Die sind leicht, damit bist du flink auf den Pfoten. Da unten gibt's jede Menge flinke Kerlchen.",
     susu_seeds: "Doto, ich hab dir Sonnenblumenkerne geschält. Klein, aber schnell – gut, um einen nach dem anderen zu werfen. Da unten gibt's jede Menge flinke Kerlchen.",
     kongi_walnut: "Doto, nimm die. Walnüsse, die ich beim Rollen aufgesammelt hab. Festhalten ist nicht die einzige Art zu beschützen. Die Schale ist so hart wie ich – wirf eine, dann zerspringt sie.",
+    doto_t_true_momo: "Der Samen ist aufgegangen? Alles nur, weil ich ihn vergessen hab. …Hehe, Spaß. Sag Naïl danke von mir.",
 };

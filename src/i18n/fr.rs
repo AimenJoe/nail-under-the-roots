@@ -988,10 +988,11 @@ pub static FR: Strings = Strings {
     act_dodge_momo: "Bond (esquive)",
     act_dodge_doto: "Recul (esquive)",
     w_sandal: "Sandales de pousse",
-    w_sandal_desc: "Légères. Un combo vif de 4 ruades. Chaque coup est faible.",
+    w_sandal_desc: "Légères. Tu marches presque à pleine vitesse en frappant, et la dernière ruade fond sur l'ennemi de loin. Chaque coup est faible.",
     w_seeds: "Graines de tournesol",
     w_seeds_desc: "Légères. Lance de petites graines trois fois vite ; la quatrième s'éparpille en trois. Chaque graine est faible.",
     susu_sandal: "Momo, je t'ai tressé des sandales avec des tiges de pousse. Elles sont légères, tes pattes iront plus vite. En bas, il y a plein de bestioles rapides.",
     susu_seeds: "Doto, je t'ai décortiqué des graines de tournesol. Petites mais rapides : parfaites pour en lancer à la suite. En bas, il y a plein de bestioles rapides.",
     kongi_walnut: "Doto, prends ça. Des noix ramassées en roulant. Retenir n'est pas la seule façon de protéger. Leur coque est aussi dure que moi : lance-en une et elle éclate.",
+    doto_t_true_momo: "Cette graine a germé? Tout ça grâce à mon oubli. …Hé hé, je blague. Dis merci à Naïl de ma part.",
 };

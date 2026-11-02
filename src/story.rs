@@ -387,7 +387,16 @@ pub const LINES: &[Line] = &[
         when: When::TalkDoto,
         who: Speaker::Doto,
         text: |s| s.doto_t_true,
-        needs: &[Flag(key::TRUE_ENDING)],
+        // "고마워"는 씨앗을 묻은 나일에게(참 엔딩은 나일의 것, 0056·0201) — 모모에게는 나일에게 전해 달라고(0266).
+        needs: &[Flag(key::TRUE_ENDING), As(Character::Mole)],
+        once: true,
+    },
+    Line {
+        id: "doto_t_true_momo",
+        when: When::TalkDoto,
+        who: Speaker::Doto,
+        text: |s| s.doto_t_true_momo,
+        needs: &[Flag(key::TRUE_ENDING), As(Character::Momo)],
         once: true,
     },
     Line {
@@ -733,6 +742,15 @@ mod tests {
         // 참 엔딩 뒤 꽃잎 이야기도 도토에게는 "네가 그러랬잖아".
         p.set(key::TRUE_ENDING);
         assert_eq!(doto_run(&mut p, When::TalkMomo), Some("momo_t_true_doto"));
+        // 도토의 참 엔딩 뒤 "고마워"는 씨앗을 묻은 나일에게, 모모에게는 "나일한테 전해 줘"(0266).
+        assert_eq!(
+            take(&mut p, When::TalkDoto, Character::Momo).unwrap().id,
+            "doto_t_true_momo"
+        );
+        assert_eq!(
+            take(&mut p, When::TalkDoto, Character::Mole).unwrap().id,
+            "doto_t_true"
+        );
 
         // 모모로: 보리는 모모에게 직접, 도토의 씨앗 이야기는 "나일한테 전해 줄래?", 나일의 독·쓰러짐 요령·반쪽 엔딩 말은 없다.
         let mut p = Profile::default();

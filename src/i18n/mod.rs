@@ -440,6 +440,7 @@ strings! {
     susu_v1_momo, susu_v1_doto, kongi_v2_momo, kongi_v2_doto, kongi_v3_momo, kongi_v3_doto, kongi_b4_momo, kongi_b4_doto, kongi_stone, act_dodge_momo, act_dodge_doto,
     // 무기 다시 짜기: 수수의 가벼운 무기·콩이의 호두(0266)
     w_sandal, w_sandal_desc, w_seeds, w_seeds_desc, susu_sandal, susu_seeds, kongi_walnut,
+    doto_t_true_momo,
 }
 
 #[cfg(test)]
