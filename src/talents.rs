@@ -273,8 +273,9 @@ impl Talents {
             }
             Some(Signature::Thorns) if finisher && h.throw == Throw::None => h.thorns = true,
             Some(Signature::Split) if finisher => {
+                // 원래 갈라지는 열매(호두)는 조각이 하나 더(0268 — 전엔 "둘 이상"이라 호두에는 아무것도 아니었다).
                 if let Throw::Shot { split, .. } = &mut h.throw {
-                    *split = (*split).max(t::SIG_SPLIT);
+                    *split = if *split > 0 { *split + 1 } else { t::SIG_SPLIT };
                 }
             }
             _ => {}
@@ -1506,6 +1507,25 @@ mod tests {
         assert!(has(Character::Momo, Boon::Pins) && has(Character::Momo, Boon::BeatClaw));
         assert!(has(Character::Doto, Boon::Ricochet));
         assert!(!has(Character::Mole, Boon::BeatClaw), "박자 귀는 모모로");
+    }
+
+    /// 갈라지는 열매(0268): 갈라지지 않던 열매는 조각 둘, 원래 갈라지는 호두는 하나 더.
+    #[test]
+    fn split_adds_a_shard_to_walnuts_and_two_to_the_rest() {
+        let tal = Talents {
+            who: Character::Doto,
+            sig: true,
+            ..Talents::default()
+        };
+        let split = |h: Hit| match h.throw {
+            Throw::Shot { split, .. } => split,
+            Throw::None => 99,
+        };
+        let walnut = crate::moveset::WALNUT.hits[1];
+        assert_eq!(split(tal.with_signature(walnut, true)), split(walnut) + 1);
+        let acorn = crate::moveset::ACORNS.hits[2];
+        assert_eq!(split(tal.with_signature(acorn, true)), t::SIG_SPLIT);
+        assert_eq!(split(tal.with_signature(acorn, false)), 0, "마무리만");
     }
 
     /// 튕기는 마무리(0267): 마무리 던지기만 벽에 한 번 튕긴다. 볼링 핀은 볼링 피해·날아가는 시간을 늘린다.

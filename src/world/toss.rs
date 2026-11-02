@@ -67,13 +67,13 @@ impl Toss {
     }
 
     /// 가시 덤불을 놓는다(많으면 오래된 것부터 뺀다).
-    fn plant(&mut self, at: Vec2) {
+    fn plant(&mut self, at: Vec2, time: f32) {
         if self.patches.len() >= t::THORN_PATCH_MAX {
             self.patches.remove(0);
         }
         self.patches.push(Patch {
             pos: at,
-            left: t::THORN_PATCH_TIME,
+            left: time,
             // 놓자마자 한 번 찌른다.
             pulse: 0.0,
         });
@@ -120,10 +120,10 @@ impl World {
                         id,
                     });
                 }
-                Spawn::Thorns { at } => {
+                Spawn::Thorns { at, time } => {
                     let mut p = at;
                     self.room.resolve_circle(&mut p, 4.0);
-                    self.toss.plant(p);
+                    self.toss.plant(p, time);
                     clods(&mut self.juice.fx, p, 4, THORN_GREEN, 40.0);
                 }
                 Spawn::Bury {
@@ -323,7 +323,7 @@ impl World {
         }
         // 밤송이(0246): 멈춘 자리에 가시.
         if s.thorns {
-            self.toss.plant(stop_at);
+            self.toss.plant(stop_at, t::THORN_PATCH_TIME);
         }
         if enemy || s.splash > 0.0 {
             let r = if s.splash > 0.0 {
@@ -685,6 +685,26 @@ mod tests {
             w.toss.patches[0].pos.x > w.player.pos.x - 4.0,
             "앞쪽(오른쪽)에"
         );
+    }
+
+    /// 가시 발 + 가시덩굴 각반(0268): 덤불이 원래 남기는 무기에 고유 재주까지 깨웠으면 덤불이 두 배 오래 남는다.
+    /// 다른 차기(뒷발)에 가시 발이면 보통 길이.
+    #[test]
+    fn thorn_feet_make_briar_patches_last_longer() {
+        let left = |weapon: usize, sig: bool| {
+            let mut w = doto();
+            arm(&mut w, Character::Momo, weapon);
+            w.player.talents.who = Character::Momo;
+            w.player.talents.sig = sig;
+            combo(&mut w);
+            assert!(!w.toss.patches.is_empty(), "덤불이 있다");
+            w.toss.patches.iter().map(|p| p.left).fold(0.0, f32::max)
+        };
+        let plain = left(crate::equipment::BRIAR, false);
+        let long = left(crate::equipment::BRIAR, true);
+        assert!(long > plain + t::THORN_PATCH_TIME * 0.5, "{plain} → {long}");
+        let kicks = left(4, true);
+        assert!(kicks <= t::THORN_PATCH_TIME, "뒷발 + 가시 발은 보통 길이");
     }
 
     /// 볼링(0267): 모모의 마무리 차기에 맞은 적이 날아가 뒤의 적을 친다. 같은 자리에서 Naïl의 마무리는 날려 보내지 않는다.

@@ -21,7 +21,8 @@ pub enum Spawn {
         strike: Strike,
     },
     /// 가시 덤불(가시덩굴 각반·밤송이, 0246): 잠시 남아 밟은 적을 찌른다.
-    Thorns { at: Vec2 },
+    /// 가시 덤불: `time`초 남는다.
+    Thorns { at: Vec2, time: f32 },
     /// 묻은 도토리 하나: `fuse`초 뒤 `radius` 둘레를 친다(적만).
     Bury {
         at: Vec2,
@@ -94,9 +95,14 @@ impl Player {
     }
 
     /// 발 앞에 가시 덤불(0246).
+    /// 무기가 원래 덤불을 남기는데(가시덩굴 각반) 가시 발까지 깨웠으면 덤불이 `SIG_THORNS_LONG`배 오래 남는다(0268 — 전엔 겹쳐서 아무것도 아니었다).
     pub(super) fn leave_thorns(&mut self, dir: Vec2, range: f32) {
+        let own = self.moveset.hits.iter().any(|h| h.thorns);
+        let sig = self.talents.signature() == Some(crate::talents::Signature::Thorns);
+        let time = t::THORN_PATCH_TIME * if own && sig { t::SIG_THORNS_LONG } else { 1.0 };
         self.spawns.push(Spawn::Thorns {
             at: self.pos + dir * (range * 0.8),
+            time,
         });
     }
 
