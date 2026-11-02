@@ -97,13 +97,13 @@ pub const STONE_CLAW: usize = 2;
 pub const VENOM_CLAW: usize = 3;
 /// 도토의 도토리(0195).
 pub const ACORN: usize = 5;
-/// 모모 무기(0246): 가시덩굴 각반(길에서)·조약돌 덧신(콩이)·꽃잎 발목끈(저널).
+/// 모모 무기(0246 → 0266): 가시덩굴 각반(길에서)·조약돌 덧신(콩이)·꽃잎 발목끈(저널)·새싹 짚신(수수, `SANDALS`).
 /// 길에서 찾는 둘(`BRIAR`·`PINECONE`)은 표의 `found_on_road`로 고르니 이름은 시험만 쓴다.
 #[cfg_attr(not(test), allow(dead_code))]
 pub const BRIAR: usize = 6;
 pub const PEBBLE: usize = 7;
 pub const PETAL: usize = 8;
-/// 도토 무기(0246): 솔방울(길에서)·호두(수수)·밤송이(저널).
+/// 도토 무기(0246 → 0266): 솔방울(길에서)·호두(콩이 — 예전엔 수수)·밤송이(저널)·해바라기씨(수수, `SEEDS`).
 #[cfg_attr(not(test), allow(dead_code))]
 pub const PINECONE: usize = 9;
 pub const WALNUT: usize = 10;
@@ -111,8 +111,11 @@ pub const CHESTNUT: usize = 11;
 /// Naïl의 길 무기(0251): 딱정벌레 발톱. 표의 `found_on_road`로 고르니 이름은 시험만 쓴다.
 #[cfg_attr(not(test), allow(dead_code))]
 pub const BEETLE: usize = 12;
+/// 수수가 주는 가벼운 무기(0266): 모모 새싹 짚신·도토 해바라기씨. Naïl의 새싹 발톱과 같은 자리.
+pub const SANDALS: usize = 13;
+pub const SEEDS: usize = 14;
 
-pub static WEAPONS: [Weapon; 13] = [
+pub static WEAPONS: [Weapon; 15] = [
     Weapon {
         name: |s| s.w_sprout,
         desc: |s| s.w_sprout_desc,
@@ -233,6 +236,25 @@ pub static WEAPONS: [Weapon; 13] = [
         color: Color::new(0.40, 0.66, 0.62, 1.0),
         key: Some("weapon.beetle"),
         found_on_road: true,
+    },
+    // 수수의 가벼운 무기(0266): 캐릭터마다 수수 하나·콩이 하나(무거운 것) — 번호는 끝에 붙인다.
+    Weapon {
+        name: |s| s.w_sandal,
+        desc: |s| s.w_sandal_desc,
+        kind: WeaponKind::Kick,
+        moveset: &moveset::SANDALS,
+        color: Color::new(0.62, 0.86, 0.48, 1.0),
+        key: Some("weapon.sandals"),
+        found_on_road: false,
+    },
+    Weapon {
+        name: |s| s.w_seeds,
+        desc: |s| s.w_seeds_desc,
+        kind: WeaponKind::Acorn,
+        moveset: &moveset::SEEDS,
+        color: Color::new(0.90, 0.84, 0.52, 1.0),
+        key: Some("weapon.seeds"),
+        found_on_road: false,
     },
 ];
 

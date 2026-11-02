@@ -597,8 +597,10 @@ pub fn chatter(who: Who, ch: Character) -> Option<&'static Chatter> {
         .or_else(|| CHATTER.iter().find(|c| c.who == who && c.to.is_none()))
 }
 
-/// 이웃이 지금 걷는 캐릭터 본인에게 주는 무기(0246 → 0265): 아직 없으면 말을 걸 때 한 번. 무기는 그 캐릭터 것만.
-/// 콩이는 길의 주인을 이긴 캐릭터에게 그 자리에서 주고(`cutscene::kongi_returns`), 다른 캐릭터는 마을에서 받는다.
+/// 이웃이 지금 걷는 캐릭터 본인에게 주는 무기(0246 → 0265 → 0266): 아직 없으면 말을 걸 때 한 번. 무기는 그 캐릭터 것만.
+/// 캐릭터마다 같은 틀(0266): 수수는 가벼운 무기(Naïl 새싹 발톱 — 첫 만남 장면 `susu_meet` · 모모 새싹 짚신 · 도토 해바라기씨),
+/// 콩이는 등딱지를 여는 무거운 무기(바위 발톱·조약돌 덧신·호두). 콩이는 길의 주인을 이긴 캐릭터에게 그 자리에서 주고
+/// (`cutscene::kongi_returns`), 다른 캐릭터는 마을에서 받는다.
 pub struct Gift {
     pub who: Who,
     pub to: Character,
@@ -609,9 +611,21 @@ pub struct Gift {
 pub const GIFTS: &[Gift] = &[
     Gift {
         who: Who::Susu,
+        to: Character::Momo,
+        weapon: crate::equipment::SANDALS,
+        line: |s| s.susu_sandal,
+    },
+    Gift {
+        who: Who::Susu,
+        to: Character::Doto,
+        weapon: crate::equipment::SEEDS,
+        line: |s| s.susu_seeds,
+    },
+    Gift {
+        who: Who::Kongi,
         to: Character::Doto,
         weapon: crate::equipment::WALNUT,
-        line: |s| s.susu_walnut,
+        line: |s| s.kongi_walnut,
     },
     Gift {
         who: Who::Kongi,
@@ -810,11 +824,26 @@ mod tests {
                 g.to
             );
         }
-        // 콩이는 셋 모두에게(마을에서), 수수는 Naïl에게는 첫 만남 장면이 따로 있다.
-        for ch in [Character::Mole, Character::Momo] {
-            assert!(gift(Who::Kongi, ch).is_some());
+        // 캐릭터마다 같은 틀(0266): 콩이는 셋 모두에게 무거운 무기, 수수는 가벼운 무기(Naïl은 첫 만남 장면이 따로).
+        use crate::equipment::{SPROUT_CLAW, WALNUT};
+        let weight = |w: usize| WEAPONS[w].moveset.hits.len();
+        for d in &crate::characters::ALL {
+            let heavy = gift(Who::Kongi, d.id).expect("콩이").weapon;
+            let light = match gift(Who::Susu, d.id) {
+                Some(g) => g.weapon,
+                None => {
+                    assert_eq!(d.id, Character::Mole);
+                    SPROUT_CLAW
+                }
+            };
+            assert!(
+                weight(light) > weight(heavy),
+                "{:?}: 수수 것이 가볍다(타가 많다)",
+                d.id
+            );
+            assert!(WEAPONS[heavy].key.is_some() && WEAPONS[light].key.is_some());
         }
-        assert!(gift(Who::Susu, Character::Doto).is_some());
+        assert_eq!(gift(Who::Kongi, Character::Doto).unwrap().weapon, WALNUT);
     }
 
     /// 캐릭터로 가른 줄은 나일이 듣는 차례를 바꾸지 않는다: 캐릭터 조건은 구체성에 세지 않는다.

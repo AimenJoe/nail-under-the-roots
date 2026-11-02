@@ -17,6 +17,7 @@ pub enum Spawn {
         bounce: u8,
         split: u8,
         thorns: bool,
+        seed: bool,
         strike: Strike,
     },
     /// 가시 덤불(가시덩굴 각반·밤송이, 0246): 잠시 남아 밟은 적을 찌른다.
@@ -48,6 +49,7 @@ impl Player {
                 bounce: 0,
                 split: 0,
                 thorns: false,
+                seed: false,
             },
             dir,
             strike,
@@ -65,6 +67,7 @@ impl Player {
             bounce,
             split,
             thorns,
+            seed,
         } = throw
         else {
             return;
@@ -82,6 +85,7 @@ impl Player {
                 bounce,
                 split,
                 thorns,
+                seed,
                 strike,
             });
         }

@@ -526,11 +526,6 @@ impl App {
             // 물웅덩이: 열린 털빛을 차례로 비춰 본다(저널 보상, 0048).
             // 실 고리: 실의 꿈 고르기(0055).
             Interact::Dream => self.open_dream(),
-            // 모모·도토는 제 모습만 비친다(0265): 털빛은 Naïl의 것이라 바꾸지 않는다.
-            Interact::Puddle if self.world.character != crate::equipment::Character::Mole => {
-                self.world.juice.toast = Some((self.world.character.def().reflection, 2.5));
-                self.sfx.play(crate::sfx::Id::Glowbug);
-            }
             Interact::Puddle => {
                 let n = crate::journal::next_fur(&self.profile, self.world.inv.fur);
                 let none = n == self.world.inv.fur;
@@ -539,7 +534,7 @@ impl App {
                 crate::profile::save(&self.profile);
                 self.world.juice.toast = Some((
                     if none {
-                        self.world.character.def().reflection
+                        |s| s.puddle_none
                     } else {
                         crate::journal::fur_name(n)
                     },

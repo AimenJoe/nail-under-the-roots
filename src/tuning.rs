@@ -774,6 +774,10 @@ pub const WALNUT_RADIUS: f32 = 4.5;
 pub const SHARD_SPEED: f32 = 230.0;
 pub const SHARD_REACH: f32 = 38.0;
 pub const SHARD_RADIUS: f32 = 2.0;
+/// 해바라기씨(0266, 도토의 가벼운 무기 — 수수가 준다): 작고 빠르고 덜 멀리. 넷째 던지기는 셋.
+pub const SEED_SPEED: f32 = 340.0;
+pub const SEED_REACH: f32 = 104.0;
+pub const SEED_RADIUS: f32 = 2.5;
 pub const SHARD_SPREAD: f32 = 0.9;
 /// 밤송이 마무리 둘의 사거리(가시를 놓을 자리라 조금 짧게).
 pub const CHESTNUT_REACH: f32 = 96.0;

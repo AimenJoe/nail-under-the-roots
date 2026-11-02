@@ -607,7 +607,16 @@ pub(super) fn draw_projectile(p: &enemy::Projectile, alpha: f32) {
 pub(super) fn draw_shot(s: &world::toss::Shot, alpha: f32) {
     let pos = lerp(s.prev, s.pos, alpha);
     let spin = (pos.x + pos.y) * 0.25;
-    if s.splash > 0.0 {
+    if s.seed {
+        // 해바라기씨(0266): 작은 검은 물방울 꼴에 흰 줄 하나, 날아가는 쪽을 향한다.
+        let p = pos.round();
+        let d = s.vel.normalize_or(vec2(1.0, 0.0));
+        let tail = (p - d * 1.5).round();
+        draw_circle(p.x, p.y, 2.0, OUTLINE);
+        draw_circle(tail.x, tail.y, 1.5, OUTLINE);
+        draw_circle(p.x, p.y, 1.2, Color::new(0.24, 0.22, 0.24, 1.0));
+        draw_rectangle(p.x, p.y - 1.0, 1.0, 1.0, Color::new(0.92, 0.90, 0.80, 1.0));
+    } else if s.splash > 0.0 {
         let p = pos.round();
         draw_circle(p.x, p.y, 4.5, OUTLINE);
         draw_circle(p.x, p.y + 0.5, 3.8, Color::new(0.82, 0.56, 0.30, 1.0));

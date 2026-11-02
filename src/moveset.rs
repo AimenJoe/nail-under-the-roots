@@ -56,6 +56,8 @@ pub enum Throw {
         split: u8,
         /// 멈추는 자리에 가시를 남긴다(밤송이, 0246).
         thorns: bool,
+        /// 해바라기씨(0266): 작고 빠른 씨앗 그림. 판정은 다른 탄과 같다.
+        seed: bool,
     },
 }
 
@@ -121,6 +123,7 @@ pub fn heavy_of(last: Hit) -> Hit {
                 bounce,
                 split,
                 thorns,
+                seed,
                 ..
             } => Throw::Shot {
                 count: 1,
@@ -132,6 +135,7 @@ pub fn heavy_of(last: Hit) -> Hit {
                 bounce,
                 split,
                 thorns,
+                seed,
             },
         },
     }
@@ -293,6 +297,7 @@ const fn acorn(count: u8, spread: f32) -> Throw {
         bounce: 0,
         split: 0,
         thorns: false,
+        seed: false,
     }
 }
 
@@ -612,6 +617,7 @@ const fn shot(count: u8, spread: f32, speed: f32, reach: f32, radius: f32) -> Th
         bounce: 0,
         split: 0,
         thorns: false,
+        seed: false,
     }
 }
 
@@ -626,6 +632,7 @@ const fn bouncing(t: Throw) -> Throw {
             splash,
             split,
             thorns,
+            seed,
             ..
         } => Throw::Shot {
             count,
@@ -637,10 +644,109 @@ const fn bouncing(t: Throw) -> Throw {
             bounce: 1,
             split,
             thorns,
+            seed,
         },
         Throw::None => Throw::None,
     }
 }
+
+/// 해바라기씨 한 알(0266).
+const fn seed(count: u8, spread: f32) -> Throw {
+    Throw::Shot {
+        count,
+        spread,
+        speed: t::SEED_SPEED,
+        reach: t::SEED_REACH,
+        radius: t::SEED_RADIUS,
+        splash: 0.0,
+        bounce: 0,
+        split: 0,
+        thorns: false,
+        seed: true,
+    }
+}
+
+/// 가벼운 던지기 한 타(해바라기씨 1~3타).
+const SEED_TOSS: Hit = Hit {
+    swing: 0.10,
+    active: (0.025, 0.07),
+    knockback: 35.0,
+    stun: 0.08,
+    hitstop: 0.03,
+    shake: 0.04,
+    range: t::ACORN_HAND,
+    lunge: 0.0,
+    throw: seed(1, 0.0),
+    ..BASE
+};
+
+/// 도토 해바라기씨(0266, 수수가 준다): 가벼움. 작은 씨를 세 번 빠르게, 넷째는 셋으로 퍼진다. 한 알은 약하다.
+/// Naïl의 새싹 발톱·모모의 새싹 짚신과 같은 자리(수수의 가벼운 무기).
+pub static SEEDS: Moveset = Moveset {
+    hits: &[
+        SEED_TOSS,
+        SEED_TOSS,
+        SEED_TOSS,
+        Hit {
+            swing: 0.20,
+            active: (0.06, 0.12),
+            recovery: 0.08,
+            knockback: 90.0,
+            stun: 0.20,
+            hitstop: 0.06,
+            shake: 0.18,
+            range: t::ACORN_HAND,
+            lunge: 0.0,
+            dodge_cancel_after: 0.12,
+            throw: seed(3, t::ACORN_FAN_SPREAD),
+            ..BASE
+        },
+    ],
+    combo_window: 0.28,
+    move_factor: 0.7,
+    mark: Color::new(0.92, 0.86, 0.50, 1.0),
+    beat_window: 1.0,
+    beat_sp: 1.0,
+};
+
+/// 가벼운 차기 한 타(새싹 짚신 1~3타).
+const SANDAL_KICK: Hit = Hit {
+    swing: 0.09,
+    active: (0.015, 0.06),
+    knockback: 60.0,
+    stun: 0.10,
+    hitstop: 0.05,
+    shake: 0.08,
+    range: 15.0,
+    lunge: 26.0,
+    ..BASE
+};
+
+/// 모모 새싹 짚신(0266, 수수가 새싹 줄기로 엮었다): 가벼움. 4연타가 짧고 빠르게, 한 방은 약하다. 새싹 발톱과 같은 자리.
+pub static SANDALS: Moveset = Moveset {
+    hits: &[
+        SANDAL_KICK,
+        SANDAL_KICK,
+        SANDAL_KICK,
+        Hit {
+            swing: 0.18,
+            active: (0.05, 0.12),
+            recovery: 0.08,
+            knockback: 230.0,
+            stun: 0.35,
+            hitstop: 0.11,
+            shake: 0.36,
+            range: 17.0,
+            lunge: 30.0,
+            ..BASE
+        },
+    ],
+    combo_window: 0.28,
+    move_factor: 0.6,
+    mark: Color::new(0.80, 0.98, 0.70, 1.0),
+    beat_window: 1.0,
+    beat_sp: 1.0,
+};
 
 /// 도토 솔방울: 가볍고 멀리 난다. 벽에 한 번 튕긴다. 3타는 둘.
 pub static PINECONE: Moveset = Moveset {
@@ -702,6 +808,7 @@ const fn splitting(t: Throw, n: u8) -> Throw {
             splash,
             bounce,
             thorns,
+            seed,
             ..
         } => Throw::Shot {
             count,
@@ -713,6 +820,7 @@ const fn splitting(t: Throw, n: u8) -> Throw {
             bounce,
             split: n,
             thorns,
+            seed,
         },
         Throw::None => Throw::None,
     }
@@ -775,6 +883,7 @@ const fn spiky(t: Throw) -> Throw {
             splash,
             bounce,
             split,
+            seed,
             ..
         } => Throw::Shot {
             count,
@@ -786,6 +895,7 @@ const fn spiky(t: Throw) -> Throw {
             bounce,
             split,
             thorns: true,
+            seed,
         },
         Throw::None => Throw::None,
     }

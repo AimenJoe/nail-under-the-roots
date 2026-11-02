@@ -19,6 +19,8 @@ pub struct Shot {
     pub bounce: u8,
     pub split: u8,
     pub thorns: bool,
+    /// 해바라기씨 그림(0266).
+    pub seed: bool,
     /// 맞을 때 쓸 타격(모양·번호는 맞는 순간 정한다).
     pub strike: Strike,
     /// 날아가는 동안 그물·고치·매듭·부술 것에 쓰는 번호(같은 탄이 같은 것을 두 번 치지 않게).
@@ -95,6 +97,7 @@ impl World {
                     bounce,
                     split,
                     thorns,
+                    seed,
                     strike,
                 } => {
                     let id = self.toss.id();
@@ -108,6 +111,7 @@ impl World {
                         bounce,
                         split,
                         thorns,
+                        seed,
                         strike,
                         id,
                     });
@@ -295,6 +299,7 @@ impl World {
                     bounce: 0,
                     split: 0,
                     thorns: false,
+                    seed: false,
                     strike: Strike {
                         damage: 1 + self.player.stats.damage,
                         knockback: 60.0,
@@ -554,6 +559,42 @@ mod tests {
             w.tick(&press());
             run(w, &Actions::default(), 26);
         }
+    }
+
+    /// 해바라기씨(0266, 수수가 도토에게): 씨앗 그림의 작은 탄을 세 번 하나씩, 넷째는 셋. 맞히면 적이 깎인다.
+    #[test]
+    fn sunflower_seeds_fly_in_fours() {
+        let mut w = doto();
+        arm(&mut w, Character::Doto, crate::equipment::SEEDS);
+        let hits = w.player.moveset.hits;
+        assert_eq!(
+            hits.len(),
+            4,
+            "가벼운 무기는 4연타(새싹 발톱·새싹 짚신과 같은 자리)"
+        );
+        let e = dummy(&mut w, vec2(50.0, 0.0));
+        let hp = w.enemies[e].hp;
+        w.tick(&press());
+        let mut seen_seed = false;
+        for _ in 0..30 {
+            w.tick(&Actions::default());
+            seen_seed |= w
+                .toss
+                .shots
+                .iter()
+                .any(|s| s.seed && s.radius == t::SEED_RADIUS);
+        }
+        assert!(seen_seed, "씨앗 그림의 탄");
+        assert!(w.enemies[e].hp < hp, "맞힌다");
+        let last = hits[3].throw;
+        assert!(matches!(
+            last,
+            crate::moveset::Throw::Shot {
+                count: 3,
+                seed: true,
+                ..
+            }
+        ));
     }
 
     /// 솔방울(0246): 벽에 닿으면 한 번 튕겨 되돌아 난다.
