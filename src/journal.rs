@@ -529,7 +529,8 @@ pub const GOALS: &[Goal] = &[
         Count(stat::LIGHT),
         300,
         None,
-        Decor(6)
+        // 예전 보상 반딧불 병(꾸미기 6)은 지웠다(0269) → 마을 씨앗. 이미 받은 기록은 그대로(병만 그리지 않는다).
+        Seeds(15)
     ),
     goal!(
         "talent",
@@ -820,9 +821,12 @@ mod tests {
             vec![5],
             "받은 장신구는 들고 시작한다"
         );
+        // "빛을 돌려주기"는 이제 마을 씨앗(0269: 반딧불 병을 지웠다). 어떤 목표도 지운 꾸미기 6을 주지 않는다.
         p.add(stat::LIGHT, 300);
-        claim(&mut p, by_id("light").unwrap());
-        assert!(p.flag(&crate::village::key_decor(6)));
+        let seeds = p.count(crate::village::KEY_SEEDS);
+        assert_eq!(claim(&mut p, by_id("light").unwrap()), Some(Seeds(15)));
+        assert_eq!(p.count(crate::village::KEY_SEEDS), seeds + 15);
+        assert!(!GOALS.iter().any(|g| matches!(g.reward, Decor(6))));
     }
 
     /// 모모 장신구(0142): 모모 런에서만 상자·가게에 나오고, 화관은 momo_deep을 받으면(옛 기록이 반딧불로 받았어도) 들고 시작한다.
