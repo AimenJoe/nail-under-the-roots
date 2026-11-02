@@ -372,6 +372,8 @@ pub static FR: Strings = Strings {
     deep_k1: "...Ça ne fait pas mal, petit. C'est juste un peu vide.",
     deep_k2: "Si je lâche... où iront-ils tous?",
     deep_k3: "...Je vois. Tes griffes sont si chaudes.",
+    deep_last: "...Le dernier fil est le plus dur à lâcher.",
+    deep_final_hint: "Le fil le plus épais ! Seule une parade avant qu'il t'atteigne le brisera.",
     deep_wrap: "Pris dans les fils! Cache-toi sous terre ou pare avant qu'ils t'atteignent.",
     deep_sleep: "Endormi dans les fils... Tu t'es réveillé près du feu du camp.",
     node_deepest_desc: "Là où tous les fils se rejoignent. Bats le gardien de ce chemin pour y arriver.",

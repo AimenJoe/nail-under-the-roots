@@ -372,6 +372,8 @@ pub static KO: Strings = Strings {
     deep_k1: "…아프진 않단다. 그냥, 조금 허전할 뿐이지.",
     deep_k2: "놓으면… 다들 어디로 가니.",
     deep_k3: "…그래. 네 발톱이 참 따뜻하구나.",
+    deep_last: "…마지막 한 가닥은, 놓기가 어렵구나.",
+    deep_final_hint: "가장 굵은 실! 닿기 전에 받아쳐야 끊긴다.",
     deep_wrap: "실에 감겼다! 땅속으로 피하거나, 닿기 전에 받아친다.",
     deep_sleep: "실에 잠겼다… 쉼터의 불 곁에서 눈을 떴다.",
     node_deepest_desc: "모든 실이 모이는 곳. 이 길의 주인을 이기면 그곳에 닿는다.",

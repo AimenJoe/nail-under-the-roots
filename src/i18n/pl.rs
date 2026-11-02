@@ -372,6 +372,8 @@ pub static PL: Strings = Strings {
     deep_k1: "...Nie boli, maluchu. Tylko trochę pusto.",
     deep_k2: "Jeśli puszczę... dokąd wszyscy pójdą?",
     deep_k3: "...Rozumiem. Twoje pazurki są takie ciepłe.",
+    deep_last: "...Ostatnią nić najtrudniej puścić.",
+    deep_final_hint: "Najgrubsza nić! Pęknie tylko, jeśli odbijesz ją, zanim dosięgnie.",
     deep_wrap: "Oplątany nićmi! Schowaj się pod ziemią albo odbij, zanim dosięgną.",
     deep_sleep: "Uśpiony w niciach... Obudziłeś się przy ognisku obozu.",
     node_deepest_desc: "Tu zbiegają się wszystkie nici. Pokonaj strażnika tej ścieżki, by tam dotrzeć.",

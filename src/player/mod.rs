@@ -228,6 +228,10 @@ pub struct Player {
     pub armed: bool,
     attack_buf: f32,
     dodge_buf: f32,
+    /// 특기 누름 버퍼(0260): 후딜레이 캔슬을 회피처럼 — 활성 구간 중에 눌러도 캔슬 자리가 오면 나간다.
+    special_buf: f32,
+    /// 다음 틱에 도토리를 던진다(도토 되던지기 0260 — 받아치기는 월드가 틱 뒤에 알려 준다).
+    toss_next: bool,
     item_buf: f32,
     /// 다음 패링 창이 열릴 수 있기까지. 지금 스윙에 창이 있나는 `parry_open`.
     parry_cd: f32,
@@ -296,6 +300,8 @@ impl Player {
             armed: true,
             attack_buf: 0.0,
             dodge_buf: 0.0,
+            special_buf: 0.0,
+            toss_next: false,
             item_buf: 0.0,
             parry_cd: 0.0,
             parry_open: false,
@@ -375,6 +381,7 @@ impl Player {
     pub fn is_invulnerable(&self) -> bool {
         cfg!(feature = "clip")
             || self.invuln > 0.0
+            || (self.talents.eat_hidden() && matches!(self.state, State::Eat { .. }))
             || self.is_burrowed()
             || matches!(
                 self.state,
@@ -401,6 +408,11 @@ impl Player {
         4.0 * h * k * (1.0 - k)
     }
 
+    /// 특기를 낼 수 있게 눌러 뒀다(0260: 버퍼 — 회피 캔슬과 같은 꼴).
+    pub(super) fn special_ready(&self) -> bool {
+        self.special_buf > 0.0 && self.armed && self.sp_full()
+    }
+
     /// 회피 시작(캐릭터마다): 굴파기 / 깡충 / 뒤로 뛰기.
     fn start_dodge(&mut self, move_dir: Vec2) {
         match self.kit.def().dodge {
@@ -412,6 +424,7 @@ impl Player {
 
     /// 특기 시작(캐릭터마다): 드릴 / 이어 뛰기 / 도토리 묻기.
     fn start_special(&mut self, move_dir: Vec2) {
+        self.special_buf = 0.0;
         match self.kit.def().special {
             crate::characters::Special::Chain => self.start_chain(move_dir),
             crate::characters::Special::Drill => self.start_drill(move_dir),
@@ -454,7 +467,11 @@ impl Player {
         match self.state {
             State::Attack { dir, .. } | State::Heavy { dir, .. }
                 if self.parry_open
-                    && self.swing_age < t::PARRY_WINDOW * self.parry_mul * self.parry_assist =>
+                    && self.swing_age
+                        < t::PARRY_WINDOW
+                            * self.parry_mul
+                            * self.parry_assist
+                            * self.talents.parry_window_mul() =>
             {
                 Some(dir)
             }
@@ -471,6 +488,13 @@ impl Player {
     pub fn on_parry(&mut self) {
         self.sp = (self.sp + self.talents.parry_sp()).min(t::SP_MAX);
         self.parry_cd = 0.0;
+        // 모모 깡충 되감기·도토 되던지기(0260).
+        if self.talents.parry_rewinds_dodge() {
+            self.burrow_cd = 0.0;
+        }
+        if self.talents.parry_toss() {
+            self.toss_next = true;
+        }
         self.events.push(Event::Parry);
     }
 
@@ -635,6 +659,9 @@ impl Player {
         if a.dodge {
             self.dodge_buf = t::INPUT_BUFFER;
         }
+        if a.special {
+            self.special_buf = t::INPUT_BUFFER;
+        }
         if a.use_item {
             self.item_buf = t::INPUT_BUFFER;
         }
@@ -687,7 +714,7 @@ impl Player {
         let a = c.a;
         let dt = c.dt;
         let move_dir = c.move_dir;
-        if a.special && self.armed && self.sp_full() {
+        if self.special_ready() {
             self.start_special(move_dir);
         } else if self.dodge_buf > 0.0 && self.burrow_cd <= 0.0 {
             self.start_dodge(move_dir);
@@ -755,6 +782,14 @@ impl Player {
         } else if time >= item.eat_time() * self.talents.eat_time_mul() {
             self.events.push(Event::Ate(item));
             self.state = State::Free;
+            // 캐릭터마다 다른 먹기(0260): 모모 먹고 깡충, 도토 까먹기·씨 뱉기.
+            if self.talents.eat_rewinds_dodge() {
+                self.burrow_cd = 0.0;
+            }
+            self.sp = (self.sp + t::SP_MAX * self.talents.eat_ki()).min(t::SP_MAX);
+            if self.talents.eat_spit() {
+                self.snack_toss(t::TAL_SPIT_COUNT);
+            }
         } else {
             self.state = State::Eat { item, time };
         }
@@ -764,6 +799,9 @@ impl Player {
     pub fn update(&mut self, a: &Actions, room: &Room, dt: f32) -> Option<Strike> {
         self.events.clear();
         self.spawns.clear();
+        if std::mem::take(&mut self.toss_next) {
+            self.snack_toss(t::TAL_TOSS_COUNT);
+        }
         self.prev_pos = self.pos;
         self.buffer(a);
 
@@ -842,6 +880,7 @@ impl Player {
 
         self.attack_buf = (self.attack_buf - dt).max(0.0);
         self.dodge_buf = (self.dodge_buf - dt).max(0.0);
+        self.special_buf = (self.special_buf - dt).max(0.0);
         self.item_buf = (self.item_buf - dt).max(0.0);
 
         self.pos += self.vel * dt;
@@ -999,6 +1038,47 @@ mod tests {
         }
         assert_eq!(stomps, t::CHAIN_HOPS as usize);
         assert_eq!(p.state, State::Free);
+    }
+
+    /// 필살기 캔슬(0260): 땅파기처럼 휘두른 뒤 캔슬 자리부터 후딜레이를 끊고, 활성 구간 중에 눌러 둔 것도 받는다.
+    #[test]
+    fn special_cancels_the_recovery_like_burrow() {
+        let room = Room::new();
+        let mut p = Player::new(room.center());
+        p.armed = true;
+        p.sp = t::SP_MAX;
+        let hit = Actions {
+            attack: true,
+            attack_held: true,
+            ..Default::default()
+        };
+        let none = Actions::default();
+        tick(&mut p, &room, &hit);
+        assert!(matches!(p.state, State::Attack { .. }));
+        // 휘두르는 첫 틱에 누른다(캔슬 자리 전) — 버퍼에 남았다가 캔슬 자리에서 나간다.
+        let go = Actions {
+            special: true,
+            ..Default::default()
+        };
+        tick(&mut p, &room, &go);
+        let cancel_at = p.hit_of(0).dodge_cancel_after;
+        let mut fired_at = None;
+        for k in 0..60 {
+            tick(&mut p, &room, &none);
+            if matches!(p.state, State::Drill { .. }) {
+                fired_at = Some(k);
+                break;
+            }
+        }
+        let k = fired_at.expect("필살기가 후딜레이를 끊고 나간다");
+        assert!(
+            (k as f32 + 2.0) * t::TICK_DT >= cancel_at - 1e-3,
+            "캔슬 자리 전에는 안 나간다"
+        );
+        assert!(
+            ((k as f32 + 2.0) * t::TICK_DT) < p.hit_of(0).swing + p.hit_of(0).recovery,
+            "후딜레이가 끝나기 전에"
+        );
     }
 
     /// 모모 재주(0142): 발 구르기는 깡충 착지에 작은 밟기, 네 번 뛰기는 밟기 넷, 높이 뛰기는 둘이고 넓다.

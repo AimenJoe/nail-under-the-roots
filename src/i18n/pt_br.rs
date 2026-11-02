@@ -372,6 +372,8 @@ pub static PT_BR: Strings = Strings {
     deep_k1: "...Não dói, pequeno. Só fica um pouco vazio.",
     deep_k2: "Se eu soltar... para onde todos vão?",
     deep_k3: "...Entendo. Suas garras são tão quentes.",
+    deep_last: "...O último fio é o mais difícil de soltar.",
+    deep_final_hint: "O fio mais grosso! Só rebatendo antes que chegue ele se rompe.",
     deep_wrap: "Enrolado nos fios! Esconda-se debaixo da terra ou rebata antes que chegue.",
     deep_sleep: "Adormecido entre os fios... Você acordou junto ao fogo do acampamento.",
     node_deepest_desc: "Onde todos os fios se juntam. Vença o dono desta trilha para chegar lá.",

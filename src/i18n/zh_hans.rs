@@ -374,6 +374,8 @@ pub static ZH_HANS: Strings = Strings {
     deep_k1: "……不疼的，孩子。只是有点空落落。",
     deep_k2: "放开了……大家会去哪儿呢。",
     deep_k3: "……是啊。你的爪子真暖和。",
+    deep_last: "……最后一根，最难放手啊。",
+    deep_final_hint: "最粗的丝线！只有在碰到前弹开才能扯断。",
     deep_wrap: "被丝线缠住了！钻进地下躲开，或在碰到前弹开。",
     deep_sleep: "沉入了丝线……在营地的火边醒来。",
     node_deepest_desc: "所有丝线汇聚的地方。打败路之主，就能到达那里。",

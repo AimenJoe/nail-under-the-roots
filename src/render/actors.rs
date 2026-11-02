@@ -1438,7 +1438,7 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
         }
     }
     // 2단계 보스(0233): 발밑에 붉은 고리 두 겹이 빠르게 숨 쉬고, 몸에서 붉은 불씨가 피어오른다(깨어났다는 표시).
-    if e.roused && marks {
+    if e.roused && marks && e.shade <= 0.0 {
         let ph = (time * 6.0).sin();
         let c = crate::world::ROUSE;
         for (grow, a) in [(0.0, 0.85), (3.0, 0.45)] {
@@ -1486,6 +1486,11 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
                 Color::new(0.85, 0.65, 1.0, 0.9),
             );
         }
+    }
+    // 실 그림자(0260): 보랏빛 반투명, 풀리기 전에 옅어진다.
+    if e.shade > 0.0 {
+        let fade = (e.shade / 0.8).min(1.0);
+        tint = Color::new(tint.r * 0.80, tint.g * 0.70, tint.b, 0.62 * fade);
     }
     let flash = e.flash > 0.0;
     let chief = e.kind == crate::enemy::Kind::Chief;

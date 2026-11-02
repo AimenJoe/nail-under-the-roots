@@ -372,6 +372,8 @@ pub static ES: Strings = Strings {
     deep_k1: "...No duele, pequeño. Solo se siente un poco vacío.",
     deep_k2: "Si suelto... ¿adónde irán todos?",
     deep_k3: "...Ya veo. Tus garras son tan cálidas.",
+    deep_last: "...El último hilo es el más difícil de soltar.",
+    deep_final_hint: "¡El hilo más grueso! Solo se rompe si lo desvías antes de que llegue.",
     deep_wrap: "¡Atrapado en los hilos! Escóndete bajo tierra o desvíalos antes de que lleguen.",
     deep_sleep: "Dormido entre los hilos... Despertaste junto al fuego del campamento.",
     node_deepest_desc: "Donde se juntan todos los hilos. Vence al guardián de este camino para llegar.",

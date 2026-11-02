@@ -372,6 +372,8 @@ pub static EN: Strings = Strings {
     deep_k1: "...It doesn't hurt, little one. It just feels a bit empty.",
     deep_k2: "If I let go... where will everyone go?",
     deep_k3: "...I see. Your claws are so warm.",
+    deep_last: "...The last strand is the hardest to let go.",
+    deep_final_hint: "The thickest thread! Only a parry before it lands will cut it.",
     deep_wrap: "Wrapped in thread! Hide underground, or parry before it reaches you.",
     deep_sleep: "Lulled into the threads... You woke beside the camp fire.",
     node_deepest_desc: "Where all the threads gather. Beat this path's keeper to get there.",

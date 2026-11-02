@@ -372,6 +372,8 @@ pub static DE: Strings = Strings {
     deep_k1: "...Es tut nicht weh, Kleines. Es fühlt sich nur ein wenig leer an.",
     deep_k2: "Wenn ich loslasse... wohin gehen dann alle?",
     deep_k3: "...Ich verstehe. Deine Krallen sind so warm.",
+    deep_last: "...Den letzten Faden loszulassen ist am schwersten.",
+    deep_final_hint: "Der dickste Faden! Nur eine Parade, bevor er dich erreicht, zerreißt ihn.",
     deep_wrap: "In Fäden gewickelt! Versteck dich unter der Erde oder pariere, bevor sie dich erreichen.",
     deep_sleep: "In den Fäden eingeschlafen... Du bist am Lagerfeuer aufgewacht.",
     node_deepest_desc: "Wo alle Fäden zusammenlaufen. Besieg den Hüter dieses Pfads, um hinzukommen.",

@@ -13,11 +13,30 @@ pub(super) fn draw_deep(art: &Art, d: &world::Deep, w: &World, alpha: f32) {
     }
     // 당기는 실.
     if let Some(p) = d.pull {
-        if p.time >= t::DEEP_PULL_WINDUP {
-            let k = ((p.time - t::DEEP_PULL_WINDUP) / t::DEEP_PULL_TIME).clamp(0.0, 1.0);
+        if p.time >= p.windup() {
+            let k = ((p.time - p.windup()) / t::DEEP_PULL_TIME).clamp(0.0, 1.0);
             let reach = if p.snapped { 0.45 } else { 1.0 };
             let end = c + p.dir * p.len * (k * 4.0).min(1.0) * reach;
-            draw_thread(c, end, t * 3.0, if p.snapped { 1.0 - k } else { 1.0 });
+            for dir in p.dirs() {
+                let e = c + dir * p.len * (k * 4.0).min(1.0) * reach;
+                draw_thread(c, e, t * 3.0, if p.snapped { 1.0 - k } else { 1.0 });
+                if p.big {
+                    // 굵은 실: 곁에 두 가닥을 더 꼬아 굵게.
+                    let side = vec2(-dir.y, dir.x) * 2.0;
+                    draw_thread(
+                        c + side,
+                        e + side,
+                        t * 3.3,
+                        if p.snapped { 1.0 - k } else { 1.0 },
+                    );
+                    draw_thread(
+                        c - side,
+                        e - side,
+                        t * 2.7,
+                        if p.snapped { 1.0 - k } else { 1.0 },
+                    );
+                }
+            }
             if p.snapped {
                 // 끊긴 실이 흩날린다.
                 let q = end + p.dir * 6.0;
@@ -30,6 +49,13 @@ pub(super) fn draw_deep(art: &Art, d: &world::Deep, w: &World, alpha: f32) {
                 );
             }
         }
+    }
+    // 둘레를 쓰는 실(0260): 할매에서 뻗어 반 바퀴를 쓴다.
+    if let Some(sw) = d.sweep.filter(|s| s.active()) {
+        let dir = Vec2::from_angle(sw.angle());
+        draw_thread(c, c + dir * t::DEEP_PULL_REACH, t * 4.0, 1.0);
+        let side = vec2(-dir.y, dir.x) * 1.5;
+        draw_thread(c + side, c + side + dir * t::DEEP_PULL_REACH, t * 3.6, 0.7);
     }
     if d.wrapped > 0.0 {
         let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
@@ -69,7 +95,8 @@ pub(super) fn draw_deep(art: &Art, d: &world::Deep, w: &World, alpha: f32) {
             art::HALMAE_FLINCH
         } else if d
             .pull
-            .is_some_and(|p| p.time < t::DEEP_PULL_WINDUP + t::DEEP_PULL_TIME)
+            .is_some_and(|p| p.time < p.windup() + t::DEEP_PULL_TIME)
+            || d.sweep.is_some()
         {
             art::HALMAE_PULL
         } else {

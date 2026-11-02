@@ -667,7 +667,12 @@ fn pic_rooms(c: PicCtx) {
         );
     }
     // 문 곁 바닥에 새긴 씨앗 표지(0259 — 떠다니지 않는다).
-    props::draw_floor_sign(vec2(18.0, y - 6.0), crate::dungeon::Bounty::Seeds, false);
+    props::draw_floor_sign(
+        vec2(18.0, y - 6.0),
+        crate::dungeon::Bounty::Seeds,
+        false,
+        time,
+    );
 }
 
 fn pic_break(c: PicCtx) {

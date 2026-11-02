@@ -41,7 +41,8 @@ const fn talent(name: Tr, desc: Tr, cost: u32) -> Talent {
     }
 }
 
-/// 자리 2·4(패링·먹기)는 두 캐릭터가 함께 쓴다(0142).
+/// 자리 2·4(받아치기·먹기)도 캐릭터마다 따로(0260, 사장 "각자 어울리는 재주 셋으로 서로 공유하지 않아야") — 전에는
+/// 세 캐릭터가 같은 표·같은 키(0142)였다. Naïl은 옛 것 그대로(되받아치기·빛 모으기 / 꼭꼭 씹기·한입에).
 const PARRY: (Tr, [Talent; 2]) = (
     |s| s.tal_parry,
     [
@@ -54,6 +55,38 @@ const EAT: (Tr, [Talent; 2]) = (
     [
         talent(|s| s.tal_eat_a, |s| s.tal_eat_a_desc, 50),
         talent(|s| s.tal_eat_b, |s| s.tal_eat_b_desc, 50),
+    ],
+);
+/// 모모 받아차기: A 깡충 되감기(받아치면 회피 대기가 끝난다) · B 넘어뜨리기(받아친 적이 오래 멈춘다).
+const MOMO_PARRY: (Tr, [Talent; 2]) = (
+    |s| s.tal_parry_momo,
+    [
+        talent(|s| s.tal_parry_momo_a, |s| s.tal_parry_momo_a_desc, 60),
+        talent(|s| s.tal_parry_momo_b, |s| s.tal_parry_momo_b_desc, 60),
+    ],
+);
+/// 모모 풀 뜯기: A 먹고 깡충(다 먹으면 회피 대기가 끝난다) · B 풀잎 숨기(먹는 동안 맞지 않지만 오래 먹는다).
+const MOMO_EAT: (Tr, [Talent; 2]) = (
+    |s| s.tal_eat_momo,
+    [
+        talent(|s| s.tal_eat_momo_a, |s| s.tal_eat_momo_a_desc, 50),
+        talent(|s| s.tal_eat_momo_b, |s| s.tal_eat_momo_b_desc, 50),
+    ],
+);
+/// 도토 볼 받기: A 되던지기(받아치면 도토리 둘을 던진다) · B 다람쥐 눈(받아치기 창이 넓다).
+const DOTO_PARRY: (Tr, [Talent; 2]) = (
+    |s| s.tal_parry_doto,
+    [
+        talent(|s| s.tal_parry_doto_a, |s| s.tal_parry_doto_a_desc, 60),
+        talent(|s| s.tal_parry_doto_b, |s| s.tal_parry_doto_b_desc, 60),
+    ],
+);
+/// 도토 볼주머니: A 까먹기(다 먹으면 게이지가 찬다) · B 씨 뱉기(다 먹으면 도토리 셋을 뱉는다).
+const DOTO_EAT: (Tr, [Talent; 2]) = (
+    |s| s.tal_eat_doto,
+    [
+        talent(|s| s.tal_eat_doto_a, |s| s.tal_eat_doto_a_desc, 50),
+        talent(|s| s.tal_eat_doto_b, |s| s.tal_eat_doto_b_desc, 50),
     ],
 );
 
@@ -86,7 +119,7 @@ pub const MOMO_TABLE: [(Tr, [Talent; 2]); 4] = [
             talent(|s| s.tal_hop_b, |s| s.tal_hop_b_desc, 40),
         ],
     ),
-    PARRY,
+    MOMO_PARRY,
     (
         |s| s.tal_chain,
         [
@@ -94,7 +127,7 @@ pub const MOMO_TABLE: [(Tr, [Talent; 2]); 4] = [
             talent(|s| s.tal_chain_b, |s| s.tal_chain_b_desc, 80),
         ],
     ),
-    EAT,
+    MOMO_EAT,
 ];
 
 /// 도토(0195): 자리 1 = 뒤로 뛰기(떨구고 뛰기·가벼운 발), 자리 3 = 도토리 묻기(한가득·빨리 터지기).
@@ -106,7 +139,7 @@ pub const DOTO_TABLE: [(Tr, [Talent; 2]); 4] = [
             talent(|s| s.tal_leap_b, |s| s.tal_leap_b_desc, 40),
         ],
     ),
-    PARRY,
+    DOTO_PARRY,
     (
         |s| s.tal_bury,
         [
@@ -114,7 +147,7 @@ pub const DOTO_TABLE: [(Tr, [Talent; 2]); 4] = [
             talent(|s| s.tal_bury_b, |s| s.tal_bury_b_desc, 80),
         ],
     ),
-    EAT,
+    DOTO_EAT,
 ];
 
 /// 캐릭터의 재주 표(캐릭터 표에서, 0170 R14).
@@ -157,7 +190,7 @@ pub fn all_awake_keys() -> Vec<String> {
                 }
             }
         }
-        for (b, (_, nodes)) in BRANCHES.iter().enumerate() {
+        for (b, (_, nodes)) in tree(ch).iter().enumerate() {
             for (d, n) in nodes.iter().enumerate() {
                 match n {
                     Node::Plus(_) => keys.push(key_plus(ch, b, d)),
@@ -226,6 +259,16 @@ impl Talents {
         self.pick[slot.index()]
     }
 
+    /// 깨운 덤 `b`의 수.
+    fn n(self, b: Boon) -> u32 {
+        self.boons[b.index()] as u32
+    }
+
+    /// `k`를 `n`번 곱한 배율.
+    fn pow(k: f32, n: u32) -> f32 {
+        k.powi(n as i32)
+    }
+
     /// `ch`의 표에서 고른 자리 1·3 갈래(다른 캐릭터면 없음). 자리 2·4는 `side`.
     fn own(self, ch: Character, slot: Slot) -> u8 {
         if self.who == ch {
@@ -252,15 +295,17 @@ impl Talents {
 
     /// 굴파기 A 깊은 굴: 오래 숨고 크게 솟구치지만 다시 파기까지 길다. B 얕은 굴: 짧게 숨고 금방 다시.
     pub fn burrow_time(self) -> f32 {
-        match self.mole(Slot::Burrow) {
+        let base = match self.mole(Slot::Burrow) {
             1 => t::TAL_DEEP_TIME,
             2 => t::TAL_SHALLOW_TIME,
             _ => t::BURROW_MAX_TIME,
-        }
+        };
+        base + t::TREE_DEEP_BREATH * self.n(Boon::DeepBreath) as f32
     }
     /// 회피 대기 배율. 모모는 깡충(A 멀리뛰기·B 발 구르기 모두 길어진다), 도토는 뒤로 뛰기(A 길게·B 짧게).
     pub fn burrow_cd_mul(self) -> f32 {
-        match (self.who, self.side(Slot::Burrow)) {
+        let quick = Self::pow(t::TREE_DODGE, self.n(Boon::QuickHop) + self.n(Boon::Nimble));
+        quick * match (self.who, self.side(Slot::Burrow)) {
             (Character::Mole, 1) => t::TAL_DEEP_CD,
             (Character::Mole, 2) => t::TAL_SHALLOW_CD,
             (Character::Momo, 1) => t::TAL_LEAP_CD,
@@ -271,36 +316,77 @@ impl Talents {
         }
     }
     pub fn emerge_radius(self) -> f32 {
-        match self.mole(Slot::Burrow) {
+        let base = match self.mole(Slot::Burrow) {
             1 => t::TAL_DEEP_RADIUS,
             2 => t::TAL_SHALLOW_RADIUS,
             _ => t::EMERGE_RADIUS,
-        }
+        };
+        base + t::TREE_QUAKE * self.n(Boon::Quake) as f32
+    }
+    /// 솟구쳐 맞힌 적이 더 멈추는 시간(Naïl 덤 "땅울림", 0260).
+    pub fn emerge_stun_add(self) -> f32 {
+        t::TREE_TREMOR * self.n(Boon::Tremor) as f32
+    }
+    /// 드릴 피해 더하기(Naïl 덤 "드릴 날", 0260).
+    pub fn drill_damage_add(self) -> i32 {
+        self.n(Boon::DrillEdge) as i32
+    }
+    /// 큰 도토리(강타) 피해 더하기(도토 덤 "묵직한 도토리", 0260).
+    pub fn heavy_damage_add(self) -> i32 {
+        2 * self.n(Boon::BigNut) as i32
     }
 
     /// 패링 A 되받아치기: 튕겨낸 돌격에 피해(게이지는 안 찬다). B 빛 모으기: 게이지가 크게 찬다.
+    /// Naïl만(0260). 덤 "빛 받기"는 받아칠 때마다 게이지를 더 채운다.
     pub fn parry_sp(self) -> f32 {
-        match self.side(Slot::Parry) {
+        let base = match self.mole(Slot::Parry) {
             1 => 0.0,
             2 => t::TAL_PARRY_SP,
             _ => t::PARRY_SP,
-        }
+        };
+        base + t::TREE_PARRY_LIGHT * self.n(Boon::ParryLight) as f32
     }
     pub fn parry_counter(self) -> i32 {
-        if self.side(Slot::Parry) == 1 {
+        if self.mole(Slot::Parry) == 1 {
             t::TAL_PARRY_COUNTER
         } else {
             0
         }
     }
 
+    /// 모모 받아차기 A 깡충 되감기: 받아치면 회피 대기가 바로 끝난다(0260).
+    pub fn parry_rewinds_dodge(self) -> bool {
+        self.momo_side(Slot::Parry) == 1
+    }
+    /// 받아친 적이 멈추는 시간 배율: 모모 받아차기 B 넘어뜨리기(0260).
+    pub fn parry_stun_mul(self) -> f32 {
+        if self.momo_side(Slot::Parry) == 2 {
+            t::TAL_TRIP_STUN
+        } else {
+            1.0
+        }
+    }
+    /// 도토 볼 받기 A 되던지기: 받아치면 바라보는 쪽으로 도토리 둘(0260).
+    pub fn parry_toss(self) -> bool {
+        self.doto_side(Slot::Parry) == 1
+    }
+    /// 받아치기 창 배율: 도토 볼 받기 B 다람쥐 눈(0260).
+    pub fn parry_window_mul(self) -> f32 {
+        if self.doto_side(Slot::Parry) == 2 {
+            t::TAL_SQUIRREL_EYE
+        } else {
+            1.0
+        }
+    }
+
     /// 드릴 A 긴 드릴: 길게 달리지만 게이지가 느리게 찬다. B 짧은 드릴: 짧게, 자주.
     pub fn drill_mul(self) -> f32 {
-        match self.mole(Slot::Drill) {
+        let base = match self.mole(Slot::Drill) {
             1 => t::TAL_LONG_DRILL,
             2 => t::TAL_SHORT_DRILL,
             _ => 1.0,
-        }
+        };
+        base * (1.0 + t::TREE_LONG_BORE * self.n(Boon::LongBore) as f32)
     }
     /// 게이지 차는 배율: Naïl은 드릴 갈래, 모모는 네 번 뛰기, 도토는 한가득 묻기(느리게 찬다).
     pub fn sp_gain_mul(self) -> f32 {
@@ -315,11 +401,20 @@ impl Talents {
 
     /// 모모 깡충 A 멀리뛰기: 더 멀리 뛴다(대기가 길다).
     pub fn hop_dist(self) -> f32 {
-        if self.momo_side(Slot::Burrow) == 1 {
+        let base = if self.momo_side(Slot::Burrow) == 1 {
             t::TAL_LEAP_DIST
         } else {
             t::HOP_DIST
-        }
+        };
+        base * (1.0 + t::TREE_FAR * self.n(Boon::FarHop) as f32)
+    }
+    /// 멀리뛰기 거리(모모 덤 "용수철 다리", 0260). 도토는 늘 `JUMP_DIST`.
+    pub fn jump_dist(self) -> f32 {
+        t::JUMP_DIST * (1.0 + t::TREE_FAR * self.n(Boon::Spring) as f32)
+    }
+    /// 달리기 배율(도토 덤 "종종걸음", 0260).
+    pub fn run_mul(self) -> f32 {
+        1.0 + t::TREE_SCAMPER * self.n(Boon::Scamper) as f32
     }
     /// 모모 깡충 B 발 구르기: 착지에 작은 밟기(회피가 공격도 된다, 0090의 모모 쪽 답).
     pub fn hop_stamp(self) -> bool {
@@ -328,25 +423,28 @@ impl Talents {
 
     /// 모모 이어 뛰기: A 네 번 뛰기, B 높이 뛰기(두 번, 넓고 오래 멈추게).
     pub fn chain_hops(self) -> u32 {
-        match self.momo_side(Slot::Drill) {
+        let base = match self.momo_side(Slot::Drill) {
             1 => t::TAL_FOUR_HOPS,
             2 => t::TAL_HIGH_HOPS,
             _ => t::CHAIN_HOPS,
-        }
+        };
+        base + self.n(Boon::ExtraHop)
     }
     pub fn chain_radius(self) -> f32 {
-        if self.momo_side(Slot::Drill) == 2 {
+        let base = if self.momo_side(Slot::Drill) == 2 {
             t::TAL_HIGH_RADIUS
         } else {
             t::CHAIN_RADIUS
-        }
+        };
+        base + t::TREE_STOMP * self.n(Boon::Stomp) as f32
     }
     pub fn chain_stun(self) -> f32 {
-        if self.momo_side(Slot::Drill) == 2 {
+        let base = if self.momo_side(Slot::Drill) == 2 {
             t::TAL_HIGH_STUN
         } else {
             t::CHAIN_STUN
-        }
+        };
+        base + t::TREE_STUN * self.n(Boon::Daze) as f32
     }
 
     /// 도토 뒤로 뛰기(0195): A 떨구고 뛰기 — 뛰어오른 자리에 도토리 하나를 떨군다(대기가 길다).
@@ -355,46 +453,72 @@ impl Talents {
         self.doto_side(Slot::Burrow) == 1
     }
     pub fn leap_dist(self) -> f32 {
-        if self.doto_side(Slot::Burrow) == 2 {
+        let base = if self.doto_side(Slot::Burrow) == 2 {
             t::BACKLEAP_DIST * t::TAL_LIGHT_DIST
         } else {
             t::BACKLEAP_DIST
-        }
+        };
+        base * (1.0 + t::TREE_FAR * self.n(Boon::Bound) as f32)
     }
 
     /// 도토 도토리 묻기(0195): A 한가득 — 다섯(게이지가 느리게 찬다). B 빨리 터지기 — 금방 터지지만 둘레가 작다.
     pub fn bury_count(self) -> usize {
-        if self.doto_side(Slot::Drill) == 1 {
+        let base = if self.doto_side(Slot::Drill) == 1 {
             t::TAL_HEAP_COUNT
         } else {
             t::BURY_COUNT
-        }
+        };
+        base + self.n(Boon::Cache) as usize
     }
     pub fn bury_fuse(self) -> f32 {
-        if self.doto_side(Slot::Drill) == 2 {
+        let base = if self.doto_side(Slot::Drill) == 2 {
             t::TAL_QUICK_FUSE
         } else {
             t::BURY_FUSE
-        }
+        };
+        base * Self::pow(t::TREE_FUSE, self.n(Boon::Fuse))
     }
     pub fn bury_radius(self) -> f32 {
-        if self.doto_side(Slot::Drill) == 2 {
+        let base = if self.doto_side(Slot::Drill) == 2 {
             t::TAL_QUICK_RADIUS
         } else {
             t::BURY_RADIUS
-        }
+        };
+        base + t::TREE_BLAST * self.n(Boon::Blast) as f32
     }
 
     /// 먹기 A 꼭꼭 씹기: 오래 먹고 산딸기가 더 채운다. B 한입에: 빨리 먹는다.
+    /// Naïl 꼭꼭 씹기·한입에, 모모 풀잎 숨기(오래 먹는다, 0260).
     pub fn eat_time_mul(self) -> f32 {
-        match self.side(Slot::Eat) {
-            1 => t::TAL_CHEW_TIME,
-            2 => t::TAL_GULP_TIME,
+        match (self.mole(Slot::Eat), self.momo_side(Slot::Eat)) {
+            (1, _) => t::TAL_CHEW_TIME,
+            (2, _) => t::TAL_GULP_TIME,
+            (_, 2) => t::TAL_HIDE_EAT_TIME,
             _ => 1.0,
         }
     }
+    /// 모모 풀 뜯기 A 먹고 깡충: 다 먹으면 회피 대기가 끝난다(0260).
+    pub fn eat_rewinds_dodge(self) -> bool {
+        self.momo_side(Slot::Eat) == 1
+    }
+    /// 모모 풀 뜯기 B 풀잎 숨기: 먹는 동안 맞지 않는다(0260).
+    pub fn eat_hidden(self) -> bool {
+        self.momo_side(Slot::Eat) == 2
+    }
+    /// 도토 볼주머니 A 까먹기: 다 먹으면 게이지가 이만큼(0..1 비율) 찬다(0260).
+    pub fn eat_ki(self) -> f32 {
+        if self.doto_side(Slot::Eat) == 1 {
+            t::TAL_SNACK_KI
+        } else {
+            0.0
+        }
+    }
+    /// 도토 볼주머니 B 씨 뱉기: 다 먹으면 바라보는 쪽으로 도토리 셋(0260).
+    pub fn eat_spit(self) -> bool {
+        self.doto_side(Slot::Eat) == 2
+    }
     pub fn berry_heal(self) -> i32 {
-        if self.side(Slot::Eat) == 1 {
+        if self.mole(Slot::Eat) == 1 {
             t::TAL_CHEW_HEAL
         } else {
             t::BERRY_HEAL
@@ -404,54 +528,95 @@ impl Talents {
 
 // ---- 큰 나무 갈래 셋 × 깊이 여덟(0246) -----------------------------------------
 
-/// 깨우면 늘 켜지는 덤. 수치는 `apply`(장신구와 같은 `Mods`).
+/// 깨우면 늘 켜지는 덤(0246 → 0260). 캐릭터마다 제 덤만 — 한 덤은 한 캐릭터의 나무에만 나온다(시험이 본다).
+/// 체력·실뿌리·장신구 칸·가게 할인 같은 "누구나 같은" 덤은 뺐다(사장 "캐릭 기본 없이"). 수치는 `apply`(장신구와 같은
+/// `Mods`)이거나 그 캐릭터의 동작 수치(`Talents`의 게터)다.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Boon {
-    /// 최대 체력 +1.
-    Hp,
-    /// 산딸기 회복 +1.
-    Berry,
-    /// 맞힌 적이 조금 더 오래 멈춘다(+0.1초).
-    Stun,
-    /// 실뿌리 하나 더(0210).
-    Lives,
-    /// 마무리 타가 20% 더 멀리 민다.
-    Knock,
-    /// 공격 8% 빨리.
-    Haste,
-    /// 박자 창 25% 넓게.
-    Beat,
-    /// 강공격 모으기 20% 빨리.
-    Charge,
-    /// 게이지 15% 빨리.
-    Ki,
-    /// 모든 타 피해 +1.
+    /// 땅속에 0.25초 더 오래(Naïl).
+    DeepBreath,
+    /// 솟구칠 때 둘레가 5px 넓게(Naïl).
+    Quake,
+    /// 솟구쳐 맞힌 적이 0.15초 더 멈춘다(Naïl).
+    Tremor,
+    /// 박자 창 25% 넓게(Naïl).
+    BeatClaw,
+    /// 발톱 피해 +1(Naïl).
     Edge,
-    /// 걷기 6% 빨리.
-    Speed,
-    /// 회피 대기 12% 짧게.
-    Dodge,
-    /// 쉼터 가게 값 15% 싸게.
-    Bargain,
-    /// 장신구 칸 +1.
-    Charm,
+    /// 드릴 피해 +1(Naïl).
+    DrillEdge,
+    /// 드릴이 15% 더 멀리(Naïl).
+    LongBore,
+    /// 게이지 15% 빨리(Naïl).
+    Ki,
+    /// 받아치면 게이지가 더 찬다(Naïl).
+    ParryLight,
+    /// 깡충 10% 더 멀리(모모).
+    FarHop,
+    /// 깡충 대기 12% 짧게(모모).
+    QuickHop,
+    /// 걷기 6% 빨리(모모).
+    Fleet,
+    /// 차기 8% 빨리(모모).
+    Haste,
+    /// 마무리 차기가 20% 더 멀리 민다(모모).
+    Knock,
+    /// 이어 뛰기 쿵의 둘레가 4px 넓게(모모).
+    Stomp,
+    /// 이어 뛰기 쿵에 맞은 적이 0.1초 더 멈춘다(모모).
+    Daze,
+    /// 이어 뛰기 한 번 더(모모).
+    ExtraHop,
+    /// 멀리뛰기 10% 더 멀리(모모).
+    Spring,
+    /// 큰 도토리 모으기 20% 빨리(도토).
+    Charge,
+    /// 맞힌 적이 0.1초 더 멈춘다(도토).
+    Heft,
+    /// 큰 도토리 피해 +2(도토).
+    BigNut,
+    /// 묻는 도토리 하나 더(도토).
+    Cache,
+    /// 묻은 도토리가 터지는 둘레 4px 넓게(도토).
+    Blast,
+    /// 묻은 도토리가 15% 빨리 터진다(도토).
+    Fuse,
+    /// 뒤로 뛰기 10% 더 멀리(도토).
+    Bound,
+    /// 뒤로 뛰기 대기 12% 짧게(도토).
+    Nimble,
+    /// 달리기 8% 빨리(도토).
+    Scamper,
 }
 
-pub const BOONS: [Boon; 14] = [
-    Boon::Hp,
-    Boon::Berry,
-    Boon::Stun,
-    Boon::Lives,
-    Boon::Knock,
-    Boon::Haste,
-    Boon::Beat,
-    Boon::Charge,
-    Boon::Ki,
+pub const BOONS: [Boon; 27] = [
+    Boon::DeepBreath,
+    Boon::Quake,
+    Boon::Tremor,
+    Boon::BeatClaw,
     Boon::Edge,
-    Boon::Speed,
-    Boon::Dodge,
-    Boon::Bargain,
-    Boon::Charm,
+    Boon::DrillEdge,
+    Boon::LongBore,
+    Boon::Ki,
+    Boon::ParryLight,
+    Boon::FarHop,
+    Boon::QuickHop,
+    Boon::Fleet,
+    Boon::Haste,
+    Boon::Knock,
+    Boon::Stomp,
+    Boon::Daze,
+    Boon::ExtraHop,
+    Boon::Spring,
+    Boon::Charge,
+    Boon::Heft,
+    Boon::BigNut,
+    Boon::Cache,
+    Boon::Blast,
+    Boon::Fuse,
+    Boon::Bound,
+    Boon::Nimble,
+    Boon::Scamper,
 ];
 
 impl Boon {
@@ -459,60 +624,82 @@ impl Boon {
         BOONS.iter().position(|b| *b == self).unwrap_or(0)
     }
 
-    fn apply(self, m: &mut Mods) {
+    /// `Mods`로 가는 덤(나머지는 0 — 동작 수치는 `Talents`의 게터가 센다).
+    pub fn apply(self, m: &mut Mods) {
         match self {
-            Boon::Hp => m.max_hp += 1,
-            Boon::Berry => m.berry_heal += 1,
-            Boon::Stun => m.stun += t::TREE_STUN,
-            Boon::Lives => m.lives += 1,
-            Boon::Knock => m.finisher_knockback *= t::TREE_KNOCK,
-            Boon::Haste => m.attack_speed *= t::TREE_HASTE,
-            Boon::Beat => m.beat *= t::TREE_BEAT,
-            Boon::Charge => m.charge *= t::TREE_CHARGE,
-            Boon::Ki => m.sp_gain *= t::TREE_KI,
+            Boon::BeatClaw => m.beat *= t::TREE_BEAT,
             Boon::Edge => m.damage += 1,
-            Boon::Speed => m.speed *= t::TREE_SPEED,
-            Boon::Dodge => m.burrow_cd *= t::TREE_DODGE,
-            Boon::Bargain => m.bargain *= t::TREE_BARGAIN,
-            Boon::Charm => m.charm_slots += 1,
+            Boon::Ki => m.sp_gain *= t::TREE_KI,
+            Boon::Fleet => m.speed *= t::TREE_SPEED,
+            Boon::Haste => m.attack_speed *= t::TREE_HASTE,
+            Boon::Knock => m.finisher_knockback *= t::TREE_KNOCK,
+            Boon::Charge => m.charge *= t::TREE_CHARGE,
+            Boon::Heft => m.stun += t::TREE_STUN,
+            _ => {}
         }
     }
 
     pub fn name(self) -> Tr {
         match self {
-            Boon::Hp => |s| s.bn_hp,
-            Boon::Berry => |s| s.bn_berry,
-            Boon::Stun => |s| s.bn_stun,
-            Boon::Lives => |s| s.bn_lives,
-            Boon::Knock => |s| s.bn_knock,
-            Boon::Haste => |s| s.bn_haste,
-            Boon::Beat => |s| s.bn_beat,
-            Boon::Charge => |s| s.bn_charge,
-            Boon::Ki => |s| s.bn_ki,
+            Boon::DeepBreath => |s| s.bn_deep_breath,
+            Boon::Quake => |s| s.bn_quake,
+            Boon::Tremor => |s| s.bn_tremor,
+            Boon::BeatClaw => |s| s.bn_beat,
             Boon::Edge => |s| s.bn_edge,
-            Boon::Speed => |s| s.bn_speed,
-            Boon::Dodge => |s| s.bn_dodge,
-            Boon::Bargain => |s| s.bn_bargain,
-            Boon::Charm => |s| s.bn_charm,
+            Boon::DrillEdge => |s| s.bn_drill_edge,
+            Boon::LongBore => |s| s.bn_long_bore,
+            Boon::Ki => |s| s.bn_ki,
+            Boon::ParryLight => |s| s.bn_parry_light,
+            Boon::FarHop => |s| s.bn_far_hop,
+            Boon::QuickHop => |s| s.bn_quick_hop,
+            Boon::Fleet => |s| s.bn_speed,
+            Boon::Haste => |s| s.bn_haste,
+            Boon::Knock => |s| s.bn_knock,
+            Boon::Stomp => |s| s.bn_stomp,
+            Boon::Daze => |s| s.bn_daze,
+            Boon::ExtraHop => |s| s.bn_extra_hop,
+            Boon::Spring => |s| s.bn_spring,
+            Boon::Charge => |s| s.bn_charge,
+            Boon::Heft => |s| s.bn_stun,
+            Boon::BigNut => |s| s.bn_big_nut,
+            Boon::Cache => |s| s.bn_cache,
+            Boon::Blast => |s| s.bn_blast,
+            Boon::Fuse => |s| s.bn_fuse,
+            Boon::Bound => |s| s.bn_bound,
+            Boon::Nimble => |s| s.bn_nimble,
+            Boon::Scamper => |s| s.bn_scamper,
         }
     }
 
     pub fn desc(self) -> Tr {
         match self {
-            Boon::Hp => |s| s.bn_hp_d,
-            Boon::Berry => |s| s.bn_berry_d,
-            Boon::Stun => |s| s.bn_stun_d,
-            Boon::Lives => |s| s.bn_lives_d,
-            Boon::Knock => |s| s.bn_knock_d,
-            Boon::Haste => |s| s.bn_haste_d,
-            Boon::Beat => |s| s.bn_beat_d,
-            Boon::Charge => |s| s.bn_charge_d,
-            Boon::Ki => |s| s.bn_ki_d,
+            Boon::DeepBreath => |s| s.bn_deep_breath_d,
+            Boon::Quake => |s| s.bn_quake_d,
+            Boon::Tremor => |s| s.bn_tremor_d,
+            Boon::BeatClaw => |s| s.bn_beat_d,
             Boon::Edge => |s| s.bn_edge_d,
-            Boon::Speed => |s| s.bn_speed_d,
-            Boon::Dodge => |s| s.bn_dodge_d,
-            Boon::Bargain => |s| s.bn_bargain_d,
-            Boon::Charm => |s| s.bn_charm_d,
+            Boon::DrillEdge => |s| s.bn_drill_edge_d,
+            Boon::LongBore => |s| s.bn_long_bore_d,
+            Boon::Ki => |s| s.bn_ki_d,
+            Boon::ParryLight => |s| s.bn_parry_light_d,
+            Boon::FarHop => |s| s.bn_far_hop_d,
+            Boon::QuickHop => |s| s.bn_quick_hop_d,
+            Boon::Fleet => |s| s.bn_speed_d,
+            Boon::Haste => |s| s.bn_haste_d,
+            Boon::Knock => |s| s.bn_knock_d,
+            Boon::Stomp => |s| s.bn_stomp_d,
+            Boon::Daze => |s| s.bn_daze_d,
+            Boon::ExtraHop => |s| s.bn_extra_hop_d,
+            Boon::Spring => |s| s.bn_spring_d,
+            Boon::Charge => |s| s.bn_charge_d,
+            Boon::Heft => |s| s.bn_stun_d,
+            Boon::BigNut => |s| s.bn_big_nut_d,
+            Boon::Cache => |s| s.bn_cache_d,
+            Boon::Blast => |s| s.bn_blast_d,
+            Boon::Fuse => |s| s.bn_fuse_d,
+            Boon::Bound => |s| s.bn_bound_d,
+            Boon::Nimble => |s| s.bn_nimble_d,
+            Boon::Scamper => |s| s.bn_scamper_d,
         }
     }
 }
@@ -568,30 +755,35 @@ pub enum Node {
 
 pub const DEPTH: usize = 8;
 
-/// 갈래 셋(모든 캐릭터 같은 꼴, 고르기 칸만 그 캐릭터의 표). 이름은 큰 나무의 뿌리·가지·잎.
-pub const BRANCHES: [(Tr, [Node; DEPTH]); 3] = [
+/// 한 캐릭터의 큰 나무: 갈래 셋(뿌리 = 몸, 가지 = 싸움, 잎 = 길) × 깊이 여덟. 고르기·고유 재주 칸의 자리는 세 나무가 같다
+/// (칸 모양 `cells`가 하나 — 시험이 본다). 덤은 캐릭터마다 제 것(0260).
+pub type Tree = [(Tr, [Node; DEPTH]); 3];
+pub const BRANCH_COUNT: usize = 3;
+
+/// Naïl(두더지): 땅속·솟구침·드릴·박자 발톱·받아치기.
+pub const NAIL_TREE: Tree = [
     (
         |s| s.tb_root,
         [
             Node::Pick(Slot::Parry),
-            Node::Plus(Boon::Hp),
+            Node::Plus(Boon::DeepBreath),
             Node::Pick(Slot::Eat),
-            Node::Plus(Boon::Berry),
-            Node::Plus(Boon::Hp),
-            Node::Plus(Boon::Stun),
-            Node::Plus(Boon::Lives),
-            Node::Plus(Boon::Hp),
+            Node::Plus(Boon::ParryLight),
+            Node::Plus(Boon::DeepBreath),
+            Node::Plus(Boon::Tremor),
+            Node::Plus(Boon::ParryLight),
+            Node::Plus(Boon::Quake),
         ],
     ),
     (
         |s| s.tb_branch,
         [
             Node::Pick(Slot::Drill),
-            Node::Plus(Boon::Knock),
-            Node::Plus(Boon::Haste),
-            Node::Plus(Boon::Beat),
-            Node::Plus(Boon::Charge),
+            Node::Plus(Boon::BeatClaw),
+            Node::Plus(Boon::DrillEdge),
             Node::Plus(Boon::Ki),
+            Node::Plus(Boon::BeatClaw),
+            Node::Plus(Boon::LongBore),
             Node::Sig,
             Node::Plus(Boon::Edge),
         ],
@@ -600,16 +792,111 @@ pub const BRANCHES: [(Tr, [Node; DEPTH]); 3] = [
         |s| s.tb_leaf,
         [
             Node::Pick(Slot::Burrow),
-            Node::Plus(Boon::Speed),
-            Node::Plus(Boon::Dodge),
-            Node::Plus(Boon::Bargain),
-            Node::Plus(Boon::Speed),
-            Node::Plus(Boon::Dodge),
-            Node::Plus(Boon::Bargain),
-            Node::Plus(Boon::Charm),
+            Node::Plus(Boon::Quake),
+            Node::Plus(Boon::Ki),
+            Node::Plus(Boon::LongBore),
+            Node::Plus(Boon::Tremor),
+            Node::Plus(Boon::DrillEdge),
+            Node::Plus(Boon::Quake),
+            Node::Plus(Boon::DeepBreath),
         ],
     ),
 ];
+
+/// 모모(굴토끼): 깡충·차기·이어 뛰기·멀리뛰기.
+pub const MOMO_TREE: Tree = [
+    (
+        |s| s.tb_root,
+        [
+            Node::Pick(Slot::Parry),
+            Node::Plus(Boon::Fleet),
+            Node::Pick(Slot::Eat),
+            Node::Plus(Boon::QuickHop),
+            Node::Plus(Boon::Fleet),
+            Node::Plus(Boon::FarHop),
+            Node::Plus(Boon::QuickHop),
+            Node::Plus(Boon::Spring),
+        ],
+    ),
+    (
+        |s| s.tb_branch,
+        [
+            Node::Pick(Slot::Drill),
+            Node::Plus(Boon::Knock),
+            Node::Plus(Boon::Haste),
+            Node::Plus(Boon::Stomp),
+            Node::Plus(Boon::Haste),
+            Node::Plus(Boon::Daze),
+            Node::Sig,
+            Node::Plus(Boon::ExtraHop),
+        ],
+    ),
+    (
+        |s| s.tb_leaf,
+        [
+            Node::Pick(Slot::Burrow),
+            Node::Plus(Boon::Spring),
+            Node::Plus(Boon::FarHop),
+            Node::Plus(Boon::Stomp),
+            Node::Plus(Boon::Knock),
+            Node::Plus(Boon::Daze),
+            Node::Plus(Boon::Spring),
+            Node::Plus(Boon::Fleet),
+        ],
+    ),
+];
+
+/// 도토(다람쥐): 던지기·큰 도토리·묻기·뒤로 뛰기·달리기.
+pub const DOTO_TREE: Tree = [
+    (
+        |s| s.tb_root,
+        [
+            Node::Pick(Slot::Parry),
+            Node::Plus(Boon::Nimble),
+            Node::Pick(Slot::Eat),
+            Node::Plus(Boon::Bound),
+            Node::Plus(Boon::Heft),
+            Node::Plus(Boon::Nimble),
+            Node::Plus(Boon::Bound),
+            Node::Plus(Boon::Heft),
+        ],
+    ),
+    (
+        |s| s.tb_branch,
+        [
+            Node::Pick(Slot::Drill),
+            Node::Plus(Boon::Charge),
+            Node::Plus(Boon::BigNut),
+            Node::Plus(Boon::Heft),
+            Node::Plus(Boon::Charge),
+            Node::Plus(Boon::BigNut),
+            Node::Sig,
+            Node::Plus(Boon::Cache),
+        ],
+    ),
+    (
+        |s| s.tb_leaf,
+        [
+            Node::Pick(Slot::Burrow),
+            Node::Plus(Boon::Scamper),
+            Node::Plus(Boon::Blast),
+            Node::Plus(Boon::Fuse),
+            Node::Plus(Boon::Scamper),
+            Node::Plus(Boon::Blast),
+            Node::Plus(Boon::Fuse),
+            Node::Plus(Boon::Cache),
+        ],
+    ),
+];
+
+/// 캐릭터의 큰 나무.
+pub fn tree(ch: Character) -> &'static Tree {
+    match ch {
+        Character::Mole => &NAIL_TREE,
+        Character::Momo => &MOMO_TREE,
+        Character::Doto => &DOTO_TREE,
+    }
+}
 
 /// 덤 칸의 값(반딧불): 깊을수록 비싸다. 고르기 칸은 제 표의 값.
 pub const fn plus_cost(depth: usize) -> u32 {
@@ -622,14 +909,12 @@ pub fn key_plus(ch: Character, branch: usize, depth: usize) -> String {
 }
 
 /// 같은 갈래 앞쪽에 같은 덤이 몇 번 나왔나(이름 뒤 II·III).
-pub fn plus_rank(branch: usize, depth: usize) -> usize {
-    let Node::Plus(b) = BRANCHES[branch].1[depth] else {
+pub fn plus_rank(ch: Character, branch: usize, depth: usize) -> usize {
+    let nodes = &tree(ch)[branch].1;
+    let Node::Plus(b) = nodes[depth] else {
         return 0;
     };
-    BRANCHES[branch].1[..depth]
-        .iter()
-        .filter(|n| **n == Node::Plus(b))
-        .count()
+    nodes[..depth].iter().filter(|n| **n == Node::Plus(b)).count()
 }
 
 // ---- 큰 나무 셈(0248 R28): 기록만 보고 계산하는 순수한 쪽. 앱은 그리기·입력만 ----------------
@@ -663,7 +948,8 @@ impl TreeView<'_> {
     /// 갈래 한 줄의 칸들: (깊이, 갈래 A/B). 고르기 칸은 두 칸, 덤·고유 재주는 한 칸.
     pub fn cells(branch: usize) -> Vec<(usize, usize)> {
         let mut v = Vec::new();
-        for (d, n) in BRANCHES[branch].1.iter().enumerate() {
+        // 칸 모양은 세 나무가 같다(고르기·고유 재주 자리, 시험이 본다).
+        for (d, n) in NAIL_TREE[branch].1.iter().enumerate() {
             match n {
                 Node::Pick(_) => v.extend([(d, 0), (d, 1)]),
                 Node::Plus(_) | Node::Sig => v.push((d, 0)),
@@ -684,7 +970,7 @@ impl TreeView<'_> {
 
     /// 한 깊이가 깨었나(고르기 칸은 어느 쪽이든).
     pub fn awake(&self, branch: usize, depth: usize) -> bool {
-        match BRANCHES[branch].1[depth] {
+        match tree(self.ch)[branch].1[depth] {
             Node::Pick(slot) => (0..2).any(|side| self.p.flag(&key_awake(self.ch, slot, side))),
             Node::Plus(_) => self.p.flag(&key_plus(self.ch, branch, depth)),
             Node::Sig => self.p.flag(self.ch.def().signature.key()),
@@ -698,7 +984,7 @@ impl TreeView<'_> {
 
     /// 깨울 때 세우는 기록 깃발(덤·고유 재주 칸). 고르기 칸은 쪽마다라 없음(`key_awake`).
     pub fn key(&self, branch: usize, depth: usize) -> Option<String> {
-        match BRANCHES[branch].1[depth] {
+        match tree(self.ch)[branch].1[depth] {
             Node::Pick(_) => None,
             Node::Plus(_) => Some(key_plus(self.ch, branch, depth)),
             Node::Sig => Some(self.ch.def().signature.key().to_string()),
@@ -707,7 +993,7 @@ impl TreeView<'_> {
 
     /// 칸 하나: 값·이름·설명·깨었나(고르기 칸은 그 쪽).
     pub fn node(&self, branch: usize, depth: usize, side: usize) -> NodeInfo {
-        match BRANCHES[branch].1[depth] {
+        match tree(self.ch)[branch].1[depth] {
             Node::Pick(slot) => {
                 let tal = &table(self.ch)[slot.index()].1[side];
                 NodeInfo {
@@ -721,7 +1007,7 @@ impl TreeView<'_> {
             Node::Plus(b) => NodeInfo {
                 cost: plus_cost(depth),
                 name: b.name(),
-                rank: plus_rank(branch, depth),
+                rank: plus_rank(self.ch, branch, depth),
                 desc: b.desc(),
                 awake: self.awake(branch, depth),
             },
@@ -751,7 +1037,7 @@ impl TreeView<'_> {
             return None;
         }
         let (r, c) = (((v - 1) / 16) as usize, ((v - 1) % 16) as usize);
-        (r < BRANCHES.len() && c < Self::width(r)).then_some((r, c))
+        (r < BRANCH_COUNT && c < Self::width(r)).then_some((r, c))
     }
 
     /// 그 칸까지 아직 안 깬 칸 수와 드는 반딧불. 지나가는 고르기 깊이는 싼 쪽, 그 칸이면 그 쪽.
@@ -796,7 +1082,7 @@ impl TreeView<'_> {
 
     /// 가진 반딧불로 지금 깨울 수 있는 칸이 있나.
     pub fn affordable(&self, have: u32) -> bool {
-        (0..BRANCHES.len()).any(|b| {
+        (0..BRANCH_COUNT).any(|b| {
             Self::cells(b).into_iter().any(|(d, side)| {
                 let n = self.node(b, d, side);
                 !n.awake && self.open(b, d) && n.cost <= have
@@ -818,7 +1104,7 @@ impl TreeView<'_> {
             }
         }
         // 갈래 셋 × 깊이 여덟의 덤(0246): 깨운 것은 늘 켜진다.
-        for (b, (_, nodes)) in BRANCHES.iter().enumerate() {
+        for (b, (_, nodes)) in tree(ch).iter().enumerate() {
             for (d, n) in nodes.iter().enumerate() {
                 if let Node::Plus(boon) = n {
                     if self.p.flag(&key_plus(ch, b, d)) {
