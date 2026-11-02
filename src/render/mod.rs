@@ -925,8 +925,8 @@ impl Renderer {
     }
 
     /// 마을 창 그림(0269, 요구 2.5): 꾸미기·짐을 월드에서 그리는 그 함수 그대로 `r` 안에 `zoom`배로(그림 두 벌을 두지 않는다).
-    /// 바닥 발 줄은 `r` 아래쪽 4px 위. `glow`는 반딧불 등의 밝기 단계.
-    pub fn draw_village_pic(&self, ui: &Ui, pic: VillagePic, r: Rect, t: f32, zoom: f32, glow: u8) {
+    /// 바닥 발 줄은 `r` 아래쪽 4px 위.
+    pub fn draw_village_pic(&self, ui: &Ui, pic: VillagePic, r: Rect, t: f32, zoom: f32) {
         let o = ui.px(vec2(r.x, r.y));
         let k = ui.scale * zoom;
         let gl = unsafe { get_internal_gl() };
@@ -951,7 +951,7 @@ impl Renderer {
                 Some(sunny) if matches!(i, 0 | 2 | 3 | 7) => {
                     draw_decor_sunny(sunny, i, foot - vec2(0.0, 4.0), t)
                 }
-                _ => draw_decor(i, foot - vec2(0.0, 4.0), t, glow),
+                _ => draw_decor(i, foot - vec2(0.0, 4.0), t),
             },
             VillagePic::Pack(crate::village::PackKind::Berry) => {
                 draw_berry(foot.x, foot.y - 5.0, 1.0, 1.0)

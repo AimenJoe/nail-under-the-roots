@@ -42,9 +42,12 @@ pub(super) const VILLAGE_TABS: &[VillageTab] = &[
     },
 ];
 
-/// 꾸미기 탭의 줄: 가게 꾸미기 여섯 + 저널 꾸미기(지운 6번 병은 빼고).
+/// 꾸미기 탭의 줄: 가게 꾸미기 + 저널 꾸미기(지운 1번 등·6번 병은 빼고, 0269).
 fn decor_rows() -> Vec<usize> {
-    (0..DECOR.len()).chain(JOURNAL_SHOWN).collect()
+    (0..DECOR.len())
+        .chain(JOURNAL_SHOWN)
+        .filter(|i| !crate::village::REMOVED_DECOR.contains(i))
+        .collect()
 }
 
 fn decor_desc(i: usize) -> Tr {
@@ -328,7 +331,6 @@ impl App {
         let n = rows.len();
         let first = self.village_view.window(self.decor_cursor, n, fits, ROW_H);
         let t = get_time() as f32;
-        let glow = self.world.adv.village.map_or(0, |v| v.glow);
         for (k, (pic, name, right, dim)) in rows.iter().enumerate().skip(first).take(fits) {
             let row = Rect::new(r.x, r.y + (k - first) as f32 * ROW_H, r.w, ROW_H - 1.0);
             self.hits.push((row, Hit::ShopItem(k)));
@@ -339,7 +341,7 @@ impl App {
             }
             let icon = Rect::new(row.x + 1.0, row.y, ROW_H, ROW_H - 1.0);
             self.renderer
-                .draw_village_pic(ui, *pic, icon, t, pic_zoom(*pic) * 0.5, glow);
+                .draw_village_pic(ui, *pic, icon, t, pic_zoom(*pic) * 0.5);
             let c = if *dim {
                 ui::TEXT_DIM
             } else if on {
@@ -376,11 +378,10 @@ impl App {
         info: &str,
     ) -> f32 {
         let t = get_time() as f32;
-        let glow = self.world.adv.village.map_or(0, |v| v.glow);
         let art = Rect::new(r.x, r.y, 44.0, 44.0);
         ui.rect(art, Color::new(0.20, 0.30, 0.18, 1.0));
         self.renderer
-            .draw_village_pic(ui, pic, art, t, pic_zoom(pic), glow);
+            .draw_village_pic(ui, pic, art, t, pic_zoom(pic));
         ui.rect_lines(art, ui::BORDER);
         let tx = art.right() + 6.0;
         let mut y = r.y + 2.0;
@@ -542,12 +543,12 @@ impl App {
 mod tests {
     use super::*;
 
-    /// 마을 창의 꾸미기 줄: 가게 여섯 + 저널 둘, 지운 반딧불 병(6)은 없다. 설명이 다 있다.
+    /// 마을 창의 꾸미기 줄: 가게 다섯 + 저널 둘, 지운 반딧불 등(1)·병(6)은 없다. 설명이 다 있다.
     #[test]
-    fn decor_rows_skip_the_removed_jar_and_have_descriptions() {
+    fn decor_rows_skip_removed_decor_and_have_descriptions() {
         let rows = decor_rows();
-        assert_eq!(rows.len(), 8);
-        assert!(!rows.contains(&6));
+        assert_eq!(rows.len(), 7);
+        assert!(!rows.contains(&1) && !rows.contains(&6));
         let ko = &crate::i18n::KO;
         for i in rows {
             assert!(!decor_desc(i)(ko).is_empty(), "{i} 설명");

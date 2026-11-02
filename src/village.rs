@@ -22,7 +22,7 @@ pub const ROWS: [&str; 16] = [
     "##########################",
     "#..T.......#######..8..R.#",
     "#.....1....###Y###...g...#",
-    "#.......W..........2.....#",
+    "#.......W................#",
     "#..k.K....n.........H....#",
     "#..........F....b........#",
     "#....3............4...X..#",
@@ -36,6 +36,33 @@ pub const ROWS: [&str; 16] = [
 
 pub fn parse() -> Parsed {
     map::parse(&ROWS)
+}
+
+/// 지운 꾸미기(0269): 1 반딧불 등(큰 나무에 가려 안 보였다), 6 반딧불 병(그림이 맞지 않았다). 번호는 기록 키라
+/// 표의 줄은 자리만 남기고 마을 창·지도·그림에서 뺀다. 갖고 있던 기록은 읽을 때 씨앗으로 돌려준다(`migrate_removed_decor`).
+pub const REMOVED_DECOR: [usize; 2] = [1, 6];
+/// 지운 꾸미기를 갖고 있던 기록에 한 번 돌려주는 마을 씨앗: 등은 산 값 8, 병은 지금 그 저널 목표가 주는 15.
+pub const REMOVED_REFUND: [u32; 2] = [8, 15];
+const KEY_REFUNDED: &str = "mig.0269.decor";
+
+/// 지운 꾸미기의 값을 한 번 돌려준다(0269). 깃발은 그대로 둔다(키를 지우지 않는다, 0041).
+pub fn migrate_removed_decor(p: &mut crate::profile::Profile) {
+    if p.flag(KEY_REFUNDED) {
+        return;
+    }
+    let back: u32 = REMOVED_DECOR
+        .iter()
+        .zip(REMOVED_REFUND)
+        .filter(|(i, _)| p.flag(&key_decor(**i)))
+        .map(|(_, n)| n)
+        .sum();
+    if back > 0 {
+        p.add(KEY_SEEDS, back);
+    }
+    // 빈 기록에는 표시를 남기지 않는다(빈 슬롯은 빈 칸으로 보여야 한다).
+    if !p.is_empty() {
+        p.set(KEY_REFUNDED);
+    }
 }
 
 /// 꾸미기 하나: 이름, 한 줄 설명(마을 창 자세히 칸, 0269), 마을 씨앗 값.
@@ -172,20 +199,6 @@ pub struct State {
     pub growth: u8,
     /// 맡긴 반딧불로 깨울 수 있는 재주가 있다: 밑동이 빛난다(0061).
     pub tree_ready: bool,
-    /// 맡긴(아직 쓰지 않은) 반딧불의 단계 0..4(`glow_level`): 반딧불 등이 그만큼 밝다(0269, 요구 2.9 A).
-    pub glow: u8,
-}
-
-/// 맡긴 반딧불 수 → 빛의 단계(0 = 없음, 4 = 가득). 큰 나무를 다 깨운 뒤에도 쌓이는 빛이 마을에 보이게(0269 2.9 A).
-/// 기준은 재주 한 칸 값(120~495, 0246)과 런 하나에 모이는 양(약 240, 0236)에서: 한 런·두 런·나무 한 칸 넘게·많이.
-pub fn glow_level(banked: u32) -> u8 {
-    match banked {
-        0 => 0,
-        1..=119 => 1,
-        120..=399 => 2,
-        400..=999 => 3,
-        _ => 4,
-    }
 }
 
 /// 기록 키.
@@ -210,8 +223,8 @@ mod tests {
         assert_eq!(p.grid.find(Cell::Gate).len(), 1);
         assert!(p.enemies.is_empty());
         for m in [
-            'K', 'b', 'M', 'H', 'Y', 'W', 'd', 'g', 'j', 'n', 'X', '1', '2', '3', '4', '5', '6',
-            '8', '9',
+            'K', 'b', 'M', 'H', 'Y', 'W', 'd', 'g', 'j', 'n', 'X', '1', '3', '4', '5', '6', '8',
+            '9',
         ] {
             // 'j'(토끼풀 가족, 0165)가 마커 목록에서 빠져 마을에 나오지 않았다 — 이웃 자리는 모두 여기서 본다.
             assert!(p.marks.iter().any(|(c, _)| *c == m), "{m}");
@@ -240,20 +253,31 @@ mod tests {
 }
 
 #[cfg(test)]
-mod glow_tests {
-    /// 0269 2.9 A: 맡긴 빛이 많을수록 반딧불 등이 밝다 — 거꾸로 가지 않는다. 옛 반딧불 병 자리(7)는 지도에 없다.
+mod removed_tests {
+    /// 0269: 지운 꾸미기(반딧불 등 1·반딧불 병 6)의 지도 자리는 없다.
     #[test]
-    fn lantern_brightens_with_banked_light() {
-        assert!(!super::parse().marks.iter().any(|(c, _)| *c == '7'));
-        assert_eq!(super::glow_level(0), 0);
-        assert_eq!(super::glow_level(1), 1);
-        assert_eq!(super::glow_level(240), 2);
-        assert_eq!(super::glow_level(5000), 4);
-        let mut last = 0;
-        for n in (0..3000).step_by(7) {
-            let g = super::glow_level(n);
-            assert!(g >= last);
-            last = g;
-        }
+    fn removed_decor_have_no_map_slot() {
+        let p = super::parse();
+        assert!(!p.marks.iter().any(|(c, _)| *c == '2' || *c == '7'));
+    }
+}
+
+#[cfg(test)]
+mod refund_tests {
+    use super::*;
+
+    #[test]
+    fn removed_decor_are_refunded_once() {
+        let mut p = crate::profile::Profile::default();
+        p.set(&key_decor(1));
+        p.set(&key_decor(6));
+        p.add(KEY_SEEDS, 2);
+        migrate_removed_decor(&mut p);
+        assert_eq!(p.count(KEY_SEEDS), 2 + 8 + 15);
+        migrate_removed_decor(&mut p);
+        assert_eq!(p.count(KEY_SEEDS), 2 + 8 + 15, "두 번 돌려주지 않는다");
+        let mut q = crate::profile::Profile::default();
+        migrate_removed_decor(&mut q);
+        assert!(q.is_empty());
     }
 }

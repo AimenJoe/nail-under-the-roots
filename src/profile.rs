@@ -421,6 +421,7 @@ pub fn load_slot(i: usize) -> Profile {
             // 옛 기록을 지금 꼴로(빈 슬롯은 건드리지 않는다 — 빈 칸으로 보여야 한다).
             crate::talents::migrate(&mut p);
             migrate_endings(&mut p);
+            crate::village::migrate_removed_decor(&mut p);
             p
         })
         .unwrap_or_default()
@@ -601,8 +602,9 @@ mod tests {
         let mut p = Profile::default();
         p.set(key::BORI_BACK);
         p.add(key::RUNS, 4);
-        // 읽을 때 옛 기록을 지금 꼴로 옮긴다(0263 — 한 번 했다는 깃발이 붙는다).
+        // 읽을 때 옛 기록을 지금 꼴로 옮긴다(0263·0269 — 한 번 했다는 깃발이 붙는다).
         crate::talents::migrate(&mut p);
+        crate::village::migrate_removed_decor(&mut p);
         assert!(save(&p));
         assert_eq!(load(), p);
         // 같은 글은 다시 쓰지 않는다(0264): 파일을 지운 뒤 같은 기록을 저장해도 저장소를 건드리지 않는다(주기 저장의 바탕).

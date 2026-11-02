@@ -1524,8 +1524,8 @@ pub(super) fn draw_decor_sunny(sunny: &art::Sunny, i: usize, at: Vec2, time: f32
     }
 }
 
-/// 마을 꾸미기 `i`. `glow`: 맡긴 반딧불의 단계(0..4, `village::glow_level`) — 반딧불 등이 그만큼 밝다(0269, 요구 2.9 A).
-pub(super) fn draw_decor(i: usize, at: Vec2, time: f32, glow: u8) {
+/// 마을 꾸미기 `i`(지운 1·6은 아무것도 그리지 않는다, 0269).
+pub(super) fn draw_decor(i: usize, at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round() + 4.0);
     let wood = Color::new(0.45, 0.31, 0.22, 1.0);
     match i {
@@ -1543,22 +1543,8 @@ pub(super) fn draw_decor(i: usize, at: Vec2, time: f32, glow: u8) {
                 draw_rectangle(fx - 1.0, y - 6.0, 3.0, 2.0, cols[k % 3]);
             }
         }
-        1 => {
-            // 반딧불 등: 맡긴 빛이 많을수록 조금 더 밝다(0269). 그림자 패스에는 빛을 넣지 않는다.
-            let pulse = (0.55 + 0.25 * (time * 2.5).sin()) * (0.8 + 0.1 * glow as f32);
-            if !shadow_pass() {
-                draw_circle(x, y - 12.0, 9.0, Color::new(0.85, 1.0, 0.55, 0.15 * pulse));
-            }
-            draw_rectangle(x - 1.0, y - 10.0, 2.0, 12.0, wood);
-            draw_rectangle(x - 3.0, y - 15.0, 6.0, 6.0, OUTLINE);
-            draw_rectangle(
-                x - 2.0,
-                y - 14.0,
-                4.0,
-                4.0,
-                Color::new(0.85, 1.0, 0.55, pulse + 0.2),
-            );
-        }
+        // 1: 옛 반딧불 등 — 지웠다(0269, 큰 나무에 가려 보이지 않았다). 기록 키 자리만.
+        1 => {}
         2 => {
             for (k, (dx, h)) in [(-5.0f32, 5.0f32), (0.0, 8.0), (5.0, 4.0)]
                 .into_iter()
