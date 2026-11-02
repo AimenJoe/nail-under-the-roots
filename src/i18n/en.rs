@@ -32,6 +32,8 @@ pub static EN: Strings = Strings {
     set_shake: "Screen shake",
     set_flash: "Screen flashes",
     set_rumble: "Gamepad rumble",
+    set_home: "Add to Home Screen",
+    set_home_d: "Share → Add to Home Screen to play like an app, without the address bar. The Home Screen app keeps its own saves; your saves here in Safari do not carry over.",
     set_effects: "Particles",
     set_tells: "Enemy tells",
     set_debug: "Debug info",

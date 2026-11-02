@@ -20,7 +20,7 @@ cargo run
 
 # 웹
 cargo build --release --target wasm32-unknown-unknown
-mkdir -p dist && cp web/index.html web/*.js dist/ && cp target/wasm32-unknown-unknown/release/nail.wasm dist/ && cp -r assets dist/assets
+python3 tools/web/assemble.py dist local dev
 python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 ```
 

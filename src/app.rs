@@ -764,6 +764,11 @@ impl App {
         if self.input.fullscreen_pressed() {
             self.toggle_fullscreen();
         }
+        // 웹(0269): 전체 화면 표시는 브라우저를 따라가고, 세로로 든 터치 기기라 회전 안내가 떠 있으면 싸움을 멈춘다.
+        self.sync_web_fullscreen();
+        if self.scene == Scene::Game && crate::web::portrait_blocked() {
+            self.open_pause();
+        }
         let dt = get_frame_time().min(t::MAX_FRAME_DT);
         let target = if self.scene == Scene::Cutscene {
             1.0
@@ -1483,7 +1488,7 @@ impl App {
                 }
             }
             Scene::Settings { back } => {
-                let n = ROWS.len();
+                let n = rows().len();
                 if a.up {
                     self.settings_cursor = (self.settings_cursor + n - 1) % n;
                     self.erase_armed = false;

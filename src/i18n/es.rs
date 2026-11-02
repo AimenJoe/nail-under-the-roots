@@ -32,6 +32,8 @@ pub static ES: Strings = Strings {
     set_shake: "Sacudir pantalla",
     set_flash: "Destellos",
     set_rumble: "Vibración del mando",
+    set_home: "Añadir a inicio",
+    set_home_d: "Compartir → Añadir a pantalla de inicio para jugar como una app, sin barra de direcciones. La app de inicio guarda su propio progreso; el de aquí en Safari no pasa.",
     set_effects: "Partículas",
     set_tells: "Avisos enemigos",
     set_debug: "Depuración",

@@ -10,3 +10,13 @@
 
 ## 확인
 배포 후 브라우저 콘솔에 `Version mismatch`·`version mismatch`가 없어야 한다. 헤드리스 확인 방법: KB `reference/macroquad/wasm-build.md`.
+
+## PWA·화면(0269)
+- `nail-host.js`: 게임 쪽 플러그인(언어·설정·기록·로딩·장치·`nail_web`) + 서비스 워커 등록 + 끝에서 `load("nail.wasm")`. 전엔 `index.html` 안에 있었다(R37).
+- `manifest.webmanifest`: 설치(이름·아이콘·`display: fullscreen`·`orientation: landscape`·바탕색 `#1f1724`). 개발판은 조립 때 이름에 "(dev)".
+- `sw.js`: 캐시 이름 = 빌드 SHA(`__BUILD__`), 미리 받기 목록(`__PRECACHE__`, 음악·팩 원본 빼고)은 `tools/web/assemble.py`가 넣는다. `skipWaiting` 없음 — 새 판은 다음 실행부터. `index.html`·`build.txt`·매니페스트는 네트워크 먼저.
+- `_headers`: `sw.js`·페이지·매니페스트는 `no-cache`(Netlify).
+- `icons/`: `tools/icons/make_icons.py web`이 만든다(192·512·maskable 512·apple-touch-icon 180).
+- 세로로 든 터치 기기: `#rotate`(글 없는 회전 그림) + 게임 자동 일시정지(`nail_portrait`), 누르면 이번 창에서는 세로로 계속.
+- 전체 화면: 게임 설정 "전체 화면"(쓸 수 있는 브라우저만 — iPhone Safari는 줄이 없고 대신 "홈 화면에 추가" 안내). 문서 전체를 올리고 가로 잠금을 시도한다.
+- 조립: `python3 tools/web/assemble.py dist <빌드> <release|dev>`(deploy-web·smoke-web·README 같은 스크립트).

@@ -32,6 +32,8 @@ pub static DE: Strings = Strings {
     set_shake: "Bildwackeln",
     set_flash: "Bildblitze",
     set_rumble: "Controller-Vibration",
+    set_home: "Zum Home-Bildschirm",
+    set_home_d: "Teilen → Zum Home-Bildschirm, um wie eine App ohne Adressleiste zu spielen. Die App dort hat eigene Spielstände – deine Spielstände hier in Safari kommen nicht mit.",
     set_effects: "Partikel",
     set_tells: "Ankündigungen",
     set_debug: "Debug-Infos",

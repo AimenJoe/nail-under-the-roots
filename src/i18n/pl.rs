@@ -32,6 +32,8 @@ pub static PL: Strings = Strings {
     set_shake: "Wstrząsy ekranu",
     set_flash: "Błyski ekranu",
     set_rumble: "Wibracje pada",
+    set_home: "Do ekranu początkowego",
+    set_home_d: "Udostępnij → Do ekranu początkowego, by grać jak w aplikacji, bez paska adresu. Aplikacja z ekranu ma własne zapisy — te tutaj, w Safari, nie przejdą.",
     set_effects: "Cząsteczki",
     set_tells: "Zamach wroga",
     set_debug: "Debugowanie",

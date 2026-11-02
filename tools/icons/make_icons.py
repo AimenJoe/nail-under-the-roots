@@ -16,6 +16,7 @@
 """
 import math
 import os
+import sys
 import random
 
 from PIL import Image, ImageDraw
@@ -163,11 +164,30 @@ def pc(src):
     print('pc nail.ico nail.icns')
 
 
+def web(src):
+    """웹 PWA(0269): 매니페스트 아이콘 192·512, 둥근 모양으로 깎이는 maskable 512(바탕색을 꽉 채우고 그림은
+    안드로이드 적응형과 같은 가운데 72/108 — 지름 80% 안전 원 안), iOS 홈 화면 apple-touch-icon 180. 산출물은 `web/icons/`."""
+    out = os.path.join(ROOT, 'web', 'icons')
+    os.makedirs(out, exist_ok=True)
+    for size in (192, 512):
+        render(src, size).save(os.path.join(out, f'icon-{size}.png'), optimize=True)
+    m = 512
+    mask = Image.new('RGBA', (m, m), BASE + (255,))
+    n = round(m * ADAPTIVE_ART_DP / 108)
+    art_n = render(src, n).convert('RGBA')
+    mask.alpha_composite(art_n, ((m - n) // 2, (m - n) // 2))
+    mask.save(os.path.join(out, 'maskable-512.png'), optimize=True)
+    render(src, 180).save(os.path.join(out, 'apple-touch-icon.png'), optimize=True)
+    print('web icons 192 512 maskable-512 apple-touch-icon')
+
+
 def main():
     src = art()
-    ios(src)
-    android(src)
-    pc(src)
+    # 인자로 고를 수 있다(`make_icons.py web`): 다른 플랫폼 산출물을 다시 쓰지 않게.
+    only = set(sys.argv[1:]) or {'ios', 'android', 'pc', 'web'}
+    for name, f in (('ios', ios), ('android', android), ('pc', pc), ('web', web)):
+        if name in only:
+            f(src)
 
 
 if __name__ == '__main__':

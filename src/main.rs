@@ -62,6 +62,7 @@ mod tuning;
 mod tutorial;
 mod ui;
 mod village;
+mod web;
 mod world;
 
 use macroquad::prelude::*;

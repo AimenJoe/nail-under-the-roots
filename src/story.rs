@@ -46,10 +46,10 @@ impl Cond {
     #[cfg_attr(not(feature = "dev"), allow(dead_code))]
     pub fn describe(self) -> String {
         match self {
-            Cond::DeathsAtLeast(n) => format!("쓰러짐 ≥ {n}"),
-            Cond::CountAtLeast(k, n) => format!("{k} ≥ {n}"),
+            Cond::DeathsAtLeast(n) => format!("쓰러짐 >= {n}"),
+            Cond::CountAtLeast(k, n) => format!("{k} >= {n}"),
             Cond::As(c) => format!("캐릭터 = {c:?}"),
-            Cond::NotAs(c) => format!("캐릭터 ≠ {c:?}"),
+            Cond::NotAs(c) => format!("캐릭터 != {c:?}"),
             Cond::Flag(k) => k.to_string(),
             Cond::NotFlag(k) => format!("!{k}"),
             Cond::Seen(id) => format!("봄 {id}"),

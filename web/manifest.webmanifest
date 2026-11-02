@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "Naïl: Under the Roots",
+  "short_name": "Naïl",
+  "description": "땅속 이웃을 실에서 풀어 주는 귀여운 탑다운 액션 로그라이트",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#1f1724",
+  "theme_color": "#1f1724",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

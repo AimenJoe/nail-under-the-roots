@@ -12,10 +12,11 @@ const path = require('path');
 const DIST = path.resolve(process.argv[2] || 'dist');
 const OUT = path.resolve(process.argv[3] || 'smoke-out');
 // 기본: 튜토리얼 보스·쉼터·필드·던전·적 다섯 종·마지막 쉼터·가장 깊은 곳·마을·토끼풀.
-const SCENARIOS = (process.argv[4] || '0,1,3,4,13,25,26,27,36').split(',').map(Number);
+const SCENARIOS = (process.argv[4] || '1,2,4,5,15,27,28,29,38').split(',').map(Number);
 const PORT = 8129;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.wasm': 'application/wasm', '.png': 'image/png',
-  '.ttf': 'font/ttf', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown' };
+  '.ttf': 'font/ttf', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown',
+  '.webmanifest': 'application/manifest+json' };
 // 한 색으로 멈춘 화면은 PNG가 아주 작다(검정 320×180×3 ≈ 1KB). 게임 화면은 수십 KB.
 const MIN_SHOT_BYTES = 6000;
 // 알려진 잡음(실패 아님). mq_js_bundle.js(macroquad 0.4.16, 상류와 바이트 같음)의 quad_net 플러그인이 "use strict" 아래에서
@@ -78,6 +79,52 @@ async function run() {
     return s;
   }
 
+  // PWA(0269): 매니페스트·아이콘, 서비스 워커 등록 → 오프라인으로 다시 열기, 모바일 가로 화면, 세로면 회전 안내.
+  {
+    const s = await open('pwa');
+    const man = await s.page.evaluate(async () => {
+      const r = await fetch('manifest.webmanifest'); const m = await r.json();
+      const icons = await Promise.all(m.icons.map((i) => fetch(i.src).then((x) => x.status)));
+      return { ok: r.ok, m, icons };
+    });
+    check(man.ok && man.m.name && man.m.start_url && ['fullscreen', 'standalone'].includes(man.m.display), 'pwa: 매니페스트 필드');
+    check(man.m.icons.some((i) => i.sizes === '192x192') && man.m.icons.some((i) => i.sizes === '512x512') && man.icons.every((c) => c === 200), `pwa: 아이콘 192·512 ${JSON.stringify(man.icons)}`);
+    const sw = await s.page.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return 'none';
+      const reg = await navigator.serviceWorker.ready; return reg.active ? reg.active.state : 'no-active';
+    });
+    check(sw === 'activated' || sw === 'activating', `pwa: 서비스 워커 ${sw}`);
+    await s.page.waitForTimeout(2500); // 미리 받기가 끝날 틈
+    await s.ctx.setOffline(true);
+    await s.page.reload({ waitUntil: 'load' });
+    await s.page.waitForFunction(() => document.getElementById('loading').classList.contains('done'), null, { timeout: 60000 });
+    const size = await s.shot('offline');
+    check(size > MIN_SHOT_BYTES, `pwa: 오프라인으로 다시 열어도 뜬다 (${size}B)`);
+    await s.ctx.close();
+  }
+  for (const [tag, w, h, portrait] of [['landscape', 844, 390, false], ['portrait', 390, 844, true]]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'ko-KR', hasTouch: true, isMobile: true });
+    await ctx.addInitScript((p) => { try { localStorage.setItem('nail.profile', p); } catch (e) {} }, PROFILE);
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => { if (!KNOWN_NOISE.some((re) => re.test(String(e)))) errors.push(String(e)); });
+    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'load' });
+    await page.waitForFunction(() => document.getElementById('loading').classList.contains('done'), null, { timeout: 60000 });
+    await page.waitForTimeout(800);
+    const on = await page.evaluate(() => document.getElementById('rotate').classList.contains('on'));
+    check(on === portrait, `mobile ${tag}: 회전 안내 ${portrait ? '뜬다' : '없다'}`);
+    const f = path.join(OUT, `mobile_${tag}.png`); await page.screenshot({ path: f });
+    check(fs.statSync(f).size > MIN_SHOT_BYTES, `mobile ${tag}: 화면이 그려진다`);
+    if (portrait) {
+      // 한 번 누르면 이번 창에서는 세로로 계속한다.
+      await page.click('#rotate');
+      await page.waitForTimeout(300);
+      const off = await page.evaluate(() => !document.getElementById('rotate').classList.contains('on'));
+      check(off, 'mobile portrait: 누르면 안내가 닫힌다');
+    }
+    check(errors.length === 0, `mobile ${tag}: 에러 없음 ${JSON.stringify(errors)}`);
+    await ctx.close();
+  }
   {
     const s = await open('title');
     const size = await s.shot('intro');

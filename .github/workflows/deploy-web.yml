@@ -56,23 +56,12 @@ jobs:
       - run: cargo test
       - run: cargo build --release --target wasm32-unknown-unknown $FEATURES
 
+      # 조립은 한 곳(0269): 페이지·JS·매니페스트·아이콘·_headers·wasm·에셋(mp3만), sw.js에 빌드 SHA와 미리 받을 목록,
+      # build.txt(어느 커밋이 올라갔는지), 개발판은 "(dev)"·noindex.
       - name: Assemble publish dir
         run: |
-          mkdir -p dist
-          cp web/index.html web/*.js dist/
-          cp assets/THIRD_PARTY_LICENSES.txt dist/
-          cp target/wasm32-unknown-unknown/release/nail.wasm dist/
-          [ -d assets ] && cp -r assets dist/assets || true
-          # 네이티브 전용 ogg는 올리지 않는다(웹은 mp3만 읽는다, 0235 R20).
-          rm -f dist/assets/music/*.ogg
-          # 어느 커밋이 올라갔는지(배포 확인용).
-          echo "$GITHUB_SHA $FLAVOR" > dist/build.txt
-          # 개발판: 탭 이름에 표시, 검색에 안 잡히게.
-          if [ "$FLAVOR" = "dev" ]; then
-            sed -i -e 's|<title>\(.*\)</title>|<title>\1 (dev)</title>|' \
-                   -e 's|<meta charset="utf-8">|<meta charset="utf-8">\n  <meta name="robots" content="noindex, nofollow">|' dist/index.html
-            grep -n "<title>\|robots" dist/index.html
-          fi
+          python3 tools/web/assemble.py dist "$GITHUB_SHA" "$FLAVOR"
+          grep -n "<title>\|robots" dist/index.html
           ls -la dist
 
       - uses: actions/upload-artifact@v4

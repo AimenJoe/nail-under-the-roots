@@ -32,6 +32,8 @@ pub static FR: Strings = Strings {
     set_shake: "Secousse écran",
     set_flash: "Flashs écran",
     set_rumble: "Vibration manette",
+    set_home: "Sur l'écran d'accueil",
+    set_home_d: "Partager → Sur l'écran d'accueil pour jouer comme une appli, sans barre d'adresse. L'appli garde ses propres sauvegardes : celles d'ici, dans Safari, ne suivent pas.",
     set_effects: "Particules",
     set_tells: "Signes ennemis",
     set_debug: "Infos debug",

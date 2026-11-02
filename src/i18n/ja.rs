@@ -32,6 +32,8 @@ pub static JA: Strings = Strings {
     set_shake: "画面のゆれ",
     set_flash: "画面のフラッシュ",
     set_rumble: "パッドの振動",
+    set_home: "ホーム画面に追加",
+    set_home_d: "共有 → ホーム画面に追加で、アプリのようにアドレスバーなしで遊べる。ホーム画面のアプリは記録を別に持つ — このSafariの記録は引きつがれない。",
     set_effects: "パーティクル",
     set_tells: "敵の予告",
     set_debug: "デバッグ表示",

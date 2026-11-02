@@ -345,7 +345,7 @@ strings! {
     // 저장 슬롯(docs/decisions/0078)
     title_continue, title_new, slot_overwrite, slot_name, slot_empty, slot_summary, slot_summary_start, slot_resting, slot_erase, slot_erase_again, slots_hint,
     // 설정
-    settings, set_sound, set_music, set_shake, set_flash, set_rumble, set_effects, set_debug, set_language, set_back, on, off, settings_hint,
+    settings, set_sound, set_music, set_shake, set_flash, set_rumble, set_home, set_home_d, set_effects, set_debug, set_language, set_back, on, off, settings_hint,
     // 일시정지
     tab_menu, tab_status, tab_talents, tab_bag, tab_journal, tab_map, tab_hint,
     pm_resume, pm_restart, pm_settings, pm_title,

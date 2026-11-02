@@ -12,6 +12,7 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'tools/test/**'
+      - 'tools/web/**'
       - '.github/workflows/smoke-web.yml'
   workflow_dispatch:
 
@@ -42,14 +43,9 @@ jobs:
       # deploy-web이 만들고 clippy(--no-default-features)로 본다(0193).
       - run: cargo build --release --target wasm32-unknown-unknown
 
-      # deploy-web.yml의 "Assemble publish dir"과 같게(유료 팩 없이 직접 그린 대체 타일).
+      # deploy-web.yml과 같은 조립 스크립트(0269, 유료 팩 없이 직접 그린 대체 타일).
       - name: Assemble dist
-        run: |
-          mkdir -p dist
-          cp web/index.html web/*.js dist/
-          cp assets/THIRD_PARTY_LICENSES.txt dist/
-          cp target/wasm32-unknown-unknown/release/nail.wasm dist/
-          cp -r assets dist/assets
+        run: python3 tools/web/assemble.py dist "$GITHUB_SHA" dev
 
       - uses: actions/setup-node@v4
         with:

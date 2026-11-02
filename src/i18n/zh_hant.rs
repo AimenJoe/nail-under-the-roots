@@ -32,6 +32,8 @@ pub static ZH_HANT: Strings = Strings {
     set_shake: "畫面震動",
     set_flash: "畫面閃光",
     set_rumble: "手把震動",
+    set_home: "加入主畫面",
+    set_home_d: "分享 → 加入主畫面，就能像應用程式一樣沒有網址列地玩。主畫面應用程式的紀錄是分開的——這裡Safari的紀錄不會帶過去。",
     set_effects: "粒子效果",
     set_tells: "敵人的預告",
     set_debug: "除錯資訊",

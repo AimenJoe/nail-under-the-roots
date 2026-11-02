@@ -1,0 +1,11 @@
+# Netlify 헤더(0269 PWA). 서비스 워커·페이지·매니페스트는 늘 새로 확인한다 — 오래 두면 새 판이 안 깔린다.
+# 다른 파일은 Netlify 기본값(다시 확인)을 둔다: 파일 이름에 해시가 없어 immutable 캐시는 금지(KB reference/netlify/deploy-from-ci.md).
+/sw.js
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+  Content-Type: application/manifest+json

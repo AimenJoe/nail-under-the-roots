@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
+  <!-- PWA(0269): 설치·홈 화면. iOS는 매니페스트 대신 apple-* 메타를 읽는다. -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#1f1724">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Naïl">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <meta name="author" content="Beardworks">
   <meta name="copyright" content="© 2026 Beardworks">
   <title>Naïl: Under the Roots</title>
@@ -22,10 +30,22 @@
     #loading .bar { width: 160px; height: 8px; border: 2px solid #5c4a3c; padding: 2px; background: #140e18; }
     #loading .fill { height: 100%; width: 0%; background: #e6b578; transition: width .15s; }
     @media (prefers-reduced-motion: reduce) { #loading .mole { animation: none; background-position: -192px 0; } }
+    /* 세로로 든 터치 기기(0269): 글 없는 회전 그림 — 폰이 세로에서 가로로 돈다. 누르면 이번 창에서는 세로로 계속. */
+    #rotate { position: absolute; inset: 0; z-index: 3; background: rgba(20,14,24,.92); display: none;
+      align-items: center; justify-content: center; cursor: pointer; }
+    #rotate.on { display: flex; }
+    #rotate .phone { width: 44px; height: 76px; border: 4px solid #e6b578; border-radius: 8px; position: relative;
+      animation: turn 2.2s ease-in-out infinite; }
+    #rotate .phone::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 8px; height: 4px; margin-left: -4px; background: #e6b578; }
+    #rotate .arrow { position: absolute; width: 112px; height: 112px; border: 3px dashed #5c4a3c; border-radius: 50%;
+      border-left-color: transparent; border-bottom-color: transparent; }
+    @keyframes turn { 0%, 25% { transform: rotate(0); } 55%, 100% { transform: rotate(-90deg); } }
+    @media (prefers-reduced-motion: reduce) { #rotate .phone { animation: none; transform: rotate(-90deg); } }
   </style>
 </head>
 <body>
   <canvas id="glcanvas" tabindex="1"></canvas>
+  <div id="rotate" aria-hidden="true"><div class="arrow"></div><div class="phone"></div></div>
   <div id="loading" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
     <div class="mole"></div>
     <div class="bar"><div class="fill"></div></div>
@@ -88,76 +108,7 @@
   <script src="mq_js_bundle.js"></script>
   <!-- gamepads 크레이트의 macroquad 플러그인. 레포 복사본(web/README.md). 핫링크 금지. -->
   <script src="macroquad-gamepads-0.1.js"></script>
-  <!-- 브라우저 선호 언어 → 게임 언어(src/i18n.rs가 고른다: 가진 첫 언어, 없으면 영어).
-       nail_locale(i, k): i번째 선호 언어 태그(예 "zh-Hant-TW")의 k번째 네 글자를 u32 하나로(빅엔디언). 끝이면 0. ASCII만. -->
-  <script>
-    miniquad_add_plugin({
-      name: "nail_locale",
-      version: 2,
-      register_plugin: function (importObject) {
-        importObject.env.nail_locale = function (i, k) {
-          var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
-          var tag = String(langs[i] || "").replace(/[^A-Za-z0-9_.@-]/g, "").slice(k * 4, k * 4 + 4);
-          var w = 0;
-          for (var j = 0; j < 4; j++) w = (w * 256) + (j < tag.length ? tag.charCodeAt(j) : 0);
-          return w >>> 0;
-        };
-      }
-    });
-    // 설정 저장(src/prefs.rs): 정수 칸 i ↔ localStorage "nail.pref.i". 없으면 0. 사생활 보호 모드 등에서 막히면 저장하지 않는다.
-    miniquad_add_plugin({
-      name: "nail_prefs",
-      version: 1,
-      register_plugin: function (importObject) {
-        importObject.env.nail_pref_get = function (i) {
-          try { var v = parseInt(window.localStorage.getItem("nail.pref." + i), 10); return isNaN(v) ? 0 : (v >>> 0); } catch (e) { return 0; }
-        };
-        importObject.env.nail_pref_set = function (i, v) {
-          try { window.localStorage.setItem("nail.pref." + i, String(v >>> 0)); } catch (e) {}
-        };
-      }
-    });
-    // 기록(프로필) 저장(src/profile.rs): 저장 슬롯 셋 + 마지막 슬롯 번호(0078). wasm 메모리에서 UTF-8 바이트를 직접 읽고 쓴다(wasm-bindgen 없이).
-    miniquad_add_plugin({
-      name: "nail_save",
-      version: 2,
-      register_plugin: function (importObject) {
-        // 칸 0 = 마지막으로 쓴 슬롯 번호, 1~3 = 저장 슬롯(src/profile.rs, 0078). 슬롯 1은 예전 한 칸 저장 열쇠 그대로.
-        // 칸 4~6 = 슬롯마다 진행 중인 런(쉼터부터 이어하기, 0080).
-        // 칸 7~9 = Lab 프리셋(개발판만, 0269) — 진행 기록과 따로.
-        var key = function (cell) { return cell === 0 ? "nail.slot" : cell === 1 ? "nail.profile" : cell <= 3 ? "nail.profile." + cell : cell <= 6 ? "nail.run." + (cell - 3) : "nail.lab." + (cell - 6); };
-        var get = function (cell) { try { return window.localStorage.getItem(key(cell)) || ""; } catch (e) { return ""; } };
-        importObject.env.nail_save_len = function (cell) { return new TextEncoder().encode(get(cell)).length; };
-        importObject.env.nail_save_read = function (cell, ptr, len) {
-          var bytes = new TextEncoder().encode(get(cell));
-          new Uint8Array(wasm_memory.buffer, ptr, len).set(bytes.subarray(0, len));
-        };
-        importObject.env.nail_save_write = function (cell, ptr, len) {
-          var text = new TextDecoder().decode(new Uint8Array(wasm_memory.buffer, ptr, len));
-          try { window.localStorage.setItem(key(cell), text); } catch (e) {}
-        };
-      }
-    });
-    // 로딩 화면 갱신(src/loading.rs): 준비 단계, 첫 프레임을 그림.
-    miniquad_add_plugin({
-      name: "nail_loading",
-      version: 1,
-      register_plugin: function (importObject) {
-        importObject.env.nail_load_step = function (done, all) { window.__nailLoading.step(done, all); };
-        importObject.env.nail_load_ready = function () { window.__nailLoading.ready(); };
-      }
-    });
-    // 처음 안내 글의 장치(src/input.rs): 주 포인터가 굵으면(손가락) 터치로 시작. 키·패드를 누르면 그쪽으로 바뀐다.
-    miniquad_add_plugin({
-      name: "nail_device",
-      version: 1,
-      register_plugin: function (importObject) {
-        importObject.env.nail_coarse_pointer = function () {
-          try { return window.matchMedia("(pointer: coarse)").matches ? 1 : 0; } catch (e) { return 0; }
-        };
-      }
-    });
-    load("nail.wasm");
-  </script>
+  <!-- 게임 쪽 다리(플러그인·PWA·화면, 0269 R37). 끝에서 nail.wasm을 띄운다. -->
+  <script src="nail-host.js"></script>
 </body>
 </html>

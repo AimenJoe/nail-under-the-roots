@@ -32,6 +32,8 @@ pub static ZH_HANS: Strings = Strings {
     set_shake: "画面震动",
     set_flash: "画面闪光",
     set_rumble: "手柄震动",
+    set_home: "添加到主屏幕",
+    set_home_d: "分享 → 添加到主屏幕，就能像应用一样没有地址栏地玩。主屏幕应用的记录是分开的——这里Safari的记录不会带过去。",
     set_effects: "粒子效果",
     set_tells: "敌人的预告",
     set_debug: "调试信息",

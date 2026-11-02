@@ -3,7 +3,7 @@
 use super::*;
 
 /// 설정 줄(0269: 번호 대신 이름 — 줄이 플랫폼마다 달라 번호를 상수로 맞추던 것이 줄을 더할 때마다 밀렸다).
-// 빌드마다 없는 줄이 있다(진동은 Android·iOS에 없고, 전체 화면은 데스크톱만) — 그 빌드에선 만들지 않는 갈래.
+// 빌드마다 없는 줄이 있다(진동은 Android·iOS 앱에 없고, 전체 화면은 데스크톱·웹만) — 그 빌드에선 만들지 않는 갈래.
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Row {
@@ -20,15 +20,17 @@ pub(super) enum Row {
     Language,
     /// 포포의 응원 창(0256).
     Assist,
-    /// 전체 화면(데스크톱 0240).
+    /// 전체 화면(데스크톱 0240, 웹은 쓸 수 있는 브라우저만 0269).
     Fullscreen,
+    /// 홈 화면에 추가 안내(0269, 웹 — iPhone·iPad의 브라우저 탭에서만): 누르는 줄, 고르면 아래 설명.
+    HomeScreen,
     Controls,
     Licenses,
     Erase,
 }
 
-/// 이 빌드의 설정 줄, 보이는 순서대로. 값 줄 | 다른 화면으로 가는 줄 | 기록 지우기.
-pub(super) const ROWS: &[Row] = &[
+/// 이 빌드의 설정 줄 후보, 보이는 순서대로. 값 줄 | 다른 화면으로 가는 줄 | 기록 지우기. 실제로 보이는 줄은 `rows()`.
+const ROWS: &[Row] = &[
     Row::Sound,
     Row::Music,
     Row::Shake,
@@ -40,12 +42,30 @@ pub(super) const ROWS: &[Row] = &[
     Row::Debug,
     Row::Language,
     Row::Assist,
-    #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     Row::Fullscreen,
+    #[cfg(target_arch = "wasm32")]
+    Row::HomeScreen,
     Row::Controls,
     Row::Licenses,
     Row::Erase,
 ];
+
+/// 지금 보이는 설정 줄(0269): 웹의 전체 화면은 쓸 수 있는 브라우저만, 홈 화면 안내는 iPhone·iPad 브라우저 탭만.
+/// 브라우저 성질은 켜는 동안 바뀌지 않아 처음 한 번 정한다.
+pub(super) fn rows() -> &'static [Row] {
+    static R: std::sync::OnceLock<Vec<Row>> = std::sync::OnceLock::new();
+    R.get_or_init(|| {
+        ROWS.iter()
+            .copied()
+            .filter(|r| match r {
+                Row::Fullscreen => crate::web::fullscreen_supported(),
+                Row::HomeScreen => crate::web::suggest_home_screen(),
+                _ => true,
+            })
+            .collect()
+    })
+}
 
 impl Row {
     pub(super) fn label(self) -> Tr {
@@ -61,6 +81,7 @@ impl Row {
             Row::Language => |s| s.set_language,
             Row::Assist => |s| s.set_assist,
             Row::Fullscreen => |s| s.set_fullscreen,
+            Row::HomeScreen => |s| s.set_home,
             Row::Controls => |s| s.set_controls,
             Row::Licenses => |s| s.set_licenses,
             Row::Erase => |s| s.set_erase,
@@ -71,7 +92,7 @@ impl Row {
     pub(super) fn is_button(self) -> bool {
         matches!(
             self,
-            Row::Assist | Row::Controls | Row::Licenses | Row::Erase
+            Row::Assist | Row::HomeScreen | Row::Controls | Row::Licenses | Row::Erase
         )
     }
 
@@ -87,12 +108,13 @@ impl Row {
 
 /// 설정 줄 `i`(없으면 마지막 줄).
 pub(super) fn row_at(i: usize) -> Row {
-    ROWS[i.min(ROWS.len() - 1)]
+    let r = rows();
+    r[i.min(r.len() - 1)]
 }
 
 /// 줄 `r`의 번호(이 빌드에 없으면 0).
 pub(super) fn row_index(r: Row) -> usize {
-    ROWS.iter().position(|x| *x == r).unwrap_or(0)
+    rows().iter().position(|x| *x == r).unwrap_or(0)
 }
 
 /// 설정 창에 한 번에 보이는 줄. 줄이 더 많으면 고른 줄이 보이게 굴린다(입자 줄을 더해 열 줄이 됐다, 0141).
@@ -199,15 +221,28 @@ impl App {
                 self.settings.lang = Some(l);
             }
             Row::Fullscreen => self.toggle_fullscreen(),
-            Row::Assist | Row::Controls | Row::Licenses | Row::Erase => {}
+            Row::Assist | Row::HomeScreen | Row::Controls | Row::Licenses | Row::Erase => {}
         }
     }
 
-    /// 전체 화면 ↔ 창(데스크톱, 0240): 설정 줄과 F11이 같이 쓴다. 바로 저장한다.
+    /// 전체 화면 ↔ 창(데스크톱 0240): 설정 줄과 F11이 같이 쓴다. 바로 저장한다.
+    /// 웹(0269)은 브라우저에 맡긴다(누른 입력에서만, 문서 전체를 올리고 가로 잠금을 시도) — 저장하지 않는다(다음에 켤 때
+    /// 브라우저가 스스로 전체 화면을 열어 주지 않는다). 켜졌는지는 `sync_web_fullscreen`이 브라우저를 따라간다.
     pub(super) fn toggle_fullscreen(&mut self) {
+        if cfg!(target_arch = "wasm32") {
+            crate::web::toggle_fullscreen();
+            return;
+        }
         self.settings.fullscreen = !self.settings.fullscreen;
         macroquad::window::set_fullscreen(self.settings.fullscreen);
         self.save_prefs();
+    }
+
+    /// 웹: 설정의 전체 화면 표시를 브라우저 상태에 맞춘다(Esc·뒤로로 나가면 브라우저가 끈다).
+    pub(super) fn sync_web_fullscreen(&mut self) {
+        if cfg!(target_arch = "wasm32") {
+            self.settings.fullscreen = crate::web::fullscreen_active();
+        }
     }
 
     pub(super) fn save_prefs(&self) {
@@ -299,7 +334,7 @@ impl App {
         self.close_button(ui, panel);
         let pct = |v: u8| format!("{}%", v * 10);
         let on_off = |b: bool| if b { s.on } else { s.off }.to_string();
-        let values: Vec<String> = ROWS
+        let values: Vec<String> = rows()
             .iter()
             .map(|r| match r {
                 Row::Sound => pct(self.settings.volume),
@@ -312,13 +347,15 @@ impl App {
                 Row::Debug => on_off(self.settings.debug_overlay),
                 Row::Language => s.lang_name.to_string(),
                 Row::Fullscreen => on_off(self.settings.fullscreen),
-                // 다른 창으로 가는 줄은 값이 없다.
-                Row::Assist | Row::Controls | Row::Licenses | Row::Erase => String::new(),
+                // 다른 창으로 가는 줄·누르는 줄은 값이 없다.
+                Row::Assist | Row::HomeScreen | Row::Controls | Row::Licenses | Row::Erase => {
+                    String::new()
+                }
             })
             .collect();
         let row_h = SETTING_ROW_H;
         // 줄이 창보다 많다: 고른 줄이 보이게 SETTING_VISIBLE줄씩 굴린다(개발 목록과 같은 방식).
-        let n = ROWS.len();
+        let n = rows().len();
         let first = self
             .settings_view
             .window(self.settings_cursor, n, SETTING_VISIBLE, row_h);
@@ -326,9 +363,9 @@ impl App {
         let x = panel.x + 6.0;
         let w = panel.w - 12.0;
         let mut y = panel.y + 18.0;
-        for (i, row) in ROWS.iter().enumerate().skip(first).take(SETTING_VISIBLE) {
+        for (i, row) in rows().iter().enumerate().skip(first).take(SETTING_VISIBLE) {
             let label = tr(row.label());
-            if i > first && row.group() != ROWS[i - 1].group() {
+            if i > first && row.group() != rows()[i - 1].group() {
                 let ly = (y + SETTING_GAP * 0.5).round();
                 ui.line(vec2(x + 4.0, ly), vec2(x + w - 4.0, ly), GROUP_LINE);
                 y += SETTING_GAP;
@@ -386,7 +423,12 @@ impl App {
                 }
             }
         }
-        let settings_hint = vfill(s.settings_hint, &[Verb::Change, Verb::Back]);
+        // 홈 화면 줄을 고르면 아래 안내 자리에 그 설명(0269 D4: 홈 화면 앱은 Safari 기록이 따라오지 않는다).
+        let settings_hint = if row_at(self.settings_cursor) == Row::HomeScreen {
+            s.set_home_d.to_string()
+        } else {
+            vfill(s.settings_hint, &[Verb::Change, Verb::Back])
+        };
         for (i, l) in ui::wrap(ui, &settings_hint, 300.0, FONT_PX)
             .iter()
             .take(2)

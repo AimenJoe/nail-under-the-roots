@@ -32,6 +32,8 @@ pub static PT_BR: Strings = Strings {
     set_shake: "Tremor da tela",
     set_flash: "Clarões na tela",
     set_rumble: "Vibração do controle",
+    set_home: "Adicionar à Tela de Início",
+    set_home_d: "Compartilhar → Adicionar à Tela de Início para jogar como app, sem a barra de endereço. O app da tela de início guarda o próprio progresso; o progresso daqui do Safari não vai junto.",
     set_effects: "Partículas",
     set_tells: "Aviso do inimigo",
     set_debug: "Info de depuração",
