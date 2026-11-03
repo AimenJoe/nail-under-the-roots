@@ -194,6 +194,7 @@ Scene: Deep inside the rabbits' old warren, a round earthen chamber whose walls 
 - 받은 기록: `mem_forest` 2026-11-03 첫 판 채택(숲이 크게 나왔지만 첫 조각에 맞다). 할매가 그림 높이 약 60%에 앉아 내레이션 띠에 몸 아래가 조금 걸린다 → 다음 장부터 "위쪽 절반"으로 적는다.
 - `mem_drought` 2026-11-03 둘째 판 채택. 첫 판은 땅 위(풀밭에 선 할매·공중의 통나무)·속도선·우는 얼굴이라 첫 장과 이어지지 않았다 → 할매 시트 + `mem_forest` 원본을 **그림체·구도 참고**로 함께 첨부("Use the second attached image only as a style and layout reference …"), "같은 땅 단면"·"움직임 선 없이 가만히"를 적으니 첫 장과 같은 자리의 앞뒤 장면으로 나왔다. 남은 셋도 이렇게 — 앞 장 원본을 둘째 첨부로.
 - `mem_alone` 2026-11-03 첫 판을 한 번 고쳐 채택: 할매 밑동에 진보라 가닥이 섞여 있어(보라는 조각 6부터) "Change only the few dark purple strands under Halmae's body into pure white threads"로 고쳤다. 땅 높이가 앞 장보다 올라갔지만 하늘이 줄어 더 비어 보여 두었고, 할매가 위쪽 38%라 내레이션 띠에 걸리지 않는다.
+- `mem_first_sprout` 2026-11-03 둘째 판 채택. 첫 판은 할매가 땅 위에 올라앉고(할매는 늘 땅속), 큰 도토리가 땅 위에, 흙이 단순한 색 띠 + 보라 띠였다 → 참고 그림을 둘(`mem_drought`·`mem_alone`)로, 세계 규칙에 "Halmae lives under the ground … never on the surface"·"no purple anywhere, not even in the soil"를 넣었다.
 - ✦: 기억 그림은 오른쪽 아래가 빈 흙이라 `strip_logo.py`가 늘 메운다(`FILL_ALWAYS`, 넓게) — 고친 판은 n이 낮게 나와도 다시 그린 ✦ 자국이 남았다.
 
 #### `mem_forest` — 조각 1 "다른 숲"

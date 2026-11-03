@@ -28,7 +28,7 @@ pub const ALL: [Memory; crate::world::MEMORIES as usize] = [
         text: |s| s.mem_3,
     },
     Memory {
-        illust: Illust::DotoMemory,
+        illust: Illust::MemFirstSprout,
         text: |s| s.mem_4,
     },
     Memory {
