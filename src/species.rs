@@ -28,6 +28,12 @@ pub enum Behavior {
     Swooper,
     /// 실버섯(0146): 움직이지 않는다. 가까이 오면 부풀었다가 포자 구름을 터뜨린다(쓰러져도). 땅속에선 안 맞는다.
     Spore,
+    /// 가재(0275 P4): 다가와 집게로 짧게 찍는다(곧게 오는 띠 — 받아친다). 맞으면 멈칫하는 대신 꼬리를 쳐 맞은 쪽에서
+    /// 곧게 멀어진다(실제 가재의 꼬리 치기 탈출, KB animal-behavior). 벽에 박히면 오래 어질어질 — 벽 쪽으로 몰아 친다.
+    Pincer,
+    /// 소금쟁이(0275 P4): 물 칸(물살·웅덩이) 위에서는 빠르고 땅에서는 느리다. 다리로 물을 두드려 퍼지는 물결 고리
+    /// (둘레 — 피한다). 물 위에서 두드리면 고리가 멀리 간다. 실제 소금쟁이는 물결로 신호를 보낸다(KB animal-behavior).
+    Skater,
     /// 들쥐 대장(튜토리얼 보스): 돌진 ↔ 뛰어 찍기, 체력 반 아래면 생쥐를 부른다. 공격 중엔 안 멈춘다(enemy.rs).
     Chief,
     /// 모모(첫 길의 보스, 0046): 높이 뛰기 ↔ 뒷발 차기, 두 번째부터 굴로 숨었다 튀어나오기, 세 번째엔 이어 뛰기.
@@ -333,6 +339,53 @@ pub static SPORE_CAP: Species = Species {
     ..BASE
 };
 
+/// 가재(0275 P4): 물길 굴의 돌 밑에 살던 이웃. 물든 가재는 집게를 들고 다가온다. 단단하고 덜 밀린다.
+/// 그림이 오기 전엔 코드 그림(`art::CODE_ROW`).
+pub static CRAYFISH: Species = Species {
+    name: |s| s.mob_crayfish,
+    lore: |s| s.mob_crayfish_lore,
+    attack: |s| s.mob_crayfish_atk,
+    tip: |s| s.mob_crayfish_tip,
+    behavior: Behavior::Pincer,
+    hp: 4,
+    radius: 6.5,
+    speed: 30.0,
+    knock_mul: 0.6,
+    trigger: 34.0,
+    windup: 0.5,
+    dash_speed: 170.0,
+    dash_time: 0.16,
+    rest: 0.6,
+    wall_rest: 0.9,
+    glowbugs: (1, 3),
+    seed_chance: 0.06,
+    color: Color::new(0.72, 0.34, 0.26, 1.0),
+    sheet_row: crate::art::CODE_ROW,
+    ..BASE
+};
+
+/// 소금쟁이(0275 P4): 물길 굴의 물 위를 걷던 이웃. 물든 소금쟁이는 물결로 밀어낸다. 가볍고 약하다.
+pub static STRIDER: Species = Species {
+    name: |s| s.mob_strider,
+    lore: |s| s.mob_strider_lore,
+    attack: |s| s.mob_strider_atk,
+    tip: |s| s.mob_strider_tip,
+    behavior: Behavior::Skater,
+    hp: 3,
+    radius: 5.5,
+    speed: 22.0,
+    knock_mul: 1.3,
+    windup: 0.7,
+    rest: 0.5,
+    keep: (40.0, 80.0),
+    fire_every: 2.2,
+    glowbugs: (1, 2),
+    seed_chance: 0.05,
+    color: Color::new(0.30, 0.36, 0.46, 1.0),
+    sheet_row: crate::art::CODE_ROW,
+    ..BASE
+};
+
 /// 들쥐 대장(튜토리얼 보스, docs/decisions/0032). 원래는 들쥐 마을의 대장 보리. 뿌리에 물들어 남쪽 공터를 지킨다.
 /// 손맛: 예고가 길고(0.75초) 크게 보이는 대신, 맞아도 공격을 멈추지 않는다. 벽에 박으면 2초 넘게 어질어질(때릴 때).
 /// 그림은 40×40 따로(assets/art/chief.png, `bori_ai.py`, 0216). `sheet_row`는 쓰지 않는다.
@@ -469,7 +522,7 @@ pub static CLOVER: Species = Species {
 };
 
 /// 도감 순서(허수아비는 빼고).
-pub const BESTIARY: [Kind; 15] = [
+pub const BESTIARY: [Kind; 17] = [
     Kind::FieldMouse,
     Kind::HouseMouse,
     Kind::SewerRat,
@@ -480,6 +533,8 @@ pub const BESTIARY: [Kind; 15] = [
     Kind::Toad,
     Kind::Bat,
     Kind::SporeCap,
+    Kind::Crayfish,
+    Kind::Strider,
     Kind::Chief,
     Kind::Momo,
     Kind::Doto,
@@ -499,6 +554,8 @@ pub fn of(kind: Kind) -> &'static Species {
         Kind::Toad => &TOAD,
         Kind::Bat => &BAT,
         Kind::SporeCap => &SPORE_CAP,
+        Kind::Crayfish => &CRAYFISH,
+        Kind::Strider => &STRIDER,
         Kind::Dummy => &DUMMY,
         Kind::Chief => &CHIEF,
         Kind::Momo => &MOMO,
@@ -555,14 +612,16 @@ pub fn roll(r: f32, depth: u32, biome: crate::biome::Biome) -> Kind {
             (Kind::Bat, 16.0 + d * 2.0),
             (Kind::SporeCap, 16.0 + d * 2.0),
         ],
-        // 물길 굴(0275): 새 잡몹 둘(P4)이 오기 전까지 물가에 사는 것 위주 — 두꺼비·시궁쥐·박쥐.
+        // 물길 굴(0275): 가재·소금쟁이(P4)가 대표, 물가에 사는 두꺼비·시궁쥐·박쥐가 섞인다.
         Biome::Water => vec![
-            (Kind::FieldMouse, 10.0),
-            (Kind::SewerRat, 16.0 + d * 3.0),
-            (Kind::Shrew, 8.0),
-            (Kind::Toad, 16.0 + d * 2.0),
-            (Kind::Bat, 12.0 + d * 2.0),
-            (Kind::SporeCap, 4.0),
+            (Kind::FieldMouse, 8.0),
+            (Kind::SewerRat, 10.0 + d * 2.0),
+            (Kind::Shrew, 6.0),
+            (Kind::Toad, 10.0 + d),
+            (Kind::Bat, 8.0 + d),
+            (Kind::SporeCap, 3.0),
+            (Kind::Crayfish, 18.0 + d * 2.0),
+            (Kind::Strider, 14.0 + d * 2.0),
         ],
     };
     let total: f32 = table.iter().map(|e| e.1).sum();
@@ -673,6 +732,30 @@ pub const SQUADS: &[Squad] = {
             weight: 2.0,
             core: &[SewerRat, SewerRat],
             fill: &[FieldMouse, Toad],
+        },
+        // 가재 둑(0275 P4): 가재 둘이 집게를 들고 앞에, 소금쟁이가 물 위에서 물결로 민다 — 물결에 밀려 가재 앞으로.
+        Squad {
+            biomes: &[Water],
+            min_depth: 0,
+            weight: 3.0,
+            core: &[Crayfish, Crayfish],
+            fill: &[Strider, FieldMouse],
+        },
+        // 물 위의 무리(0275 P4): 소금쟁이 둘이 물결을 엇갈려 보내고, 앞은 시궁쥐가 막는다.
+        Squad {
+            biomes: &[Water],
+            min_depth: 0,
+            weight: 2.5,
+            core: &[Strider, Strider],
+            fill: &[SewerRat, Crayfish],
+        },
+        // 물가 매복(0275 P4): 두꺼비 혀 + 가재 집게, 둘 다 곧게 온다(받아치기 연습).
+        Squad {
+            biomes: &[Water],
+            min_depth: 1,
+            weight: 1.5,
+            core: &[Toad, Crayfish],
+            fill: &[Crayfish, Shrew],
         },
         // 박쥐와 버섯: 위에서 내리꽂고 아래는 포자.
         Squad {

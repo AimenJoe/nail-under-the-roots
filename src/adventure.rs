@@ -2050,11 +2050,8 @@ mod tests {
         });
         w.hazards.clouds.push(Cloud { pos: p, time: 0.0 });
         w.hazards.rocks.push(Rockfall { pos: p, time: 0.0 });
-        w.hazards.waves.push(Wave {
-            pos: p,
-            time: 0.0,
-            hit: false,
-        });
+        w.hazards.waves.push(Wave::thump(p));
+        w.hazards.waves.push(Wave::ripple(p, true));
         w.hazards.thread_lash = Some((p, p, 0.0));
         w.hazards.place_cocoons(p);
         // 플레이어가 깐 가시 덤불도(0248).

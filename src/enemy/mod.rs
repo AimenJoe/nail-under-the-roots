@@ -12,7 +12,7 @@ use crate::tuning as t;
 mod boss;
 mod melee;
 mod ranged;
-pub use ranged::tongue_out;
+pub use ranged::{ripple_radius, tongue_out};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Kind {
@@ -44,6 +44,9 @@ pub enum Kind {
     Toad,
     Bat,
     SporeCap,
+    /// 물길 굴 잡몹(0275 P4): 가재(집게 찍기 + 맞으면 꼬리 쳐 뒤로 튀기)·소금쟁이(물 위에서 빠르고 물결 고리).
+    Crayfish,
+    Strider,
 }
 
 impl Kind {
@@ -88,6 +91,8 @@ pub enum State {
     Thump { time: f32 },
     /// 토끼풀(0165): 고치로 가 실을 더 감는다(반 아래, 한 번). `CLOVER_THREAD_AT`에 `Event::Thread`(실 한 가닥).
     Gather { time: f32 },
+    /// 가재(0275 P4): 꼬리를 쳐 곧게 뒤로 튄다(맞은 쪽에서 멀어지게). 벽에 박히면 오래 어질어질.
+    Flip { time: f32, dir: Vec2 },
 }
 
 /// 플레이어의 타격을 받은 결과(0170 R10). 월드는 이것만 보고 연출·통계·소리를 낸다 — 종 규칙은 전부 `Enemy::receive` 안.
@@ -126,6 +131,8 @@ pub enum Event {
     /// 토끼풀이 발을 굴렀다(그 자리) / 실 한 가닥을 뻗었다(자리, 방향). 판정은 월드가(0165).
     Thump(Vec2),
     Thread(Vec2, Vec2),
+    /// 소금쟁이가 다리로 물을 두드렸다(자리, 물 위였나, 0275 P4). 월드가 물결 고리를 놓는다.
+    Ripple(Vec2, bool),
     /// 보스가 체력 반 아래에서 2단계로 깨어났다(그 자리, 0233). 한 싸움에 한 번.
     Rouse(Vec2),
 }
@@ -201,6 +208,8 @@ pub struct Enemy {
     pub webbed: f32,
     /// 토끼풀(0165): 지키는 자리의 가운데(아기들의 고치). 늘 여기와 플레이어 사이에 선다.
     pub guard: Option<Vec2>,
+    /// 가재(0275 P4): 다음 꼬리 튀기까지(초). 연달아 맞으면 한 번만 튄다.
+    pub flip_cd: f32,
 }
 
 pub struct Projectile {
@@ -329,6 +338,7 @@ impl Enemy {
             elite: false,
             webbed: 0.0,
             guard: None,
+            flip_cd: 0.0,
         }
     }
 
@@ -472,6 +482,7 @@ impl Enemy {
         self.prev_pos = self.pos;
         self.flash = (self.flash - dt).max(0.0);
         self.thorn_cd = (self.thorn_cd - dt).max(0.0);
+        self.flip_cd = (self.flip_cd - dt).max(0.0);
         self.tick_poison(dt);
         let sp = self.sp();
         if sp.behavior == Behavior::Dummy {
@@ -549,6 +560,7 @@ impl Enemy {
             State::Lash { time, dir } => self.tick_lash(&mut c, time, dir),
             State::Puff { time } => self.tick_puff(&mut c, time),
             State::Aim { time } => self.tick_aim(&mut c, time),
+            State::Flip { time, dir } => self.tick_flip(&mut c, time, dir),
         }
 
         self.launched = (self.launched - dt).max(0.0);
@@ -789,6 +801,14 @@ impl Enemy {
                     }
                 };
             }
+        } else if self.sp().behavior == Behavior::Pincer && dmg > 0 && self.flip_cd <= 0.0 {
+            // 가재(0275 P4): 맞으면 멈칫하지 않고 꼬리를 쳐 맞은 쪽에서 곧게 멀어진다(실제 가재의 꼬리 치기 탈출).
+            self.flip_cd = t::CRAY_FLIP_CD;
+            self.vel = Vec2::ZERO;
+            self.state = State::Flip {
+                time: 0.0,
+                dir: knock_dir.normalize_or(-self.facing),
+            };
         } else {
             self.state = State::Stunned { time: stun };
         }
@@ -816,6 +836,7 @@ impl Enemy {
             State::Puff { .. } => "PUFF",
             State::Thump { .. } => "THUMP",
             State::Gather { .. } => "gather",
+            State::Flip { .. } => "FLIP",
         }
     }
 }
@@ -829,12 +850,14 @@ fn idle_of(b: Behavior) -> State {
         | Behavior::Kongi
         | Behavior::Clover
         | Behavior::Darter
-        | Behavior::Roller => State::Approach,
+        | Behavior::Roller
+        | Behavior::Pincer => State::Approach,
         Behavior::Shooter
         | Behavior::Leaper
         | Behavior::Tongue
         | Behavior::Swooper
-        | Behavior::Spore => State::Keep,
+        | Behavior::Spore
+        | Behavior::Skater => State::Keep,
         Behavior::Dummy => State::Rest { time: f32::MAX },
     }
 }
@@ -1493,6 +1516,83 @@ mod tests {
         };
         g.on_parried();
         assert!(matches!(g.state, State::Rest { .. }));
+    }
+
+    /// 가재(0275 P4): 맞으면 멈칫 대신 맞은 쪽에서 곧게 뒤로 튄다. 방 가운데서는 거리만 벌어지고(쉼),
+    /// 벽 가까이서 튀면 박혀 오래 어질어질하다. 연달아 맞아도 한 번만 튄다(`CRAY_FLIP_CD`).
+    #[test]
+    fn crayfish_flips_away_and_bonks_walls() {
+        let room = Room::new();
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let player = room.center() - vec2(30.0, 0.0);
+        let mut e = Enemy::new(Kind::Crayfish, room.center());
+        e.hurt(1, vec2(1.0, 0.0), 120.0, 0.3);
+        assert!(matches!(e.state, State::Flip { .. }), "{:?}", e.state);
+        let x0 = e.pos.x;
+        for _ in 0..30 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+        }
+        let moved = e.pos.x - x0;
+        assert!(moved > 40.0 && moved < 75.0, "곧게 뒤로 {moved}px");
+        assert!(!ev.contains(&Event::WallHit), "가운데선 안 박힌다");
+        // 다시 튀기 전에 맞으면 보통 멈칫.
+        e.hurt(1, vec2(1.0, 0.0), 120.0, 0.3);
+        assert!(matches!(e.state, State::Stunned { .. }));
+        // 벽 바로 앞에서 맞으면 박혀 어질어질.
+        let mut w = Enemy::new(
+            Kind::Crayfish,
+            vec2(room.inner.right() - 20.0, room.center().y),
+        );
+        w.hurt(1, vec2(1.0, 0.0), 120.0, 0.3);
+        let mut ev = Vec::new();
+        for _ in 0..20 {
+            w.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+        }
+        assert!(ev.contains(&Event::WallHit));
+        assert!(
+            matches!(w.state, State::Stunned { time } if time > 1.0),
+            "{:?}",
+            w.state
+        );
+    }
+
+    /// 소금쟁이(0275 P4): 물 칸 위에서는 땅보다 훨씬 빨리 미끄러지고, 때가 되면 둘레 예고(Aim) 뒤 물결을 낸다.
+    #[test]
+    fn strider_skates_fast_on_water_and_ripples() {
+        let mut room = Room::new();
+        let c = room.center();
+        for dx in -6..=6 {
+            room.streams
+                .push((c + vec2(dx as f32 * 16.0, 0.0), vec2(0.0, 1.0)));
+        }
+        let player = c + vec2(0.0, 70.0);
+        let step = |at: Vec2, room: &Room| {
+            let mut e = Enemy::new(Kind::Strider, at);
+            e.fire_cd = 99.0;
+            let (mut pr, mut ev) = (Vec::new(), Vec::new());
+            e.update(player, true, room, t::TICK_DT, &mut pr, &mut ev);
+            (e.pos - at).length()
+        };
+        // 물 위(가운데 줄 끝) vs 같은 자리지만 물 없는 방.
+        let wet = step(c + vec2(-90.0, 0.0), &room);
+        let dry = step(c + vec2(-90.0, 0.0) + vec2(0.0, -40.0), &room);
+        assert!(wet > dry * 3.0, "물 위 {wet} vs 땅 {dry}");
+        let mut e = Enemy::new(Kind::Strider, c);
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        let mut aimed = false;
+        for _ in 0..600 {
+            e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+            aimed |= matches!(e.state, State::Aim { .. }) && e.telegraph().is_some();
+            if ev.iter().any(|v| matches!(v, Event::Ripple(..))) {
+                break;
+            }
+        }
+        assert!(aimed, "예고가 먼저");
+        assert!(
+            ev.iter().any(|v| matches!(v, Event::Ripple(_, true))),
+            "물 위에서 물결"
+        );
+        assert!(ripple_radius(true) > ripple_radius(false));
     }
 
     /// 두꺼비(0146): 거리를 두고 겨누다가 플레이어 쪽으로 혀를 내민다. 혀를 내민 동안은 몸으로 아프지 않다.

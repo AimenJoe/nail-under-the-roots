@@ -161,3 +161,35 @@ Solid magenta background (#FF00FF), figures well separated, no text, no grid lin
 1. standing   2. walking (one leg forward)   3. cap squashed down, about to burst
 4. cap puffed up, releasing a puff (no spore cloud, the game draws it)   5. hurt (flinching back, eyes squeezed shut)   6. defeated (lying on its side, eyes closed)
 ```
+
+## crayfish (키 11px, 코드 임시 그림)
+
+```
+Redraw the creature in the attached image (the right figure) as a pixel art sprite sheet for a cute top-down
+action game: a small reddish-brown crayfish with two big pincers held forward, a segmented tail and thin feelers. It is corrupted by purple threads: its eyes are GLOWING RED (red, not black), and a few small
+purple root-threads grow on its back. No mouth line.
+
+Use the attached image for size: draw it as big as the right figure next to the small mole, same pixel block size.
+Keep every frame the same body size.
+
+3 columns x 2 rows, 6 frames. EVERY frame is a side view facing RIGHT (never a back view or front view).
+Solid magenta background (#FF00FF), figures well separated, no text, no grid lines, no shadows, no effects.
+1. standing   2. walking (one leg forward)   3. pincers raised and open, about to snap
+4. lunging forward, snapping both pincers shut   5. hurt (flinching back, eyes squeezed shut)   6. defeated (lying on its side, eyes closed)
+```
+
+## strider (키 9px, 코드 임시 그림)
+
+```
+Redraw the creature in the attached image (the right figure) as a pixel art sprite sheet for a cute top-down
+action game: a slender dark brown water strider (pond skater) with a thin body held up on very long thin bent legs. It is corrupted by purple threads: its eyes are GLOWING RED (red, not black), and a few small
+purple root-threads grow on its back. No mouth line.
+
+Use the attached image for size: draw it as big as the right figure next to the small mole, same pixel block size.
+Keep every frame the same body size.
+
+3 columns x 2 rows, 6 frames. EVERY frame is a side view facing RIGHT (never a back view or front view).
+Solid magenta background (#FF00FF), figures well separated, no text, no grid lines, no shadows, no effects.
+1. standing   2. walking (one leg forward)   3. legs bent low, tapping the surface
+4. legs stamping down hard (no ripple, the game draws it)   5. hurt (flinching back, eyes squeezed shut)   6. defeated (lying on its side, eyes closed)
+```

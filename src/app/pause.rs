@@ -755,6 +755,8 @@ impl App {
         let frame = ((get_time() * 2.0) as u32) % 2;
         if k == crate::enemy::Kind::Chief {
             self.renderer.draw_chief_icon(ui, inner, frame);
+        } else if sp.sheet_row == crate::art::CODE_ROW {
+            self.renderer.draw_code_critter(ui, inner, k, frame);
         } else {
             self.renderer.draw_critter(ui, inner, sp.sheet_row, frame);
         }

@@ -255,6 +255,21 @@ impl Room {
             .map(|(_, d)| *d)
     }
 
+    /// 물 칸(물살 + 고인 웅덩이)의 가운데들(0275 P4: 소금쟁이가 미끄러질 자리).
+    pub fn water_cells(&self) -> impl Iterator<Item = Vec2> + '_ {
+        self.streams
+            .iter()
+            .map(|(c, _)| *c)
+            .chain(self.pools.iter().copied())
+    }
+
+    /// 이 자리(몸 가운데)가 물 칸(물살·웅덩이) 안인가.
+    pub fn water_at(&self, p: Vec2) -> bool {
+        let h = TILE * 0.5;
+        self.water_cells()
+            .any(|c| (p.x - c.x).abs() <= h && (p.y - c.y).abs() <= h)
+    }
+
     /// 원을 벽·기둥 밖으로 밀어낸다. 무언가에 닿았으면 true.
     pub fn resolve_circle(&self, pos: &mut Vec2, r: f32) -> bool {
         let mut hit = false;

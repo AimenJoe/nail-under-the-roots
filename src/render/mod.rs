@@ -541,6 +541,26 @@ impl Renderer {
 
     /// 도감 그림: critters `row`줄 `frame`칸(새 그림 시트면 그 시트, `Art::critter`)을 논리 사각형 `r`에 —
     /// 칸이 아니라 몸 자리(`CritterCell::body`)를 가운데에 맞춰 키운다.
+    /// 도감 칸의 코드 그림(0275 P4, 시트가 없는 종): 칸 가운데에 게임 픽셀 2배로.
+    pub fn draw_code_critter(&self, ui: &Ui, r: Rect, kind: crate::enemy::Kind, frame: u32) {
+        let o = ui.px(vec2(r.x + r.w * 0.5, r.y + r.h * 0.5));
+        let gl = unsafe { get_internal_gl() };
+        gl.quad_gl
+            .push_model_matrix(Mat4::from_scale_rotation_translation(
+                vec3(ui.scale * 2.0, ui.scale * 2.0, 1.0),
+                Quat::IDENTITY,
+                vec3(o.x.round(), o.y.round(), 0.0),
+            ));
+        let pose = if frame == 1 {
+            actors::CodePose::Ready
+        } else {
+            actors::CodePose::Idle
+        };
+        actors::draw_code_mob(kind, Vec2::ZERO, false, pose, Some(WHITE), 0.0, false);
+        let gl = unsafe { get_internal_gl() };
+        gl.quad_gl.pop_model_matrix();
+    }
+
     pub fn draw_critter(&self, ui: &Ui, r: Rect, row: u32, frame: u32) {
         let Some(c) = self.art.as_ref().and_then(|a| a.critter(frame, row)) else {
             return;

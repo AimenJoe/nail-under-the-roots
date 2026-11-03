@@ -737,6 +737,20 @@ pub const SHREW_BITES: u32 = 2;
 pub const SHREW_REAIM: f32 = 0.4;
 /// 두꺼비: 혀가 닿는 거리·두께(플레이어 반지름에 더함)·내민 채 머무는 시간·맞으면 끌려가는 속도.
 pub const TOAD_TONGUE_REACH: f32 = 70.0;
+/// 가재 꼬리 튀기(0275 P4): 처음 빠르기(px/s, 끝으로 갈수록 30%까지 준다)·길이·다시 튀기까지·끝난 뒤 쉼·벽에 박힌 어질어질.
+/// 0.28초 × 평균 약 0.65 × 300 ≈ 55px — 방 가운데서는 거리만 벌리고, 벽 앞 세 칸 안이면 박힌다.
+pub const CRAY_FLIP_SPEED: f32 = 300.0;
+pub const CRAY_FLIP_TIME: f32 = 0.28;
+pub const CRAY_FLIP_CD: f32 = 1.4;
+pub const CRAY_FLIP_REST: f32 = 0.35;
+pub const CRAY_WALL_STUN: f32 = 1.5;
+/// 소금쟁이(0275 P4): 물 칸 위 걸음 배율, 물결 고리(다 퍼진 반지름·퍼지는 시간·밀기, 땅에서 두드리면 반지름 배율).
+/// 토끼풀 충격파(44px, 0.35초)보다 넓고 느리다 — 고리가 오는 게 보여 회피·땅속·깡충으로 넘는다.
+pub const STRIDER_WATER_MUL: f32 = 4.0;
+pub const RIPPLE_R: f32 = 56.0;
+pub const RIPPLE_TIME: f32 = 0.9;
+pub const RIPPLE_KNOCK: f32 = 110.0;
+pub const RIPPLE_LAND_MUL: f32 = 0.6;
 pub const TOAD_TONGUE_WIDTH: f32 = 4.0;
 pub const TOAD_LASH_TIME: f32 = 0.22;
 /// 혀가 다 뻗기까지(0253, 사장 "두꺼비 혀가 보이지도 않고 맞음"): 이 동안 혀끝이 자라며, 맞는 판정도 지금 뻗은 길이까지.

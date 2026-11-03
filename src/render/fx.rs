@@ -388,29 +388,20 @@ pub(super) fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
 /// 토끼풀의 충격파(0165): 퍼지는 두꺼운 흰 고리 + 안쪽 옅은 빛, 다 퍼지면 옅어진다. 뻗은 실 한 가닥도 여기서.
 pub(super) fn draw_waves(w: &World) {
     for wv in &w.hazards.waves {
-        let k = (wv.time / t::CLOVER_WAVE_TIME).min(1.0);
-        let r = t::CLOVER_WAVE_R * k;
-        let fade = 1.0 - ((wv.time - t::CLOVER_WAVE_TIME) / 0.25).clamp(0.0, 1.0);
-        draw_circle(
-            wv.pos.x.round(),
-            wv.pos.y.round(),
-            r,
-            Color::new(0.92, 0.88, 1.0, 0.10 * fade),
-        );
-        draw_circle_lines(
-            wv.pos.x.round(),
-            wv.pos.y.round(),
-            r,
-            3.0,
-            Color::new(0.96, 0.94, 1.0, 0.85 * fade),
-        );
-        draw_circle_lines(
-            wv.pos.x.round(),
-            wv.pos.y.round(),
-            r - 3.0,
-            1.0,
-            Color::new(0.70, 0.55, 0.95, 0.6 * fade),
-        );
+        let r = wv.radius();
+        let fade = 1.0 - ((wv.time - wv.dur) / 0.25).clamp(0.0, 1.0);
+        let (x, y) = (wv.pos.x.round(), wv.pos.y.round());
+        if wv.ripple {
+            // 소금쟁이 물결(0275 P4): 물빛 고리 두 겹(앞이 밝고 뒤가 옅다) — 땅 위에서도 물기가 번진 것처럼.
+            draw_circle_lines(x, y, r, 2.0, Color::new(0.82, 0.94, 1.0, 0.85 * fade));
+            if r > 6.0 {
+                draw_circle_lines(x, y, r - 5.0, 1.0, Color::new(0.55, 0.78, 0.92, 0.5 * fade));
+            }
+            continue;
+        }
+        draw_circle(x, y, r, Color::new(0.92, 0.88, 1.0, 0.10 * fade));
+        draw_circle_lines(x, y, r, 3.0, Color::new(0.96, 0.94, 1.0, 0.85 * fade));
+        draw_circle_lines(x, y, r - 3.0, 1.0, Color::new(0.70, 0.55, 0.95, 0.6 * fade));
     }
     if let Some((a, b, age)) = w.hazards.thread_lash {
         let k = 1.0 - (age / 0.3).clamp(0.0, 1.0);
@@ -1056,6 +1047,7 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                         | Behavior::Darter
                         | Behavior::Roller
                         | Behavior::Swooper
+                        | Behavior::Pincer
                 ) =>
             {
                 let dir = e.facing.normalize_or(vec2(1.0, 0.0));
@@ -1065,6 +1057,10 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
             }
             enemy::State::Lash { time, dir } => {
                 actors::draw_tongue(w, pos, e.radius(), dir, time);
+            }
+            enemy::State::Aim { .. } if sp.behavior == Behavior::Skater => {
+                // 소금쟁이(0275 P4): 물결 고리가 다 퍼질 둘레(물 위면 크다) — 둘레 공격이라 원판(피함).
+                draw_tele_disk(pos, crate::enemy::ripple_radius(w.room.water_at(e.pos)), k);
             }
             enemy::State::Aim { .. } if sp.behavior == Behavior::Spore => {
                 // 포자버섯: 구름이 덮을 자리.

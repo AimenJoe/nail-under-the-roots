@@ -121,4 +121,27 @@ impl Enemy {
             State::Rest { time }
         };
     }
+
+    /// 가재의 꼬리 튀기(0275 P4): `dir`로 곧게 빠르게 물러난다. 벽에 박히면 오래 어질어질 — 벽 쪽으로 몰아 치는 적.
+    pub(super) fn tick_flip(&mut self, c: &mut Ctx<'_>, time: f32, dir: Vec2) {
+        let dt = c.dt;
+        let time = time + dt;
+        // 처음이 가장 빠르고 끝으로 갈수록 느려진다(물을 한 번 차고 미끄러진다).
+        let k = (time / t::CRAY_FLIP_TIME).min(1.0);
+        self.pos += dir * t::CRAY_FLIP_SPEED * (1.0 - k * 0.7) * dt;
+        let r = self.radius();
+        if c.room.resolve_circle(&mut self.pos, r) {
+            self.flash = t::HIT_FLASH;
+            c.events.push(Event::WallHit);
+            self.state = State::Stunned {
+                time: t::CRAY_WALL_STUN,
+            };
+        } else if time >= t::CRAY_FLIP_TIME {
+            self.state = State::Rest {
+                time: t::CRAY_FLIP_REST,
+            };
+        } else {
+            self.state = State::Flip { time, dir };
+        }
+    }
 }

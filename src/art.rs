@@ -261,6 +261,9 @@ pub const SPORE_ROW: u32 = 18;
 pub const CLOVER_ROW: u32 = 19;
 pub const CLOVER_BACK_ROW: u32 = 20;
 pub const BABY_ROW: u32 = 21;
+/// 그림 시트가 아직 없는 종(0275 P4: 가재·소금쟁이): 렌더가 코드로 임시 그림을 그린다(`render/actors.rs draw_code_mob`).
+/// critters 줄(`CRITTER_ROWS` 아래)과 겹치지 않는 값.
+pub const CODE_ROW: u32 = 1000;
 
 impl Art {
     /// 시작할 때 읽는 그림 파일(assets 기준). main이 `loading::prefetch`로 한꺼번에 받는다(0092).
@@ -721,6 +724,9 @@ impl Art {
     /// critters `row`줄 `frame`칸(`row`에 `CRITTER_ROWS`를 더하면 흰 실루엣). 새 그림으로 옮긴 줄(모모·도토, 0206 C3)은
     /// 그 시트로 — 칸 번호의 뜻은 같다(0·1 서기, 2·3 걷기·깡충, 4 웅크림·겨누기, 5 공격, 6 맞음; 큰 시트는 7 쓰러짐도).
     pub fn critter(&self, frame: u32, row: u32) -> Option<CritterCell<'_>> {
+        if row >= CODE_ROW {
+            return None;
+        }
         let (base, sil) = (row % CRITTER_ROWS, row >= CRITTER_ROWS);
         if let Some((i, b, tex, r)) = self.big_sheet(base) {
             let body = self
@@ -769,6 +775,9 @@ impl Art {
     /// 걷는 칸: `steps`는 걸음 수(옛 두 칸 시절 `time × 빠르기`, 한 칸 = 한 걸음). 걷기 네 칸이 있으면(`BigSheet::walk4`, 0229)
     /// 한 걸음에 두 칸(디딤·지나감)을 돌아 걸음 박자는 그대로, 없으면 칸 2·3.
     pub fn walk(&self, row: u32, steps: f32) -> u32 {
+        if row >= CODE_ROW {
+            return frame::WALK + steps as u32 % 2;
+        }
         match self.big_sheet(row % CRITTER_ROWS) {
             Some((_, b, tex, _)) => walk_frame(b, tex, steps),
             None => frame::WALK + steps as u32 % 2,

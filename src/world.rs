@@ -71,12 +71,49 @@ pub struct Fx {
     pub kind: FxKind,
 }
 
-/// 토끼풀의 충격파(0165): 발을 구른 자리에서 퍼지는 고리. 고리가 지나는 순간 한 번 아프다(땅속·깡충은 안 맞는다).
+/// 퍼지는 고리(토끼풀의 충격파 0165, 소금쟁이의 물결 0275 P4). 고리가 지나는 순간 한 번 아프다(땅속·깡충은 안 맞는다).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Wave {
     pub pos: Vec2,
     pub time: f32,
     pub hit: bool,
+    /// 다 퍼진 반지름·퍼지는 시간·미는 세기.
+    pub r: f32,
+    pub dur: f32,
+    pub knock: f32,
+    /// 물결(소금쟁이): 그림이 물빛이고, 잡몹 피해로 친다.
+    pub ripple: bool,
+}
+
+impl Wave {
+    pub fn thump(pos: Vec2) -> Self {
+        Self {
+            pos,
+            time: 0.0,
+            hit: false,
+            r: t::CLOVER_WAVE_R,
+            dur: t::CLOVER_WAVE_TIME,
+            knock: t::CLOVER_WAVE_KNOCK,
+            ripple: false,
+        }
+    }
+
+    pub fn ripple(pos: Vec2, on_water: bool) -> Self {
+        Self {
+            pos,
+            time: 0.0,
+            hit: false,
+            r: crate::enemy::ripple_radius(on_water),
+            dur: t::RIPPLE_TIME,
+            knock: t::RIPPLE_KNOCK,
+            ripple: true,
+        }
+    }
+
+    /// 지금 고리의 반지름.
+    pub fn radius(&self) -> f32 {
+        self.r * (self.time / self.dur).min(1.0)
+    }
 }
 
 /// 길의 샘(0159). 들어서는 순간이 아니라 발을 담가야 회복한다(말로만 샘이었다).
@@ -1596,6 +1633,8 @@ impl World {
                 && e.hittable()
                 && !e.flying()
                 && !e.is_boss()
+                // 소금쟁이는 물 위를 미끄러진다(0275 P4).
+                && e.sp().behavior != crate::species::Behavior::Skater
             {
                 if let Some(d) = self.room.stream_at(e.pos) {
                     e.pos += d * t::STREAM_PUSH * dt;
@@ -1775,6 +1814,7 @@ impl World {
         let mut summon = false;
         let mut bury = 0;
         let mut thumps = Vec::new();
+        let mut ripples: Vec<(Vec2, bool)> = Vec::new();
         let mut threads = Vec::new();
         let mut rouse = Vec::new();
         let mut arrived = Vec::new();
@@ -1802,12 +1842,19 @@ impl World {
                 enemy::Event::Tongue => self.juice.audio.play(sfx::Id::Shoot),
                 enemy::Event::Spore => self.juice.audio.play(sfx::Id::Burrow),
                 enemy::Event::Thump(at) => thumps.push(*at),
+                enemy::Event::Ripple(at, wet) => ripples.push((*at, *wet)),
                 enemy::Event::Thread(at, dir) => threads.push((*at, *dir)),
                 enemy::Event::Rouse(at) => rouse.push(*at),
             }
         }
         for at in rouse {
             self.rouse_fx(at);
+        }
+        // 소금쟁이 물결(0275 P4): 고리 + 물방울 몇, 작은 첨벙.
+        for (at, wet) in ripples {
+            self.hazards.waves.push(Wave::ripple(at, wet));
+            puff(&mut self.juice.fx, at, 4, STREAM_SPRAY, 7.0, 0.35);
+            self.juice.audio.play(sfx::Id::Burrow);
         }
         // 방에 나타났다(0257): 솟으면 흙덩이가 튀고, 떨어지면 먼지가 퍼지고 땅이 울린다.
         for (entry, at) in arrived {
@@ -1880,9 +1927,7 @@ impl World {
         for wv in self.hazards.waves.iter_mut().filter(|_| !frozen) {
             wv.time += dt;
         }
-        self.hazards
-            .waves
-            .retain(|w| w.time < t::CLOVER_WAVE_TIME + 0.25);
+        self.hazards.waves.retain(|w| w.time < w.dur + 0.25);
         if let Some((_, _, age)) = self.hazards.thread_lash.as_mut() {
             *age += dt;
         }
@@ -2471,20 +2516,23 @@ impl World {
                     hurt_from = Some((*p, 1, crate::combat::HurtTier::Hazard));
                 }
             }
-            // 토끼풀의 충격파(0165): 퍼지는 고리가 지나는 순간 한 번, 멀리 밀린다. 땅속·깡충·드릴은 안 맞는다.
+            // 토끼풀의 충격파(0165)·소금쟁이의 물결(0275 P4): 퍼지는 고리가 지나는 순간 한 번, 밀린다. 땅속·깡충·드릴은 안 맞는다.
             if hurt_from.is_none() && !parried && self.player.on_foot() {
                 for wv in self.hazards.waves.iter_mut() {
-                    if wv.hit {
+                    if wv.hit || (wv.ripple && wv.time > wv.dur) {
                         continue;
                     }
-                    let r = t::CLOVER_WAVE_R * (wv.time / t::CLOVER_WAVE_TIME).min(1.0);
+                    let r = wv.radius();
                     let d = (ppos - wv.pos).length();
                     if d <= r + pr && d >= r - 10.0 {
                         wv.hit = true;
-                        hurt_from = Some((wv.pos, 1, crate::combat::HurtTier::Boss));
-                        pull = Some(
-                            (ppos - wv.pos).normalize_or(vec2(0.0, 1.0)) * t::CLOVER_WAVE_KNOCK,
-                        );
+                        let tier = if wv.ripple {
+                            crate::combat::HurtTier::Light
+                        } else {
+                            crate::combat::HurtTier::Boss
+                        };
+                        hurt_from = Some((wv.pos, 1, tier));
+                        pull = Some((ppos - wv.pos).normalize_or(vec2(0.0, 1.0)) * wv.knock);
                         break;
                     }
                 }
@@ -3074,11 +3122,7 @@ impl World {
         self.juice.audio.play(sfx::Id::Impact);
         self.juice.feel.add_trauma(t::CLOVER_THUMP_SHAKE);
         self.juice.feel.add_hitstop(t::CLOVER_THUMP_HITSTOP);
-        self.hazards.waves.push(Wave {
-            pos: at,
-            time: 0.0,
-            hit: false,
-        });
+        self.hazards.waves.push(Wave::thump(at));
         clods(&mut self.juice.fx, at, 10, DIRT, 90.0);
         self.juice.fx.push(ring(at, 6.0, 20.0, 0.2, DIRT));
         let pp = self.player.pos;
@@ -4360,6 +4404,30 @@ mod tests {
             matches!(w.enemies[0].state, State::Stunned { .. }),
             "혀가 뻗기 시작한 순간에도 받아친다"
         );
+    }
+
+    /// 소금쟁이 물결(0275 P4): 퍼지는 고리가 걷는 플레이어를 지날 때 한 번 아프고, 땅속이면 지나간다.
+    #[test]
+    fn strider_ripple_hits_walkers_once_and_passes_burrowers() {
+        let run = |burrow: bool| {
+            let mut w = World::new();
+            w.enemies.clear();
+            if burrow {
+                w.player.state = crate::player::State::Burrow { time: 0.0 };
+            }
+            let at = w.player.pos + vec2(30.0, 0.0);
+            w.hazards.waves.push(Wave::ripple(at, true));
+            let hp0 = w.player.hp;
+            for _ in 0..90 {
+                for wv in w.hazards.waves.iter_mut() {
+                    wv.time += t::TICK_DT;
+                }
+                w.hit_player(&[], &[]);
+            }
+            hp0 - w.player.hp
+        };
+        assert_eq!(run(false), 1, "걸으면 한 번");
+        assert_eq!(run(true), 0, "땅속은 지나간다");
     }
 
     /// 토끼풀이 멈칫하고 아니면 끌려간다.

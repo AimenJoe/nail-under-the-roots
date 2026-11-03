@@ -38,6 +38,15 @@ fn critter(art: Option<&Art>, kind: Kind, frame: u32, at: Vec2, left: bool, tint
             left,
             tint,
         ),
+        None if kind.species().sheet_row == art::CODE_ROW => super::actors::draw_code_mob(
+            kind,
+            at,
+            left,
+            super::actors::CodePose::Idle,
+            Some(tint),
+            0.0,
+            false,
+        ),
         None => draw_circle(at.x, at.y, 5.0, kind.species().color),
     }
 }

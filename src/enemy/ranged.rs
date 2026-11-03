@@ -52,6 +52,9 @@ impl Enemy {
         let dist = c.dist;
         let dir_to_player = c.dir_to_player;
         let sp = self.sp();
+        if sp.behavior == Behavior::Skater {
+            return self.tick_skate(c);
+        }
         if player_targetable {
             self.facing = dir_to_player;
             let (near, far) = sp.keep;
@@ -175,6 +178,11 @@ impl Enemy {
                 time: 0.0,
                 dir: self.facing,
             };
+        } else if time >= self.windup() && sp.behavior == Behavior::Skater {
+            // 소금쟁이: 제자리에서 물결 고리(월드가 놓는다). 물 위면 크게 퍼진다.
+            events.push(Event::Ripple(self.pos, c.room.water_at(self.pos)));
+            self.fire_cd = sp.fire_every;
+            self.state = State::Rest { time: sp.rest };
         } else if time >= self.windup() && sp.behavior == Behavior::Spore {
             // 포자버섯: 제자리에 포자 구름(월드가 놓는다).
             events.push(Event::Spore);
@@ -209,5 +217,53 @@ impl Enemy {
         } else {
             self.state = State::Aim { time };
         }
+    }
+
+    /// 소금쟁이(0275 P4): 물 위에서는 빠르고 땅에서는 느리다. 물 칸 가운데 플레이어와 알맞게 떨어진 칸으로 미끄러지고,
+    /// 때가 되면(가까우면) 다리를 구르는 예고(`Aim`) 뒤 물결 고리. 방에 물이 없으면 땅에서 거리만 둔다.
+    pub(super) fn tick_skate(&mut self, c: &mut Ctx<'_>) {
+        let dt = c.dt;
+        let sp = self.sp();
+        if !c.targetable {
+            return;
+        }
+        self.facing = c.dir_to_player;
+        let on_water = c.room.water_at(self.pos);
+        let speed = self.speed() * if on_water { t::STRIDER_WATER_MUL } else { 1.0 };
+        let want = (sp.keep.0 + sp.keep.1) * 0.5;
+        let here = self.pos;
+        let pp = c.player_pos;
+        // 고르는 값: 플레이어와의 거리가 알맞을수록 + 가까운 칸일수록. 플레이어 발밑 칸은 피한다.
+        let best = c
+            .room
+            .water_cells()
+            .filter(|w| (*w - pp).length() > sp.keep.0 * 0.6)
+            .min_by(|a, b| {
+                let score = |w: Vec2| ((w - pp).length() - want).abs() + (w - here).length() * 0.35;
+                score(*a).total_cmp(&score(*b))
+            });
+        let target = match best {
+            Some(w) => w,
+            None => here - c.dir_to_player * (want - c.dist),
+        };
+        let to = target - here;
+        if to.length() > 2.0 {
+            self.pos += to.normalize() * speed.min(to.length() / dt) * dt;
+        }
+        if c.dist < sp.keep.1 + 20.0 {
+            self.fire_cd -= dt;
+        }
+        if self.fire_cd <= 0.0 {
+            self.state = State::Aim { time: 0.0 };
+        }
+    }
+}
+
+/// 소금쟁이 물결 고리의 다 퍼진 반지름(0275 P4): 물 위에서 두드리면 멀리, 땅에서는 짧게. 예고 원판도 이 값.
+pub fn ripple_radius(on_water: bool) -> f32 {
+    if on_water {
+        t::RIPPLE_R
+    } else {
+        t::RIPPLE_R * t::RIPPLE_LAND_MUL
     }
 }
