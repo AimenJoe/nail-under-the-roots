@@ -1,4 +1,5 @@
-//! 앨범: 본 일러스트 고르기·크게 보기. 일러스트 뒤에 실의 기억 여섯(0273 A) — 칸은 그 조각의 그림, 크게 보면 조각 글.
+//! 앨범: 본 일러스트 고르기·크게 보기. 일러스트 뒤에 실의 기억 여섯(0273 A), 그 뒤에 이야기 조각(0273 C) —
+//! 칸은 그 조각의 그림, 크게 보면 조각 글(이야기 조각은 제목도).
 
 use super::*;
 
@@ -6,31 +7,61 @@ pub(super) const ALBUM_COLS: usize = 5;
 /// 앨범에 한 번에 보이는 줄. 그림이 더 많으면 굴린다(0085).
 pub(super) const ALBUM_ROWS: usize = 2;
 
+/// 앨범 칸 하나(0273): 그림, 본·받은 적 있나, 무슨 칸인가.
+struct AlbumItem {
+    illust: crate::illust::Illust,
+    seen: bool,
+    kind: AlbumKind,
+}
+
+#[derive(Clone, Copy)]
+enum AlbumKind {
+    Illust,
+    /// 실의 기억(글).
+    Memory(Tr),
+    /// 이야기 조각(제목, 글).
+    Tale(Tr, Tr),
+}
+
 impl App {
     pub(super) fn album_seen(&self, il: crate::illust::Illust) -> bool {
         self.profile
             .flag(&crate::profile::key::illust(il.spec().file))
     }
 
-    /// 앨범 칸 i(일러스트 다음에 실의 기억): 그림, 본 적 있나, 실의 기억이면 그 글.
-    fn album_item(&self, i: usize) -> (crate::illust::Illust, bool, Option<Tr>) {
+    /// 앨범 칸 i: 일러스트 → 실의 기억 → 이야기 조각.
+    fn album_item(&self, i: usize) -> AlbumItem {
         use crate::illust::Illust;
-        match i.checked_sub(Illust::ALL.len()) {
-            None => (Illust::ALL[i], self.album_seen(Illust::ALL[i]), None),
-            Some(k) => {
-                let n = k as u8 + 1;
-                let m = crate::memories::get(n);
-                (
-                    m.illust,
-                    crate::memories::seen(&self.profile, n),
-                    Some(m.text),
-                )
-            }
+        let mems = crate::world::MEMORIES as usize;
+        if i < Illust::ALL.len() {
+            let il = Illust::ALL[i];
+            return AlbumItem {
+                illust: il,
+                seen: self.album_seen(il),
+                kind: AlbumKind::Illust,
+            };
+        }
+        let k = i - Illust::ALL.len();
+        if k < mems {
+            let n = k as u8 + 1;
+            let m = crate::memories::get(n);
+            return AlbumItem {
+                illust: m.illust,
+                seen: crate::memories::seen(&self.profile, n),
+                kind: AlbumKind::Memory(m.text),
+            };
+        }
+        let t = (k - mems).min(crate::tales::ALL.len() - 1);
+        let tale = &crate::tales::ALL[t];
+        AlbumItem {
+            illust: tale.illust,
+            seen: crate::tales::owned(&self.profile, t),
+            kind: AlbumKind::Tale(tale.title, tale.text),
         }
     }
 
     fn album_len() -> usize {
-        crate::illust::Illust::ALL.len() + crate::world::MEMORIES as usize
+        crate::illust::Illust::ALL.len() + crate::world::MEMORIES as usize + crate::tales::ALL.len()
     }
 
     /// 앨범: 5×2 칸에서 고르고, 본 그림은 크게(패닝·입자 그대로). 확인·뒤로·탭으로 닫는다.
@@ -81,7 +112,7 @@ impl App {
             None
         };
         if let Some(i) = chosen {
-            if self.album_item(i).1 {
+            if self.album_item(i).seen {
                 self.album_view = Some(0.0);
             }
         }
@@ -93,22 +124,32 @@ impl App {
     pub(super) fn draw_album(&mut self, ui: &Ui) {
         let s = i18n::s();
         if let Some(t) = self.album_view {
-            let (il, _, text) = self.album_item(self.album_cursor);
-            self.renderer.draw_illust(ui, il, t);
-            // 실의 기억은 그림 아래에 조각 글(컷씬의 내레이션처럼 아래서 위로 옅어지는 어둠 위에).
+            let item = self.album_item(self.album_cursor);
+            self.renderer.draw_illust(ui, item.illust, t);
+            // 실의 기억·이야기 조각은 그림 아래에 글(컷씬의 내레이션처럼 어두운 띠 위에). 이야기 조각은 제목이 한 줄 위에.
+            let (title, text) = match item.kind {
+                AlbumKind::Illust => (None, None),
+                AlbumKind::Memory(text) => (None, Some(text)),
+                AlbumKind::Tale(title, text) => (Some(title), Some(text)),
+            };
             if let Some(text) = text {
                 let lines = ui::wrap(ui, tr(text), 280.0, FONT_PX);
-                let top = 150.0 - lines.len() as f32 * 13.0;
+                let heads = title.is_some() as usize;
+                let top = 150.0 - (lines.len() + heads) as f32 * 13.0;
                 ui.rect(
                     Rect::new(0.0, top - 6.0, t::VIEW_W, t::VIEW_H - top + 6.0),
                     Color::new(0.03, 0.02, 0.05, 0.66),
                 );
                 let ui = &ui.with_outline();
+                if let Some(title) = title {
+                    let head = ui.fit(tr(title), 280.0, FONT_PX);
+                    ui.text_center(&head, 160.0, top, FONT_PX, ui::ACCENT);
+                }
                 for (k, l) in lines.iter().enumerate() {
                     ui.text_center(
                         l,
                         160.0,
-                        top + k as f32 * 13.0,
+                        top + (k + heads) as f32 * 13.0,
                         FONT_PX,
                         Color::new(0.94, 0.90, 0.82, 1.0),
                     );
@@ -130,9 +171,9 @@ impl App {
         let top = self
             .album_rows
             .window(row, rows, ALBUM_ROWS, ch + gap + 10.0);
-        let seen = (0..n).filter(|i| self.album_item(*i).1).count();
+        let seen = (0..n).filter(|i| self.album_item(*i).seen).count();
         for i in 0..n {
-            let (il, is_seen, memory) = self.album_item(i);
+            let item = self.album_item(i);
             let r_row = i / ALBUM_COLS;
             if r_row < top || r_row >= top + ALBUM_ROWS {
                 continue;
@@ -143,15 +184,28 @@ impl App {
                 cw,
                 ch,
             );
-            if is_seen {
-                self.renderer.draw_illust_thumb(ui, il, r);
-                // 실의 기억 칸: 그림이 일러스트와 겹치니 모서리에 흰 실 표시.
-                if memory.is_some() {
-                    ui.rect(Rect::new(r.right() - 7.0, r.y + 2.0, 5.0, 3.0), ui::TEXT);
-                    ui.rect(
-                        Rect::new(r.right() - 3.0, r.y + 5.0, 2.0, 1.0),
-                        Color::new(0.70, 0.56, 0.86, 1.0),
-                    );
+            if item.seen {
+                self.renderer.draw_illust_thumb(ui, item.illust, r);
+                // 그림이 일러스트와 겹치니 모서리 표시: 실의 기억은 흰 실, 이야기 조각은 펼친 책.
+                match item.kind {
+                    AlbumKind::Illust => {}
+                    AlbumKind::Memory(_) => {
+                        ui.rect(Rect::new(r.right() - 7.0, r.y + 2.0, 5.0, 3.0), ui::TEXT);
+                        ui.rect(
+                            Rect::new(r.right() - 3.0, r.y + 5.0, 2.0, 1.0),
+                            Color::new(0.70, 0.56, 0.86, 1.0),
+                        );
+                    }
+                    AlbumKind::Tale(..) => {
+                        let (bx, by) = (r.right() - 9.0, r.y + 2.0);
+                        ui.rect(
+                            Rect::new(bx, by, 7.0, 5.0),
+                            Color::new(0.55, 0.38, 0.28, 1.0),
+                        );
+                        let page = Color::new(0.93, 0.88, 0.76, 1.0);
+                        ui.rect(Rect::new(bx + 1.0, by, 2.0, 4.0), page);
+                        ui.rect(Rect::new(bx + 4.0, by, 2.0, 4.0), page);
+                    }
                 }
             } else {
                 ui.rect(r, ui::PANEL_LIGHT);

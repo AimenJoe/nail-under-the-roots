@@ -1266,6 +1266,13 @@ impl App {
                 } else {
                     None
                 },
+                // 이웃의 부탁(0273 B): 들었는데 아직 못 찾은 것이 있으면 이번 런의 맞는 굴에 하나.
+                quest: if normal {
+                    crate::quests::seek(&self.profile)
+                        .map(|q| (q as u8, crate::quests::ALL[q].biome))
+                } else {
+                    None
+                },
             });
             // 개발 시나리오는 길을 이미 짰으니(쉼터에서 시작) 갈래를 넣어 다시 짠다.
             if self.world.story.warren_open()
@@ -1923,6 +1930,7 @@ impl App {
             doto: self.profile.flag(key::DOTO_MEMORY) && self.picked() != Character::Doto,
             kongi: self.profile.flag(key::KONGI_BACK),
             clover: self.profile.flag(key::CLOVER_BACK),
+            traces: std::array::from_fn(|i| crate::quests::done(&self.profile, i)),
             // 거꾸로 Naïl은 다른 캐릭터로 걸을 때 큰 나무 곁에 남는다(0249).
             nail: self.picked() != Character::Mole,
             decor,

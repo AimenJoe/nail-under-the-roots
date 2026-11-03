@@ -19,6 +19,8 @@ pub(super) enum Drawable {
     Decor(usize, Vec2),
     /// 실 고리(0055).
     DreamLoop(Vec2),
+    /// 들어준 부탁의 흔적(0273 B, `quests::ALL` 번호, 자리).
+    Trace(usize, Vec2),
 }
 
 /// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
@@ -83,6 +85,10 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
             match c {
                 'Y' => {
                     list.push((at.y + 8.0, Drawable::Tree(*at, v.growth)));
+                    if v.traces[crate::quests::DOTO] {
+                        let t = *at + TRACE_OFFSET[crate::quests::DOTO];
+                        list.push((t.y + 3.0, Drawable::Trace(crate::quests::DOTO, t)));
+                    }
                     // 깨울 재주가 있으면 밑동이 빛난다(그림자처럼 먼저, 0061).
                     if v.tree_ready && ground {
                         draw_tree_glow(*at + vec2(0.0, 14.0), w.time);
@@ -93,6 +99,12 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                     draw_puddle(*at, w.time)
                 }
                 'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
+                // 들어준 부탁의 흔적(0273 B): 그 이웃 자리 곁(이웃이 없어도 — 플레이어가 그 이웃이어도 흔적은 남는다).
+                'K' | 'b' | 'M' if v.traces[trace_of(*c)] => {
+                    let i = trace_of(*c);
+                    let at = *at + TRACE_OFFSET[i];
+                    list.push((at.y + 3.0, Drawable::Trace(i, at)));
+                }
                 c if crate::village::slot_decor(*c).is_some() => {
                     let i = crate::village::slot_decor(*c).unwrap_or(0);
                     if v.decor.get(i).copied().unwrap_or(false) {
@@ -427,8 +439,26 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
             }
         }
         Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
+        Drawable::Trace(i, at) => draw_quest_trace(i, at, w.time),
     }
 }
+
+/// 부탁 흔적이 붙는 지도 기호 → 부탁 번호(큰 나무 'Y'의 깍정이는 따로).
+fn trace_of(c: char) -> usize {
+    match c {
+        'K' => crate::quests::POPO,
+        'b' => crate::quests::BORI,
+        _ => crate::quests::MOMO,
+    }
+}
+
+/// 흔적 자리: 기호에서 얼마나 떨어져 있나(포포 왼쪽 아래 — 좌판과 사이 · 보리 오른쪽 · 모모 자리 오른쪽 · 큰 나무 밑동 오른쪽).
+const TRACE_OFFSET: [Vec2; 4] = [
+    vec2(-11.0, 12.0),
+    vec2(11.0, 5.0),
+    vec2(18.0, 7.0),
+    vec2(17.0, 24.0),
+];
 
 /// 정렬 그리기 한 개의 발 x(그림자 패스가 모닥불까지 거리를 잴 때).
 pub(super) fn drawable_x(w: &World, alpha: f32, d: &Drawable) -> f32 {
@@ -445,7 +475,10 @@ pub(super) fn drawable_x(w: &World, alpha: f32, d: &Drawable) -> f32 {
             .as_ref()
             .map_or(0.0, |n| lerp(n.prev_pos, n.pos, alpha).x),
         Drawable::Neighbor(i) => w.neighbors[i].pos.x,
-        Drawable::Tree(at, _) | Drawable::Decor(_, at) | Drawable::DreamLoop(at) => at.x,
+        Drawable::Tree(at, _)
+        | Drawable::Decor(_, at)
+        | Drawable::DreamLoop(at)
+        | Drawable::Trace(_, at) => at.x,
     }
 }
 
@@ -487,6 +520,91 @@ fn draw_root_grass(b: Vec2) {
             if h >= 4.0 {
                 let tip = if lean_left { -1.0 } else { 1.0 };
                 draw_rectangle(bx + tip, y - h - 1.0, 1.0, 1.0, c);
+            }
+        }
+    }
+}
+
+/// 들어준 부탁의 흔적(0273 B). 0 샘 그릇(물이 반짝), 1 갈대 피리(가끔 음표가 오른다), 2 꽃밭(분홍·흰 꽃 넷), 3 큰 깍정이.
+fn draw_quest_trace(i: usize, at: Vec2, time: f32) {
+    let (x, y) = (at.x.round(), at.y.round());
+    let px = |dx: f32, dy: f32, w: f32, h: f32, c: Color| draw_rectangle(x + dx, y + dy, w, h, c);
+    let dark = Color::new(0.22, 0.15, 0.13, 1.0);
+    if !shadow_pass() {
+        draw_ellipse(x, y + 3.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+    }
+    match i {
+        0 => {
+            // 돌 그릇에 담긴 샘물.
+            px(-5.0, -2.0, 11.0, 5.0, dark);
+            px(-4.0, -1.0, 9.0, 3.0, Color::new(0.60, 0.60, 0.64, 1.0));
+            px(-3.0, -1.0, 7.0, 1.0, Color::new(0.45, 0.70, 0.90, 1.0));
+            if (time * 1.3).sin() > 0.4 {
+                px(-1.0, -1.0, 2.0, 1.0, Color::new(0.85, 0.95, 1.0, 1.0));
+            }
+        }
+        1 => {
+            // 통나무에 기대 둔 갈대 피리 + 몇 초마다 오르는 음표 하나.
+            px(-1.0, -7.0, 3.0, 10.0, dark);
+            px(0.0, -6.0, 1.0, 8.0, Color::new(0.88, 0.76, 0.48, 1.0));
+            if shadow_pass() {
+                return;
+            }
+            let t = (time * 0.35).fract();
+            if t < 0.45 {
+                let k = t / 0.45;
+                let (nx, ny) = (x + 3.0 + (k * 6.0).sin() * 2.0, y - 10.0 - k * 12.0);
+                let a = 1.0 - k;
+                let c = Color::new(0.96, 0.92, 0.80, a);
+                draw_rectangle(nx.round(), ny.round(), 2.0, 2.0, c);
+                draw_rectangle(nx.round() + 1.0, ny.round() - 4.0, 1.0, 4.0, c);
+                draw_rectangle(nx.round() + 2.0, ny.round() - 4.0, 1.0, 1.0, c);
+            }
+        }
+        2 => {
+            // 갈아 놓은 흙 한 줄 위에 꽃 넷: 분홍·흰 번갈아, 줄기 초록(바닥 꽃 장식과 갈리게 심은 자리).
+            px(-7.0, 1.0, 15.0, 3.0, Color::new(0.40, 0.27, 0.18, 1.0));
+            px(-6.0, 1.0, 13.0, 1.0, Color::new(0.52, 0.36, 0.24, 1.0));
+            let stem = Color::new(0.36, 0.62, 0.34, 1.0);
+            let pink = Color::new(0.96, 0.58, 0.74, 1.0);
+            let white = Color::new(0.97, 0.95, 0.90, 1.0);
+            for (k, (dx, dy)) in [(-5.0, 0.0), (-1.0, -1.0), (3.0, 0.0), (6.0, -1.0)]
+                .iter()
+                .enumerate()
+            {
+                let sway = ((time * 1.2 + k as f32).sin() * 0.6).round();
+                px(*dx, *dy, 1.0, 3.0, stem);
+                let c = if k % 2 == 0 { pink } else { white };
+                px(*dx - 1.0 + sway, *dy - 2.0, 3.0, 1.0, c);
+                px(*dx + sway, *dy - 3.0, 1.0, 3.0, c);
+                px(
+                    *dx + sway,
+                    *dy - 2.0,
+                    1.0,
+                    1.0,
+                    Color::new(1.0, 0.88, 0.40, 1.0),
+                );
+            }
+        }
+        _ => {
+            // 큰 깍정이: 뒤집힌 반달 + 비늘 무늬.
+            px(-5.0, -2.0, 11.0, 2.0, dark);
+            px(-4.0, 0.0, 9.0, 2.0, dark);
+            px(-3.0, 2.0, 7.0, 1.0, dark);
+            let cup = Color::new(0.60, 0.42, 0.25, 1.0);
+            px(-4.0, -1.0, 9.0, 1.0, Color::new(0.72, 0.54, 0.34, 1.0));
+            px(-3.0, 0.0, 7.0, 2.0, cup);
+            let scale = Color::new(0.42, 0.28, 0.16, 1.0);
+            for (dx, dy) in [
+                (-3.0, 0.0),
+                (-1.0, 0.0),
+                (1.0, 0.0),
+                (3.0, 0.0),
+                (-2.0, 1.0),
+                (0.0, 1.0),
+                (2.0, 1.0),
+            ] {
+                px(dx, dy, 1.0, 1.0, scale);
             }
         }
     }

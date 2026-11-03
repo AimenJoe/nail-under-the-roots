@@ -1036,6 +1036,7 @@ impl App {
             Reward::Decor(i) => fill(s.r_decor, &[&tr(crate::village::decor_name(i))]),
             Reward::Charm(i) => fill(s.r_charm, &[&tr(crate::equipment::CHARMS[i].name)]),
             Reward::Weapon(i) => fill(s.r_weapon, &[&tr(crate::equipment::WEAPONS[i].name)]),
+            Reward::Tale(i) => fill(s.r_tale, &[&tr(crate::tales::ALL[i].title)]),
         };
         let what = fill(s.j_reward, &[&what]);
         // 아래에서부터 쌓는다: 상태(받기 상자 / 어디 있나 두 줄 / 진행 막대) 위에 보상(아이콘 + 두 줄까지), 남은 자리에 설명(세 줄까지).
@@ -1307,6 +1308,14 @@ fn draw_reward_icon(ui: &Ui, r: crate::journal::Reward, x: f32, y: f32) {
             let c = crate::equipment::WEAPONS[i].color;
             ui.rect(Rect::new(x + 1.0, y + 1.0, 2.0, 5.0), c);
             ui.rect(Rect::new(x + 4.0, y + 2.0, 2.0, 5.0), c);
+        }
+        Reward::Tale(_) => {
+            // 이야기 조각은 펼친 책 한 권(양쪽 쪽 + 가운데 접힘).
+            let page = Color::new(0.93, 0.88, 0.76, 1.0);
+            let cover = Color::new(0.55, 0.38, 0.28, 1.0);
+            ui.rect(Rect::new(x, y + 1.0, 7.0, 6.0), cover);
+            ui.rect(Rect::new(x + 1.0, y + 1.0, 2.0, 5.0), page);
+            ui.rect(Rect::new(x + 4.0, y + 1.0, 2.0, 5.0), page);
         }
     }
 }

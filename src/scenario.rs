@@ -89,6 +89,8 @@ pub enum Scenario {
     Spring,
     /// 실의 기억(0273 A): 던전 시작방, 넷째 조각이 곁 바닥에 — 밟으면 장면.
     Memory,
+    /// 이웃의 부탁 물건(0273 B): 던전 시작방, 모모의 꽃씨 주머니가 곁 바닥에 — 밟으면 알림.
+    QuestItem,
     /// 출구 확인(0159): 적 없는 한 방짜리 굴 — 들어서면 바로 출구가 열린다.
     Exit,
     /// 보스 2단계 확인(0233): 빈 방에 보스 하나, 체력 반 — 깨자마자 2단계로 깨어난다.
@@ -153,7 +155,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 55] = [
+pub const LIST: [Entry; 56] = [
     Entry {
         cat: Cat::Tools,
         name: "대화 검수",
@@ -213,6 +215,12 @@ pub const LIST: [Entry; 55] = [
         name: "실의 기억",
         desc: "던전 시작방 곁 바닥에 실의 기억 넷째 조각. 밟으면 그림 + 내레이션(0273 A).",
         scenario: Scenario::Memory,
+    },
+    Entry {
+        cat: Cat::Story,
+        name: "부탁 물건",
+        desc: "던전 시작방 곁 바닥에 모모의 꽃씨 주머니(부탁 물건). 밟으면 누구에게 가져갈지 알림(0273 B).",
+        scenario: Scenario::QuestItem,
     },
     Entry {
         cat: Cat::Places,
@@ -524,6 +532,16 @@ pub fn build(s: Scenario) -> World {
                 ..Default::default()
             });
             w.story.place_memory(w.player.pos + vec2(-30.0, 4.0));
+            w
+        }
+        Scenario::QuestItem => {
+            let mut w = World::field();
+            w.enter_dungeon_now();
+            w.story.seed(crate::world::StorySeed {
+                quest: Some((crate::quests::MOMO as u8, None)),
+                ..Default::default()
+            });
+            w.story.place_quest(w.player.pos + vec2(-30.0, 4.0));
             w
         }
         Scenario::Hall(_) => hall(),

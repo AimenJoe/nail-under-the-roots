@@ -438,6 +438,10 @@ pub struct Story {
     memory_at: Option<Vec2>,
     /// 이번 런에 들어선 굴 수(실의 기억은 둘째 굴부터).
     burrows: u32,
+    /// 이웃의 부탁(0273 B): 이번 런에 찾을 것(`quests::ALL` 번호)과 그것이 놓이는 지대(None = 어느 굴이든). 주우면 None.
+    quest_next: Option<(u8, Option<crate::biome::Biome>)>,
+    /// 굴 바닥에 놓인 부탁 물건 자리. 굴을 떠나면 치우고 다음 맞는 굴에 다시 놓는다.
+    quest_at: Option<Vec2>,
 }
 
 /// 기록(profile)이 새 런의 이야기에 주는 것(0170 R11). 앱이 기록에서 만들어 `Story::seed`에 넣는다. 월드는 기록을 모른다.
@@ -452,6 +456,8 @@ pub struct StorySeed {
     pub warren_open: bool,
     /// 실의 기억(0273 A): 이번 런에 놓을 다음 조각. 반쪽 엔딩을 본 기록의 첫 시작에서만.
     pub memory_next: Option<u8>,
+    /// 이웃의 부탁(0273 B): 이번 런에 굴에서 찾을 것(번호, 지대). 들은 부탁을 아직 못 찾은 기록의 첫 시작에서만.
+    pub quest: Option<(u8, Option<crate::biome::Biome>)>,
 }
 
 /// 보스를 이긴 결과: 이긴 수와 돌아왔나(모모만 세 번).
@@ -473,6 +479,8 @@ impl Story {
         self.memory_next = s.memory_next;
         self.memory_at = None;
         self.burrows = 0;
+        self.quest_next = s.quest;
+        self.quest_at = None;
     }
 
     /// 이번 런에 그 보스와 길 끝에서 싸우나.
@@ -542,6 +550,7 @@ impl Story {
     pub fn clear_petals(&mut self) {
         self.petals.clear();
         self.memory_at = None;
+        self.quest_at = None;
     }
 
     /// 이번 런에 주울 실의 기억(0273 A). 주웠으면 None.
@@ -563,6 +572,20 @@ impl Story {
         self.memory_at = Some(at);
     }
 
+    /// 이 지대의 굴에 부탁 물건을 놓을까(0273 B): 이번 런에 찾을 것이 남았고 지대가 맞으면.
+    pub fn quest_wants(&self, biome: crate::biome::Biome) -> bool {
+        self.quest_next
+            .is_some_and(|(_, b)| b.is_none_or(|b| b == biome))
+            && self.quest_at.is_none()
+    }
+    pub fn place_quest(&mut self, at: Vec2) {
+        self.quest_at = Some(at);
+    }
+    #[cfg(test)]
+    pub fn quest_at(&self) -> Option<Vec2> {
+        self.quest_at
+    }
+
     /// 바닥에 놓인 이야기 물건 전부(0258): 렌더는 이것 하나만 돌며 줍는 것 표시(`draw_pickup_mark`)를 붙인다 —
     /// 어둠·그늘 위에도 반짝임이 남는다. 새 이야기 물건은 `StoryItem`에 한 줄 + 여기에 한 줄.
     pub fn pickups(&self) -> impl Iterator<Item = (StoryItem, Vec2)> + '_ {
@@ -570,6 +593,11 @@ impl Story {
             .iter()
             .map(|p| (StoryItem::Petal, *p))
             .chain(self.memory_at.map(|p| (StoryItem::Memory, p)))
+            .chain(
+                self.quest_at
+                    .zip(self.quest_next)
+                    .map(|(p, (i, _))| (StoryItem::Quest(i), p)),
+            )
     }
 }
 
@@ -585,6 +613,8 @@ pub enum StoryItem {
     Petal,
     /// 실의 기억(0273 A): 할매의 지난날 한 조각. 흰 실 한 타래.
     Memory,
+    /// 이웃의 부탁 물건(0273 B, `quests::ALL` 번호): 젖은 조약돌·갈대 피리·꽃씨 주머니·오래된 깍정이.
+    Quest(u8),
 }
 
 /// 런 통계(0169 R2): 저널 `stat.*`·튜토리얼 단계가 읽는 수. `app/run.rs`가 저장한다.
@@ -3240,6 +3270,30 @@ impl World {
         self.adv
             .events
             .push(crate::adventure::AdvEvent::MemoryFound(n));
+        true
+    }
+
+    /// 부탁 물건 줍기(0273 B): 실의 기억과 같은 거리. 주우면 이번 런엔 더 놓지 않는다.
+    pub fn quest_tick(&mut self) -> bool {
+        if !self.player.is_alive() || !self.player.on_foot() {
+            return false;
+        }
+        let (Some(at), Some((i, _))) = (self.story.quest_at, self.story.quest_next) else {
+            return false;
+        };
+        if (self.player.pos - at).length() > 10.0 {
+            return false;
+        }
+        self.story.quest_at = None;
+        self.story.quest_next = None;
+        self.juice.fx.push(glint(
+            at + vec2(0.0, -4.0),
+            Color::new(1.0, 0.95, 0.80, 1.0),
+            0.7,
+        ));
+        self.adv
+            .events
+            .push(crate::adventure::AdvEvent::QuestFound(i));
         true
     }
 

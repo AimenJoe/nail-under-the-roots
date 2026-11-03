@@ -317,6 +317,14 @@ impl App {
                             tr(t)
                         ),
                         Talk::KnotPick => "실뜨기 고르기 창".to_string(),
+                        Talk::Quest(q, step) => format!(
+                            "부탁 {} {step:?}: {}",
+                            crate::quests::ALL[q].id,
+                            tr(match step {
+                                crate::quests::Step::Ask => crate::quests::ALL[q].ask,
+                                crate::quests::Step::Thanks => crate::quests::ALL[q].thanks,
+                            })
+                        ),
                         Talk::Nothing => "아무 일도 없다".to_string(),
                     };
                     put(ui, &desc, ui::TEXT);

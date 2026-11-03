@@ -334,6 +334,16 @@ impl App {
                     }
                     self.play(cutscene::memory(&self.world, n));
                 }
+                // 이웃의 부탁 물건(0273 B): 기록에 "찾음", 누구에게 가져갈지 알림. 돌려주기는 마을에서 말 걸기로.
+                AdvEvent::QuestFound(i) => {
+                    let i = i as usize;
+                    if self.recording() {
+                        self.profile
+                            .set(&crate::quests::key_of(i, crate::quests::FOUND));
+                        self.save_profile();
+                    }
+                    self.world.juice.toast = Some((crate::quests::ALL[i].found, 3.5));
+                }
                 AdvEvent::DeepSleep => {
                     // 잠드는 장면(0163) 뒤 맡겨 둔 쉼터로.
                     self.after_cutscene = super::AfterCut::Respawn;
@@ -523,6 +533,28 @@ impl App {
                     }
                     // 누룩 할매: 실뜨기 고르기(마을, 0043·0045).
                     Talk::KnotPick => self.open_knot_pick(),
+                    // 이웃의 부탁(0273 B): 부탁 한마디 / 찾아 온 것을 돌려받는 한마디 + 마을의 흔적.
+                    Talk::Quest(q, step) => {
+                        use crate::quests::{Step, ALL};
+                        if self.recording() {
+                            crate::quests::advance(&mut self.profile, q, step);
+                            self.save_profile();
+                        }
+                        let (line, face) = match step {
+                            Step::Ask => (ALL[q].ask, Face::Normal),
+                            Step::Thanks => (ALL[q].thanks, Face::Happy),
+                        };
+                        if step == Step::Thanks {
+                            if let Some(v) = self.world.adv.village.as_mut() {
+                                v.traces[q] = true;
+                            }
+                            self.journal_ready = crate::journal::ready_count(&self.profile);
+                        }
+                        self.play(cutscene::talk(
+                            &self.world,
+                            &[(crate::story::speaker(who), line, face)],
+                        ));
+                    }
                     // 표에 줄이 없는 이웃: 아무 일도 없다. 시험이 이웃마다 줄이 있는지 본다.
                     Talk::Nothing => {}
                 }
@@ -1293,7 +1325,7 @@ impl App {
             Reward::Weapon(w) => {
                 self.inventory.add(w);
             }
-            Reward::Light(_) | Reward::Seeds(_) => {}
+            Reward::Light(_) | Reward::Seeds(_) | Reward::Tale(_) => {}
         }
         self.journal_ready = crate::journal::ready_count(&self.profile);
         self.sfx.play(crate::sfx::Id::Heal);

@@ -962,6 +962,8 @@ pub enum Talk {
     ChatterKnots(Tr, Face),
     /// 할매: 실뜨기 고르기.
     KnotPick,
+    /// 이웃의 부탁(0273 B): 부탁하기 / 찾아 온 것을 돌려받기(`quests::talk`).
+    Quest(usize, crate::quests::Step),
     /// 할 말이 없다.
     Nothing,
 }
@@ -977,6 +979,17 @@ pub struct TalkCtx<'a> {
 
 pub fn talk_route(who: Who, c: &TalkCtx) -> Talk {
     let story = |w: When| pick(c.profile, w, c.ch).is_some().then_some(Talk::Story(w));
+    // 이웃의 부탁(0273 B)은 마을에서만. 포포는 말 걸면 늘 마을 창이라 그보다 먼저, 다른 이웃은 진행 한마디 다음.
+    let quest = c
+        .village
+        .then(|| crate::quests::talk(who, c.profile))
+        .flatten()
+        .map(|(q, step)| Talk::Quest(q, step));
+    if who == Who::Popo {
+        if let Some(q) = quest {
+            return q;
+        }
+    }
     let first = match who {
         Who::Popo if c.village => Some(Talk::Decor),
         Who::Popo => Some(Talk::Shop),
@@ -999,7 +1012,7 @@ pub fn talk_route(who: Who, c: &TalkCtx) -> Talk {
         Who::Nail => story(When::TalkNail),
         _ => None,
     };
-    if let Some(t) = first {
+    if let Some(t) = first.or(quest) {
         return t;
     }
     if let Some(g) = gift(who, c.ch).filter(|g| !(c.owns)(g.weapon)) {
@@ -1095,6 +1108,12 @@ mod route_tests {
         let all = |_: usize| true;
         let mut p = Profile::default();
         p.set(key::TUTORIAL);
+        // 이웃의 부탁(0273 B): 마을의 포포는 부탁이 먼저(한 번), 들은 뒤엔 늘 마을 창. 쉼터에서는 부탁하지 않는다.
+        assert!(matches!(
+            talk_route(Who::Popo, &ctx(&p, Character::Mole, true, &none, 0)),
+            Talk::Quest(crate::quests::POPO, crate::quests::Step::Ask)
+        ));
+        crate::quests::advance(&mut p, crate::quests::POPO, crate::quests::Step::Ask);
         assert!(matches!(
             talk_route(Who::Popo, &ctx(&p, Character::Mole, true, &none, 0)),
             Talk::Decor

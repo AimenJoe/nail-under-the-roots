@@ -74,6 +74,8 @@ pub enum Metric {
     Bought,
     /// 깨운 재주 수.
     Talents,
+    /// 깃발 여럿 중 선 것 수(0273 C: 실에 감겼던 이웃 다섯이 다 돌아옴).
+    Flags(&'static [&'static str]),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,6 +88,8 @@ pub enum Reward {
     Charm(usize),
     /// equipment::WEAPONS 번호(0246): 그 무기의 기록 깃발을 세운다 — 그 캐릭터의 런마다 가방에.
     Weapon(usize),
+    /// tales::ALL 번호(0273 C): 이웃의 옛이야기 한 장. 힘이 아닌 보상, 앨범에서 다시 본다.
+    Tale(usize),
 }
 
 pub struct Goal {
@@ -224,6 +228,23 @@ pub const GOALS: &[Goal] = &[
         Some("momo3"),
         Charm(crate::equipment::SILK_KNOT)
     ),
+    // 실에 감겼던 이웃 다섯(보리·모모·도토·콩이·토끼풀)이 다 돌아옴(0273 C). 보상은 토끼풀의 옛이야기.
+    goal!(
+        "all_back",
+        Story,
+        jg_all_back,
+        jg_all_back_d,
+        Flags(&[
+            key::BORI_BACK,
+            key::MOMO_BACK,
+            key::DOTO_MEMORY,
+            key::KONGI_BACK,
+            key::CLOVER_BACK
+        ]),
+        5,
+        Some("clover"),
+        Tale(crate::tales::CLOVER)
+    ),
     // 모모와 가장 깊은 곳(0056): 모모를 골라 끝까지. 보상은 들꽃 화관(0142, 그 전에는 반딧불 40).
     goal!(
         "momo_deep",
@@ -308,7 +329,7 @@ pub const GOALS: &[Goal] = &[
         Flag(key::MEMORY_LAST),
         1,
         Some("deepest"),
-        Seeds(20)
+        Tale(crate::tales::KONGI)
     ),
     goal!(
         "true_end",
@@ -519,6 +540,47 @@ pub const GOALS: &[Goal] = &[
         Seeds(5)
     ),
     // 이웃
+    // 이웃의 부탁(0273 B): 돌려주면 그 이웃의 옛이야기(이야기 조각, 힘이 아닌 보상).
+    goal!(
+        "quest_popo",
+        Neighbors,
+        jg_q_popo,
+        jg_q_popo_d,
+        Flag(crate::quests::DONE_KEYS[crate::quests::POPO]),
+        1,
+        Some("tutorial"),
+        Tale(crate::tales::POPO)
+    ),
+    goal!(
+        "quest_bori",
+        Neighbors,
+        jg_q_bori,
+        jg_q_bori_d,
+        Flag(crate::quests::DONE_KEYS[crate::quests::BORI]),
+        1,
+        Some("bori"),
+        Tale(crate::tales::BORI)
+    ),
+    goal!(
+        "quest_momo",
+        Neighbors,
+        jg_q_momo,
+        jg_q_momo_d,
+        Flag(crate::quests::DONE_KEYS[crate::quests::MOMO]),
+        1,
+        Some("momo3"),
+        Tale(crate::tales::MOMO)
+    ),
+    goal!(
+        "quest_doto",
+        Neighbors,
+        jg_q_doto,
+        jg_q_doto_d,
+        Flag(crate::quests::DONE_KEYS[crate::quests::DOTO]),
+        1,
+        Some("doto"),
+        Tale(crate::tales::DOTO)
+    ),
     goal!(
         "mobs",
         Neighbors,
@@ -666,6 +728,7 @@ impl Goal {
                 .iter()
                 .filter(|k| p.flag(k))
                 .count() as u32,
+            Flags(ks) => ks.iter().filter(|k| p.flag(k)).count() as u32,
         };
         n.min(self.goal)
     }
@@ -738,6 +801,9 @@ fn grant(p: &mut Profile, r: Reward) {
                 p.set(k);
             }
         }
+        Tale(i) => {
+            p.set(&crate::tales::key(i));
+        }
     }
 }
 
@@ -762,6 +828,7 @@ pub fn reward_place(r: Reward) -> Tr {
         Seeds(_) => |s| s.j_got_seeds,
         Decor(_) => |s| s.j_got_decor,
         Charm(_) | Weapon(_) => |s| s.j_got_charm,
+        Tale(_) => |s| s.j_got_tale,
     }
 }
 
@@ -790,6 +857,43 @@ mod tests {
             key::knots_open(crate::equipment::Character::Mole),
             KNOTS_OPEN
         );
+    }
+
+    /// 이야기 조각(0273 C): 받으면 앨범 깃발이 서고, 재화(반딧불·씨앗)는 그대로다.
+    #[test]
+    fn tale_rewards_add_no_currency() {
+        let mut p = Profile::default();
+        p.set(key::HALF_ENDING);
+        p.set(key::MEMORY_LAST);
+        for f in ["tutorial", "camp", "deeper", "deepest"] {
+            p.set(&key_claimed(f));
+        }
+        let g = by_id("memory").unwrap();
+        let before = (
+            p.count(crate::talents::KEY_LIGHT),
+            p.count(crate::village::KEY_SEEDS),
+        );
+        assert_eq!(claim(&mut p, g), Some(Tale(crate::tales::KONGI)));
+        assert!(crate::tales::owned(&p, crate::tales::KONGI));
+        assert_eq!(
+            (
+                p.count(crate::talents::KEY_LIGHT),
+                p.count(crate::village::KEY_SEEDS)
+            ),
+            before
+        );
+        let all = by_id("all_back").unwrap();
+        for k in [
+            key::BORI_BACK,
+            key::MOMO_BACK,
+            key::DOTO_MEMORY,
+            key::KONGI_BACK,
+        ] {
+            p.set(k);
+        }
+        assert!(!all.done(&p), "넷이면 아직");
+        p.set(key::CLOVER_BACK);
+        assert!(all.done(&p));
     }
 
     #[test]

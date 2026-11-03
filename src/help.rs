@@ -98,9 +98,11 @@ pub enum Pic {
     Knot,
     /// 실의 기억(0273 A): 흰 실 타래를 밟아 줍는다.
     Memory,
+    /// 이웃의 부탁(0273 B): 굴 바닥의 부탁 물건을 밟아 줍는다(넷이 번갈아).
+    Quest,
 }
 
-pub const TOPICS: [Topic; 23] = [
+pub const TOPICS: [Topic; 24] = [
     Topic {
         id: "move",
         title: |s| s.h_move,
@@ -266,6 +268,17 @@ pub const TOPICS: [Topic; 23] = [
         body: |s| s.h_memory_d,
         pic: Pic::Memory,
         gate: Some(|p| p.flag(&key::memory(1))),
+    },
+    // 이웃의 부탁(0273 B): 처음 부탁을 들은 뒤에 열린다.
+    Topic {
+        id: "quest",
+        title: |s| s.h_quest,
+        body: |s| s.h_quest_d,
+        pic: Pic::Quest,
+        gate: Some(|p| {
+            (0..crate::quests::ALL.len())
+                .any(|i| p.flag(&crate::quests::key_of(i, crate::quests::ASKED)))
+        }),
     },
 ];
 

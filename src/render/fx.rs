@@ -46,6 +46,7 @@ pub(super) fn draw_story_pickup(
     match item {
         StoryItem::Petal => draw_left_petal(at, time),
         StoryItem::Memory => draw_memory_thread(at, time),
+        StoryItem::Quest(i) => draw_quest_item(i, at, time),
     }
 }
 
@@ -99,6 +100,79 @@ fn draw_memory_thread(at: Vec2, time: f32) {
     draw_rectangle(x + 7.0, y + 4.0, 2.0, 1.0, lilac);
     if breathe > 0.85 {
         draw_rectangle(x - 2.0, y - 2.0, 1.0, 1.0, WHITE);
+    }
+}
+
+/// 이웃의 부탁 물건(0273 B, `quests::ALL` 번호): 어두운 테두리 위 작은 물건(실의 기억과 같은 크기 9×7), 숨 쉬듯 떠오른다.
+/// 0 젖은 조약돌(물빛 반짝), 1 갈대 피리(구멍 셋), 2 꽃씨 주머니(분홍 꽃 표), 3 오래된 깍정이(비늘 무늬).
+pub(crate) fn draw_quest_item(i: u8, at: Vec2, time: f32) {
+    let (x, y) = (at.x.round(), at.y.round());
+    let breathe = 0.5 + 0.5 * (time * 1.6).sin();
+    draw_circle(
+        x + 0.5,
+        y,
+        9.0,
+        Color::new(1.0, 0.94, 0.80, 0.10 + 0.10 * breathe),
+    );
+    let y = y + ((time * 1.4).sin() * 0.5).round();
+    let dark = Color::new(0.20, 0.14, 0.12, 1.0);
+    let px = |dx: f32, dy: f32, w: f32, h: f32, c: Color| draw_rectangle(x + dx, y + dy, w, h, c);
+    match i {
+        0 => {
+            // 젖은 조약돌: 둥근 회색 돌 + 물빛 줄 + 물방울 하나.
+            for (dy, half) in [(-2.0, 2.0), (-1.0, 3.0), (0.0, 4.0), (1.0, 4.0), (2.0, 3.0)] {
+                px(-half, dy, half * 2.0 + 1.0, 1.0, dark);
+            }
+            let stone = Color::new(0.62, 0.64, 0.70, 1.0);
+            for (dy, half) in [(-1.0, 2.0), (0.0, 3.0), (1.0, 3.0)] {
+                px(-half, dy, half * 2.0 + 1.0, 1.0, stone);
+            }
+            px(-2.0, -1.0, 2.0, 1.0, Color::new(0.78, 0.90, 1.0, 1.0));
+            px(1.0, 1.0, 2.0, 1.0, Color::new(0.48, 0.50, 0.58, 1.0));
+            if breathe > 0.6 {
+                px(4.0, -3.0, 1.0, 2.0, Color::new(0.60, 0.82, 1.0, 1.0));
+            }
+        }
+        1 => {
+            // 갈대 피리: 비스듬한 대롱 + 구멍 셋.
+            px(-5.0, -1.0, 11.0, 4.0, dark);
+            let reed = Color::new(0.86, 0.74, 0.46, 1.0);
+            px(-4.0, 0.0, 9.0, 2.0, reed);
+            px(-4.0, 0.0, 9.0, 1.0, Color::new(0.95, 0.86, 0.60, 1.0));
+            for dx in [-2.0, 0.0, 2.0] {
+                px(dx, 1.0, 1.0, 1.0, Color::new(0.40, 0.28, 0.18, 1.0));
+            }
+            px(4.0, -1.0, 1.0, 1.0, Color::new(0.55, 0.42, 0.25, 1.0));
+        }
+        2 => {
+            // 꽃씨 주머니: 묶은 자루 + 분홍 꽃 표.
+            px(-3.0, -3.0, 7.0, 7.0, dark);
+            px(-4.0, -1.0, 9.0, 5.0, dark);
+            let sack = Color::new(0.76, 0.60, 0.42, 1.0);
+            px(-3.0, -1.0, 7.0, 4.0, sack);
+            px(-2.0, -2.0, 5.0, 1.0, Color::new(0.62, 0.46, 0.30, 1.0));
+            px(-1.0, -3.0, 3.0, 1.0, sack);
+            let pink = Color::new(0.95, 0.56, 0.72, 1.0);
+            px(0.0, 0.0, 1.0, 1.0, pink);
+            px(-1.0, 1.0, 3.0, 1.0, pink);
+            px(0.0, 2.0, 1.0, 1.0, pink);
+            px(0.0, 1.0, 1.0, 1.0, Color::new(1.0, 0.90, 0.45, 1.0));
+        }
+        _ => {
+            // 오래된 깍정이: 뒤집힌 반달 + 비늘 무늬.
+            for (dy, half) in [(-2.0, 4.0), (-1.0, 4.0), (0.0, 4.0), (1.0, 3.0), (2.0, 2.0)] {
+                px(-half, dy, half * 2.0 + 1.0, 1.0, dark);
+            }
+            let cup = Color::new(0.58, 0.40, 0.24, 1.0);
+            px(-3.0, -1.0, 7.0, 1.0, Color::new(0.70, 0.52, 0.32, 1.0));
+            px(-3.0, 0.0, 7.0, 1.0, cup);
+            px(-2.0, 1.0, 5.0, 1.0, cup);
+            let scale = Color::new(0.42, 0.28, 0.16, 1.0);
+            for (dx, dy) in [(-2.0, 0.0), (0.0, 0.0), (2.0, 0.0), (-1.0, 1.0), (1.0, 1.0)] {
+                px(dx, dy, 1.0, 1.0, scale);
+            }
+            px(0.0, -3.0, 1.0, 1.0, dark);
+        }
     }
 }
 

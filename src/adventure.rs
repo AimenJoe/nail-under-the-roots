@@ -133,6 +133,8 @@ pub enum AdvEvent {
     PetalFound,
     /// 실의 기억 한 조각을 주웠다(0273 A, 1..=6): 앱이 기록에 남기고 그 조각의 장면을 튼다.
     MemoryFound(u8),
+    /// 이웃의 부탁 물건을 주웠다(0273 B, `quests::ALL` 번호).
+    QuestFound(u8),
     /// 굴에서 문이 열린 채 다른 방으로 넘어섰다(0265): 앱이 기록·이어하기를 적는다 — 지난 방에서 주운 것까지.
     RoomEntered,
     /// 싸움방을 비웠다(문이 열렸다, 0265): 앱이 기록·이어하기를 적는다(통계·처음 본 이웃·싸움 뒤 체력).
@@ -706,7 +708,7 @@ impl World {
         if self.petal_tick() {
             self.juice.audio.play(sfx::Id::Glowbug);
         }
-        if self.memory_tick() {
+        if self.memory_tick() || self.quest_tick() {
             self.juice.audio.play(sfx::Id::Glowbug);
         }
         if self.adv.place == Place::Field {
@@ -1033,14 +1035,22 @@ impl World {
         self.adv.boss_cleared = false;
         self.adv.last_cell = None;
         self.biome = biome;
-        self.place_memory_in_burrow();
+        self.place_story_in_burrow();
         self.snap_cam();
     }
 
-    /// 실의 기억(0273 A): 이번 런의 둘째 굴부터, 조각이 남았으면 조용한 방(쉼·보물 → 곁방 보상이 있는 싸움방 → 싸움방) 하나의
-    /// 가운데에 놓는다. 고르는 것은 굴 시드로 — 같은 시드 = 같은 자리. 꿈에서는 놓지 않는다.
-    fn place_memory_in_burrow(&mut self) {
-        if self.dream || !self.story.burrow_entered() {
+    /// 이야기 물건을 굴에 놓는다 — 고르는 것은 굴 시드로(같은 시드 = 같은 자리), 꿈에서는 놓지 않는다.
+    /// - 실의 기억(0273 A): 이번 런의 둘째 굴부터, 조각이 남았으면.
+    /// - 이웃의 부탁(0273 B): 찾을 것이 남았고 그 지대의 굴이면 첫 굴부터. 실의 기억과는 다른 방에(방이 하나면 곁에).
+    ///
+    /// 자리는 조용한 방(쉼·보물 → 곁방 보상이 있는 싸움방 → 싸움방)의 가운데.
+    fn place_story_in_burrow(&mut self) {
+        if self.dream {
+            return;
+        }
+        let memory = self.story.burrow_entered();
+        let quest = self.story.quest_wants(self.biome);
+        if !memory && !quest {
             return;
         }
         let Some(d) = self.adv.dungeon.as_ref() else {
@@ -1060,9 +1070,24 @@ impl World {
         let Some(list) = [quiet, side, any].into_iter().find(|l| !l.is_empty()) else {
             return;
         };
-        let at = list[((self.adv.seed >> 11) % list.len() as u64) as usize];
-        self.story
-            .place_memory(dungeon::room_rect(at).center() + vec2(0.0, 6.0));
+        let spot = |at: (i32, i32)| dungeon::room_rect(at).center() + vec2(0.0, 6.0);
+        let mem_room = list[((self.adv.seed >> 11) % list.len() as u64) as usize];
+        if memory {
+            self.story.place_memory(spot(mem_room));
+        }
+        if quest {
+            let rest: Vec<_> = list
+                .iter()
+                .copied()
+                .filter(|r| !memory || *r != mem_room)
+                .collect();
+            let at = if rest.is_empty() {
+                spot(mem_room) + vec2(-24.0, 0.0)
+            } else {
+                spot(rest[((self.adv.seed >> 17) % rest.len() as u64) as usize])
+            };
+            self.story.place_quest(at);
+        }
     }
 
     /// 맡겨 둔 필드·쉼터로 돌아온다.
@@ -2479,6 +2504,45 @@ mod tests {
         assert!(w.story.memory_next().is_none() && w.story.memory_at().is_none());
         w.enter_dungeon_now();
         assert!(w.story.memory_at().is_none(), "한 런에 하나");
+    }
+
+    /// 이웃의 부탁 물건(0273 B): 지대가 맞는 굴에 첫 굴부터, 실의 기억과 다른 자리, 주우면 한 번.
+    #[test]
+    fn quest_item_lies_in_a_matching_burrow_apart_from_the_memory() {
+        let start = |quest: Option<(u8, Option<crate::biome::Biome>)>| {
+            let mut w = World::camp_start_seeded(7);
+            w.story.seed(crate::world::StorySeed {
+                memory_next: Some(1),
+                quest,
+                ..Default::default()
+            });
+            w.enter_dungeon_now();
+            w
+        };
+        let w = start(Some((2, None)));
+        let biome = w.biome;
+        let at = w.story.quest_at().expect("어느 굴이든 → 첫 굴에");
+        let other = if biome == crate::biome::Biome::Deep {
+            crate::biome::Biome::Meadow
+        } else {
+            crate::biome::Biome::Deep
+        };
+        assert!(
+            start(Some((2, Some(other)))).story.quest_at().is_none(),
+            "다른 지대엔 없다"
+        );
+        assert_eq!(start(Some((2, Some(biome)))).story.quest_at(), Some(at));
+        // 둘째 굴: 실의 기억과 겹치지 않는다.
+        let mut w = start(Some((2, None)));
+        w.enter_dungeon_now();
+        let (m, q) = (w.story.memory_at().unwrap(), w.story.quest_at().unwrap());
+        assert!((m - q).length() > 12.0, "기억과 부탁 물건은 떨어져 있다");
+        w.adv.events.clear();
+        w.player.pos = q;
+        assert!(w.quest_tick());
+        assert_eq!(w.adv.events, vec![AdvEvent::QuestFound(2)]);
+        w.enter_dungeon_now();
+        assert!(w.story.quest_at().is_none(), "주운 뒤엔 없다");
     }
 
     /// 같은 시드면 같은 첫 길(이어하기·버그 재현이 기대는 성질).
