@@ -155,7 +155,7 @@ pub fn choose(l: &Listen) -> Choice {
     } else {
         match l.place {
             Place::Village => pick(Track::VillageSprings, Track::Village),
-            Place::Camp if l.stage >= crate::tuning::FINAL_STAGE => Track::Camp,
+            Place::Camp if crate::route::leg(l.stage).ends_deep() => Track::Camp,
             Place::Camp => Track::CampCalm,
             // 할매를 놓아준 뒤(엔딩).
             Place::Deep => Track::Ending,

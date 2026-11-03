@@ -75,6 +75,8 @@ pub enum Scenario {
     Camp,
     /// 둘째 쉼터(뿌리 동굴 지도, 0151).
     Camp2,
+    /// 옆 굴 쉼터(0275): 셋째 길 끝에서 옆으로 난 넷째 길 앞. 길 지도의 끝은 가장 깊은 곳.
+    SideCamp,
     /// 첫 쉼터, 실뿌리 둘이 감긴 채 체력 1, 곁에 들쥐(0225): 런이 끝나는 쓰러짐 연출을 바로 본다.
     LastRootlet,
     /// 첫 길 끝 굴(모모가 지킨다)에 바로. 숫자 = 이미 이긴 수(0 → 첫 만남, 2 → 세 번째, docs/decisions/0046).
@@ -155,7 +157,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 56] = [
+pub const LIST: [Entry; 57] = [
     Entry {
         cat: Cat::Tools,
         name: "대화 검수",
@@ -245,6 +247,12 @@ pub const LIST: [Entry; 56] = [
         name: "마지막 쉼터",
         desc: "마지막 길(길 지도의 끝이 가장 깊은 곳). 씨앗 40.",
         scenario: Scenario::LastCamp,
+    },
+    Entry {
+        cat: Cat::Places,
+        name: "쉼터: 옆 굴",
+        desc: "옆 굴 쉼터(0275, 넷째 길 앞 — 낮고 긴 굴, 왼쪽 위 좁은 틈에 숨은 자리). 길 지도의 끝은 가장 깊은 곳. 씨앗 40.",
+        scenario: Scenario::SideCamp,
     },
     Entry {
         cat: Cat::Places,
@@ -517,6 +525,12 @@ pub fn build(s: Scenario) -> World {
         }
         Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi | Scenario::Clover => road_boss(s),
         Scenario::LastRootlet => last_rootlet(),
+        Scenario::SideCamp => {
+            let mut w = World::camp_start(crate::tuning::SIDE_STAGE);
+            w.inv.seeds = 40;
+            w.adv.events.clear();
+            w
+        }
         Scenario::Camp2 => {
             let mut w = World::camp_start(2);
             w.inv.seeds = 40;

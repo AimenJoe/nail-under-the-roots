@@ -53,11 +53,41 @@ pub struct Route {
     pub stage: u32,
 }
 
+/// 몇 번째 길이 어떤 길인가(0275 R38): "셋째 길 = 마지막"을 여기 한 곳에서만 안다.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Leg {
+    /// 첫째·둘째 길: 주인을 이기면 다음 쉼터.
+    Main,
+    /// 셋째 길: 주인을 이기면 가장 깊은 곳(옆 굴이 열렸으면 고른다, 0275). 굴토끼 옛 굴 갈래(0165)도 여기.
+    Last,
+    /// 옆 굴(넷째 길, 0275): 셋째 길 끝에서 옆으로. 주인을 이기면 가장 깊은 곳.
+    Side,
+}
+
+impl Leg {
+    /// 이 길의 주인을 이기면 가장 깊은 곳으로 가나(0042).
+    pub fn ends_deep(self) -> bool {
+        matches!(self, Leg::Last | Leg::Side)
+    }
+}
+
+/// 길 번호(1부터) → 어떤 길.
+pub fn leg(stage: u32) -> Leg {
+    use crate::tuning as t;
+    if stage >= t::SIDE_STAGE {
+        Leg::Side
+    } else if stage >= t::FINAL_STAGE {
+        Leg::Last
+    } else {
+        Leg::Main
+    }
+}
+
 impl Route {
     /// `warren`이면(모모가 돌아온 뒤, 0165) 마지막 길의 보스 층이 둘이 된다: 콩이의 문 / 굴토끼 옛 굴.
     /// 보스 앞 층의 모든 칸이 두 칸으로 다 이어진다(어느 샘에서 와도 고를 수 있게).
     pub fn generate(seed: u64, stage: u32, warren: bool) -> Self {
-        let warren = warren && stage >= crate::tuning::FINAL_STAGE;
+        let warren = warren && leg(stage) == Leg::Last;
         let mut rng = Rng::new(seed ^ 0x5157_0A7E);
         let mut counts: Vec<usize> = Vec::new();
         for l in 0..CHOICE_LAYERS {
@@ -193,9 +223,14 @@ impl Route {
         }
     }
 
-    /// 마지막 길: 주인을 이기면 쉼터가 아니라 가장 깊은 곳(0042).
+    /// 어떤 길인가(0275 R38).
+    pub fn leg(&self) -> Leg {
+        leg(self.stage)
+    }
+
+    /// 주인을 이기면 쉼터가 아니라 가장 깊은 곳(0042) — 셋째 길과 옆 굴.
     pub fn is_final(&self) -> bool {
-        self.stage >= crate::tuning::FINAL_STAGE
+        self.leg().ends_deep()
     }
 
     /// 지금 고를 수 있는 칸(층, 번호).
@@ -281,6 +316,32 @@ impl Route {
 
 #[cfg(test)]
 mod tests {
+    use crate::tuning as t;
+
+    /// "셋째 길 = 마지막"은 `leg` 한 곳(0275 R38): 첫·둘째는 쉼터로, 셋째·옆 굴은 가장 깊은 곳으로.
+    /// 굴토끼 옛 굴 갈래(0165)는 셋째 길에만 — 옆 굴에는 없다.
+    #[test]
+    fn legs_know_which_path_ends_deep() {
+        assert_eq!(leg(1), Leg::Main);
+        assert_eq!(leg(2), Leg::Main);
+        assert_eq!(leg(t::FINAL_STAGE), Leg::Last);
+        assert_eq!(leg(t::SIDE_STAGE), Leg::Side);
+        assert!(!Route::generate(7, 2, true).is_final());
+        assert!(Route::generate(7, t::FINAL_STAGE, true).is_final());
+        let side = Route::generate(7, t::SIDE_STAGE, true);
+        assert!(side.is_final());
+        assert!(side
+            .layers
+            .iter()
+            .flatten()
+            .all(|n| n.kind != NodeKind::Warren));
+        assert!(Route::generate(7, t::FINAL_STAGE, true)
+            .layers
+            .iter()
+            .flatten()
+            .any(|n| n.kind == NodeKind::Warren));
+    }
+
     use super::*;
 
     fn kinds(r: &Route, l: usize) -> Vec<NodeKind> {

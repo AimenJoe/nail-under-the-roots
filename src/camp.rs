@@ -5,7 +5,8 @@
 //! 첫 쉼터에만 땅강아지 장인 수수(z, 그루터기 곁, 0053).
 //! 아래쪽 뿌리 길(G) 곁에서 확인을 누르면 길 지도가 열린다. 화면보다 조금 넓어서(26×14칸) 살짝 걷는다.
 //!
-//! 쉼터마다 지도가 다르다(0151): 첫 쉼터 = 뿌리 빈터(`ROWS`), 둘째 = 뿌리 동굴(`ROWS_2`), 셋째(마지막 길 앞) = 버섯 숲(`ROWS_3`, 심층).
+//! 쉼터마다 지도가 다르다(0151): 첫 쉼터 = 뿌리 빈터(`ROWS`), 둘째 = 뿌리 동굴(`ROWS_2`), 셋째(마지막 길 앞) = 버섯 숲(`ROWS_3`, 심층),
+//! 옆 굴(0275) = 낮고 긴 굴(`ROWS_SIDE`). 표 `CAMPS` 한 줄 = 쉼터 하나(R39).
 //! 지도마다 구석에 숨은 자리(*)가 하나: 반딧불 한 줌과 씨앗. 기호는 같아서 이웃·가게·저장·뿌리 길 자리는 지도가 정한다.
 
 use crate::biome::Biome;
@@ -64,22 +65,65 @@ pub const ROWS_3: [&str; 14] = [
     "##########################",
 ];
 
-/// `stage`번째 쉼터(1부터)의 지도. 셋째 뒤(가장 깊은 곳 앞 등)는 셋째 지도.
-pub fn parse(stage: u32) -> Parsed {
-    match stage {
-        0 | 1 => map::parse(&ROWS),
-        2 => map::parse(&ROWS_2),
-        _ => map::parse(&ROWS_3),
-    }
+/// 옆 굴 쉼터(0275): 셋째 길 끝에서 옆으로 난 낮고 긴 굴. 가운데를 가로지르는 바위 턱 아래로 돌아 들어가면
+/// 왼쪽 위 좁은 틈 끝에 숨은 자리. 지대 그림(새 지대)이 오기 전에는 심층 바닥으로 그린다.
+pub const ROWS_SIDE: [&str; 14] = [
+    "##########################",
+    "##########################",
+    "#*.....###################",
+    "##.###.......T......######",
+    "##.###...................#",
+    "#......k.K....F......b...#",
+    "#.....P..................#",
+    "#...RR########RR.....T...#",
+    "#........................#",
+    "#..M.......S.............#",
+    "#.T................G.....#",
+    "##########################",
+    "##########################",
+    "##########################",
+];
+
+/// 쉼터 한 곳: 지도 + 지대(0275 R39 — 쉼터를 더하면 표 한 줄).
+pub struct CampDef {
+    pub rows: &'static [&'static str],
+    pub biome: Biome,
 }
 
-/// 쉼터의 지대(바닥색·빛·입자). 마지막 길 앞 버섯 숲만 심층.
+/// 쉼터 표(인덱스 = 길 번호 − 1): 뿌리 빈터·뿌리 동굴·버섯 숲(마지막 길 앞, 심층)·옆 굴(0275).
+pub const CAMPS: [CampDef; 4] = [
+    CampDef {
+        rows: &ROWS,
+        biome: Biome::Roots,
+    },
+    CampDef {
+        rows: &ROWS_2,
+        biome: Biome::Roots,
+    },
+    CampDef {
+        rows: &ROWS_3,
+        biome: Biome::Deep,
+    },
+    CampDef {
+        rows: &ROWS_SIDE,
+        biome: Biome::Deep,
+    },
+];
+
+/// `stage`번째 쉼터(1부터)의 줄. 0(필드에서 처음)은 첫 쉼터, 표 밖은 마지막 줄.
+pub fn def(stage: u32) -> &'static CampDef {
+    let i = (stage.max(1) as usize - 1).min(CAMPS.len() - 1);
+    &CAMPS[i]
+}
+
+/// `stage`번째 쉼터(1부터)의 지도.
+pub fn parse(stage: u32) -> Parsed {
+    map::parse(def(stage).rows)
+}
+
+/// 쉼터의 지대(바닥색·빛·입자).
 pub fn biome(stage: u32) -> Biome {
-    if stage >= 3 {
-        Biome::Deep
-    } else {
-        Biome::Roots
-    }
+    def(stage).biome
 }
 
 #[cfg(test)]
@@ -89,7 +133,7 @@ mod tests {
 
     #[test]
     fn camp_has_save_gate_shop_and_seats() {
-        for stage in 1..=3 {
+        for stage in 1..=CAMPS.len() as u32 {
             let p = parse(stage);
             assert_eq!(p.grid.find(Cell::Save).len(), 1, "쉼터 {stage}");
             assert_eq!(p.grid.find(Cell::Gate).len(), 1, "쉼터 {stage}");
@@ -110,7 +154,7 @@ mod tests {
     /// 지도를 고쳐도(0151) 시작 자리에서 저장·뿌리 길·숨은 자리·이웃 곁에 모두 걸어서 닿는다(소품은 막는다).
     #[test]
     fn every_camp_spot_is_reachable() {
-        for stage in 1..=3 {
+        for stage in 1..=CAMPS.len() as u32 {
             let p = parse(stage);
             let (w, h) = (p.grid.w, p.grid.h);
             let cell = |v: macroquad::prelude::Vec2| ((v.x / 16.0) as usize, (v.y / 16.0) as usize);

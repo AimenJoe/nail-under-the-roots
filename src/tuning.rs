@@ -518,6 +518,9 @@ pub const VILLAGE_SEEDS_CLEAR: u32 = 5;
 pub const VILLAGE_SEEDS_KNOT: u32 = 10;
 /// 한 런 = 필드 + 길 몇 개. 이 번째 길의 주인을 이기면 가장 깊은 곳(엔딩, docs/decisions/0042).
 pub const FINAL_STAGE: u32 = 3;
+/// 옆 굴(0275): 셋째 길 끝에서 내려가지 않고 옆으로 난 넷째 길. 쉼터·길 번호로는 넷째지만 깊이는 셋째 길 끝과 같다.
+/// 어느 길이 무엇인지는 `route::leg` 한 곳에서 읽는다(0275 R38).
+pub const SIDE_STAGE: u32 = 4;
 
 /// "주울 수 있다" 표시(판정 9): 발밑 고리가 퍼지는 주기, 머리 위 별이 반짝이는 주기(초).
 pub const PICKUP_RING_EVERY: f32 = 1.2;
