@@ -1,6 +1,6 @@
 """Naïl 스프라이트 시트(28×28 칸): 나노바나나 원본(tools/art/sources/ai/sprites/)을 게임 도트로 옮긴다(0206 → 0238).
 
-실행: python3 tools/art/nail_ai.py [출력 경로]   (기본 assets/art/nail.png, 털빛 1~3은 같은 폴더의 nail_fur<n>.png)
+실행: python3 tools/art/nail_ai.py [출력 경로]   (기본 assets/art/nail.png. 털빛 시트 nail_fur*.png는 0272에서 뺐다)
 
 옮기는 법(색표·다수결 줄이기·효과 지우기·손발 색·흔들기·숨쉬기)은 공용 변환기 `sprite_ai.py`에 있고, 여기는 Naïl의
 설정(`SPEC`)과 시트 배치뿐이다. 왜 이 길인가(0203 → 0206 → 0238): 16칸 손 그림은 "두더지 같지 않다"(사장) → 실루엣 시안 1
@@ -12,7 +12,6 @@
   줄 0: 서기 2, 걷기 4 / 줄 1: 치기 3, 맞음, 쓰러짐, 들기 3, 거두기 / 줄 2: 흙더미 2, 그림자(16칸 그림을 칸 아래 가운데에)
   줄 3~5: 줄 0~2의 흰 실루엣(피격 번쩍·다 모인 몸빛)
 """
-import os
 import sys
 from pathlib import Path
 
@@ -21,8 +20,8 @@ from PIL import Image, ImageDraw, ImageFilter
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림과 털빛 표(FURS)를 같이 쓴다
-from sprite_ai import Source, Spec, convert, is_fur, magenta, seat, seat_on_fur, step_cycle  # noqa: E402
+import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림을 같이 쓴다
+from sprite_ai import Source, Spec, convert, magenta, seat, seat_on_fur, step_cycle  # noqa: E402
 
 SPRITES = HERE / "sources" / "ai" / "sprites"
 CELL = 28          # 키 약 24px(머리 키운 뒤, 0242) + 뻗은 발톱(0238: 18px는 모모 23·도토 25보다 작아 주인공이 가장 작았다)
@@ -352,39 +351,7 @@ def build():
     return sheet
 
 
-def fur_variant(sheet, fur):
-    """털빛(0048): 털 갈색만 그 털빛의 4단(d·b·h·l)에 밝기 순으로 옮긴다. 목도리·분홍·눈·흙은 그대로."""
-    if fur == 0:
-        return sheet
-    target = [legacy.FURS[fur][k] for k in "dbhl"]
-    base = [legacy.P[k] for k in "dbhl"]
-    lum = lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
-    out = sheet.copy()
-    flat = out[: CELL * 3].reshape(-1, 4)
-    cache = {}
-    for i, px in enumerate(flat):
-        if px[3] == 0:
-            continue
-        key = tuple(int(v) for v in px[:3])
-        if key not in cache:
-            if not is_fur(key):
-                cache[key] = None
-            else:
-                # 기본 털 4단 밝기 사이 어디쯤인가 → 같은 자리의 털빛 색
-                L = lum(key)
-                bl = [lum(c) for c in base]
-                t = np.interp(L, bl, range(4))
-                i0, f = int(min(t, 2.999)), t - int(min(t, 2.999))
-                c0, c1 = target[i0], target[i0 + 1]
-                cache[key] = tuple(int(c0[j] * (1 - f) + c1[j] * f) for j in range(3))
-        if cache[key] is not None:
-            flat[i, :3] = cache[key]
-    return out
-
-
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "assets/art/nail.png"
     sheet = build()
     Image.fromarray(sheet, "RGBA").save(out)
-    for n in legacy.FURS:
-        Image.fromarray(fur_variant(sheet, n), "RGBA").save(os.path.join(os.path.dirname(out) or ".", f"nail_fur{n}.png"))

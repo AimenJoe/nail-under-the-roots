@@ -513,10 +513,9 @@ pub const KNOT_PARRY: f32 = 0.75;
 pub const KNOT_BURROW_CD: f32 = 1.25;
 /// 실뜨기의 보상(0247): 단계마다 마을로 보내는 반딧불 +15%(10단계면 ×2.5).
 pub const KNOT_GLOW_STEP: f32 = 0.15;
-/// 마을 씨앗(docs/decisions/0045): 가장 깊은 곳에 닿으면 남은 씨앗 + 이것, 새 실뜨기 단계 + 이것, 오늘의 굴 완주 + 이것.
+/// 마을 씨앗(docs/decisions/0045): 가장 깊은 곳에 닿으면 남은 씨앗 + 이것, 새 실뜨기 단계 + 이것.
 pub const VILLAGE_SEEDS_CLEAR: u32 = 5;
 pub const VILLAGE_SEEDS_KNOT: u32 = 10;
-pub const VILLAGE_SEEDS_DAILY: u32 = 5;
 /// 한 런 = 필드 + 길 몇 개. 이 번째 길의 주인을 이기면 가장 깊은 곳(엔딩, docs/decisions/0042).
 pub const FINAL_STAGE: u32 = 3;
 

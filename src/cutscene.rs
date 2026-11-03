@@ -373,9 +373,7 @@ mod portrait_tests {
         assert_eq!(Portrait::MOMO_TAINTED.frame(Face::Worried), 8);
         assert_eq!(Portrait::POPO.frame(Face::Happy), 6);
         assert_eq!(Portrait::NAIL.frame(Face::Determined), 3);
-        assert_eq!(Portrait::nail(0).frame(Face::Happy), 1);
-        assert_eq!(Portrait::nail(1).frame(Face::Normal), 18);
-        assert_eq!(Portrait::nail(3).frame(Face::Determined), 29);
+        assert_eq!(Portrait::NAIL.frame(Face::Happy), 1);
         assert_eq!(Portrait::CHIEF.frame(Face::Worried), 9);
         assert_eq!(Portrait::BORI.frame(Face::Happy), 11);
         assert_eq!(Portrait::MOMO.frame(Face::Worried), 14);
@@ -941,7 +939,7 @@ fn nail_actor(w: &World) -> Actor {
             Character::Momo => MOMO_PETAL,
             Character::Doto => DOTO_FUR,
         },
-        portrait: Some((w.character.def().portrait)(w.inv.fur)),
+        portrait: Some(w.character.def().portrait),
         pos: w.player.pos,
         facing: w.player.facing,
         visible: true,
@@ -1038,7 +1036,7 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
         Speaker::NailHome => {
             let mole = crate::equipment::Character::Mole;
             Actor {
-                portrait: Some((mole.def().portrait)(w.inv.fur)),
+                portrait: Some(mole.def().portrait),
                 ..story_actor(mole.name(), crate::world::MOLE)
             }
         }

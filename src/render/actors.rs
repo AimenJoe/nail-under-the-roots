@@ -1069,7 +1069,7 @@ pub(super) fn draw_kin_player(art: &Art, p: &Player, row: u32, alpha: f32, time:
     }
 }
 
-pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
+pub(super) fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {
     match p.kit {
         crate::equipment::Character::Momo => {
             return draw_kin_player(art, p, art::MOMO_BLOOM_ROW, alpha, time)
@@ -1089,7 +1089,7 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
             let sink = (art::NAIL_CELL * k).round();
             if sink < art::NAIL_CELL {
                 draw_texture_ex(
-                    art.nail_fur(fur),
+                    &art.nail,
                     o.x,
                     o.y + sink,
                     WHITE,
@@ -1105,7 +1105,7 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
             let rise = (16.0 * (1.0 - k)).round();
             let top = art::NAIL_CELL - 16.0;
             draw_texture_ex(
-                art.nail_fur(fur),
+                &art.nail,
                 o.x,
                 o.y + top + rise,
                 WHITE,
@@ -1202,7 +1202,7 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     };
     let o = art::nail_origin(pos);
     draw_texture_ex(
-        art.nail_fur(fur),
+        &art.nail,
         o.x + jitter,
         o.y - pop + crouch,
         tint,
@@ -1217,7 +1217,7 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
     let glow = charge_glow(p);
     if glow > 0.0 && !flash {
         draw_texture_ex(
-            art.nail_fur(fur),
+            &art.nail,
             o.x + jitter,
             o.y - pop + crouch,
             Color::new(1.0, 1.0, 1.0, glow),
@@ -1232,10 +1232,10 @@ pub(super) fn draw_nail(art: &Art, p: &Player, fur: u8, alpha: f32, time: f32) {
 }
 
 /// 이웃으로 선 Naïl(다른 캐릭터로 마을을 걸을 때, 0249): 서기 두 칸을 숨 쉬듯.
-pub(super) fn draw_nail_at(art: &Art, pos: Vec2, fur: u8, face_left: bool, time: f32) {
+pub(super) fn draw_nail_at(art: &Art, pos: Vec2, face_left: bool, time: f32) {
     let o = art::nail_origin(pos);
     draw_texture_ex(
-        art.nail_fur(fur),
+        &art.nail,
         o.x,
         o.y,
         WHITE,

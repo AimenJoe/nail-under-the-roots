@@ -396,7 +396,7 @@ impl Renderer {
                 art.sunny.as_ref().map(|s| &s.sheet),
             );
             if draw_super_dim(w, cam) {
-                draw_nail(art, &w.player, w.inv.fur, alpha, w.time);
+                draw_nail(art, &w.player, alpha, w.time);
                 draw_player_fx(&w.player, alpha);
             }
         } else {

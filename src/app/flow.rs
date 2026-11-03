@@ -7,17 +7,13 @@
 use crate::equipment::Character;
 use crate::scenario::Scenario;
 
-/// 이 런의 캐릭터(0056): 런(첫 시작·오늘의 굴)과 개발의 가장 깊은 곳은 뿌리 길에서 고른 캐릭터,
+/// 이 런의 캐릭터(0056): 런(첫 시작)과 개발의 가장 깊은 곳은 뿌리 길에서 고른 캐릭터,
 /// 개발의 도토·모모 시험장은 그 캐릭터, 그 밖(실의 꿈·개발)은 Naïl. 실의 꿈은 Naïl만: 꿈 목록에 모모가 있다.
 /// 마을도 고른 캐릭터로 걷는다(사장 2026-10-29: 도토로 고르면 엔딩 뒤 올라오는 길·마을까지 도토) — 그 이웃은 자리에서 빠진다.
 pub fn character(s: Scenario, picked: Character) -> Character {
     match s {
         // 실의 꿈도 고른 캐릭터로(꿈 고르기 창에서 바꾼다).
-        Scenario::Normal
-        | Scenario::Daily
-        | Scenario::Deepest
-        | Scenario::Village
-        | Scenario::Dream => picked,
+        Scenario::Normal | Scenario::Deepest | Scenario::Village | Scenario::Dream => picked,
         // 개발: 도토로 싸워 보기(0195).
         Scenario::DotoArena | Scenario::DotoMobs => Character::Doto,
         Scenario::MomoArena => Character::Momo,
@@ -89,13 +85,13 @@ pub fn first(s: Scenario, veteran: bool, bori_back: bool, resuming: bool) -> Fir
 pub enum Fall {
     /// 모험(필드·던전)에서는 저장 지점에서 깨어난다. `wake_line`: 깨어난 뒤 이웃의 한마디(기록이 남는 런만).
     Respawn { wake_line: bool },
-    /// 실뿌리가 다 감긴 뒤 또 쓰러졌다(0210): 런이 끝난다. 이야기 런은 마을로, 그 밖(오늘의 굴)은 타이틀로.
+    /// 실뿌리가 다 감긴 뒤 또 쓰러졌다(0210): 런이 끝난다. 이야기 런은 마을로, 그 밖(개발 시나리오)은 타이틀로.
     RunLost { to_village: bool },
     /// 아레나·개발 시나리오는 처음부터.
     Restart,
 }
 
-/// 런이 끝나면 마을로 돌아가나(이야기 런). 아니면 타이틀로(오늘의 굴·개발).
+/// 런이 끝나면 마을로 돌아가나(이야기 런). 아니면 타이틀로(개발).
 pub fn back_to_village(s: Scenario) -> bool {
     s == Scenario::Normal
 }
@@ -138,7 +134,10 @@ mod tests {
     #[test]
     fn veteran_run_descends_from_village_once_bori_is_back() {
         assert!(veteran(Scenario::Normal, true));
-        assert!(!veteran(Scenario::Daily, true), "오늘의 굴은 늘 제 길");
+        assert!(
+            !veteran(Scenario::Deepest, true),
+            "개발 시나리오는 늘 제 길"
+        );
         assert_eq!(first(Scenario::Normal, true, true, false), First::Descend);
         // 보리를 아직 못 깨웠으면 들판의 공터 싸움부터, 런 첫 한마디.
         assert_eq!(
@@ -191,7 +190,7 @@ mod tests {
 
     #[test]
     fn characters_follow_the_pick_only_on_runs() {
-        for s in [Scenario::Normal, Scenario::Daily, Scenario::Deepest] {
+        for s in [Scenario::Normal, Scenario::Deepest] {
             assert_eq!(character(s, Character::Momo), Character::Momo);
         }
         assert_eq!(character(Scenario::Dream, Character::Momo), Character::Momo);
@@ -212,7 +211,7 @@ mod tests {
             Fall::Respawn { wake_line: true }
         );
         assert_eq!(
-            fall(Scenario::Daily, false, false, false),
+            fall(Scenario::Deepest, false, false, false),
             Fall::Respawn { wake_line: false }
         );
         assert_eq!(
@@ -220,7 +219,7 @@ mod tests {
             Fall::RunLost { to_village: true }
         );
         assert_eq!(
-            fall(Scenario::Daily, false, false, true),
+            fall(Scenario::Deepest, false, false, true),
             Fall::RunLost { to_village: false }
         );
         assert_eq!(fall(Scenario::Arena, true, false, false), Fall::Restart);

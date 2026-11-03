@@ -145,8 +145,6 @@ pub enum Interact {
     Seat,
     /// 마을의 큰 나무 밑동: 재주 깨우기(0047).
     Tree,
-    /// 마을 물웅덩이: 털빛 바꾸기(0048).
-    Puddle,
     /// 마을 할매 곁 실 고리: 실의 꿈(0055).
     Dream,
     Gate,
@@ -410,7 +408,9 @@ impl World {
         w
     }
 
-    /// 정한 시드로 첫 쉼터에서 시작(오늘의 굴, docs/decisions/0044). 길·굴은 이 시드에서 이어진다.
+    /// 정한 시드로 첫 쉼터에서 시작. 길·굴은 이 시드에서 이어진다 — 시험이 "같은 시드 = 같은 길"을 본다
+    /// (오늘의 굴 0044가 쓰던 입구, 0272에서 오늘의 굴은 뺐다).
+    #[cfg(test)]
     pub fn camp_start_seeded(seed: u64) -> World {
         let mut w = World::field();
         w.adv.boss = BossFight::Done;
@@ -558,9 +558,6 @@ impl World {
         if self.tree_base().is_some_and(near) {
             return Some(Interact::Tree);
         }
-        if self.puddle().is_some_and(near) {
-            return Some(Interact::Puddle);
-        }
         if self.dream_loop().is_some_and(near) {
             return Some(Interact::Dream);
         }
@@ -609,18 +606,6 @@ impl World {
             .map(|(_, at)| *at)
     }
 
-    fn puddle(&self) -> Option<Vec2> {
-        self.adv.village?;
-        if self.character != crate::equipment::Character::Mole {
-            return None;
-        }
-        self.adv
-            .marks
-            .iter()
-            .find(|(c, _)| *c == 'W')
-            .map(|(_, at)| *at)
-    }
-
     /// 확인 말풍선을 띄울 자리(이웃·자리·길 위).
     pub fn interact_anchor(&self) -> Option<Vec2> {
         let p = self.player.pos;
@@ -643,9 +628,6 @@ impl World {
         }
         if let Some(b) = self.tree_base() {
             consider(b, 14.0);
-        }
-        if let Some(b) = self.puddle() {
-            consider(b, 8.0);
         }
         if let Some(b) = self.dream_loop() {
             consider(b, 18.0);
@@ -2423,7 +2405,7 @@ mod tests {
         assert!(w.adv.fade.is_none(), "쉼터로 가지 않는다");
     }
 
-    /// 오늘의 굴: 같은 시드면 같은 첫 길.
+    /// 같은 시드면 같은 첫 길(이어하기·버그 재현이 기대는 성질).
     #[test]
     fn seeded_camp_start_gives_the_same_route() {
         let a = World::camp_start_seeded(42);

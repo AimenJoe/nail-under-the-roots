@@ -203,10 +203,10 @@ enum Back {
 
 /// 런 통계를 기록에 쌓을 때의 기준(저널, docs/decisions/0048). 월드가 새로 만들어지면 0부터.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
-struct Tally([u32; 10]);
+struct Tally([u32; 12]);
 
 impl Tally {
-    const KEYS: [&'static str; 10] = [
+    const KEYS: [&'static str; 12] = [
         crate::journal::stat::KILLS,
         crate::journal::stat::EMERGE_KILLS,
         crate::journal::stat::PARRIES,
@@ -217,6 +217,8 @@ impl Tally {
         crate::journal::stat::CHESTS,
         crate::journal::stat::SPRINGS,
         crate::journal::stat::HEAVY,
+        crate::journal::stat::BROKEN,
+        crate::journal::stat::BOWLS,
     ];
 
     fn of(w: &World) -> Self {
@@ -231,6 +233,8 @@ impl Tally {
             w.stats.chests,
             w.stats.springs,
             w.stats.heavy_hits,
+            w.stats.broken,
+            w.stats.bowls,
         ])
     }
 }
@@ -521,7 +525,7 @@ pub struct App {
     char_cursor: usize,
     /// 이번 런의 실뜨기 단계(고르는 화면의 커서이기도 하다).
     knot_level: u8,
-    /// 타이틀 아래 잠깐 띄우는 글(오늘의 굴 완주 등)과 남은 시간.
+    /// 타이틀 아래 잠깐 띄우는 글과 남은 시간.
     title_note: Option<(Tr, f32)>,
     /// 앨범: 고른 칸, 크게 보는 중이면 흐른 시간.
     album_cursor: usize,
@@ -1079,7 +1083,7 @@ impl App {
         }
     }
 
-    /// 실뿌리가 다 감겼다(0210): 런이 끝난다. 이야기 런은 마을로(뿌리가 데려다 놓는다), 오늘의 굴은 타이틀로.
+    /// 실뿌리가 다 감겼다(0210): 런이 끝난다. 이야기 런은 마을로(뿌리가 데려다 놓는다), 개발 시나리오는 타이틀로.
     /// 모은 재화는 잃지 않는다(0259): 들고 있던 반딧불은 마을로, 남은 씨앗은 마을 씨앗으로(깬 덤은 없다).
     fn lose_run(&mut self, to_village: bool) {
         self.keep_run_currency();
@@ -1189,7 +1193,7 @@ impl App {
         self.enter_first_scene(s, veteran);
     }
 
-    /// 런 시작의 기록: 첫 시작은 런 수 +1, 새 런·마을이면 쉼터 이어하기 끝(0080), 오늘의 굴은 묵은 기록 정리.
+    /// 런 시작의 기록: 첫 시작은 런 수 +1, 새 런·마을이면 쉼터 이어하기 끝(0080).
     fn note_run_start(&mut self, s: Scenario) {
         if s == Scenario::Normal && !self.resuming {
             self.profile.add(crate::profile::key::RUNS, 1);
@@ -1199,18 +1203,9 @@ impl App {
         if matches!(s, Scenario::Normal | Scenario::Village) && !self.resuming {
             self.clear_run();
         }
-        if s == Scenario::Daily {
-            // 한 달 넘은 오늘의 굴 기록은 지운다(기록이 끝없이 늘지 않게).
-            let today = crate::daily::today();
-            self.profile
-                .drop_counts(|k| crate::daily::is_stale_key(k, today));
-            // 첫 쉼터에서 시작하니 시작만 해도 쉼터 1.
-            self.profile.raise(&crate::daily::key_best(today), 1);
-            crate::profile::save(&self.profile);
-        }
     }
 
-    /// 기록(프로필)이 새 월드에 주는 것: 도감·시든 꽃잎, 실뜨기 단계, 저널 보상(장신구 풀·털빛), 재주, 보스 깃발과 열린 길.
+    /// 기록(프로필)이 새 월드에 주는 것: 도감·시든 꽃잎, 실뜨기 단계, 저널 보상(장신구 풀), 재주, 보스 깃발과 열린 길.
     /// 시나리오가 만든 월드 위에 얹는다 — `scenario::build`는 기록을 모른다.
     fn seed_run_from_profile(&mut self, s: Scenario, ch: Character) {
         // 도감은 런을 넘어 남는다. 시든 꽃잎(0164)도.
@@ -1232,9 +1227,8 @@ impl App {
         self.world.player.eat_cd_mul = knots.eat_cd_mul();
         self.world.player.parry_mul = knots.parry_mul();
         self.world.player.burrow_knot = knots.burrow_cd_mul();
-        // 저널 보상(0048): 상자에서 나올 장신구, 털빛. 통계 기준은 새 월드에서 0부터.
+        // 저널 보상(0048): 상자에서 나올 장신구. 통계 기준은 새 월드에서 0부터.
         self.world.inv.charm_pool = crate::journal::charm_pool(&self.profile, ch);
-        self.world.inv.fur = crate::journal::fur(&self.profile);
         self.tally = Tally::of(&self.world);
         self.journal_ready = crate::journal::ready_count(&self.profile);
         // 큰 나무의 재주(0047): 튜토리얼만 빼고 모든 시작에(개발 시나리오도 고른 재주로 시험한다).
@@ -1253,7 +1247,7 @@ impl App {
         if matches!(s, Scenario::Normal | Scenario::Village) {
             use crate::profile::key;
             // 기록이 이야기에 주는 것을 한 번에(0170 R11). 모모로 내려가면 모모 보스는 없다(0056); 도토(0052)·콩이(0054)·토끼풀(0165)은
-            // 첫 시작에서만, 돌아오기(기억해 내기) 전까지; 굴토끼 옛 굴(0165)은 첫 시작은 모모가 돌아온 뒤, 오늘의 굴엔 없고, 개발 시나리오는 늘.
+            // 첫 시작에서만, 돌아오기(기억해 내기) 전까지; 굴토끼 옛 굴(0165)은 첫 시작은 모모가 돌아온 뒤, 개발 시나리오는 늘.
             let normal = s == Scenario::Normal;
             self.world.story.seed(crate::world::StorySeed {
                 momo_wins: self.profile.count(key::MOMO_WINS).min(t::MOMO_FIGHTS) as u8,
@@ -1264,7 +1258,6 @@ impl App {
                 clover_back: self.profile.flag(key::CLOVER_BACK),
                 warren_open: match s {
                     Scenario::Normal => self.profile.flag(key::MOMO_BACK),
-                    Scenario::Daily => false,
                     _ => true,
                 },
             });
@@ -1473,10 +1466,6 @@ impl App {
                 match chosen.and_then(|i| items.get(i).copied()) {
                     Some(TitleItem::New) => self.open_slots(false),
                     Some(TitleItem::Continue) => self.open_slots(true),
-                    Some(TitleItem::Daily) => {
-                        self.knot_level = 0;
-                        self.start(Scenario::Daily);
-                    }
                     Some(TitleItem::Album) => {
                         self.album_cursor = 0;
                         self.album_rows = Default::default();
@@ -2121,7 +2110,6 @@ impl App {
             ui.rect_lines(portrait, ui::BORDER);
             // 본문(타자 효과): 지금 장의 줄을 찍힌 만큼. 글 폭은 `SAY_TEXT_W`(이름표·초상화를 뺀 자리).
             let tx = portrait.right() + 8.0;
-            debug_assert!((b.right() - tx - 10.0 - SAY_TEXT_W).abs() < 0.5);
             for (i, (_, part)) in page_lines(&lines, &d).iter().enumerate() {
                 ui.text(part, tx, b.y + 9.0 + i as f32 * 13.0, FONT_PX, ui::TEXT);
             }
@@ -2129,7 +2117,7 @@ impl App {
             if d.complete && (get_time() * 2.0) as i64 % 2 == 0 {
                 ui.text(
                     "▼",
-                    tx + SAY_TEXT_W + 1.0,
+                    tx + SAY_TEXT_W + 2.0,
                     b.bottom() - 15.0,
                     FONT_PX,
                     ui::ACCENT,
@@ -2481,8 +2469,9 @@ mod bag_tests {
     }
 }
 
-/// 컷씬 대화창의 글 폭: 대사(초상화 오른쪽)·내레이션(가운데). `draw_cutscene`의 상자와 같은 값.
-const SAY_TEXT_W: f32 = 238.0;
+/// 컷씬 대화창의 글 폭: 대사(초상화 오른쪽)·내레이션(가운데). 대사는 상자 안 글 칸(238)에서 "▼" 자리(12 + 틈 2)를
+/// 오른쪽에 비운다 — 꽉 찬 셋째 줄 끝과 ▼가 겹치지 않고, ▼가 상자 밖으로 나가지 않게(F3 검사, 0271).
+const SAY_TEXT_W: f32 = 234.0;
 const NARRATE_TEXT_W: f32 = 280.0;
 
 /// 대사 글 전체를 대화창 폭으로 나눈 줄(장 경계와 그리기가 같이 쓴다).

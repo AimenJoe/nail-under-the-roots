@@ -380,7 +380,7 @@ impl Pickup {
     }
 }
 
-/// 런이 들고 다니는 것(0169 R2): 가방·장신구·반딧불·씨앗·뿌리 심장·털빛·받을 선물. `suspend::RunSave`가 적는 쪽.
+/// 런이 들고 다니는 것(0169 R2): 가방·장신구·반딧불·씨앗·뿌리 심장·받을 선물. `suspend::RunSave`가 적는 쪽.
 #[derive(Default)]
 pub struct Inventory {
     /// 모은 반딧불: 기술을 깨우는 데 쓴다(해금은 나중에). 쓰러지면 조금 잃는다.
@@ -399,12 +399,10 @@ pub struct Inventory {
     pub gifts: Vec<Gift>,
     /// 지금까지 찾은 장신구(같은 걸 두 번 주지 않게).
     pub charms_found: Vec<usize>,
-    /// 상자에서 나올 수 있는 장신구(기본 + 저널로 연 것, 0048)와 Naïl의 털빛(그리기만).
     /// 상자에서 나올 장신구. 기록이 정하므로 앱이 `seed_run_from_profile`에서 넣는다(0170 R-소) — 월드는 기록을 모른다.
     pub charm_pool: Vec<usize>,
     /// 이 런의 길(상자·가게)에서 찾을 수 있는 무기(그 캐릭터 것 중 아직 없는 것, 0246). 앱이 기록에서 넣는다.
     pub road_weapons: Vec<usize>,
-    pub fur: u8,
 }
 
 /// 런의 이야기 깃발(0169 R2): 어떤 보스와 싸우는 중인지·이겼는지, 길이 열렸는지, 한 번만 알리는 토스트를 알렸는지.

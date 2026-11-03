@@ -1034,7 +1034,6 @@ impl App {
             Reward::Light(n) => fill(s.r_light, &[&n]),
             Reward::Seeds(n) => fill(s.village_seeds, &[&n]),
             Reward::Decor(i) => fill(s.r_decor, &[&tr(crate::village::decor_name(i))]),
-            Reward::Fur(n) => tr(crate::journal::fur_name(n)).to_string(),
             Reward::Charm(i) => fill(s.r_charm, &[&tr(crate::equipment::CHARMS[i].name)]),
             Reward::Weapon(i) => fill(s.r_weapon, &[&tr(crate::equipment::WEAPONS[i].name)]),
         };
@@ -1263,7 +1262,7 @@ impl App {
     }
 }
 
-/// 저널 보상 아이콘(0173, 7×7 게임 px): 반딧불(빛나는 점), 마을 씨앗(싹 튼 씨앗), 꾸미기(작은 집), 털빛(색 견본), 장신구(그 색 칸).
+/// 저널 보상 아이콘(0173, 7×7 게임 px): 반딧불(빛나는 점), 마을 씨앗(싹 튼 씨앗), 꾸미기(작은 집), 장신구(그 색 칸).
 fn draw_reward_icon(ui: &Ui, r: crate::journal::Reward, x: f32, y: f32) {
     use crate::journal::Reward;
     match r {
@@ -1295,16 +1294,6 @@ fn draw_reward_icon(ui: &Ui, r: crate::journal::Reward, x: f32, y: f32) {
                 vec2(x + 3.5, y),
                 Color::new(0.75, 0.32, 0.3, 1.0),
             );
-        }
-        Reward::Fur(n) => {
-            let fur = match n {
-                1 => Color::new(0.62, 0.62, 0.66, 1.0),
-                2 => Color::new(0.42, 0.28, 0.22, 1.0),
-                3 => Color::new(0.86, 0.76, 0.58, 1.0),
-                _ => Color::new(0.55, 0.4, 0.32, 1.0),
-            };
-            ui.rect(Rect::new(x, y, 7.0, 7.0), fur);
-            ui.rect_lines(Rect::new(x, y, 7.0, 7.0), ui::BORDER);
         }
         Reward::Charm(i) => {
             ui.rect(

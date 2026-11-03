@@ -283,12 +283,6 @@ impl App {
                     self.play(cutscene::boss_beaten(&self.world, at, ent));
                 }
                 AdvEvent::CampArrive(n) => {
-                    if self.current == crate::scenario::Scenario::Daily {
-                        let k = crate::daily::key_best(crate::daily::today());
-                        if self.profile.raise(&k, n) {
-                            crate::profile::save(&self.profile);
-                        }
-                    }
                     if self.recording() {
                         self.profile.raise(crate::profile::key::DEEPEST, n);
                         self.save_profile();
@@ -314,14 +308,10 @@ impl App {
                 AdvEvent::RoomEntered | AdvEvent::RoomCleared => self.save_progress(true),
                 // 쓰러져 다시 섰다(0259): 감긴 실뿌리까지 이어하기에. 전에는 다음 쉼터까지 옛 글이 남아, 끄고 이으면 실뿌리가 풀렸다.
                 AdvEvent::Woke => self.checkpoint_run(),
-                // 오늘의 굴은 싸움 없이 기록만(0162). 이야기 런은 가장 깊은 곳의 실매듭 끊기로.
+                // 가장 깊은 곳의 실매듭 끊기로(0162).
                 AdvEvent::Deepest => {
-                    if self.current == crate::scenario::Scenario::Daily {
-                        self.reach_deepest();
-                    } else {
-                        self.world
-                            .start_fade(crate::adventure::Transition::EnterDeep);
-                    }
+                    self.world
+                        .start_fade(crate::adventure::Transition::EnterDeep);
                 }
                 AdvEvent::DeepIntro => {
                     use crate::profile::key;
@@ -365,20 +355,6 @@ impl App {
     pub(super) fn reach_deepest(&mut self) {
         use crate::profile::key;
         self.bank_glowbugs();
-        // 오늘의 굴은 이야기 엔딩 없이 기록만 남기고 타이틀로.
-        if self.current == crate::scenario::Scenario::Daily {
-            self.profile
-                .add(&crate::daily::key_clear(crate::daily::today()), 1);
-            self.profile
-                .add(crate::village::KEY_SEEDS, t::VILLAGE_SEEDS_DAILY);
-            self.profile.add(crate::journal::stat::DAILY_CLEARS, 1);
-            // 타이틀로 가기 전에 이번 런에서 본 이웃까지(0264).
-            self.save_profile();
-            self.title_cursor = 0;
-            self.title_note = Some((|s| s.toast_daily_clear, 5.0));
-            self.scene = Scene::Title;
-            return;
-        }
         // 런이 끝났다: 쉼터 이어하기를 지운다(0080).
         self.clear_run();
         let ch = self.world.character;
@@ -543,25 +519,8 @@ impl App {
                     Talk::Nothing => {}
                 }
             }
-            // 물웅덩이: 열린 털빛을 차례로 비춰 본다(저널 보상, 0048).
-            // 실 고리: 실의 꿈 고르기(0055).
+            // 실 고리: 실의 꿈 고르기(0055). 물웅덩이(털빛 비춰 보기)는 0272에서 뺐다 — 풍경으로만 남는다.
             Interact::Dream => self.open_dream(),
-            Interact::Puddle => {
-                let n = crate::journal::next_fur(&self.profile, self.world.inv.fur);
-                let none = n == self.world.inv.fur;
-                self.world.inv.fur = n;
-                self.profile.set_count(crate::journal::KEY_FUR, n as u32);
-                crate::profile::save(&self.profile);
-                self.world.juice.toast = Some((
-                    if none {
-                        |s| s.puddle_none
-                    } else {
-                        crate::journal::fur_name(n)
-                    },
-                    2.0,
-                ));
-                self.sfx.play(crate::sfx::Id::Glowbug);
-            }
             // 큰 나무: 반딧불로 재주를 깨운다(0047).
             Interact::Tree => {
                 self.tree_cursor = (0, 0);
@@ -1174,7 +1133,6 @@ impl App {
             Interact::Talk(Who::Halmae) => s.ia_knots,
             Interact::Seat => s.ia_look,
             Interact::Tree => s.ia_tree,
-            Interact::Puddle => s.ia_puddle,
             Interact::Dream => s.ia_dream,
             Interact::Gate if village => s.ia_descend,
             Interact::Gate => s.ia_route,
@@ -1298,7 +1256,7 @@ impl App {
         }
     }
 
-    /// 저널 탭에서 고른 목표의 보상을 받는다. 월드에 바로 보이는 것(꾸미기·털빛·장신구 풀)도 고친다.
+    /// 저널 탭에서 고른 목표의 보상을 받는다. 월드에 바로 보이는 것(꾸미기·장신구 풀)도 고친다.
     pub(super) fn claim_journal(&mut self) {
         use crate::journal::{claim, visible, Reward};
         let Some(g) = visible(&self.profile).get(self.journal_cursor).copied() else {
@@ -1314,7 +1272,6 @@ impl App {
                     v.decor[i] = true;
                 }
             }
-            Reward::Fur(_) => self.world.inv.fur = crate::journal::fur(&self.profile),
             // 장신구는 바로 가방에(0050). 이번 런의 상자에서는 다시 안 나온다.
             Reward::Charm(c) => {
                 self.world.inv.charm_pool =

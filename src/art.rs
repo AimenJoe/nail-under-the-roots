@@ -6,8 +6,6 @@ use macroquad::prelude::*;
 pub struct Art {
     /// Naïl 시트: 16×16 칸, 줄 0 idle·walk, 줄 1 attack·hurt·dead, 줄 2 흙더미·그림자, 줄 3~5 흰 실루엣.
     pub nail: Texture2D,
-    /// 털빛 1~3(tools/art/nail.py, 저널 보상 docs/decisions/0048). 없으면 기본 털.
-    pub nail_furs: Vec<Option<Texture2D>>,
     /// 대체 타일셋(tools/art/tiles.py).
     pub tiles: Texture2D,
     /// 같은 타일셋의 CPU 쪽 그림: 지도 굽기(terrain.rs)가 장식을 찍는다.
@@ -40,7 +38,7 @@ pub struct Art {
     pub hub: Option<Texture2D>,
     /// 큰 나무 잎 단계 다섯 칸(tree.png, `tools/art/tree_ai.py`, 0238).
     pub tree: Option<Texture2D>,
-    /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 털빛 1~3, 줄 4 돌아온 모모. 땅 단면 전환에서만.
+    /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 옛 털빛(0272에서 뺐다, 쓰지 않음), 줄 4 돌아온 모모. 땅 단면 전환에서만.
     pub dig: Option<Texture2D>,
     /// 컷씬 일러스트(illust::Illust::ALL 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
     pub illust: Vec<Option<Texture2D>>,
@@ -232,7 +230,7 @@ pub const PORTRAIT: f32 = 88.0;
 pub const PORTRAIT_COLS: u32 = 12;
 
 pub const CELL: f32 = 16.0;
-/// Naïl 시트(nail.png·nail_fur*.png)의 칸: 28×28(몸 키 약 22px + 벌린 발톱, 0238 — 0206의 24칸·몸 16은 모모·도토보다 작았다),
+/// Naïl 시트(nail.png)의 칸: 28×28(몸 키 약 22px + 벌린 발톱, 0238 — 0206의 24칸·몸 16은 모모·도토보다 작았다),
 /// 발바닥 줄 `NAIL_FOOT`(칸 위에서). 다른 시트는 `CELL`.
 pub const NAIL_CELL: f32 = 28.0;
 pub const NAIL_FOOT: f32 = 26.0;
@@ -265,15 +263,6 @@ pub const CLOVER_BACK_ROW: u32 = 20;
 pub const BABY_ROW: u32 = 21;
 
 impl Art {
-    /// 털빛 n의 Naïl 시트(0 또는 없으면 기본).
-    pub fn nail_fur(&self, n: u8) -> &Texture2D {
-        (n as usize)
-            .checked_sub(1)
-            .and_then(|i| self.nail_furs.get(i))
-            .and_then(|t| t.as_ref())
-            .unwrap_or(&self.nail)
-    }
-
     /// 시작할 때 읽는 그림 파일(assets 기준). main이 `loading::prefetch`로 한꺼번에 받는다(0092).
     /// `load`의 경로와 같아야 한다(다르면 그 파일만 따로 받는다 — 느릴 뿐 틀리지 않는다).
     pub fn files() -> Vec<String> {
@@ -281,7 +270,6 @@ impl Art {
             .iter()
             .map(|s| s.to_string())
             .collect();
-        v.extend((1..crate::journal::FURS).map(|n| format!("art/nail_fur{n}.png")));
         v.extend(
             [
                 "art/portraits.png",
@@ -313,16 +301,6 @@ impl Art {
         let tiles_img = crate::loading::image("art/tiles.png").await.ok()?;
         let tiles = Texture2D::from_image(&tiles_img);
         nail.set_filter(FilterMode::Nearest);
-        let mut nail_furs = Vec::new();
-        for n in 1..crate::journal::FURS {
-            let t = crate::loading::texture(&format!("art/nail_fur{n}.png"))
-                .await
-                .ok();
-            if let Some(t) = &t {
-                t.set_filter(FilterMode::Nearest);
-            }
-            nail_furs.push(t);
-        }
         tiles.set_filter(FilterMode::Nearest);
         let portraits = crate::loading::texture("art/portraits.png").await.ok();
         if let Some(p) = &portraits {
@@ -403,7 +381,6 @@ impl Art {
             title,
             title_fog,
             nail,
-            nail_furs,
             tiles,
             tiles_img,
             sunny: load_sunny().await,
@@ -874,19 +851,8 @@ pub struct Portrait {
 }
 
 impl Portrait {
-    /// Naïl: 칸 0~3(보통·기쁨·걱정·결의). 털빛 1~3은 칸 18부터 넷씩(docs/decisions/0048·0051).
+    /// Naïl: 칸 0~3(보통·기쁨·걱정·결의). 칸 18~29는 옛 털빛 셋(0048 → 0272에서 뺐다) — 칸 번호가 밀리지 않게 시트에 남긴다.
     pub const NAIL: Portrait = Portrait { first: 0, faces: 4 };
-
-    /// 털빛을 따르는 Naïl 초상화.
-    pub fn nail(fur: u8) -> Portrait {
-        match fur {
-            1..=3 => Portrait {
-                first: 18 + (fur as u32 - 1) * 4,
-                faces: 4,
-            },
-            _ => Portrait::NAIL,
-        }
-    }
     /// 물든 모모(굴토끼, 히로인): 칸 7 차가움(보통), 칸 8 괴로움(걱정). 이름은 나중에 밝혀진다 — 그때까지 "???"
     /// (docs/decisions/0027, 0029). 칸 4(그림자 + 빛나는 눈)는 시트에 남겨 두었다(정체를 숨길 장면용).
     pub const MOMO_TAINTED: Portrait = Portrait { first: 7, faces: 2 };

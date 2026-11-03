@@ -129,7 +129,7 @@ impl App {
             })
     }
 
-    /// 적어 둔 쉼터로 돌아간다. 새 런처럼 기록에서 정하는 것(재주·실뜨기·장신구 풀·털빛)은 `start`가 하고,
+    /// 적어 둔 쉼터로 돌아간다. 새 런처럼 기록에서 정하는 것(재주·실뜨기·장신구 풀)은 `start`가 하고,
     /// 그 위에 이번 런의 값(쉼터·시드·재화·가방·장비·통계)을 덮는다. 쉼터 도착 장면은 다시 틀지 않는다.
     pub(super) fn resume_run(&mut self, r: RunSave) {
         let ch = Character::from_code(r.character);

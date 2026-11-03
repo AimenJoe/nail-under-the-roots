@@ -23,7 +23,6 @@ mod camp;
 mod characters;
 mod combat;
 mod cutscene;
-mod daily;
 mod depth;
 mod dream;
 mod dungeon;

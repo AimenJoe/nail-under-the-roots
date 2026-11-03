@@ -2,7 +2,8 @@
 //!
 //! 평소 하는 일(처치·패링·상자·이웃 만나기·이야기)이 목표가 되고, 다 하면 저널에서 "받기"로 보상을 받는다.
 //! 앞 목표를 이루면 다음 목표가 보인다(`after`). 진행은 모두 기록(profile)에서 계산한다 — 저널 자체는 받았는지만 적는다.
-//! 보상은 쓰는 재화(반딧불·마을 씨앗)와 힘이 아닌 것(저널 전용 꾸미기·털빛), 옆으로 넓히는 장신구다(0040).
+//! 보상은 쓰는 재화(반딧불·마을 씨앗)와 힘이 아닌 것(저널 전용 꾸미기), 옆으로 넓히는 장신구·무기다(0040).
+//! 털빛(0048)은 0272에서 뺐다 — 그 목표 셋은 같은 단계 목표와 맞춘 재화로, 이미 받은 기록에는 `migrate`가 한 번 돌려준다.
 
 use crate::i18n::Tr;
 use crate::profile::{key, Profile};
@@ -20,7 +21,11 @@ pub mod stat {
     pub const SPRINGS: &str = "stat.springs";
     /// 마을로 보낸 반딧불 누적(쓴 것과 무관).
     pub const LIGHT: &str = "stat.light";
-    pub const DAILY_CLEARS: &str = "stat.daily_clears";
+    // "stat.daily_clears"(오늘의 굴, 0044)는 0272에서 뺐다. 기록에 남은 수는 그대로 두고 키는 다시 쓰지 않는다.
+    /// 부순 것(0175, 저널 0272).
+    pub const BROKEN: &str = "stat.broken";
+    /// 모모의 날려 보내기가 다른 적에 부딪힌 수(0267, 저널 0272).
+    pub const BOWLS: &str = "stat.bowls";
     /// 강공격 명중(0168·0173).
     pub const HEAVY: &str = "stat.heavy_hits";
 }
@@ -77,8 +82,6 @@ pub enum Reward {
     Seeds(u32),
     /// village::DECOR_ALL 번호(저널 전용은 6~8).
     Decor(usize),
-    /// 털빛 번호(1~3, 0은 기본).
-    Fur(u8),
     /// equipment::CHARMS 번호(저널로 여는 것은 `Charm::journal`).
     Charm(usize),
     /// equipment::WEAPONS 번호(0246): 그 무기의 기록 깃발을 세운다 — 그 캐릭터의 런마다 가방에.
@@ -365,7 +368,8 @@ pub const GOALS: &[Goal] = &[
         Count(stat::PARRIES),
         60,
         Some("parry"),
-        Fur(1)
+        // 털빛 1이었다(0272): 같은 둘째 단계 싸움 목표(kills2·ambush2)와 같은 값.
+        Light(60)
     ),
     goal!(
         "drill",
@@ -418,6 +422,17 @@ pub const GOALS: &[Goal] = &[
         Some("heavy"),
         Seeds(10)
     ),
+    // 모모의 날려 보내기(0267·0272): 모모가 돌아온 뒤에 보인다. 첫 단계 싸움 목표와 같은 값.
+    goal!(
+        "bowl",
+        Fight,
+        jg_bowl,
+        jg_bowl_d,
+        Count(stat::BOWLS),
+        20,
+        Some("momo3"),
+        Light(30)
+    ),
     // 탐험
     goal!(
         "chest",
@@ -437,7 +452,8 @@ pub const GOALS: &[Goal] = &[
         Count(stat::CHESTS),
         25,
         Some("chest"),
-        Fur(2)
+        // 털빛 2였다(0272): 둘째 단계 목표의 마을 씨앗(heavy2)과 같은 값.
+        Seeds(10)
     ),
     goal!(
         "spring",
@@ -479,13 +495,15 @@ pub const GOALS: &[Goal] = &[
         None,
         Seeds(5)
     ),
+    // "daily"(오늘의 굴)는 0272에서 뺐다. 아이디는 다시 쓰지 않는다(받은 깃발 `journal.daily`가 남아 있다).
+    // 부순 것(0175·0272): 굴의 항아리·버섯·돌무더기. 늘 하는 일이라 첫 단계 탐험 목표와 같은 값.
     goal!(
-        "daily",
+        "break",
         Explore,
-        jg_daily,
-        jg_daily_d,
-        Count(stat::DAILY_CLEARS),
-        1,
+        jg_break,
+        jg_break_d,
+        Count(stat::BROKEN),
+        30,
         None,
         Seeds(5)
     ),
@@ -550,7 +568,8 @@ pub const GOALS: &[Goal] = &[
         Talents,
         4,
         Some("talent"),
-        Fur(3)
+        // 털빛 3이었다(0272): 재주 한 칸(덤 칸 120~495) 값의 일부 — 다음 칸을 앞당기지 않을 만큼.
+        Light(40)
     ),
     // 마을
     goal!(
@@ -591,34 +610,34 @@ pub const KNOTS_OPEN: &str = "knots.Mole";
 pub fn key_claimed(id: &str) -> String {
     format!("journal.{id}")
 }
-/// 털빛: 열림(깃발 `fur.<n>`), 고른 것(수 `fur`).
-pub fn key_fur(n: u8) -> String {
-    format!("fur.{n}")
-}
-pub const KEY_FUR: &str = "fur";
 /// 저널로 연 장신구(상자에서 나오기 시작한다).
 pub fn key_charm(i: usize) -> String {
     format!("charm.{i}")
 }
-pub const FURS: u8 = 4;
 
-/// 털빛 이름(알림·보상 글).
-pub fn fur_name(n: u8) -> Tr {
-    match n {
-        1 => |s| s.fur_1,
-        2 => |s| s.fur_2,
-        3 => |s| s.fur_3,
-        _ => |s| s.fur_0,
+/// 털빛을 뺀 뒤(0272) 옛 기록을 맞춘다 — 기록을 읽을 때마다 부른다(두 번째부터는 아무 일 없음).
+/// - 털빛을 주던 목표를 이미 받은 기록: 지금 그 목표의 보상을 한 번 준다(털빛 깃발 `fur.<n>`이 받았다는 표시).
+/// - 오늘의 굴(0044, 0272에서 뺌)의 날짜 기록 `daily.<날짜>`는 지운다(예전에는 지난 날짜만 지웠다).
+pub fn migrate(p: &mut Profile) {
+    p.drop_counts(|k| k.starts_with("daily."));
+    if p.flag(KEY_FUR_REFUNDED) {
+        return;
+    }
+    for (id, n) in FUR_GOALS {
+        if p.flag(&format!("fur.{n}")) && p.flag(&key_claimed(id)) {
+            if let Some(g) = by_id(id) {
+                grant(p, g.reward);
+            }
+        }
+    }
+    if !p.is_empty() {
+        p.set(KEY_FUR_REFUNDED);
     }
 }
 
-/// 열린 털빛 가운데 `now` 다음 것(마을 물웅덩이, 0048). 기본(0)은 늘 열려 있다.
-pub fn next_fur(p: &Profile, now: u8) -> u8 {
-    (1..=FURS)
-        .map(|k| (now + k) % FURS)
-        .find(|n| *n == 0 || p.flag(&key_fur(*n)))
-        .unwrap_or(0)
-}
+/// 털빛을 주던 목표와 그 털빛 번호(0048 → 0272).
+const FUR_GOALS: [(&str, u8); 3] = [("parry2", 1), ("chest2", 2), ("talent2", 3)];
+const KEY_FUR_REFUNDED: &str = "mig.0272.fur";
 
 impl Goal {
     pub fn progress(&self, p: &Profile) -> u32 {
@@ -688,15 +707,17 @@ pub fn claim(p: &mut Profile, g: &Goal) -> Option<Reward> {
         return None;
     }
     p.set(&key_claimed(g.id));
-    match g.reward {
+    grant(p, g.reward);
+    Some(g.reward)
+}
+
+/// 보상을 기록에 넣는다(받기·옛 기록 맞추기).
+fn grant(p: &mut Profile, r: Reward) {
+    match r {
         Light(n) => p.add(crate::talents::KEY_LIGHT, n),
         Seeds(n) => p.add(crate::village::KEY_SEEDS, n),
         Decor(i) => {
             p.set(&crate::village::key_decor(i));
-        }
-        Fur(n) => {
-            p.set(&key_fur(n));
-            p.set_count(KEY_FUR, n as u32);
         }
         Charm(i) => {
             p.set(&key_charm(i));
@@ -707,7 +728,6 @@ pub fn claim(p: &mut Profile, g: &Goal) -> Option<Reward> {
             }
         }
     }
-    Some(g.reward)
 }
 
 /// 저널로 받은 장신구인가. 깃발이 없어도 그 장신구를 주는 목표를 이미 받았으면 가진 것으로 친다:
@@ -730,7 +750,6 @@ pub fn reward_place(r: Reward) -> Tr {
         Light(_) => |s| s.j_got_light,
         Seeds(_) => |s| s.j_got_seeds,
         Decor(_) => |s| s.j_got_decor,
-        Fur(_) => |s| s.j_got_fur,
         Charm(_) | Weapon(_) => |s| s.j_got_charm,
     }
 }
@@ -741,16 +760,6 @@ pub fn charm_pool(p: &Profile, ch: crate::equipment::Character) -> Vec<usize> {
     (0..CHARMS.len())
         .filter(|i| CHARMS[*i].fits(ch) && (!CHARMS[*i].journal || has_charm(p, *i)))
         .collect()
-}
-
-/// 고른 털빛(열린 것만, 아니면 기본).
-pub fn fur(p: &Profile) -> u8 {
-    let n = p.count(KEY_FUR).min(FURS as u32 - 1) as u8;
-    if n == 0 || p.flag(&key_fur(n)) {
-        n
-    } else {
-        0
-    }
 }
 
 #[cfg(test)]
@@ -790,26 +799,11 @@ mod tests {
     }
 
     #[test]
-    fn puddle_cycles_only_unlocked_furs() {
+    fn rewards_unlock_charm_and_decor() {
         let mut p = Profile::default();
-        assert_eq!(next_fur(&p, 0), 0);
-        p.set(&key_fur(2));
-        assert_eq!(next_fur(&p, 0), 2);
-        assert_eq!(next_fur(&p, 2), 0);
-        p.set(&key_fur(3));
-        assert_eq!(next_fur(&p, 2), 3);
-    }
-
-    #[test]
-    fn rewards_unlock_fur_charm_and_decor() {
-        let mut p = Profile::default();
-        assert_eq!(fur(&p), 0);
-        p.set_count(KEY_FUR, 2);
-        assert_eq!(fur(&p), 0, "열지 않은 털빛은 못 고른다");
         p.add(stat::CHESTS, 25);
         claim(&mut p, by_id("chest").unwrap());
-        assert_eq!(claim(&mut p, by_id("chest2").unwrap()), Some(Fur(2)));
-        assert_eq!(fur(&p), 2);
+        assert_eq!(claim(&mut p, by_id("chest2").unwrap()), Some(Seeds(10)));
         let mole = crate::equipment::Character::Mole;
         assert!(!charm_pool(&p, mole).contains(&5));
         p.set(key::BORI_BACK);
@@ -827,6 +821,41 @@ mod tests {
         assert_eq!(claim(&mut p, by_id("light").unwrap()), Some(Seeds(15)));
         assert_eq!(p.count(crate::village::KEY_SEEDS), seeds + 15);
         assert!(!GOALS.iter().any(|g| matches!(g.reward, Decor(6))));
+    }
+
+    /// 털빛을 뺀 뒤(0272): 털빛 목표를 이미 받은 기록은 새 보상을 한 번만 받고, 오늘의 굴 날짜 기록은 지운다.
+    #[test]
+    fn migrate_refunds_claimed_fur_goals_once() {
+        let mut p = Profile::default();
+        p.set(&key_claimed("parry2"));
+        p.set("fur.1");
+        p.set(&key_claimed("chest2"));
+        p.set("fur.2");
+        p.set_count("fur", 2);
+        p.add("daily.20261027", 3);
+        let (light, seeds) = (
+            p.count(crate::talents::KEY_LIGHT),
+            p.count(crate::village::KEY_SEEDS),
+        );
+        migrate(&mut p);
+        migrate(&mut p);
+        assert_eq!(
+            p.count(crate::talents::KEY_LIGHT),
+            light + 60,
+            "받아치기 60번의 새 보상, 한 번"
+        );
+        assert_eq!(
+            p.count(crate::village::KEY_SEEDS),
+            seeds + 10,
+            "상자 25개의 새 보상, 한 번"
+        );
+        assert_eq!(p.count("daily.20261027"), 0);
+        // 받지 않은 목표는 그대로 받을 수 있다(재주 4칸 = 반딧불 40).
+        assert!(!by_id("talent2").unwrap().claimed(&p));
+        assert!(
+            !GOALS.iter().any(|g| g.id == "daily"),
+            "오늘의 굴 목표는 뺐다"
+        );
     }
 
     /// 모모 장신구(0142): 모모 런에서만 상자·가게에 나오고, 화관은 momo_deep을 받으면(옛 기록이 반딧불로 받았어도) 들고 시작한다.

@@ -332,16 +332,11 @@ pub(super) fn draw_descent(
             shade(soil, 1.35, a * (1.0 - ph)),
         );
     }
-    // Naïl(또는 모모): 이 장면 전용 32×32(dig.png, `tools/art/dig.py`). 털빛마다 줄이 있다.
+    // Naïl(또는 모모): 이 장면 전용 32×32(dig.png, `tools/art/dig.py`). 줄 0이 Naïl(줄 1~3은 옛 털빛, 0272에서 뺐다).
     // 순서(사장 제안): 파다가 → 고개를 들어 우리를 보고 윙크 → 드릴처럼 뱅글뱅글 돌며 내려간다. 굽기가 길면 되풀이.
     if let Some(tex) = art.and_then(|a| a.dig.as_ref()) {
         let (col, spinning) = dig_col(clock);
-        let row = w
-            .player
-            .kit
-            .def()
-            .dig_row
-            .unwrap_or(u32::from(w.inv.fur.min(3)));
+        let row = w.player.kit.def().dig_row.unwrap_or(0);
         if spinning {
             // 돌며 흙을 나선으로 흩뿌린다(몸 둘레를 돌다 바깥으로).
             let soil = strata_color(d.depth_m + 1.0);

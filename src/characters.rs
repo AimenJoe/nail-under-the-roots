@@ -76,8 +76,8 @@ pub struct CharacterDef {
     /// 큰 나무 가지 갈래의 고유 재주 한 칸(0247): 칸 자리는 모두 같고 내용만 캐릭터마다.
     pub signature: crate::talents::Signature,
     pub talent_keys: [&'static str; 4],
-    /// 고르기 창의 초상화(털빛을 받는다)와 소개.
-    pub portrait: fn(u8) -> Portrait,
+    /// 고르기 창의 초상화와 소개.
+    pub portrait: Portrait,
     pub pick_text: Tr,
     /// 회피 동작의 이름(0265): 터치 안내(`input::prompt`)와 조작 설정 줄. 예전엔 모두 "굴파기(회피)"였다.
     pub act_dodge: Tr,
@@ -94,7 +94,7 @@ pub struct CharacterDef {
     pub special_desc: Tr,
     /// 가장 굵은 실을 받아쳤을 때 할매의 한마디(0264): 무엇이 따뜻한지(발톱·발·앞발).
     pub deep_warm: Tr,
-    /// 파 내려가는 전환(`draw_descent`)의 그림 줄. None = Naïl의 털빛 줄.
+    /// 파 내려가는 전환(`draw_descent`)의 그림 줄. None = 줄 0(Naïl).
     pub dig_row: Option<u32>,
     /// 터치 버튼 그림: 공격·회피·특기(0172).
     pub touch: [Icon; 3],
@@ -117,7 +117,7 @@ pub static ALL: [CharacterDef; 3] = [
         talents: &crate::talents::TABLE,
         signature: crate::talents::Signature::Venom,
         talent_keys: ["burrow", "parry", "drill", "eat"],
-        portrait: Portrait::nail,
+        portrait: Portrait::NAIL,
         pick_text: |s| s.pick_nail,
         act_dodge: |s| s.act_dodge,
         stat_dodge_cd: |s| s.stat_dig_cd,
@@ -147,7 +147,7 @@ pub static ALL: [CharacterDef; 3] = [
         talents: &crate::talents::MOMO_TABLE,
         signature: crate::talents::Signature::Thorns,
         talent_keys: ["hop", "momo_parry", "chain", "momo_eat"],
-        portrait: |_| Portrait::MOMO,
+        portrait: Portrait::MOMO,
         pick_text: |s| s.pick_momo,
         act_dodge: |s| s.act_dodge_momo,
         stat_dodge_cd: |s| s.stat_hop_cd,
@@ -177,7 +177,7 @@ pub static ALL: [CharacterDef; 3] = [
         talents: &crate::talents::DOTO_TABLE,
         signature: crate::talents::Signature::Split,
         talent_keys: ["leap", "doto_parry", "bury", "doto_eat"],
-        portrait: |_| Portrait::DOTO,
+        portrait: Portrait::DOTO,
         pick_text: |s| s.pick_doto,
         act_dodge: |s| s.act_dodge_doto,
         stat_dodge_cd: |s| s.stat_leap_cd,

@@ -49,10 +49,6 @@ def main() -> int:
         m = importlib.import_module(mod)
         built = np.asarray(m.build() if arg is None else m.build(arg)).astype(int)
         sheets = [(file, built)]
-        if mod == "nail_ai":
-            # 털빛 셋(nail_fur*.png)은 같은 시트에서 색만 바꾼 것.
-            sheets += [(f"nail_fur{n}.png", np.asarray(m.fur_variant(built.astype(np.uint8), n)).astype(int))
-                       for n in m.legacy.FURS]
         for name, img in sheets:
             have = np.asarray(Image.open(ART / name).convert("RGBA")).astype(int)
             if have.shape != img.shape:

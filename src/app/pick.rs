@@ -106,7 +106,7 @@ impl App {
             let on = self.char_cursor == i;
             ui.rect(r, if on { ui::PANEL_LIGHT } else { ui::PANEL });
             ui.rect_lines(r, if on { ui::ACCENT } else { ui::BORDER });
-            let portrait = (d.portrait)(crate::journal::fur(&self.profile));
+            let portrait = d.portrait;
             let face = if on { Face::Happy } else { Face::Normal };
             let pr = Rect::new(r.center().x - 22.0, r.y + 4.0, 44.0, 44.0);
             self.renderer.draw_portrait(ui, pr, portrait.frame(face));

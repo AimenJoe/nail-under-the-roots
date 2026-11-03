@@ -33,8 +33,6 @@ pub enum Scenario {
     StoryPreview,
     /// 마지막 쉼터(길 지도의 보스 칸이 "가장 깊은 곳", docs/decisions/0042).
     LastCamp,
-    /// 오늘의 굴: 날짜 시드로 첫 쉼터에서(타이틀에서 고른다, docs/decisions/0044).
-    Daily,
     /// 실의 꿈(마을의 실 고리에서, docs/decisions/0055): 빈 방에서 보스 다시 싸우기. 개발 목록에는 없다.
     Dream,
     /// 큰 나무 아래 마을(모습은 기록에서, docs/decisions/0045).
@@ -493,11 +491,6 @@ pub fn build(s: Scenario) -> World {
         Scenario::Dream => {
             let mut w = World::empty();
             w.biome = crate::biome::Biome::Roots;
-            w
-        }
-        Scenario::Daily => {
-            let mut w = World::camp_start_seeded(crate::daily::seed(crate::daily::today()));
-            w.adv.events.clear();
             w
         }
         Scenario::LastCamp | Scenario::Deepest => {

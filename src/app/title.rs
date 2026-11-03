@@ -4,14 +4,13 @@ use super::*;
 
 pub(super) const INTRO_LINES: [Tr; 3] = [|s| s.intro_1, |s| s.intro_2, |s| s.intro_3];
 pub(super) const INTRO_LINE_TIME: f32 = 2.6;
-/// 타이틀 메뉴 줄. 오늘의 굴은 튜토리얼을 마친 뒤에만 보인다.
+/// 타이틀 메뉴 줄.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum TitleItem {
     /// 시작하기: 슬롯을 골라 처음부터(0078).
     New,
     /// 이어하기: 기록이 있는 슬롯을 골라 이어서(기록이 하나라도 있을 때만).
     Continue,
-    Daily,
     Album,
     Settings,
     #[cfg(feature = "dev")]
@@ -61,9 +60,6 @@ impl App {
         if (0..crate::profile::SLOTS).any(|i| self.slot_filled(i)) {
             v.push(TitleItem::Continue);
         }
-        if self.profile.flag(crate::profile::key::TUTORIAL) {
-            v.push(TitleItem::Daily);
-        }
         v.push(TitleItem::Album);
         v.push(TitleItem::Settings);
         #[cfg(feature = "dev")]
@@ -79,17 +75,6 @@ impl App {
         match it {
             TitleItem::New => s.title_new.to_string(),
             TitleItem::Continue => s.title_continue.to_string(),
-            TitleItem::Daily => {
-                let day = crate::daily::today();
-                if self.profile.count(&crate::daily::key_clear(day)) > 0 {
-                    s.daily_clear.to_string()
-                } else {
-                    match self.profile.count(&crate::daily::key_best(day)) {
-                        0 => s.title_daily.to_string(),
-                        n => fill(s.daily_best, &[&n]),
-                    }
-                }
-            }
             TitleItem::Album => s.title_album.to_string(),
             TitleItem::Settings => s.title_settings.to_string(),
             #[cfg(feature = "dev")]
@@ -101,7 +86,7 @@ impl App {
     pub(super) fn draw_title(&mut self, ui: &Ui) {
         // 뒤의 뿌리 선이 가는 글자 획과 겹치면 끊겨(깨져) 보인다(사람 피드백). 타이틀 글에는 어두운 테두리.
         let ui = &ui.with_outline();
-        // 줄이 여섯(시작하기·이어하기·오늘의 굴·앨범·설정·개발)까지 들어가게 제목을 조금 올렸다(0078).
+        // 줄이 여섯(시작하기·이어하기·앨범·설정·개발·끝내기)까지 들어가게 제목을 조금 올렸다(0078).
         ui.text_center("Naïl", 160.0, 16.0, FONT_PX * 2.0, ui::ACCENT);
         ui.text_center("Under the Roots", 160.0, 40.0, FONT_PX, ui::TEXT);
         let s = i18n::s();
@@ -111,7 +96,7 @@ impl App {
             .map(|it| self.title_label(it))
             .collect();
         let labels: Vec<&str> = labels.iter().map(|l| l.as_str()).collect();
-        // 메뉴 뒤 그늘(0152): 줄 수만큼, 가장자리 없이 둥글게(오늘의 굴 날짜 자리까지).
+        // 메뉴 뒤 그늘(0152): 줄 수만큼, 가장자리 없이 둥글게.
         let rows = labels.len() as f32 * (FONT_PX + 4.0);
         self.renderer
             .draw_soft_shade(ui, Rect::new(96.0, 56.0, 150.0, rows), 0.55);
@@ -143,22 +128,6 @@ impl App {
                 r
             })
             .collect();
-        // 오늘의 굴 줄 오른쪽에 오늘 날짜(UTC): 날마다 다른 굴이라는 표시.
-        if let Some(i) = self
-            .title_items()
-            .iter()
-            .position(|t| *t == TitleItem::Daily)
-        {
-            let (_, m, d) = crate::daily::civil(crate::daily::today());
-            let r = rects[i];
-            ui.text(
-                &format!("{m}/{d}"),
-                r.right() + 4.0,
-                r.y + 2.0,
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
-        }
         let note = self.title_note.map(|(n, _)| n);
         for (i, r) in rects.into_iter().enumerate() {
             self.hits.push((r, Hit::TitleItem(i)));
@@ -169,7 +138,7 @@ impl App {
             s.title_controls_touch,
             &[Verb::Pick, Verb::Confirm],
         );
-        // 알림(오늘의 굴 완주)이 있으면 조작 안내 자리에.
+        // 알림이 있으면 조작 안내 자리에.
         match note {
             Some(n) => ui.text_center(tr(n), 160.0, 153.0, FONT_PX, ui::ACCENT),
             None => ui.text_center(&hint, 160.0, 153.0, FONT_PX, ui::TEXT_DIM),

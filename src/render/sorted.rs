@@ -329,7 +329,7 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
         }
         Drawable::Pickup(i) => draw_pickup(&w.pickups[i], w.time),
         Drawable::Loot(i) => draw_loot(&w.loot[i], alpha, w.time, false),
-        Drawable::Player => draw_nail(art, &w.player, w.inv.fur, alpha, w.time),
+        Drawable::Player => draw_nail(art, &w.player, alpha, w.time),
         Drawable::Enemy(i) => draw_enemy(
             Some(art),
             &w.enemies[i],
@@ -371,7 +371,7 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
                 world::Who::Kongi => {
                     draw_critter_at(art, art::KONGI_BACK_ROW, n.pos, left, false, w.time)
                 }
-                world::Who::Nail => draw_nail_at(art, n.pos, w.inv.fur, left, w.time),
+                world::Who::Nail => draw_nail_at(art, n.pos, left, w.time),
                 world::Who::Clover => {
                     // 토끼풀 + 아기 둘(0165): 어미 곁에서 아기들이 번갈아 깡충.
                     draw_critter_at(art, art::CLOVER_BACK_ROW, n.pos, left, false, w.time);
