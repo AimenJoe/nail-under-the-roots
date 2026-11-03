@@ -307,7 +307,10 @@ impl Renderer {
                     _ => Vec::new(),
                 };
                 let sunny_img = art.sunny.as_ref().map(|s| &s.sheet_img);
-                let key = crate::terrain::key(g, w.biome, &paths) ^ u64::from(sunny_img.is_some());
+                let water: Vec<Vec2> = w.room.streams.iter().map(|s| s.0).collect();
+                let key = crate::terrain::key(g, w.biome, &paths)
+                    ^ u64::from(sunny_img.is_some())
+                    ^ crate::terrain::water_key(&water);
                 if let Some(i) = self.terrain.iter().position(|(k, _)| *k == key) {
                     let hit = self.terrain.remove(i);
                     self.terrain.insert(0, hit);
@@ -316,7 +319,8 @@ impl Renderer {
                     if self.baking.as_ref().map(|(k, _)| *k) != Some(key) {
                         self.baking = Some((
                             key,
-                            crate::terrain::Baker::new(g, w.biome, &paths, &campfires(w)),
+                            crate::terrain::Baker::new(g, w.biome, &paths, &campfires(w))
+                                .with_water(&water),
                         ));
                     }
                     let (_, baker) = self.baking.as_mut().unwrap();

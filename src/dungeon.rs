@@ -800,48 +800,46 @@ fn stream_runs(
 ) {
     let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
     let mut rng = Rng::new(seed | 1);
+    // 덤불과 달리 벽 곁 칸(x 1·18)까지 — 물줄기가 벽 틈에서 솟거나 벽 밑으로 드는 일이 잦게(0275).
     let ok = |x: i32, y: i32, out: &Vec<(Vec2, Vec2)>| {
-        if !(2..=17).contains(&x) || !(3..=10).contains(&y) {
+        if !(1..=18).contains(&x) || !(3..=10).contains(&y) {
             return false;
         }
         let (x, y) = (x as usize, y as usize);
         let c = cell_center(ox + x, oy + y);
+        // `KEEP`(적·문 자리를 바닥으로 지키는 칸)은 물이어도 된다 — 바닥이고 걸을 수 있다.
         !passage_lane(x, y, room.hall)
-            && !KEEP.contains(&(x, y))
             && grid.get(ox + x, oy + y) == Cell::Floor
             && !props.iter().any(|p| p.rect.contains(c))
-            && !avoid.iter().any(|a| a.distance(c) < 12.0)
             && !out.iter().any(|(o, _)| *o == c)
     };
+    // 적 자리는 피하지 않는다(물에 선 적은 떠밀릴 뿐) — 피하면 물줄기가 웅덩이처럼 짧게 끊겼다.
+    let _ = avoid;
     for _ in 0..1 + rng.below(2) {
-        let mut start = None;
-        for _ in 0..12 {
-            let (x, y) = (2 + rng.below(16) as i32, 3 + rng.below(8) as i32);
-            if ok(x, y, out) {
-                start = Some((x, y));
-                break;
-            }
-        }
-        let Some((x0, y0)) = start else {
-            continue;
-        };
-        let dir = if rng.chance(0.5) { 1 } else { -1 };
-        // 흐르는 쪽 반대로 거슬러 올라가 시작점을 잡고, 흐르는 쪽으로 늘린다.
-        let mut x = x0;
-        while (x0 - x).abs() < t::STREAM_RUN_MAX as i32 - 1 && ok(x - dir, y0, out) {
-            x -= dir;
+        // 한쪽 끝은 늘 벽(0275): 방 위·아래 가장자리 줄에서 왼쪽이나 오른쪽 벽 곁부터 안쪽으로 늘린다 —
+        // 벽 틈에서 솟아 바닥 구멍으로 빠지거나, 바닥에서 솟아 벽 밑으로 든다. 문 앞 길에 닿으면 멈춘다.
+        let y0 = [3, 4, 9, 10][rng.below(4) as usize];
+        let left = rng.chance(0.5);
+        let step = if left { 1 } else { -1 };
+        let mut x = if left { 1 } else { 18 };
+        while (1..=18).contains(&x) && !ok(x, y0, out) && (x - if left { 1 } else { 18 }).abs() < 3
+        {
+            x += step;
         }
         let mut run = Vec::new();
         while run.len() < t::STREAM_RUN_MAX && ok(x, y0, out) {
             run.push(x);
-            x += dir;
+            x += step;
         }
         if run.len() < t::STREAM_RUN_MIN {
             continue;
         }
+        // 흐르는 쪽: 벽에서 나오거나(안쪽으로) 벽으로 든다(바깥쪽으로).
+        let out_of_wall = rng.chance(0.5);
+        let dir = if out_of_wall == left { 1 } else { -1 };
         let flow = vec2(dir as f32, 0.0);
-        let side = if rng.chance(0.5) { 1 } else { -1 };
-        let wide = rng.chance(0.5) && run.iter().all(|&x| ok(x, y0 + side, out));
+        let side = if y0 == 3 || y0 == 9 { 1 } else { -1 };
+        let wide = rng.chance(0.7) && run.iter().all(|&x| ok(x, y0 + side, out));
         for &x in &run {
             out.push((cell_center(ox + x as usize, oy + y0 as usize), flow));
         }

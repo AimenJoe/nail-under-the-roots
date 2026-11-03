@@ -537,26 +537,43 @@ pub(super) fn draw_web(c: Vec2, time: f32, near: f32) {
     draw_circle(x, y, 1.5, silk);
 }
 
-/// 물살 칸 하나(0275): 옅은 물빛 바닥 + 흐르는 쪽으로 미끄러지는 물결 줄 셋 + 물살 밖으로 닿는 가장자리의 물거품.
-/// 흐르는 쪽은 움직임과 모양(줄 끝의 작은 꺾쇠)으로 — 색에 기대지 않는다(0150). `edges`: 위·아래·흐름 뒤·흐름 앞에 물살이 없나.
-pub(super) fn draw_stream(c: Vec2, dir: Vec2, time: f32, edges: [bool; 4]) {
+/// 물이 들고 나는 곳(0275): 물줄기 끝 너머가 벽이면 벽 틈에서 솟는 물(물보라 줄), 바닥이면 바닥 구멍으로 빠진다.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum StreamEnd {
+    /// 물줄기가 이어진다(끝이 아니다).
+    Open,
+    /// 끝 너머가 벽.
+    Wall,
+    /// 끝 너머가 바닥.
+    Floor,
+}
+
+/// 물살 칸 하나(0275). 물 바닥·물가는 지형 굽기(`terrain::water_px`)가 그리고, 여기서는 움직이는 것만:
+/// 흐르는 쪽으로 미끄러지는 옅은 물결 줄 둘, 드문 반짝임, 물줄기 끝(`back` 들어오는 곳·`front` 나가는 곳).
+/// `baked`가 아니면(격자 없는 아레나) 물빛 바닥도 여기서 칠한다.
+pub(super) fn draw_stream(
+    c: Vec2,
+    dir: Vec2,
+    time: f32,
+    back: StreamEnd,
+    front: StreamEnd,
+    baked: bool,
+) {
     let (x0, y0) = ((c.x - 8.0).round(), (c.y - 8.0).round());
-    draw_rectangle(x0, y0, 16.0, 16.0, Color::new(0.26, 0.58, 0.80, 0.50));
-    // 아래 물가 쪽만 깊은 물빛(두 칸 너비 물줄기 가운데에 줄무늬가 생기지 않게).
-    if edges[1] {
-        draw_rectangle(x0, y0 + 12.0, 16.0, 4.0, Color::new(0.16, 0.34, 0.50, 0.30));
+    if !baked {
+        draw_rectangle(x0, y0, 16.0, 16.0, Color::new(0.18, 0.40, 0.48, 0.9));
     }
     let sx = dir.x.signum();
     let seed = ((c.x * 7.0 + c.y * 13.0) as i32).rem_euclid(97) as f32;
-    let lite = Color::new(0.82, 0.94, 1.0, 0.55);
-    for i in 0..3 {
-        let row = 3.0 + i as f32 * 4.5 + (seed + i as f32 * 3.0) % 2.0;
-        // 칸마다 이어지게 월드 x에 맞춘 위상: 줄이 칸 경계를 넘어 계속 흐른다.
+    let lite = Color::new(0.66, 0.86, 0.92, 0.5);
+    for i in 0..2 {
+        // 위 물가 그늘(3~5px)을 피해 가운데·아래쪽에. 칸마다 이어지게 월드 x 위상.
+        let row = 7.0 + i as f32 * 4.0 + (seed + i as f32 * 3.0) % 2.0;
         let ph =
-            (c.x * sx + time * t::STREAM_PUSH * 0.9 + seed * 3.0 + i as f32 * 7.0).rem_euclid(16.0);
+            (c.x * sx + time * t::STREAM_PUSH * 0.9 + seed * 3.0 + i as f32 * 9.0).rem_euclid(16.0);
         let head = if sx >= 0.0 { x0 + ph } else { x0 + 16.0 - ph };
-        let tail = head - sx * 4.0;
-        let (a, b) = (head.min(tail).max(x0), head.max(tail).min(x0 + 16.0));
+        let tail = head - sx * 5.0;
+        let (a, b) = (head.min(tail).max(x0 + 1.0), head.max(tail).min(x0 + 15.0));
         if b > a {
             draw_rectangle(
                 a.round(),
@@ -566,37 +583,65 @@ pub(super) fn draw_stream(c: Vec2, dir: Vec2, time: f32, edges: [bool; 4]) {
                 lite,
             );
         }
-        // 꺾쇠: 줄 머리 위아래에 한 점씩(흐르는 쪽이 모양으로 보인다).
-        if (x0..x0 + 16.0).contains(&head) {
-            let hx = (head - sx).round();
-            draw_rectangle(hx, (y0 + row - 1.0).round(), 1.0, 1.0, lite);
-            draw_rectangle(hx, (y0 + row + 1.0).round(), 1.0, 1.0, lite);
+    }
+    // 반짝임(✦): 칸마다 가끔 한 번.
+    let tw = (time * 1.3 + seed * 0.37).rem_euclid(3.0);
+    if tw < 0.35 {
+        let (gx, gy) = (
+            x0 + 3.0 + (seed * 5.0) % 10.0,
+            y0 + 7.0 + (seed * 3.0) % 6.0,
+        );
+        let a = 0.9 * (1.0 - (tw / 0.35 - 0.5).abs() * 2.0);
+        let g = Color::new(0.92, 0.98, 1.0, a);
+        draw_rectangle(gx, gy, 1.0, 1.0, g);
+        if a > 0.5 {
+            draw_rectangle(gx - 1.0, gy, 3.0, 1.0, Color::new(0.92, 0.98, 1.0, a * 0.5));
+            draw_rectangle(gx, gy - 1.0, 1.0, 3.0, Color::new(0.92, 0.98, 1.0, a * 0.5));
         }
     }
-    let foam = Color::new(0.90, 0.97, 1.0, 0.65);
-    let bob = ((time * 3.0 + seed).sin() * 0.5 + 0.5).round();
-    if edges[0] {
-        draw_rectangle(x0, y0 - bob, 16.0, 1.0, foam);
-    }
-    if edges[1] {
-        draw_rectangle(
-            x0,
-            y0 + 15.0 + bob,
-            16.0,
-            1.0,
-            Color::new(0.70, 0.86, 0.96, 0.5),
-        );
-    }
-    // 물줄기가 시작하는 쪽은 솟는 물, 끝나는 쪽은 바닥으로 스며드는 물보라 점.
-    for (k, at) in [(2, -sx), (3, sx)] {
-        if edges[k] {
-            let ex = if at > 0.0 { x0 + 15.0 } else { x0 };
-            for j in 0..3 {
-                let yy = y0
-                    + 3.0
-                    + j as f32 * 5.0
-                    + ((time * 4.0 + j as f32 + seed).sin() * 1.0).round();
-                draw_rectangle(ex, yy, 1.0, 2.0, foam);
+    let foam = Color::new(0.86, 0.95, 0.98, 0.85);
+    for (end, side) in [(back, -sx), (front, sx)] {
+        let ex = if side > 0.0 { x0 + 15.0 } else { x0 };
+        match end {
+            StreamEnd::Open => {}
+            // 벽 틈에서 솟는/벽 밑으로 드는 물: 물가를 따라 흔들리는 물보라 줄.
+            StreamEnd::Wall => {
+                for j in 0..4 {
+                    let yy = y0 + 4.0 + j as f32 * 3.0;
+                    let off = ((time * 6.0 + j as f32 * 1.7 + seed).sin() * 1.0).round();
+                    draw_rectangle(ex - side * off.abs(), yy, 1.0, 2.0, foam);
+                    draw_rectangle(
+                        ex - side * (1.0 + off.abs()),
+                        yy + 1.0,
+                        1.0,
+                        1.0,
+                        Color::new(0.7, 0.86, 0.92, 0.6),
+                    );
+                }
+            }
+            // 바닥 구멍으로 빠지는 물: 어두운 구멍 + 안으로 도는 물결 점.
+            StreamEnd::Floor => {
+                let (hx, hy) = (ex - side * 2.0, y0 + 9.0);
+                draw_ellipse(hx, hy, 5.0, 4.0, 0.0, Color::new(0.03, 0.05, 0.08, 0.95));
+                draw_ellipse_lines(
+                    hx,
+                    hy,
+                    5.5,
+                    4.5,
+                    0.0,
+                    1.0,
+                    Color::new(0.09, 0.14, 0.18, 1.0),
+                );
+                for k in 0..3 {
+                    let a = time * 3.0 + k as f32 * 2.1;
+                    draw_rectangle(
+                        (hx + a.cos() * 3.5).round(),
+                        (hy + a.sin() * 2.6).round(),
+                        1.0,
+                        1.0,
+                        Color::new(0.6, 0.8, 0.86, 0.8),
+                    );
+                }
             }
         }
     }

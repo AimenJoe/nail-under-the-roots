@@ -602,8 +602,18 @@ pub fn build(s: Scenario) -> World {
             let mut w = World::field();
             w.enter_tangle_now(b);
             // 물길 굴(0275): 첫 물줄기 곁에서 시작한다(물살을 바로 본다).
-            if let Some((c, _)) = w.room.streams.first().copied() {
-                w.player.pos = c + vec2(0.0, -20.0);
+            // 방 위쪽 줄의 물줄기를 먼저(아래쪽은 화면 HUD에 가린다).
+            let top =
+                |c: &Vec2| ((c.y / 16.0) as i32).rem_euclid(crate::dungeon::ROOM_H as i32) <= 4;
+            let pick = w
+                .room
+                .streams
+                .iter()
+                .find(|(c, _)| top(c))
+                .or(w.room.streams.first())
+                .copied();
+            if let Some((c, _)) = pick {
+                w.player.pos = c + vec2(0.0, 40.0);
                 w.player.prev_pos = w.player.pos;
                 w.snap_cam();
             }

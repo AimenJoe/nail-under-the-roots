@@ -159,7 +159,8 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
         let near = 1.0 - ((*c - pp).length() - 14.0).clamp(0.0, 30.0) / 30.0;
         draw_web(*c, w.time, near);
     }
-    // 물살(0275): 바닥 위, 세워 그리는 것들 아래.
+    // 물살(0275): 물 바닥은 지형에 구워 있고, 여기서는 움직이는 물결·반짝임과 물줄기 끝만.
+    let baked = w.room.grid.is_some();
     for (c, d) in w.room.streams.iter().filter(|_| ground) {
         let has = |p: Vec2| {
             w.room
@@ -167,15 +168,23 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                 .iter()
                 .any(|(q, _)| q.distance_squared(p) < 1.0)
         };
-        let back = *c - *d * 16.0;
-        let front = *c + *d * 16.0;
-        let edges = [
-            !has(*c - vec2(0.0, 16.0)),
-            !has(*c + vec2(0.0, 16.0)),
-            !has(back),
-            !has(front),
-        ];
-        draw_stream(*c, *d, w.time, edges);
+        let end = |p: Vec2| {
+            if has(p) {
+                StreamEnd::Open
+            } else if w.room.is_solid(p, 1.0) {
+                StreamEnd::Wall
+            } else {
+                StreamEnd::Floor
+            }
+        };
+        draw_stream(
+            *c,
+            *d,
+            w.time,
+            end(*c - *d * 16.0),
+            end(*c + *d * 16.0),
+            baked,
+        );
     }
     for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
         let q = lerp(p.prev_pos, p.pos, alpha);

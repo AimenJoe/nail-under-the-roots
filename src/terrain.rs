@@ -386,6 +386,9 @@ pub struct Baker {
     far: Vec<[u8; 4]>,
     band_n: Vec<f32>,
     patch_n: Vec<f32>,
+    /// 물살 칸(0275, 칸 좌표)과 1px마다 물인가. 물은 바닥보다 낮다: 위 물가는 땅이 떨어지는 면, 그 아래 그늘.
+    water_cells: Vec<(i32, i32)>,
+    water: Vec<bool>,
     img: Image,
 }
 
@@ -431,8 +434,24 @@ impl Baker {
             far,
             band_n: vec![0.0; hw * hh],
             patch_n: vec![0.0; hw * hh],
+            water_cells: Vec::new(),
+            water: Vec::new(),
             img: Image::gen_image_color(w as u16, h as u16, Color::new(0.0, 0.0, 0.0, 1.0)),
         }
+    }
+
+    /// 물살 칸(칸 가운데 월드 좌표, `Room::streams`)을 바닥에 굽는다(0275). 열쇠는 `water_key`로.
+    pub fn with_water(mut self, cells: &[Vec2]) -> Self {
+        self.water_cells = cells
+            .iter()
+            .map(|c| {
+                (
+                    (c.x / T as f32).floor() as i32,
+                    (c.y / T as f32).floor() as i32,
+                )
+            })
+            .collect();
+        self
     }
 
     pub fn finish(self) -> Image {
@@ -464,7 +483,10 @@ impl Baker {
             let y = self.row;
             match self.stage {
                 Stage::Shape => shape_row(&self.g, &self.uniform, y, &mut self.solid),
-                Stage::Depth => self.depth_and_paths(),
+                Stage::Depth => {
+                    self.depth_and_paths();
+                    self.water_mask();
+                }
                 Stage::Noise => self.noise_row(y as usize),
                 Stage::Color => self.color_row(y),
                 Stage::Decor => self.decor_row(y, tiles.unwrap(), sunny),
@@ -520,6 +542,38 @@ impl Baker {
         }
     }
 
+    /// 물 모양(0275): 칸 가운데 값을 겹선형으로 잇고 잡음을 더해 0.5에서 자른다 — 벽 윤곽(`shape_row`)과 같은 법이라
+    /// 물가가 벽처럼 비스듬히 깎이고 들쭉날쭉하다. 벽 위에는 물이 없다.
+    fn water_mask(&mut self) {
+        if self.water_cells.is_empty() {
+            return;
+        }
+        let (w, h) = (self.w, self.h);
+        self.water = vec![false; (w * h) as usize];
+        let cells = &self.water_cells;
+        let m = |cx: i32, cy: i32| f32::from(u8::from(cells.contains(&(cx, cy))));
+        for &(cx, cy) in cells {
+            for y in (cy - 1) * T..(cy + 2) * T {
+                for x in (cx - 1) * T..(cx + 2) * T {
+                    if x < 0 || y < 0 || x >= w || y >= h || self.solid[(y * w + x) as usize] {
+                        continue;
+                    }
+                    let u = (x as f32 + 0.5) / T as f32 - 0.5;
+                    let v = (y as f32 + 0.5) / T as f32 - 0.5;
+                    let (ci, cj) = (u.floor() as i32, v.floor() as i32);
+                    let (fu, fv) = (u - ci as f32, v - cj as f32);
+                    let top = m(ci, cj) + (m(ci + 1, cj) - m(ci, cj)) * fu;
+                    let bot = m(ci, cj + 1) + (m(ci + 1, cj + 1) - m(ci, cj + 1)) * fu;
+                    let f = top + (bot - top) * fv;
+                    let n = (vnoise(x as f32, y as f32, 7.0, 61) - 0.5) * 0.26;
+                    if f + n > 0.5 {
+                        self.water[(y * w + x) as usize] = true;
+                    }
+                }
+            }
+        }
+    }
+
     /// 바닥 큰 잡음(띠·얼룩)은 2×2 px마다 한 번만(도트 덩어리, 굽기 시간 ¼). 보이는 칸만.
     fn noise_row(&mut self, by: usize) {
         let hw = (self.w as usize).div_ceil(2);
@@ -551,11 +605,20 @@ impl Baker {
             far,
             band_n,
             patch_n,
+            water,
             img,
             ..
         } = self;
         let (w, h) = (*w, *h);
         let wu = w as usize;
+        let is_water = |x: i32, y: i32| {
+            !water.is_empty()
+                && x >= 0
+                && y >= 0
+                && x < w
+                && y < h
+                && water[y as usize * wu + x as usize]
+        };
         let hw = wu.div_ceil(2);
         let idx = |x: i32, y: i32| y as usize * wu + x as usize;
         let is_solid = |x: i32, y: i32| {
@@ -574,6 +637,12 @@ impl Baker {
                 let i = idx(x, y) * 4;
                 let px = far[(y.rem_euclid(PAT) * PAT + x.rem_euclid(PAT)) as usize];
                 img.bytes[i..i + 4].copy_from_slice(&px);
+                continue;
+            }
+            if is_water(x, y) {
+                let px = water_px(pal, x, y, &is_water);
+                let i = idx(x, y) * 4;
+                img.bytes[i..i + 4].copy_from_slice(&[px.0, px.1, px.2, 255]);
                 continue;
             }
             let c: Rgb = if is_solid(x, y) {
@@ -638,6 +707,10 @@ impl Baker {
                         break;
                     }
                 }
+                // 물가의 젖은 흙(0275): 물에서 2px 안은 어둡게.
+                if (-2..=2).any(|d| is_water(x + d, y) || is_water(x, y + d)) {
+                    k *= 0.76;
+                }
                 if k == 1.0 {
                     if is_solid(x - 1, y) || is_solid(x + 1, y) {
                         k = 0.82;
@@ -700,8 +773,9 @@ impl Baker {
             }
         };
         let ft = b.floor_tint();
+        let wet = &self.water_cells;
         for cx in 0..g.w as i32 {
-            if g.get_i(cx, cy) != Cell::Floor {
+            if g.get_i(cx, cy) != Cell::Floor || wet.contains(&(cx, cy)) {
                 continue;
             }
             let Some((d, ox, oy)) = decor_at(b, cx, cy) else {
@@ -801,6 +875,49 @@ impl Baker {
             }
         }
     }
+}
+
+/// 물 한 px(0275, Sunnyside 물을 굴 빛으로): 물은 바닥보다 낮다. 위 물가는 땅이 물로 떨어지는 짧은 면(벼랑 면 색 2px) +
+/// 그 아래 그늘 3px, 아래 물가는 밝은 물결 1px, 옆 물가는 어두운 테. 가운데는 거의 한 색에 옅은 빛 그물(두 겹 잡음).
+fn water_px(p: &Palette, x: i32, y: i32, is_water: &impl Fn(i32, i32) -> bool) -> Rgb {
+    const DEEP: Rgb = (30, 70, 88);
+    const MID: Rgb = (46, 100, 118);
+    const LITE: Rgb = (66, 128, 144);
+    const FOAM: Rgb = (150, 196, 206);
+    let up = (1..=5).find(|d| !is_water(x, y - d)).unwrap_or(9);
+    if up == 1 {
+        return p.face[0];
+    }
+    if up == 2 {
+        return p.face[3];
+    }
+    if !is_water(x - 1, y) || !is_water(x + 1, y) {
+        return (24, 44, 56);
+    }
+    if !is_water(x, y + 1) {
+        return FOAM;
+    }
+    if up <= 5 {
+        return DEEP;
+    }
+    // 빛 그물: 잡음 두 겹의 등고선이 가늘게 겹치는 곳만 밝다(Sunnyside 물 무늬의 꼴).
+    let (xf, yf) = (x as f32, y as f32);
+    let a = (vnoise(xf, yf, 9.0, 71) - 0.5).abs();
+    let b = (vnoise(xf + 3.0, yf, 5.0, 72) - 0.5).abs();
+    if a < 0.03 || (b < 0.02 && rnd(x, y, 73) < 0.6) {
+        LITE
+    } else if !is_water(x, y + 2) {
+        DEEP
+    } else {
+        MID
+    }
+}
+
+/// 물살 칸의 굽기 열쇠(0275): `key`와 XOR한다.
+pub fn water_key(cells: &[Vec2]) -> u64 {
+    cells.iter().fold(0x0057_4311_u64, |h, c| {
+        (h ^ (c.x as u64 ^ ((c.y as u64) << 20))).wrapping_mul(0x0000_0100_0000_01B3)
+    })
 }
 
 /// 벼랑 앞면 한 px: 흙 지층·박힌 돌·늘어진 뿌리, 맨 아래 그늘, 옆 가장자리 테두리.
@@ -984,6 +1101,56 @@ mod tests {
         }
         assert!(steps > 100, "멈춘 횟수 {steps}");
         assert_eq!(k.finish().bytes, whole.bytes);
+        // 물살 칸을 구워도 같다(0275), 물이 바닥 그림을 바꾼다.
+        let water = [vec2(40.0, 56.0), vec2(56.0, 56.0), vec2(72.0, 56.0)];
+        let mut one = Baker::new(&g, Biome::Water, &paths, &[]).with_water(&water);
+        one.step(Some(&tiles), None, &mut || false);
+        let one = one.finish();
+        let mut k = Baker::new(&g, Biome::Water, &paths, &[]).with_water(&water);
+        while !k.step(Some(&tiles), None, &mut || true) {}
+        assert_eq!(k.finish().bytes, one.bytes);
+        let dry = bake(&g, Biome::Water, &paths, Some(&tiles), None);
+        assert_ne!(dry.bytes, one.bytes);
+    }
+
+    /// 물길 굴(0275) 굽기 미리 보기: `NAIL_WATER_PREVIEW=<경로>`면 물살 있는 첫 방을 RGBA 날것(폭·높이 머리 8바이트)으로 쓴다.
+    /// `NAIL_WATER_PREVIEW=/tmp/w.rgba cargo test water_bake_preview -- --ignored`.
+    #[test]
+    #[ignore]
+    fn water_bake_preview() {
+        let Ok(out) = std::env::var("NAIL_WATER_PREVIEW") else {
+            return;
+        };
+        let prm = crate::dungeon::Params {
+            biome: Biome::Water,
+            ..crate::dungeon::Params::new(1)
+        };
+        let seed: u64 = std::env::var("NAIL_WATER_SEED")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(3);
+        let (_, room) = crate::dungeon::generate(seed, &prm);
+        let g = room.grid.clone().unwrap();
+        let tiles =
+            Image::from_file_with_format(include_bytes!("../assets/art/tiles.png"), None).unwrap();
+        let water: Vec<Vec2> = room.streams.iter().map(|s| s.0).collect();
+        let mut k = Baker::new(&g, Biome::Water, &[], &[]).with_water(&water);
+        k.step(Some(&tiles), None, &mut || false);
+        let img = k.finish();
+        let c = water[0];
+        let (rw, rh) = (
+            crate::dungeon::ROOM_W as i32 * T,
+            crate::dungeon::ROOM_H as i32 * T,
+        );
+        let (rx, ry) = ((c.x as i32 / rw) * rw, (c.y as i32 / rh) * rh);
+        let mut bytes = Vec::new();
+        bytes.extend((rw as u32).to_le_bytes());
+        bytes.extend((rh as u32).to_le_bytes());
+        for y in ry..ry + rh {
+            let i = (y as usize * img.width as usize + rx as usize) * 4;
+            bytes.extend_from_slice(&img.bytes[i..i + rw as usize * 4]);
+        }
+        std::fs::write(out, bytes).unwrap();
     }
 
     /// 던전 크기(100×60칸) 굽기 시간. `cargo test --release bake_speed -- --ignored --nocapture`.

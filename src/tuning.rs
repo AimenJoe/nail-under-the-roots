@@ -682,7 +682,7 @@ pub const WEB_SLOW: f32 = 0.5;
 /// 물줄기 하나의 칸 수(최소~최대). 몸 가운데가 칸 안일 때만 밀린다(발만 걸치면 안 밀린다).
 pub const STREAM_PUSH: f32 = 46.0;
 pub const STREAM_RUN_MIN: usize = 3;
-pub const STREAM_RUN_MAX: usize = 6;
+pub const STREAM_RUN_MAX: usize = 7;
 /// 돌진하다 덤불에 박은 적: 피해·멈칫.
 pub const THORN_ENEMY_DAMAGE: i32 = 1;
 pub const THORN_STUN: f32 = 0.9;

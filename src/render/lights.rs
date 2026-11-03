@@ -99,12 +99,11 @@ pub(super) fn draw_world_lights(
     // 물살(0275): 어둠 속에서도 물빛이 일렁인다.
     for (c, _) in &w.room.streams {
         let pulse = 0.5 + 0.5 * (t * 2.0 + c.x * 0.13 + c.y * 0.07).sin();
-        draw_rectangle(
-            (c.x - 8.0).round(),
-            (c.y - 8.0).round(),
-            16.0,
-            16.0,
-            Color::new(0.45, 0.75, 0.95, (0.06 + 0.05 * pulse) * k),
+        draw_circle(
+            c.x.round(),
+            (c.y + 1.0).round(),
+            9.0,
+            Color::new(0.40, 0.70, 0.85, (0.05 + 0.04 * pulse) * k),
         );
     }
     for r in &w.hazards.rocks {
