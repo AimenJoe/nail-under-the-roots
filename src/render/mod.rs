@@ -307,7 +307,13 @@ impl Renderer {
                     _ => Vec::new(),
                 };
                 let sunny_img = art.sunny.as_ref().map(|s| &s.sheet_img);
-                let water: Vec<Vec2> = w.room.streams.iter().map(|s| s.0).collect();
+                let water: Vec<Vec2> = w
+                    .room
+                    .streams
+                    .iter()
+                    .map(|s| s.0)
+                    .chain(w.room.pools.iter().copied())
+                    .collect();
                 let key = crate::terrain::key(g, w.biome, &paths)
                     ^ u64::from(sunny_img.is_some())
                     ^ crate::terrain::water_key(&water);

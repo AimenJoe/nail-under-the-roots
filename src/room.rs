@@ -71,6 +71,8 @@ pub struct Room {
     pub webs: Vec<Vec2>,
     /// 물살 칸(0275, 물길 굴): 칸 가운데와 흐르는 쪽(단위 벡터). 막지 않는다. 걷는 것은 흐르는 쪽으로 밀린다.
     pub streams: Vec<(Vec2, Vec2)>,
+    /// 고인 물웅덩이 칸(0275, 칸 가운데). 물살처럼 굽지만 흐르지도 밀지도 않는다.
+    pub pools: Vec<Vec2>,
 }
 
 impl Room {
@@ -114,6 +116,7 @@ impl Room {
             thorns: Vec::new(),
             webs: Vec::new(),
             streams: Vec::new(),
+            pools: Vec::new(),
         }
     }
 
@@ -132,6 +135,7 @@ impl Room {
             thorns: Vec::new(),
             webs: Vec::new(),
             streams: Vec::new(),
+            pools: Vec::new(),
         };
         r.rebuild_solids();
         r

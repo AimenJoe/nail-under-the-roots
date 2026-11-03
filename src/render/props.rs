@@ -91,6 +91,7 @@ pub(super) fn floor_decor(w: &World, cam: Vec2) -> Vec<(f32, f32, Decor)> {
                 .streams
                 .iter()
                 .any(|(c, _)| c.distance_squared(mid) < 1.0)
+                || w.room.pools.iter().any(|c| c.distance_squared(mid) < 1.0)
             {
                 continue;
             }

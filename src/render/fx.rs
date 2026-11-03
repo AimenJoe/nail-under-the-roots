@@ -625,6 +625,40 @@ pub(super) fn draw_stream(
     }
 }
 
+/// 고인 웅덩이 한 칸(0275): 물은 지형에 구워 있고, 여기서는 가끔 반짝임과 천천히 퍼지는 물결 고리 하나(물방울이 떨어진 듯).
+pub(super) fn draw_pool_glint(c: Vec2, time: f32, baked: bool) {
+    let (x0, y0) = ((c.x - 8.0).round(), (c.y - 8.0).round());
+    if !baked {
+        draw_rectangle(x0, y0, 16.0, 16.0, Color::new(0.18, 0.40, 0.48, 0.9));
+    }
+    let seed = ((c.x * 5.0 + c.y * 11.0) as i32).rem_euclid(89) as f32;
+    let tw = (time * 0.9 + seed * 0.29).rem_euclid(4.0);
+    if tw < 1.2 {
+        let k = tw / 1.2;
+        let (cx, cy) = (x0 + 5.0 + (seed * 7.0) % 6.0, y0 + 7.0 + (seed * 3.0) % 4.0);
+        draw_ellipse_lines(
+            cx,
+            cy,
+            1.0 + 4.0 * k,
+            0.6 + 2.4 * k,
+            0.0,
+            1.0,
+            Color::new(0.75, 0.9, 0.95, 0.5 * (1.0 - k)),
+        );
+    }
+    let g = (time * 1.1 + seed * 0.41).rem_euclid(3.5);
+    if g < 0.3 {
+        let a = 0.9 * (1.0 - (g / 0.3 - 0.5).abs() * 2.0);
+        draw_rectangle(
+            x0 + 3.0 + (seed * 3.0) % 9.0,
+            y0 + 6.0 + (seed * 5.0) % 5.0,
+            1.0,
+            1.0,
+            Color::new(0.92, 0.98, 1.0, a),
+        );
+    }
+}
+
 /// 시든 꽃잎(0159): 모모가 지키는 굴에서 방마다 떠도는 복선. 마을 빈 자리의 시든 꽃잎과 같은 색.
 /// 옆으로 흘러가며 위아래로 팔랑이고, 흔들림에 따라 가로·세로로 바뀐다.
 pub(super) fn draw_wilted_petals(w: &World, cam: Vec2) {

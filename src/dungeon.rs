@@ -413,6 +413,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
     let mut thorns = Vec::new();
     let mut webs = Vec::new();
     let mut streams: Vec<(Vec2, Vec2)> = Vec::new();
+    let mut pools: Vec<Vec2> = Vec::new();
     for (ri, room) in rooms.iter_mut().enumerate() {
         let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
         for y in 2..ROOM_H - 1 {
@@ -669,6 +670,14 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                         seed ^ hash_at(room.at) ^ 0x57EA_3A11,
                         &mut streams,
                     );
+                    pool_patches(
+                        &grid,
+                        &props,
+                        room,
+                        seed ^ hash_at(room.at) ^ 0x9001_7E55,
+                        &streams,
+                        &mut pools,
+                    );
                 }
             }
             RoomKind::Rest => {}
@@ -695,6 +704,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                 .iter()
                 .copied()
                 .chain(streams.iter().map(|s| s.0))
+                .chain(pools.iter().copied())
                 .collect::<Vec<_>>(),
             ox,
             oy,
@@ -737,6 +747,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
     room.thorns = thorns;
     room.webs = webs;
     room.streams = streams;
+    room.pools = pools;
     (dungeon, room)
 }
 
@@ -866,6 +877,55 @@ fn stream_runs(
         }
         for (x, y) in cells {
             out.push((cell_center(ox + x as usize, oy + y as usize), flow));
+        }
+    }
+}
+
+/// 고인 물웅덩이(0275): 싸움방 빈 자리에 1~2개, 2×2~3×2칸(모서리 하나를 비우기도). 물살과 한 칸 넘게 떨어지고,
+/// 문 앞 십자 길·소품 밖. 흐르지 않고 밀지 않는다 — 그림만(물 바닥은 물살과 같이 굽는다).
+fn pool_patches(
+    grid: &Grid,
+    props: &[Prop],
+    room: &DRoom,
+    seed: u64,
+    streams: &[(Vec2, Vec2)],
+    out: &mut Vec<Vec2>,
+) {
+    let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
+    let mut rng = Rng::new(seed | 1);
+    let ok = |x: i32, y: i32, out: &Vec<Vec2>| {
+        if !(2..=17).contains(&x) || !(2..=10).contains(&y) {
+            return false;
+        }
+        let (xu, yu) = (x as usize, y as usize);
+        let c = cell_center(ox + xu, oy + yu);
+        !passage_lane(xu, yu, room.hall)
+            && grid.get(ox + xu, oy + yu) == Cell::Floor
+            && !props.iter().any(|p| p.rect.contains(c))
+            && !streams
+                .iter()
+                .any(|(s, _)| (s.x - c.x).abs() <= 32.0 && (s.y - c.y).abs() <= 32.0)
+            && !out
+                .iter()
+                .any(|o| (o.x - c.x).abs() <= 32.0 && (o.y - c.y).abs() <= 32.0)
+    };
+    for _ in 0..1 + rng.below(2) {
+        let (w, h) = (2 + rng.below(2) as i32, 2);
+        for _ in 0..40 {
+            let (x0, y0) = (2 + rng.below(15) as i32, 2 + rng.below(8) as i32);
+            let cells: Vec<(i32, i32)> = (0..h)
+                .flat_map(|dy| (0..w).map(move |dx| (x0 + dx, y0 + dy)))
+                .collect();
+            if !cells.iter().all(|&(x, y)| ok(x, y, out)) {
+                continue;
+            }
+            // 모서리 하나를 비워 네모로 안 보이게(3칸 너비일 때만 — 2×2에서 비우면 외톨이가 생긴다).
+            let skip =
+                (w == 3 && rng.chance(0.6)).then(|| cells[[0, 2, 3, 5][rng.below(4) as usize]]);
+            for c in cells.into_iter().filter(|c| Some(*c) != skip) {
+                out.push(cell_center(ox + c.0 as usize, oy + c.1 as usize));
+            }
+            break;
         }
     }
 }
@@ -1391,7 +1451,7 @@ mod tests {
             biome: Biome::Water,
             ..Params::new(1)
         };
-        let mut any = false;
+        let (mut any, mut pools) = (false, false);
         for seed in 1..40 {
             let (_, room) = generate(seed, &water);
             let (_, again) = generate(seed, &water);
@@ -1421,9 +1481,26 @@ mod tests {
                     ..water
                 },
             );
-            assert!(deep.streams.is_empty());
+            assert!(deep.streams.is_empty() && deep.pools.is_empty());
+            // 고인 웅덩이(0275): 같은 시드면 같은 자리, 문 앞 길 밖, 물살과 한 칸 넘게 떨어진다.
+            assert_eq!(room.pools, again.pools, "seed {seed}");
+            pools |= !room.pools.is_empty();
+            for p in &room.pools {
+                let (x, y) = (
+                    ((p.x / 16.0) as i32).rem_euclid(ROOM_W as i32),
+                    ((p.y / 16.0) as i32).rem_euclid(ROOM_H as i32),
+                );
+                assert!(
+                    !(8..=11).contains(&x) && !(5..=8).contains(&y),
+                    "seed {seed}: 웅덩이가 길 위"
+                );
+                assert!(room
+                    .streams
+                    .iter()
+                    .all(|(s, _)| (s.x - p.x).abs() > 32.0 || (s.y - p.y).abs() > 32.0));
+            }
         }
-        assert!(any);
+        assert!(any && pools, "물살과 웅덩이가 어딘가엔 있다");
     }
 
     /// 뿌리 지대 굴에만 가시 덤불(0147). 문 앞 길·적 자리·소품 칸은 비우고, 같은 시드면 같은 자리.

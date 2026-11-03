@@ -186,6 +186,10 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
             baked,
         );
     }
+    // 고인 웅덩이(0275): 물결 없이 반짝임만.
+    for c in w.room.pools.iter().filter(|_| ground) {
+        draw_pool_glint(*c, w.time, baked);
+    }
     for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
         let q = lerp(p.prev_pos, p.pos, alpha);
         list.push((q.y + 3.0, Drawable::Projectile(i)));

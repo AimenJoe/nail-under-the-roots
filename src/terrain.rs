@@ -1133,7 +1133,12 @@ mod tests {
         let g = room.grid.clone().unwrap();
         let tiles =
             Image::from_file_with_format(include_bytes!("../assets/art/tiles.png"), None).unwrap();
-        let water: Vec<Vec2> = room.streams.iter().map(|s| s.0).collect();
+        let water: Vec<Vec2> = room
+            .streams
+            .iter()
+            .map(|s| s.0)
+            .chain(room.pools.iter().copied())
+            .collect();
         let mut k = Baker::new(&g, Biome::Water, &[], &[]).with_water(&water);
         k.step(Some(&tiles), None, &mut || false);
         let img = k.finish();
