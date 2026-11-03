@@ -694,6 +694,7 @@ pub(super) fn draw_chest(tex: Option<&Texture2D>, r: Rect, opened: bool, time: f
 /// 새 그림(`props.png`, 0222)이 있으면 그 칸(외곽선·금이 그림에 있다) + 반짝만 코드로.
 pub(super) fn draw_breakable(
     tex: Option<&Texture2D>,
+    sunny: Option<&Texture2D>,
     b: crate::room::Breakable,
     r: Rect,
     time: f32,
@@ -703,11 +704,13 @@ pub(super) fn draw_breakable(
     let (cx, foot) = (c.x.round(), (r.bottom() - 2.0).round());
     draw_ellipse(cx, foot + 1.0, 7.0, 2.5, 0.0, SHADOW_SOFT);
     let px = |x: f32, y: f32, col: Color| draw_rectangle(x, y, 1.0, 1.0, col);
-    if let Some(t) = tex {
+    if let (Breakable::RiverStone, Some(sheet)) = (b, sunny) {
+        draw_river_stone(sheet, vec2(cx, foot + 1.0));
+    } else if let Some(t) = tex {
         let frame = match b {
             Breakable::Mound => 0,
             Breakable::Gall => 1,
-            Breakable::RockPile => 2,
+            Breakable::RockPile | Breakable::RiverStone => 2,
             Breakable::SilkBall => 3,
         };
         art::draw_prop(t, frame, vec2(cx, foot + 1.0));
@@ -728,6 +731,49 @@ pub(super) fn draw_breakable(
     }
 }
 
+/// 물길 굴의 젖은 강돌(0275, 사장이 시안 D를 고름): Sunnyside 작은 돌을 팩에서 그대로 읽어 — 레포에는 팩 그림을 넣지 않는다 —
+/// 어두운 외곽선(네 쪽으로 한 px 민 검은 그림자) + 물빛을 곱한 몸 + 위쪽 이끼(윗줄을 청록으로 한 번 더, 아래 끝은 들쭉날쭉) + 젖은 반짝 둘.
+fn draw_river_stone(sheet: &Texture2D, foot: Vec2) {
+    use crate::sunny::{draw_at_foot, RIVER_STONE};
+    for d in [
+        vec2(-1.0, 0.0),
+        vec2(1.0, 0.0),
+        vec2(0.0, -1.0),
+        vec2(0.0, 1.0),
+    ] {
+        draw_at_foot(
+            sheet,
+            RIVER_STONE,
+            foot + d,
+            Color::new(0.22, 0.15, 0.20, 1.0),
+        );
+    }
+    // 시안 D의 색(밝기 → 젖은 청회색, 팩 돌 평균에서 맞춘 곱): 팩 돌에 이미 푸른 기가 있어 푸르게 곱하면 남색 덩어리가 된다.
+    draw_at_foot(sheet, RIVER_STONE, foot, Color::new(0.85, 0.89, 0.87, 1.0));
+    let (x0, y0, w, h) = RIVER_STONE;
+    let left = (foot.x - w as f32 / 2.0).round();
+    let top = (foot.y - h as f32).round();
+    let moss = Color::new(0.47, 0.72, 0.56, 1.0);
+    // 이끼: 칸마다 아래 끝이 다른 1px 줄(들쭉날쭉) — 윗면에만 낀다.
+    const DROP: [u16; 9] = [4, 5, 6, 5, 4, 6, 7, 5, 4];
+    for x in 0..w {
+        let hh = DROP[(x as usize * 5 + 3) % DROP.len()];
+        draw_texture_ex(
+            sheet,
+            left + x as f32,
+            top,
+            moss,
+            DrawTextureParams {
+                source: Some(Rect::new((x0 + x) as f32, y0 as f32, 1.0, hh as f32)),
+                ..Default::default()
+            },
+        );
+    }
+    let glint = Color::new(0.88, 0.96, 1.0, 1.0);
+    draw_rectangle(left + 5.0, top + 6.0, 2.0, 1.0, glint);
+    draw_rectangle(left + 12.0, top + 9.0, 1.0, 1.0, glint);
+}
+
 /// 부술 수 있는 것의 코드 그림(새 그림이 없을 때): 몸통 + 금.
 fn draw_breakable_code(b: crate::room::Breakable, cx: f32, foot: f32, c: Vec2, time: f32) {
     use crate::room::Breakable;
@@ -738,7 +784,7 @@ fn draw_breakable_code(b: crate::room::Breakable, cx: f32, foot: f32, c: Vec2, t
     match b {
         Breakable::Mound => rim(cx, foot - 3.0, 6.5, 4.5),
         Breakable::Gall => rim(cx, foot - 4.0, 5.7, 5.5),
-        Breakable::RockPile => {
+        Breakable::RockPile | Breakable::RiverStone => {
             rim(cx - 3.0, foot - 2.0, 3.5, 2.5);
             rim(cx + 3.0, foot - 2.0, 3.5, 2.5);
             rim(cx, foot - 5.5, 3.5, 3.0);
@@ -771,7 +817,7 @@ fn draw_breakable_code(b: crate::room::Breakable, cx: f32, foot: f32, c: Vec2, t
             draw_line(cx - 5.0, foot - 2.0, cx + 4.0, foot - 6.0, 1.0, root);
             draw_line(cx - 3.0, foot - 8.0, cx + 5.0, foot - 3.0, 1.0, root);
         }
-        Breakable::RockPile => {
+        Breakable::RockPile | Breakable::RiverStone => {
             // 돌무더기: 회색 돌 셋을 쌓았다.
             let (lo, hi) = (
                 Color::new(0.36, 0.33, 0.36, 1.0),

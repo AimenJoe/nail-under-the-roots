@@ -89,6 +89,9 @@ pub fn rect(r: R) -> Rect {
     Rect::new(r.0 as f32, r.1 as f32, r.2 as f32, r.3 as f32)
 }
 
+/// 작은 매끈한 돌(광석 돌 열의 맨 아래 줄, 셋째 크기): 물길 굴의 부술 것 젖은 강돌(0275, 사장이 시안 D를 고름).
+pub const RIVER_STONE: R = (855, 477, 18, 16);
+
 /// 팩 한 칸을 발(아래 가운데)이 `foot`에 오게 그린다.
 pub fn draw_at_foot(sheet: &Texture2D, r: R, foot: Vec2, tint: Color) {
     let src = rect(r);

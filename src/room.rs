@@ -30,13 +30,15 @@ pub enum PropKind {
     Breakable(Breakable),
 }
 
-/// 부술 수 있는 것의 생김새(0175): 지대마다 다르다. 흙더미(들판)·뿌리혹(뿌리)·돌무더기(심층)·실뭉치(흰 실 굴).
+/// 부술 수 있는 것의 생김새(0175): 지대마다 다르다. 흙더미(들판)·뿌리혹(뿌리)·돌무더기(심층)·실뭉치(흰 실 굴)·
+/// 젖은 강돌(물길 굴, 0275 — Sunnyside 돌 + 외곽선·이끼, 팩이 없으면 돌무더기 그림).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Breakable {
     Mound,
     Gall,
     RockPile,
     SilkBall,
+    RiverStone,
 }
 
 #[derive(Debug, Clone, Copy)]

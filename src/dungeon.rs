@@ -982,8 +982,8 @@ fn breakables(
         Biome::Roots => Breakable::Gall,
         Biome::Deep => Breakable::RockPile,
         Biome::Silk => Breakable::SilkBall,
-        // 물길 굴(0275): 젖은 돌무더기(그림은 심층 것, 새 그림은 P4·P5 때).
-        Biome::Water => Breakable::RockPile,
+        // 물길 굴(0275): 젖은 강돌(사장이 시안 D를 고름, 2026-11-03).
+        Biome::Water => Breakable::RiverStone,
     };
     for _ in 0..n {
         for _ in 0..12 {
@@ -1697,6 +1697,7 @@ mod tests {
             (Biome::Roots, Breakable::Gall),
             (Biome::Deep, Breakable::RockPile),
             (Biome::Silk, Breakable::SilkBall),
+            (Biome::Water, Breakable::RiverStone),
         ] {
             let prm = Params {
                 biome,

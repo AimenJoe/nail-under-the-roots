@@ -347,7 +347,13 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
                     draw_tile(&art.tiles, src, r.x, r.bottom() - 32.0, w.biome.wall_tint());
                 }
                 PropKind::Chest { opened } => draw_chest(art.props.as_ref(), r, opened, w.time),
-                PropKind::Breakable(b) => draw_breakable(art.props.as_ref(), b, r, w.time),
+                PropKind::Breakable(b) => draw_breakable(
+                    art.props.as_ref(),
+                    art.sunny.as_ref().map(|s| &s.sheet),
+                    b,
+                    r,
+                    w.time,
+                ),
                 PropKind::Campfire => match &art.sunny {
                     Some(sunny) => draw_campfire_sunny(sunny, art.hub.as_ref(), r, w.time),
                     None => draw_campfire(r, w.time),

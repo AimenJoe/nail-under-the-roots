@@ -3293,6 +3293,10 @@ impl World {
                     Color::new(0.5, 0.36, 0.26, 1.0),
                 ),
                 crate::room::Breakable::RockPile => (ROCK, Color::new(0.55, 0.52, 0.52, 1.0)),
+                // 젖은 강돌(0275): 청회색 조각 + 물방울빛 먼지.
+                crate::room::Breakable::RiverStone => {
+                    (Color::new(0.42, 0.48, 0.56, 1.0), STREAM_SPRAY)
+                }
                 crate::room::Breakable::SilkBall => (
                     Color::new(0.92, 0.90, 0.98, 1.0),
                     Color::new(0.85, 0.82, 0.92, 1.0),

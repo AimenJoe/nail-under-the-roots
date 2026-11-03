@@ -19,7 +19,7 @@ pub enum Scenario {
     /// 아레나 웨이브(예전 첫 시작). 손맛 시험장.
     Arena,
     Empty,
-    /// 부술 수 있는 것 넷(0177): 흙더미·뿌리혹·돌무더기·실뭉치가 플레이어 둘레에.
+    /// 부술 수 있는 것 다섯(0177·0275): 흙더미·뿌리혹·돌무더기·실뭉치·젖은 강돌이 플레이어 둘레에.
     Breakables,
     Chargers(u32),
     Shooters(u32),
@@ -524,8 +524,8 @@ pub const LIST: [Entry; 61] = [
     },
     Entry {
         cat: Cat::Items,
-        name: "부술 수 있는 것 넷",
-        desc: "흙더미·뿌리혹·돌무더기·실뭉치. 쳐서 깨면 운에 따라 씨앗·산딸기·반딧불·지렁이(0177).",
+        name: "부술 수 있는 것 다섯",
+        desc: "흙더미·뿌리혹·돌무더기·실뭉치·젖은 강돌(물길 굴, 0275). 쳐서 깨면 운에 따라 씨앗·산딸기·반딧불·지렁이(0177).",
         scenario: Scenario::Breakables,
     },
 ];
@@ -889,6 +889,7 @@ fn breakables() -> World {
         Breakable::Gall,
         Breakable::RockPile,
         Breakable::SilkBall,
+        Breakable::RiverStone,
     ]
     .into_iter()
     .enumerate()
@@ -972,6 +973,14 @@ fn water_mobs() -> World {
         w.room
             .pools
             .push(vec2(x as f32 * 16.0 + 8.0, y as f32 * 16.0 + 8.0));
+    }
+    // 젖은 강돌 둘(물길 굴의 부술 것) — 물 밖 바닥에.
+    for (x, y) in [(10, 7), (13, 10)] {
+        let at = vec2(x as f32 * 16.0, y as f32 * 16.0);
+        w.room.add_prop(crate::room::Prop {
+            rect: Rect::new(at.x, at.y, 16.0, 16.0),
+            kind: crate::room::PropKind::Breakable(crate::room::Breakable::RiverStone),
+        });
     }
     for (i, k) in [
         Kind::Crayfish,

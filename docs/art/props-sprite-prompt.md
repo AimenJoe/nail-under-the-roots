@@ -19,7 +19,7 @@ Every breakable object (1-4) has one bright zigzag crack down its middle, so the
 6. the same chest, opened (lid up, dark empty inside)
 ```
 
-## 2. 물길 굴의 부술 것(0275 P3) — 하나만
+## 2. 물길 굴의 부술 것(0275 P3) — 하나만 (쓰지 않음: 사장이 Sunnyside 시안 D를 골라 `Breakable::RiverStone`으로, 2026-11-03)
 새 대화에서 `tools/art/sources/ai/sprites/props_v1.png`(지금 소품 원본, 그림체·크기 참고) 한 장만 붙이고 아래를 넣는다. 받은 원본은 `tools/art/sources/ai/sprites/props_water_v1.png`로(Claude가 ✦를 지우고 `props_ai.py`에 일곱째 칸으로 넣는다). 들어오기 전에는 심층 돌무더기를 쓴다.
 
 ```

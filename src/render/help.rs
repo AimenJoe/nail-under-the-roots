@@ -748,6 +748,7 @@ fn pic_break(c: PicCtx) {
     if ph < 0.6 {
         props::draw_breakable(
             art.and_then(|a| a.props.as_ref()),
+            art.and_then(|a| a.sunny.as_ref()).map(|s| &s.sheet),
             crate::room::Breakable::Mound,
             thing,
             time,
