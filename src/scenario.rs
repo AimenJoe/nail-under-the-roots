@@ -538,7 +538,7 @@ pub fn build(s: Scenario) -> World {
             let mut w = World::field();
             w.enter_dungeon_now();
             w.story.seed(crate::world::StorySeed {
-                quest: Some((crate::quests::MOMO as u8, None)),
+                quest: Some((QUEST_ITEM_SHOWN, None)),
                 ..Default::default()
             });
             w.story.place_quest(w.player.pos + vec2(-30.0, 4.0));
@@ -654,6 +654,9 @@ fn last_rootlet() -> World {
     w.spawn_mob(Kind::FieldMouse, at);
     w
 }
+
+/// 개발 "부탁 물건"이 놓는 물건(`quests::ALL` 번호).
+const QUEST_ITEM_SHOWN: u8 = crate::quests::MOMO as u8;
 
 /// 시나리오 `Scenario::Spring`의 월드(0248 R29: `build`의 갈래를 함수로).
 fn spring() -> World {

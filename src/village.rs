@@ -251,8 +251,8 @@ pub struct State {
     pub clover: bool,
     /// 다른 캐릭터로 걷는다: Naïl이 큰 나무 곁에 이웃으로 선다(0249).
     pub nail: bool,
-    /// 들어준 부탁의 흔적(0273 B, `quests::ALL` 번호): 포포 좌판 곁 샘 그릇·보리 곁 피리·모모 자리 곁 꽃밭·큰 나무 밑동의 깍정이.
-    pub traces: [bool; 4],
+    /// 들어준 부탁의 흔적(0273 B, `quests::ALL` 번호): 포포 샘 그릇·보리 피리·모모 꽃밭·큰 나무 밑동의 깍정이·모닥불 곁 풀 방석·콩이 버섯 등·토끼풀 솜털 잠자리.
+    pub traces: [bool; 7],
     pub decor: [bool; DECOR_ALL],
     /// 큰 나무의 잎(0 = 거의 없음 … 4 = 꽃).
     pub growth: u8,

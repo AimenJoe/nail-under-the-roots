@@ -21,8 +21,11 @@ pub const MOMO: usize = 2;
 pub const DOTO: usize = 3;
 pub const KONGI: usize = 4;
 pub const CLOVER: usize = 5;
+pub const SUSU: usize = 6;
+pub const KONGI_BALL: usize = 7;
+pub const CLOVER_KITS: usize = 8;
 
-pub const ALL: [Tale; 6] = [
+pub const ALL: [Tale; 9] = [
     Tale {
         id: "popo",
         illust: Illust::GreatTree,
@@ -59,6 +62,24 @@ pub const ALL: [Tale; 6] = [
         title: |s| s.tale_clover_t,
         text: |s| s.tale_clover,
     },
+    Tale {
+        id: "susu",
+        illust: Illust::Sprout,
+        title: |s| s.tale_susu_t,
+        text: |s| s.tale_susu,
+    },
+    Tale {
+        id: "kongi_ball",
+        illust: Illust::KongiDoor,
+        title: |s| s.tale_kongi_ball_t,
+        text: |s| s.tale_kongi_ball,
+    },
+    Tale {
+        id: "clover_kits",
+        illust: Illust::CloverCocoon,
+        title: |s| s.tale_clover_kits_t,
+        text: |s| s.tale_clover_kits,
+    },
 ];
 
 pub fn key(i: usize) -> String {
@@ -85,6 +106,9 @@ mod tests {
             (DOTO, "doto"),
             (KONGI, "kongi"),
             (CLOVER, "clover"),
+            (SUSU, "susu"),
+            (KONGI_BALL, "kongi_ball"),
+            (CLOVER_KITS, "clover_kits"),
         ] {
             assert_eq!(ALL[i].id, id);
         }

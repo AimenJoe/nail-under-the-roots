@@ -74,6 +74,8 @@ pub enum Id {
     Dodge,
     /// 가방 아이템·무기를 주웠다(0234). 반딧불·씨앗은 오르는 음 `Glowbug` 그대로.
     Pickup,
+    /// 보리의 갈대 피리(0273 B, 부탁을 들어준 뒤 마을): 숨결 섞인 부드러운 세 음 가락(합성 — 파일 없음).
+    Pipe,
 }
 
 /// 파일 소리 표: (이름, 변형 수, 크기). 크기는 MASTER_VOLUME·설정에 곱한다 — 귀로 맞춘다.
@@ -135,7 +137,8 @@ fn file_of(id: Id) -> Option<&'static str> {
         | Id::Parry
         | Id::Impact
         | Id::Unbind
-        | Id::Break => return None,
+        | Id::Break
+        | Id::Pipe => return None,
     })
 }
 
@@ -207,6 +210,7 @@ pub struct Sfx {
     brk: Sound,
     glowbug: [Sound; 4],
     heal: Sound,
+    pipe: Sound,
     drill: [Sound; 3],
     drill_wall: Sound,
     parry: Sound,
@@ -390,6 +394,7 @@ impl Sfx {
                 Layer::tone(0.3, 1046.0, 1318.0, Wave::Sine, 0.15, 1.5),
             ])
             .await,
+            pipe: load_samples(&pipe()).await,
             drill: [
                 load_samples(&engine(tuning::DRILL_REV, tuning::DRILL_TIME)).await,
                 load_samples(&engine(
@@ -528,6 +533,7 @@ impl Sfx {
                 &self.glowbug[i]
             }
             Id::Heal => &self.heal,
+            Id::Pipe => &self.pipe,
             Id::Drill(i) => &self.drill[i.min(2)],
             Id::DrillWall => &self.drill_wall,
             Id::Parry => &self.parry,
@@ -607,6 +613,36 @@ async fn load_samples(samples: &[i16]) -> Sound {
     load_sound_from_bytes(&bytes)
         .await
         .expect("합성 WAV 로드 실패")
+}
+
+/// 보리의 갈대 피리(0273 B): 솔·라·미(한 음 0.34초, 마지막은 길게), 사인 + 2배음 조금, 5Hz 떨림, 숨소리.
+/// 음마다 부드럽게 들어가고(0.04초) 잦아든다. 마을 소리라 작게(최대 0.22).
+fn pipe() -> Vec<i16> {
+    use std::f32::consts::TAU;
+    let notes = [(784.0f32, 0.34f32), (880.0, 0.34), (659.0, 0.62)];
+    let total: f32 = notes.iter().map(|n| n.1).sum();
+    let n = (total * SR as f32) as usize;
+    let mut out = Vec::with_capacity(n);
+    let (mut ph, mut rng, mut lp) = (0.0f32, 0x2545_F491u32, 0.0f32);
+    let mut start = 0.0f32;
+    for &(f, d) in &notes {
+        let m = (d * SR as f32) as usize;
+        for i in 0..m {
+            let t = i as f32 / SR as f32;
+            let env = (t / 0.04).min(1.0) * (1.0 - t / d).max(0.0).powf(0.7);
+            let fv = f * (1.0 + 0.006 * (TAU * 5.0 * (start + t)).sin());
+            ph = (ph + fv / SR as f32).fract();
+            rng ^= rng << 13;
+            rng ^= rng >> 17;
+            rng ^= rng << 5;
+            let noise = (rng as f32 / u32::MAX as f32) * 2.0 - 1.0;
+            lp += (noise - lp) * 0.08;
+            let v = (TAU * ph).sin() * 0.8 + (TAU * ph * 2.0).sin() * 0.15 + lp * 0.25;
+            out.push((v * env * 0.22 * i16::MAX as f32) as i16);
+        }
+        start += d;
+    }
+    out
 }
 
 /// 드릴 엔진 "부아아앙": 시동(`rev`초) 동안 음이 낮은 데서 빠르게 올라가고, 돌진(`dash`초) 동안 높은 데서 버틴다.

@@ -1030,3 +1030,7 @@ pub const CUT_SHAKE_SMALL: f32 = 0.15;
 pub const CUT_SHAKE: f32 = 0.2;
 pub const CUT_SHAKE_BIG: f32 = 0.35;
 pub const CUT_SHAKE_HUGE: f32 = 0.4;
+
+/// 보리의 갈대 피리(0273 B): 한 가락 주기(초당 횟수 — 그림의 음표와 같다)·들리는 거리(px, 마을 칸 약 여섯).
+pub const PIPE_RATE: f32 = 0.35;
+pub const PIPE_HEAR: f32 = 96.0;

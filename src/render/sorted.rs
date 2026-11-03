@@ -100,7 +100,7 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                 }
                 'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
                 // 들어준 부탁의 흔적(0273 B): 그 이웃 자리 곁(이웃이 없어도 — 플레이어가 그 이웃이어도 흔적은 남는다).
-                'K' | 'b' | 'M' if v.traces[trace_of(*c)] => {
+                'K' | 'b' | 'M' | 'n' | 'g' | 'j' if v.traces[trace_of(*c)] => {
                     let i = trace_of(*c);
                     let at = *at + TRACE_OFFSET[i];
                     list.push((at.y + 3.0, Drawable::Trace(i, at)));
@@ -448,16 +448,23 @@ fn trace_of(c: char) -> usize {
     match c {
         'K' => crate::quests::POPO,
         'b' => crate::quests::BORI,
+        'n' => crate::quests::SUSU,
+        'g' => crate::quests::KONGI,
+        'j' => crate::quests::CLOVER,
         _ => crate::quests::MOMO,
     }
 }
 
 /// 흔적 자리: 기호에서 얼마나 떨어져 있나(포포 왼쪽 아래 — 좌판과 사이 · 보리 오른쪽 · 모모 자리 오른쪽 · 큰 나무 밑동 오른쪽).
-const TRACE_OFFSET: [Vec2; 4] = [
+/// 수수는 마을에 살지 않아 모닥불 곁(Naïl 자리 'n'에서 모닥불 왼쪽 아래), 콩이는 바위 곁, 토끼풀은 가족 자리 오른쪽.
+const TRACE_OFFSET: [Vec2; 7] = [
     vec2(-11.0, 12.0),
     vec2(11.0, 5.0),
     vec2(18.0, 7.0),
     vec2(17.0, 24.0),
+    vec2(-2.0, 20.0),
+    vec2(14.0, 6.0),
+    vec2(16.0, 8.0),
 ];
 
 /// 정렬 그리기 한 개의 발 x(그림자 패스가 모닥불까지 거리를 잴 때).
@@ -525,8 +532,9 @@ fn draw_root_grass(b: Vec2) {
     }
 }
 
-/// 들어준 부탁의 흔적(0273 B). 0 샘 그릇(물이 반짝), 1 갈대 피리(가끔 음표가 오른다), 2 꽃밭(분홍·흰 꽃 넷), 3 큰 깍정이.
-fn draw_quest_trace(i: usize, at: Vec2, time: f32) {
+/// 들어준 부탁의 흔적(0273 B). 0 샘 그릇(물이 반짝), 1 갈대 피리(가끔 음표가 오른다), 2 꽃밭(분홍·흰 꽃 넷), 3 큰 깍정이,
+/// 4 풀 방석, 5 버섯 등(빛), 6 솜털 잠자리. 마을 수첩 그림도 이것(`pub(super)`).
+pub(super) fn draw_quest_trace(i: usize, at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round());
     let px = |dx: f32, dy: f32, w: f32, h: f32, c: Color| draw_rectangle(x + dx, y + dy, w, h, c);
     let dark = Color::new(0.22, 0.15, 0.13, 1.0);
@@ -550,7 +558,7 @@ fn draw_quest_trace(i: usize, at: Vec2, time: f32) {
             if shadow_pass() {
                 return;
             }
-            let t = (time * 0.35).fract();
+            let t = (time * crate::tuning::PIPE_RATE).fract();
             if t < 0.45 {
                 let k = t / 0.45;
                 let (nx, ny) = (x + 3.0 + (k * 6.0).sin() * 2.0, y - 10.0 - k * 12.0);
@@ -584,6 +592,40 @@ fn draw_quest_trace(i: usize, at: Vec2, time: f32) {
                     1.0,
                     Color::new(1.0, 0.88, 0.40, 1.0),
                 );
+            }
+        }
+        4 => {
+            // 풀 방석: 둥글게 엮은 노란 풀 + 엮은 줄.
+            px(-6.0, -2.0, 13.0, 5.0, dark);
+            px(-5.0, -3.0, 11.0, 1.0, dark);
+            let straw = Color::new(0.86, 0.74, 0.42, 1.0);
+            px(-5.0, -2.0, 11.0, 4.0, straw);
+            let weave = Color::new(0.66, 0.52, 0.28, 1.0);
+            for dx in [-4.0, -1.0, 2.0, 5.0] {
+                px(dx, -1.0, 1.0, 2.0, weave);
+            }
+            px(-4.0, -2.0, 9.0, 1.0, Color::new(0.95, 0.86, 0.58, 1.0));
+        }
+        5 => {
+            // 버섯 등: 빛나는 갓을 얹은 작은 돌 받침 + 둥근 빛.
+            if !shadow_pass() {
+                let a = 0.12 + 0.08 * (time * 1.7).sin().abs();
+                draw_circle(x + 0.5, y - 5.0, 10.0, Color::new(0.55, 0.85, 1.0, a));
+            }
+            px(-3.0, -1.0, 7.0, 4.0, dark);
+            px(-2.0, 0.0, 5.0, 2.0, Color::new(0.55, 0.55, 0.60, 1.0));
+            px(-4.0, -6.0, 9.0, 5.0, dark);
+            px(-3.0, -5.0, 7.0, 3.0, Color::new(0.55, 0.82, 0.95, 1.0));
+            px(-2.0, -5.0, 2.0, 1.0, Color::new(0.85, 0.97, 1.0, 1.0));
+        }
+        6 => {
+            // 솜털 잠자리: 흰 솜털을 둥글게 깐 자리.
+            px(-7.0, -2.0, 15.0, 5.0, dark);
+            let fluff = Color::new(0.97, 0.96, 0.93, 1.0);
+            let shade = Color::new(0.84, 0.82, 0.78, 1.0);
+            px(-6.0, -2.0, 13.0, 4.0, shade);
+            for dx in [-5.0, -2.0, 1.0, 4.0] {
+                px(dx, -3.0, 3.0, 3.0, fluff);
             }
         }
         _ => {

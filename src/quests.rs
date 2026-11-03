@@ -32,8 +32,11 @@ pub const POPO: usize = 0;
 pub const BORI: usize = 1;
 pub const MOMO: usize = 2;
 pub const DOTO: usize = 3;
+pub const SUSU: usize = 4;
+pub const KONGI: usize = 5;
+pub const CLOVER: usize = 6;
 
-pub const ALL: [Quest; 4] = [
+pub const ALL: [Quest; 7] = [
     Quest {
         id: "popo",
         who: Who::Popo,
@@ -74,7 +77,43 @@ pub const ALL: [Quest; 4] = [
         found: |s| s.q_doto_found,
         thanks: |s| s.q_doto_thanks,
     },
+    // 수수는 마을이 아니라 첫 쉼터에 산다 — 부탁·돌려주기는 쉼터에서(`talk_anywhere`), 흔적은 마을 모닥불 곁.
+    Quest {
+        id: "susu",
+        who: Who::Susu,
+        opens: key::TUTORIAL,
+        biome: None,
+        ask: |s| s.q_susu_ask,
+        item: |s| s.q_susu_item,
+        found: |s| s.q_susu_found,
+        thanks: |s| s.q_susu_thanks,
+    },
+    Quest {
+        id: "kongi",
+        who: Who::Kongi,
+        opens: key::KONGI_BACK,
+        biome: Some(Biome::Deep),
+        ask: |s| s.q_kongi_ask,
+        item: |s| s.q_kongi_item,
+        found: |s| s.q_kongi_found,
+        thanks: |s| s.q_kongi_thanks,
+    },
+    Quest {
+        id: "clover",
+        who: Who::Clover,
+        opens: key::CLOVER_BACK,
+        biome: Some(Biome::Meadow),
+        ask: |s| s.q_clover_ask,
+        item: |s| s.q_clover_item,
+        found: |s| s.q_clover_found,
+        thanks: |s| s.q_clover_thanks,
+    },
 ];
+
+/// 마을 밖에서도 부탁하는 이웃(마을에 살지 않는다): 수수(첫 쉼터).
+pub fn talk_anywhere(who: Who) -> bool {
+    who == Who::Susu
+}
 
 /// 부탁 한 단계의 기록 키.
 pub fn key_of(i: usize, step: &str) -> String {
@@ -85,11 +124,14 @@ pub const FOUND: &str = "found";
 pub const DONE: &str = "done";
 
 /// 저널 목표가 보는 깃발(`quest.<id>.done`) — 문자열 상수라 표에 쓴다.
-pub const DONE_KEYS: [&str; 4] = [
+pub const DONE_KEYS: [&str; 7] = [
     "quest.popo.done",
     "quest.bori.done",
     "quest.momo.done",
     "quest.doto.done",
+    "quest.susu.done",
+    "quest.kongi.done",
+    "quest.clover.done",
 ];
 
 pub fn done(p: &Profile, i: usize) -> bool {
@@ -145,6 +187,17 @@ mod tests {
         assert_eq!(ALL[BORI].who, Who::Bori);
         assert_eq!(ALL[MOMO].who, Who::Momo);
         assert_eq!(ALL[DOTO].who, Who::Doto);
+        assert_eq!(ALL[SUSU].who, Who::Susu);
+        assert_eq!(ALL[KONGI].who, Who::Kongi);
+        assert_eq!(ALL[CLOVER].who, Who::Clover);
+        // 이웃마다 부탁은 하나(한 번에 하나 규칙이 이웃으로 갈린다).
+        for (i, q) in ALL.iter().enumerate() {
+            assert!(
+                ALL[..i].iter().all(|o| o.who != q.who && o.id != q.id),
+                "{}",
+                q.id
+            );
+        }
     }
 
     /// 부탁 → 찾기 → 돌려주기, 한 번에 하나: 열린 동안 다른 이웃은 부탁하지 않고, 돌려준 뒤에야 다음.

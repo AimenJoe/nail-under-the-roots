@@ -1000,6 +1000,7 @@ impl Renderer {
             Spot::Puddle => draw_puddle(foot - vec2(0.0, 6.0), t),
             Spot::Seat => draw_seat(Rect::new(foot.x - 8.0, foot.y - 14.0, 16.0, 16.0), 0),
             Spot::Loop => draw_dream_loop(foot - vec2(0.0, 2.0), t),
+            Spot::Trace(i) => sorted::draw_quest_trace(i as usize, foot - vec2(0.0, 3.0), t),
             _ => {}
         }
     }

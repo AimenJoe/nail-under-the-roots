@@ -406,7 +406,8 @@ pub const LINES: &[Line] = &[
         when: When::TalkDoto,
         who: Speaker::Doto,
         text: |s| s.doto_t_true,
-        // "고마워"는 씨앗을 묻은 나일에게(참 엔딩은 나일의 것, 0056·0201) — 모모에게는 나일에게 전해 달라고(0266).
+        // "고마워"는 잊힌 씨앗을 할매 곁에 가져다 놓은 나일에게(참 엔딩은 나일의 것, 0056·0201) — 모모에게는 나일에게 전해 달라고(0266).
+        // 예전 글은 "나일이 씨앗을 묻었다"였다 — 씨앗을 묻는 건 청설모의 일이라 "찾아 할매 곁에 놓았다"로(사장 2026-11-03).
         needs: &[Flag(key::TRUE_ENDING), As(Character::Mole)],
         once: true,
     },
@@ -979,9 +980,8 @@ pub struct TalkCtx<'a> {
 
 pub fn talk_route(who: Who, c: &TalkCtx) -> Talk {
     let story = |w: When| pick(c.profile, w, c.ch).is_some().then_some(Talk::Story(w));
-    // 이웃의 부탁(0273 B)은 마을에서만. 포포는 말 걸면 늘 마을 창이라 그보다 먼저, 다른 이웃은 진행 한마디 다음.
-    let quest = c
-        .village
+    // 이웃의 부탁(0273 B)은 마을에서만(쉼터에 사는 수수는 쉼터에서). 포포는 말 걸면 늘 마을 창이라 그보다 먼저, 다른 이웃은 진행 한마디 다음.
+    let quest = (c.village || crate::quests::talk_anywhere(who))
         .then(|| crate::quests::talk(who, c.profile))
         .flatten()
         .map(|(q, step)| Talk::Quest(q, step));
@@ -1117,6 +1117,14 @@ mod route_tests {
         assert!(matches!(
             talk_route(Who::Popo, &ctx(&p, Character::Mole, true, &none, 0)),
             Talk::Decor
+        ));
+        // 쉼터에 사는 수수는 쉼터에서 부탁한다(다른 부탁이 열려 있지 않으면) — 마을 이웃은 쉼터에서 부탁하지 않는다.
+        let mut q = Profile::default();
+        q.set(key::TUTORIAL);
+        q.set(key::SPROUT);
+        assert!(matches!(
+            talk_route(Who::Susu, &ctx(&q, Character::Mole, false, &all, 0)),
+            Talk::Quest(crate::quests::SUSU, crate::quests::Step::Ask)
         ));
         assert!(matches!(
             talk_route(Who::Popo, &ctx(&p, Character::Mole, false, &none, 0)),

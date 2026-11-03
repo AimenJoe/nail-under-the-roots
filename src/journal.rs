@@ -582,6 +582,36 @@ pub const GOALS: &[Goal] = &[
         Tale(crate::tales::DOTO)
     ),
     goal!(
+        "quest_susu",
+        Neighbors,
+        jg_q_susu,
+        jg_q_susu_d,
+        Flag(crate::quests::DONE_KEYS[crate::quests::SUSU]),
+        1,
+        Some("susu"),
+        Tale(crate::tales::SUSU)
+    ),
+    goal!(
+        "quest_kongi",
+        Neighbors,
+        jg_q_kongi,
+        jg_q_kongi_d,
+        Flag(crate::quests::DONE_KEYS[crate::quests::KONGI]),
+        1,
+        Some("kongi"),
+        Tale(crate::tales::KONGI_BALL)
+    ),
+    goal!(
+        "quest_clover",
+        Neighbors,
+        jg_q_clover,
+        jg_q_clover_d,
+        Flag(crate::quests::DONE_KEYS[crate::quests::CLOVER]),
+        1,
+        Some("clover"),
+        Tale(crate::tales::CLOVER_KITS)
+    ),
+    goal!(
         "mobs",
         Neighbors,
         jg_mobs,

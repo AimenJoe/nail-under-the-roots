@@ -228,6 +228,8 @@ pub struct Adventure {
     /// 마을이면 그 모습(이웃·꾸미기·나무)과 자리 표시(0045).
     pub village: Option<crate::village::State>,
     pub marks: Vec<(char, Vec2)>,
+    /// 보리 피리(0273 B)의 지난 틱 박자 자리(0..1). 0을 지나면 한 가락 — 그림의 음표(`render::sorted` 흔적)와 같은 주기.
+    pipe_phase: f32,
     /// 이번 런에서 마지막으로 이름 카드를 보인 지대(같은 지대로 내려가면 다시 띄우지 않는다, 0156).
     pub shown_biome: Option<Biome>,
     /// 지대 이름 카드: (지대, 깊이 m, 남은 시간).
@@ -711,6 +713,9 @@ impl World {
         if self.memory_tick() || self.quest_tick() {
             self.juice.audio.play(sfx::Id::Glowbug);
         }
+        if self.pipe_tick() {
+            self.juice.audio.play(sfx::Id::Pipe);
+        }
         if self.adv.place == Place::Field {
             if let Some(id) = self.field_boss() {
                 self.juice.audio.play(id);
@@ -1037,6 +1042,26 @@ impl World {
         self.biome = biome;
         self.place_story_in_burrow();
         self.snap_cam();
+    }
+
+    /// 보리의 갈대 피리(0273 B): 부탁을 들어준 마을에서, 보리 곁(`PIPE_HEAR` 안)에 있으면 음표가 오를 때마다 한 가락.
+    /// 주기는 그림과 같다(`PIPE_RATE`, 음표가 오르는 첫 순간 = 박자 자리가 0을 지날 때).
+    pub fn pipe_tick(&mut self) -> bool {
+        let Some(v) = self.adv.village.as_ref() else {
+            return false;
+        };
+        if self.adv.place != Place::Village || !v.traces[crate::quests::BORI] {
+            return false;
+        }
+        let phase = (self.time * t::PIPE_RATE).fract();
+        let wrapped = phase < self.adv.pipe_phase;
+        self.adv.pipe_phase = phase;
+        let near = self
+            .adv
+            .marks
+            .iter()
+            .any(|(c, at)| *c == 'b' && (self.player.pos - *at).length() <= t::PIPE_HEAR);
+        wrapped && near
     }
 
     /// 이야기 물건을 굴에 놓는다 — 고르는 것은 굴 시드로(같은 시드 = 같은 자리), 꿈에서는 놓지 않는다.

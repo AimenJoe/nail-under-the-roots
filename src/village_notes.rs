@@ -3,7 +3,7 @@
 //! 나누는 기준: 안내(`help.rs`)는 조작·규칙·시스템, 수첩은 장소·이웃·분위기. 수첩에는 버튼·수치·규칙을 쓰지 않고,
 //! 같은 글을 두 곳에 쓰지 않는다(시험 `help::tests::help_and_notes_share_no_text`).
 //!
-//! 본 것만 열린다: 이웃은 돌아온 뒤, 할매와 실 고리는 할매가 마을에 온 뒤(엔딩 전 스포일러를 막는다 — 2.1과 같은 기준,
+//! 본 것만 열린다: 이웃은 돌아온 뒤, 부탁의 흔적은 돌려준 뒤(0273 B), 할매와 실 고리는 할매가 마을에 온 뒤(엔딩 전 스포일러를 막는다 — 2.1과 같은 기준,
 //! 정체를 말하지 않는 결로). 잠금은 이미 있는 기록 깃발만 쓴다(새 키 없음).
 
 use crate::i18n::Tr;
@@ -25,6 +25,8 @@ pub enum Spot {
     Clover,
     Halmae,
     Loop,
+    /// 들어준 부탁의 흔적(0273 B, `quests::ALL` 번호) — 그림은 마을의 흔적 그대로.
+    Trace(u8),
 }
 
 impl Spot {
@@ -61,7 +63,7 @@ fn halmae(p: &Profile) -> bool {
     p.flag(key::HALF_ENDING) || p.flag(key::TRUE_ENDING)
 }
 
-pub const NOTES: [Note; 13] = [
+pub const NOTES: [Note; 20] = [
     Note {
         spot: Spot::Tree,
         title: |s| s.vn_tree,
@@ -140,6 +142,49 @@ pub const NOTES: [Note; 13] = [
         title: |s| s.vn_loop,
         body: |s| s.vn_loop_d,
         gate: Some(halmae),
+    },
+    // 들어준 부탁의 흔적(0273 B): 돌려준 뒤에만.
+    Note {
+        spot: Spot::Trace(0),
+        title: |s| s.vn_tr_popo,
+        body: |s| s.vn_tr_popo_d,
+        gate: Some(|p| crate::quests::done(p, 0)),
+    },
+    Note {
+        spot: Spot::Trace(1),
+        title: |s| s.vn_tr_bori,
+        body: |s| s.vn_tr_bori_d,
+        gate: Some(|p| crate::quests::done(p, 1)),
+    },
+    Note {
+        spot: Spot::Trace(2),
+        title: |s| s.vn_tr_momo,
+        body: |s| s.vn_tr_momo_d,
+        gate: Some(|p| crate::quests::done(p, 2)),
+    },
+    Note {
+        spot: Spot::Trace(3),
+        title: |s| s.vn_tr_doto,
+        body: |s| s.vn_tr_doto_d,
+        gate: Some(|p| crate::quests::done(p, 3)),
+    },
+    Note {
+        spot: Spot::Trace(4),
+        title: |s| s.vn_tr_susu,
+        body: |s| s.vn_tr_susu_d,
+        gate: Some(|p| crate::quests::done(p, 4)),
+    },
+    Note {
+        spot: Spot::Trace(5),
+        title: |s| s.vn_tr_kongi,
+        body: |s| s.vn_tr_kongi_d,
+        gate: Some(|p| crate::quests::done(p, 5)),
+    },
+    Note {
+        spot: Spot::Trace(6),
+        title: |s| s.vn_tr_clover,
+        body: |s| s.vn_tr_clover_d,
+        gate: Some(|p| crate::quests::done(p, 6)),
     },
 ];
 
