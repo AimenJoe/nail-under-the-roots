@@ -49,7 +49,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26   # 최신 LTS(Lithium, 2026-10-28 Active LTS). lts/*는 쓰지 않는다 — 다음 LTS로 조용히 넘어가지 않게
       - name: Install Playwright
         working-directory: tools/test
         run: |
