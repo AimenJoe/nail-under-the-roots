@@ -24,7 +24,7 @@ pub const ALL: [Memory; crate::world::MEMORIES as usize] = [
         text: |s| s.mem_2,
     },
     Memory {
-        illust: Illust::HalmaeDeep,
+        illust: Illust::MemAlone,
         text: |s| s.mem_3,
     },
     Memory {

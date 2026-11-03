@@ -94,6 +94,7 @@ AI_SCENES = [
     'title',
     'mem_forest',
     'mem_drought',
+    'mem_alone',
 ]
 # 코드로 그리는 것.
 CODE_SCENES = {

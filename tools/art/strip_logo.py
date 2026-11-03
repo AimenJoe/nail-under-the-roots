@@ -40,6 +40,9 @@ EDGE = 1024 - (863 + CENTER)    # 1024² 원본의 오른쪽·아래 가장자�
 FILL_ABOVE = 1.4
 # 고친 그림이지만 메우지 않고 되돌리기만 하는 원본(sources/ai 기준 경로, 확장자 없이): 무늬 위에서 메우기가 덩어리져 보였다.
 BLEND_ONLY = {'illust/mother_burrow', 'sheets/kongi'}
+# 늘 메우는 원본(이름 앞부분): 실의 기억(0273)은 오른쪽 아래가 늘 빈 흙이라 메우기가 보이지 않는다. 고친 판은 n이
+# FILL_ABOVE 아래로 나와도(1.09) 모델이 다시 그린 ✦ 자국이 게임 그림의 어두운 흙에 남았다.
+FILL_ALWAYS = ('illust/mem_',)
 
 
 def _sample(xs, ys):
@@ -121,10 +124,12 @@ def clean(img, name):
     a = _alpha(w, h, box, dx, dy, m, n)
     rgb[y0:y1, x0:x1] = np.round(_unblend(rgb[y0:y1, x0:x1].astype(float), a)).astype(np.uint8)
     out = Image.fromarray(rgb)
-    if n <= FILL_ABOVE or name in BLEND_ONLY:
+    if (n <= FILL_ABOVE and not name.startswith(FILL_ALWAYS)) or name in BLEND_ONLY:
         return out, n, 'unblend'
     # 별보다 조금 크게(템플릿 반지름 48에 3) 메운다: 모델이 다시 그린 별은 가장자리가 번져 있다.
-    mask = _alpha(w, h, box, dx, dy, m * (1 + 3 / 48)) > FILL_A
+    # 늘 메우는 원본은 빈 흙이라 넓게(12): 고친 판은 앞 판의 ✦가 조금 어긋난 자리에 다시 그려져 가장자리 자국이 남았다(mem_alone).
+    grow = 12 if name.startswith(FILL_ALWAYS) else 3
+    mask = _alpha(w, h, box, dx, dy, m * (1 + grow / 48)) > FILL_A
     ref_pack.fill_hole(out, {(x0 + x, y0 + y) for y, x in zip(*np.nonzero(mask))})
     return out, n, 'unblend+fill'
 
