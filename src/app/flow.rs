@@ -87,7 +87,8 @@ pub enum Fall {
     Respawn { wake_line: bool },
     /// 실뿌리가 다 감긴 뒤 또 쓰러졌다(0210): 런이 끝난다. 이야기 런은 마을로, 그 밖(개발 시나리오)은 타이틀로.
     RunLost { to_village: bool },
-    /// 아레나·개발 시나리오는 처음부터.
+    /// 아레나·개발 시나리오는 처음부터(같은 시나리오를 다시). 개발 굴은 필드 지도 위에 지은 것이라, 저장 지점에서
+    /// 깨면 튜토리얼 필드로 가 버렸다(사장 2026-11-03 "너무 불편함").
     Restart,
 }
 
@@ -97,16 +98,21 @@ pub fn back_to_village(s: Scenario) -> bool {
 }
 
 pub fn fall(s: Scenario, in_arena: bool, alive: bool, run_over: bool) -> Fall {
+    // 이야기 런(새 런·마을에서 나선 런·튜토리얼)만 저장 지점에서 깬다.
+    let story = matches!(s, Scenario::Normal | Scenario::Village | Scenario::Tutorial);
     if in_arena || alive {
         Fall::Restart
     } else if run_over {
+        // 실뿌리가 다 감긴 끝은 개발 시나리오(쉼터: 실뿌리 둘)에서도 그 연출을 본다.
         Fall::RunLost {
             to_village: back_to_village(s),
         }
-    } else {
+    } else if story {
         Fall::Respawn {
             wake_line: s == Scenario::Normal,
         }
+    } else {
+        Fall::Restart
     }
 }
 
@@ -239,8 +245,19 @@ mod tests {
             fall(Scenario::Normal, false, false, false),
             Fall::Respawn { wake_line: true }
         );
+        // 개발 시나리오(굴·가장 깊은 곳 …)는 저장 지점이 아니라 같은 시나리오를 처음부터.
+        assert_eq!(fall(Scenario::Deepest, false, false, false), Fall::Restart);
         assert_eq!(
-            fall(Scenario::Deepest, false, false, false),
+            fall(
+                Scenario::Tangle(crate::biome::Biome::Water),
+                false,
+                false,
+                false
+            ),
+            Fall::Restart
+        );
+        assert_eq!(
+            fall(Scenario::Village, false, false, false),
             Fall::Respawn { wake_line: false }
         );
         assert_eq!(
