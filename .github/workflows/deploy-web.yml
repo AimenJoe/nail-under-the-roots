@@ -21,12 +21,12 @@ jobs:
       NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # 유료 에셋 팩(레포 밖, docs/decisions/0010). 시크릿이 없으면 건너뛰고 직접 그린 대체 타일로 빌드한다.
       - name: Fetch vendor assets (private repo)
         if: env.ASSETS_REPO != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ secrets.ASSETS_REPO }}
           token: ${{ secrets.ASSETS_TOKEN }}
@@ -64,12 +64,12 @@ jobs:
           grep -n "<title>\|robots" dist/index.html
           ls -la dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: dist
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: env.NETLIFY_SITE_ID != ''
         with:
           node-version: 22

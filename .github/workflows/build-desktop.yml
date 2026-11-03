@@ -50,13 +50,13 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # 유료 에셋 팩(레포 밖, 0010). 시크릿이 없으면 건너뛰고 직접 그린 대체 그림으로 빌드한다.
       # persist-credentials: false — 묶음에 assets/vendor/.git이 실려도 토큰이 남지 않게(0235 R23).
       - name: Fetch vendor assets (private repo)
         if: env.ASSETS_REPO != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ secrets.ASSETS_REPO }}
           token: ${{ secrets.ASSETS_TOKEN }}
@@ -177,7 +177,7 @@ jobs:
           ldd "$D/nail" | head -20
           echo "PKG=nail-linux-$FLAVOR.tar.gz" >> "$GITHUB_ENV"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: nail-${{ matrix.name }}-${{ env.FLAVOR }}-${{ github.sha }}
           path: ${{ env.PKG }}
@@ -185,7 +185,7 @@ jobs:
 
       - name: Attach to Release
         if: inputs.release_tag != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.release_tag }}
           files: ${{ env.PKG }}
