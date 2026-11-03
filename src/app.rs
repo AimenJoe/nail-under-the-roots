@@ -2045,6 +2045,16 @@ impl App {
 
     /// JRPG식 대화창: 아래 전체 폭, 이름표, 초상 자리, 타자 효과, ▼.
     fn draw_cutscene(&mut self, ui: &Ui) {
+        // 대사는 글꼴로 줄을 나눠 `LINES_PER_PAGE`줄씩 장으로 — 장 경계를 컷씬에 알려 주면 "▼"가 다음 장을 넘긴다(2026-11-03).
+        let lines = self
+            .cutscene
+            .as_ref()
+            .and_then(|c| c.dialogue())
+            .map(|d| cut_lines(ui, &d));
+        if let (Some(c), Some(l)) = (&mut self.cutscene, &lines) {
+            c.set_pages(cutscene::page_ends(l));
+        }
+        let lines = lines.unwrap_or_default();
         let Some(c) = &self.cutscene else { return };
         // 일러스트는 월드·레터박스 위, 대화창 아래(docs/decisions/0039).
         if let Some(il) = c.illust {
@@ -2068,26 +2078,23 @@ impl App {
                 y += 2.0;
             }
             let ui = &ui.with_outline();
-            // 줄은 다 찍힌 글로 나누고(찍히는 동안 줄이 바뀌지 않게) 앞에서부터 찍힌 만큼만 보인다.
-            let full = ui::wrap(ui, &d.text, b.w - 24.0, FONT_PX);
-            let top = b.y + (b.h - full.len().min(3) as f32 * 13.0) / 2.0;
-            let mut left = d.shown_chars;
-            for (i, l) in full.iter().take(3).enumerate() {
-                let n = l.chars().count().min(left);
-                left -= n;
-                let part: String = l.chars().take(n).collect();
+            // 줄은 다 찍힌 글로 나누고(찍히는 동안 줄이 바뀌지 않게) 지금 장의 줄을 찍힌 만큼만 보인다.
+            let page = page_lines(&lines, &d);
+            let top = b.y + (b.h - page.len() as f32 * 13.0) / 2.0;
+            for (i, (l, part)) in page.iter().enumerate() {
                 ui.text(
-                    &part,
+                    part,
                     160.0 - ui.text_w(l, FONT_PX) / 2.0,
                     top + i as f32 * 13.0,
                     FONT_PX,
                     Color::new(0.94, 0.90, 0.82, 1.0),
                 );
             }
+            // ▼는 글 칸(가운데 `NARRATE_TEXT_W`) 바로 바깥 — 꽉 찬 셋째 줄 끝과 겹치지 않게(장 넘김으로 앞 장은 늘 꽉 찬다).
             if d.complete && (get_time() * 2.0) as i64 % 2 == 0 {
                 ui.text(
                     "▼",
-                    b.right() - 14.0,
+                    160.0 + NARRATE_TEXT_W / 2.0 + 2.0,
                     b.bottom() - 13.0,
                     FONT_PX,
                     ui::ACCENT,
@@ -2112,17 +2119,17 @@ impl App {
                 ui.rect(Rect::new(b.x + 12.0, b.y + 11.0, 28.0, 28.0), d.color);
             }
             ui.rect_lines(portrait, ui::BORDER);
-            // 본문(타자 효과)
-            let shown: String = d.text.chars().take(d.shown_chars).collect();
+            // 본문(타자 효과): 지금 장의 줄을 찍힌 만큼. 글 폭은 `SAY_TEXT_W`(이름표·초상화를 뺀 자리).
             let tx = portrait.right() + 8.0;
-            let tw = b.right() - tx - 10.0;
-            for (i, l) in ui::wrap(ui, &shown, tw, FONT_PX).iter().take(3).enumerate() {
-                ui.text(l, tx, b.y + 9.0 + i as f32 * 13.0, FONT_PX, ui::TEXT);
+            debug_assert!((b.right() - tx - 10.0 - SAY_TEXT_W).abs() < 0.5);
+            for (i, (_, part)) in page_lines(&lines, &d).iter().enumerate() {
+                ui.text(part, tx, b.y + 9.0 + i as f32 * 13.0, FONT_PX, ui::TEXT);
             }
+            // ▼는 글 칸 바로 오른쪽(상자 테두리 안) — 꽉 찬 셋째 줄 끝과 겹치지 않게.
             if d.complete && (get_time() * 2.0) as i64 % 2 == 0 {
                 ui.text(
                     "▼",
-                    b.right() - 16.0,
+                    tx + SAY_TEXT_W + 1.0,
                     b.bottom() - 15.0,
                     FONT_PX,
                     ui::ACCENT,
@@ -2472,4 +2479,39 @@ mod bag_tests {
         assert_eq!(charms, vec![anyone, crate::equipment::MAPLE_SCARF]);
         assert!(CHARMS[crate::equipment::MAPLE_SCARF].only == Some(Character::Doto));
     }
+}
+
+/// 컷씬 대화창의 글 폭: 대사(초상화 오른쪽)·내레이션(가운데). `draw_cutscene`의 상자와 같은 값.
+const SAY_TEXT_W: f32 = 238.0;
+const NARRATE_TEXT_W: f32 = 280.0;
+
+/// 대사 글 전체를 대화창 폭으로 나눈 줄(장 경계와 그리기가 같이 쓴다).
+fn cut_lines(ui: &Ui, d: &cutscene::Dialogue) -> Vec<String> {
+    let w = if d.narration {
+        NARRATE_TEXT_W
+    } else {
+        SAY_TEXT_W
+    };
+    ui::wrap(ui, &d.text, w, FONT_PX)
+}
+
+/// 지금 장의 줄과 그중 찍힌 부분: (줄 전체, 보이는 앞부분). 앞 장의 글자는 이미 찍힌 것으로 센다.
+fn page_lines(lines: &[String], d: &cutscene::Dialogue) -> Vec<(String, String)> {
+    let per = cutscene::LINES_PER_PAGE;
+    let before: usize = lines
+        .iter()
+        .take(d.page * per)
+        .map(|l| l.chars().count())
+        .sum();
+    let mut left = d.shown_chars.saturating_sub(before);
+    lines
+        .iter()
+        .skip(d.page * per)
+        .take(per)
+        .map(|l| {
+            let n = l.chars().count().min(left);
+            left -= n;
+            (l.clone(), l.chars().take(n).collect())
+        })
+        .collect()
 }

@@ -13,6 +13,20 @@ use crate::world::{Cue, World};
 
 /// 글자가 찍히는 속도(초당 글자 수).
 const CHARS_PER_SEC: f32 = 40.0;
+/// 대화창 한 장의 줄 수. 넘는 글은 "▼" 다음 장으로 이어진다(2026-11-03 사장 "장 넘김으로").
+pub const LINES_PER_PAGE: usize = 3;
+
+/// 줄 나눈 글(그리는 쪽이 글꼴로 나눈 것)을 장으로 묶어, 장마다 끝나는 글자 수(앞에서부터 센 누적)를 낸다.
+/// 글자 수는 줄의 글자로 센다 — 줄바꿈에서 빠진 띄어쓰기는 세지 않는다(그리는 쪽이 줄 글자로 찍는다).
+pub fn page_ends(lines: &[String]) -> Vec<usize> {
+    let mut ends = Vec::new();
+    let mut n = 0;
+    for page in lines.chunks(LINES_PER_PAGE) {
+        n += page.iter().map(|l| l.chars().count()).sum::<usize>();
+        ends.push(n);
+    }
+    ends
+}
 /// 컷씬이 시작되고 이 시간 동안은 확인을 버린다. 싸우다 바로 이어지는 장면(보스 처치)에서
 /// 공격 연타가 대사를 다 넘겨 버리지 않게(헤드리스 확인에서 실제로 그랬다).
 const START_GUARD: f32 = 1.0;
@@ -25,6 +39,54 @@ pub use crate::art::{Face, Portrait};
 #[cfg(test)]
 mod device_tests {
     use super::*;
+
+    /// 장 넘김(2026-11-03): 세 줄이 넘는 대사는 "▼"마다 다음 장 — 마지막 장을 넘겨야 다음 스텝.
+    /// 다 찍히기 전 누름은 그 장만 다 보이고(다음 장 글자는 안 나온다), 장이 바뀌면 그 장의 첫 글자부터 찍는다.
+    #[test]
+    fn long_lines_turn_pages_before_the_next_step() {
+        let lines: Vec<String> = ["가나다", "라마", "바사아", "자차"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert_eq!(page_ends(&lines), vec![8, 10], "셋 + 하나 = 두 장");
+        assert_eq!(page_ends(&lines[..3]), vec![8], "세 줄이면 한 장");
+
+        let mut w = World::empty();
+        let mut c = Cutscene::new(vec![], vec![Step::Narrate(|s| s.half_1), Step::Wait(9.0)]);
+        let dt = 1.0 / 60.0;
+        let quiet = Actions::default();
+        let press = Actions {
+            confirm: true,
+            ..Default::default()
+        };
+        // 시작 보호 시간이 지나도록 기다리며 그리는 쪽처럼 장 경계를 알려 준다.
+        for _ in 0..70 {
+            c.set_pages(vec![8, 10]);
+            c.update(&quiet, dt, &mut w);
+        }
+        let d = c.dialogue().unwrap();
+        assert_eq!(
+            (d.page, d.shown_chars, d.complete),
+            (0, 8, true),
+            "첫 장 끝에서 멈춘다"
+        );
+        c.update(&press, dt, &mut w);
+        let d = c.dialogue().expect("넘겨도 같은 대사의 둘째 장");
+        assert_eq!(d.page, 1);
+        assert!(!d.complete, "둘째 장은 새로 찍힌다");
+        // 줄 보호 시간 안의 누름은 버린다 → 기다렸다 누르면 둘째 장 전부, 한 번 더면 다음 스텝.
+        for _ in 0..20 {
+            c.update(&quiet, dt, &mut w);
+        }
+        c.set_pages(vec![8, 10]);
+        let d = c.dialogue().unwrap();
+        assert_eq!((d.page, d.shown_chars, d.complete), (1, 10, true));
+        c.update(&press, dt, &mut w);
+        assert!(
+            c.dialogue().is_none(),
+            "마지막 장을 넘기면 다음 스텝(기다리기)"
+        );
+    }
 
     /// 모모 등장 장치(0159): 음악을 내리고 어둠을 덮고 카메라를 모모에게 옮긴 뒤, 끝나면(건너뛰어도) 모두 제자리.
     #[test]
@@ -424,8 +486,12 @@ pub struct Cutscene {
     idx: usize,
     /// 현재 스텝 안에서 흐른 시간.
     t: f32,
-    /// 대화: 지금까지 보인 글자 수.
+    /// 대화: 지금까지 보인 글자 수(장 경계를 알면 줄 글자로 센다).
     shown: f32,
+    /// 대화: 지금 장(0부터)과 장마다 끝나는 글자 수(`page_ends`). 그리는 쪽이 글꼴로 나눠 `set_pages`로 알려 준다 —
+    /// 로직은 글꼴을 모른다. 비어 있으면(그 대사의 첫 프레임) 한 장으로 본다.
+    page: usize,
+    page_ends: Vec<usize>,
     /// 검은 화면 알파(0 = 안 보임).
     pub fade: f32,
     done: bool,
@@ -451,10 +517,14 @@ pub struct Dialogue {
     /// 초상화 시트 칸. 없으면 색 네모.
     pub portrait: Option<u32>,
     pub text: String,
+    /// 앞에서부터 보인 글자 수(장 경계를 알면 줄 글자로, 앞 장들 포함).
     pub shown_chars: usize,
+    /// 지금 장이 다 찍혔다(▼).
     pub complete: bool,
     /// 내레이션(이름표·초상화 없음).
     pub narration: bool,
+    /// 지금 장(0부터, `LINES_PER_PAGE`줄씩). 다음 장이 있어도 다 찍히면 같은 ▼(누르면 다음 장).
+    pub page: usize,
 }
 
 impl Cutscene {
@@ -470,6 +540,8 @@ impl Cutscene {
             idx: 0,
             t: 0.0,
             shown: 0.0,
+            page: 0,
+            page_ends: Vec::new(),
             fade,
             done: false,
             age: 0.0,
@@ -485,6 +557,35 @@ impl Cutscene {
 
     pub fn is_done(&self) -> bool {
         self.done
+    }
+
+    /// 지금 대사의 장 경계(`page_ends`). 그리는 쪽이 매 프레임 알려 준다(같은 글·같은 언어면 같은 값).
+    pub fn set_pages(&mut self, ends: Vec<usize>) {
+        self.page_ends = ends;
+    }
+
+    /// 지금 장의 (시작, 끝) 글자 수와 마지막 장인지. 장 경계를 모르면 글 전체가 한 장.
+    fn page_bounds(&self, total: usize) -> (usize, usize, bool) {
+        match self.page_ends.get(self.page) {
+            Some(&end) => {
+                let start = if self.page == 0 {
+                    0
+                } else {
+                    self.page_ends[self.page - 1]
+                };
+                (start, end, self.page + 1 >= self.page_ends.len())
+            }
+            None => (0, total, true),
+        }
+    }
+
+    /// 다음 스텝(또는 멈춤 자리)으로: 글·장을 처음부터.
+    fn reset_text(&mut self) {
+        self.t = 0.0;
+        self.shown = 0.0;
+        self.page = 0;
+        self.page_ends.clear();
+        self.fresh = true;
     }
 
     /// 이 배우가 지금 걷는 중인가(그림 칸 고르기).
@@ -648,9 +749,7 @@ impl Cutscene {
         };
         if advance {
             self.idx += 1;
-            self.t = 0.0;
-            self.shown = 0.0;
-            self.fresh = true;
+            self.reset_text();
             if self.idx >= self.steps.len() {
                 self.done = true;
             }
@@ -664,20 +763,27 @@ impl Cutscene {
         }
     }
 
-    /// 글이 한 자씩 찍힌다. 다 찍히기 전에 누르면 전부, 다 찍힌 뒤 누르면 다음(true).
+    /// 글이 한 자씩 찍힌다. 다 찍히기 전에 누르면 그 장을 전부, 다 찍힌 뒤 누르면 다음 장 — 마지막 장이면 다음 스텝(true).
     fn type_text(&mut self, text: &str, a: &Actions, dt: f32) -> bool {
-        let total = text.chars().count() as f32;
-        let complete = self.shown >= total;
+        let (start, end, last) = self.page_bounds(text.chars().count());
+        let (start, end) = (start as f32, end as f32);
+        self.shown = self.shown.clamp(start, end);
+        let complete = self.shown >= end;
         let pressed = a.confirm || a.attack || a.tap.is_some();
         if pressed && self.age >= START_GUARD && self.t >= LINE_GUARD {
-            if complete {
+            if !complete {
+                self.shown = end;
+                false
+            } else if last {
                 true
             } else {
-                self.shown = total;
+                // 다음 장: 그 장의 첫 글자부터 다시 찍는다. 넘기자마자 또 눌려 건너뛰지 않게 줄 보호 시간도 다시.
+                self.page += 1;
+                self.t = 0.0;
                 false
             }
         } else {
-            self.shown = (self.shown + CHARS_PER_SEC * dt).min(total);
+            self.shown = (self.shown + CHARS_PER_SEC * dt).min(end);
             false
         }
     }
@@ -701,9 +807,7 @@ impl Cutscene {
         let end = stop.map_or(self.steps.len(), |k| self.idx + k + 1);
         let rest: Vec<Step> = self.steps.drain(self.idx..end).collect();
         if stop.is_some() {
-            self.t = 0.0;
-            self.shown = 0.0;
-            self.fresh = true;
+            self.reset_text();
         }
         for step in rest {
             match step {
@@ -760,8 +864,8 @@ impl Cutscene {
                 arg,
             } => {
                 let text = say_text(*text, *arg);
-                let total = text.chars().count();
-                let shown = (self.shown as usize).min(total);
+                let (_, end, _) = self.page_bounds(text.chars().count());
+                let shown = (self.shown as usize).min(end);
                 let a = &self.actors[*actor];
                 Some(Dialogue {
                     name: a.name,
@@ -769,22 +873,24 @@ impl Cutscene {
                     portrait: a.portrait.map(|p| p.frame(*face)),
                     text,
                     shown_chars: shown,
-                    complete: shown >= total,
+                    complete: shown >= end,
                     narration: false,
+                    page: self.page,
                 })
             }
             Step::Narrate(text) => {
                 let text = i18n::tr(*text).to_string();
-                let total = text.chars().count();
-                let shown = (self.shown as usize).min(total);
+                let (_, end, _) = self.page_bounds(text.chars().count());
+                let shown = (self.shown as usize).min(end);
                 Some(Dialogue {
                     name: "",
                     color: WHITE,
                     portrait: None,
                     text,
                     shown_chars: shown,
-                    complete: shown >= total,
+                    complete: shown >= end,
                     narration: true,
+                    page: self.page,
                 })
             }
             _ => None,
