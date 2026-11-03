@@ -165,6 +165,7 @@ pub fn choose(l: &Listen) -> Choice {
             Biome::Meadow => Track::AmbMeadow,
             Biome::Roots | Biome::Silk => Track::AmbCave,
             Biome::Deep => Track::AmbDeep,
+            Biome::Water => Track::AmbStream,
         }),
         Place::Arena => None,
     };
@@ -206,6 +207,7 @@ pub fn choose(l: &Listen) -> Choice {
                 Biome::Roots => pick(Track::RootsExplorer, Track::Roots),
                 Biome::Deep => pick(Track::DeepPool, Track::Deep),
                 Biome::Silk => Track::Silk,
+                Biome::Water => pick(Track::SidePath, Track::SidePathAlt),
             },
         }
     };

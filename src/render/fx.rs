@@ -347,6 +347,12 @@ pub(super) fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
             ),
             // 흰 실 굴은 위에서 따로 그렸다(`draw_silk_fluff`).
             Biome::Silk => return,
+            // 물안개: 물살 따라 옆으로 천천히, 위아래로 살짝(0275).
+            Biome::Water => (
+                vec2(4.0 + hs * 4.0, (t * (0.5 + hs) + hs * 7.0).sin() * 2.0),
+                Color::new(0.78, 0.90, 0.96, 0.30),
+                1.0,
+            ),
             // 빛 알갱이: 아주 천천히 떠오른다.
             Biome::Deep => (
                 vec2((t * 0.5 + hs * 7.0).sin() * 5.0, -3.0 - hs * 3.0),
@@ -360,7 +366,7 @@ pub(super) fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
             ),
         };
         // 꽃가루는 옆으로 흘러가고, 포자·빛 알갱이는 위아래로 흐른다(나머지 축은 살랑임).
-        let flow = if w.biome == Biome::Meadow {
+        let flow = if matches!(w.biome, Biome::Meadow | Biome::Water) {
             vec2(drift.x * t, drift.y)
         } else {
             vec2(drift.x, drift.y * t)
@@ -531,6 +537,71 @@ pub(super) fn draw_web(c: Vec2, time: f32, near: f32) {
     draw_circle(x, y, 1.5, silk);
 }
 
+/// 물살 칸 하나(0275): 옅은 물빛 바닥 + 흐르는 쪽으로 미끄러지는 물결 줄 셋 + 물살 밖으로 닿는 가장자리의 물거품.
+/// 흐르는 쪽은 움직임과 모양(줄 끝의 작은 꺾쇠)으로 — 색에 기대지 않는다(0150). `edges`: 위·아래·흐름 뒤·흐름 앞에 물살이 없나.
+pub(super) fn draw_stream(c: Vec2, dir: Vec2, time: f32, edges: [bool; 4]) {
+    let (x0, y0) = ((c.x - 8.0).round(), (c.y - 8.0).round());
+    draw_rectangle(x0, y0, 16.0, 16.0, Color::new(0.26, 0.58, 0.80, 0.50));
+    // 아래 물가 쪽만 깊은 물빛(두 칸 너비 물줄기 가운데에 줄무늬가 생기지 않게).
+    if edges[1] {
+        draw_rectangle(x0, y0 + 12.0, 16.0, 4.0, Color::new(0.16, 0.34, 0.50, 0.30));
+    }
+    let sx = dir.x.signum();
+    let seed = ((c.x * 7.0 + c.y * 13.0) as i32).rem_euclid(97) as f32;
+    let lite = Color::new(0.82, 0.94, 1.0, 0.55);
+    for i in 0..3 {
+        let row = 3.0 + i as f32 * 4.5 + (seed + i as f32 * 3.0) % 2.0;
+        // 칸마다 이어지게 월드 x에 맞춘 위상: 줄이 칸 경계를 넘어 계속 흐른다.
+        let ph =
+            (c.x * sx + time * t::STREAM_PUSH * 0.9 + seed * 3.0 + i as f32 * 7.0).rem_euclid(16.0);
+        let head = if sx >= 0.0 { x0 + ph } else { x0 + 16.0 - ph };
+        let tail = head - sx * 4.0;
+        let (a, b) = (head.min(tail).max(x0), head.max(tail).min(x0 + 16.0));
+        if b > a {
+            draw_rectangle(
+                a.round(),
+                (y0 + row).round(),
+                (b - a).round().max(1.0),
+                1.0,
+                lite,
+            );
+        }
+        // 꺾쇠: 줄 머리 위아래에 한 점씩(흐르는 쪽이 모양으로 보인다).
+        if (x0..x0 + 16.0).contains(&head) {
+            let hx = (head - sx).round();
+            draw_rectangle(hx, (y0 + row - 1.0).round(), 1.0, 1.0, lite);
+            draw_rectangle(hx, (y0 + row + 1.0).round(), 1.0, 1.0, lite);
+        }
+    }
+    let foam = Color::new(0.90, 0.97, 1.0, 0.65);
+    let bob = ((time * 3.0 + seed).sin() * 0.5 + 0.5).round();
+    if edges[0] {
+        draw_rectangle(x0, y0 - bob, 16.0, 1.0, foam);
+    }
+    if edges[1] {
+        draw_rectangle(
+            x0,
+            y0 + 15.0 + bob,
+            16.0,
+            1.0,
+            Color::new(0.70, 0.86, 0.96, 0.5),
+        );
+    }
+    // 물줄기가 시작하는 쪽은 솟는 물, 끝나는 쪽은 바닥으로 스며드는 물보라 점.
+    for (k, at) in [(2, -sx), (3, sx)] {
+        if edges[k] {
+            let ex = if at > 0.0 { x0 + 15.0 } else { x0 };
+            for j in 0..3 {
+                let yy = y0
+                    + 3.0
+                    + j as f32 * 5.0
+                    + ((time * 4.0 + j as f32 + seed).sin() * 1.0).round();
+                draw_rectangle(ex, yy, 1.0, 2.0, foam);
+            }
+        }
+    }
+}
+
 /// 시든 꽃잎(0159): 모모가 지키는 굴에서 방마다 떠도는 복선. 마을 빈 자리의 시든 꽃잎과 같은 색.
 /// 옆으로 흘러가며 위아래로 팔랑이고, 흔들림에 따라 가로·세로로 바뀐다.
 pub(super) fn draw_wilted_petals(w: &World, cam: Vec2) {
@@ -654,7 +725,7 @@ pub(super) fn tele_ink_for(b: crate::biome::Biome) -> TeleInk {
     use crate::biome::Biome;
     match b {
         Biome::Meadow | Biome::Roots => TELE_INK_SHADE,
-        Biome::Deep | Biome::Silk => TELE_INK_GLOW,
+        Biome::Deep | Biome::Silk | Biome::Water => TELE_INK_GLOW,
     }
 }
 /// 테두리 띠의 폭(px).
@@ -1188,7 +1259,7 @@ pub(super) fn draw_light_shafts(w: &World, cam: Vec2, k: f32) {
 pub(super) fn draw_overhead_falls(w: &World, cam: Vec2) {
     let drip = match w.biome {
         Biome::Roots | Biome::Silk => false,
-        Biome::Deep => true,
+        Biome::Deep | Biome::Water => true,
         Biome::Meadow => return,
     };
     if w.room.grid.is_none() {

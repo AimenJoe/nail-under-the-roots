@@ -159,7 +159,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 58] = [
+pub const LIST: [Entry; 60] = [
     Entry {
         cat: Cat::Tools,
         name: "대화 검수",
@@ -311,6 +311,12 @@ pub const LIST: [Entry; 58] = [
         scenario: Scenario::Tangle(Biome::Silk),
     },
     Entry {
+        cat: Cat::Places,
+        name: "실타래 굴: 물길",
+        desc: "물길 굴 3방 + 물살(0275: 흐르는 칸이 걷는 것을 민다 — 적도).",
+        scenario: Scenario::Tangle(Biome::Water),
+    },
+    Entry {
         cat: Cat::Rooms,
         name: "넓은 방",
         desc: "둘째 길의 보통 굴, 화면 두 칸짜리 넓은 방 안(0244). 카메라가 방 안을 따라가고 두 칸의 적이 함께 깬다. 방마다 지형(기둥·골짜기·돌밭).",
@@ -369,6 +375,12 @@ pub const LIST: [Entry; 58] = [
         name: "환경: 흰 실 굴",
         desc: "굴토끼 옛 굴의 지대(0165). 보랏빛 흙에 흰 실 얼룩, 보풀.",
         scenario: Scenario::InBiome(Biome::Silk),
+    },
+    Entry {
+        cat: Cat::Rooms,
+        name: "환경: 물길 굴",
+        desc: "옆 굴의 지대(0275). 젖은 청회색 돌, 청록 이끼, 물안개·물방울. 물줄기 둘(위 → 오른쪽, 아래 → 왼쪽).",
+        scenario: Scenario::InBiome(Biome::Water),
     },
     Entry {
         cat: Cat::Bosses,
@@ -589,6 +601,12 @@ pub fn build(s: Scenario) -> World {
         Scenario::Tangle(b) => {
             let mut w = World::field();
             w.enter_tangle_now(b);
+            // 물길 굴(0275): 첫 물줄기 곁에서 시작한다(물살을 바로 본다).
+            if let Some((c, _)) = w.room.streams.first().copied() {
+                w.player.pos = c + vec2(0.0, -20.0);
+                w.player.prev_pos = w.player.pos;
+                w.snap_cam();
+            }
             w
         }
         Scenario::Arena | Scenario::DotoArena | Scenario::MomoArena => World::new(),
@@ -613,6 +631,23 @@ pub fn build(s: Scenario) -> World {
         Scenario::InBiome(b) => {
             let mut w = build(Scenario::OneEach);
             w.biome = b;
+            // 물길 굴(0275): 아레나에 물줄기 둘(위는 오른쪽으로 두 칸 너비, 아래는 왼쪽으로) — 물살을 바로 본다.
+            if b == Biome::Water {
+                for x in 2..9 {
+                    for y in [3, 4] {
+                        w.room.streams.push((
+                            vec2(x as f32 * 16.0 + 8.0, y as f32 * 16.0 + 8.0),
+                            vec2(1.0, 0.0),
+                        ));
+                    }
+                }
+                for x in 12..18 {
+                    w.room.streams.push((
+                        vec2(x as f32 * 16.0 + 8.0, 9.0 * 16.0 + 8.0),
+                        vec2(-1.0, 0.0),
+                    ));
+                }
+            }
             w
         }
         Scenario::OneEach => one_each(),

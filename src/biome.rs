@@ -10,6 +10,8 @@ pub enum Biome {
     Deep,
     /// 흰 실 굴(0165): 굴토끼 옛 굴. 할매의 흰 실이 흙과 돌에 감겨 있다. 셋째 길 갈래 칸의 굴에만.
     Silk,
+    /// 물길 굴(0275): 옆 굴. 지하 냇물이 흐르는 젖은 돌 굴 — 넷째 길(`route::Leg::Side`)에만. 장애물은 물살(`Room::streams`).
+    Water,
 }
 
 /// 장식 타일(tiles.png 칸).
@@ -41,6 +43,7 @@ impl Biome {
             Biome::Roots => |s| s.biome_roots,
             Biome::Deep => |s| s.biome_deep,
             Biome::Silk => |s| s.biome_silk,
+            Biome::Water => |s| s.biome_water,
         }
     }
 
@@ -50,6 +53,7 @@ impl Biome {
             Biome::Roots => Color::new(0.13, 0.11, 0.12, 1.0),
             Biome::Deep => Color::new(0.05, 0.04, 0.08, 1.0),
             Biome::Silk => Color::new(0.09, 0.07, 0.12, 1.0),
+            Biome::Water => Color::new(0.04, 0.07, 0.09, 1.0),
         }
     }
 
@@ -60,6 +64,8 @@ impl Biome {
             Biome::Roots => Color::new(0.58, 0.46, 0.38, 1.0),
             Biome::Deep => Color::new(0.50, 0.50, 0.62, 1.0),
             Biome::Silk => Color::new(0.80, 0.76, 0.88, 1.0),
+            // 물길 굴: 젖은 돌에서 튀는 물보라빛.
+            Biome::Water => Color::new(0.62, 0.74, 0.80, 1.0),
         }
     }
 
@@ -69,6 +75,7 @@ impl Biome {
             Biome::Roots => Color::new(0.80, 0.76, 0.80, 1.0),
             Biome::Deep => Color::new(0.48, 0.48, 0.62, 1.0),
             Biome::Silk => Color::new(0.72, 0.68, 0.82, 1.0),
+            Biome::Water => Color::new(0.60, 0.70, 0.80, 1.0),
         }
     }
 
@@ -78,12 +85,13 @@ impl Biome {
             Biome::Roots => Color::new(0.78, 0.72, 0.76, 1.0),
             Biome::Deep => Color::new(0.42, 0.40, 0.56, 1.0),
             Biome::Silk => Color::new(0.64, 0.60, 0.78, 1.0),
+            Biome::Water => Color::new(0.50, 0.60, 0.74, 1.0),
         }
     }
 
     /// 바닥 기본이 흙인가(심층). 아니면 풀.
     pub fn dirt_floor(self) -> bool {
-        matches!(self, Biome::Deep | Biome::Silk)
+        matches!(self, Biome::Deep | Biome::Silk | Biome::Water)
     }
 
     /// 기본 바닥 위에 반대 재질 얼룩(풀 위 흙, 흙 위 풀)을 덮을 확률. 칸 경계가 안 보이게 한다.
@@ -93,6 +101,7 @@ impl Biome {
             Biome::Roots => 0.34,
             Biome::Deep => 0.22,
             Biome::Silk => 0.30,
+            Biome::Water => 0.26,
         }
     }
 
@@ -103,6 +112,8 @@ impl Biome {
             Biome::Roots => (0.38, 150.0),
             Biome::Deep => (0.78, 92.0),
             Biome::Silk => (0.55, 120.0),
+            // 물빛이 조금 밝혀 심층보다는 덜 어둡다.
+            Biome::Water => (0.62, 110.0),
         }
     }
 
@@ -138,6 +149,12 @@ impl Biome {
                 (0.10, &[Decor::Mushroom]),
                 (0.18, &[Decor::Pebble]),
                 (0.24, &[Decor::Moss]),
+            ],
+            // 물길 굴(0275): 젖은 돌에 이끼가 많고, 야광버섯이 길잡이(심층보다 조금 적게 — 물빛이 있다).
+            Biome::Water => &[
+                (0.16, &[Decor::Moss]),
+                (0.24, &[Decor::Pebble]),
+                (0.30, &[Decor::Mushroom]),
             ],
         };
         for (limit, opts) in table {

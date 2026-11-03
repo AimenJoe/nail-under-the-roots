@@ -69,6 +69,8 @@ pub struct Room {
     pub thorns: Vec<Vec2>,
     /// 흰 실 그물 자리(칸 가운데, 0165). 막지 않는다. 걸으면 느려지고, 발톱으로 끊긴다.
     pub webs: Vec<Vec2>,
+    /// 물살 칸(0275, 물길 굴): 칸 가운데와 흐르는 쪽(단위 벡터). 막지 않는다. 걷는 것은 흐르는 쪽으로 밀린다.
+    pub streams: Vec<(Vec2, Vec2)>,
 }
 
 impl Room {
@@ -111,6 +113,7 @@ impl Room {
             door_was_locked: false,
             thorns: Vec::new(),
             webs: Vec::new(),
+            streams: Vec::new(),
         }
     }
 
@@ -128,6 +131,7 @@ impl Room {
             door_was_locked: false,
             thorns: Vec::new(),
             webs: Vec::new(),
+            streams: Vec::new(),
         };
         r.rebuild_solids();
         r
@@ -236,6 +240,15 @@ impl Room {
         }
         let (x, y) = ((p.x / TILE) as usize, (p.y / TILE) as usize);
         (x < g.w && y < g.h).then(|| g.get(x, y))
+    }
+
+    /// 이 자리(몸 가운데)가 물살 칸 안이면 흐르는 쪽(0275). 칸은 16px 네모 그대로 — 좁히면 이어진 칸 사이에 틈이 생긴다.
+    pub fn stream_at(&self, p: Vec2) -> Option<Vec2> {
+        let h = TILE * 0.5;
+        self.streams
+            .iter()
+            .find(|(c, _)| (p.x - c.x).abs() <= h && (p.y - c.y).abs() <= h)
+            .map(|(_, d)| *d)
     }
 
     /// 원을 벽·기둥 밖으로 밀어낸다. 무언가에 닿았으면 true.

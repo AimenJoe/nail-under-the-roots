@@ -434,6 +434,8 @@ pub struct Story {
     thorn_told: bool,
     /// 흰 실 그물(0165)에 처음 걸렸을 때 한 번 알려 줬나.
     web_told: bool,
+    /// 물살 한마디(0275)를 이 런에 했나.
+    stream_told: bool,
     /// 콩이(0054): 셋째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
     kongi_fight: bool,
     /// 토끼풀(0165): 굴토끼 옛 굴 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
@@ -1062,6 +1064,7 @@ impl World {
         self.web_tick();
         self.player.threat = self.parry_threat();
         let strike = self.player.update(a, &self.room, dt);
+        self.stream_push_player(dt);
         self.last_strike = strike;
         self.deep_tick(dt);
         // 도토의 던지는 손(`Toss`)은 받아치기만 — 매듭·그물·고치·부술 것에는 탄이 닿는다(0195).
@@ -1587,6 +1590,19 @@ impl World {
                 &mut self.projectiles,
                 &mut self.enemy_events,
             );
+            // 물살(0275): 걷는 적도 흐르는 쪽으로(나는 것·보스·숨은 것은 그대로) — 밀어 넣기 전술.
+            if !self.room.streams.is_empty()
+                && e.alive
+                && e.hittable()
+                && !e.flying()
+                && !e.is_boss()
+            {
+                if let Some(d) = self.room.stream_at(e.pos) {
+                    e.pos += d * t::STREAM_PUSH * dt;
+                    let r = e.radius();
+                    self.room.resolve_circle(&mut e.pos, r);
+                }
+            }
             e.walked += (e.pos - e.prev_pos).length();
         }
         // 이웃: 따라갈 곳이 있으면 천천히 걸어간다(가까우면 멈춤).
@@ -3025,6 +3041,34 @@ impl World {
         }
     }
 
+    /// 물살(0275): 걸어서 물살 칸에 있으면 흐르는 쪽으로 민다(땅속·깡충·멀리뛰기는 지나간다). 처음엔 한마디.
+    /// 플레이어가 움직인 뒤에 밀어 보간(`prev_pos`)에 들어간다. 가끔 발밑에 물보라.
+    fn stream_push_player(&mut self, dt: f32) {
+        if self.room.streams.is_empty() || !self.player.on_foot() || !self.player.is_alive() {
+            return;
+        }
+        let Some(d) = self.room.stream_at(self.player.pos) else {
+            return;
+        };
+        self.player.pos += d * t::STREAM_PUSH * dt;
+        let r = self.player.radius();
+        self.room.resolve_circle(&mut self.player.pos, r);
+        if ((self.time / dt).round() as u32).is_multiple_of(12) {
+            puff(
+                &mut self.juice.fx,
+                self.player.pos + vec2(0.0, 4.0),
+                1,
+                STREAM_SPRAY,
+                6.0,
+                0.35,
+            );
+        }
+        if !self.story.stream_told {
+            self.story.stream_told = true;
+            self.juice.toast = Some((self.character.def().toast_stream, 2.5));
+        }
+    }
+
     /// 토끼풀이 발을 굴렀다(0165): 충격파 고리 + 흙·흔들림, 플레이어 둘레에 흰 실 그물이 몇 개 떨어진다.
     fn thump_at(&mut self, at: Vec2) {
         self.juice.audio.play(sfx::Id::Impact);
@@ -3809,6 +3853,8 @@ impl World {
 // ---- 팔레트(렌더와 공유) ---------------------------------------------------------
 pub const MOLE: Color = Color::new(0.90, 0.71, 0.47, 1.0);
 pub const DIRT: Color = Color::new(0.55, 0.40, 0.28, 1.0);
+/// 물살 물보라(0275).
+pub const STREAM_SPRAY: Color = Color::new(0.80, 0.92, 1.0, 0.9);
 /// 가시뿌리 덤불(0147)·무너지는 돌.
 pub const THORN: Color = Color::new(0.52, 0.34, 0.58, 1.0);
 pub const ROCK: Color = Color::new(0.46, 0.42, 0.44, 1.0);
@@ -4376,6 +4422,57 @@ mod tests {
     }
 
     /// 흰 실 그물(0165): 그물 위를 걸으면 느리고(처음엔 한마디), 땅속은 안 걸리고, 발톱이 닿으면 끊긴다.
+    #[test]
+    fn streams_push_walkers_but_not_the_burrowed_or_flying() {
+        // 플레이어: 서 있기만 해도 흐르는 쪽(+x)으로, 땅속이면 그대로. 처음엔 한마디.
+        let mut w = World::new();
+        let at = w.player.pos;
+        for dx in -1..=3 {
+            w.room
+                .streams
+                .push((at + vec2(dx as f32 * 16.0, 0.0), vec2(1.0, 0.0)));
+        }
+        let x0 = w.player.pos.x;
+        for _ in 0..30 {
+            w.stream_push_player(t::TICK_DT);
+        }
+        let moved = w.player.pos.x - x0;
+        let want = t::STREAM_PUSH * t::TICK_DT * 30.0;
+        assert!((moved - want).abs() < 0.5, "{moved} vs {want}");
+        assert!(w.juice.toast.is_some(), "처음엔 한마디");
+        w.player.pos = at;
+        w.player.state = crate::player::State::Burrow { time: 0.0 };
+        w.stream_push_player(t::TICK_DT);
+        assert_eq!(w.player.pos, at, "땅속은 물살 밑으로 지나간다");
+        // 적: 같은 적을 물살 있는 방·없는 방에서 돌려 흐르는 쪽으로 더 갔는지. 박쥐(나는 것)는 같다.
+        for (kind, pushed) in [(Kind::FieldMouse, true), (Kind::Bat, false)] {
+            let run = |stream: bool| {
+                let mut w = World::new();
+                w.player.pos = vec2(40.0, 40.0);
+                let e = vec2(150.0, 140.0);
+                w.enemies.clear();
+                w.spawn_enemy(kind, e);
+                if stream {
+                    for dx in -2..=2 {
+                        w.room
+                            .streams
+                            .push((e + vec2(dx as f32 * 16.0, 0.0), vec2(1.0, 0.0)));
+                    }
+                }
+                // 한 틱: 같은 적은 같은 걸음을 하고, 물살이 있으면 그 위에 한 틱만큼 더 밀린다(AI가 섞이지 않게).
+                w.tick_enemies(t::TICK_DT);
+                w.enemies[0].pos.x
+            };
+            let gap = run(true) - run(false);
+            if pushed {
+                let want = t::STREAM_PUSH * t::TICK_DT;
+                assert!((gap - want).abs() < 0.01, "{kind:?} 밀림 {gap} vs {want}");
+            } else {
+                assert!(gap.abs() < 0.01, "{kind:?}는 날아서 안 밀린다 {gap}");
+            }
+        }
+    }
+
     #[test]
     fn silk_webs_slow_walking_and_are_cut_by_claws() {
         use crate::combat::{Shape, StrikeKind};

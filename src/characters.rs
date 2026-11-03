@@ -86,6 +86,8 @@ pub struct CharacterDef {
     pub toast_shell: Tr,
     pub toast_thorn: Tr,
     pub toast_web: Tr,
+    /// 물살에 처음 밀렸을 때(0275): 이 캐릭터가 건너는 법.
+    pub toast_stream: Tr,
     /// 가장 깊은 곳에서 실에 처음 감겼을 때의 안내(피하는 동작이 캐릭터마다, 0264).
     pub toast_wrap: Tr,
     /// 상태 탭의 필살기 이름·설명(0264). 전에는 Naïl의 "드릴 돌진"과 그 설명 하나라 모모·도토 런에도 드릴이 나왔다.
@@ -124,6 +126,7 @@ pub static ALL: [CharacterDef; 3] = [
         toast_shell: |s| s.toast_shell,
         toast_thorn: |s| s.toast_thorn,
         toast_web: |s| s.toast_web,
+        toast_stream: |s| s.toast_stream,
         toast_wrap: |s| s.deep_wrap,
         special_name: |s| s.special_name,
         special_desc: |s| s.special_desc,
@@ -154,6 +157,7 @@ pub static ALL: [CharacterDef; 3] = [
         toast_shell: |s| s.toast_shell_momo,
         toast_thorn: |s| s.toast_thorn_momo,
         toast_web: |s| s.toast_web_momo,
+        toast_stream: |s| s.toast_stream_momo,
         toast_wrap: |s| s.deep_wrap_momo,
         special_name: |s| s.tal_chain,
         special_desc: |s| s.special_desc_momo,
@@ -184,6 +188,7 @@ pub static ALL: [CharacterDef; 3] = [
         toast_shell: |s| s.toast_shell_doto,
         toast_thorn: |s| s.toast_thorn_doto,
         toast_web: |s| s.toast_web_doto,
+        toast_stream: |s| s.toast_stream_doto,
         toast_wrap: |s| s.deep_wrap_doto,
         special_name: |s| s.tal_bury,
         special_desc: |s| s.special_desc_doto,

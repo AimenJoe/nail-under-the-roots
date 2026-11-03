@@ -106,7 +106,7 @@ pub const CAMPS: [CampDef; 4] = [
     },
     CampDef {
         rows: &ROWS_SIDE,
-        biome: Biome::Deep,
+        biome: Biome::Water,
     },
 ];
 

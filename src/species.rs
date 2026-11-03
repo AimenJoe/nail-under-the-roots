@@ -555,6 +555,15 @@ pub fn roll(r: f32, depth: u32, biome: crate::biome::Biome) -> Kind {
             (Kind::Bat, 16.0 + d * 2.0),
             (Kind::SporeCap, 16.0 + d * 2.0),
         ],
+        // 물길 굴(0275): 새 잡몹 둘(P4)이 오기 전까지 물가에 사는 것 위주 — 두꺼비·시궁쥐·박쥐.
+        Biome::Water => vec![
+            (Kind::FieldMouse, 10.0),
+            (Kind::SewerRat, 16.0 + d * 3.0),
+            (Kind::Shrew, 8.0),
+            (Kind::Toad, 16.0 + d * 2.0),
+            (Kind::Bat, 12.0 + d * 2.0),
+            (Kind::SporeCap, 4.0),
+        ],
     };
     let total: f32 = table.iter().map(|e| e.1).sum();
     let mut x = r.clamp(0.0, 0.9999) * total;
@@ -582,12 +591,12 @@ pub struct Squad {
 
 /// 지대마다의 무리 줄. 지대 표(`roll`)에 없는 종은 그 지대 무리에 넣지 않는다.
 pub const SQUADS: &[Squad] = {
-    use crate::biome::Biome::{Deep, Meadow, Roots, Silk};
+    use crate::biome::Biome::{Deep, Meadow, Roots, Silk, Water};
     use Kind::*;
     &[
         // 섞인 무리: 예전처럼 한 마리씩 지대 표에서.
         Squad {
-            biomes: &[Meadow, Roots, Deep, Silk],
+            biomes: &[Meadow, Roots, Deep, Silk, Water],
             min_depth: 0,
             weight: 2.0,
             core: &[],
@@ -627,7 +636,7 @@ pub const SQUADS: &[Squad] = {
         },
         // 뒤쥐 사냥: 빠르게 두 번 무는 뒤쥐 둘.
         Squad {
-            biomes: &[Meadow, Roots, Silk],
+            biomes: &[Meadow, Roots, Silk, Water],
             min_depth: 0,
             weight: 1.5,
             core: &[Shrew, Shrew],
@@ -635,7 +644,7 @@ pub const SQUADS: &[Squad] = {
         },
         // 두꺼비 진지: 혀 둘이 뒷줄, 앞은 쥐.
         Squad {
-            biomes: &[Roots, Deep, Silk],
+            biomes: &[Roots, Deep, Silk, Water],
             min_depth: 0,
             weight: 2.0,
             core: &[Toad, Toad],
@@ -651,7 +660,7 @@ pub const SQUADS: &[Squad] = {
         },
         // 하늘 습격: 박쥐 둘(솟구치기가 안 닿는다) + 땅의 쥐.
         Squad {
-            biomes: &[Deep, Silk],
+            biomes: &[Deep, Silk, Water],
             min_depth: 0,
             weight: 2.5,
             core: &[Bat, Bat],
@@ -659,7 +668,7 @@ pub const SQUADS: &[Squad] = {
         },
         // 시궁쥐 굴: 단단한 시궁쥐 둘, 들쥐나 뒤의 두꺼비.
         Squad {
-            biomes: &[Deep, Silk],
+            biomes: &[Deep, Silk, Water],
             min_depth: 0,
             weight: 2.0,
             core: &[SewerRat, SewerRat],
@@ -774,7 +783,13 @@ mod tests {
     #[test]
     fn squads_use_only_their_biome_mobs() {
         use crate::biome::Biome;
-        for b in [Biome::Meadow, Biome::Roots, Biome::Deep, Biome::Silk] {
+        for b in [
+            Biome::Meadow,
+            Biome::Roots,
+            Biome::Deep,
+            Biome::Silk,
+            Biome::Water,
+        ] {
             let table: Vec<Kind> = (0..4000).map(|i| roll(i as f32 / 4000.0, 4, b)).collect();
             let mine: Vec<&Squad> = SQUADS.iter().filter(|q| q.biomes.contains(&b)).collect();
             assert!(mine.len() > 3, "{b:?} 무리 {}", mine.len());

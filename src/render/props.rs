@@ -1849,6 +1849,7 @@ pub(super) fn draw_room_art(art: &Art, w: &World) {
             crate::biome::Biome::Roots => roll < 0.55,
             crate::biome::Biome::Deep => roll < 0.8,
             crate::biome::Biome::Silk => roll < 0.6,
+            crate::biome::Biome::Water => roll < 0.35,
         };
         let src = if roots {
             tile_src(2, 1)
@@ -2185,7 +2186,7 @@ pub(super) fn draw_dark_extras(art: &Art, w: &World, alpha: f32, cam: Vec2) {
 pub(super) fn draw_mushrooms(art: &Art, w: &World, cam: Vec2) {
     let deep = matches!(
         w.biome,
-        crate::biome::Biome::Deep | crate::biome::Biome::Silk
+        crate::biome::Biome::Deep | crate::biome::Biome::Silk | crate::biome::Biome::Water
     );
     for (x, y, d) in floor_decor(w, cam) {
         if d == Decor::Mushroom {

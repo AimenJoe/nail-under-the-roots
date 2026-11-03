@@ -200,9 +200,13 @@ impl Route {
                 n.next = vec![0, 1];
             }
         }
-        // 환경: 첫 길은 뿌리 지대, 둥지·깊은 길은 어두운 심층이 섞인다.
+        // 환경: 첫 길은 뿌리 지대, 둥지·깊은 길은 어두운 심층이 섞인다. 옆 굴(0275)은 모두 물길 굴.
         for layer in layers.iter_mut() {
             for n in layer.iter_mut() {
+                if leg(stage) == Leg::Side {
+                    n.biome = Biome::Water;
+                    continue;
+                }
                 let deep = match n.kind {
                     NodeKind::Nest | NodeKind::Boss => stage >= 1,
                     _ => stage >= 2 && rng.chance(0.5),
@@ -335,6 +339,19 @@ mod tests {
             .iter()
             .flatten()
             .all(|n| n.kind != NodeKind::Warren));
+        // 옆 굴은 모두 물길 굴(0275), 다른 길에는 물길 굴이 없다.
+        assert!(side
+            .layers
+            .iter()
+            .flatten()
+            .all(|n| n.biome == Biome::Water));
+        for stage in 0..t::SIDE_STAGE {
+            assert!(Route::generate(7, stage, true)
+                .layers
+                .iter()
+                .flatten()
+                .all(|n| n.biome != Biome::Water));
+        }
         assert!(Route::generate(7, t::FINAL_STAGE, true)
             .layers
             .iter()

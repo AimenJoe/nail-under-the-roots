@@ -159,6 +159,24 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
         let near = 1.0 - ((*c - pp).length() - 14.0).clamp(0.0, 30.0) / 30.0;
         draw_web(*c, w.time, near);
     }
+    // 물살(0275): 바닥 위, 세워 그리는 것들 아래.
+    for (c, d) in w.room.streams.iter().filter(|_| ground) {
+        let has = |p: Vec2| {
+            w.room
+                .streams
+                .iter()
+                .any(|(q, _)| q.distance_squared(p) < 1.0)
+        };
+        let back = *c - *d * 16.0;
+        let front = *c + *d * 16.0;
+        let edges = [
+            !has(*c - vec2(0.0, 16.0)),
+            !has(*c + vec2(0.0, 16.0)),
+            !has(back),
+            !has(front),
+        ];
+        draw_stream(*c, *d, w.time, edges);
+    }
     for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
         let q = lerp(p.prev_pos, p.pos, alpha);
         list.push((q.y + 3.0, Drawable::Projectile(i)));

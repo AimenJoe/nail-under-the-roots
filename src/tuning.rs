@@ -678,6 +678,11 @@ pub const THORN_R: f32 = 6.5;
 /// 흰 실 그물(0165, 흰 실 굴의 장애물): 반지름(판정·그림), 걸린 동안 걷는 속도 배율(Naïl·모모·걷는 적).
 pub const WEB_R: f32 = 9.0;
 pub const WEB_SLOW: f32 = 0.5;
+/// 물살(0275, 물길 굴의 장애물): 걷는 것을 흐르는 쪽으로 미는 빠르기(px/s — 걷기 90보다 느려 거슬러 갈 수 있다),
+/// 물줄기 하나의 칸 수(최소~최대). 몸 가운데가 칸 안일 때만 밀린다(발만 걸치면 안 밀린다).
+pub const STREAM_PUSH: f32 = 46.0;
+pub const STREAM_RUN_MIN: usize = 3;
+pub const STREAM_RUN_MAX: usize = 6;
 /// 돌진하다 덤불에 박은 적: 피해·멈칫.
 pub const THORN_ENEMY_DAMAGE: i32 = 1;
 pub const THORN_STUN: f32 = 0.9;

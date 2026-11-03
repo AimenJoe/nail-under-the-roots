@@ -112,6 +112,30 @@ fn palette(b: Biome) -> Palette {
             roots_on_top: true,
             stone_top: true,
         },
+        // 물길 굴(0275): 젖은 청회색 돌 바닥에 청록 이끼 얼룩, 물에 닳은 둥근 돌 윗면. 뿌리는 적게(물이 깎았다).
+        Biome::Water => Palette {
+            floor: [
+                (92, 102, 112),
+                (104, 116, 126),
+                (80, 90, 100),
+                (120, 132, 142),
+            ],
+            soil: [(64, 108, 98), (54, 92, 86), (82, 124, 110)],
+            patch_is_soil: false,
+            patch_at: 0.62,
+            path: [(128, 140, 148), (110, 122, 132)],
+            top: [
+                (88, 104, 118),
+                (106, 122, 136),
+                (68, 82, 96),
+                (128, 144, 156),
+            ],
+            // 벼랑도 흙빛이 아니라 젖은 돌빛.
+            face: [(86, 94, 106), (72, 80, 92), (102, 112, 124), (58, 64, 76)],
+            roots_on_face: 0.3,
+            roots_on_top: false,
+            stone_top: true,
+        },
     }
 }
 
@@ -925,7 +949,13 @@ mod tests {
                 }
             }
         }
-        for b in [Biome::Meadow, Biome::Roots, Biome::Deep, Biome::Silk] {
+        for b in [
+            Biome::Meadow,
+            Biome::Roots,
+            Biome::Deep,
+            Biome::Silk,
+            Biome::Water,
+        ] {
             let img = bake(
                 &g,
                 b,

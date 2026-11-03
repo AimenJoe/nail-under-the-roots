@@ -412,6 +412,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
     let mut props = Vec::new();
     let mut thorns = Vec::new();
     let mut webs = Vec::new();
+    let mut streams: Vec<(Vec2, Vec2)> = Vec::new();
     for (ri, room) in rooms.iter_mut().enumerate() {
         let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
         for y in 2..ROOM_H - 1 {
@@ -658,6 +659,17 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
                         &mut webs,
                     );
                 }
+                // 물길 굴(0275): 물줄기 1~2개. 덤불과 같은 자리 규칙, 옆으로 흐른다.
+                if prm.biome == Biome::Water && prm.boss.is_none() {
+                    stream_runs(
+                        &grid,
+                        &props,
+                        &spawn_marks,
+                        room,
+                        seed ^ hash_at(room.at) ^ 0x57EA_3A11,
+                        &mut streams,
+                    );
+                }
             }
             RoomKind::Rest => {}
         }
@@ -679,7 +691,11 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
             &mut props,
             &marks,
             &thorns,
-            &webs,
+            &webs
+                .iter()
+                .copied()
+                .chain(streams.iter().map(|s| s.0))
+                .collect::<Vec<_>>(),
             ox,
             oy,
             seed ^ hash_at(room.at) ^ 0xB4EA_4B1E,
@@ -720,6 +736,7 @@ pub fn generate(seed: u64, prm: &Params) -> (Dungeon, Room) {
     let mut room = Room::from_grid(grid, props, Vec::new());
     room.thorns = thorns;
     room.webs = webs;
+    room.streams = streams;
     (dungeon, room)
 }
 
@@ -771,6 +788,74 @@ fn thorn_patches(
     }
 }
 
+/// 물줄기(0275): 옆으로 흐르는 칸 `STREAM_RUN_MIN`~`MAX`개, 반쯤은 한 줄을 더 붙여 두 칸 너비. 1~2개.
+/// 자리 규칙은 덤불과 같다(문 앞 십자 길·적 자리·소품·`KEEP` 밖) — 그래서 방 위아래 가장자리를 따라 흐르곤 한다.
+fn stream_runs(
+    grid: &Grid,
+    props: &[Prop],
+    avoid: &[Vec2],
+    room: &DRoom,
+    seed: u64,
+    out: &mut Vec<(Vec2, Vec2)>,
+) {
+    let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
+    let mut rng = Rng::new(seed | 1);
+    let ok = |x: i32, y: i32, out: &Vec<(Vec2, Vec2)>| {
+        if !(2..=17).contains(&x) || !(3..=10).contains(&y) {
+            return false;
+        }
+        let (x, y) = (x as usize, y as usize);
+        let c = cell_center(ox + x, oy + y);
+        !passage_lane(x, y, room.hall)
+            && !KEEP.contains(&(x, y))
+            && grid.get(ox + x, oy + y) == Cell::Floor
+            && !props.iter().any(|p| p.rect.contains(c))
+            && !avoid.iter().any(|a| a.distance(c) < 12.0)
+            && !out.iter().any(|(o, _)| *o == c)
+    };
+    for _ in 0..1 + rng.below(2) {
+        let mut start = None;
+        for _ in 0..12 {
+            let (x, y) = (2 + rng.below(16) as i32, 3 + rng.below(8) as i32);
+            if ok(x, y, out) {
+                start = Some((x, y));
+                break;
+            }
+        }
+        let Some((x0, y0)) = start else {
+            continue;
+        };
+        let dir = if rng.chance(0.5) { 1 } else { -1 };
+        // 흐르는 쪽 반대로 거슬러 올라가 시작점을 잡고, 흐르는 쪽으로 늘린다.
+        let mut x = x0;
+        while (x0 - x).abs() < t::STREAM_RUN_MAX as i32 - 1 && ok(x - dir, y0, out) {
+            x -= dir;
+        }
+        let mut run = Vec::new();
+        while run.len() < t::STREAM_RUN_MAX && ok(x, y0, out) {
+            run.push(x);
+            x += dir;
+        }
+        if run.len() < t::STREAM_RUN_MIN {
+            continue;
+        }
+        let flow = vec2(dir as f32, 0.0);
+        let side = if rng.chance(0.5) { 1 } else { -1 };
+        let wide = rng.chance(0.5) && run.iter().all(|&x| ok(x, y0 + side, out));
+        for &x in &run {
+            out.push((cell_center(ox + x as usize, oy + y0 as usize), flow));
+        }
+        if wide {
+            for &x in &run {
+                out.push((
+                    cell_center(ox + x as usize, oy + (y0 + side) as usize),
+                    flow,
+                ));
+            }
+        }
+    }
+}
+
 /// 문 앞 십자 길과 넓은 방의 열린 이음새까지 잇는 접근로는 장애물 없이 둔다.
 fn passage_lane(x: usize, y: usize, hall: Option<usize>) -> bool {
     (8..=11).contains(&x)
@@ -811,6 +896,8 @@ fn breakables(
         Biome::Roots => Breakable::Gall,
         Biome::Deep => Breakable::RockPile,
         Biome::Silk => Breakable::SilkBall,
+        // 물길 굴(0275): 젖은 돌무더기(그림은 심층 것, 새 그림은 P4·P5 때).
+        Biome::Water => Breakable::RockPile,
     };
     for _ in 0..n {
         for _ in 0..12 {
@@ -1279,6 +1366,54 @@ mod tests {
                 },
             );
             assert!(deep.webs.is_empty());
+        }
+        assert!(any);
+    }
+
+    /// 물길 굴에만 물살(0275): 같은 시드면 같은 자리, 문 앞 길·소품 밖, 옆으로 흐르고 한 줄은 `STREAM_RUN_MIN`칸 넘게 이어진다.
+    #[test]
+    fn streams_only_in_water_burrows() {
+        let water = Params {
+            biome: Biome::Water,
+            ..Params::new(1)
+        };
+        let mut any = false;
+        for seed in 1..40 {
+            let (_, room) = generate(seed, &water);
+            let (_, again) = generate(seed, &water);
+            assert_eq!(room.streams, again.streams, "seed {seed}");
+            any |= !room.streams.is_empty();
+            assert!(room.thorns.is_empty() && room.webs.is_empty());
+            for (c, d) in &room.streams {
+                let (x, y) = (
+                    ((c.x / 16.0) as i32).rem_euclid(ROOM_W as i32),
+                    ((c.y / 16.0) as i32).rem_euclid(ROOM_H as i32),
+                );
+                assert!(
+                    !(8..=11).contains(&x) && !(5..=8).contains(&y),
+                    "seed {seed}: 길 위"
+                );
+                assert!(
+                    !room.props.iter().any(|p| p.rect.contains(*c)),
+                    "seed {seed}: 소품 위"
+                );
+                assert_eq!(d.y, 0.0, "옆으로만 흐른다");
+                assert_eq!(d.x.abs(), 1.0);
+                // 흐르는 쪽 앞이나 뒤로 같은 물줄기가 이어진다(외톨이 칸 없음).
+                let next = |p: Vec2| room.streams.iter().any(|(q, e)| *q == p && e == d);
+                assert!(
+                    next(*c + *d * 16.0) || next(*c - *d * 16.0),
+                    "seed {seed}: 외톨이 물살"
+                );
+            }
+            let (_, deep) = generate(
+                seed,
+                &Params {
+                    biome: Biome::Deep,
+                    ..water
+                },
+            );
+            assert!(deep.streams.is_empty());
         }
         assert!(any);
     }
