@@ -43,6 +43,9 @@ BLEND_ONLY = {'illust/mother_burrow', 'sheets/kongi'}
 # 늘 메우는 원본(이름 앞부분): 실의 기억(0273)은 오른쪽 아래가 늘 빈 흙이라 메우기가 보이지 않는다. 고친 판은 n이
 # FILL_ABOVE 아래로 나와도(1.09) 모델이 다시 그린 ✦ 자국이 게임 그림의 어두운 흙에 남았다.
 FILL_ALWAYS = ('illust/mem_',)
+# 메운 뒤 별 자리를 둘레 흙의 평면으로 한 번 더 덮는 원본: 나노바나나로 고친 판(mem_alone)은 다시 그린 ✦의 옅은 얼룩이 남았다.
+# 흙에 결이 있는 그림(mem_forest·mem_drought)에서는 평면 자리가 둥글게 밝아 보여 쓰지 않는다.
+SMOOTH = {'illust/mem_alone', 'illust/mem_first_sprout', 'illust/mem_dyed_thread'}
 
 
 def _sample(xs, ys):
@@ -131,7 +134,32 @@ def clean(img, name):
     grow = 12 if name.startswith(FILL_ALWAYS) else 3
     mask = _alpha(w, h, box, dx, dy, m * (1 + grow / 48)) > FILL_A
     ref_pack.fill_hole(out, {(x0 + x, y0 + y) for y, x in zip(*np.nonzero(mask))})
+    if name in SMOOTH:
+        # 빈 흙 자리: 메운 뒤에도 다시 그린 ✦의 옅은 얼룩이 남았다(mem_alone) → 별 자리(+여유)를 둘레 고리에서 잰
+        # 고른 기울기(평면)로 덮는다. 무늬 없는 어두운 흙이라 평면이 둘레와 이어진다.
+        ys, xs = np.nonzero(mask)
+        cx, cy = x0 + xs.mean(), y0 + ys.mean()
+        r = max(xs.max() - xs.min(), ys.max() - ys.min()) / 2 + 6
+        out = _smooth_disk(out, cx, cy, r)
+        return out, n, 'unblend+fill+smooth'
     return out, n, 'unblend+fill'
+
+
+def _smooth_disk(img, cx, cy, r, ring=10):
+    """(cx, cy) 반지름 r 원을 둘레 고리(r..r+ring)에 맞춘 색 평면으로 바꾸고, 가장자리 4px는 섞는다."""
+    a = np.asarray(img).astype(float)
+    h, w, _ = a.shape
+    yy, xx = np.mgrid[:h, :w]
+    dist = np.hypot(xx - cx, yy - cy)
+    ringm = (dist > r) & (dist <= r + ring)
+    A = np.stack([xx[ringm], yy[ringm], np.ones(ringm.sum())], 1)
+    inside = dist <= r + 4
+    for c in range(3):
+        coef, *_ = np.linalg.lstsq(A, a[..., c][ringm], rcond=None)
+        plane = coef[0] * xx + coef[1] * yy + coef[2]
+        k = np.clip((r + 4 - dist) / 4, 0, 1)
+        a[..., c] = np.where(inside, k * plane + (1 - k) * a[..., c], a[..., c])
+    return Image.fromarray(np.clip(np.round(a), 0, 255).astype(np.uint8))
 
 
 def _chunks(data):
