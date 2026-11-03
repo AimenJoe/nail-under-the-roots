@@ -348,7 +348,7 @@ strings! {
     settings, set_sound, set_music, set_shake, set_flash, set_rumble, set_home, set_home_d, set_effects, set_debug, set_language, set_back, on, off, settings_hint,
     // 일시정지
     tab_menu, tab_status, tab_talents, tab_bag, tab_journal, tab_map, tab_hint,
-    pm_resume, pm_restart, pm_settings, pm_title,
+    pm_resume, pm_restart, pm_settings, pm_title, pm_restart_ask, pm_title_ask, ask_cancel,
     // 상태
     hp, bare_hands,
     burrow, special, glowbugs,

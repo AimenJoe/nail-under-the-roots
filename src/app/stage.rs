@@ -888,16 +888,8 @@ impl App {
         let Some((i, yes)) = self.shop_ask else {
             return;
         };
-        if a.left || a.right {
-            self.shop_ask = Some((i, !yes));
-        }
-        let choice = match tap_hit {
-            Some(Hit::ShopYes) => Some(true),
-            Some(Hit::ShopNo) | Some(Hit::Close) => Some(false),
-            _ if a.cancel || a.menu => Some(false),
-            _ if a.confirm => self.shop_ask.map(|(_, y)| y),
-            _ => None,
-        };
+        let (yes, choice) = super::ask_choice(a, tap_hit, yes);
+        self.shop_ask = Some((i, yes));
         if let Some(buy) = choice {
             self.shop_ask = None;
             if buy {
@@ -1075,15 +1067,30 @@ impl App {
             return;
         };
         let s = i18n::s();
-        ui.rect(panel, ui::DIM_OVERLAY);
-        let b = Rect::new(panel.x + 26.0, panel.y + 44.0, panel.w - 52.0, 62.0);
-        ui.panel(b, None);
         let q = fill(s.shop_confirm, &[&tr(ware.name()), &self.ware_cost(ware)]);
-        for (k, l) in ui::wrap(ui, &q, b.w - 12.0, FONT_PX)
-            .iter()
-            .take(2)
-            .enumerate()
-        {
+        self.draw_ask(ui, panel, &q, s.shop_yes, s.shop_no, yes);
+    }
+
+    /// 묻는 창(가게 사기·일시정지의 다시 시작·타이틀로): 패널을 어둡게 덮고 가운데 물음 두 줄 + 단추 둘.
+    /// 열려 있는 동안 다른 칸은 탭을 받지 않는다(바깥 탭 = `Hit::Close` = 아니오). 입력은 `ask_choice`.
+    pub(super) fn draw_ask(
+        &mut self,
+        ui: &Ui,
+        panel: Rect,
+        q: &str,
+        yes_l: &str,
+        no_l: &str,
+        yes: bool,
+    ) {
+        ui.rect(panel, ui::DIM_OVERLAY);
+        // 물음은 세 줄까지(긴 언어), 창 높이가 줄 수를 따른다 — 두 줄이면 예전 가게 창과 같은 62px.
+        let w = panel.w - 52.0;
+        let lines = ui::wrap(ui, q, w - 12.0, FONT_PX);
+        let n = lines.len().clamp(1, 3);
+        let h = 38.0 + n as f32 * 12.0;
+        let b = Rect::new(panel.x + 26.0, panel.center().y - h / 2.0 + 4.0, w, h);
+        ui.panel(b, None);
+        for (k, l) in lines.iter().take(n).enumerate() {
             ui.text_center(
                 l,
                 b.center().x,
@@ -1092,15 +1099,11 @@ impl App {
                 ui::TEXT,
             );
         }
-        // 이 창이 열려 있는 동안 다른 칸(물건·✕)은 탭을 받지 않는다.
         self.hits.clear();
         let bw = (b.w - 18.0) / 2.0;
-        for (k, (label, hit, on)) in [
-            (s.shop_yes, Hit::ShopYes, yes),
-            (s.shop_no, Hit::ShopNo, !yes),
-        ]
-        .into_iter()
-        .enumerate()
+        for (k, (label, hit, on)) in [(yes_l, Hit::AskYes, yes), (no_l, Hit::AskNo, !yes)]
+            .into_iter()
+            .enumerate()
         {
             let r = Rect::new(
                 b.x + 6.0 + k as f32 * (bw + 6.0),

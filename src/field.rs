@@ -50,9 +50,10 @@ pub const ROWS: [&str; 40] = [
     "##################################################",
 ];
 
-/// 보리 공터 문(`++`, 28~29줄 37~38칸) 바로 위 길에 놓는 시든 꽃잎(0190): 모모가 이 길로 내려갔다는 자국.
+/// 보리 공터 문(`++`, 28~29줄 37~38칸) 바로 앞에 놓는 시든 꽃잎(0190): 모모가 이 길로 내려갔다는 자국.
+/// 문 두 칸의 가운데, 문턱 한 칸 위(사장 2026-11-03: 보스방에 더 가깝게 — 예전엔 세 칸 위 25줄).
 pub fn petal_road() -> macroquad::math::Vec2 {
-    map::cell_center(37, 25) + macroquad::math::vec2(6.0, 2.0)
+    map::cell_center(37, 27) + macroquad::math::vec2(8.0, 2.0)
 }
 
 pub fn parse() -> Parsed {
@@ -87,6 +88,11 @@ mod tests {
         let (pc, prow) = ((pr.x / map::TILE) as usize, (pr.y / map::TILE) as usize);
         assert_eq!(p.grid.get(pc, prow), Cell::Floor);
         assert!(pr.y < top);
+        // 문 바로 앞(사장 2026-11-03): 문 칸 두 줄 위로 한 칸 안쪽, 가로는 문 두 칸 사이.
+        let door_top = doors.iter().map(|d| d.y).fold(f32::MAX, f32::min);
+        assert!(door_top - pr.y < map::TILE * 1.5, "꽃잎이 공터 문에서 멀다");
+        let door_x = doors.iter().map(|d| d.x).sum::<f32>() / doors.len() as f32;
+        assert!((pr.x - door_x).abs() < map::TILE);
         // 오프닝 컷씬이 걷는 줄(y≈90, x 30..300)은 바닥이어야 한다.
         for x in (32..300).step_by(16) {
             let (cx, cy) = (x / 16, 90 / 16);

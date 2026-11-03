@@ -727,39 +727,32 @@ impl World {
         self.update_cam();
     }
 
-    /// 발밑 칸: 입구·출구(장소 바꾸기, 길 지도), 저장 지점. 저장 지점을 새로 밟았으면 true(소리).
+    /// 발밑 칸: 저장 지점. 저장 지점을 새로 밟았으면 true(소리). 입구·출구는 확인 버튼(`use_exit`).
     fn cell_triggers(&mut self) -> bool {
         let cell = self.room.cell_at(self.player.pos);
-        let stepped = cell != self.adv.last_cell;
         self.adv.last_cell = cell;
         if self.player.is_alive() && self.adv.fade.is_none() {
-            match cell {
-                // 굴 입구는 공터의 대장을 이긴 뒤에야 산다. 그 아래는 쉼터.
-                // 입구·출구는 밟는 순간에만(0060): 싸움이 끝날 때 그 칸에 서 있었다면, 한 번 비켰다가 다시 밟아야 나간다.
-                Some(Cell::Entrance)
-                    if stepped
-                        && self.adv.place == Place::Field
-                        && self.adv.boss == BossFight::Done =>
-                {
-                    self.start_fade(Transition::EnterCamp)
-                }
-                Some(Cell::Save) => return self.touch_save(),
-                _ => {}
+            // 굴 입구(공터의 `D`)는 밟아도 내려가지 않는다 — 굴 출구처럼 곁에서 확인 버튼(`exit_near`, 사장 2026-11-03).
+            if cell == Some(Cell::Save) {
+                return self.touch_save();
             }
         }
         false
     }
 
     /// 굴 출구(내려가는 구멍) 곁: 밟아도 내려가지 않고 확인 버튼으로 내려간다(사장 2026-10-30).
+    /// 필드 공터의 굴 입구(`D`)도 같다 — 대장을 이긴 뒤에만 열린다(사장 2026-11-03, 예전엔 밟으면 내려갔다).
     fn exit_near(&self) -> Option<Vec2> {
-        if self.adv.place != Place::Dungeon {
-            return None;
-        }
+        let cell = match self.adv.place {
+            Place::Dungeon => Cell::Exit,
+            Place::Field if self.adv.boss == BossFight::Done => Cell::Entrance,
+            _ => return None,
+        };
         let p = self.player.pos;
         self.room
             .grid
             .as_ref()?
-            .find(Cell::Exit)
+            .find(cell)
             .into_iter()
             .find(|q| (*q - p).length() < t::INTERACT_RADIUS)
     }
@@ -767,6 +760,11 @@ impl World {
     /// 앱이 부른다(`Interact::Exit`): 굴 출구로 내려간다. 길 칸은 길 지도, 보스 칸은 다음 쉼터·가장 깊은 곳.
     pub fn use_exit(&mut self) {
         if self.exit_near().is_none() || self.adv.fade.is_some() {
+            return;
+        }
+        if self.adv.place == Place::Field {
+            // 공터의 굴 입구: 그 아래는 첫 쉼터.
+            self.start_fade(Transition::EnterCamp);
             return;
         }
         match self.adv.node {
@@ -2417,17 +2415,29 @@ mod tests {
             .find(|l| l.kind == LootKind::RootHeart)
             .unwrap();
         assert!((heart.pos - w.adv.entrance_pos).length() >= t::EXIT_MIN_DIST * 0.7);
-        // 싸움이 끝날 때 입구에 서 있었다: 그대로면 안 들어간다.
+        // 입구는 밟아도(비켰다가 다시 밟아도) 내려가지 않는다 — 곁에서 확인 버튼(사장 2026-11-03).
         w.adv.last_cell = w.room.cell_at(w.player.pos);
         assert_eq!(w.adv.last_cell, Some(Cell::Entrance));
         w.cell_triggers();
-        assert!(w.adv.fade.is_none(), "서 있던 채로는 들어가지 않는다");
-        // 비켰다가 다시 밟으면 들어간다.
         w.player.pos += vec2(0.0, -32.0);
         w.cell_triggers();
         w.player.pos += vec2(0.0, 32.0);
         w.cell_triggers();
+        assert!(w.adv.fade.is_none(), "밟기만 해서는 내려가지 않는다");
+        assert_eq!(w.interactable(), Some(Interact::Exit));
+        w.use_exit();
         assert_eq!(w.adv.fade.map(|f| f.kind), Some(Transition::EnterCamp));
+    }
+
+    /// 공터의 굴 입구는 대장을 이기기 전엔 확인 버튼도 받지 않는다.
+    #[test]
+    fn glade_entrance_waits_for_the_chief() {
+        let mut w = World::field();
+        w.player.pos = w.adv.entrance_pos;
+        assert_ne!(w.adv.boss, BossFight::Done);
+        assert_eq!(w.interactable(), None);
+        w.use_exit();
+        assert!(w.adv.fade.is_none());
     }
 
     /// 길의 굴: 출구를 밟는 순간 길 지도를 한 번 연다. 보스 칸의 출구는 다음 쉼터로.

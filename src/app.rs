@@ -70,8 +70,18 @@ fn device_hint(t: &str, touch: &str, verbs: &[Verb]) -> String {
 }
 
 /// 표 → 지금 언어의 글 목록(메뉴 그리기용).
-fn trs(items: &[Tr]) -> Vec<&'static str> {
-    items.iter().map(|f| tr(*f)).collect()
+/// 묻는 창의 입력(가게 사기·다시 시작·타이틀로, `App::draw_ask`): 좌우로 커서를 옮기고, 확인 = 커서 쪽,
+/// 뒤로·메뉴·바깥 탭 = 아니오. 돌려주는 것: (옮긴 커서, 고른 답).
+fn ask_choice(a: &Actions, tap_hit: Option<Hit>, yes: bool) -> (bool, Option<bool>) {
+    let yes = if a.left || a.right { !yes } else { yes };
+    let choice = match tap_hit {
+        Some(Hit::AskYes) => Some(true),
+        Some(Hit::AskNo) | Some(Hit::Close) => Some(false),
+        _ if a.cancel || a.menu => Some(false),
+        _ if a.confirm => Some(yes),
+        _ => None,
+    };
+    (yes, choice)
 }
 
 /// 런이 끝나는 쓰러짐(0225 → 0258)의 실뿌리 불투명도: 뿌리 너머 장면이 비치게.
@@ -368,9 +378,9 @@ enum Hit {
     ShopTab(usize),
     /// 마을 창 짐 −·+ 단추(짐 번호, ±1, 0269).
     PackStep(usize, i8),
-    /// 사기 전에 묻는 창의 단추.
-    ShopYes,
-    ShopNo,
+    /// 묻는 창(가게 사기·다시 시작·타이틀로)의 단추.
+    AskYes,
+    AskNo,
     /// 닫기 단추·패널 바깥(가게·길 지도).
     Close,
     /// 컷씬 건너뛰기 안내.
@@ -498,6 +508,8 @@ pub struct App {
     shop_msg: Option<(Tr, f32)>,
     /// 사기 전에 묻는 중: (물건 줄, "사기"에 커서가 있나).
     shop_ask: Option<(usize, bool)>,
+    /// 일시정지 메뉴에서 묻는 중(다시 시작·타이틀로): (메뉴 항목, "예"에 커서가 있나). 기본은 "아니오"(사장 2026-11-03).
+    pause_ask: Option<(PauseItem, bool)>,
     /// 보리에게 말 건 횟수(말이 돌아간다).
     /// 이웃마다 늘 하는 말 차례(0269 R34: 전엔 하나를 같이 써서 이웃 사이를 오가면 순서가 튀었다).
     talk_n: [u32; crate::story::WHO_COUNT],
@@ -664,6 +676,7 @@ impl App {
             shop_cursor: 0,
             shop_msg: None,
             shop_ask: None,
+            pause_ask: None,
             talk_n: [0; crate::story::WHO_COUNT],
             profile: crate::profile::load(),
             death_noted: false,

@@ -84,14 +84,38 @@ pub(super) const PAUSE_TABS: &[PauseTab] = &[
 ];
 /// 지도 탭 번호(지도 버튼으로 바로 연다).
 pub(super) const TAB_MAP: usize = 6;
-/// 메뉴 탭의 줄. 개발판은 끝에 "Lab"(0269 — 개발 도구는 개발 메뉴에 모으고, 게임 중에는 여기서 연다).
-pub(super) const PAUSE_MENU: &[Tr] = &[
-    |s| s.pm_resume,
-    |s| s.pm_restart,
-    |s| s.pm_settings,
-    |s| s.pm_title,
+/// 메뉴 탭의 항목. 줄 순서는 `PAUSE_MENU` 표 하나가 정하고, 하는 일은 이 이름으로 가른다(번호로 가르면
+/// 개발판에만 있는 줄이 끼어들 때 뒤 항목이 밀린다).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PauseItem {
+    Resume,
+    Restart,
+    Settings,
+    /// 손맛 실험실(0269, 개발판만).
     #[cfg(feature = "dev")]
-    |_| "Lab",
+    Lab,
+    Title,
+}
+
+impl PauseItem {
+    /// 고르면 바로 하지 않고 한 번 묻는 항목(사장 2026-11-03): 런을 버리거나 화면을 떠난다.
+    fn asks(self) -> Option<(Tr, Tr)> {
+        match self {
+            PauseItem::Restart => Some((|s| s.pm_restart_ask, |s| s.pm_restart)),
+            PauseItem::Title => Some((|s| s.pm_title_ask, |s| s.pm_title)),
+            _ => None,
+        }
+    }
+}
+
+/// 메뉴 탭의 줄: 이름 + 항목. 개발판의 "Lab"은 설정 아래, 타이틀로 위(0269 → 사장 2026-11-03).
+pub(super) const PAUSE_MENU: &[(Tr, PauseItem)] = &[
+    (|s| s.pm_resume, PauseItem::Resume),
+    (|s| s.pm_restart, PauseItem::Restart),
+    (|s| s.pm_settings, PauseItem::Settings),
+    #[cfg(feature = "dev")]
+    (|_| "Lab", PauseItem::Lab),
+    (|s| s.pm_title, PauseItem::Title),
 ];
 /// 가방 칸의 발톱 아이콘: 크림/무기 색 발톱 세 개.
 pub(super) fn draw_claw_icon(ui: &Ui, r: Rect, color: Color) {
@@ -155,6 +179,11 @@ impl App {
         let step = |t: usize, d: i32| (t as i32 + d).rem_euclid(n_tabs as i32) as usize;
         // 이번 입력을 받기 전 탭: 좌우로 가방에 막 들어온 프레임에 같은 좌우가 가방 끝에서 또 탭을 넘기지 않게.
         let came_in = self.pause_tab;
+        // 묻는 창이 열려 있으면 그 창만 입력을 받는다(뒤로 = 아니오, 일시정지는 그대로).
+        if self.pause_ask.is_some() {
+            self.update_pause_ask(a, tap_hit);
+            return;
+        }
         if a.cancel || a.menu {
             self.scene = Scene::Game;
             return;
@@ -183,7 +212,7 @@ impl App {
         }
     }
 
-    /// 메뉴 탭: 이어하기·다시 하기·설정·타이틀로.
+    /// 메뉴 탭: 이어하기·다시 하기·설정·(Lab)·타이틀로. 다시 하기·타이틀로는 한 번 묻는다(`PauseItem::asks`).
     fn update_pause_menu(&mut self, a: &Actions, tap_hit: Option<Hit>) {
         let n = PAUSE_MENU.len();
         if a.up {
@@ -199,28 +228,54 @@ impl App {
         } else {
             None
         };
-        match chosen {
-            Some(0) => self.scene = Scene::Game,
-            Some(1) => {
+        let Some(&(_, item)) = chosen.and_then(|i| PAUSE_MENU.get(i)) else {
+            return;
+        };
+        if item.asks().is_some() {
+            // 커서는 "아니오"에서 시작한다: 확인을 두 번 눌러 실수로 런을 버리지 않게.
+            self.pause_ask = Some((item, false));
+        } else {
+            self.do_pause_item(item);
+        }
+    }
+
+    /// 묻는 창의 입력: 예면 그 항목을 하고, 아니오면 메뉴로 돌아간다.
+    fn update_pause_ask(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        let Some((item, yes)) = self.pause_ask else {
+            return;
+        };
+        let (yes, choice) = super::ask_choice(a, tap_hit, yes);
+        self.pause_ask = Some((item, yes));
+        if let Some(go) = choice {
+            self.pause_ask = None;
+            if go {
+                self.do_pause_item(item);
+            }
+        }
+    }
+
+    fn do_pause_item(&mut self, item: PauseItem) {
+        match item {
+            PauseItem::Resume => self.scene = Scene::Game,
+            PauseItem::Restart => {
                 // 다시 하기: 런을 버린다. 모은 재화는 잃지 않는다(0259) — 반딧불은 마을로, 남은 씨앗은 마을 씨앗으로.
                 self.keep_run_currency();
                 self.start_game();
             }
-            Some(2) => {
+            PauseItem::Settings => {
                 self.settings_cursor = 0;
                 self.scene = Scene::Settings { back: Back::Pause };
             }
-            Some(3) => {
+            // 손맛 실험실(0269, 개발판): 값을 바꾸고 닫으면 이 일시정지로 — 이어 하면 바로 느낀다.
+            #[cfg(feature = "dev")]
+            PauseItem::Lab => self.scene = Scene::Lab { from_pause: true },
+            PauseItem::Title => {
                 // 타이틀로: 런은 이어하기에 남는다. 반딧불은 마을로 보내고(0259), 지금 가방·씨앗까지 적는다 —
                 // 굴 안이면 이어할 때 마지막 쉼터·지나온 길부터(0259), 그 굴의 진행만 다시 한다.
                 self.suspend_run();
                 self.title_cursor = 0;
                 self.scene = Scene::Title;
             }
-            // 손맛 실험실(0269, 개발판): 값을 바꾸고 닫으면 이 일시정지로 — 이어 하면 바로 느낀다.
-            #[cfg(feature = "dev")]
-            Some(4) => self.scene = Scene::Lab { from_pause: true },
-            _ => {}
         }
     }
 
@@ -354,8 +409,9 @@ impl App {
 
     /// 메뉴 탭 그림.
     fn draw_pause_menu(&mut self, ui: &Ui, content: Rect) {
+        let names: Vec<&str> = PAUSE_MENU.iter().map(|(n, _)| tr(*n)).collect();
         let rects = ui.menu_list(
-            &trs(PAUSE_MENU),
+            &names,
             self.pause_cursor,
             content.x + 90.0,
             content.y + 12.0,
@@ -402,6 +458,11 @@ impl App {
             panel.h - 38.0,
         );
         (PAUSE_TABS[self.pause_tab].draw)(self, ui, content);
+        if let Some((item, yes)) = self.pause_ask {
+            if let Some((q, label)) = item.asks() {
+                self.draw_ask(ui, panel, tr(q), tr(label), s.ask_cancel, yes);
+            }
+        }
     }
 
     /// 상태 탭: 캐릭터 능력치는 숫자로(두 칸 표), 그 아래 필살기·장신구·재주·화폐 설명.
