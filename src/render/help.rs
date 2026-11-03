@@ -154,6 +154,36 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
         Pic::Tree => pic_tree(c),
         Pic::Journal => pic_journal(c),
         Pic::Knot => pic_knot(c),
+        Pic::Memory => pic_memory(c),
+    }
+}
+
+fn pic_memory(c: PicCtx) {
+    let PicCtx {
+        art, w, time, y, ..
+    } = c;
+    // 실의 기억(0273 A): 조용한 방 가운데 흰 실 한 타래 → Naïl이 걸어가 밟으면 반짝이며 사라진다 → 처음부터.
+    let ph = time % 3.2;
+    let at = vec2((w * 0.66).round(), y + 2.0);
+    let walk = (ph / 1.6).min(1.0);
+    let x = 18.0 + (at.x - 18.0) * walk;
+    if ph < 1.6 {
+        fx::draw_story_pickup(crate::world::StoryItem::Memory, at, time, false);
+        nail(art, 2 + ((time * 10.0) as u32) % 4, 0, vec2(x, y), false);
+    } else {
+        let k = ((ph - 1.6) / 0.8).min(1.0);
+        for i in 0..6 {
+            let a = i as f32 * 1.047 + time * 2.0;
+            let r = 3.0 + 9.0 * k;
+            draw_rectangle(
+                (at.x + a.cos() * r).round(),
+                (at.y - 6.0 + a.sin() * r * 0.6).round(),
+                1.0,
+                1.0,
+                Color::new(0.95, 0.92, 1.0, 1.0 - k),
+            );
+        }
+        nail(art, 0, 0, vec2(x, y), false);
     }
 }
 

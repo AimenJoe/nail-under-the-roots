@@ -326,6 +326,14 @@ impl App {
                         self.save_profile();
                     }
                 }
+                // 실의 기억(0273 A): 기록에 남기고 그 조각의 장면(그림 + 내레이션). 다시 보기는 앨범.
+                AdvEvent::MemoryFound(n) => {
+                    if self.recording() {
+                        self.profile.set(&crate::profile::key::memory(n));
+                        self.save_profile();
+                    }
+                    self.play(cutscene::memory(&self.world, n));
+                }
                 AdvEvent::DeepSleep => {
                     // 잠드는 장면(0163) 뒤 맡겨 둔 쉼터로.
                     self.after_cutscene = super::AfterCut::Respawn;

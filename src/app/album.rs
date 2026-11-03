@@ -1,4 +1,4 @@
-//! 앨범: 본 일러스트 고르기·크게 보기.
+//! 앨범: 본 일러스트 고르기·크게 보기. 일러스트 뒤에 실의 기억 여섯(0273 A) — 칸은 그 조각의 그림, 크게 보면 조각 글.
 
 use super::*;
 
@@ -12,9 +12,29 @@ impl App {
             .flag(&crate::profile::key::illust(il.spec().file))
     }
 
+    /// 앨범 칸 i(일러스트 다음에 실의 기억): 그림, 본 적 있나, 실의 기억이면 그 글.
+    fn album_item(&self, i: usize) -> (crate::illust::Illust, bool, Option<Tr>) {
+        use crate::illust::Illust;
+        match i.checked_sub(Illust::ALL.len()) {
+            None => (Illust::ALL[i], self.album_seen(Illust::ALL[i]), None),
+            Some(k) => {
+                let n = k as u8 + 1;
+                let m = crate::memories::get(n);
+                (
+                    m.illust,
+                    crate::memories::seen(&self.profile, n),
+                    Some(m.text),
+                )
+            }
+        }
+    }
+
+    fn album_len() -> usize {
+        crate::illust::Illust::ALL.len() + crate::world::MEMORIES as usize
+    }
+
     /// 앨범: 5×2 칸에서 고르고, 본 그림은 크게(패닝·입자 그대로). 확인·뒤로·탭으로 닫는다.
     pub(super) fn update_album(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
-        use crate::illust::Illust;
         if let Some(t) = self.album_view.as_mut() {
             *t += dt;
             if a.confirm || a.cancel || a.attack || a.tap.is_some() {
@@ -22,7 +42,7 @@ impl App {
             }
             return;
         }
-        let n = Illust::ALL.len();
+        let n = Self::album_len();
         let c = self.album_cursor;
         if a.left {
             self.album_cursor = (c + n - 1) % n;
@@ -61,7 +81,7 @@ impl App {
             None
         };
         if let Some(i) = chosen {
-            if self.album_seen(Illust::ALL[i]) {
+            if self.album_item(i).1 {
                 self.album_view = Some(0.0);
             }
         }
@@ -71,11 +91,29 @@ impl App {
     }
 
     pub(super) fn draw_album(&mut self, ui: &Ui) {
-        use crate::illust::Illust;
         let s = i18n::s();
         if let Some(t) = self.album_view {
-            let il = Illust::ALL[self.album_cursor];
+            let (il, _, text) = self.album_item(self.album_cursor);
             self.renderer.draw_illust(ui, il, t);
+            // 실의 기억은 그림 아래에 조각 글(컷씬의 내레이션처럼 아래서 위로 옅어지는 어둠 위에).
+            if let Some(text) = text {
+                let lines = ui::wrap(ui, tr(text), 280.0, FONT_PX);
+                let top = 150.0 - lines.len() as f32 * 13.0;
+                ui.rect(
+                    Rect::new(0.0, top - 6.0, t::VIEW_W, t::VIEW_H - top + 6.0),
+                    Color::new(0.03, 0.02, 0.05, 0.66),
+                );
+                let ui = &ui.with_outline();
+                for (k, l) in lines.iter().enumerate() {
+                    ui.text_center(
+                        l,
+                        160.0,
+                        top + k as f32 * 13.0,
+                        FONT_PX,
+                        Color::new(0.94, 0.90, 0.82, 1.0),
+                    );
+                }
+            }
             let hint = vfill(s.album_close, &[Verb::Back]);
             ui.text_center(&hint, 160.0, 166.0, FONT_PX, ui::TEXT_DIM);
             return;
@@ -86,16 +124,15 @@ impl App {
         let (cw, ch, gap) = (52.0, 30.0, 5.0);
         let x0 = panel.x + (panel.w - ALBUM_COLS as f32 * cw - (ALBUM_COLS - 1) as f32 * gap) / 2.0;
         let y0 = panel.y + 38.0;
-        let rows = Illust::ALL.len().div_ceil(ALBUM_COLS);
+        let n = Self::album_len();
+        let rows = n.div_ceil(ALBUM_COLS);
         let row = self.album_cursor / ALBUM_COLS;
         let top = self
             .album_rows
             .window(row, rows, ALBUM_ROWS, ch + gap + 10.0);
-        let seen = Illust::ALL
-            .iter()
-            .filter(|il| self.album_seen(**il))
-            .count();
-        for (i, il) in Illust::ALL.iter().enumerate() {
+        let seen = (0..n).filter(|i| self.album_item(*i).1).count();
+        for i in 0..n {
+            let (il, is_seen, memory) = self.album_item(i);
             let r_row = i / ALBUM_COLS;
             if r_row < top || r_row >= top + ALBUM_ROWS {
                 continue;
@@ -106,8 +143,16 @@ impl App {
                 cw,
                 ch,
             );
-            if self.album_seen(*il) {
-                self.renderer.draw_illust_thumb(ui, *il, r);
+            if is_seen {
+                self.renderer.draw_illust_thumb(ui, il, r);
+                // 실의 기억 칸: 그림이 일러스트와 겹치니 모서리에 흰 실 표시.
+                if memory.is_some() {
+                    ui.rect(Rect::new(r.right() - 7.0, r.y + 2.0, 5.0, 3.0), ui::TEXT);
+                    ui.rect(
+                        Rect::new(r.right() - 3.0, r.y + 5.0, 2.0, 1.0),
+                        Color::new(0.70, 0.56, 0.86, 1.0),
+                    );
+                }
             } else {
                 ui.rect(r, ui::PANEL_LIGHT);
                 ui.text_center("?", r.center().x, r.y + 12.0, FONT_PX, ui::TEXT_DIM);
@@ -136,7 +181,7 @@ impl App {
             self.hits
                 .push((Rect::new(146.0, yb - 2.0, 28.0, 13.0), Hit::AlbumRow(true)));
         }
-        let count = fill(s.album_count, &[&seen, &Illust::ALL.len()]);
+        let count = fill(s.album_count, &[&seen, &n]);
         ui.text(&count, panel.x + 8.0, panel.y + 21.0, FONT_PX, ui::TEXT_DIM);
         let hint = device_hint(s.album_hint, s.album_hint, &[Verb::Confirm, Verb::Pick]);
         let hint = ui.fit(&hint, panel.w - 8.0, FONT_PX);

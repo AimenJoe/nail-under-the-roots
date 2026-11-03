@@ -186,6 +186,36 @@ Scene: The entrance to the deepest place: a huge stone door in the darkness. The
 Scene: Deep inside the rabbits' old warren, a round earthen chamber whose walls are wrapped in white silk threads, with a few violet threads mixed in. In the middle, the mother rabbit Clover sleeps curled around two silk cocoons, each cocoon a soft white oval with a tiny rabbit kit faintly visible inside, breathing. Her long ears are laid back over the cocoons like a blanket. Violet threads coil loosely around her body and fade to white where they touch the cocoons. A faint pale light glows from inside the cocoons and lights her face from below. Her eyes are closed; she looks tired but at peace, protecting. Clover and the cocoons fill the middle of the image, above the bottom quarter; the bottom quarter is plain silk-covered floor, because a text box covers it. Quiet, tender, a little sad. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
 ```
 
+### 실의 기억 다섯(0273 A) — 16:9 (640×360) · 할매의 지난날. 원본이 오기 전엔 있는 그림을 쓴다(`src/memories.rs` 표의 `illust`)
+다섯 다 아주 오래전 일이라 `doto_memory`처럼 **바랜 기억**으로 그린다. 첨부: `sheet_halmae.png`(넷째 장면은 + `sheet_doto.png`를 그림체 참고로만). 공통 스타일·세계 규칙·누룩 할매 글을 앞에 붙이고, 세계 규칙 뒤에 이 문장을 붙인다:
+`This is a memory from long, long ago, before the great tree existed: the whole image is faded toward warm sepia and lavender, and the edges darken softly like an old photograph. Halmae here is younger and smaller than in the character sheet (a soft white mycelium mound about the size of a fox, with only three or four small mushroom caps), but her face is the same: closed eyes, rosy cheeks and a small smile. Her threads are pure white unless the scene says otherwise. Keep Halmae and all important things above the bottom quarter of the image; the bottom quarter is plain dark soil, because a text box covers it.`
+받으면 `tools/art/sources/ai/illust/<이름>.png` → `strip_logo.py` → `ai_illust.py`의 `AI_SCENES`에 한 줄 + `Illust`에 한 칸, `memories.rs`의 `illust`를 바꾼다(앨범은 표를 따라간다).
+
+#### `mem_forest` — 조각 1 "다른 숲"
+```
+Scene: A cross-section of the earth long ago. The upper third is a dense, healthy old forest of many different trees under a soft green-gold sky, seen small and far. Below the ground line, a rich web of brown roots from all those trees fills the soil, and the young Halmae sits in the middle of it, holding dozens of roots with fine white threads that run out to every one of them like hands held in a circle. Tiny dots of soft light travel along the threads. The feeling is warmth and belonging. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
+```
+
+#### `mem_drought` — 조각 2 "마른 여름"
+```
+Scene: The same underground place in a long dry summer. The soil is pale and cracked, and the brown roots above are thin, grey and brittle; some have snapped. The young Halmae stretches her white threads as far as she can toward the drying roots, straining, but the thread tips fall short or slip off the crumbling wood. Far above, through cracks in the ground, a harsh white sun glare. Her face is worried for the first time: brows lifted, a small open mouth, eyes still closed. The feeling is helplessness, not horror. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
+```
+
+#### `mem_alone` — 조각 3 "혼자"
+```
+Scene: A wide, empty darkness under the ground. There are no roots left, only a few dry, broken root stubs far away at the edges. The young Halmae sits small in the middle, her white threads lying slack on the ground in loose loops, with no one at the other end. One thin thread reaches up toward a faint, far-off speck of light and ends in nothing. Lots of quiet dark space around her. Loneliness and long waiting, gentle and still. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
+```
+
+#### `mem_first_sprout` — 조각 4 "잊힌 도토리"
+```
+Scene: Early spring in the dark soil. In the upper middle, a single forgotten acorn has cracked open, and a tiny pale sprout with two seed leaves pushes up toward a thin line of light from above. The young Halmae has crept close from the lower left and very gently wraps one white thread around the sprout's root, like taking a small hand; a few more threads curl toward it. Small round dots of soft light rise from where they touch. Far above, out of focus at the very top edge, the bushy tail of a red squirrel hurries away. Her face shows a soft, surprised joy: eyes closed, a small smile, rosy cheeks. A quiet new beginning. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
+```
+
+#### `mem_dyed_thread` — 조각 6 "실이 물든 날"
+```
+Scene: Much later, under the great tree when it had grown old. Above, the great tree's crown is thinning, with a few pale leaves falling through the soil-line cut. Below, its huge brown roots fill the soil, and Halmae, now large like the character sheet, holds them all with her threads. Her face is tight with fear: brows drawn together, eyes squeezed shut, holding on too hard. The threads near her are still white, but as they wrap tighter around the roots they slowly turn violet, a soft gradient from white to glowing violet along each thread. The roots themselves stay brown wood. The feeling is a sad, loving fear, never menace. A clean, wordless illustration that fills the frame edge to edge. Aspect ratio 16:9.
+```
+
 ### `title` (타이틀 바탕) — 16:9 (640×360)
 첨부: `sheet_nail.png`. 공통 스타일의 Layout 줄은 타이틀용으로 바꾼다(위에 제목, 가운데 메뉴, 0137).
 ```

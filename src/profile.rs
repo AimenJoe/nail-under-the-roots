@@ -37,6 +37,8 @@ pub mod key {
     /// 가장 깊은 곳에 닿아 반쪽 엔딩을 봤다 / 참 엔딩을 봤다(0042).
     pub const HALF_ENDING: &str = "half_ending";
     pub const TRUE_ENDING: &str = "true_ending";
+    /// 실의 기억 마지막 조각(0273 A) — `memory(6)`과 같은 키(시험이 본다). 다 봤다는 뜻(차례대로 줍는다).
+    pub const MEMORY_LAST: &str = "memory.6";
     /// 참 엔딩 조건(0037): 모모가 돌아옴(세 번 이기면, 0046), 도토가 씨앗 자리를 기억해 냄(도토를 이기면, 0052).
     pub const MOMO_BACK: &str = "momo";
     pub const DOTO_MEMORY: &str = "doto_memory";
@@ -79,6 +81,10 @@ pub mod key {
     }
     pub fn line(id: &str) -> String {
         format!("line.{id}")
+    }
+    /// 실의 기억 n번째 조각을 봤다(0273 A, 1..=6).
+    pub fn memory(n: u8) -> String {
+        format!("memory.{n}")
     }
 }
 

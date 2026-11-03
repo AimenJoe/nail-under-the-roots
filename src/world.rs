@@ -432,6 +432,12 @@ pub struct Story {
     petals: Vec<Vec2>,
     /// 시든 꽃잎을 주웠다(기록 `key::PETAL`): 모모를 만나기 전에도 도감에 '???' 칸이 선다.
     petal_found: bool,
+    /// 실의 기억(0273 A): 이번 런에 주울 다음 조각(1..=6). 주우면 None — 한 런에 하나.
+    memory_next: Option<u8>,
+    /// 굴 바닥에 놓인 실의 기억 자리. 굴을 떠나면 치운다(`clear_pickups`) — 다음 굴에 다시 놓인다.
+    memory_at: Option<Vec2>,
+    /// 이번 런에 들어선 굴 수(실의 기억은 둘째 굴부터).
+    burrows: u32,
 }
 
 /// 기록(profile)이 새 런의 이야기에 주는 것(0170 R11). 앱이 기록에서 만들어 `Story::seed`에 넣는다. 월드는 기록을 모른다.
@@ -444,6 +450,8 @@ pub struct StorySeed {
     pub clover_fight: bool,
     pub clover_back: bool,
     pub warren_open: bool,
+    /// 실의 기억(0273 A): 이번 런에 놓을 다음 조각. 반쪽 엔딩을 본 기록의 첫 시작에서만.
+    pub memory_next: Option<u8>,
 }
 
 /// 보스를 이긴 결과: 이긴 수와 돌아왔나(모모만 세 번).
@@ -462,6 +470,9 @@ impl Story {
         self.clover_fight = s.clover_fight;
         self.clover_back = s.clover_back;
         self.warren_open = s.warren_open;
+        self.memory_next = s.memory_next;
+        self.memory_at = None;
+        self.burrows = 0;
     }
 
     /// 이번 런에 그 보스와 길 끝에서 싸우나.
@@ -530,20 +541,50 @@ impl Story {
     }
     pub fn clear_petals(&mut self) {
         self.petals.clear();
+        self.memory_at = None;
+    }
+
+    /// 이번 런에 주울 실의 기억(0273 A). 주웠으면 None.
+    #[cfg(test)]
+    pub fn memory_next(&self) -> Option<u8> {
+        self.memory_next
+    }
+    #[cfg(test)]
+    pub fn memory_at(&self) -> Option<Vec2> {
+        self.memory_at
+    }
+
+    /// 굴에 들어섰다(0273 A): 둘째 굴부터, 이번 런의 조각이 남았으면 그 굴의 놓을 자리를 돌려준다(놓기는 부르는 쪽이 `place_memory`로).
+    pub fn burrow_entered(&mut self) -> bool {
+        self.burrows += 1;
+        self.memory_next.is_some() && self.burrows >= MEMORY_FROM_BURROW
+    }
+    pub fn place_memory(&mut self, at: Vec2) {
+        self.memory_at = Some(at);
     }
 
     /// 바닥에 놓인 이야기 물건 전부(0258): 렌더는 이것 하나만 돌며 줍는 것 표시(`draw_pickup_mark`)를 붙인다 —
     /// 어둠·그늘 위에도 반짝임이 남는다. 새 이야기 물건은 `StoryItem`에 한 줄 + 여기에 한 줄.
     pub fn pickups(&self) -> impl Iterator<Item = (StoryItem, Vec2)> + '_ {
-        self.petals.iter().map(|p| (StoryItem::Petal, *p))
+        self.petals
+            .iter()
+            .map(|p| (StoryItem::Petal, *p))
+            .chain(self.memory_at.map(|p| (StoryItem::Memory, p)))
     }
 }
+
+/// 실의 기억은 런의 몇째 굴부터 놓이나(0273 A: 둘째 — 보스를 못 이겨도 이야기가 나아간다).
+pub const MEMORY_FROM_BURROW: u32 = 2;
+/// 실의 기억 조각 수(0273 A).
+pub const MEMORIES: u8 = 6;
 
 /// 바닥에 놓이는 이야기 물건(0258). 그림은 `render::fx::draw_story_pickup`이 고른다(`_` 없는 match라 새 줄을 빠뜨리면 컴파일이 안 된다).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum StoryItem {
     /// 모모가 남긴 시든 꽃잎(0164·0190).
     Petal,
+    /// 실의 기억(0273 A): 할매의 지난날 한 조각. 흰 실 한 타래.
+    Memory,
 }
 
 /// 런 통계(0169 R2): 저널 `stat.*`·튜토리얼 단계가 읽는 수. `app/run.rs`가 저장한다.
@@ -3175,6 +3216,30 @@ impl World {
             24.0,
         );
         self.adv.events.push(crate::adventure::AdvEvent::PetalFound);
+        true
+    }
+
+    /// 실의 기억(0273 A): 밟으면 줍는다 — 흰 실이 풀리는 반짝임. 그림·글은 앱이 컷씬으로(`AdvEvent::MemoryFound`), 기록도 앱이.
+    pub fn memory_tick(&mut self) -> bool {
+        if !self.player.is_alive() || !self.player.on_foot() {
+            return false;
+        }
+        let (Some(at), Some(n)) = (self.story.memory_at, self.story.memory_next) else {
+            return false;
+        };
+        if (self.player.pos - at).length() > 10.0 {
+            return false;
+        }
+        self.story.memory_at = None;
+        self.story.memory_next = None;
+        self.juice.fx.push(glint(
+            at + vec2(0.0, -4.0),
+            Color::new(0.95, 0.92, 1.0, 1.0),
+            0.7,
+        ));
+        self.adv
+            .events
+            .push(crate::adventure::AdvEvent::MemoryFound(n));
         true
     }
 

@@ -554,6 +554,33 @@ pub const LINES: &[Line] = &[
         ],
         once: true,
     },
+    // 실의 기억(0273 A): 여섯 조각을 다 본 뒤 마을의 할매가 한 번 — 참 엔딩 전·뒤 다르게.
+    Line {
+        id: "halmae_memory",
+        when: When::Village,
+        who: Speaker::Halmae,
+        text: |s| s.halmae_memory,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::MEMORY_LAST),
+            NotFlag(key::TRUE_ENDING),
+            Seen("halmae_arrive"),
+        ],
+        once: true,
+    },
+    Line {
+        id: "halmae_memory_true",
+        when: When::Village,
+        who: Speaker::Halmae,
+        text: |s| s.halmae_memory_true,
+        needs: &[
+            Flag(key::TUTORIAL),
+            Flag(key::MEMORY_LAST),
+            Flag(key::TRUE_ENDING),
+            Seen("halmae_arrive"),
+        ],
+        once: true,
+    },
     // 아직 할매를 말하지 않던 이웃 다섯: 반쪽 뒤 한 번, 참 뒤 한 번.
     Line {
         id: "kongi_t_halmae",

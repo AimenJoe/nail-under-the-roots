@@ -1260,6 +1260,12 @@ impl App {
                     Scenario::Normal => self.profile.flag(key::MOMO_BACK),
                     _ => true,
                 },
+                // 실의 기억(0273 A): 첫 시작에서만, 정체를 본 기록이 다음 조각을 하나.
+                memory_next: if normal {
+                    crate::memories::next(&self.profile)
+                } else {
+                    None
+                },
             });
             // 개발 시나리오는 길을 이미 짰으니(쉼터에서 시작) 갈래를 넣어 다시 짠다.
             if self.world.story.warren_open()

@@ -45,6 +45,60 @@ pub(super) fn draw_story_pickup(
     }
     match item {
         StoryItem::Petal => draw_left_petal(at, time),
+        StoryItem::Memory => draw_memory_thread(at, time),
+    }
+}
+
+/// 실의 기억(0273 A): 바닥에 놓인 흰 실 한 타래 — 끝이 옅은 보라, 숨 쉬듯 빛난다. 할매의 실이 본래 흰빛(0037)이라 흰색이 먼저.
+fn draw_memory_thread(at: Vec2, time: f32) {
+    let (x, y) = (at.x.round(), at.y.round());
+    let breathe = 0.5 + 0.5 * (time * 1.6).sin();
+    draw_circle(
+        x + 0.5,
+        y,
+        9.0,
+        Color::new(0.92, 0.88, 1.0, 0.12 + 0.10 * breathe),
+    );
+    let white = Color::new(0.96, 0.94, 0.98, 1.0);
+    let lilac = Color::new(0.70, 0.56, 0.86, 1.0);
+    let dark = Color::new(0.20, 0.14, 0.24, 1.0);
+    // 바닥 장식(버섯·풀)보다 크게(9×7) — 꽃잎처럼 "놓인 물건"으로 읽히게, 숨 쉬듯 한 점씩 떠오른다.
+    let bob = ((time * 1.4).sin() * 0.5).round();
+    let y = y + bob;
+    // 둥근 실뭉치: 어두운 테두리 위에 흰 공, 감긴 줄은 비스듬히 두 가닥.
+    for (dy, half) in [
+        (-3.0, 2.0),
+        (-2.0, 3.0),
+        (-1.0, 4.0),
+        (0.0, 4.0),
+        (1.0, 4.0),
+        (2.0, 3.0),
+        (3.0, 2.0),
+    ] {
+        draw_rectangle(x - half, y + dy, half * 2.0 + 1.0, 1.0, dark);
+    }
+    for (dy, half) in [(-2.0, 2.0), (-1.0, 3.0), (0.0, 3.0), (1.0, 3.0), (2.0, 2.0)] {
+        draw_rectangle(x - half, y + dy, half * 2.0 + 1.0, 1.0, white);
+    }
+    let line = Color::new(0.76, 0.70, 0.88, 1.0);
+    for (dx, dy) in [
+        (-2.0, 1.0),
+        (-1.0, 0.0),
+        (0.0, -1.0),
+        (1.0, -2.0),
+        (0.0, 2.0),
+        (1.0, 1.0),
+        (2.0, 0.0),
+        (3.0, -1.0),
+    ] {
+        draw_rectangle(x + dx, y + dy, 1.0, 1.0, line);
+    }
+    // 풀린 끝이 보라로 흘러나온다.
+    draw_rectangle(x + 4.0, y + 2.0, 1.0, 1.0, lilac);
+    draw_rectangle(x + 5.0, y + 3.0, 2.0, 1.0, lilac);
+    draw_rectangle(x + 7.0, y + 4.0, 2.0, 1.0, lilac);
+    if breathe > 0.85 {
+        draw_rectangle(x - 2.0, y - 2.0, 1.0, 1.0, WHITE);
     }
 }
 

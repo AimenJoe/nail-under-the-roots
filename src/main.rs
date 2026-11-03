@@ -40,6 +40,7 @@ mod lab;
 mod loading;
 mod loot;
 mod map;
+mod memories;
 mod moveset;
 mod music;
 mod player;

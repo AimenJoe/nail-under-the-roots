@@ -87,6 +87,8 @@ pub enum Scenario {
     Clover,
     /// 길의 샘 칸(0159): 쉼방의 샘 곁에서 시작(체력은 깎인 채).
     Spring,
+    /// 실의 기억(0273 A): 던전 시작방, 넷째 조각이 곁 바닥에 — 밟으면 장면.
+    Memory,
     /// 출구 확인(0159): 적 없는 한 방짜리 굴 — 들어서면 바로 출구가 열린다.
     Exit,
     /// 보스 2단계 확인(0233): 빈 방에 보스 하나, 체력 반 — 깨자마자 2단계로 깨어난다.
@@ -151,7 +153,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 54] = [
+pub const LIST: [Entry; 55] = [
     Entry {
         cat: Cat::Tools,
         name: "대화 검수",
@@ -205,6 +207,12 @@ pub const LIST: [Entry; 54] = [
         name: "마을로 올라오기",
         desc: "엔딩 뒤처럼 가장 깊은 곳(130m)에서 땅 위까지 올라와 뿌리 길 곁으로 튀어나온다(0204).",
         scenario: Scenario::Ascent,
+    },
+    Entry {
+        cat: Cat::Story,
+        name: "실의 기억",
+        desc: "던전 시작방 곁 바닥에 실의 기억 넷째 조각. 밟으면 그림 + 내레이션(0273 A).",
+        scenario: Scenario::Memory,
     },
     Entry {
         cat: Cat::Places,
@@ -508,6 +516,16 @@ pub fn build(s: Scenario) -> World {
             w
         }
         Scenario::Spring => spring(),
+        Scenario::Memory => {
+            let mut w = World::field();
+            w.enter_dungeon_now();
+            w.story.seed(crate::world::StorySeed {
+                memory_next: Some(4),
+                ..Default::default()
+            });
+            w.story.place_memory(w.player.pos + vec2(-30.0, 4.0));
+            w
+        }
         Scenario::Hall(_) => hall(),
         Scenario::Rooms(i) => rooms(i),
         Scenario::Exit => exit(),

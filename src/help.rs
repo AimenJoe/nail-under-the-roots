@@ -96,9 +96,11 @@ pub enum Pic {
     Journal,
     /// 실뜨기·실의 꿈: 실 고리가 돈다.
     Knot,
+    /// 실의 기억(0273 A): 흰 실 타래를 밟아 줍는다.
+    Memory,
 }
 
-pub const TOPICS: [Topic; 22] = [
+pub const TOPICS: [Topic; 23] = [
     Topic {
         id: "move",
         title: |s| s.h_move,
@@ -256,6 +258,14 @@ pub const TOPICS: [Topic; 22] = [
         body: |s| s.h_knot_d,
         pic: Pic::Knot,
         gate: Some(halmae),
+    },
+    // 실의 기억(0273 A): 첫 조각을 주운 뒤에 열린다(정체·장면은 말하지 않고 줍는 규칙만).
+    Topic {
+        id: "memory",
+        title: |s| s.h_memory,
+        body: |s| s.h_memory_d,
+        pic: Pic::Memory,
+        gate: Some(|p| p.flag(&key::memory(1))),
     },
 ];
 

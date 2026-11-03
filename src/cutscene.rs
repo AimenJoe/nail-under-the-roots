@@ -2458,6 +2458,17 @@ pub fn ending_doto(w: &World, done: bool) -> Cutscene {
     Cutscene::new(vec![nail_actor(w)], steps)
 }
 
+/// 실의 기억(0273 A): 주운 조각 하나 — 검게 → 그 조각의 그림 → 내레이션 → 굴로 돌아온다. 글·그림은 `memories` 표.
+pub fn memory(w: &World, n: u8) -> Cutscene {
+    let m = crate::memories::get(n);
+    let mut steps = vec![Step::Hush(true)];
+    steps.extend(cut_to(Some(m.illust)));
+    steps.push(Step::Narrate(m.text));
+    steps.extend(cut_to(None));
+    steps.push(Step::Hush(false));
+    Cutscene::new(vec![nail_actor(w)], steps)
+}
+
 /// 개발: 놓아준 뒤(0270)의 장면을 이어서 — 다시 내려간 깊은 곳의 첫 세 줄, 되풀이 엔딩 둘(짧은 판), 약속이 이뤄진 뒤의
 /// 모모·도토 끝줄. 싸움을 끝까지 하지 않고 글·그림을 본다(`story_preview`가 기록에 반쪽·참 엔딩이 있으면 이것을 튼다).
 /// 배우 0은 이번 캐릭터라 모모·도토 끝줄의 초상화는 그 캐릭터로 걸어야 맞다.

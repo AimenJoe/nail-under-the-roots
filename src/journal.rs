@@ -299,6 +299,17 @@ pub const GOALS: &[Goal] = &[
         Some("doto_deep"),
         Weapon(crate::equipment::CHESTNUT)
     ),
+    // 실의 기억(0273 A): 여섯 조각을 다 봄. 보상은 C의 이야기 조각으로 바꿀 자리 — 지금은 같은 단계 이야기 목표의 씨앗.
+    goal!(
+        "memory",
+        Story,
+        jg_memory,
+        jg_memory_d,
+        Flag(key::MEMORY_LAST),
+        1,
+        Some("deepest"),
+        Seeds(20)
+    ),
     goal!(
         "true_end",
         Story,

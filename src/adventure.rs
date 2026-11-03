@@ -131,6 +131,8 @@ pub enum AdvEvent {
     DeepSleep,
     /// 모모가 남긴 시든 꽃잎을 주웠다(0164): 기록에 남기고 도감 '???' 칸.
     PetalFound,
+    /// 실의 기억 한 조각을 주웠다(0273 A, 1..=6): 앱이 기록에 남기고 그 조각의 장면을 튼다.
+    MemoryFound(u8),
     /// 굴에서 문이 열린 채 다른 방으로 넘어섰다(0265): 앱이 기록·이어하기를 적는다 — 지난 방에서 주운 것까지.
     RoomEntered,
     /// 싸움방을 비웠다(문이 열렸다, 0265): 앱이 기록·이어하기를 적는다(통계·처음 본 이웃·싸움 뒤 체력).
@@ -704,6 +706,9 @@ impl World {
         if self.petal_tick() {
             self.juice.audio.play(sfx::Id::Glowbug);
         }
+        if self.memory_tick() {
+            self.juice.audio.play(sfx::Id::Glowbug);
+        }
         if self.adv.place == Place::Field {
             if let Some(id) = self.field_boss() {
                 self.juice.audio.play(id);
@@ -1028,7 +1033,36 @@ impl World {
         self.adv.boss_cleared = false;
         self.adv.last_cell = None;
         self.biome = biome;
+        self.place_memory_in_burrow();
         self.snap_cam();
+    }
+
+    /// 실의 기억(0273 A): 이번 런의 둘째 굴부터, 조각이 남았으면 조용한 방(쉼·보물 → 곁방 보상이 있는 싸움방 → 싸움방) 하나의
+    /// 가운데에 놓는다. 고르는 것은 굴 시드로 — 같은 시드 = 같은 자리. 꿈에서는 놓지 않는다.
+    fn place_memory_in_burrow(&mut self) {
+        if self.dream || !self.story.burrow_entered() {
+            return;
+        }
+        let Some(d) = self.adv.dungeon.as_ref() else {
+            return;
+        };
+        use dungeon::RoomKind;
+        let pick = |want: &dyn Fn(&dungeon::DRoom) -> bool| -> Vec<(i32, i32)> {
+            d.rooms
+                .iter()
+                .filter(|r| r.at != d.start && r.kind != RoomKind::Boss && want(r))
+                .map(|r| r.at)
+                .collect()
+        };
+        let quiet = pick(&|r| matches!(r.kind, RoomKind::Rest | RoomKind::Treasure));
+        let side = pick(&|r| r.kind == RoomKind::Combat && r.bounty.is_some());
+        let any = pick(&|r| r.kind == RoomKind::Combat);
+        let Some(list) = [quiet, side, any].into_iter().find(|l| !l.is_empty()) else {
+            return;
+        };
+        let at = list[((self.adv.seed >> 11) % list.len() as u64) as usize];
+        self.story
+            .place_memory(dungeon::room_rect(at).center() + vec2(0.0, 6.0));
     }
 
     /// 맡겨 둔 필드·쉼터로 돌아온다.
@@ -2403,6 +2437,48 @@ mod tests {
         w.use_exit();
         assert_eq!(w.adv.events, vec![AdvEvent::Deepest]);
         assert!(w.adv.fade.is_none(), "쉼터로 가지 않는다");
+    }
+
+    /// 실의 기억(0273 A): 런의 둘째 굴부터 한 자리에 놓이고(같은 시드 = 같은 자리), 밟으면 이벤트 하나 — 이번 런엔 더 없다.
+    /// 꿈에서는 놓지 않는다.
+    #[test]
+    fn memory_lies_in_the_second_burrow_and_is_picked_once() {
+        let run = |dream: bool| {
+            let mut w = World::camp_start_seeded(7);
+            w.dream = dream;
+            w.story.seed(crate::world::StorySeed {
+                memory_next: Some(3),
+                ..Default::default()
+            });
+            w.enter_dungeon_now();
+            assert!(w.story.memory_at().is_none(), "첫 굴엔 없다");
+            w.enter_dungeon_now();
+            w
+        };
+        assert!(run(true).story.memory_at().is_none(), "꿈에는 없다");
+        let mut w = run(false);
+        let at = w.story.memory_at().expect("둘째 굴에 놓인다");
+        assert_eq!(
+            run(false).story.memory_at(),
+            Some(at),
+            "같은 시드 = 같은 자리"
+        );
+        let d = w.adv.dungeon.as_ref().unwrap();
+        assert!(
+            d.rooms
+                .iter()
+                .any(|r| r.at != d.start && dungeon::room_rect(r.at).contains(at)),
+            "시작 방이 아닌 방 안"
+        );
+        w.adv.events.clear();
+        w.player.pos = at + vec2(40.0, 0.0);
+        assert!(!w.memory_tick(), "멀리서는 안 줍는다");
+        w.player.pos = at;
+        assert!(w.memory_tick());
+        assert_eq!(w.adv.events, vec![AdvEvent::MemoryFound(3)]);
+        assert!(w.story.memory_next().is_none() && w.story.memory_at().is_none());
+        w.enter_dungeon_now();
+        assert!(w.story.memory_at().is_none(), "한 런에 하나");
     }
 
     /// 같은 시드면 같은 첫 길(이어하기·버그 재현이 기대는 성질).
