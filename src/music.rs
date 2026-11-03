@@ -43,6 +43,11 @@ pub enum Track {
     AmbMeadow,
     AmbCave,
     AmbDeep,
+    /// 옆 굴(0275 R40, 사장이 고름): 쉼터 하프 독주 · 굴 종소리 아르페지오 · 주인 싸움(두 단계 모두) · 땅속 물길 환경음.
+    SideCamp,
+    SidePath,
+    SideKeeper,
+    AmbStream,
 }
 
 impl Track {
@@ -70,7 +75,16 @@ impl Track {
             Track::AmbMeadow => "amb_meadow",
             Track::AmbCave => "amb_cave",
             Track::AmbDeep => "amb_deep",
+            Track::SideCamp => "side_camp",
+            Track::SidePath => "side_path",
+            Track::SideKeeper => "side_keeper",
+            Track::AmbStream => "amb_stream",
         }
+    }
+
+    /// 옆 굴의 곡(이 곡이 들리는 동안은 보스 곡 대신 옆 굴 주인 곡을 미리 쥔다).
+    fn is_side(self) -> bool {
+        matches!(self, Track::SideCamp | Track::SidePath | Track::SideKeeper)
     }
 
     /// 타이틀 쪽 곡(이때는 보스 곡을 미리 읽지 않는다).
@@ -125,7 +139,10 @@ pub fn choose(l: &Listen) -> Choice {
             ducked: false,
         };
     }
+    // 옆 굴(0275): 쉼터·굴·주인 싸움 모두 제 곡, 밑에는 땅속 물길.
+    let side = crate::route::leg(l.stage) == crate::route::Leg::Side;
     let ambience = match l.place {
+        Place::Camp | Place::Dungeon if side => Some(Track::AmbStream),
         Place::Village | Place::Field => Some(Track::AmbMeadow),
         Place::Camp => Some(Track::AmbCave),
         Place::Deep => Some(Track::AmbDeep),
@@ -146,6 +163,9 @@ pub fn choose(l: &Listen) -> Choice {
     }
     let music = if l.deep_fight {
         Track::Final
+    } else if l.boss && side && l.place == Place::Dungeon {
+        // 옆 굴 주인은 한 곡으로 끝까지(사장이 고른 곡 하나, 2단계에서 넘기지 않는다).
+        Track::SideKeeper
     } else if l.boss {
         if l.roused {
             Track::BossRise
@@ -154,6 +174,8 @@ pub fn choose(l: &Listen) -> Choice {
         }
     } else {
         match l.place {
+            Place::Camp if side => Track::SideCamp,
+            Place::Dungeon if side => Track::SidePath,
             Place::Village => pick(Track::VillageSprings, Track::Village),
             Place::Camp if crate::route::leg(l.stage).ends_deep() => Track::Camp,
             Place::Camp => Track::CampCalm,
@@ -177,7 +199,7 @@ pub fn choose(l: &Listen) -> Choice {
 
 /// 모든 곡(시험·패키징이 파일 목록을 만들 때). `file`의 match와 같은 수인지 시험이 본다.
 #[cfg(test)]
-const ALL: [Track; 20] = [
+const ALL: [Track; 24] = [
     Track::Title,
     Track::Village,
     Track::Field,
@@ -198,12 +220,18 @@ const ALL: [Track; 20] = [
     Track::AmbMeadow,
     Track::AmbCave,
     Track::AmbDeep,
+    Track::SideCamp,
+    Track::SidePath,
+    Track::SideKeeper,
+    Track::AmbStream,
 ];
 
 /// 다 내려간 뒤에도 놓지 않는 곡. 보스 곡은 싸움 한가운데서 갑자기 필요하다: 그때 풀면(네이티브는 그 자리에서
 /// 통째로 푼다) 화면이 멈춘다 → 처음 게임 장면에 들어설 때(화면이 검을 때) 미리 읽고 쥐고 있는다.
 /// 2단계 곡도 싸움 한가운데서 넘어가니 같이 쥔다(0233·0234).
 const KEEP: &[Track] = &[Track::Boss, Track::BossRise];
+/// 옆 굴에서는 그 주인 곡만 쥔다(보스 곡 셋을 다 쥐면 네이티브에서 곡당 수십 MB, 0275).
+const SIDE_KEEP: &[Track] = &[Track::SideKeeper];
 
 /// 교차 시간(초): 새 곡이 올라오고 옛 곡이 내려가는 데 걸리는 시간.
 const FADE: f32 = 1.0;
@@ -303,10 +331,16 @@ impl Music {
 
     /// 프레임마다: 들려야 할 곡(`None` = 조용히), 낮출지.
     pub fn update(&mut self, want: Option<Track>, ducked: bool, dt: f32) {
+        // 쥐고 있을 곡: 음악 층은 옆 굴이면 옆 굴 주인 곡, 아니면 보스 곡(환경음 층은 없음).
+        let keep: &[Track] = if !self.keep.is_empty() && want.is_some_and(Track::is_side) {
+            SIDE_KEEP
+        } else {
+            self.keep
+        };
         if let Some(t) = want {
             self.request(t);
             if !t.is_title() {
-                for k in self.keep {
+                for k in keep {
                     self.request(*k);
                 }
             }
@@ -381,7 +415,7 @@ impl Music {
             !matches!(s, Slot::Ready(_))
                 || Some(*t) == now
                 || fading.contains(t)
-                || self.keep.contains(t)
+                || keep.contains(t)
         });
     }
 }
@@ -508,6 +542,48 @@ mod tests {
     }
 
     /// 표의 곡마다 두 파일(웹 mp3·네이티브 ogg)이 있다 — 없으면 웹 콘솔에 404, 네이티브는 조용히 빈다.
+    #[test]
+    /// 옆 굴(0275 R40): 쉼터·굴·주인 싸움이 제 곡, 주인 곡은 2단계에서도 그대로, 밑에는 땅속 물길.
+    /// 셋째 길은 그대로(마지막 쉼터 곡·보스 두 단계).
+    fn side_path_has_its_own_sounds() {
+        use crate::adventure::Place;
+        use crate::biome::Biome;
+        let side = |place| Listen {
+            stage: crate::tuning::SIDE_STAGE,
+            ..game(place, Biome::Deep)
+        };
+        let c = choose(&side(Place::Camp));
+        assert_eq!(
+            (c.music, c.ambience),
+            (Some(Track::SideCamp), Some(Track::AmbStream))
+        );
+        let c = choose(&side(Place::Dungeon));
+        assert_eq!(
+            (c.music, c.ambience),
+            (Some(Track::SidePath), Some(Track::AmbStream))
+        );
+        for roused in [false, true] {
+            let l = Listen {
+                boss: true,
+                roused,
+                ..side(Place::Dungeon)
+            };
+            assert_eq!(choose(&l).music, Some(Track::SideKeeper));
+        }
+        let last = Listen {
+            stage: crate::tuning::FINAL_STAGE,
+            ..game(Place::Camp, Biome::Deep)
+        };
+        assert_eq!(choose(&last).music, Some(Track::Camp));
+        let rise = Listen {
+            stage: crate::tuning::FINAL_STAGE,
+            boss: true,
+            roused: true,
+            ..game(Place::Dungeon, Biome::Deep)
+        };
+        assert_eq!(choose(&rise).music, Some(Track::BossRise));
+    }
+
     #[test]
     fn every_track_has_both_files() {
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/music");

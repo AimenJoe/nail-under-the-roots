@@ -3,7 +3,7 @@
 실행(단계마다 따로, 자기 표의 파일만 다시 쓴다):
   python3 tools/audio/make_audio.py kenney <Kenney 폴더>
   python3 tools/audio/make_audio.py music <rpgchip 폴더> <어쿠스틱 폴더>
-  python3 tools/audio/make_audio.py oga <OpenGameArt 폴더>
+  python3 tools/audio/make_audio.py oga <OpenGameArt 폴더> [이름 …]   (이름을 주면 그 줄만 — 새 줄을 더할 때 옛 원본을 다시 받지 않는다)
   - Kenney(CC0): https://kenney.nl/assets/interface-sounds · impact-sounds · rpg-audio 의 zip을 한 폴더에 푼다.
   - rpgchip(CC0, Aureolus_Omicron): https://opengameart.org/content/15-melodic-rpg-chiptunes 의 zip을 푼다.
   - 어쿠스틱(CC0, OpenGameArt, 0154): 아래 `ACOUSTIC` 표의 페이지에서 받아 표의 파일 이름으로 한 폴더에 둔다.
@@ -87,6 +87,10 @@ OGA_MUSIC = [
     ("boss_rise", "jrpg-pack-5-action", "x/Action1 - Encounter With The Witches.ogg"),
     ("final", "fantasy-lament-for-a-warriors-soul", "Lament_for_a_Warriors_Soul_REUPLOAD.mp3"),
     ("ending", "goodbye-to-friends", "TS3.mp3"),
+    # 옆 굴(0275 R40, 사장이 듣기 페이지에서 고름 2026-11-03): 쉼터 하프 독주·굴 종소리 아르페지오·주인 싸움 관현악.
+    ("side_camp", "meadow-thoughts", "Meadow%20Thoughts.ogg"),
+    ("side_path", "crystal-cave-song18", "song18_0.mp3"),
+    ("side_keeper", "boss-battle-music", "Juhani%20Junkala%20-%20Epic%20Boss%20Battle%20%5BSeamlessly%20Looping%5D.wav"),
 ]
 # 환경음(음악 밑에 깔린다, 모노): (게임 이름, slug, 파일, 모양). "loop" = 그대로 고리,
 # "scatter" = 3초 새소리 조각을 AMB_BED초 바탕 위 `SCATTER` 자리에 흩어 둔다(3초마다 같은 소리가 되풀이되지 않게).
@@ -94,6 +98,8 @@ OGA_AMB = [
     ("amb_meadow", "bird-chirping-sounds", "birdchirping071414.wav", "scatter"),
     ("amb_cave", "dripping-water-loop", "atmosbasement.mp3_.flac", "loop"),
     ("amb_deep", "rumble-fx", "rumble.wav", "loop"),
+    # 옆 굴의 땅속 물길(0275 R40): 낮은 바람 + 물방울 고리.
+    ("amb_stream", "loopable-dungeon-ambience", "dungeon_ambient_1_0.ogg", "loop"),
 ]
 AMB_BED = 24.0
 SCATTER = [(0.8, 1.0), (5.6, 0.55), (9.1, 0.85), (14.3, 0.5), (18.4, 0.75)]  # (초, 크기)
@@ -230,12 +236,18 @@ def oga_path(oga, slug, f):
     return path
 
 
-def make_oga(oga):
+def make_oga(oga, only=()):
+    """`only`(게임 이름들)를 주면 그 줄만 다시 만든다. 비우면 OGA_* 표 전부."""
+    pick = lambda name: not only or name in only
     for name, slug, files, max_s in OGA_SFX:
-        write_sfx(name, [oga_path(oga, slug, f) for f in files], max_s)
+        if pick(name):
+            write_sfx(name, [oga_path(oga, slug, f) for f in files], max_s)
     for name, slug, f in OGA_MUSIC:
-        encode_music(name, acoustic_level(decode(oga_path(oga, slug, f), 2)), f)
+        if pick(name):
+            encode_music(name, acoustic_level(decode(oga_path(oga, slug, f), 2)), f)
     for name, slug, f, shape in OGA_AMB:
+        if not pick(name):
+            continue
         a = decode(oga_path(oga, slug, f))
         # 크기는 원본 조각으로 잰다(흩어 둔 바탕은 대부분 조용해 평균이 낮다). 물방울처럼 드문 봉우리는 누르지 않고
         # 봉우리에서 멈춘다(리미터로 누르면 똑 소리가 뭉개진다).
@@ -258,7 +270,7 @@ if __name__ == "__main__":
         make_sfx(*args)
     elif step == "music" and len(args) == 2:
         make_music(*args)
-    elif step == "oga" and len(args) == 1:
-        make_oga(*args)
+    elif step == "oga" and len(args) >= 1:
+        make_oga(args[0], set(args[1:]))
     else:
         sys.exit(__doc__)
