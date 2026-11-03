@@ -108,13 +108,23 @@ impl PauseItem {
     }
 }
 
-/// 메뉴 탭의 줄: 이름 + 항목. 개발판의 "Lab"은 설정 아래, 타이틀로 위(0269 → 사장 2026-11-03).
+/// 메뉴 탭의 줄: 이름 + 항목. 개발판의 "연구실"(손맛 실험실, 한국어가 아니면 "Lab")은 설정 아래, 타이틀로 위
+/// (0269 → 사장 2026-11-03: 위치, "한글로 했는데 lab은 눈에 밟히네, 연구실로 하자"). 개발 전용이라 표 밖 글(0013).
 pub(super) const PAUSE_MENU: &[(Tr, PauseItem)] = &[
     (|s| s.pm_resume, PauseItem::Resume),
     (|s| s.pm_restart, PauseItem::Restart),
     (|s| s.pm_settings, PauseItem::Settings),
     #[cfg(feature = "dev")]
-    (|_| "Lab", PauseItem::Lab),
+    (
+        |_| {
+            if crate::i18n::lang() == crate::i18n::Lang::Ko {
+                "연구실"
+            } else {
+                "Lab"
+            }
+        },
+        PauseItem::Lab,
+    ),
     (|s| s.pm_title, PauseItem::Title),
 ];
 /// 가방 칸의 발톱 아이콘: 크림/무기 색 발톱 세 개.
