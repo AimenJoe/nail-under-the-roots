@@ -788,8 +788,9 @@ fn thorn_patches(
     }
 }
 
-/// 물줄기(0275): 옆으로 흐르는 칸 `STREAM_RUN_MIN`~`MAX`개, 반쯤은 한 줄을 더 붙여 두 칸 너비. 1~2개.
-/// 자리 규칙은 덤불과 같다(문 앞 십자 길·적 자리·소품·`KEEP` 밖) — 그래서 방 위아래 가장자리를 따라 흐르곤 한다.
+/// 물줄기(0275): 방을 옆으로 가로질러 길게(`STREAM_RUN_MIN`~`MAX`칸) 흐른다. 위 띠(2~4줄)나 아래 띠(9~10줄)를 따라
+/// 가다 가끔 한 줄 꺾이고, 대개 두 칸 너비. 1~2개(띠마다 하나). 옆문 앞 가로 길(5~8줄)은 비우고, 위아래 문 앞
+/// 세로 길은 가로질러도 된다(걸어서 건너며 떠밀린다). 적 자리·`KEEP`은 피하지 않는다 — 물에 선 적은 떠밀릴 뿐.
 fn stream_runs(
     grid: &Grid,
     props: &[Prop],
@@ -798,58 +799,73 @@ fn stream_runs(
     seed: u64,
     out: &mut Vec<(Vec2, Vec2)>,
 ) {
+    let _ = avoid;
     let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
     let mut rng = Rng::new(seed | 1);
-    // 덤불과 달리 벽 곁 칸(x 1·18)까지 — 물줄기가 벽 틈에서 솟거나 벽 밑으로 드는 일이 잦게(0275).
+    // 넓은 방의 가로 이음새 줄(위 3~4·아래 9~10)도 비운다(옆 방과 이어지는 길).
+    let lane_row = |y: i32| {
+        (5..=8).contains(&y)
+            || match room.hall {
+                Some(0) => (3..=4).contains(&y),
+                Some(2) => (9..=10).contains(&y),
+                _ => false,
+            }
+    };
     let ok = |x: i32, y: i32, out: &Vec<(Vec2, Vec2)>| {
-        if !(1..=18).contains(&x) || !(3..=10).contains(&y) {
+        if !(1..=18).contains(&x) || !(2..=10).contains(&y) || lane_row(y) {
             return false;
         }
-        let (x, y) = (x as usize, y as usize);
-        let c = cell_center(ox + x, oy + y);
-        // `KEEP`(적·문 자리를 바닥으로 지키는 칸)은 물이어도 된다 — 바닥이고 걸을 수 있다.
-        !passage_lane(x, y, room.hall)
-            && grid.get(ox + x, oy + y) == Cell::Floor
+        let c = cell_center(ox + x as usize, oy + y as usize);
+        grid.get(ox + x as usize, oy + y as usize) == Cell::Floor
             && !props.iter().any(|p| p.rect.contains(c))
             && !out.iter().any(|(o, _)| *o == c)
     };
-    // 적 자리는 피하지 않는다(물에 선 적은 떠밀릴 뿐) — 피하면 물줄기가 웅덩이처럼 짧게 끊겼다.
-    let _ = avoid;
-    for _ in 0..1 + rng.below(2) {
-        // 한쪽 끝은 늘 벽(0275): 방 위·아래 가장자리 줄에서 왼쪽이나 오른쪽 벽 곁부터 안쪽으로 늘린다 —
-        // 벽 틈에서 솟아 바닥 구멍으로 빠지거나, 바닥에서 솟아 벽 밑으로 든다. 문 앞 길에 닿으면 멈춘다.
-        let y0 = [3, 4, 9, 10][rng.below(4) as usize];
-        let left = rng.chance(0.5);
-        let step = if left { 1 } else { -1 };
-        let mut x = if left { 1 } else { 18 };
-        while (1..=18).contains(&x) && !ok(x, y0, out) && (x - if left { 1 } else { 18 }).abs() < 3
-        {
-            x += step;
+    let mut bands: Vec<&[i32]> = vec![&[2, 3, 4], &[9, 10]];
+    if rng.chance(0.5) {
+        bands.reverse();
+    }
+    let n = 1 + rng.below(2) as usize;
+    for band in bands.into_iter().take(n) {
+        let (lo, hi) = (band[0], band[band.len() - 1]);
+        let wide = rng.chance(0.7);
+        let flow = vec2(if rng.chance(0.5) { 1.0 } else { -1.0 }, 0.0);
+        // 띠 안에서 시작 줄을 고르고, 왼쪽부터 오른쪽으로 걸으며 줄을 가끔 바꾼다.
+        let top = if wide { hi - 1 } else { hi };
+        let mut row = lo + rng.below((top - lo + 1) as u64) as i32;
+        let mut x = 1;
+        while x <= 18 && !ok(x, row, out) {
+            x += 1;
         }
-        let mut run = Vec::new();
-        while run.len() < t::STREAM_RUN_MAX && ok(x, y0, out) {
-            run.push(x);
-            x += step;
+        let mut cells: Vec<(i32, i32)> = Vec::new();
+        let mut cols = 0;
+        while x <= 18 && cols < t::STREAM_RUN_MAX && ok(x, row, out) {
+            cells.push((x, row));
+            if wide && ok(x, row + 1, out) {
+                cells.push((x, row + 1));
+            }
+            cols += 1;
+            // 꺾임: 띠 안에서 한 줄 위·아래로(다음 칸이 그 줄에서 이어질 수 있을 때만).
+            if rng.chance(0.18) {
+                let nr = row + if rng.chance(0.5) { 1 } else { -1 };
+                if (lo..=top).contains(&nr) && ok(x + 1, nr, out) {
+                    let fill = if nr < row {
+                        (x, nr)
+                    } else {
+                        (x, nr + i32::from(wide))
+                    };
+                    if !cells.contains(&fill) && ok(fill.0, fill.1, out) {
+                        cells.push(fill);
+                    }
+                    row = nr;
+                }
+            }
+            x += 1;
         }
-        if run.len() < t::STREAM_RUN_MIN {
+        if cols < t::STREAM_RUN_MIN {
             continue;
         }
-        // 흐르는 쪽: 벽에서 나오거나(안쪽으로) 벽으로 든다(바깥쪽으로).
-        let out_of_wall = rng.chance(0.5);
-        let dir = if out_of_wall == left { 1 } else { -1 };
-        let flow = vec2(dir as f32, 0.0);
-        let side = if y0 == 3 || y0 == 9 { 1 } else { -1 };
-        let wide = rng.chance(0.7) && run.iter().all(|&x| ok(x, y0 + side, out));
-        for &x in &run {
-            out.push((cell_center(ox + x as usize, oy + y0 as usize), flow));
-        }
-        if wide {
-            for &x in &run {
-                out.push((
-                    cell_center(ox + x as usize, oy + (y0 + side) as usize),
-                    flow,
-                ));
-            }
+        for (x, y) in cells {
+            out.push((cell_center(ox + x as usize, oy + y as usize), flow));
         }
     }
 }
@@ -1383,26 +1399,20 @@ mod tests {
             any |= !room.streams.is_empty();
             assert!(room.thorns.is_empty() && room.webs.is_empty());
             for (c, d) in &room.streams {
-                let (x, y) = (
-                    ((c.x / 16.0) as i32).rem_euclid(ROOM_W as i32),
-                    ((c.y / 16.0) as i32).rem_euclid(ROOM_H as i32),
-                );
-                assert!(
-                    !(8..=11).contains(&x) && !(5..=8).contains(&y),
-                    "seed {seed}: 길 위"
-                );
+                let y = ((c.y / 16.0) as i32).rem_euclid(ROOM_H as i32);
+                assert!(!(5..=8).contains(&y), "seed {seed}: 옆문 앞 가로 길 위");
                 assert!(
                     !room.props.iter().any(|p| p.rect.contains(*c)),
                     "seed {seed}: 소품 위"
                 );
                 assert_eq!(d.y, 0.0, "옆으로만 흐른다");
                 assert_eq!(d.x.abs(), 1.0);
-                // 흐르는 쪽 앞이나 뒤로 같은 물줄기가 이어진다(외톨이 칸 없음).
-                let next = |p: Vec2| room.streams.iter().any(|(q, e)| *q == p && e == d);
-                assert!(
-                    next(*c + *d * 16.0) || next(*c - *d * 16.0),
-                    "seed {seed}: 외톨이 물살"
-                );
+                // 옆(꺾인 곳은 대각선 포함) 한 칸에 같은 물줄기가 이어진다(외톨이 칸 없음).
+                let near = room
+                    .streams
+                    .iter()
+                    .any(|(q, e)| e == d && (q.x - c.x).abs() == 16.0 && (q.y - c.y).abs() <= 16.0);
+                assert!(near, "seed {seed}: 외톨이 물살");
             }
             let (_, deep) = generate(
                 seed,

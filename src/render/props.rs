@@ -85,6 +85,11 @@ pub(super) fn floor_decor(w: &World, cam: Vec2) -> Vec<(f32, f32, Decor)> {
                     continue;
                 }
             }
+            // 물살 칸(0275)엔 장식이 없다(굽기도 같다).
+            let mid = vec2(cx as f32 * 16.0 + 8.0, cy as f32 * 16.0 + 8.0);
+            if w.room.streams.iter().any(|(c, _)| c.distance_squared(mid) < 1.0) {
+                continue;
+            }
             // 구운 지도와 같은 자리(무리 밀도·어긋남, terrain.rs).
             if let Some((d, ox, oy)) = crate::terrain::decor_at(w.biome, cx, cy) {
                 out.push((cx as f32 * 16.0 + ox, cy as f32 * 16.0 + oy, d));

@@ -537,7 +537,7 @@ pub(super) fn draw_web(c: Vec2, time: f32, near: f32) {
     draw_circle(x, y, 1.5, silk);
 }
 
-/// 물이 들고 나는 곳(0275): 물줄기 끝 너머가 벽이면 벽 틈에서 솟는 물(물보라 줄), 바닥이면 바닥 구멍으로 빠진다.
+/// 물이 들고 나는 곳(0275): 물줄기 끝 너머가 벽이면 벽 틈에서 솟는 물(물보라 줄), 바닥이면 그냥 둥글게 닫힌다.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum StreamEnd {
     /// 물줄기가 이어진다(끝이 아니다).
@@ -619,30 +619,8 @@ pub(super) fn draw_stream(
                     );
                 }
             }
-            // 바닥 구멍으로 빠지는 물: 어두운 구멍 + 안으로 도는 물결 점.
-            StreamEnd::Floor => {
-                let (hx, hy) = (ex - side * 2.0, y0 + 9.0);
-                draw_ellipse(hx, hy, 5.0, 4.0, 0.0, Color::new(0.03, 0.05, 0.08, 0.95));
-                draw_ellipse_lines(
-                    hx,
-                    hy,
-                    5.5,
-                    4.5,
-                    0.0,
-                    1.0,
-                    Color::new(0.09, 0.14, 0.18, 1.0),
-                );
-                for k in 0..3 {
-                    let a = time * 3.0 + k as f32 * 2.1;
-                    draw_rectangle(
-                        (hx + a.cos() * 3.5).round(),
-                        (hy + a.sin() * 2.6).round(),
-                        1.0,
-                        1.0,
-                        Color::new(0.6, 0.8, 0.86, 0.8),
-                    );
-                }
-            }
+            // 바닥에서 끝나는 물: 따로 그리지 않는다(물가가 둥글게 닫힌다). 예전의 검은 구멍은 뺐다.
+            StreamEnd::Floor => {}
         }
     }
 }
