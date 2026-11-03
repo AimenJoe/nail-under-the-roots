@@ -188,8 +188,10 @@ Scene: Deep inside the rabbits' old warren, a round earthen chamber whose walls 
 
 ### 실의 기억 다섯(0273 A) — 16:9 (640×360) · 할매의 지난날. 원본이 오기 전엔 있는 그림을 쓴다(`src/memories.rs` 표의 `illust`)
 다섯 다 아주 오래전 일이라 `doto_memory`처럼 **바랜 기억**으로 그린다. 첨부: `sheet_halmae.png`(넷째 장면은 + `sheet_doto.png`를 그림체 참고로만). 공통 스타일·세계 규칙·누룩 할매 글을 앞에 붙이고, 세계 규칙 뒤에 이 문장을 붙인다:
-`This is a memory from long, long ago, before the great tree existed: the whole image is faded toward warm sepia and lavender, and the edges darken softly like an old photograph. Halmae here is younger and smaller than in the character sheet (a soft white mycelium mound about the size of a fox, with only three or four small mushroom caps), but her face is the same: closed eyes, rosy cheeks and a small smile. Her threads are pure white unless the scene says otherwise. Keep Halmae and all important things above the bottom quarter of the image; the bottom quarter is plain dark soil, because a text box covers it.`
-받으면 `tools/art/sources/ai/illust/<이름>.png` → `strip_logo.py` → `ai_illust.py`의 `AI_SCENES`에 한 줄 + `Illust`에 한 칸, `memories.rs`의 `illust`를 바꾼다(앨범은 표를 따라간다).
+`This is a memory from long, long ago, before the great tree existed: the whole image is faded toward warm sepia and lavender, and the edges darken softly like an old photograph. Halmae here is younger and smaller than in the character sheet (a soft white mycelium mound about the size of a fox, with only three or four small mushroom caps), but her face is the same: closed eyes, rosy cheeks and a small smile. Her threads are pure white unless the scene says otherwise. Keep Halmae and all important things in the upper half of the image; the bottom 40% is plain dark soil, because the narration text covers it.`
+받으면 `tools/art/sources/ai/illust/<이름>.png` → `strip_logo.py` → `ai_illust.py`의 `SIZE`·`illust.py`의 `AI_SCENES`에 한 줄 + `Illust`에 한 칸(`LOADED`에만 — `ALL`은 앨범의 일러스트 칸이라 넣지 않는다), `memories.rs`의 `illust`를 바꾼다. 할매가 작아 얼굴이 묻히면 `ai_illust.FOCUS`에 자리를 적는다.
+- 세계 규칙에서 "묶인 동물의 눈 색" 줄과 할매 글의 "흰 실에 보라가 섞였다"는 빼고 붙인다(동물이 없고, 기억 속 실은 흰색).
+- 받은 기록: `mem_forest` 2026-11-03 첫 판 채택(숲이 크게 나왔지만 첫 조각에 맞다). 할매가 그림 높이 약 60%에 앉아 내레이션 띠에 몸 아래가 조금 걸린다 → 다음 장부터 "위쪽 절반"으로 적는다.
 
 #### `mem_forest` — 조각 1 "다른 숲"
 ```

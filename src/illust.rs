@@ -37,6 +37,9 @@ pub enum Illust {
     KongiDoor,
     /// 굴토끼네 옛 굴 가장 안쪽: 실에 감긴 토끼풀이 아기들의 고치를 품고 잠들어 있다(0165).
     CloverCocoon,
+    /// 실의 기억 1(0273 A): 아주 오래전 다른 숲, 어린 할매가 뿌리마다 흰 실로 손을 잡고 있다(세피아).
+    /// 실의 기억 그림은 앨범의 일러스트 칸이 아니라 기억 칸에 나온다 — `ALL`이 아니라 `LOADED`에만.
+    MemForest,
 }
 
 /// 그림 위에 떠다니는 것.
@@ -79,8 +82,26 @@ impl Illust {
         Illust::CloverCocoon,
     ];
 
+    /// 불러오는 그림 전부(앨범 일러스트 칸 `ALL` + 실의 기억 그림). 텍스처는 이 순서로 둔다.
+    pub const LOADED: [Illust; 13] = [
+        Illust::GreatTree,
+        Illust::MotherBurrow,
+        Illust::BoriFreed,
+        Illust::MomoBloom,
+        Illust::HalmaeDeep,
+        Illust::LastBloom,
+        Illust::Sprout,
+        Illust::Molehill,
+        Illust::DotoMemory,
+        Illust::MomoDeep,
+        Illust::KongiDoor,
+        Illust::CloverCocoon,
+        Illust::MemForest,
+    ];
+
+    /// 텍스처 칸 번호(`LOADED` 순서).
     pub fn index(self) -> usize {
-        Self::ALL.iter().position(|i| *i == self).unwrap_or(0)
+        Self::LOADED.iter().position(|i| *i == self).unwrap_or(0)
     }
 
     pub fn spec(self) -> Spec {
@@ -116,6 +137,7 @@ impl Illust {
             Illust::MomoDeep => ("momo_deep", (Vec2::ZERO, vec2(64.0, 0.0)), 12.0, Fx::Spores),
             Illust::KongiDoor => ("kongi_door", still, 1.0, Fx::Dust),
             Illust::CloverCocoon => ("clover_cocoon", still, 1.0, Fx::Dust),
+            Illust::MemForest => ("mem_forest", still, 1.0, Fx::Sparkles),
         };
         Spec {
             file,
@@ -197,11 +219,13 @@ mod tests {
 
     #[test]
     fn every_illustration_has_its_own_file_and_index() {
-        for (i, il) in Illust::ALL.iter().enumerate() {
+        for (i, il) in Illust::LOADED.iter().enumerate() {
             assert_eq!(il.index(), i);
             let f = il.spec().file;
-            assert!(Illust::ALL[..i].iter().all(|o| o.spec().file != f));
+            assert!(Illust::LOADED[..i].iter().all(|o| o.spec().file != f));
         }
+        // 앨범 칸(ALL)은 LOADED의 앞부분 그대로(텍스처 칸 번호가 같다).
+        assert_eq!(&Illust::LOADED[..Illust::ALL.len()], &Illust::ALL[..]);
     }
 
     #[test]

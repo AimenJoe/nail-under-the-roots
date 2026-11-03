@@ -40,7 +40,7 @@ pub struct Art {
     pub tree: Option<Texture2D>,
     /// 파 내려가기(tools/art/dig.py, 0156): 32×32 × 6칸. 줄 0 Naïl, 줄 1~3 옛 털빛(0272에서 뺐다, 쓰지 않음), 줄 4 돌아온 모모. 땅 단면 전환에서만.
     pub dig: Option<Texture2D>,
-    /// 컷씬 일러스트(illust::Illust::ALL 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
+    /// 컷씬 일러스트(illust::Illust::LOADED 순서, docs/decisions/0039). 없으면 그 장면은 어두운 바탕.
     pub illust: Vec<Option<Texture2D>>,
     /// 타이틀 바탕 640×360(2배 밀도, `tools/art/illust.py` title, 0083). 없으면 예전 선 바탕.
     pub title: Option<Texture2D>,
@@ -286,7 +286,7 @@ impl Art {
         );
         v.extend(BIG_SHEETS.iter().map(|b| b.file.to_string()));
         v.extend(
-            crate::illust::Illust::ALL
+            crate::illust::Illust::LOADED
                 .iter()
                 .map(|il| format!("art/illust/{}.png", il.spec().file)),
         );
@@ -357,7 +357,7 @@ impl Art {
             d.set_filter(FilterMode::Nearest);
         }
         let mut illust = Vec::new();
-        for il in crate::illust::Illust::ALL {
+        for il in crate::illust::Illust::LOADED {
             let t = crate::loading::texture(&format!("art/illust/{}.png", il.spec().file))
                 .await
                 .ok();

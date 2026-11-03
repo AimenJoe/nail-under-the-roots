@@ -16,7 +16,7 @@ pub struct Memory {
 
 pub const ALL: [Memory; crate::world::MEMORIES as usize] = [
     Memory {
-        illust: Illust::GreatTree,
+        illust: Illust::MemForest,
         text: |s| s.mem_1,
     },
     Memory {
