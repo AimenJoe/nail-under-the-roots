@@ -799,9 +799,9 @@ fn thorn_patches(
     }
 }
 
-/// 물줄기(0275): 방을 옆으로 가로질러 길게(`STREAM_RUN_MIN`~`MAX`칸) 흐른다. 위 띠(2~4줄)나 아래 띠(9~10줄)를 따라
-/// 가다 가끔 한 줄 꺾이고, 대개 두 칸 너비. 1~2개(띠마다 하나). 옆문 앞 가로 길(5~8줄)은 비우고, 위아래 문 앞
-/// 세로 길은 가로질러도 된다(걸어서 건너며 떠밀린다). 적 자리·`KEEP`은 피하지 않는다 — 물에 선 적은 떠밀릴 뿐.
+/// 물줄기(0275): 방 어디서든 시작해 구불구불 흐른다 — 가로나 세로가 큰 흐름이고, 걸음마다 가끔 옆으로 한 칸 비껴 굽는다.
+/// 길이 `STREAM_RUN_MIN`~`MAX`칸, 한 칸이나 두 칸 너비, 방마다 1~2개. 문 바로 앞(문에서 두 칸)만 비우고, 문 앞 길은
+/// 가로질러도 된다(건너며 떠밀린다). 적 자리·`KEEP`은 피하지 않는다 — 물에 선 적은 떠밀릴 뿐.
 fn stream_runs(
     grid: &Grid,
     props: &[Prop],
@@ -813,69 +813,81 @@ fn stream_runs(
     let _ = avoid;
     let (ox, oy) = (room.at.0 as usize * ROOM_W, room.at.1 as usize * ROOM_H);
     let mut rng = Rng::new(seed | 1);
-    // 넓은 방의 가로 이음새 줄(위 3~4·아래 9~10)도 비운다(옆 방과 이어지는 길).
-    let lane_row = |y: i32| {
-        (5..=8).contains(&y)
-            || match room.hall {
-                Some(0) => (3..=4).contains(&y),
-                Some(2) => (9..=10).contains(&y),
-                _ => false,
-            }
+    // 문 바로 앞: 위·아래 문(가운데 9~10칸, 줄 2~3 / 9~10), 옆문(줄 6~7, 칸 1~2 / 17~18).
+    let door_front = |x: i32, y: i32| {
+        ((9..=10).contains(&x) && (y <= 3 || y >= 9))
+            || ((6..=7).contains(&y) && (x <= 2 || x >= 17))
     };
-    let ok = |x: i32, y: i32, out: &Vec<(Vec2, Vec2)>| {
-        if !(1..=18).contains(&x) || !(2..=10).contains(&y) || lane_row(y) {
+    let ok = |x: i32, y: i32, mine: &[(i32, i32)], out: &Vec<(Vec2, Vec2)>| {
+        if !(1..=18).contains(&x) || !(2..=10).contains(&y) || door_front(x, y) {
             return false;
         }
         let c = cell_center(ox + x as usize, oy + y as usize);
         grid.get(ox + x as usize, oy + y as usize) == Cell::Floor
             && !props.iter().any(|p| p.rect.contains(c))
-            && !out.iter().any(|(o, _)| *o == c)
+            && !mine.contains(&(x, y))
+            // 다른 물줄기와는 한 칸 띄운다(합쳐져 덩어리가 되지 않게).
+            && !out.iter().any(|(o, _)| (o.x - c.x).abs() <= 16.0 && (o.y - c.y).abs() <= 16.0)
     };
-    let mut bands: Vec<&[i32]> = vec![&[2, 3, 4], &[9, 10]];
-    if rng.chance(0.5) {
-        bands.reverse();
-    }
-    let n = 1 + rng.below(2) as usize;
-    for band in bands.into_iter().take(n) {
-        let (lo, hi) = (band[0], band[band.len() - 1]);
-        let wide = rng.chance(0.7);
-        let flow = vec2(if rng.chance(0.5) { 1.0 } else { -1.0 }, 0.0);
-        // 띠 안에서 시작 줄을 고르고, 왼쪽부터 오른쪽으로 걸으며 줄을 가끔 바꾼다.
-        let top = if wide { hi - 1 } else { hi };
-        let mut row = lo + rng.below((top - lo + 1) as u64) as i32;
-        let mut x = 1;
-        while x <= 18 && !ok(x, row, out) {
-            x += 1;
-        }
-        let mut cells: Vec<(i32, i32)> = Vec::new();
-        let mut cols = 0;
-        while x <= 18 && cols < t::STREAM_RUN_MAX && ok(x, row, out) {
-            cells.push((x, row));
-            if wide && ok(x, row + 1, out) {
-                cells.push((x, row + 1));
-            }
-            cols += 1;
-            // 꺾임: 띠 안에서 한 줄 위·아래로(다음 칸이 그 줄에서 이어질 수 있을 때만).
-            if rng.chance(0.18) {
-                let nr = row + if rng.chance(0.5) { 1 } else { -1 };
-                if (lo..=top).contains(&nr) && ok(x + 1, nr, out) {
-                    let fill = if nr < row {
-                        (x, nr)
-                    } else {
-                        (x, nr + i32::from(wide))
-                    };
-                    if !cells.contains(&fill) && ok(fill.0, fill.1, out) {
-                        cells.push(fill);
-                    }
-                    row = nr;
+    for _ in 0..1 + rng.below(2) {
+        let horiz = rng.chance(0.6);
+        let sign = if rng.chance(0.5) { 1 } else { -1 };
+        let (step, side) = if horiz {
+            ((sign, 0), (0, 1))
+        } else {
+            ((0, sign), (1, 0))
+        };
+        let wide = rng.chance(0.6);
+        let want = t::STREAM_RUN_MIN
+            + rng.below((t::STREAM_RUN_MAX - t::STREAM_RUN_MIN + 1) as u64) as usize;
+        let mut best: Vec<(i32, i32)> = Vec::new();
+        for _ in 0..10 {
+            let (mut x, mut y) = (1 + rng.below(18) as i32, 2 + rng.below(9) as i32);
+            let mut cells: Vec<(i32, i32)> = Vec::new();
+            let mut cols = 0;
+            while cols < want && ok(x, y, &cells, out) {
+                cells.push((x, y));
+                let (wx, wy) = (x + side.0, y + side.1);
+                if wide && ok(wx, wy, &cells, out) {
+                    cells.push((wx, wy));
                 }
+                cols += 1;
+                // 굽이: 옆으로 한 칸 비껴 간다(빈틈이 없게 비낀 칸도 채운다).
+                if rng.chance(0.3) {
+                    let d = if rng.chance(0.5) { 1 } else { -1 };
+                    let (bx, by) = (x + side.0 * d, y + side.1 * d);
+                    if ok(bx, by, &cells, out) || cells.contains(&(bx, by)) {
+                        if !cells.contains(&(bx, by)) {
+                            cells.push((bx, by));
+                        }
+                        (x, y) = (bx, by);
+                    }
+                }
+                (x, y) = (x + step.0, y + step.1);
             }
-            x += 1;
+            if cols
+                > best
+                    .iter()
+                    .map(|c| if horiz { c.0 } else { c.1 })
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+            {
+                best = cells;
+            }
+            if cols >= want {
+                break;
+            }
         }
-        if cols < t::STREAM_RUN_MIN {
+        let len = best
+            .iter()
+            .map(|c| if horiz { c.0 } else { c.1 })
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        if len < t::STREAM_RUN_MIN {
             continue;
         }
-        for (x, y) in cells {
+        let flow = vec2(step.0 as f32, step.1 as f32);
+        for (x, y) in best {
             out.push((cell_center(ox + x as usize, oy + y as usize), flow));
         }
     }
@@ -1459,19 +1471,24 @@ mod tests {
             any |= !room.streams.is_empty();
             assert!(room.thorns.is_empty() && room.webs.is_empty());
             for (c, d) in &room.streams {
-                let y = ((c.y / 16.0) as i32).rem_euclid(ROOM_H as i32);
-                assert!(!(5..=8).contains(&y), "seed {seed}: 옆문 앞 가로 길 위");
+                let (x, y) = (
+                    ((c.x / 16.0) as i32).rem_euclid(ROOM_W as i32),
+                    ((c.y / 16.0) as i32).rem_euclid(ROOM_H as i32),
+                );
+                assert!(
+                    !((9..=10).contains(&x) && (y <= 3 || y >= 9))
+                        && !((6..=7).contains(&y) && (x <= 2 || x >= 17)),
+                    "seed {seed}: 문 바로 앞"
+                );
                 assert!(
                     !room.props.iter().any(|p| p.rect.contains(*c)),
                     "seed {seed}: 소품 위"
                 );
-                assert_eq!(d.y, 0.0, "옆으로만 흐른다");
-                assert_eq!(d.x.abs(), 1.0);
+                assert_eq!(d.x.abs() + d.y.abs(), 1.0, "가로나 세로로 흐른다");
                 // 옆(꺾인 곳은 대각선 포함) 한 칸에 같은 물줄기가 이어진다(외톨이 칸 없음).
-                let near = room
-                    .streams
-                    .iter()
-                    .any(|(q, e)| e == d && (q.x - c.x).abs() == 16.0 && (q.y - c.y).abs() <= 16.0);
+                let near = room.streams.iter().any(|(q, e)| {
+                    e == d && q != c && (q.x - c.x).abs() <= 16.0 && (q.y - c.y).abs() <= 16.0
+                });
                 assert!(near, "seed {seed}: 외톨이 물살");
             }
             let (_, deep) = generate(

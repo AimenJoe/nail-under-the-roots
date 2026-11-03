@@ -563,25 +563,44 @@ pub(super) fn draw_stream(
     if !baked {
         draw_rectangle(x0, y0, 16.0, 16.0, Color::new(0.18, 0.40, 0.48, 0.9));
     }
-    let sx = dir.x.signum();
+    // 칸 안 좌표: u = 흐르는 쪽(0..16), v = 가로지르는 쪽(0..16). 가로 물줄기면 (x, y), 세로면 (y, x).
+    let horiz = dir.x != 0.0;
+    let s = if horiz {
+        dir.x.signum()
+    } else {
+        dir.y.signum()
+    };
+    let world_u = if horiz { c.x } else { c.y };
+    let put = |u: f32, v: f32, lu: f32, lv: f32, col: Color| {
+        let (x, y, w, h) = if horiz {
+            (u, v, lu, lv)
+        } else {
+            (v, u, lv, lu)
+        };
+        draw_rectangle(
+            (x0 + x).round(),
+            (y0 + y).round(),
+            w.round().max(1.0),
+            h.round().max(1.0),
+            col,
+        );
+    };
     let seed = ((c.x * 7.0 + c.y * 13.0) as i32).rem_euclid(97) as f32;
     let lite = Color::new(0.66, 0.86, 0.92, 0.5);
     for i in 0..2 {
-        // 위 물가 그늘(3~5px)을 피해 가운데·아래쪽에. 칸마다 이어지게 월드 x 위상.
-        let row = 7.0 + i as f32 * 4.0 + (seed + i as f32 * 3.0) % 2.0;
-        let ph =
-            (c.x * sx + time * t::STREAM_PUSH * 0.9 + seed * 3.0 + i as f32 * 9.0).rem_euclid(16.0);
-        let head = if sx >= 0.0 { x0 + ph } else { x0 + 16.0 - ph };
-        let tail = head - sx * 5.0;
-        let (a, b) = (head.min(tail).max(x0 + 1.0), head.max(tail).min(x0 + 15.0));
+        // 위 물가 그늘(가로 물줄기의 위 3~5px)을 피해 가운데쪽에. 칸마다 이어지게 월드 위상.
+        let v = if horiz {
+            7.0 + i as f32 * 4.0
+        } else {
+            4.0 + i as f32 * 6.0
+        } + (seed + i as f32 * 3.0) % 2.0;
+        let ph = (world_u * s + time * t::STREAM_PUSH * 0.9 + seed * 3.0 + i as f32 * 9.0)
+            .rem_euclid(16.0);
+        let head = if s >= 0.0 { ph } else { 16.0 - ph };
+        let tail = head - s * 5.0;
+        let (a, b) = (head.min(tail).max(1.0), head.max(tail).min(15.0));
         if b > a {
-            draw_rectangle(
-                a.round(),
-                (y0 + row).round(),
-                (b - a).round().max(1.0),
-                1.0,
-                lite,
-            );
+            put(a, v, b - a, 1.0, lite);
         }
     }
     // 반짝임(✦): 칸마다 가끔 한 번.
@@ -599,28 +618,19 @@ pub(super) fn draw_stream(
             draw_rectangle(gx, gy - 1.0, 1.0, 3.0, Color::new(0.92, 0.98, 1.0, a * 0.5));
         }
     }
+    // 끝 너머가 벽이면 벽 틈에서 솟는/드는 물: 물가를 따라 흔들리는 물보라 줄. 바닥이면 그리지 않는다.
     let foam = Color::new(0.86, 0.95, 0.98, 0.85);
-    for (end, side) in [(back, -sx), (front, sx)] {
-        let ex = if side > 0.0 { x0 + 15.0 } else { x0 };
-        match end {
-            StreamEnd::Open => {}
-            // 벽 틈에서 솟는/벽 밑으로 드는 물: 물가를 따라 흔들리는 물보라 줄.
-            StreamEnd::Wall => {
-                for j in 0..4 {
-                    let yy = y0 + 4.0 + j as f32 * 3.0;
-                    let off = ((time * 6.0 + j as f32 * 1.7 + seed).sin() * 1.0).round();
-                    draw_rectangle(ex - side * off.abs(), yy, 1.0, 2.0, foam);
-                    draw_rectangle(
-                        ex - side * (1.0 + off.abs()),
-                        yy + 1.0,
-                        1.0,
-                        1.0,
-                        Color::new(0.7, 0.86, 0.92, 0.6),
-                    );
-                }
-            }
-            // 바닥에서 끝나는 물: 따로 그리지 않는다(물가가 둥글게 닫힌다). 예전의 검은 구멍은 뺐다.
-            StreamEnd::Floor => {}
+    let dim = Color::new(0.7, 0.86, 0.92, 0.6);
+    for (end, side) in [(back, -s), (front, s)] {
+        if end != StreamEnd::Wall {
+            continue;
+        }
+        let eu = if side > 0.0 { 15.0 } else { 0.0 };
+        for j in 0..4 {
+            let v = 3.0 + j as f32 * 3.0;
+            let off = ((time * 6.0 + j as f32 * 1.7 + seed).sin()).round().abs();
+            put(eu - side * off, v, 1.0, 2.0, foam);
+            put(eu - side * (1.0 + off), v + 1.0, 1.0, 1.0, dim);
         }
     }
 }
