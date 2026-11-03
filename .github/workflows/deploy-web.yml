@@ -72,7 +72,7 @@ jobs:
       - uses: actions/setup-node@v7
         if: env.NETLIFY_SITE_ID != ''
         with:
-          node-version: 22
+          node-version: 26   # 최신 LTS(Lithium, 2026-10-28 Active LTS). lts/*는 쓰지 않는다 — 다음 LTS로 조용히 넘어가지 않게
 
       # Netlify 시크릿이 설정되기 전에는 아래 두 단계가 건너뛰어진다 (빌드 검증만).
       - name: Deploy production
