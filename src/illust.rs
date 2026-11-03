@@ -46,6 +46,8 @@ pub enum Illust {
     MemAlone,
     /// 실의 기억 4: 잊힌 도토리 — 봄 첫 아침, 땅속 도토리에서 새싹, 할매가 흰 실로 뿌리를 감싼다(청설모는 꼬리만).
     MemFirstSprout,
+    /// 실의 기억 6: 실이 물든 날 — 늙은 큰 나무의 뿌리를 꽉 붙잡은 할매, 흰 실이 뿌리 쪽으로 보라로 물든다.
+    MemDyedThread,
 }
 
 /// 그림 위에 떠다니는 것.
@@ -89,7 +91,7 @@ impl Illust {
     ];
 
     /// 불러오는 그림 전부(앨범 일러스트 칸 `ALL` + 실의 기억 그림). 텍스처는 이 순서로 둔다.
-    pub const LOADED: [Illust; 16] = [
+    pub const LOADED: [Illust; 17] = [
         Illust::GreatTree,
         Illust::MotherBurrow,
         Illust::BoriFreed,
@@ -106,6 +108,7 @@ impl Illust {
         Illust::MemDrought,
         Illust::MemAlone,
         Illust::MemFirstSprout,
+        Illust::MemDyedThread,
     ];
 
     /// 텍스처 칸 번호(`LOADED` 순서).
@@ -150,6 +153,7 @@ impl Illust {
             Illust::MemDrought => ("mem_drought", still, 1.0, Fx::Dust),
             Illust::MemAlone => ("mem_alone", still, 1.0, Fx::Spores),
             Illust::MemFirstSprout => ("mem_first_sprout", still, 1.0, Fx::Sparkles),
+            Illust::MemDyedThread => ("mem_dyed_thread", still, 1.0, Fx::Leaves),
         };
         Spec {
             file,

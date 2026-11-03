@@ -9,7 +9,7 @@ use crate::illust::Illust;
 use crate::profile::{key, Profile};
 
 pub struct Memory {
-    /// 장면의 그림. 새 그림(0273 프롬프트)이 오면 바꾼다 — 지금은 있는 그림.
+    /// 장면의 그림: 나노바나나 원본 다섯(`Illust::Mem*`, 2026-11-03), 조각 5는 큰 나무 그대로.
     pub illust: Illust,
     pub text: Tr,
 }
@@ -36,7 +36,7 @@ pub const ALL: [Memory; crate::world::MEMORIES as usize] = [
         text: |s| s.mem_5,
     },
     Memory {
-        illust: Illust::HalmaeDeep,
+        illust: Illust::MemDyedThread,
         text: |s| s.mem_6,
     },
 ];

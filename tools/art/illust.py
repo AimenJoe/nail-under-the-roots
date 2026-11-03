@@ -96,6 +96,7 @@ AI_SCENES = [
     'mem_drought',
     'mem_alone',
     'mem_first_sprout',
+    'mem_dyed_thread',
 ]
 # 코드로 그리는 것.
 CODE_SCENES = {
