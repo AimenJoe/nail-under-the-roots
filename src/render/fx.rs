@@ -586,21 +586,107 @@ pub(super) fn draw_stream(
         );
     };
     let seed = ((c.x * 7.0 + c.y * 13.0) as i32).rem_euclid(97) as f32;
-    let lite = Color::new(0.66, 0.86, 0.92, 0.5);
-    for i in 0..2 {
-        // 위 물가 그늘(가로 물줄기의 위 3~5px)을 피해 가운데쪽에. 칸마다 이어지게 월드 위상.
+    // 물결 줄 셋(0275, "방향을 알 수 있어?" → 뚜렷하게): 머리 2px는 밝고 꼬리 5px는 옅게 — 머리가 흐르는 쪽.
+    let head_c = Color::new(0.80, 0.94, 0.98, 0.85);
+    let tail_c = Color::new(0.62, 0.84, 0.92, 0.45);
+    for i in 0..3 {
         let v = if horiz {
-            7.0 + i as f32 * 4.0
+            5.0 + i as f32 * 3.5
         } else {
-            4.0 + i as f32 * 6.0
+            3.0 + i as f32 * 4.5
         } + (seed + i as f32 * 3.0) % 2.0;
-        let ph = (world_u * s + time * t::STREAM_PUSH * 0.9 + seed * 3.0 + i as f32 * 9.0)
+        let ph = (world_u * s + time * t::STREAM_PUSH * 0.9 + seed * 3.0 + i as f32 * 6.0)
             .rem_euclid(16.0);
         let head = if s >= 0.0 { ph } else { 16.0 - ph };
-        let tail = head - s * 5.0;
-        let (a, b) = (head.min(tail).max(1.0), head.max(tail).min(15.0));
-        if b > a {
-            put(a, v, b - a, 1.0, lite);
+        for k in 0..7 {
+            let u = head - s * k as f32;
+            if (1.0..15.0).contains(&u) {
+                put(u, v, 1.0, 1.0, if k < 2 { head_c } else { tail_c });
+            }
+        }
+    }
+    // 떠내려가는 것: 잎(갈색·초록)·거품 조각이 미는 빠르기 그대로 흘러간다. 자리는 월드 좌표의 격자라 칸을 넘어 이어진다.
+    let world_v = if horiz { c.y } else { c.x };
+    for lane in 0..2 {
+        let v = 4.0 + lane as f32 * 7.0;
+        let lane_seed = ((world_v + v) * 0.37).floor().rem_euclid(13.0);
+        let spacing = 34.0 + lane_seed * 3.0;
+        let off = lane_seed * 11.0 + time * t::STREAM_PUSH * s;
+        let lo = world_u - 8.0;
+        let n0 = ((lo - off) / spacing).ceil() as i32;
+        let mut n = n0;
+        loop {
+            let pu = off + n as f32 * spacing;
+            if pu >= lo + 16.0 {
+                break;
+            }
+            let u = pu - lo;
+            let bob = ((time * 3.0 + n as f32 * 1.3).sin() * 0.8).round();
+            let kind = (n + lane * 7 + lane_seed as i32).rem_euclid(3);
+            match kind {
+                0 => {
+                    put(u, v + bob, 2.0, 1.0, Color::new(0.52, 0.40, 0.22, 0.95));
+                    put(
+                        u + s,
+                        v + bob - 1.0,
+                        1.0,
+                        1.0,
+                        Color::new(0.62, 0.50, 0.28, 0.95),
+                    );
+                }
+                1 => {
+                    put(u, v + bob, 2.0, 1.0, Color::new(0.34, 0.56, 0.32, 0.95));
+                    put(
+                        u - s,
+                        v + bob + 1.0,
+                        1.0,
+                        1.0,
+                        Color::new(0.28, 0.46, 0.26, 0.95),
+                    );
+                }
+                _ => {
+                    put(u, v + bob, 1.0, 1.0, Color::new(0.92, 0.98, 1.0, 0.9));
+                    put(u - s, v + bob, 1.0, 1.0, Color::new(0.80, 0.92, 0.96, 0.6));
+                }
+            }
+            n += 1;
+        }
+    }
+    // 물 밖으로 솟은 작은 돌(칸의 ¼쯤, 물줄기 끝 칸은 빼고): 위쪽에 부딪는 물거품, 아래쪽으로 V자로 갈라지는 물결.
+    let stone = (seed as i32 % 4 == 0) && back == StreamEnd::Open && front == StreamEnd::Open;
+    if stone {
+        let (su, sv) = (8.0, 6.0 + seed % 3.0);
+        put(
+            su - 1.0,
+            sv - 1.0,
+            3.0,
+            3.0,
+            Color::new(0.20, 0.24, 0.30, 1.0),
+        );
+        put(
+            su - 1.0,
+            sv - 1.0,
+            2.0,
+            1.0,
+            Color::new(0.46, 0.52, 0.60, 1.0),
+        );
+        let foam = Color::new(0.90, 0.97, 1.0, 0.9);
+        let up = su - s * 2.0;
+        put(up, sv - 1.0, 1.0, 3.0, foam);
+        put(
+            up - s,
+            sv - 2.0 + f32::from(u8::from((time * 7.0 + seed).sin() > 0.0)),
+            1.0,
+            1.0,
+            foam,
+        );
+        for k in 1..6 {
+            let a = 0.75 * (1.0 - k as f32 / 6.0);
+            let wake = Color::new(0.80, 0.94, 0.98, a);
+            let u = su + s * (1.0 + k as f32);
+            let spread = (k as f32 * 0.6).round() + 1.0;
+            put(u, sv - spread, 1.0, 1.0, wake);
+            put(u, sv + 1.0 + spread, 1.0, 1.0, wake);
         }
     }
     // 반짝임(✦): 칸마다 가끔 한 번.
@@ -621,6 +707,16 @@ pub(super) fn draw_stream(
     // 끝 너머가 벽이면 벽 틈에서 솟는/드는 물: 물가를 따라 흔들리는 물보라 줄. 바닥이면 그리지 않는다.
     let foam = Color::new(0.86, 0.95, 0.98, 0.85);
     let dim = Color::new(0.7, 0.86, 0.92, 0.6);
+    // 흐름이 바닥 물가에 닿는 끝(아래쪽): 부딪혀 쌓이는 물거품 띠가 들썩인다.
+    if front == StreamEnd::Floor {
+        let eu = if s > 0.0 { 13.0 } else { 2.0 };
+        for j in 0..5 {
+            let v = 2.0 + j as f32 * 3.0;
+            let lift = ((time * 5.0 + j as f32 * 1.9 + seed).sin() * 1.0).round();
+            put(eu + s * lift.abs(), v, 1.0, 2.0, foam);
+            put(eu - s, v + 1.0, 1.0, 1.0, dim);
+        }
+    }
     for (end, side) in [(back, -s), (front, s)] {
         if end != StreamEnd::Wall {
             continue;

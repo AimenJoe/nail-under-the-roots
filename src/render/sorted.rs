@@ -168,8 +168,10 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                 .iter()
                 .any(|(q, _)| q.distance_squared(p) < 1.0)
         };
+        // 굽은 곳(다음 칸이 옆으로 한 칸 비껴 이어짐)도 이어진 것으로 — 끝이 아니다.
+        let perp = vec2(d.y.abs(), d.x.abs()) * 16.0;
         let end = |p: Vec2| {
-            if has(p) {
+            if has(p) || has(p + perp) || has(p - perp) {
                 StreamEnd::Open
             } else if w.room.is_solid(p, 1.0) {
                 StreamEnd::Wall
