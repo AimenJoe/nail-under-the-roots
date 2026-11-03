@@ -22,6 +22,7 @@ mod actors;
 mod deep;
 mod descent;
 mod fx;
+pub(crate) use fx::quest_item_shape;
 mod help;
 mod hud;
 mod lights;

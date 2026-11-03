@@ -2541,6 +2541,11 @@ mod tests {
         w.player.pos = q;
         assert!(w.quest_tick());
         assert_eq!(w.adv.events, vec![AdvEvent::QuestFound(2)]);
+        assert_eq!(
+            w.juice.found,
+            vec![crate::world::Found::Quest(2)],
+            "획득 창으로 보여 준다(위 한 줄 알림이 아니라)"
+        );
         w.enter_dungeon_now();
         assert!(w.story.quest_at().is_none(), "주운 뒤엔 없다");
     }

@@ -314,10 +314,17 @@ impl Inventory {
     }
 }
 
-/// 무기 획득 창(JRPG식). 떠 있는 동안 월드는 멈춘다.
+/// 획득 창(JRPG식). 떠 있는 동안 월드는 멈춘다. 무기·장신구(가방에 든다)와 가방에 들지 않는 획득물
+/// (부탁 물건·뿌리 심장·처음 주운 꽃잎 — 위 한 줄 알림은 못 보고 지나친다, 사장 2026-11-03).
 struct Gift {
-    item: crate::world::Gift,
+    item: Card,
     t: f32,
+}
+
+#[derive(Clone, Copy)]
+enum Card {
+    Gear(crate::world::Gift),
+    Found(crate::world::Found),
 }
 
 /// 직전 프레임에 그린, 탭/클릭에 반응하는 요소.
@@ -435,6 +442,8 @@ pub struct App {
     gift: Option<Gift>,
     /// 아직 창을 못 띄운 획득(여러 개가 한꺼번에 들어올 때).
     gift_queue: Vec<crate::world::Gift>,
+    /// 획득 창을 기다리는 가방 밖 획득물(`World::juice.found`에서 꺼낸 것).
+    found_queue: Vec<crate::world::Found>,
     pub settings: Settings,
     world: World,
     /// 저널: 런 통계 기준, 받을 수 있는 수(새로 생기면 알림), 목록 스크롤, 다시 세기까지(0048).
@@ -616,6 +625,7 @@ impl App {
             skip_hold: 0.0,
             tutorial: None,
             gift_queue: Vec::new(),
+            found_queue: Vec::new(),
             settings,
             world,
             tally: Tally::default(),
@@ -1185,6 +1195,7 @@ impl App {
         }
         self.gift = None;
         self.gift_queue.clear();
+        self.found_queue.clear();
         self.apply_equipped();
         self.run_time = 0.0;
         self.acc = 0.0;
@@ -2185,10 +2196,23 @@ impl App {
         }
     }
 
-    /// 월드가 받은 무기(획득물·컷씬)를 가방에 넣고 획득 창을 띄운다.
+    /// 월드가 받은 무기(획득물·컷씬)를 가방에 넣고 획득 창을 띄운다. 무기·장신구가 먼저, 그다음 가방 밖 획득물.
     fn take_gifts(&mut self) {
         self.gift_queue.append(&mut self.world.inv.gifts);
-        if self.gift.is_some() || self.gift_queue.is_empty() {
+        self.found_queue.append(&mut self.world.juice.found);
+        if self.gift.is_some() {
+            return;
+        }
+        if self.gift_queue.is_empty() {
+            if self.found_queue.is_empty() {
+                return;
+            }
+            let f = self.found_queue.remove(0);
+            self.world.freeze();
+            self.gift = Some(Gift {
+                item: Card::Found(f),
+                t: 0.0,
+            });
             return;
         }
         let item = self.gift_queue.remove(0);
@@ -2213,7 +2237,10 @@ impl App {
         // 물건을 받았다(0265): 가방까지 이어하기에.
         self.save_progress(true);
         self.world.freeze();
-        self.gift = Some(Gift { item, t: 0.0 });
+        self.gift = Some(Gift {
+            item: Card::Gear(item),
+            t: 0.0,
+        });
     }
 
     /// 획득 창: 최소 시간이 지나면 확인으로 닫고, 그대로 두어도 닫힌다. 그동안 월드는 멈춘다.
@@ -2243,18 +2270,27 @@ impl App {
     }
 
     fn draw_gift(&self, ui: &Ui, g: &Gift) {
+        use crate::world::Found;
         let s = i18n::s();
-        let (title, name, desc) = match g.item {
-            crate::world::Gift::Weapon(w) => (
+        let (title, name, desc): (&str, &str, &str) = match g.item {
+            Card::Gear(crate::world::Gift::Weapon(w)) => (
                 if WEAPONS[w].kind == crate::equipment::WeaponKind::Claw {
                     s.gift_title
                 } else {
                     s.gift_weapon
                 },
-                WEAPONS[w].name,
-                WEAPONS[w].desc,
+                tr(WEAPONS[w].name),
+                tr(WEAPONS[w].desc),
             ),
-            crate::world::Gift::Charm(c) => (s.gift_charm, CHARMS[c].name, CHARMS[c].desc),
+            Card::Gear(crate::world::Gift::Charm(c)) => {
+                (s.gift_charm, tr(CHARMS[c].name), tr(CHARMS[c].desc))
+            }
+            Card::Found(Found::Quest(i)) => {
+                let q = &crate::quests::ALL[i as usize];
+                (s.gift_quest, tr(q.item), tr(q.found))
+            }
+            Card::Found(Found::Heart) => (s.gift_heart, s.shop_heart, s.heart_desc),
+            Card::Found(Found::Petal) => (s.gift_found, s.petal_name, s.petal_desc),
         };
         let k = (g.t / 0.2).min(1.0);
         let r = Rect::new(56.0, 42.0 + (1.0 - k) * 8.0, 208.0, 86.0);
@@ -2264,19 +2300,23 @@ impl App {
         ui.rect(icon, ui::PANEL_LIGHT);
         ui.rect_lines(icon, ui::BORDER);
         match g.item {
-            crate::world::Gift::Weapon(w) => draw_weapon_icon(ui, icon, w),
-            crate::world::Gift::Charm(c) => draw_charm_icon(ui, icon, CHARMS[c].color),
+            Card::Gear(crate::world::Gift::Weapon(w)) => draw_weapon_icon(ui, icon, w),
+            Card::Gear(crate::world::Gift::Charm(c)) => draw_charm_icon(ui, icon, CHARMS[c].color),
+            Card::Found(f) => draw_found_icon(ui, icon, f),
         }
-        ui.text(tr(name), icon.right() + 8.0, r.y + 22.0, FONT_PX, ui::TEXT);
+        ui.text(name, icon.right() + 8.0, r.y + 22.0, FONT_PX, ui::TEXT);
         // 다른 캐릭터 것이면(0246) 설명을 두 줄로 줄이고 누구 가방에 갔는지 아래에.
-        let owner = self.gift_owner(g.item);
+        let owner = match g.item {
+            Card::Gear(item) => self.gift_owner(item),
+            Card::Found(_) => None,
+        };
         let rows = if owner.is_some() { 2 } else { 3 };
         if let Some(o) = owner {
             let note = fill(s.gift_elsewhere, &[&o.name()]);
             let note = ui.fit(&note, r.w - 36.0, FONT_PX);
             ui.text(&note, r.x + 10.0, r.bottom() - 15.0, FONT_PX, ui::ACCENT);
         }
-        let lines = ui::wrap(ui, tr(desc), r.right() - icon.right() - 16.0, FONT_PX);
+        let lines = ui::wrap(ui, desc, r.right() - icon.right() - 16.0, FONT_PX);
         for (i, l) in lines.iter().take(rows).enumerate() {
             ui.text(
                 l,
@@ -2517,4 +2557,77 @@ fn page_lines(lines: &[String], d: &cutscene::Dialogue) -> Vec<(String, String)>
             (l.clone(), l.chars().take(n).collect())
         })
         .collect()
+}
+
+/// 가방 밖 획득물의 창 아이콘(22×22 칸 가운데). 부탁 물건은 바닥 그림과 같은 모양을 두 배로.
+fn draw_found_icon(ui: &Ui, r: Rect, f: crate::world::Found) {
+    use crate::world::Found;
+    let c = r.center();
+    let (cx, cy) = (c.x.floor(), c.y.floor());
+    match f {
+        Found::Quest(i) => crate::render::quest_item_shape(i, true, &mut |dx, dy, w, h, col| {
+            ui.rect(
+                Rect::new(cx + dx * 2.0, cy + dy * 2.0, w * 2.0, h * 2.0),
+                col,
+            )
+        }),
+        Found::Heart => {
+            // 뿌리 심장: 붉은 하트 + 뿌리 한 가닥.
+            let red = Color::new(0.86, 0.28, 0.34, 1.0);
+            let dark = Color::new(0.45, 0.12, 0.18, 1.0);
+            for (dy, x0, w) in [
+                (-5.0, -6.0, 5.0),
+                (-5.0, 1.0, 5.0),
+                (-4.0, -7.0, 14.0),
+                (-3.0, -7.0, 14.0),
+                (-2.0, -7.0, 14.0),
+                (-1.0, -6.0, 12.0),
+                (0.0, -5.0, 10.0),
+                (1.0, -4.0, 8.0),
+                (2.0, -3.0, 6.0),
+                (3.0, -2.0, 4.0),
+                (4.0, -1.0, 2.0),
+            ] {
+                ui.rect(Rect::new(cx + x0, cy + dy, w, 1.0), red);
+            }
+            ui.rect(
+                Rect::new(cx - 5.0, cy - 4.0, 2.0, 2.0),
+                Color::new(1.0, 0.75, 0.78, 1.0),
+            );
+            ui.rect(
+                Rect::new(cx, cy + 5.0, 1.0, 3.0),
+                Color::new(0.55, 0.38, 0.24, 1.0),
+            );
+            ui.rect(
+                Rect::new(cx + 1.0, cy + 7.0, 2.0, 1.0),
+                Color::new(0.55, 0.38, 0.24, 1.0),
+            );
+            ui.rect(Rect::new(cx + 2.0, cy - 1.0, 3.0, 1.0), dark);
+        }
+        Found::Petal => {
+            // 시든 꽃잎: 회분홍 잎 하나 + 잎맥.
+            let pink = Color::new(0.88, 0.66, 0.72, 1.0);
+            for (dy, x0, w) in [
+                (-6.0, -1.0, 3.0),
+                (-5.0, -3.0, 6.0),
+                (-4.0, -4.0, 8.0),
+                (-3.0, -5.0, 10.0),
+                (-2.0, -5.0, 10.0),
+                (-1.0, -5.0, 10.0),
+                (0.0, -4.0, 9.0),
+                (1.0, -3.0, 7.0),
+                (2.0, -2.0, 5.0),
+                (3.0, -1.0, 3.0),
+            ] {
+                ui.rect(Rect::new(cx + x0, cy + dy, w, 1.0), pink);
+            }
+            let vein = Color::new(0.70, 0.46, 0.54, 1.0);
+            for k in 0..6 {
+                ui.rect(
+                    Rect::new(cx + 1.0 - k as f32 * 0.5, cy - 4.0 + k as f32, 1.0, 1.0),
+                    vein,
+                );
+            }
+        }
+    }
 }

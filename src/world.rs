@@ -185,6 +185,18 @@ pub enum Gift {
     Charm(usize),
 }
 
+/// 가방에 들지 않는 획득물(사장 2026-11-03: 위 한 줄 알림만으로는 못 보고 지나친다 → 무기·장신구와 같은 획득 창).
+/// 월드는 `Juice::found`에 쌓기만 하고, 앱이 꺼내 창으로 보여 준다(그동안 월드는 멈춘다).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Found {
+    /// 이웃의 부탁 물건(0273 B, `quests::ALL` 번호).
+    Quest(u8),
+    /// 뿌리 심장: 최대 체력 +1.
+    Heart,
+    /// 처음 주운 시든 꽃잎(0164). 둘째부터는 한 줄 알림 그대로.
+    Petal,
+}
+
 /// 도토가 묻은 도토리(0052): 흙이 부풀다가 터진다. 터지는 순간 둘레에 있으면 다친다. 발톱으로 미리 파낼 수 있다.
 pub struct Mine {
     pub pos: Vec2,
@@ -673,6 +685,8 @@ pub struct Juice {
     fx_acc: f32,
     /// 화면 위 한 줄 알림(되살아남, 씨앗)과 남은 시간. 글은 Tr이라 월드는 언어를 모른다.
     pub toast: Option<(Tr, f32)>,
+    /// 획득 창으로 보여 줄 것(`Found`): 앱이 프레임마다 꺼낸다.
+    pub found: Vec<Found>,
     pub feel: Feel,
     /// 모으는 동안 빨려 드는 먼지의 간격 시계(0168).
     charge_fx_t: f32,
@@ -832,6 +846,7 @@ impl Default for Juice {
             fx_acc: 0.0,
             audio: sfx::Queue::default(),
             toast: None,
+            found: Vec::new(),
             deny: [0.0; 2],
             boss_card: None,
             hush: false,
@@ -1508,7 +1523,7 @@ impl World {
             self.refresh_stats();
             self.player.heal(self.player.stats.max_hp);
             self.juice.audio.play(sfx::Id::Heal);
-            self.juice.toast = Some((|s| s.toast_heart, 2.5));
+            self.juice.found.push(Found::Heart);
         }
         for (pos, kind) in picked_at {
             match kind {
@@ -3228,11 +3243,11 @@ impl World {
         // 처음 주운 꽃잎은 "분홍빛 + 이 길로 갔다", 예전에 주운 적이 있으면 "또 … 이 길로"(0190 → 0194).
         let first = !self.story.petal_found;
         self.story.petal_found = true;
-        self.juice.toast = Some(if first {
-            (|s| s.toast_petal, 4.0)
+        if first {
+            self.juice.found.push(Found::Petal);
         } else {
-            (|s| s.toast_petal_trail, 3.0)
-        });
+            self.juice.toast = Some((|s| s.toast_petal_trail, 3.0));
+        }
         self.juice.fx.push(glint(
             at + vec2(0.0, -4.0),
             Color::new(1.0, 0.72, 0.80, 1.0),
@@ -3286,6 +3301,7 @@ impl World {
         }
         self.story.quest_at = None;
         self.story.quest_next = None;
+        self.juice.found.push(Found::Quest(i));
         self.juice.fx.push(glint(
             at + vec2(0.0, -4.0),
             Color::new(1.0, 0.95, 0.80, 1.0),

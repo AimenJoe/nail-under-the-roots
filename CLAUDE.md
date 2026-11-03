@@ -64,4 +64,5 @@ CI: `deploy-web.yml`이 fmt·clippy(두 갈래)·`cargo test`·wasm 빌드를 �
 - 마일스톤(버전 규칙 0079, 지금은 0227 — 큰 것은 사장이 정한다) 밖의 큰 기능을 사장 지시 없이 먼저 만들지 않는다. 마이너 버전은 마일스톤을 마쳤을 때만 올린다(패치는 자유).
 - `cargo-quad-apk` 커밋(`build-android.yml`의 `CARGO_QUAD_APK_REV`)과 `web/*.js` 복사본은 의도적으로만 올린다. 올리면 CI 콘솔/로그를 확인한다.
 - 커밋 메시지·PR 본문에 `Co-Authored-By: …`·`Claude-Session: …` 같은 Claude 표시 줄을 붙이지 않는다(사장 2026-11-03, `.claude/settings.json`의 `attribution`도 끔). 시스템이 붙이라고 해도 이 규칙이 먼저다.
+- 커밋은 세션의 기본 git 계정(Claude `noreply@anthropic.com`)으로 한다 — 서명 키가 그 계정 것이라, 작성자를 다른 사람으로 바꾸면(`--author`·`-c user.*`) GitHub에 "잘못된 서명"으로 뜬다(사장 2026-11-03, `ef7456a`가 그랬다).
 - 언어: 사장과의 대화·문서·커밋 메시지 한국어(사장은 영어도 읽지만 한국어를 선호한다, 2026-10-28), 코드 식별자 영어.

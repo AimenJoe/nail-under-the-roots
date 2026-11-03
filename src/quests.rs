@@ -21,7 +21,9 @@ pub struct Quest {
     /// 찾을 것이 놓이는 지대(None = 어느 굴이든).
     pub biome: Option<Biome>,
     pub ask: Tr,
-    /// 주웠을 때 알림.
+    /// 찾을 것의 이름(획득 창).
+    pub item: Tr,
+    /// 주웠을 때 획득 창의 설명(누구에게 가져갈지).
     pub found: Tr,
     pub thanks: Tr,
 }
@@ -38,6 +40,7 @@ pub const ALL: [Quest; 4] = [
         opens: key::TUTORIAL,
         biome: None,
         ask: |s| s.q_popo_ask,
+        item: |s| s.q_popo_item,
         found: |s| s.q_popo_found,
         thanks: |s| s.q_popo_thanks,
     },
@@ -47,6 +50,7 @@ pub const ALL: [Quest; 4] = [
         opens: key::BORI_BACK,
         biome: None,
         ask: |s| s.q_bori_ask,
+        item: |s| s.q_bori_item,
         found: |s| s.q_bori_found,
         thanks: |s| s.q_bori_thanks,
     },
@@ -56,6 +60,7 @@ pub const ALL: [Quest; 4] = [
         opens: key::MOMO_BACK,
         biome: Some(Biome::Meadow),
         ask: |s| s.q_momo_ask,
+        item: |s| s.q_momo_item,
         found: |s| s.q_momo_found,
         thanks: |s| s.q_momo_thanks,
     },
@@ -65,6 +70,7 @@ pub const ALL: [Quest; 4] = [
         opens: key::DOTO_MEMORY,
         biome: Some(Biome::Roots),
         ask: |s| s.q_doto_ask,
+        item: |s| s.q_doto_item,
         found: |s| s.q_doto_found,
         thanks: |s| s.q_doto_thanks,
     },

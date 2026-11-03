@@ -334,15 +334,14 @@ impl App {
                     }
                     self.play(cutscene::memory(&self.world, n));
                 }
-                // 이웃의 부탁 물건(0273 B): 기록에 "찾음", 누구에게 가져갈지 알림. 돌려주기는 마을에서 말 걸기로.
+                // 이웃의 부탁 물건(0273 B): 기록에 "찾음". 누구에게 가져갈지는 획득 창이(`Found::Quest`, take_gifts).
+                // 돌려주기는 마을에서 말 걸기로.
                 AdvEvent::QuestFound(i) => {
-                    let i = i as usize;
                     if self.recording() {
                         self.profile
-                            .set(&crate::quests::key_of(i, crate::quests::FOUND));
+                            .set(&crate::quests::key_of(i as usize, crate::quests::FOUND));
                         self.save_profile();
                     }
-                    self.world.juice.toast = Some((crate::quests::ALL[i].found, 3.5));
                 }
                 AdvEvent::DeepSleep => {
                     // 잠드는 장면(0163) 뒤 맡겨 둔 쉼터로.

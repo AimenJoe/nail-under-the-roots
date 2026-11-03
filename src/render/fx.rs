@@ -115,8 +115,14 @@ pub(crate) fn draw_quest_item(i: u8, at: Vec2, time: f32) {
         Color::new(1.0, 0.94, 0.80, 0.10 + 0.10 * breathe),
     );
     let y = y + ((time * 1.4).sin() * 0.5).round();
+    quest_item_shape(i, breathe > 0.6, &mut |dx, dy, w, h, c| {
+        draw_rectangle(x + dx, y + dy, w, h, c)
+    });
+}
+
+/// 부탁 물건의 모양(가운데 기준 점 사각형): 월드 바닥(`draw_quest_item`)과 획득 창 아이콘이 같이 쓴다.
+pub(crate) fn quest_item_shape(i: u8, glint: bool, px: &mut dyn FnMut(f32, f32, f32, f32, Color)) {
     let dark = Color::new(0.20, 0.14, 0.12, 1.0);
-    let px = |dx: f32, dy: f32, w: f32, h: f32, c: Color| draw_rectangle(x + dx, y + dy, w, h, c);
     match i {
         0 => {
             // 젖은 조약돌: 둥근 회색 돌 + 물빛 줄 + 물방울 하나.
@@ -129,7 +135,7 @@ pub(crate) fn draw_quest_item(i: u8, at: Vec2, time: f32) {
             }
             px(-2.0, -1.0, 2.0, 1.0, Color::new(0.78, 0.90, 1.0, 1.0));
             px(1.0, 1.0, 2.0, 1.0, Color::new(0.48, 0.50, 0.58, 1.0));
-            if breathe > 0.6 {
+            if glint {
                 px(4.0, -3.0, 1.0, 2.0, Color::new(0.60, 0.82, 1.0, 1.0));
             }
         }
