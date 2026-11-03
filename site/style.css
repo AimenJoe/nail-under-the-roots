@@ -215,6 +215,8 @@ kbd {
 .play p, .play li { color: var(--muted); font-size: .95rem; }
 .play ul { margin: 0; padding-left: 1.1rem; }
 .play .small-note { font-size: .82rem; overflow-wrap: anywhere; }
+/* 받는 파일·릴리스 노트는 웹·Android·PC 모두의 것 — 카드 하나 안이 아니라 카드 줄 아래 전체 폭에. */
+.play .small-note.files { grid-column: 1 / -1; margin: -.3rem 0 0; }
 .keytable { overflow-x: auto; grid-column: 1 / -1; }
 .keytable table { border-collapse: collapse; width: 100%; font-size: .9rem; }
 .keytable th, .keytable td { text-align: left; padding: .35rem .4rem; border-bottom: 1px solid var(--deep-3); }
