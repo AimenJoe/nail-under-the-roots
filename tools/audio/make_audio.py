@@ -94,6 +94,8 @@ OGA_MUSIC = [
     # 2차(장소마다 곡 둘, 0234): 굴은 런마다 번갈아, 주인은 1단계 곡(깨어나면 위 side_keeper로).
     ("side_path_alt", "mysterious-cave-theme-loop", "cave_in_game.ogg"),
     ("side_keeper_calm", "battle-theme-b-for-rpg", "battleThemeB.mp3"),
+    # 3차: 쉼터 둘째 곡(런마다 side_camp와 번갈아).
+    ("side_camp_alt", "a-small-fire-will-do-calming-loop", "a_small_fire_will_do.wav"),
 ]
 # 환경음(음악 밑에 깔린다, 모노): (게임 이름, slug, 파일, 모양). "loop" = 그대로 고리,
 # "scatter" = 3초 새소리 조각을 AMB_BED초 바탕 위 `SCATTER` 자리에 흩어 둔다(3초마다 같은 소리가 되풀이되지 않게).

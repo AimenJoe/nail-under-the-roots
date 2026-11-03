@@ -43,9 +43,10 @@ pub enum Track {
     AmbMeadow,
     AmbCave,
     AmbDeep,
-    /// 옆 굴(0275 R40, 사장이 두 번 골랐다): 쉼터 하프 독주 · 굴 둘(런마다 번갈아) · 주인 1단계 → 깨어나면 2단계 ·
+    /// 옆 굴(0275 R40, 사장이 듣기 페이지에서 골랐다): 쉼터 둘·굴 둘(런마다 번갈아) · 주인 1단계 → 깨어나면 2단계 ·
     /// 땅속 물길 환경음.
     SideCamp,
+    SideCampAlt,
     SidePath,
     SidePathAlt,
     SideKeeperCalm,
@@ -79,6 +80,7 @@ impl Track {
             Track::AmbCave => "amb_cave",
             Track::AmbDeep => "amb_deep",
             Track::SideCamp => "side_camp",
+            Track::SideCampAlt => "side_camp_alt",
             Track::SidePath => "side_path",
             Track::SidePathAlt => "side_path_alt",
             Track::SideKeeperCalm => "side_keeper_calm",
@@ -92,6 +94,7 @@ impl Track {
         matches!(
             self,
             Track::SideCamp
+                | Track::SideCampAlt
                 | Track::SidePath
                 | Track::SidePathAlt
                 | Track::SideKeeperCalm
@@ -190,7 +193,7 @@ pub fn choose(l: &Listen) -> Choice {
         }
     } else {
         match l.place {
-            Place::Camp if side => Track::SideCamp,
+            Place::Camp if side => pick(Track::SideCamp, Track::SideCampAlt),
             Place::Dungeon if side => pick(Track::SidePath, Track::SidePathAlt),
             Place::Village => pick(Track::VillageSprings, Track::Village),
             Place::Camp if crate::route::leg(l.stage).ends_deep() => Track::Camp,
@@ -215,7 +218,7 @@ pub fn choose(l: &Listen) -> Choice {
 
 /// 모든 곡(시험·패키징이 파일 목록을 만들 때). `file`의 match와 같은 수인지 시험이 본다.
 #[cfg(test)]
-const ALL: [Track; 26] = [
+const ALL: [Track; 27] = [
     Track::Title,
     Track::Village,
     Track::Field,
@@ -237,6 +240,7 @@ const ALL: [Track; 26] = [
     Track::AmbCave,
     Track::AmbDeep,
     Track::SideCamp,
+    Track::SideCampAlt,
     Track::SidePath,
     Track::SidePathAlt,
     Track::SideKeeperCalm,
@@ -561,7 +565,7 @@ mod tests {
 
     /// 표의 곡마다 두 파일(웹 mp3·네이티브 ogg)이 있다 — 없으면 웹 콘솔에 404, 네이티브는 조용히 빈다.
     #[test]
-    /// 옆 굴(0275 R40): 쉼터·굴·주인 싸움이 제 곡(굴은 런마다 번갈아, 주인은 1단계 → 2단계), 밑에는 땅속 물길.
+    /// 옆 굴(0275 R40): 쉼터·굴·주인 싸움이 제 곡(쉼터·굴은 런마다 번갈아, 주인은 1단계 → 2단계), 밑에는 땅속 물길.
     /// 셋째 길은 그대로(마지막 쉼터 곡·보스 두 단계).
     fn side_path_has_its_own_sounds() {
         use crate::adventure::Place;
@@ -585,6 +589,11 @@ mod tests {
             ..side(Place::Dungeon)
         };
         assert_eq!(choose(&other_run).music, Some(Track::SidePathAlt));
+        let other_camp = Listen {
+            alt: false,
+            ..side(Place::Camp)
+        };
+        assert_eq!(choose(&other_camp).music, Some(Track::SideCampAlt));
         for (roused, want) in [(false, Track::SideKeeperCalm), (true, Track::SideKeeper)] {
             let l = Listen {
                 boss: true,
