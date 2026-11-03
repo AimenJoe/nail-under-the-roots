@@ -40,6 +40,8 @@ pub enum Illust {
     /// 실의 기억 1(0273 A): 아주 오래전 다른 숲, 어린 할매가 뿌리마다 흰 실로 손을 잡고 있다(세피아).
     /// 실의 기억 그림은 앨범의 일러스트 칸이 아니라 기억 칸에 나온다 — `ALL`이 아니라 `LOADED`에만.
     MemForest,
+    /// 실의 기억 2: 마른 여름 — 같은 자리, 앙상한 나무와 갈라진 흙, 마르는 뿌리에 닿지 못하는 흰 실.
+    MemDrought,
 }
 
 /// 그림 위에 떠다니는 것.
@@ -83,7 +85,7 @@ impl Illust {
     ];
 
     /// 불러오는 그림 전부(앨범 일러스트 칸 `ALL` + 실의 기억 그림). 텍스처는 이 순서로 둔다.
-    pub const LOADED: [Illust; 13] = [
+    pub const LOADED: [Illust; 14] = [
         Illust::GreatTree,
         Illust::MotherBurrow,
         Illust::BoriFreed,
@@ -97,6 +99,7 @@ impl Illust {
         Illust::KongiDoor,
         Illust::CloverCocoon,
         Illust::MemForest,
+        Illust::MemDrought,
     ];
 
     /// 텍스처 칸 번호(`LOADED` 순서).
@@ -138,6 +141,7 @@ impl Illust {
             Illust::KongiDoor => ("kongi_door", still, 1.0, Fx::Dust),
             Illust::CloverCocoon => ("clover_cocoon", still, 1.0, Fx::Dust),
             Illust::MemForest => ("mem_forest", still, 1.0, Fx::Sparkles),
+            Illust::MemDrought => ("mem_drought", still, 1.0, Fx::Dust),
         };
         Spec {
             file,

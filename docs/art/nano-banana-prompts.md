@@ -192,6 +192,7 @@ Scene: Deep inside the rabbits' old warren, a round earthen chamber whose walls 
 받으면 `tools/art/sources/ai/illust/<이름>.png` → `strip_logo.py` → `ai_illust.py`의 `SIZE`·`illust.py`의 `AI_SCENES`에 한 줄 + `Illust`에 한 칸(`LOADED`에만 — `ALL`은 앨범의 일러스트 칸이라 넣지 않는다), `memories.rs`의 `illust`를 바꾼다. 할매가 작아 얼굴이 묻히면 `ai_illust.FOCUS`에 자리를 적는다.
 - 세계 규칙에서 "묶인 동물의 눈 색" 줄과 할매 글의 "흰 실에 보라가 섞였다"는 빼고 붙인다(동물이 없고, 기억 속 실은 흰색).
 - 받은 기록: `mem_forest` 2026-11-03 첫 판 채택(숲이 크게 나왔지만 첫 조각에 맞다). 할매가 그림 높이 약 60%에 앉아 내레이션 띠에 몸 아래가 조금 걸린다 → 다음 장부터 "위쪽 절반"으로 적는다.
+- `mem_drought` 2026-11-03 둘째 판 채택. 첫 판은 땅 위(풀밭에 선 할매·공중의 통나무)·속도선·우는 얼굴이라 첫 장과 이어지지 않았다 → 할매 시트 + `mem_forest` 원본을 **그림체·구도 참고**로 함께 첨부("Use the second attached image only as a style and layout reference …"), "같은 땅 단면"·"움직임 선 없이 가만히"를 적으니 첫 장과 같은 자리의 앞뒤 장면으로 나왔다. 남은 셋도 이렇게 — 앞 장 원본을 둘째 첨부로.
 
 #### `mem_forest` — 조각 1 "다른 숲"
 ```

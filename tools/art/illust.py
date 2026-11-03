@@ -93,6 +93,7 @@ AI_SCENES = [
     'clover_cocoon',
     'title',
     'mem_forest',
+    'mem_drought',
 ]
 # 코드로 그리는 것.
 CODE_SCENES = {
