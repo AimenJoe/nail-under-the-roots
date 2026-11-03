@@ -193,7 +193,7 @@ pub const LIST: [Entry; 54] = [
     Entry {
         cat: Cat::Story,
         name: "이야기 일러스트",
-        desc: "모모가 돌아옴 → 반쪽 엔딩 → 참 엔딩·에필로그. 아직 게임에 자리가 없는 장면(임시 그림).",
+        desc: "모모가 돌아옴 → 반쪽 엔딩 → 참 엔딩·에필로그. 기록에 반쪽·참 엔딩이 있으면 놓아준 뒤의 장면(다시 내려간 첫 줄·짧은 엔딩·이뤄진 약속, 0270).",
         scenario: Scenario::StoryPreview,
     },
     Entry {

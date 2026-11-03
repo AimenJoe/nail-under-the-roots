@@ -1393,7 +1393,14 @@ impl App {
             }
             flow::First::StoryPreview => {
                 self.world.wave = 0;
-                self.cutscene = Some(cutscene::story_preview(&self.world));
+                // 기록에 놓아준 뒤가 있으면 그 뒤의 장면(0270)을 튼다.
+                let released = self.profile.flag(crate::profile::key::HALF_ENDING)
+                    || self.profile.flag(crate::profile::key::TRUE_ENDING);
+                self.cutscene = Some(if released {
+                    cutscene::release_preview(&self.world)
+                } else {
+                    cutscene::story_preview(&self.world)
+                });
                 self.scene = Scene::Cutscene;
             }
             flow::First::Play { tutorial } => {

@@ -2354,6 +2354,56 @@ pub fn ending_doto(w: &World, done: bool) -> Cutscene {
     Cutscene::new(vec![nail_actor(w)], steps)
 }
 
+/// 개발: 놓아준 뒤(0270)의 장면을 이어서 — 다시 내려간 깊은 곳의 첫 세 줄, 되풀이 엔딩 둘(짧은 판), 약속이 이뤄진 뒤의
+/// 모모·도토 끝줄. 싸움을 끝까지 하지 않고 글·그림을 본다(`story_preview`가 기록에 반쪽·참 엔딩이 있으면 이것을 튼다).
+/// 배우 0은 이번 캐릭터라 모모·도토 끝줄의 초상화는 그 캐릭터로 걸어야 맞다.
+pub fn release_preview(w: &World) -> Cutscene {
+    let mut steps = vec![
+        Step::Illust(Some(Illust::HalmaeDeep)),
+        Step::Fade {
+            to_clear: true,
+            secs: 1.0,
+        },
+        Step::Narrate(|s| s.half_1_again),
+        say(2, Face::Normal, |s| s.half_2_again),
+        say(0, Face::Determined, |s| s.deep_1_again),
+        say(0, Face::Determined, |s| s.deep_1_again_momo),
+        say(0, Face::Determined, |s| s.deep_1_again_doto),
+        Step::Fade {
+            to_clear: false,
+            secs: 1.0,
+        },
+    ];
+    steps.extend(short_ending(Illust::HalmaeDeep, &[|s| s.rep_half]));
+    steps.extend(short_ending(
+        Illust::Sprout,
+        &[|s| s.rep_true_1, |s| s.rep_true_2],
+    ));
+    for (il, line, end) in [
+        (
+            Illust::MomoDeep,
+            (|s| s.mend_3_done) as Tr,
+            (|s| s.mend_4_done) as Tr,
+        ),
+        (Illust::DotoMemory, |s| s.dend_3_done, |s| s.dend_4_done),
+    ] {
+        steps.extend([
+            Step::Illust(Some(il)),
+            Step::Fade {
+                to_clear: true,
+                secs: 1.0,
+            },
+            say(0, Face::Normal, line),
+            Step::Narrate(end),
+            Step::Fade {
+                to_clear: false,
+                secs: 1.0,
+            },
+        ]);
+    }
+    Cutscene::new(story_actors(w), steps)
+}
+
 /// 개발: 아직 게임에 자리가 없는 이야기 장면을 이어서(모모 → 반쪽 엔딩 → 참 엔딩·에필로그).
 pub fn story_preview(w: &World) -> Cutscene {
     let mut steps = momo_steps(w.character);
