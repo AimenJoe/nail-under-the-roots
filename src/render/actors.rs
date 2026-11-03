@@ -1891,8 +1891,9 @@ pub(crate) fn draw_code_mob(
             }
             // 집게 둘: 팔 + 집게 머리(열리면 가운데가 빈다).
             for side in [-1.0f32, 1.0] {
-                let y = side * 4.0 - 1.0;
-                px(5.0, y, 2.0 + reach.max(0.0), 1.0, dark);
+                // 팔은 몸통 앞 모서리(윗줄·아랫줄)에서 나온다 — 몸 밖에서 시작하면 집게가 떠 보인다.
+                let y = side * 3.0;
+                px(4.0, y, 3.0 + reach.max(0.0), 1.0, dark);
                 let hx = 7.0 + reach;
                 px(hx, y - 1.0, 4.0, 3.0, line);
                 px(hx + 1.0, y, 2.0, 1.0, if open { line } else { shell });

@@ -67,8 +67,8 @@ def code_ref(name):
                               (4, 2, 1, 1, (0, 0, 0, 255))]:
             rect(x, y, w, h, c)
         for side in (-1, 1):
-            y = side * 4 - 1
-            rect(5, y, 2, 1, dark)
+            y = side * 3
+            rect(4, y, 3, 1, dark)
             rect(7, y - 1, 4, 3, line)
             rect(8, y, 2, 1, shell)
     else:

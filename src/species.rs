@@ -617,7 +617,7 @@ pub fn roll(r: f32, depth: u32, biome: crate::biome::Biome) -> Kind {
             (Kind::FieldMouse, 8.0),
             (Kind::SewerRat, 10.0 + d * 2.0),
             (Kind::Shrew, 6.0),
-            (Kind::Toad, 10.0 + d),
+            (Kind::Toad, 14.0 + d * 2.0),
             (Kind::Bat, 8.0 + d),
             (Kind::SporeCap, 3.0),
             (Kind::Crayfish, 18.0 + d * 2.0),

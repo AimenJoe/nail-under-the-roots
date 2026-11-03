@@ -61,7 +61,7 @@ pub enum Scenario {
     AllSpecies,
     /// 새 졸개 다섯(0146): 땃쥐·고슴도치·두꺼비·박쥐·포자버섯, 어두운 심층에서.
     NewMobs,
-    /// 물길 굴 잡몹(0275 P4): 물줄기·웅덩이 아레나에 가재 둘·소금쟁이 둘.
+    /// 물길 굴 잡몹(0275 P4): 물줄기·웅덩이 아레나에 가재 둘·소금쟁이 둘·두꺼비 하나.
     WaterMobs,
     /// 도토로 싸우기(0195): 아레나 웨이브, 플레이어는 도토(도토리 들고).
     DotoArena,
@@ -459,7 +459,7 @@ pub const LIST: [Entry; 61] = [
     Entry {
         cat: Cat::Combat,
         name: "물길 굴 잡몹",
-        desc: "가재 둘(집게 띠 — 받아침, 맞으면 뒤로 튀고 벽에 박히면 어질어질)·소금쟁이 둘(물 위에서 빠름, 물결 고리 — 피함). 물줄기·웅덩이 아레나(0275 P4).",
+        desc: "가재 둘(집게 띠 — 받아침, 맞으면 뒤로 튀고 벽에 박히면 어질어질)·소금쟁이 둘(물 위에서 빠름, 물결 고리 — 피함)·두꺼비 하나. 물줄기·웅덩이 아레나(0275 P4).",
         scenario: Scenario::WaterMobs,
     },
     Entry {
@@ -963,7 +963,7 @@ fn new_mobs() -> World {
     w
 }
 
-/// 시나리오 `Scenario::WaterMobs`의 월드(0275 P4): "환경: 물길 굴" 아레나 + 웅덩이 둘, 적은 새 둘만.
+/// 시나리오 `Scenario::WaterMobs`의 월드(0275 P4): "환경: 물길 굴" 아레나 + 웅덩이 둘, 새 둘 + 원래 물가의 두꺼비.
 fn water_mobs() -> World {
     let mut w = build(Scenario::InBiome(Biome::Water));
     w.enemies.clear();
@@ -973,9 +973,15 @@ fn water_mobs() -> World {
             .pools
             .push(vec2(x as f32 * 16.0 + 8.0, y as f32 * 16.0 + 8.0));
     }
-    for (i, k) in [Kind::Crayfish, Kind::Strider, Kind::Crayfish, Kind::Strider]
-        .into_iter()
-        .enumerate()
+    for (i, k) in [
+        Kind::Crayfish,
+        Kind::Strider,
+        Kind::Toad,
+        Kind::Crayfish,
+        Kind::Strider,
+    ]
+    .into_iter()
+    .enumerate()
     {
         let p = spawn_point(&w, i);
         w.spawn_mob(k, p);
