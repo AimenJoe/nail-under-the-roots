@@ -73,6 +73,8 @@ pub static FR: Strings = Strings {
     biome_roots: "Racines mêlées",
     biome_deep: "Profondeurs",
     biome_silk: "Terrier de soie",
+    biome_water: "Terrier des eaux",
+    side_ask_q: "En bas, le Tréfonds. D'un tunnel sur le côté monte un bruit d'eau qui coule.",
     depth_m: "{0} m sous terre",
     depth_short: "{0} m",
     w_sprout: "Griffes de pousse",

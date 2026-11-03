@@ -73,6 +73,8 @@ pub static RU: Strings = Strings {
     biome_roots: "Клубок корней",
     biome_deep: "Тёмная глубь",
     biome_silk: "Шёлковая нора",
+    biome_water: "Нора у ручья",
+    side_ask_q: "Внизу — самая глубь. Из бокового хода доносится шум бегущей воды.",
     depth_m: "{0} м под землёй",
     depth_short: "{0} м",
     w_sprout: "Когти-ростки",

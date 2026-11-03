@@ -123,6 +123,10 @@ enum Scene {
     Pause,
     /// 길 지도(쉼터의 뿌리 길, 굴의 출구, docs/decisions/0031).
     Route,
+    /// 셋째 길 끝 출구에서 "가장 깊은 곳 / 물길 굴"(0275). `deep`: 커서가 가장 깊은 곳에 있나.
+    SideAsk {
+        deep: bool,
+    },
     /// 포포의 가게(쉼터, docs/decisions/0030).
     Shop,
     /// 앨범: 본 컷씬 일러스트를 다시 본다(타이틀, docs/decisions/0041).
@@ -180,6 +184,7 @@ impl Scene {
             | Scene::Game
             | Scene::Pause
             | Scene::Route
+            | Scene::SideAsk { .. }
             | Scene::Shop
             | Scene::KnotPick
             | Scene::Decor
@@ -1284,6 +1289,8 @@ impl App {
                     Scenario::Normal => self.profile.flag(key::MOMO_BACK),
                     _ => true,
                 },
+                // 물길 굴(0275): 엔딩을 하나라도 본 기록(어느 캐릭터든 — Naïl 반쪽·참, 모모·도토의 끝).
+                side_open: flow::seen_an_ending(&self.profile),
                 // 실의 기억(0273 A): 첫 시작에서만, 정체를 본 기록이 다음 조각을 하나.
                 memory_next: if normal {
                     crate::memories::next(&self.profile)
@@ -1677,6 +1684,7 @@ impl App {
             Scene::Licenses { back } => self.update_licenses(a, tap_hit, back),
             Scene::Pause => self.update_pause(a, tap_hit),
             Scene::Route => self.update_route(a, tap_hit),
+            Scene::SideAsk { deep } => self.update_side_ask(a, tap_hit, deep),
             Scene::Shop => self.update_shop(a, tap_hit, dt),
             Scene::Album => self.update_album(a, tap_hit, dt),
             Scene::Slots => self.update_slots(a, tap_hit),
@@ -1743,6 +1751,7 @@ impl App {
                 ui.dim();
                 self.draw_knot_pick(&ui);
             }
+            Scene::SideAsk { deep } => self.draw_side_ask(&ui, deep),
             Scene::Decor => {
                 ui.dim();
                 self.draw_village_menu(&ui);

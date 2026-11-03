@@ -73,6 +73,8 @@ pub static KO: Strings = Strings {
     biome_roots: "뿌리 지대",
     biome_deep: "어두운 심층",
     biome_silk: "흰 실 굴",
+    biome_water: "물길 굴",
+    side_ask_q: "아래로는 가장 깊은 곳. 옆으로 난 굴에서 물 흐르는 소리가 들린다.",
     depth_m: "지하 {0}m",
     depth_short: "{0}m",
     w_sprout: "새싹 발톱",

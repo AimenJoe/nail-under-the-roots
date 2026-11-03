@@ -73,6 +73,8 @@ pub static DE: Strings = Strings {
     biome_roots: "Wurzelgewirr",
     biome_deep: "Dunkle Tiefen",
     biome_silk: "Seidenbau",
+    biome_water: "Bachbau",
+    side_ask_q: "Unten liegt der tiefste Grund. Aus einem Seitengang dringt das Rauschen von Wasser.",
     depth_m: "{0} m unter der Erde",
     depth_short: "{0} m",
     w_sprout: "Sprosskrallen",

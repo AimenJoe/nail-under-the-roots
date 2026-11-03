@@ -73,6 +73,8 @@ pub static ZH_HANT: Strings = Strings {
     biome_roots: "樹根地帶",
     biome_deep: "黑暗深處",
     biome_silk: "白絲洞穴",
+    biome_water: "水路洞穴",
+    side_ask_q: "下面是最深處。旁邊的洞裡傳來流水聲。",
     depth_m: "地下{0}公尺",
     depth_short: "{0}公尺",
     w_sprout: "嫩芽之爪",

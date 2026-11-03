@@ -73,6 +73,8 @@ pub static ZH_HANS: Strings = Strings {
     biome_roots: "树根地带",
     biome_deep: "黑暗深处",
     biome_silk: "白丝洞穴",
+    biome_water: "水路洞穴",
+    side_ask_q: "下面是最深处。旁边的洞里传来流水声。",
     depth_m: "地下{0}米",
     depth_short: "{0}米",
     w_sprout: "嫩芽之爪",

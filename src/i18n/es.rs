@@ -73,6 +73,8 @@ pub static ES: Strings = Strings {
     biome_roots: "Maraña de raíces",
     biome_deep: "Fondo oscuro",
     biome_silk: "Madriguera de seda",
+    biome_water: "Madriguera del arroyo",
+    side_ask_q: "Abajo está lo más profundo. De un túnel a un lado llega el rumor del agua.",
     depth_m: "{0} m bajo tierra",
     depth_short: "{0} m",
     w_sprout: "Garras de brote",

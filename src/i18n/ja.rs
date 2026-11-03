@@ -73,6 +73,8 @@ pub static JA: Strings = Strings {
     biome_roots: "根っこエリア",
     biome_deep: "くらい深み",
     biome_silk: "白い糸の巣穴",
+    biome_water: "水みちの巣穴",
+    side_ask_q: "下には、いちばん深い場所。横の穴から、水の流れる音がきこえる。",
     depth_m: "地下{0}m",
     depth_short: "{0}m",
     w_sprout: "新芽のツメ",

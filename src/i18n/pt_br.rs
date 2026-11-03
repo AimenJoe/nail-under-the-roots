@@ -73,6 +73,8 @@ pub static PT_BR: Strings = Strings {
     biome_roots: "Emaranhado de raízes",
     biome_deep: "Profundezas escuras",
     biome_silk: "Toca de seda",
+    biome_water: "Toca do córrego",
+    side_ask_q: "Lá embaixo fica o lugar mais profundo. De um túnel ao lado vem o som de água correndo.",
     depth_m: "{0} m de profundidade",
     depth_short: "{0} m",
     w_sprout: "Garras de broto",

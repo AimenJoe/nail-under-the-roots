@@ -308,6 +308,8 @@ impl App {
                 AdvEvent::RoomEntered | AdvEvent::RoomCleared => self.save_progress(true),
                 // 쓰러져 다시 섰다(0259): 감긴 실뿌리까지 이어하기에. 전에는 다음 쉼터까지 옛 글이 남아, 끄고 이으면 실뿌리가 풀렸다.
                 AdvEvent::Woke => self.checkpoint_run(),
+                // 셋째 길 끝 출구, 물길 굴이 열린 기록(0275): 어디로 갈지 묻는다(커서는 가장 깊은 곳에서).
+                AdvEvent::AskSide => self.scene = Scene::SideAsk { deep: true },
                 // 가장 깊은 곳의 실매듭 끊기로(0162).
                 AdvEvent::Deepest => {
                     self.world
@@ -1056,6 +1058,45 @@ impl App {
             ui::TEXT_DIM,
         );
         self.draw_shop_ask(ui, panel);
+    }
+
+    /// "가장 깊은 곳 / 물길 굴"(0275): 좌우로 커서, 확인으로 고른다. 뒤로·바깥 탭은 고르지 않고 출구 곁으로 돌아간다
+    /// (가게의 묻는 창과 달리 둘째 단추가 "아니오"가 아니라 다른 길이라 `ask_choice`를 쓰지 않는다).
+    pub(super) fn update_side_ask(&mut self, a: &Actions, tap_hit: Option<Hit>, deep: bool) {
+        let deep = if a.left || a.right { !deep } else { deep };
+        self.scene = Scene::SideAsk { deep };
+        let go = match tap_hit {
+            Some(Hit::AskYes) => Some(true),
+            Some(Hit::AskNo) => Some(false),
+            Some(Hit::Close) => {
+                self.scene = Scene::Game;
+                return;
+            }
+            _ if a.cancel || a.menu => {
+                self.scene = Scene::Game;
+                return;
+            }
+            _ if a.confirm => Some(deep),
+            _ => None,
+        };
+        match go {
+            Some(true) => {
+                self.scene = Scene::Game;
+                self.world
+                    .start_fade(crate::adventure::Transition::EnterDeep);
+            }
+            Some(false) => {
+                self.scene = Scene::Game;
+                self.world.take_side_path();
+            }
+            None => {}
+        }
+    }
+
+    pub(super) fn draw_side_ask(&mut self, ui: &Ui, deep: bool) {
+        let s = i18n::s();
+        let panel = Rect::new(12.0, 8.0, 296.0, 156.0);
+        self.draw_ask(ui, panel, s.side_ask_q, s.node_deepest, s.biome_water, deep);
     }
 
     /// 사기 전에 묻는 창(가게 패널 가운데). 열려 있으면 탭은 이 창만 받는다.

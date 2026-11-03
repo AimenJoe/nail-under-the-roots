@@ -110,9 +110,38 @@ pub fn fall(s: Scenario, in_arena: bool, alive: bool, run_over: bool) -> Fall {
     }
 }
 
+/// 엔딩을 하나라도 본 기록인가(0275 물길 굴의 여는 조건, 사장 2026-11-03 "엔딩 하나라도"):
+/// Naïl의 반쪽·참 엔딩, 모모·도토의 끝(캐릭터 표의 `deep_flag`) 가운데 하나라도.
+pub fn seen_an_ending(p: &crate::profile::Profile) -> bool {
+    use crate::profile::key;
+    p.flag(key::HALF_ENDING)
+        || p.flag(key::TRUE_ENDING)
+        || crate::characters::ALL
+            .iter()
+            .filter_map(|d| d.deep_flag)
+            .any(|f| p.flag(f))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 물길 굴(0275): 처음 하는 기록은 닫혀 있고, 어느 캐릭터의 끝이든 하나면 열린다.
+    #[test]
+    fn side_path_opens_after_any_ending() {
+        use crate::profile::{key, Profile};
+        assert!(!seen_an_ending(&Profile::default()));
+        for f in [
+            key::HALF_ENDING,
+            key::TRUE_ENDING,
+            key::MOMO_DEEP,
+            key::DOTO_DEEP,
+        ] {
+            let mut p = Profile::default();
+            p.set(f);
+            assert!(seen_an_ending(&p), "{f}");
+        }
+    }
 
     #[test]
     fn first_run_plays_opening_then_tutorial() {

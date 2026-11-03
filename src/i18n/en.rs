@@ -73,6 +73,8 @@ pub static EN: Strings = Strings {
     biome_roots: "Root Tangle",
     biome_deep: "Dark Depths",
     biome_silk: "Silk Warren",
+    biome_water: "Waterway Burrow",
+    side_ask_q: "Below lies the deepest place. From a tunnel to the side comes the sound of running water.",
     depth_m: "{0} m underground",
     depth_short: "{0} m",
     w_sprout: "Sprout Claws",

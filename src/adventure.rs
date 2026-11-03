@@ -122,6 +122,8 @@ pub enum AdvEvent {
     Woke,
     /// 마지막 길의 주인을 이기고 출구를 밟았다: 가장 깊은 곳(엔딩은 앱, 0042).
     Deepest,
+    /// 셋째 길의 주인을 이기고 출구에서 버튼을 눌렀는데 물길 굴이 열렸다(0275): 앱이 "가장 깊은 곳 / 물길 굴"을 묻는다.
+    AskSide,
     /// 길의 주인(`bosses.rs`: 모모 0046·도토 0052·콩이 0054·토끼풀 0165)이 끝 방에 있다 / 이겼다. 장면·기록은 앱.
     KeeperIntro(Kind),
     KeeperBeaten(Kind),
@@ -757,6 +759,14 @@ impl World {
             .find(|q| (*q - p).length() < t::INTERACT_RADIUS)
     }
 
+    /// 앱이 부른다(묻는 창에서 "물길 굴", 0275): 셋째 길 끝에서 가장 깊은 곳으로 내려가지 않고 옆 굴 쉼터로.
+    /// 쉼터로 가는 전환이 길 번호를 하나 올리니 셋째 다음은 옆 굴(`route::Leg::Side`)이다.
+    pub fn take_side_path(&mut self) {
+        if self.adv.fade.is_none() && self.adv.stage == t::FINAL_STAGE {
+            self.start_fade(Transition::EnterCamp);
+        }
+    }
+
     /// 앱이 부른다(`Interact::Exit`): 굴 출구로 내려간다. 길 칸은 길 지도, 보스 칸은 다음 쉼터·가장 깊은 곳.
     pub fn use_exit(&mut self) {
         if self.exit_near().is_none() || self.adv.fade.is_some() {
@@ -774,7 +784,11 @@ impl World {
                 let boss = route
                     .is_some_and(|r| matches!(r.node(at).kind, NodeKind::Boss | NodeKind::Warren));
                 let last = route.is_some_and(|r| r.is_final());
-                if boss && last {
+                let ask_side = route.is_some_and(|r| r.leg() == crate::route::Leg::Last)
+                    && self.story.side_open();
+                if boss && last && ask_side {
+                    self.adv.events.push(AdvEvent::AskSide);
+                } else if boss && last {
                     self.adv.events.push(AdvEvent::Deepest);
                 } else if boss {
                     self.start_fade(Transition::EnterCamp);
@@ -2497,6 +2511,46 @@ mod tests {
         w.use_exit();
         assert_eq!(w.adv.events, vec![AdvEvent::Deepest]);
         assert!(w.adv.fade.is_none(), "쉼터로 가지 않는다");
+    }
+
+    /// 물길 굴(0275): 엔딩을 본 기록이면 셋째 길 주인 방 출구가 묻는다(`AskSide`) — 고르기 전엔 아무 데도 가지 않는다.
+    /// "물길 굴"을 고르면 옆 굴 쉼터(넷째, `Leg::Side`)로, 그 길의 주인 방 출구는 묻지 않고 가장 깊은 곳.
+    #[test]
+    fn side_path_is_asked_at_the_third_exit_and_ends_deep() {
+        let boss_exit = |w: &mut World| {
+            w.adv.events.clear();
+            let r = w.adv.route.as_mut().unwrap();
+            let boss = (r.layers.len() - 1, 0);
+            r.at = Some((boss.0 - 1, 0));
+            assert!(w.choose_node(boss));
+            w.adv.fade = None;
+            w.enter_node();
+            let p = w.player.pos;
+            if let Some(g) = w.room.grid.as_mut() {
+                g.set((p.x / 16.0) as usize, (p.y / 16.0) as usize, Cell::Exit);
+            }
+            w.use_exit();
+        };
+        let mut w = World::camp_start(t::FINAL_STAGE);
+        w.story.seed(crate::world::StorySeed {
+            side_open: true,
+            ..Default::default()
+        });
+        boss_exit(&mut w);
+        assert_eq!(w.adv.events, vec![AdvEvent::AskSide]);
+        assert!(w.adv.fade.is_none(), "고르기 전엔 가지 않는다");
+        w.take_side_path();
+        assert_eq!(w.adv.fade.map(|f| f.kind), Some(Transition::EnterCamp));
+        w.adv.fade = None;
+        w.enter_camp();
+        assert_eq!((w.adv.place, w.adv.stage), (Place::Camp, t::SIDE_STAGE));
+        assert_eq!(w.adv.route.as_ref().unwrap().leg(), crate::route::Leg::Side);
+        boss_exit(&mut w);
+        assert_eq!(
+            w.adv.events,
+            vec![AdvEvent::Deepest],
+            "옆 굴 끝은 묻지 않고 가장 깊은 곳"
+        );
     }
 
     /// 실의 기억(0273 A): 런의 둘째 굴부터 한 자리에 놓이고(같은 시드 = 같은 자리), 밟으면 이벤트 하나 — 이번 런엔 더 없다.

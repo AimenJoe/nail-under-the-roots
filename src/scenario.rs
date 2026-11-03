@@ -77,6 +77,8 @@ pub enum Scenario {
     Camp2,
     /// 옆 굴 쉼터(0275): 셋째 길 끝에서 옆으로 난 넷째 길 앞. 길 지도의 끝은 가장 깊은 곳.
     SideCamp,
+    /// 셋째 길 끝 출구의 "가장 깊은 곳 / 물길 굴"(0275): 엔딩을 본 기록처럼 열고 묻는 창부터.
+    SideAsk,
     /// 첫 쉼터, 실뿌리 둘이 감긴 채 체력 1, 곁에 들쥐(0225): 런이 끝나는 쓰러짐 연출을 바로 본다.
     LastRootlet,
     /// 첫 길 끝 굴(모모가 지킨다)에 바로. 숫자 = 이미 이긴 수(0 → 첫 만남, 2 → 세 번째, docs/decisions/0046).
@@ -157,7 +159,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 57] = [
+pub const LIST: [Entry; 58] = [
     Entry {
         cat: Cat::Tools,
         name: "대화 검수",
@@ -253,6 +255,12 @@ pub const LIST: [Entry; 57] = [
         name: "쉼터: 옆 굴",
         desc: "옆 굴 쉼터(0275, 넷째 길 앞 — 낮고 긴 굴, 왼쪽 위 좁은 틈에 숨은 자리). 길 지도의 끝은 가장 깊은 곳. 씨앗 40.",
         scenario: Scenario::SideCamp,
+    },
+    Entry {
+        cat: Cat::Places,
+        name: "셋째 길 끝: 물길 굴 묻기",
+        desc: "엔딩을 본 기록처럼 물길 굴을 열고, 셋째 길 주인을 이긴 뒤 출구의 묻는 창(0275)부터. 가장 깊은 곳 / 물길 굴.",
+        scenario: Scenario::SideAsk,
     },
     Entry {
         cat: Cat::Places,
@@ -525,6 +533,17 @@ pub fn build(s: Scenario) -> World {
         }
         Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi | Scenario::Clover => road_boss(s),
         Scenario::LastRootlet => last_rootlet(),
+        Scenario::SideAsk => {
+            let mut w = World::camp_start(crate::tuning::FINAL_STAGE);
+            w.adv.events.clear();
+            w.story.seed(crate::world::StorySeed {
+                side_open: true,
+                ..Default::default()
+            });
+            // 앱이 이 이벤트를 받아 묻는 창을 연다(실제로는 길의 주인 방 출구에서 확인 버튼).
+            w.adv.events.push(crate::adventure::AdvEvent::AskSide);
+            w
+        }
         Scenario::SideCamp => {
             let mut w = World::camp_start(crate::tuning::SIDE_STAGE);
             w.inv.seeds = 40;

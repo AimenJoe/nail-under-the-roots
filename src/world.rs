@@ -425,6 +425,8 @@ pub struct Story {
     momo_fight: bool,
     /// 굴토끼 옛 굴(0165)이 길 지도에 열렸나(모모가 돌아온 뒤). 길을 짤 때 본다.
     warren_open: bool,
+    /// 물길 굴(0275, 옆 굴)이 열렸나: 엔딩을 하나라도 본 기록. 셋째 길 끝 출구에서 묻는다.
+    side_open: bool,
     momo_wins: u8,
     /// 도토(0052): 둘째 길 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다). 묻힌 도토리.
     doto_fight: bool,
@@ -466,6 +468,8 @@ pub struct StorySeed {
     pub clover_fight: bool,
     pub clover_back: bool,
     pub warren_open: bool,
+    /// 물길 굴(0275): 엔딩을 하나라도 본 기록이면 셋째 길 끝 출구에서 "가장 깊은 곳 / 물길 굴"을 묻는다.
+    pub side_open: bool,
     /// 실의 기억(0273 A): 이번 런에 놓을 다음 조각. 반쪽 엔딩을 본 기록의 첫 시작에서만.
     pub memory_next: Option<u8>,
     /// 이웃의 부탁(0273 B): 이번 런에 굴에서 찾을 것(번호, 지대). 들은 부탁을 아직 못 찾은 기록의 첫 시작에서만.
@@ -488,6 +492,7 @@ impl Story {
         self.clover_fight = s.clover_fight;
         self.clover_back = s.clover_back;
         self.warren_open = s.warren_open;
+        self.side_open = s.side_open;
         self.memory_next = s.memory_next;
         self.memory_at = None;
         self.burrows = 0;
@@ -541,6 +546,10 @@ impl Story {
     }
     pub fn warren_open(&self) -> bool {
         self.warren_open
+    }
+    /// 물길 굴(0275)이 열렸나.
+    pub fn side_open(&self) -> bool {
+        self.side_open
     }
     pub fn clover_back(&self) -> bool {
         self.clover_back

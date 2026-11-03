@@ -73,6 +73,8 @@ pub static PL: Strings = Strings {
     biome_roots: "Gąszcz korzeni",
     biome_deep: "Mroczne głębiny",
     biome_silk: "Jedwabna nora",
+    biome_water: "Nora strumienia",
+    side_ask_q: "W dole czeka najgłębsze miejsce. Z bocznego tunelu dobiega szum płynącej wody.",
     depth_m: "{0} m pod ziemią",
     depth_short: "{0} m",
     w_sprout: "Kiełkowe pazury",

@@ -358,7 +358,7 @@ strings! {
     map_floor, map_note,
     // 저널
     // 환경
-    biome_meadow, biome_roots, biome_deep, biome_silk, depth_m, depth_short,
+    biome_meadow, biome_roots, biome_deep, biome_silk, biome_water, side_ask_q, depth_m, depth_short,
     // 무기
     w_sprout, w_sprout_desc, w_mole, w_mole_desc, w_stone, w_stone_desc, w_venom, w_venom_desc,
     gift_title,
