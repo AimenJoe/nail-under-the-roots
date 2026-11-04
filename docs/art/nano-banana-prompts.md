@@ -58,6 +58,7 @@ Edit the last attached image, the portrait of [이름]. Add only [고칠 것], c
 | 도토 | 31~32 | `calm` · `happy, eyes closed in a smile` |
 | 수수 | 33~34 | `calm` · `happy` |
 | 콩이 | 36~37 | `calm` · `happy, eyes closed in a smile` |
+| 무무(풀림·물듦, 0275) | 새 칸 | `calm and gentle, gills relaxed` · `cold and distant, a faint red glow under the skin where eyes would be` |
 | 도토·콩이·들쥐 대장(물듦) | 30·35·9 | `glaring, small glowing eyes` — 도토는 amber, 콩이는 pale sky blue, 대장은 red(0052·0054) |
 | 엄마 | 17 | `gentle, eyes closed` |
 | 토끼풀(돌아옴, 0165) | 39~40 | `calm, tired but warm, eyes half open` · `happy, eyes closed in a soft smile` — 돌아온 토끼풀은 보통·웃음 둘 |
@@ -102,6 +103,8 @@ World rules: The violet threads belong to Halmae, an ancient and lonely fungus g
 | 포포 | `sheet_popo.png` | `Popo: a raccoon with grey fur, a black eye mask, a white muzzle and round ears, with a small trinket tucked behind one ear. Match the attached character sheet of Popo.` |
 | 토끼풀(0165) | `sheet_clover.png` | `Clover: Momo's mother, a grown European wild rabbit: the same kind of rabbit as the attached Momo sheet but larger and heavier, with slightly darker grey-brown fur, long ears that she lays flat back along her head, a cream chest, soft tired eyes and a pink clover flower at the base of one ear. Gentle and protective.` |
 | 토끼풀(물듦) | `sheet_clover.png` + `ref_clover_tainted` | `Clover while bound: the same mother rabbit with dusky plum-grey fur and glowing green eyes like Momo's, violet threads coiled around her body, ears laid flat back.` |
+| 무무(0275, 풀린 모습) | `sheets/mumu.png`(아직 없음 — 먼저 `sprites/ref/ref_mumu_freed.png`로 시트를 그린다) | `Mumu: a big, very old cave salamander (an olm) with a long, soft, pale pink body, four small stubby legs, a long flat paddle tail, three feathery coral-pink gills on each side of a rounded, slightly flat head, a short blunt snout and no eyes at all (smooth skin where eyes would be); a small closed mouth that reads as a calm smile. Old, quiet and gentle. Match the attached character sheet of Mumu.` |
+| 무무(물듦) | `sheets/mumu.png` + `ref_mumu_tainted`(물든 초상화) | `Mumu while bound: the same salamander, the skin a shade duller and greyer, a faint red glow under the skin where eyes would be, violet threads coiled around the body and gills, gills pressed flat back.` |
 | 박하·민들레(0165) | 모모 시트 첨부 | `Mint and Dandelion: two tiny rabbit kits, round and fluffy, the same kind of rabbit as the attached Momo sheet but much smaller and younger, warm grey-brown fur, big dark eyes, short ears. One is sleepy, the other curious.` |
 
 ## 4. 장면
@@ -254,3 +257,12 @@ Scene (a game title screen background; the game draws the title text and menu on
 - [1차] Google Developers Blog, "How to prompt Gemini 2.5 Flash Image Generation for the best results"(2025-08-28: 장면을 문장으로, 마지막 첨부 그림의 비율, 생김새가 흐트러지면 새 대화, semantic negative prompt): https://developers.googleblog.com/en/how-to-prompt-gemini-2-5-flash-image-generation-for-the-best-results/
 - [2차] SpriteCook, "Turning Nano Banana 2 AI Images into Actual Pixel Art"(2026-03-19: 격자 문제와 뒤에서 맞추기, 가장 큰 해상도, limited palette): https://www.spritecook.ai/blog/nanobanana-pixel-art-for-games — 도구 회사 글이라 자기 도구 홍보가 섞여 있다.
 - 첫 시험(2026-10-26, 사장): 참고 그림 없이 홈페이지만 주고 초상화를 그리게 했더니 이름·종족 글로 흔한 그림을 채웠다(누룩 할매 → 빨간 독버섯 할아버지, 땅강아지 → 사슴벌레, 모모 → 흰 토끼, 게임에 없는 이웃 넷). 참고 그림 + 생김새 글이 필요한 근거.
+
+## 무무 초상화(0275, 2026-11-04)
+무무는 확정한 캐릭터 시트가 없다(게임 그림은 옆모습 스프라이트 시트 `sprites/mumu_v1.png`뿐). 0-1·0-2 차례대로:
+1. **시트**(풀린 모습): 첨부 ① `sprites/ref/ref_mumu_freed.png`(게임 칸 `mumu.png` 서기 칸에서 보라 실·붉은 빛을 지운 것 — 물든 그림을 넣으면 풀린 모습에 번진다, 0127) ② 그림체 참고로 `sheets/clover.png`.
+```
+Create a character reference sheet for a cozy pixel-art game: the creature in the first attached image, shown from the side and from a three-quarter front view side by side on a plain light background, full body, same proportions and colors as the reference. Mumu: a big, very old cave salamander (an olm) with a long, soft, pale pink body, four small stubby legs, a long flat paddle tail, three feathery coral-pink gills on each side of a rounded, slightly flat head, a short blunt snout and NO eyes at all (smooth skin where eyes would be); a small closed mouth that reads as a calm smile. Old, quiet and gentle. Style: high-quality 2D pixel art like a 16-bit era console game. Chunky, clean pixel clusters, crisp hard pixel edges, and solid flat color bands with 3 to 5 shades per material. Outlined in dark plum (#2B1D2A), about two pixels thick. Soft light from the upper left. Use the last attached image only as a style reference for line, palette and pixel density; take Mumu's design only from the first attached image. A clean, wordless image with no title, labels or color swatches. Aspect ratio 16:9.
+```
+2. **초상화 보통**(시트 첨부, 0-2의 1번 틀): 상징은 `three feathery coral-pink gills on each side of the head and the front of the long pink body with one small front leg`, 표정은 `calm and gentle, gills relaxed`.
+3. **물든 모습**: 보통 초상화를 고쳐 그린다(0-2 "물든 모습은 돌아온 모습 그림을 고쳐 그린다").

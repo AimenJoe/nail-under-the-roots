@@ -1012,12 +1012,40 @@ fn pic_hazards(c: PicCtx) {
     fx::draw_web(vec2(w - 20.0, y - 6.0), time, 0.6);
 }
 
+/// 굴의 물 한 덩어리(그림 전용): 지형 굽기 `terrain::water_px`와 같은 색·같은 층 — 위 물가는 땅이 물로 떨어지는 면 2px +
+/// 그늘 3px, 아래 물가는 밝은 물결 1px, 옆은 어두운 테, 가운데는 물빛에 옅은 빛 점.
+fn water_patch(x0: f32, y0: f32, w: f32, h: f32) {
+    let rgb = |r: u8, g: u8, b: u8| Color::from_rgba(r, g, b, 255);
+    let row = |y: f32, hh: f32, c: Color| draw_rectangle(x0, y0 + y, w, hh, c);
+    row(0.0, h, rgb(46, 100, 118));
+    row(0.0, 1.0, rgb(86, 94, 106));
+    row(1.0, 1.0, rgb(58, 64, 76));
+    row(2.0, 3.0, rgb(30, 70, 88));
+    row(h - 2.0, 1.0, rgb(30, 70, 88));
+    row(h - 1.0, 1.0, rgb(150, 196, 206));
+    draw_rectangle(x0, y0 + 2.0, 1.0, h - 2.0, rgb(24, 44, 56));
+    draw_rectangle(x0 + w - 1.0, y0 + 2.0, 1.0, h - 2.0, rgb(24, 44, 56));
+    // 빛 그물 대신 띄엄띄엄 밝은 점(잡음 없이 고정 자리).
+    let lite = rgb(66, 128, 144);
+    let mut k = 0;
+    let mut x = 4.0;
+    while x < w - 3.0 {
+        let yy = 6.0 + ((k * 5) % (h as i32 - 9).max(1)) as f32;
+        draw_rectangle(x0 + x, y0 + yy, 2.0, 1.0, lite);
+        x += 7.0;
+        k += 1;
+    }
+}
+
 fn pic_water(c: PicCtx) {
     let PicCtx {
         art, w, time, y, ..
     } = c;
-    // 물살 다섯 칸(오른쪽으로 흐른다) 위의 Naïl이 흐르는 쪽으로 밀려 내려간다 · 오른쪽은 물 위로 퍼지는 소금쟁이 물결.
+    // 물살 다섯 칸(오른쪽으로 흐른다) 위의 Naïl이 흐르는 쪽으로 밀려 내려간다 · 오른쪽은 고인 웅덩이 위 소금쟁이의 물결.
+    // 물 바닥은 굴과 같은 색(`water_patch`), 흐르는 줄은 굴과 같은 `draw_stream`(바닥은 이미 그렸으니 baked).
     let cells = 5;
+    let (x0, top, band) = (8.0, y - 13.0, 18.0);
+    water_patch(x0, top, cells as f32 * 16.0, band);
     for i in 0..cells {
         let back = if i == 0 {
             fx::StreamEnd::Wall
@@ -1029,21 +1057,15 @@ fn pic_water(c: PicCtx) {
         } else {
             fx::StreamEnd::Open
         };
-        let at = vec2(16.0 + i as f32 * 16.0, y - 2.0);
-        fx::draw_stream(at, vec2(1.0, 0.0), time, back, front, false);
+        let at = vec2(x0 + 8.0 + i as f32 * 16.0, top + 9.0);
+        fx::draw_stream(at, vec2(1.0, 0.0), time, back, front, true);
     }
     let ph = (time / 2.4).fract();
-    nail(art, 0, 0, vec2(18.0 + ph * 56.0, y - 4.0), false);
+    nail(art, 0, 0, vec2(x0 + 10.0 + ph * 56.0, y - 4.0), false);
+    // 고인 웅덩이(밀지 않는다) — 굴의 `pool_patches`처럼 칸 둘.
     let strider = vec2(w - 26.0, y - 2.0);
-    // 소금쟁이 밑의 고인 물(밀지 않는다).
-    draw_ellipse(
-        strider.x,
-        strider.y + 2.0,
-        13.0,
-        5.0,
-        0.0,
-        Color::new(0.18, 0.40, 0.48, 0.9),
-    );
+    water_patch(strider.x - 16.0, top + 2.0, 32.0, band - 2.0);
+    fx::draw_pool_glint(vec2(strider.x - 8.0, top + 10.0), time, true);
     let k = (time / 1.6).fract();
     let r = 3.0 + k * 18.0;
     let fade = 1.0 - k;
