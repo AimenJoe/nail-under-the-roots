@@ -385,7 +385,7 @@ pub const LIST: [Entry; 64] = [
     Entry {
         cat: Cat::Rooms,
         name: "환경: 물길 굴",
-        desc: "옆 굴의 지대(0275). 젖은 청회색 돌, 청록 이끼, 물안개·물방울. 물줄기 둘(위 → 오른쪽, 아래 → 왼쪽).",
+        desc: "옆 굴의 지대(0275). 젖은 청회색 돌, 청록 이끼, 물안개·물방울. 실제 굴처럼 굽는 격자 아레나 — 위 벽 틈에서 솟아 구불구불 내려가는 물줄기, 웅덩이 둘. 가재·소금쟁이·두꺼비.",
         scenario: Scenario::InBiome(Biome::Water),
     },
     Entry {
@@ -674,26 +674,20 @@ pub fn build(s: Scenario) -> World {
         Scenario::Loot => loot(),
         Scenario::Chargers(n) => chargers(n),
         Scenario::Shooters(n) => shooters(n),
+        Scenario::InBiome(Biome::Water) => {
+            let mut w = water_arena();
+            for (i, k) in [Kind::Crayfish, Kind::Strider, Kind::Toad]
+                .into_iter()
+                .enumerate()
+            {
+                let p = spawn_point(&w, i);
+                w.spawn_mob(k, p);
+            }
+            w
+        }
         Scenario::InBiome(b) => {
             let mut w = build(Scenario::OneEach);
             w.biome = b;
-            // 물길 굴(0275): 아레나에 물줄기 둘(위는 오른쪽으로 두 칸 너비, 아래는 왼쪽으로) — 물살을 바로 본다.
-            if b == Biome::Water {
-                for x in 2..9 {
-                    for y in [3, 4] {
-                        w.room.streams.push((
-                            vec2(x as f32 * 16.0 + 8.0, y as f32 * 16.0 + 8.0),
-                            vec2(1.0, 0.0),
-                        ));
-                    }
-                }
-                for x in 12..18 {
-                    w.room.streams.push((
-                        vec2(x as f32 * 16.0 + 8.0, 9.0 * 16.0 + 8.0),
-                        vec2(-1.0, 0.0),
-                    ));
-                }
-            }
             w
         }
         Scenario::OneEach => one_each(),
@@ -963,9 +957,94 @@ fn boss_half(kind: Kind) -> World {
     w
 }
 
-/// 시나리오 `Scenario::MumuArena`의 월드(0275 P5): "환경: 물길 굴" 아레나에 무무 하나.
+/// 물길 굴 아레나(0275): 실제 굴처럼 격자 방이라 지형 굽기가 물가·물빛을 그린다(격자 없는 아레나는 물이 네모 칸으로만 보였다,
+/// 사장 2026-11-04 "자연스럽게 할 수 있던 거잖아"). 위 벽 틈에서 솟아 구불구불 내려가는 두 칸 너비 물줄기 하나 +
+/// 모양이 고르지 않은 웅덩이 둘 + 바위 둘. 싸움 시나리오(잡몹·무무)가 이 위에 적을 놓는다.
+fn water_arena() -> World {
+    use crate::map::{cell_center, Cell, Grid};
+    let (gw, gh) = (20usize, 12usize);
+    let mut g = Grid::filled(gw, gh, Cell::Floor);
+    for x in 0..gw {
+        g.set(x, 0, Cell::Wall);
+        g.set(x, gh - 1, Cell::Wall);
+    }
+    for y in 0..gh {
+        g.set(0, y, Cell::Wall);
+        g.set(gw - 1, y, Cell::Wall);
+    }
+    for (x, y) in [(15, 3), (16, 3), (3, 8)] {
+        g.set(x, y, Cell::Wall);
+    }
+    // 물줄기의 가운데 줄(흐르는 차례). 칸마다 흐르는 쪽 = 다음 칸 쪽, 마지막 칸은 앞 칸의 쪽.
+    let path: [(usize, usize); 17] = [
+        (6, 1),
+        (6, 2),
+        (6, 3),
+        (7, 3),
+        (7, 4),
+        (7, 5),
+        (8, 5),
+        (9, 5),
+        (10, 5),
+        (10, 6),
+        (11, 6),
+        (12, 6),
+        (12, 7),
+        (13, 7),
+        (13, 8),
+        (13, 9),
+        (13, 10),
+    ];
+    let mut cells: Vec<((usize, usize), Vec2)> = Vec::new();
+    for (i, &(x, y)) in path.iter().enumerate() {
+        let (nx, ny) = path
+            .get(i + 1)
+            .copied()
+            .unwrap_or_else(|| (2 * x - path[i - 1].0, 2 * y - path[i - 1].1));
+        let dir = vec2(nx as f32 - x as f32, ny as f32 - y as f32);
+        // 두 칸 너비: 흐름에 수직으로 한 칸(세로 흐름 → 오른쪽, 가로 흐름 → 아래).
+        let side = if dir.y != 0.0 { (x + 1, y) } else { (x, y + 1) };
+        for c in [(x, y), side] {
+            if g.get(c.0, c.1) == Cell::Floor && !cells.iter().any(|(k, _)| *k == c) {
+                cells.push((c, dir));
+            }
+        }
+    }
+    // 오른쪽 웅덩이는 물줄기와 한 칸 넘게 띄운다(붙으면 한 물로 굽혀 보인다 — 굴의 `pool_patches`와 같은 규칙).
+    let pools = [
+        (2, 2),
+        (3, 2),
+        (4, 2),
+        (2, 3),
+        (3, 3),
+        (16, 8),
+        (17, 8),
+        (16, 9),
+        (17, 9),
+        (18, 9),
+    ];
+    let spawns = [(3, 5), (16, 2), (17, 5), (5, 9), (15, 6), (10, 2), (9, 9)];
+    let mut w = World::new();
+    w.room = crate::room::Room::from_grid(
+        g,
+        Vec::new(),
+        spawns.iter().map(|&(x, y)| cell_center(x, y)).collect(),
+    );
+    w.biome = Biome::Water;
+    w.room.streams = cells
+        .into_iter()
+        .map(|((x, y), d)| (cell_center(x, y), d))
+        .collect();
+    w.room.pools = pools.iter().map(|&(x, y)| cell_center(x, y)).collect();
+    w.enemies.clear();
+    w.player.pos = cell_center(9, 8);
+    w.player.prev_pos = w.player.pos;
+    w
+}
+
+/// 시나리오 `Scenario::MumuArena`의 월드(0275 P5): 물길 굴 아레나에 무무 하나.
 fn mumu_arena(half: bool) -> World {
-    let mut w = build(Scenario::InBiome(Biome::Water));
+    let mut w = water_arena();
     w.enemies.clear();
     w.auto_waves = false;
     let c = w.room.center();
@@ -1015,16 +1094,10 @@ fn new_mobs() -> World {
 
 /// 시나리오 `Scenario::WaterMobs`의 월드(0275 P4): "환경: 물길 굴" 아레나 + 웅덩이 둘, 새 둘 + 원래 물가의 두꺼비.
 fn water_mobs() -> World {
-    let mut w = build(Scenario::InBiome(Biome::Water));
-    w.enemies.clear();
+    let mut w = water_arena();
     w.auto_waves = false;
-    for (x, y) in [(4, 7), (5, 7), (4, 8), (5, 8), (15, 4), (16, 4), (15, 5)] {
-        w.room
-            .pools
-            .push(vec2(x as f32 * 16.0 + 8.0, y as f32 * 16.0 + 8.0));
-    }
     // 젖은 강돌 둘(물길 굴의 부술 것) — 물 밖 바닥에.
-    for (x, y) in [(10, 7), (13, 10)] {
+    for (x, y) in [(4, 6), (16, 6)] {
         let at = vec2(x as f32 * 16.0, y as f32 * 16.0);
         w.room.add_prop(crate::room::Prop {
             rect: Rect::new(at.x, at.y, 16.0, 16.0),
