@@ -269,4 +269,8 @@ Create a character reference sheet for a cozy pixel-art game: the creature in th
 ```
 Using the attached character sheet of Mumu, create one dialogue portrait for the same game: a single head-and-shoulders portrait of Mumu, centered, facing slightly to the right, with the feathery coral-pink gills on both sides of the head and the front of the soft pink body with one small front leg visible at the bottom, on a plain flat light background (#E8E0D0). Calm and gentle, gills relaxed. Mumu has no eyes at all: smooth skin where the eyes would be, and a small closed mouth that reads as a calm smile. Keep the character's design, colors and pixel style exactly the same as the sheet. A clean, wordless image with only this one character. Aspect ratio 1:1.
 ```
-3. **물든 모습**: 보통 초상화를 고쳐 그린다(0-2 "물든 모습은 돌아온 모습 그림을 고쳐 그린다").
+   → 2026-11-04 받음: `mumu_normal.png`(✦ 지움) → 초상화 칸 42(`Portrait::MUMU`, 풀려남 컷씬 `mumu_freed`).
+3. **물든 모습**: 보통 초상화(`mumu_normal.png`)만 첨부해 고쳐 그린다(0-2 "물든 모습은 돌아온 모습 그림을 고쳐 그린다", 실은 선만큼 굵게). → 칸 41.
+```
+Edit this image. Using the attached portrait of Mumu, change Mumu to how it looks while bound by the violet threads: the pink skin a shade duller and greyer, a faint red glow under the skin where the eyes would be (two small soft red spots under the skin, still no eyes), a few softly glowing violet threads about as thick as the outlines coiled around the neck, the front leg and the base of the gills, the gills pressed flat back along the head, and the mouth a thin, cold straight line. Keep everything else exactly the same: the same size, position, framing, background and pixel style.
+```

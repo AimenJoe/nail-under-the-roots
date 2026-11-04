@@ -1061,9 +1061,12 @@ pub fn mumu_meet(w: &World) -> Cutscene {
 }
 
 /// 무무를 이겼다(0275 P5): 실이 풀리고, 무무가 이름을 말한다. 마을로 오자는 말에 물길을 지키겠다며 남는다 —
-/// 대신 마을의 샘이 다시 솟는다(`key::MUMU_FREED` → `village::State::spring`). 그림이 오기 전엔 말만(빛이 그 자리에 선다).
+/// 대신 마을의 샘이 다시 솟는다(`key::MUMU_FREED` → `village::State::spring`). 초상화는 칸 42(풀린 무무), 월드 그림은 아직 없어 빛이 그 자리에 선다.
 pub fn mumu_freed(w: &World, at: Vec2) -> Cutscene {
-    let mut mumu = story_actor(i18n::s().name_mumu, MUMU_SKIN);
+    let mut mumu = Actor {
+        portrait: Some(Portrait::MUMU),
+        ..story_actor(i18n::s().name_mumu, MUMU_SKIN)
+    };
     mumu.pos = at;
     mumu.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
     let actors = vec![nail_actor(w), mumu];

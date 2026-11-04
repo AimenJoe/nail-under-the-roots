@@ -963,6 +963,11 @@ impl Portrait {
         first: 39,
         faces: 2,
     };
+    /// 풀린 무무(0275): 칸 42 하나(보통). 칸 41은 물든 무무 자리(그림이 오면).
+    pub const MUMU: Portrait = Portrait {
+        first: 42,
+        faces: 1,
+    };
 
     pub fn frame(self, face: Face) -> u32 {
         // 모모는 칸이 둘(차가움·괴로움)뿐이라 걱정 = 둘째 칸.
