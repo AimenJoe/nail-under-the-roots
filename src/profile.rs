@@ -52,6 +52,8 @@ pub mod key {
     pub const KONGI_BACK: &str = "kongi";
     /// 토끼풀(어미 굴토끼)이 아기들과 마을로 돌아왔다(0165).
     pub const CLOVER_BACK: &str = "clover";
+    /// 무무(넷째 길의 주인, 0275 P5)의 실을 풀었다: 마을 물웅덩이가 다시 솟는 샘이 된다. 무무는 물길 굴에 남는다(이웃이 아니다).
+    pub const MUMU_FREED: &str = "mumu";
     pub const STONE: &str = "weapon.stone";
     /// 마을 뿌리 길에서 마지막으로 고른 캐릭터(0 = Naïl, 1 = 모모, 0056). 모모로 가장 깊은 곳에 닿았다.
     pub const CHAR_PICK: &str = "char_pick";

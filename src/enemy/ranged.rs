@@ -190,26 +190,39 @@ impl Enemy {
             self.state = State::Puff { time: 0.0 };
         } else if time >= self.windup() {
             // 도토: 부채꼴로 여럿(가운데가 플레이어 쪽), 던진 뒤 잠깐 쉰다.
+            let mumu = sp.behavior == Behavior::Mumu;
             let n = match sp.behavior {
                 Behavior::Doto if self.hurt_half() => t::DOTO_FAN_HURT,
                 Behavior::Doto => t::DOTO_FAN,
+                // 무무(0275 P5): 2단계면 세 갈래.
+                Behavior::Mumu if self.roused => 3,
                 _ => 1,
             };
+            let spread = if mumu {
+                t::MUMU_JET_SPREAD
+            } else {
+                t::DOTO_FAN_SPREAD
+            };
+            // 무무의 물줄기는 한 줄에 물방울 여럿이 잇달아(뒤의 것은 조금 뒤에서 출발).
+            let beads = if mumu { t::MUMU_JET_BEADS } else { 1 };
             for i in 0..n {
-                let a = (i as f32 - (n - 1) as f32 * 0.5) * t::DOTO_FAN_SPREAD;
+                let a = (i as f32 - (n - 1) as f32 * 0.5) * spread;
                 let dir = Vec2::from_angle(a).rotate(self.facing);
-                let start = self.pos + dir * (self.radius() + t::PROJECTILE_RADIUS + 1.0);
-                projectiles.push(Projectile {
-                    pos: start,
-                    prev_pos: start,
-                    vel: dir * sp.shot_speed,
-                    alive: true,
-                    friendly: false,
-                });
+                for b in 0..beads {
+                    let start = self.pos + dir * (self.radius() + t::PROJECTILE_RADIUS + 1.0)
+                        - dir * (b as f32 * t::MUMU_JET_GAP);
+                    projectiles.push(Projectile {
+                        pos: start,
+                        prev_pos: start,
+                        vel: dir * sp.shot_speed,
+                        alive: true,
+                        friendly: false,
+                    });
+                }
             }
             events.push(Event::Shoot);
             self.fire_cd = sp.fire_every;
-            self.state = if sp.behavior == Behavior::Doto {
+            self.state = if matches!(sp.behavior, Behavior::Doto | Behavior::Mumu) {
                 State::Rest { time: sp.rest }
             } else {
                 State::Keep

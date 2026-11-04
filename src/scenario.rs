@@ -101,6 +101,10 @@ pub enum Scenario {
     Exit,
     /// 보스 2단계 확인(0233): 빈 방에 보스 하나, 체력 반 — 깨자마자 2단계로 깨어난다.
     BossHalf(Kind),
+    /// 무무(0275 P5)를 물길 굴 아레나에서: 처음부터 / 체력 반(2단계).
+    MumuArena(bool),
+    /// 넷째 길(옆 굴) 끝방의 무무(0275 P5): 만남 장면부터 이김·풀려남 장면까지 실제 길에서.
+    Mumu,
     /// 넓은 방(0244): 길의 보통 굴에서 넓은 방 안에 바로(들어서면 두 칸의 적이 함께 깬다). 그 캐릭터로.
     Hall(crate::equipment::Character),
     /// 방 짜임(0257): 시작방 옆 싸움방을 물결(0)·매복(1)·버티기(2)로, 문 곁 표지가 보이는 자리에서.
@@ -161,7 +165,7 @@ pub struct Entry {
     pub scenario: Scenario,
 }
 
-pub const LIST: [Entry; 61] = [
+pub const LIST: [Entry; 64] = [
     Entry {
         cat: Cat::Tools,
         name: "대화 검수",
@@ -422,6 +426,12 @@ pub const LIST: [Entry; 61] = [
     },
     Entry {
         cat: Cat::Bosses,
+        name: "넷째 길 끝: 무무",
+        desc: "옆 굴(물길 굴) 끝방의 무무(0275 P5): 만남 장면 → 싸움 → 실이 풀리고 무무는 물길에 남는다(마을 샘이 다시 솟는다). 그림은 임시.",
+        scenario: Scenario::Mumu,
+    },
+    Entry {
+        cat: Cat::Bosses,
         name: "보스 2단계: 대장",
         desc: "빈 방에 들쥐 대장, 체력 반(0233). 깨자마자 2단계 — 붉은 발밑 고리, 빨라진 예고·걸음, 덜 멈칫.",
         scenario: Scenario::BossHalf(Kind::Chief),
@@ -431,6 +441,18 @@ pub const LIST: [Entry; 61] = [
         name: "보스 2단계: 모모",
         desc: "첫 만남 모모, 체력 반(0233). 2단계면 첫 만남에도 굴로 숨고 뛰기를 두 번 잇는다.",
         scenario: Scenario::BossHalf(Kind::Momo),
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "무무(물길 아레나)",
+        desc: "넷째 길의 주인 무무를 물줄기 아레나에서(0275 P5). 물줄기(점선 — 되받아침)·미끄러져 돌진(띠)·꼬리 물결(원판 — 피함). 땅속이면 못 찾는다. 그림은 임시(두꺼비 줄을 크게).",
+        scenario: Scenario::MumuArena(false),
+    },
+    Entry {
+        cat: Cat::Bosses,
+        name: "보스 2단계: 무무",
+        desc: "무무 체력 반 — 물줄기 세 갈래·돌진 두 번·물결 두 겹(0275 P5).",
+        scenario: Scenario::MumuArena(true),
     },
     Entry {
         cat: Cat::Combat,
@@ -551,7 +573,11 @@ pub fn build(s: Scenario) -> World {
             w.adv.events.clear();
             w
         }
-        Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi | Scenario::Clover => road_boss(s),
+        Scenario::Momo(_)
+        | Scenario::Doto
+        | Scenario::Kongi
+        | Scenario::Clover
+        | Scenario::Mumu => road_boss(s),
         Scenario::LastRootlet => last_rootlet(),
         Scenario::SideAsk => {
             let mut w = World::camp_start(crate::tuning::FINAL_STAGE);
@@ -641,6 +667,7 @@ pub fn build(s: Scenario) -> World {
         Scenario::Breakables => breakables(),
         Scenario::Gear => gear(),
         Scenario::BossHalf(kind) => boss_half(kind),
+        Scenario::MumuArena(half) => mumu_arena(half),
         Scenario::AllSpecies => all_species(),
         Scenario::NewMobs | Scenario::DotoMobs => new_mobs(),
         Scenario::WaterMobs => water_mobs(),
@@ -686,12 +713,13 @@ fn boss_glade() -> World {
     w
 }
 
-/// 시나리오 `Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi | Scenario::Clover`의 월드(0248 R29: `build`의 갈래를 함수로).
+/// 시나리오 `Scenario::Momo(_) | Scenario::Doto | Scenario::Kongi | Scenario::Clover | Scenario::Mumu`의 월드(0248 R29: `build`의 갈래를 함수로).
 fn road_boss(s: Scenario) -> World {
     let doto = s == Scenario::Doto;
     let stage = match s {
         Scenario::Doto => 2,
         Scenario::Kongi | Scenario::Clover => crate::tuning::FINAL_STAGE,
+        Scenario::Mumu => crate::tuning::SIDE_STAGE,
         _ => 1,
     };
     let mut w = World::camp_start(stage);
@@ -707,7 +735,9 @@ fn road_boss(s: Scenario) -> World {
         doto_fight: doto,
         kongi_fight: s == Scenario::Kongi,
         clover_fight: s == Scenario::Clover,
+        mumu_fight: s == Scenario::Mumu,
         warren_open: s == Scenario::Clover,
+        side_open: s == Scenario::Mumu,
         ..Default::default()
     });
     if s == Scenario::Clover {
@@ -926,6 +956,25 @@ fn boss_half(kind: Kind) -> World {
     e.wake_delay = 1.0;
     e.knotted = true; // 실뜨기가 체력을 다시 채우지 않게(개발 확인용)
     e.hp = e.max_hp / 2;
+    w.enemies.push(e);
+    w.player.pos = c + vec2(0.0, 44.0);
+    w.player.prev_pos = w.player.pos;
+    w.player.facing = vec2(0.0, -1.0);
+    w
+}
+
+/// 시나리오 `Scenario::MumuArena`의 월드(0275 P5): "환경: 물길 굴" 아레나에 무무 하나.
+fn mumu_arena(half: bool) -> World {
+    let mut w = build(Scenario::InBiome(Biome::Water));
+    w.enemies.clear();
+    w.auto_waves = false;
+    let c = w.room.center();
+    let mut e = Enemy::new(Kind::Mumu, c - vec2(0.0, 30.0));
+    e.wake_delay = 1.0;
+    if half {
+        e.knotted = true;
+        e.hp = e.max_hp / 2;
+    }
     w.enemies.push(e);
     w.player.pos = c + vec2(0.0, 44.0);
     w.player.prev_pos = w.player.pos;

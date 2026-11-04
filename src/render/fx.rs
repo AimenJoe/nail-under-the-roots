@@ -389,6 +389,9 @@ pub(super) fn draw_ambient(w: &World, cam: Vec2, glow: bool) {
 pub(super) fn draw_waves(w: &World) {
     for wv in &w.hazards.waves {
         let r = wv.radius();
+        if r <= 0.0 {
+            continue;
+        }
         let fade = 1.0 - ((wv.time - wv.dur) / 0.25).clamp(0.0, 1.0);
         let (x, y) = (wv.pos.x.round(), wv.pos.y.round());
         if wv.ripple {
@@ -1048,6 +1051,7 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                         | Behavior::Roller
                         | Behavior::Swooper
                         | Behavior::Pincer
+                        | Behavior::Mumu
                 ) =>
             {
                 let dir = e.facing.normalize_or(vec2(1.0, 0.0));
@@ -1066,6 +1070,15 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                 // 포자버섯: 구름이 덮을 자리.
                 draw_tele_disk(pos, t::SPORE_CLOUD_R, k);
             }
+            enemy::State::Aim { .. } if sp.behavior == Behavior::Mumu => {
+                // 무무의 물줄기(0275 P5): 2단계면 세 갈래를 다 보인다.
+                let n = if e.roused { 3 } else { 1 };
+                for i in 0..n {
+                    let a = (i as f32 - (n - 1) as f32 * 0.5) * t::MUMU_JET_SPREAD;
+                    let dir = Vec2::from_angle(a).rotate(e.facing);
+                    draw_aim_lane(w, pos, dir, e.radius(), t::MUMU_JET_RANGE, k);
+                }
+            }
             enemy::State::Aim { .. } => {
                 // 두꺼비 혀는 닿는 데까지만, 도토리는 멀리.
                 let reach = if sp.behavior == Behavior::Tongue {
@@ -1076,8 +1089,13 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                 draw_aim_lane(w, pos, e.facing, e.radius(), reach, k);
             }
             enemy::State::Thump { .. } => {
-                // 토끼풀 발 구르기(0165): 충격파가 닿을 둘레.
-                draw_tele_disk(pos, t::CLOVER_WAVE_R, k);
+                // 토끼풀 발 구르기(0165)·무무의 꼬리 내리치기(0275 P5): 고리가 닿을 둘레.
+                let r = if sp.behavior == Behavior::Mumu {
+                    t::MUMU_WAVE_R
+                } else {
+                    t::CLOVER_WAVE_R
+                };
+                draw_tele_disk(pos, r, k);
             }
             enemy::State::Gather { time } if time < t::CLOVER_THREAD_AT => {
                 let k = (time / t::CLOVER_THREAD_AT).min(1.0);

@@ -1,13 +1,16 @@
 //! 실의 꿈(docs/decisions/0055): 누룩 할매의 실이 기억하는 물든 모습들과 꿈속에서 다시 싸운다(Hollow Knight Godhome 자리).
 //!
-//! 마을 할매 곁 실 고리(`X`)에서 고른다. 이긴 길의 주인만 열린다. 넷을 다 이기면 넷을 이어서 꾸는 줄이 열린다.
+//! 마을 할매 곁 실 고리(`X`)에서 고른다. 이긴 길의 주인만 열린다. 앞의 넷을 다 이기면 넷을 이어서 꾸는 줄이 열린다
+//! (넷째 길의 무무(0275 P5)는 따로 한 줄 — 옆 굴은 고르는 길이라 이어서 꾸기에 넣지 않는다).
 //! 기록은 가장 빠른 시간(0.1초)과 안 맞고 이김(★)만 남는다. 이야기·통계·반딧불은 남기지 않는다(꿈이니까).
 
 use crate::enemy::Kind;
 use crate::profile::{key, Profile};
 
 /// 꿈의 길의 주인(나오는 순서 = 이어서 꾸기 순서).
-pub const BOSSES: [Kind; 4] = [Kind::Chief, Kind::Momo, Kind::Doto, Kind::Kongi];
+pub const BOSSES: [Kind; 5] = [Kind::Chief, Kind::Momo, Kind::Doto, Kind::Kongi, Kind::Mumu];
+/// 이어서 꾸기에 드는 앞의 보스 수.
+pub const RUSH: usize = 4;
 /// 목록 줄: 보스 넷 + 이어서 꾸기.
 pub const ROWS: usize = BOSSES.len() + 1;
 /// 꿈의 모모는 세 번째 모습(한 수씩 다 배운).
@@ -24,8 +27,9 @@ pub fn unlocked(p: &Profile, row: usize) -> bool {
         Some(Kind::Momo) => p.count(key::MOMO_WINS) >= 1,
         Some(Kind::Doto) => p.flag(key::DOTO_MEMORY),
         Some(Kind::Kongi) => p.flag(key::KONGI_BACK),
+        Some(Kind::Mumu) => p.flag(key::MUMU_FREED),
         Some(_) => false,
-        None => (0..BOSSES.len()).all(|r| unlocked(p, r)),
+        None => (0..RUSH).all(|r| unlocked(p, r)),
     }
 }
 
@@ -33,7 +37,7 @@ pub fn unlocked(p: &Profile, row: usize) -> bool {
 pub fn queue(row: usize) -> Vec<Kind> {
     match BOSSES.get(row) {
         Some(k) => vec![*k],
-        None => BOSSES.to_vec(),
+        None => BOSSES[..RUSH].to_vec(),
     }
 }
 
@@ -88,6 +92,9 @@ mod tests {
         assert!(unlocked(&p, BOSSES.len()), "넷 다 이기면 이어서 꾸기");
         assert_eq!(queue(BOSSES.len()).len(), 4);
         assert_eq!(queue(2), vec![Kind::Doto]);
+        assert!(!unlocked(&p, 4), "무무는 풀어 준 뒤에");
+        p.set(key::MUMU_FREED);
+        assert!(unlocked(&p, 4) && queue(4) == vec![Kind::Mumu]);
     }
 
     #[test]

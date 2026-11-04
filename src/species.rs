@@ -34,6 +34,9 @@ pub enum Behavior {
     /// 소금쟁이(0275 P4): 물 칸(물살·웅덩이) 위에서는 빠르고 땅에서는 느리다. 다리로 물을 두드려 퍼지는 물결 고리
     /// (둘레 — 피한다). 물 위에서 두드리면 고리가 멀리 간다. 실제 소금쟁이는 물결로 신호를 보낸다(KB animal-behavior).
     Skater,
+    /// 무무(넷째 길의 주인, 0275 P5): 물줄기 뿜기(점선 — 되받아친다) → 미끄러져 돌진(띠 — 받아친다) → 꼬리로 물 내리치기
+    /// (원판 — 큰 물결 고리, 피한다)를 돈다. 2단계면 물줄기 세 갈래·돌진 두 번·물결 두 겹. 눈이 멀어 땅속의 플레이어는 못 찾는다.
+    Mumu,
     /// 들쥐 대장(튜토리얼 보스): 돌진 ↔ 뛰어 찍기, 체력 반 아래면 생쥐를 부른다. 공격 중엔 안 멈춘다(enemy.rs).
     Chief,
     /// 모모(첫 길의 보스, 0046): 높이 뛰기 ↔ 뒷발 차기, 두 번째부터 굴로 숨었다 튀어나오기, 세 번째엔 이어 뛰기.
@@ -387,6 +390,34 @@ pub static STRIDER: Species = Species {
     ..BASE
 };
 
+/// 무무(물든 눈먼 늙은 도롱뇽, 0275 P5). 넷째 길(옆 굴) 끝에서 큰 나무로 가는 샘의 물길을 지켜 왔다. 무겁고 느리지만
+/// 미끄러지면 빠르다. 그림은 나노바나나 원본이 오기 전까지 두꺼비 줄을 크게·옅게(`render/actors.rs`, 임시).
+pub static MUMU: Species = Species {
+    name: |s| s.mob_mumu,
+    lore: |s| s.mob_mumu_lore,
+    attack: |s| s.mob_mumu_atk,
+    tip: |s| s.mob_mumu_tip,
+    behavior: Behavior::Mumu,
+    hp: 50,
+    radius: 11.0,
+    speed: 30.0,
+    damage: 1,
+    knock_mul: 0.12,
+    trigger: 100.0,
+    windup: 0.75,
+    dash_speed: 240.0,
+    dash_time: 0.55,
+    rest: 0.85,
+    wall_rest: 1.6,
+    keep: (60.0, 130.0),
+    shot_speed: 110.0,
+    glowbugs: (16, 18),
+    seed_chance: 1.0,
+    color: Color::new(0.86, 0.72, 0.74, 1.0),
+    sheet_row: crate::art::TOAD_ROW,
+    ..BASE
+};
+
 /// 들쥐 대장(튜토리얼 보스, docs/decisions/0032). 원래는 들쥐 마을의 대장 보리. 뿌리에 물들어 남쪽 공터를 지킨다.
 /// 손맛: 예고가 길고(0.75초) 크게 보이는 대신, 맞아도 공격을 멈추지 않는다. 벽에 박으면 2초 넘게 어질어질(때릴 때).
 /// 그림은 40×40 따로(assets/art/chief.png, `bori_ai.py`, 0216). `sheet_row`는 쓰지 않는다.
@@ -523,7 +554,7 @@ pub static CLOVER: Species = Species {
 };
 
 /// 도감 순서(허수아비는 빼고).
-pub const BESTIARY: [Kind; 17] = [
+pub const BESTIARY: [Kind; 18] = [
     Kind::FieldMouse,
     Kind::HouseMouse,
     Kind::SewerRat,
@@ -541,6 +572,7 @@ pub const BESTIARY: [Kind; 17] = [
     Kind::Doto,
     Kind::Kongi,
     Kind::Clover,
+    Kind::Mumu,
 ];
 
 pub fn of(kind: Kind) -> &'static Species {
@@ -563,6 +595,7 @@ pub fn of(kind: Kind) -> &'static Species {
         Kind::Doto => &DOTO,
         Kind::Kongi => &KONGI,
         Kind::Clover => &CLOVER,
+        Kind::Mumu => &MUMU,
     }
 }
 

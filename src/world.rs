@@ -110,9 +110,22 @@ impl Wave {
         }
     }
 
-    /// 지금 고리의 반지름.
+    /// 무무의 꼬리 물결(0275 P5): 소금쟁이 것보다 크고 세다(물빛 그림·잡몹 피해가 아니라 보스 피해). `time`이 음수면 그만큼 뒤에 퍼진다.
+    pub fn slam(pos: Vec2, time: f32) -> Self {
+        Self {
+            pos,
+            time,
+            hit: false,
+            r: t::MUMU_WAVE_R,
+            dur: t::MUMU_WAVE_TIME,
+            knock: t::MUMU_WAVE_KNOCK,
+            ripple: true,
+        }
+    }
+
+    /// 지금 고리의 반지름(아직 안 퍼졌으면 0).
     pub fn radius(&self) -> f32 {
-        self.r * (self.time / self.dur).min(1.0)
+        self.r * (self.time / self.dur).clamp(0.0, 1.0)
     }
 }
 
@@ -477,6 +490,8 @@ pub struct Story {
     kongi_fight: bool,
     /// 토끼풀(0165): 굴토끼 옛 굴 끝에서 싸우나(돌아오기 전까지, 쓰러지면 이번 런엔 끈다).
     clover_fight: bool,
+    /// 무무(0275 P5): 넷째 길 끝에서 싸우나(풀려나기 전까지, 쓰러지면 이번 런엔 끈다).
+    mumu_fight: bool,
     /// 토끼풀 가족이 마을에 돌아왔다(기록 `CLOVER_BACK`): 참 엔딩 에필로그에 한 줄 더.
     clover_back: bool,
     /// 고치를 쳤을 때 한 번 알려 줬나 / 마지막으로 튕긴 공격 번호.
@@ -505,6 +520,7 @@ pub struct StorySeed {
     pub doto_fight: bool,
     pub kongi_fight: bool,
     pub clover_fight: bool,
+    pub mumu_fight: bool,
     pub clover_back: bool,
     pub warren_open: bool,
     /// 물길 굴(0275): 엔딩을 하나라도 본 기록이면 셋째 길 끝 출구에서 "가장 깊은 곳 / 물길 굴"을 묻는다.
@@ -529,6 +545,7 @@ impl Story {
         self.doto_fight = s.doto_fight;
         self.kongi_fight = s.kongi_fight;
         self.clover_fight = s.clover_fight;
+        self.mumu_fight = s.mumu_fight;
         self.clover_back = s.clover_back;
         self.warren_open = s.warren_open;
         self.side_open = s.side_open;
@@ -546,6 +563,7 @@ impl Story {
             Kind::Doto => self.doto_fight,
             Kind::Kongi => self.kongi_fight,
             Kind::Clover => self.clover_fight,
+            Kind::Mumu => self.mumu_fight,
             _ => false,
         }
     }
@@ -557,6 +575,7 @@ impl Story {
             Kind::Doto => self.doto_fight = on,
             Kind::Kongi => self.kongi_fight = on,
             Kind::Clover => self.clover_fight = on,
+            Kind::Mumu => self.mumu_fight = on,
             _ => {}
         }
     }
@@ -1815,6 +1834,7 @@ impl World {
         let mut bury = 0;
         let mut thumps = Vec::new();
         let mut ripples: Vec<(Vec2, bool)> = Vec::new();
+        let mut slams: Vec<(Vec2, bool)> = Vec::new();
         let mut threads = Vec::new();
         let mut rouse = Vec::new();
         let mut arrived = Vec::new();
@@ -1843,6 +1863,7 @@ impl World {
                 enemy::Event::Spore => self.juice.audio.play(sfx::Id::Burrow),
                 enemy::Event::Thump(at) => thumps.push(*at),
                 enemy::Event::Ripple(at, wet) => ripples.push((*at, *wet)),
+                enemy::Event::Slam(at, double) => slams.push((*at, *double)),
                 enemy::Event::Thread(at, dir) => threads.push((*at, *dir)),
                 enemy::Event::Rouse(at) => rouse.push(*at),
             }
@@ -1855,6 +1876,16 @@ impl World {
             self.hazards.waves.push(Wave::ripple(at, wet));
             puff(&mut self.juice.fx, at, 4, STREAM_SPRAY, 7.0, 0.35);
             self.juice.audio.play(sfx::Id::Burrow);
+        }
+        // 무무의 꼬리 내리치기(0275 P5): 큰 물결 고리(2단계면 조금 뒤에 하나 더) + 물보라·흔들림.
+        for (at, double) in slams {
+            self.hazards.waves.push(Wave::slam(at, 0.0));
+            if double {
+                self.hazards.waves.push(Wave::slam(at, -t::MUMU_WAVE_GAP));
+            }
+            puff(&mut self.juice.fx, at, 10, STREAM_SPRAY, 14.0, 0.45);
+            self.juice.audio.play(sfx::Id::Impact);
+            self.juice.feel.add_trauma(t::CLOVER_THUMP_SHAKE);
         }
         // 방에 나타났다(0257): 솟으면 흙덩이가 튀고, 떨어지면 먼지가 퍼지고 땅이 울린다.
         for (entry, at) in arrived {
@@ -2519,14 +2550,14 @@ impl World {
             // 토끼풀의 충격파(0165)·소금쟁이의 물결(0275 P4): 퍼지는 고리가 지나는 순간 한 번, 밀린다. 땅속·깡충·드릴은 안 맞는다.
             if hurt_from.is_none() && !parried && self.player.on_foot() {
                 for wv in self.hazards.waves.iter_mut() {
-                    if wv.hit || (wv.ripple && wv.time > wv.dur) {
+                    if wv.hit || wv.time < 0.0 || (wv.ripple && wv.time > wv.dur) {
                         continue;
                     }
                     let r = wv.radius();
                     let d = (ppos - wv.pos).length();
                     if d <= r + pr && d >= r - 10.0 {
                         wv.hit = true;
-                        let tier = if wv.ripple {
+                        let tier = if wv.ripple && wv.r < t::MUMU_WAVE_R {
                             crate::combat::HurtTier::Light
                         } else {
                             crate::combat::HurtTier::Boss
@@ -4408,6 +4439,28 @@ mod tests {
             matches!(w.enemies[0].state, State::Stunned { .. }),
             "혀가 뻗기 시작한 순간에도 받아친다"
         );
+    }
+
+    /// 무무의 두 겹 물결(0275 P5): 둘째 고리는 늦게 퍼지고, 걷는 플레이어는 고리마다 한 번씩 맞을 수 있다.
+    #[test]
+    fn mumu_double_slam_rings_follow_each_other() {
+        let mut w = World::new();
+        w.enemies.clear();
+        let at = w.player.pos + vec2(40.0, 0.0);
+        w.enemy_events.push(enemy::Event::Slam(at, true));
+        w.enemy_events();
+        assert_eq!(w.hazards.waves.len(), 2);
+        assert!(w.hazards.waves[1].time < 0.0 && w.hazards.waves[1].radius() == 0.0);
+        w.player.hp = 9;
+        let hp0 = w.player.hp;
+        for _ in 0..120 {
+            for wv in w.hazards.waves.iter_mut() {
+                wv.time += t::TICK_DT;
+            }
+            w.player.invuln = 0.0;
+            w.hit_player(&[], &[]);
+        }
+        assert_eq!(hp0 - w.player.hp, 2, "고리마다 한 번");
     }
 
     /// 소금쟁이 물결(0275 P4): 퍼지는 고리가 걷는 플레이어를 지날 때 한 번 아프고, 땅속이면 지나간다.

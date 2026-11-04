@@ -751,6 +751,20 @@ pub const RIPPLE_R: f32 = 56.0;
 pub const RIPPLE_TIME: f32 = 0.9;
 pub const RIPPLE_KNOCK: f32 = 110.0;
 pub const RIPPLE_LAND_MUL: f32 = 0.6;
+/// 무무(0275 P5): 물줄기(겨누는 거리·물방울 수·물방울 사이·2단계 세 갈래의 벌어짐), 미끄러져 돌진(2단계 둘째 겨눔 덜기),
+/// 꼬리 내리치기(가까이 와야·예고·물결 반지름·퍼지는 시간·밀기·두 겹 사이). 그림 임시 배율(두꺼비 줄).
+pub const MUMU_JET_RANGE: f32 = 170.0;
+pub const MUMU_JET_BEADS: usize = 4;
+pub const MUMU_JET_GAP: f32 = 9.0;
+pub const MUMU_JET_SPREAD: f32 = 0.32;
+pub const MUMU_SLIDE_REAIM: f32 = 0.45;
+pub const MUMU_SLAM_NEAR: f32 = 64.0;
+pub const MUMU_SLAM_WINDUP: f32 = 0.9;
+pub const MUMU_WAVE_R: f32 = 72.0;
+pub const MUMU_WAVE_TIME: f32 = 0.85;
+pub const MUMU_WAVE_KNOCK: f32 = 170.0;
+pub const MUMU_WAVE_GAP: f32 = 0.4;
+pub const MUMU_ART_SCALE: f32 = 1.8;
 pub const TOAD_TONGUE_WIDTH: f32 = 4.0;
 pub const TOAD_LASH_TIME: f32 = 0.22;
 /// 혀가 다 뻗기까지(0253, 사장 "두꺼비 혀가 보이지도 않고 맞음"): 이 동안 혀끝이 자라며, 맞는 판정도 지금 뻗은 길이까지.

@@ -20,7 +20,7 @@ pub struct Boss {
     pub wins_key: Option<&'static str>,
 }
 
-pub static ALL: [Boss; 4] = [
+pub static ALL: [Boss; 5] = [
     Boss {
         kind: Kind::Momo,
         stage: 1,
@@ -51,6 +51,15 @@ pub static ALL: [Boss; 4] = [
         node: NodeKind::Warren,
         petals: false,
         back_flag: key::CLOVER_BACK,
+        wins_key: None,
+    },
+    // 넷째 길(옆 굴, 0275 P5): 무무. 이겨도 마을로 오지 않는다 — 기록은 "풀려났다"(마을의 샘이 다시 솟는다).
+    Boss {
+        kind: Kind::Mumu,
+        stage: t::SIDE_STAGE,
+        node: NodeKind::Boss,
+        petals: false,
+        back_flag: key::MUMU_FREED,
         wins_key: None,
     },
 ];

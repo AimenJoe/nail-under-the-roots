@@ -988,6 +988,8 @@ pub enum Speaker {
     /// 물든 토끼풀(굴토끼 옛 굴의 보스, 이름표 "???") / 돌아온 토끼풀(0165). 초상화는 아직 없다(색 네모).
     CloverTainted,
     Clover,
+    /// 물든 무무(넷째 길의 주인, 이름표 "???", 0275 P5). 그림·초상화는 아직 없다(월드의 적이 선다).
+    MumuTainted,
     /// 마을에 남은 Naïl(다른 캐릭터로 걸을 때의 이웃, 0249). `Nail`은 늘 이번 런의 플레이어다.
     NailHome,
 }
@@ -1033,6 +1035,7 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
             ..story_actor("???", CLOVER_FUR)
         },
         Speaker::Clover => clover_actor(w.player.pos),
+        Speaker::MumuTainted => story_actor("???", MUMU_SKIN),
         Speaker::NailHome => {
             let mole = crate::equipment::Character::Mole;
             Actor {
@@ -1041,6 +1044,47 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
             }
         }
     }
+}
+
+/// 무무의 살빛(이름표·말풍선 테두리, 0275 P5): 동굴도롱뇽의 옅은 분홍.
+const MUMU_SKIN: Color = Color::new(0.86, 0.72, 0.74, 1.0);
+
+/// 넷째 길(옆 굴) 끝 방에 무무가 있다(0275 P5): 눈이 멀어 물소리로 누가 왔는지 안다.
+pub fn mumu_meet(w: &World) -> Cutscene {
+    let at = w.adv.boss_last;
+    let actors = vec![nail_actor(w), tainted_actor(w, Speaker::MumuTainted, at)];
+    let lines = vec![
+        say(1, Face::Normal, |s| s.mumu_meet_1),
+        say(0, Face::Determined, |s| s.mumu_meet_1b),
+    ];
+    Cutscene::new(actors, tainted_meet_steps(w, at, |s| s.mob_mumu, lines))
+}
+
+/// 무무를 이겼다(0275 P5): 실이 풀리고, 무무가 이름을 말한다. 마을로 오자는 말에 물길을 지키겠다며 남는다 —
+/// 대신 마을의 샘이 다시 솟는다(`key::MUMU_FREED` → `village::State::spring`). 그림이 오기 전엔 말만(빛이 그 자리에 선다).
+pub fn mumu_freed(w: &World, at: Vec2) -> Cutscene {
+    let mut mumu = story_actor(i18n::s().name_mumu, MUMU_SKIN);
+    mumu.pos = at;
+    mumu.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
+    let actors = vec![nail_actor(w), mumu];
+    let mut steps = unbind_steps(at, 0, false);
+    steps.extend([
+        Step::Cue {
+            cue: Cue::Sparkle,
+            at,
+        },
+        Step::Face {
+            actor: 0,
+            dir: at - w.player.pos,
+        },
+        say(1, Face::Normal, |s| s.mumu_b1),
+        say(1, Face::Normal, |s| s.mumu_b2),
+        say(0, Face::Normal, |s| s.mumu_b3),
+        say(1, Face::Normal, |s| s.mumu_b4),
+        say(0, Face::Happy, |s| s.mumu_b5),
+        Step::Wait(0.4),
+    ]);
+    Cutscene::new(actors, steps)
 }
 
 /// 토끼풀의 색(이름표·말풍선 테두리, 0165).
@@ -1502,6 +1546,7 @@ pub fn keeper_meet(kind: crate::enemy::Kind, w: &World) -> Cutscene {
         Kind::Doto => doto_meet(w),
         Kind::Kongi => kongi_meet(w),
         Kind::Clover => clover_meet(w),
+        Kind::Mumu => mumu_meet(w),
         other => unreachable!("길의 주인이 아니다: {other:?}"),
     }
 }
@@ -1516,6 +1561,7 @@ pub fn keeper_beaten(kind: crate::enemy::Kind, w: &World, r: crate::world::BossB
         Kind::Doto => doto_returns(w, at),
         Kind::Kongi => kongi_returns(w, at),
         Kind::Clover => clover_returns(w, at),
+        Kind::Mumu => mumu_freed(w, at),
         other => unreachable!("길의 주인이 아니다: {other:?}"),
     }
 }
@@ -1549,6 +1595,8 @@ mod keeper_tests {
                     "kongi_back".into(),
                     keeper_beaten(Kind::Kongi, w, won(true)),
                 ),
+                ("mumu_meet".into(), keeper_meet(Kind::Mumu, w)),
+                ("mumu_freed".into(), keeper_beaten(Kind::Mumu, w, won(true))),
                 ("clover_meet".into(), keeper_meet(Kind::Clover, w)),
                 (
                     "clover_back".into(),

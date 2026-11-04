@@ -1304,6 +1304,11 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
     }
     let base = sp.color;
     let mut tint = WHITE;
+    // 무무(0275 P5): 그림이 오기 전엔 두꺼비 줄을 크게·옅은 분홍으로(동굴도롱뇽의 살빛).
+    if e.kind == crate::enemy::Kind::Mumu {
+        body *= t::MUMU_ART_SCALE;
+        tint = Color::new(1.0, 0.86, 0.90, 1.0);
+    }
     // 그림자 패스(0106)에서는 몸만: 거품·별·잔상·고리·Z·체력 점은 빛·표시라 그림자를 드리우지 않는다.
     let marks = !shadow_pass();
     if e.poison > 0.0 && e.flash <= 0.0 {
@@ -1598,9 +1603,15 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
     match art.and_then(|a| a.critter(frame, row)) {
         Some(c) => {
             // 발바닥 자리는 16칸 시절(칸 위 = pos.y + r − 15 − 찌그러짐)과 같은 점. 큰 그림 칸(모모)도 같은 배율로 찌그러진다.
+            // 찌그러짐의 기준 키: 보통 16, 크게 그린 무무(임시 그림)는 그 배율만큼 — 발이 늘 몸 아래에 닿게.
+            let base_h = if e.kind == crate::enemy::Kind::Mumu {
+                16.0 * t::MUMU_ART_SCALE
+            } else {
+                16.0
+            };
             let feet = vec2(
                 pos.x,
-                (pos.y + r - 15.0 - (body.y - 16.0)).round() + art::CRITTER_FOOT,
+                (pos.y + r - 15.0 - (body.y - base_h)).round() + art::CRITTER_FOOT,
             );
             c.draw(
                 feet,

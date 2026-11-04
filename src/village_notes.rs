@@ -16,6 +16,8 @@ pub enum Spot {
     Fire,
     Gate,
     Puddle,
+    /// 무무를 풀어 준 뒤 물웅덩이 자리(0275 P5).
+    Spring,
     Stall,
     Seat,
     Bori,
@@ -63,7 +65,7 @@ fn halmae(p: &Profile) -> bool {
     p.flag(key::HALF_ENDING) || p.flag(key::TRUE_ENDING)
 }
 
-pub const NOTES: [Note; 20] = [
+pub const NOTES: [Note; 21] = [
     Note {
         spot: Spot::Tree,
         title: |s| s.vn_tree,
@@ -82,11 +84,18 @@ pub const NOTES: [Note; 20] = [
         body: |s| s.vn_gate_d,
         gate: None,
     },
+    // 물웅덩이는 무무를 풀어 주면(0275 P5) 다시 솟는 샘의 줄로 바뀐다.
     Note {
         spot: Spot::Puddle,
         title: |s| s.vn_puddle,
         body: |s| s.vn_puddle_d,
-        gate: None,
+        gate: Some(|p| !p.flag(key::MUMU_FREED)),
+    },
+    Note {
+        spot: Spot::Spring,
+        title: |s| s.vn_spring,
+        body: |s| s.vn_spring_d,
+        gate: Some(|p| p.flag(key::MUMU_FREED)),
     },
     Note {
         spot: Spot::Stall,

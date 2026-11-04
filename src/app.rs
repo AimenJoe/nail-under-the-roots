@@ -1284,6 +1284,7 @@ impl App {
                 doto_fight: normal && !self.profile.flag(key::DOTO_MEMORY),
                 kongi_fight: normal && !self.profile.flag(key::KONGI_BACK),
                 clover_fight: normal && !self.profile.flag(key::CLOVER_BACK),
+                mumu_fight: normal && !self.profile.flag(key::MUMU_FREED),
                 clover_back: self.profile.flag(key::CLOVER_BACK),
                 warren_open: match s {
                     Scenario::Normal => self.profile.flag(key::MOMO_BACK),
@@ -1963,6 +1964,7 @@ impl App {
             doto: self.profile.flag(key::DOTO_MEMORY) && self.picked() != Character::Doto,
             kongi: self.profile.flag(key::KONGI_BACK),
             clover: self.profile.flag(key::CLOVER_BACK),
+            spring: self.profile.flag(key::MUMU_FREED),
             traces: std::array::from_fn(|i| crate::quests::done(&self.profile, i)),
             // 거꾸로 Naïl은 다른 캐릭터로 걸을 때 큰 나무 곁에 남는다(0249).
             nail: self.picked() != Character::Mole,

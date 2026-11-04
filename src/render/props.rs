@@ -1288,6 +1288,56 @@ pub(super) fn draw_puddle(at: Vec2, time: f32) {
     }
 }
 
+/// 다시 솟는 샘(0275 P5): 물웅덩이 바탕에 가운데서 물이 솟아 고리가 퍼지고, 물방울이 튀며, 둘레에 젖은 이끼 테.
+pub(super) fn draw_village_spring(at: Vec2, time: f32) {
+    let (x, y) = (at.x.round(), at.y.round() + 3.0);
+    draw_ellipse(
+        x,
+        y + 1.0,
+        13.0,
+        6.0,
+        0.0,
+        Color::new(0.24, 0.42, 0.34, 1.0),
+    );
+    draw_puddle(at, time);
+    // 솟는 자리: 밝은 둥근 물 + 퍼지는 고리 둘.
+    let bob = (time * 5.0).sin() * 0.5;
+    draw_ellipse(
+        x,
+        y - 0.5,
+        3.0 + bob,
+        1.4,
+        0.0,
+        Color::new(0.78, 0.92, 0.98, 1.0),
+    );
+    for k in 0..2 {
+        let ph = (time * 0.9 + k as f32 * 0.5).fract();
+        draw_ellipse_lines(
+            x,
+            y,
+            2.0 + ph * 8.0,
+            1.0 + ph * 3.5,
+            0.0,
+            1.0,
+            Color::new(0.86, 0.96, 1.0, 0.7 * (1.0 - ph)),
+        );
+    }
+    // 튀는 물방울 셋(포물선).
+    for k in 0..3 {
+        let ph = (time * 1.3 + k as f32 * 0.33).fract();
+        let side = [-1.0, 0.3, 1.0][k];
+        let dx = side * ph * 5.0;
+        let dy = -6.0 * 4.0 * ph * (1.0 - ph);
+        draw_rectangle(
+            (x + dx).round(),
+            (y - 1.0 + dy).round(),
+            1.0,
+            1.0,
+            Color::new(0.90, 0.98, 1.0, 1.0 - ph * 0.6),
+        );
+    }
+}
+
 /// 빈 자리(모모를 기다리는 그루터기). 꽃잎 셋 가운데 모모를 이긴 만큼 분홍(0046).
 pub(super) fn draw_seat(r: Rect, petals: u8) {
     let bark = Color::new(0.42, 0.28, 0.20, 1.0);

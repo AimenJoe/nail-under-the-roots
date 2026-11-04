@@ -47,6 +47,8 @@ pub enum Kind {
     /// 물길 굴 잡몹(0275 P4): 가재(집게 찍기 + 맞으면 꼬리 쳐 뒤로 튀기)·소금쟁이(물 위에서 빠르고 물결 고리).
     Crayfish,
     Strider,
+    /// 넷째 길(옆 굴, 0275 P5)의 주인: 물든 눈먼 늙은 도롱뇽 무무. 물줄기·미끄러져 돌진·꼬리로 물 내리치기.
+    Mumu,
 }
 
 impl Kind {
@@ -133,6 +135,8 @@ pub enum Event {
     Thread(Vec2, Vec2),
     /// 소금쟁이가 다리로 물을 두드렸다(자리, 물 위였나, 0275 P4). 월드가 물결 고리를 놓는다.
     Ripple(Vec2, bool),
+    /// 무무가 꼬리로 물을 내리쳤다(자리, 두 겹인가 — 2단계, 0275 P5). 월드가 큰 물결 고리를 놓는다.
+    Slam(Vec2, bool),
     /// 보스가 체력 반 아래에서 2단계로 깨어났다(그 자리, 0233). 한 싸움에 한 번.
     Rouse(Vec2),
 }
@@ -540,6 +544,7 @@ impl Enemy {
                         | Behavior::Doto
                         | Behavior::Kongi
                         | Behavior::Clover
+                        | Behavior::Mumu
                 ) =>
             {
                 self.tick_boss_approach(&mut c)
@@ -592,8 +597,11 @@ impl Enemy {
         idle_of(self.sp().behavior)
     }
 
-    /// 발 구르기 예고(0165): 반 아래면 짧다. 실뜨기 배율은 그대로.
+    /// 발 구르기 예고(0165): 반 아래면 짧다. 실뜨기 배율은 그대로. 무무의 꼬리 내리치기(0275 P5)도 같은 상태.
     pub fn thump_windup(&self) -> f32 {
+        if self.sp().behavior == Behavior::Mumu {
+            return t::MUMU_SLAM_WINDUP * self.windup_mul;
+        }
         let base = if self.hurt_half() {
             t::CLOVER_THUMP_WINDUP_HURT
         } else {
@@ -684,7 +692,12 @@ impl Enemy {
     pub fn is_boss(&self) -> bool {
         matches!(
             self.sp().behavior,
-            Behavior::Chief | Behavior::Momo | Behavior::Doto | Behavior::Kongi | Behavior::Clover
+            Behavior::Chief
+                | Behavior::Momo
+                | Behavior::Doto
+                | Behavior::Kongi
+                | Behavior::Clover
+                | Behavior::Mumu
         )
     }
 
@@ -849,6 +862,7 @@ fn idle_of(b: Behavior) -> State {
         | Behavior::Doto
         | Behavior::Kongi
         | Behavior::Clover
+        | Behavior::Mumu
         | Behavior::Darter
         | Behavior::Roller
         | Behavior::Pincer => State::Approach,
@@ -1516,6 +1530,59 @@ mod tests {
         };
         g.on_parried();
         assert!(matches!(g.state, State::Rest { .. }));
+    }
+
+    /// 무무(0275 P5): 물줄기(겨눔 → 한 줄 물방울) → 미끄러져 돌진(띠) → 가까우면 꼬리 내리치기(물결)를 돌고,
+    /// 2단계면 물줄기 세 갈래·돌진 두 번·물결 두 겹. 땅속(노릴 수 없음)이면 아무 수도 고르지 않는다.
+    #[test]
+    fn mumu_cycles_three_moves_and_sharpens_when_roused() {
+        let room = Room::new();
+        let at = room.center();
+        let near = at + vec2(40.0, 0.0);
+        let run = |e: &mut Enemy, player: Vec2, targetable: bool, ticks: usize| {
+            let (mut pr, mut ev) = (Vec::new(), Vec::new());
+            let mut seen = Vec::new();
+            for _ in 0..ticks {
+                e.update(player, targetable, &room, t::TICK_DT, &mut pr, &mut ev);
+                let name = e.state_name();
+                if seen.last() != Some(&name) {
+                    seen.push(name);
+                }
+                e.pos = at; // 자리 고정(돌진·걷기로 멀어지지 않게)
+            }
+            (pr, ev, seen)
+        };
+        let mut e = Enemy::new(Kind::Mumu, at);
+        let (pr, ev, seen) = run(&mut e, near, true, 60 * 8);
+        assert!(
+            seen.contains(&"aim") && seen.contains(&"CHARGE") && seen.contains(&"THUMP"),
+            "{seen:?}"
+        );
+        assert!(
+            pr.len() >= t::MUMU_JET_BEADS,
+            "물줄기는 한 줄에 물방울 여럿"
+        );
+        assert!(
+            ev.iter().any(|v| matches!(v, Event::Slam(_, false))),
+            "1단계 물결은 한 겹"
+        );
+        // 땅속: 눈이 멀어 아무 수도 없다.
+        let mut blind = Enemy::new(Kind::Mumu, at);
+        let (pr, ev, seen) = run(&mut blind, near, false, 60 * 4);
+        assert!(
+            pr.is_empty() && !ev.iter().any(|v| matches!(v, Event::Slam(..))),
+            "{seen:?}"
+        );
+        // 2단계: 세 갈래(물방울 셋 배)·두 겹 물결.
+        let mut r = Enemy::new(Kind::Mumu, at);
+        r.roused = true;
+        let (pr, ev, _) = run(&mut r, near, true, 60 * 8);
+        assert!(pr.len() >= t::MUMU_JET_BEADS * 3, "세 갈래 {}", pr.len());
+        assert!(
+            ev.iter().any(|v| matches!(v, Event::Slam(_, true))),
+            "2단계 물결은 두 겹"
+        );
+        assert!(r.is_boss());
     }
 
     /// 가재(0275 P4): 맞으면 멈칫 대신 맞은 쪽에서 곧게 뒤로 튄다. 방 가운데서는 거리만 벌어지고(쉼),

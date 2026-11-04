@@ -94,7 +94,8 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
                         draw_tree_glow(*at + vec2(0.0, 14.0), w.time);
                     }
                 }
-                // 물웅덩이는 바닥: 맨 먼저.
+                // 물웅덩이는 바닥: 맨 먼저. 무무를 풀어 주면(0275 P5) 다시 솟는 샘 — 누구로 걸어도 보인다.
+                'W' if ground && v.spring => draw_village_spring(*at, w.time),
                 'W' if ground && w.character == crate::equipment::Character::Mole => {
                     draw_puddle(*at, w.time)
                 }

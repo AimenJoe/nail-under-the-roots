@@ -1376,7 +1376,7 @@ impl World {
         if let Some(m) = self
             .enemies
             .iter()
-            .find(|e| matches!(e.kind, Kind::Momo | Kind::Doto | Kind::Kongi))
+            .find(|e| matches!(e.kind, Kind::Momo | Kind::Doto | Kind::Kongi | Kind::Mumu))
         {
             self.adv.boss_last = m.pos;
         }
@@ -2704,6 +2704,22 @@ mod tests {
             ..Default::default()
         });
         assert!(v.neighbors.iter().any(|n| n.who == Who::Kongi));
+    }
+
+    /// 무무(0275 P5): 넷째 길(옆 굴) 끝 굴만 무무가 지키고(싸울 때만 — 풀어 준 기록이면 없다), 다른 길엔 없다.
+    #[test]
+    fn mumu_guards_the_side_path_end() {
+        for (stage, fight, want) in [
+            (t::SIDE_STAGE, true, true),
+            (t::SIDE_STAGE, false, false),
+            (t::FINAL_STAGE, true, false),
+        ] {
+            let mut w = World::camp_start(stage);
+            w.story.set_fight(crate::enemy::Kind::Mumu, fight);
+            w.enter_route_boss_now();
+            let boss = w.adv.dungeon.as_ref().and_then(|d| d.boss);
+            assert_eq!(boss == Some(Kind::Mumu), want, "길 {stage}, 싸움 {fight}");
+        }
     }
 
     /// 수수(0053)는 첫 쉼터에만 서 있고, 곁에서 말을 걸 수 있다.

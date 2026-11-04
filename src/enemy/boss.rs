@@ -19,6 +19,7 @@ impl Enemy {
                 Behavior::Momo => self.momo_next(dist, player_pos, events),
                 Behavior::Kongi => self.kongi_next(dist),
                 Behavior::Clover => self.clover_next(dist, player_pos),
+                Behavior::Mumu => self.mumu_next(dist),
                 _ => self.doto_next(dist, player_pos),
             };
             if matches!(self.state, State::Approach) {
@@ -49,7 +50,11 @@ impl Enemy {
         if player_targetable {
             self.facing = dir_to_player;
         }
-        if time >= self.thump_windup() {
+        if time >= self.thump_windup() && sp.behavior == Behavior::Mumu {
+            // 무무(0275 P5): 꼬리로 물을 내리친다 — 2단계면 두 겹.
+            events.push(Event::Slam(self.pos, self.roused));
+            self.state = State::Rest { time: sp.rest };
+        } else if time >= self.thump_windup() {
             events.push(Event::Thump(self.pos));
             self.state = State::Rest { time: sp.rest };
         } else {
@@ -322,6 +327,29 @@ impl Enemy {
         match self.guard {
             Some(g) => g + (player_pos - g).normalize_or(vec2(0.0, 1.0)) * t::CLOVER_GUARD_DIST,
             None => player_pos,
+        }
+    }
+
+    /// 무무의 다음 수(0275 P5): 물줄기 뿜기(멀어도) → 미끄러져 돌진(조금 멀어도) → 꼬리로 물 내리치기(가까이 와서)를 돈다.
+    /// 2단계면 물줄기가 세 갈래(`tick_aim`), 돌진이 두 번(`chain`), 물결이 두 겹(`tick_thump`). 눈이 멀어 땅속의 플레이어는
+    /// 못 찾는다 — `tick_boss_approach`가 노릴 수 없으면 아무것도 고르지 않는다.
+    pub(super) fn mumu_next(&mut self, dist: f32) -> State {
+        let sp = self.sp();
+        match self.pattern % 3 {
+            0 if dist < t::MUMU_JET_RANGE => {
+                self.pattern += 1;
+                State::Aim { time: 0.0 }
+            }
+            1 if dist < sp.trigger * 1.6 => {
+                self.pattern += 1;
+                self.chain = if self.roused { 1 } else { 0 };
+                State::Windup { time: 0.0 }
+            }
+            2 if dist < t::MUMU_SLAM_NEAR => {
+                self.pattern += 1;
+                State::Thump { time: 0.0 }
+            }
+            _ => State::Approach,
         }
     }
 }

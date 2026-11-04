@@ -88,12 +88,17 @@ impl Enemy {
             self.flash = t::HIT_FLASH;
             events.push(Event::WallHit);
         } else if time >= dur
-            && matches!(sp.behavior, Behavior::Darter | Behavior::Clover)
+            && matches!(
+                sp.behavior,
+                Behavior::Darter | Behavior::Clover | Behavior::Mumu
+            )
             && self.chain > 0
         {
             // 뒤쥐: 곧바로 다시 겨눠 한 번 더 문다(예고는 짧게). 토끼풀도 둘째 차기(0165).
             self.chain -= 1;
-            let skip = if sp.behavior == Behavior::Clover {
+            let skip = if sp.behavior == Behavior::Mumu {
+                t::MUMU_SLIDE_REAIM
+            } else if sp.behavior == Behavior::Clover {
                 t::CLOVER_KICK_REAIM
             } else {
                 t::SHREW_REAIM
