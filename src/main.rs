@@ -28,6 +28,7 @@ mod depth;
 mod dream;
 mod dungeon;
 mod enemy;
+mod epic;
 mod equipment;
 mod field;
 mod help;

@@ -3,6 +3,9 @@ name: build-desktop
 # - release/** push: 개발판(기본 기능)을 Actions 아티팩트로.
 # - release.yml이 부를 때(release_tag): 운영판(--no-default-features)을 만들어 그 태그의 GitHub Release에 붙인다.
 # - 손으로: Actions → build-desktop → Run workflow(브랜치 고르기, 0169 R8와 같은 방식).
+# - store-deploy.yml이 부를 때(store = steam | epic, 0276 S4·E4): 운영판 + 상점 기능(--features steam|epic)을 만들어
+#   아티팩트로만 둔다(Release에 붙이지 않는다). epic은 Windows·macOS만(Epic 런처에 Linux 없음) — EOS 아이디는
+#   Environment `store`에서 빌드 때 넣고, EOS SDK(.lib·.dll)는 비공개 에셋 레포의 `eos/sdk`에서 꺼낸다.
 # main push마다는 돌리지 않는다: macOS 러너는 분당 비용이 리눅스의 약 10배라(레포를 비공개로 바꾸면 유료, 0237) 릴리스·개발판에서만.
 # 묶음 안: 실행 파일 + assets(웹 전용 mp3·vendor/.git 뺌) + 제3자 고지. 게임은 실행 파일 옆(또는 .app/Contents/Resources)의
 # assets를 찾는다(src/main.rs `assets_dir`). 서명: macOS는 임시(ad-hoc) 서명만, Windows는 서명 없음 — docs/decisions/0240.
@@ -23,9 +26,13 @@ on:
       release_tag:
         type: string
         required: true
+      store:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
-  group: desktop-${{ inputs.release_tag || github.ref }}
+  group: desktop-${{ inputs.store }}${{ inputs.release_tag || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -33,19 +40,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            name: windows
-          - os: macos-latest
-            name: macos
-          # glibc를 낮게: 오래된 배포판·Steam Deck(SteamOS)에서도 뜨게 22.04에서 빌드한다.
-          - os: ubuntu-22.04
-            name: linux
+        # glibc를 낮게: 오래된 배포판·Steam Deck(SteamOS)에서도 뜨게 리눅스는 22.04에서 빌드한다. Epic 판은 Linux가 없다.
+        include: ${{ fromJSON(inputs.store == 'epic' && '[{"os":"windows-latest","name":"windows"},{"os":"macos-latest","name":"macos"}]' || '[{"os":"windows-latest","name":"windows"},{"os":"macos-latest","name":"macos"},{"os":"ubuntu-22.04","name":"linux"}]') }}
     runs-on: ${{ matrix.os }}
+    # Epic 판만 EOS 아이디가 필요하다 — 그때만 Environment `store`(배포 갈래·사람 승인)에 들어간다.
+    environment: ${{ inputs.store == 'epic' && 'store' || '' }}
     permissions:
       contents: write   # release_tag일 때 Release에 붙이기
     env:
       ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+      STORE: ${{ inputs.store }}
     defaults:
       run:
         shell: bash
@@ -79,22 +83,39 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          if [ -n "$RELEASE_TAG" ]; then
+          if [ -n "$STORE" ]; then
+            # 상점 판: 운영판 + 상점 기능. 묶음 이름 = 상점 이름.
+            echo "FEATURES=--no-default-features --features $STORE" >> "$GITHUB_ENV"; echo "FLAVOR=$STORE" >> "$GITHUB_ENV"
+          elif [ -n "$RELEASE_TAG" ]; then
             echo "FEATURES=--no-default-features" >> "$GITHUB_ENV"; echo "FLAVOR=release" >> "$GITHUB_ENV"
           else
             echo "FEATURES=" >> "$GITHUB_ENV"; echo "FLAVOR=dev" >> "$GITHUB_ENV"
           fi
           echo "VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)" >> "$GITHUB_ENV"
 
-      # 묶음에 넣을 assets: 네이티브는 ogg만 푼다(mp3는 웹 전용, 0235 R20). vendor의 .git은 뺀다.
-      - name: Stage assets
+      # Steam 판 리눅스: 실행 파일 옆의 libsteam_api.so를 찾게 rpath $ORIGIN(Steam은 게임 폴더를 LD_LIBRARY_PATH에 넣어 주지 않는다고 본다 — 실기 확인 전).
+      - name: Store build env
+        if: inputs.store != ''
+        env:
+          EOS_PRODUCT_ID: ${{ secrets.NAIL_EOS_PRODUCT_ID }}
+          EOS_SANDBOX_ID: ${{ secrets.NAIL_EOS_SANDBOX_ID }}
+          EOS_DEPLOYMENT_ID: ${{ secrets.NAIL_EOS_DEPLOYMENT_ID }}
+          EOS_CLIENT_ID: ${{ secrets.NAIL_EOS_CLIENT_ID }}
+          EOS_CLIENT_SECRET: ${{ secrets.NAIL_EOS_CLIENT_SECRET }}
         run: |
-          mkdir -p stage
-          cp -R assets stage/assets
-          rm -f stage/assets/music/*.mp3
-          rm -rf stage/assets/vendor/.git
-          cp assets/THIRD_PARTY_LICENSES.txt stage/
-          du -sh stage/assets
+          if [ "$STORE" = steam ] && [ "${{ matrix.name }}" = linux ]; then
+            echo "RUSTFLAGS=-C link-arg=-Wl,-rpath,\$ORIGIN" >> "$GITHUB_ENV"
+          fi
+          if [ "$STORE" = epic ]; then
+            # EOS 아이디는 빌드에 박는다(option_env!, src/epic.rs). 값은 로그에 찍지 않는다.
+            for k in PRODUCT_ID SANDBOX_ID DEPLOYMENT_ID CLIENT_ID CLIENT_SECRET; do
+              v="EOS_$k"; echo "NAIL_EOS_$k=${!v}" >> "$GITHUB_ENV"
+            done
+            if [ "${{ matrix.name }}" = windows ]; then
+              test -d assets/vendor/eos/sdk/Lib || { echo "::error::비공개 에셋 레포에 eos/sdk가 없다(EOS SDK — Epic 포털에서 받아 넣는다)"; exit 1; }
+              echo "EOS_SDK_DIR=$GITHUB_WORKSPACE/assets/vendor/eos/sdk" >> "$GITHUB_ENV"
+            fi
+          fi
 
       - name: Build (Windows)
         if: matrix.name == 'windows'
@@ -111,71 +132,9 @@ jobs:
             target/aarch64-apple-darwin/release/nail target/x86_64-apple-darwin/release/nail
           lipo -info target/release-nail-universal
 
-      - name: Package (Windows)
-        if: matrix.name == 'windows'
-        run: |
-          # 실행 파일 아이콘(pc/nail.ico, tools/icons/make_icons.py)을 rcedit로 넣는다(빌드 의존성 없이).
-          curl -sSL -o rcedit.exe https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
-          ./rcedit.exe target/release/nail.exe --set-icon pc/nail.ico \
-            --set-version-string ProductName "Nail: Under the Roots" \
-            --set-version-string FileDescription "Nail: Under the Roots" \
-            --set-file-version "$VERSION" --set-product-version "$VERSION"
-          D="Nail-Under-the-Roots"
-          mkdir -p "$D"
-          cp target/release/nail.exe "$D/Nail.exe"
-          cp -R stage/assets stage/THIRD_PARTY_LICENSES.txt "$D/"
-          7z a -tzip "nail-windows-$FLAVOR.zip" "$D" > /dev/null
-          ls -la "nail-windows-$FLAVOR.zip"
-          echo "PKG=nail-windows-$FLAVOR.zip" >> "$GITHUB_ENV"
-
-      - name: Package (macOS)
-        if: matrix.name == 'macos'
-        run: |
-          APP="Nail.app"
-          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-          cp target/release-nail-universal "$APP/Contents/MacOS/nail"
-          cp -R stage/assets "$APP/Contents/Resources/assets"
-          cp stage/THIRD_PARTY_LICENSES.txt "$APP/Contents/Resources/"
-          cp pc/nail.icns "$APP/Contents/Resources/nail.icns"
-          cat > "$APP/Contents/Info.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleName</key><string>Naïl</string>
-            <key>CFBundleDisplayName</key><string>Naïl: Under the Roots</string>
-            <key>CFBundleIdentifier</key><string>io.github.aimenjoe.nail</string>
-            <key>CFBundleExecutable</key><string>nail</string>
-            <key>CFBundleIconFile</key><string>nail.icns</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>${VERSION}</string>
-            <key>CFBundleVersion</key><string>${VERSION}</string>
-            <key>LSMinimumSystemVersion</key><string>11.0</string>
-            <key>LSApplicationCategoryType</key><string>public.app-category.role-playing-games</string>
-            <key>NSHighResolutionCapable</key><true/>
-          </dict>
-          </plist>
-          EOF
-          plutil -lint "$APP/Contents/Info.plist"
-          # 임시(ad-hoc) 서명: lipo로 합치면 arm64의 링커 서명이 깨져 애플 실리콘에서 켜지지 않는다.
-          # 개발자 ID 서명·공증은 Apple Developer 가입 뒤(0240). 그 전에는 처음 열 때 "개인정보 보호 및 보안 → 그래도 열기".
-          codesign --force --deep -s - "$APP"
-          codesign --verify --verbose "$APP"
-          ditto -c -k --sequesterRsrc --keepParent "$APP" "nail-macos-$FLAVOR.zip"
-          ls -la "nail-macos-$FLAVOR.zip"
-          echo "PKG=nail-macos-$FLAVOR.zip" >> "$GITHUB_ENV"
-
-      - name: Package (Linux)
-        if: matrix.name == 'linux'
-        run: |
-          D="Nail-Under-the-Roots"
-          mkdir -p "$D"
-          cp target/release/nail "$D/nail"
-          cp -R stage/assets stage/THIRD_PARTY_LICENSES.txt "$D/"
-          tar czf "nail-linux-$FLAVOR.tar.gz" "$D"
-          ls -la "nail-linux-$FLAVOR.tar.gz"
-          ldd "$D/nail" | head -20
-          echo "PKG=nail-linux-$FLAVOR.tar.gz" >> "$GITHUB_ENV"
+      # 묶기(assets 고르기·아이콘·Info.plist·서명·상점 재배포 파일)는 한 곳: tools/pc/package.sh.
+      - name: Package
+        run: tools/pc/package.sh "${{ matrix.name }}" "$FLAVOR" "$STORE"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -184,7 +143,7 @@ jobs:
           retention-days: 7
 
       - name: Attach to Release
-        if: inputs.release_tag != ''
+        if: inputs.release_tag != '' && inputs.store == ''
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.release_tag }}

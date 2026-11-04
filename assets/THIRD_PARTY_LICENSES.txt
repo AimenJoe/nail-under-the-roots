@@ -4968,6 +4968,7 @@ freely, subject to the following restrictions:
 라이선스 파일이 크레이트에 없는 항목(SPDX 표기만):
   dasp_frame 0.11.0 (MIT OR Apache-2.0)
   dasp_sample 0.11.0 (MIT OR Apache-2.0)
+  eos-sys 0.1.1 (MIT OR Apache-2.0)
   gilrs 0.10.10 (Apache-2.0/MIT)
   gilrs-core 0.5.15 (Apache-2.0/MIT)
   malloc_buf 0.0.6 (MIT)

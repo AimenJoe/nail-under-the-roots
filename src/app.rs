@@ -522,6 +522,8 @@ pub struct App {
     profile: crate::profile::Profile,
     /// Steam 연결과 업적(0276) — `steam` 기능이 없으면 빈 손.
     steam: crate::steam::Steam,
+    /// Epic Games Store 연결과 업적(0276 E2) — `epic` 기능(Windows)이 없으면 빈 손.
+    epic: crate::epic::Epic,
     /// 이번 쓰러짐을 이미 셌나.
     death_noted: bool,
     /// 전환이 끝난 뒤에 할 일(깨어난 뒤·쉼터 도착·런 첫 한마디·길 지도, 0230 R15).
@@ -579,6 +581,7 @@ impl App {
         }
         // Steam이 먼저: 연결되면 기록 폴더를 계정마다로 정한다(0276 S3) — 기록을 읽기 전에.
         let steam = crate::steam::Steam::start();
+        let epic = crate::epic::Epic::start();
         let saved = crate::prefs::load();
         let settings = Settings {
             volume: saved.map(|p| p.volume).unwrap_or(7),
@@ -689,6 +692,7 @@ impl App {
             talk_n: [0; crate::story::WHO_COUNT],
             profile: crate::profile::load(),
             steam,
+            epic,
             death_noted: false,
             after: after::After::default(),
             erase_armed: false,
@@ -741,6 +745,7 @@ impl App {
         }
         crate::profile::save(&self.profile);
         self.steam.sync(&self.profile);
+        self.epic.sync(&self.profile);
     }
 
     /// 이벤트 저장(0265, 0264의 5초 주기 저장을 대신함): 굴의 방 경계(방을 비움·다음 방으로 넘어섬)·상자·물건 받기·일시정지에서
@@ -824,6 +829,7 @@ impl App {
     /// 프레임마다 한 번: 입력 → 장면 갱신 → 그리기.
     pub fn frame(&mut self) {
         self.steam.tick(&self.profile);
+        self.epic.tick(&self.profile);
         self.input.set_menu_mode(self.scene != Scene::Game);
         self.input.poll();
         if self.input.fullscreen_pressed() {

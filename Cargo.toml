@@ -15,6 +15,9 @@ clip = []
 # steam: Steam 판(0276 S1) — PC 빌드에만 켠다(`cargo build --release --no-default-features --features steam`).
 # Steam이 없거나 앱 번호가 맞지 않으면 조용히 그냥 켜진다(직접 받은 판과 같다). 웹·Android·iOS에는 켜지 않는다.
 steam = ["dep:steamworks"]
+# epic: Epic Games Store 판(0276 E2) — Windows 빌드에만 켠다(`--target x86_64-pc-windows-msvc --no-default-features --features epic`).
+# Epic 런처가 넘긴 로그인 코드가 없거나 EOS 아이디(빌드 때 환경 변수)가 없으면 조용히 그냥 켜진다. macOS는 Epic 업적 의무 면제.
+epic = ["dep:eos-sys"]
 
 [dependencies]
 macroquad = { version = "0.4.16", features = ["audio"] }
@@ -34,6 +37,11 @@ sys-locale = "0.3"
 # 레포에 넣지 않는다(Valve SDK 계약) — Steam 빌드 CI가 실행 파일 옆에 둔다.
 [target.'cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))'.dependencies]
 steamworks = { version = "0.13", optional = true }
+
+# Epic Online Services(0276 E2): 미리 만든 바인딩(eos-sys, MIT/Apache)만 쓰고 SDK는 레포에 넣지 않는다 —
+# 링크·실행에 필요한 EOSSDK-Win64-Shipping.lib·.dll은 Epic 포털에서 받아 비공개 에셋 레포에 두고 CI가 `EOS_SDK_DIR`로 준다.
+[target.'cfg(windows)'.dependencies]
+eos-sys = { version = "0.1.1", optional = true }
 
 # cargo-quad-apk 설정 (.github/workflows/build-android.yml, docs/decisions/0005)
 [package.metadata.android]

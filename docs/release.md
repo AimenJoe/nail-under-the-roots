@@ -74,3 +74,21 @@
 5. 계정 2단계 인증.
 
 남은 틈(알고 둔다): `ASSETS_TOKEN`(비공개 에셋 레포 읽기 전용)·`ANDROID_DEBUG_KEYSTORE_B64`는 아직 레포 시크릿이다 — Write 권한자가 없으면 읽을 사람이 없다(1·4). 협업자를 들이게 되면 이 둘도 Environment로 옮긴다(빌드 워크플로마다 `environment:` 한 줄).
+
+## 상점 업로드(Steam·Epic, 0276 S4·E4 — 실기 확인 전)
+`store-deploy.yml`을 손으로 돌린다(Actions → store-deploy → Run workflow → store = steam | epic). 순서: `build-desktop.yml`이 상점 판(운영판 + `--features steam|epic`)을 묶고 → Environment **`store`**에 들어간 업로드 잡만 상점 자격을 읽어 올린다. Steam은 **베타 갈래에만**(`SetLive`, 기본 갈래로는 사람이 파트너 사이트에서 옮긴다 — SteamPipe가 자동으로 못 건다), Epic은 아티팩트에 바이너리만(라벨·출시는 사람이 포털에서).
+
+Environment `store` 만들기(사람): Settings → Environments → New `store` → Deployment branches = `main`(+ 출시 전 베타 시험을 하려면 `release/**`), **Required reviewers = 사장**. 넣을 값:
+
+| 종류 | 이름 | 무엇 |
+|---|---|---|
+| Secret | `STEAM_USERNAME` | 업로드 전용 빌더 계정 이름(앱 메타데이터 편집·변경 게시만 준 계정) |
+| Secret | `STEAM_CONFIG_VDF` | 그 계정으로 한 번 `steamcmd +login <계정>` 해 Steam Guard를 지난 뒤의 `config/config.vdf`를 base64로(`base64 -w0 config.vdf`). 가끔 만료 → 다시 만들어 바꾼다 |
+| Variable | `STEAM_APP_ID`·`STEAM_DEPOT_WINDOWS`·`STEAM_DEPOT_MACOS`·`STEAM_DEPOT_LINUX` | 파트너 사이트의 앱 번호·데포 번호 |
+| Secret | `NAIL_EOS_PRODUCT_ID`·`NAIL_EOS_SANDBOX_ID`·`NAIL_EOS_DEPLOYMENT_ID`·`NAIL_EOS_CLIENT_ID`·`NAIL_EOS_CLIENT_SECRET` | 게임 안 EOS 연결(업적)에 박는 아이디 — Epic 포털의 제품 설정(Live 샌드박스·배포, GameClient 정책의 클라이언트) |
+| Secret | `EPIC_BPT_CLIENT_ID`·`EPIC_BPT_CLIENT_SECRET` | BuildPatchTool 업로드용 자격(포털에서 발급) |
+| Variable | `EPIC_ORG_ID`·`EPIC_PRODUCT_ID`·`EPIC_ARTIFACT_WINDOWS`·`EPIC_ARTIFACT_MACOS` | 조직·제품·아티팩트 아이디 |
+
+비공개 에셋 레포(`ASSETS_REPO`)에 넣을 것(포털에서 받는 파일이라 공개 레포에 두지 않는다): `eos/sdk/`(EOS SDK의 `Include`·`Lib`·`Bin` — 빌드가 `EOSSDK-Win64-Shipping.lib`로 링크하고 `.dll`을 실행 파일 옆에 둔다), `eos/BuildPatchTool/`(압축을 푼 그대로, Linux 실행 파일을 쓴다). 묶음은 이 `eos/` 폴더를 빼고 assets를 싣는다(`tools/pc/package.sh`). Steam 재배포 파일은 크레이트가 빌드 때 내놓은 것을 실행 파일 옆에 둔다.
+
+Steam 파트너 사이트에서 사람이: 데포 셋(OS마다), 실행 옵션(Windows `Nail.exe`, macOS `Nail.app`, Linux `nail`), 업로드 뒤 빌드 목록에서 기본 갈래로 옮기기. Epic 포털에서: 아티팩트(Windows·macOS), 실행 파일·인자, 올린 바이너리에 라벨, EOS·Epic 상점 업적 일괄 올리기(`python3 tools/epic/make_eos_zip.py` → zip, XP는 `docs/epic/epic-store-xp.csv`). 한국에 내면 업데이트마다 content notes.

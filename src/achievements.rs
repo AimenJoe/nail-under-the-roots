@@ -18,50 +18,59 @@ pub struct Achievement {
     /// 이루기 전까지 숨김(이야기·엔딩 뒤). 게임은 읽지 않는다 — 파트너 사이트 등록표(`docs/steam/achievements.md`)를 만드는 시험만.
     #[cfg_attr(not(test), allow(dead_code))]
     pub hidden: bool,
+    /// Epic Games Store 업적 XP(0276 E3): 합이 정확히 1,000, 하나에 5~200, 5의 배수(동 5~45·은 50~95·금 100~200).
+    /// 올린 뒤에는 못 바꾼다 — 시험 `epic_xp_follows_store_rules`. 게임은 읽지 않는다(등록 자료를 만드는 시험만).
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub xp: u16,
 }
 
-const fn a(api: &'static str, goal: &'static str, hidden: bool) -> Achievement {
-    Achievement { api, goal, hidden }
+const fn a(api: &'static str, goal: &'static str, hidden: bool, xp: u16) -> Achievement {
+    Achievement {
+        api,
+        goal,
+        hidden,
+        xp,
+    }
 }
 
 /// 서른: 이야기 열여섯(엔딩 뒤 것은 숨김) · 싸움 여섯 · 탐험 셋 · 이웃 셋 · 마을 둘.
 /// 갈아 넣는 수(처치 1000 같은)는 넣지 않는다 — 저널의 둘째 단계 정도까지만(0276 조사: 반복보다 이야기·발견).
 pub const ALL: [Achievement; 30] = [
     // 이야기
-    a("ACH_TUTORIAL", "tutorial", false),
-    a("ACH_BORI_BACK", "bori", false),
-    a("ACH_MOMO_FIRST_WIN", "momo1", false),
-    a("ACH_MOMO_BACK", "momo3", false),
-    a("ACH_DOTO_BACK", "doto", false),
-    a("ACH_SUSU_SPROUT_CLAWS", "susu", false),
-    a("ACH_KONGI_BACK", "kongi", false),
-    a("ACH_DEEPEST_PLACE", "deepest", false),
-    a("ACH_CLOVER_BACK", "clover", true),
-    a("ACH_ALL_NEIGHBORS_BACK", "all_back", true),
-    a("ACH_TRUE_ENDING", "true_end", true),
-    a("ACH_ALL_MEMORIES", "memory", true),
-    a("ACH_SIDE_BURROW", "side", true),
-    a("ACH_MUMU_FREED", "mumu", true),
-    a("ACH_MOMO_DEEPEST", "momo_deep", true),
-    a("ACH_DOTO_DEEPEST", "doto_deep", true),
+    a("ACH_TUTORIAL", "tutorial", false, 10),
+    a("ACH_BORI_BACK", "bori", false, 25),
+    a("ACH_MOMO_FIRST_WIN", "momo1", false, 20),
+    a("ACH_MOMO_BACK", "momo3", false, 40),
+    a("ACH_DOTO_BACK", "doto", false, 40),
+    a("ACH_SUSU_SPROUT_CLAWS", "susu", false, 15),
+    a("ACH_KONGI_BACK", "kongi", false, 40),
+    a("ACH_DEEPEST_PLACE", "deepest", false, 50),
+    a("ACH_CLOVER_BACK", "clover", true, 50),
+    a("ACH_ALL_NEIGHBORS_BACK", "all_back", true, 60),
+    a("ACH_TRUE_ENDING", "true_end", true, 100),
+    a("ACH_ALL_MEMORIES", "memory", true, 50),
+    a("ACH_SIDE_BURROW", "side", true, 30),
+    a("ACH_MUMU_FREED", "mumu", true, 50),
+    a("ACH_MOMO_DEEPEST", "momo_deep", true, 40),
+    a("ACH_DOTO_DEEPEST", "doto_deep", true, 40),
     // 싸움
-    a("ACH_KILLS", "kills2", false),
-    a("ACH_BURST_KILLS", "ambush2", false),
-    a("ACH_PARRIES", "parry2", false),
-    a("ACH_HEAVY_HITS", "heavy2", false),
-    a("ACH_FINISHERS", "finisher", false),
-    a("ACH_MOMO_BOWLING", "bowl", true),
+    a("ACH_KILLS", "kills2", false, 30),
+    a("ACH_BURST_KILLS", "ambush2", false, 25),
+    a("ACH_PARRIES", "parry2", false, 30),
+    a("ACH_HEAVY_HITS", "heavy2", false, 25),
+    a("ACH_FINISHERS", "finisher", false, 20),
+    a("ACH_MOMO_BOWLING", "bowl", true, 20),
     // 탐험
-    a("ACH_CHESTS", "chest2", false),
-    a("ACH_BREAKABLES", "break", false),
-    a("ACH_FALLS", "falls", false),
+    a("ACH_CHESTS", "chest2", false, 20),
+    a("ACH_BREAKABLES", "break", false, 20),
+    a("ACH_FALLS", "falls", false, 10),
     // 이웃
-    a("ACH_BESTIARY", "mobs2", false),
-    a("ACH_TALENTS", "talent2", false),
-    a("ACH_DREAM_RUSH", "dream_all", true),
+    a("ACH_BESTIARY", "mobs2", false, 30),
+    a("ACH_TALENTS", "talent2", false, 25),
+    a("ACH_DREAM_RUSH", "dream_all", true, 40),
     // 마을
-    a("ACH_VILLAGE_DECOR", "decor2", false),
-    a("ACH_FIRST_KNOT", "knot", false),
+    a("ACH_VILLAGE_DECOR", "decor2", false, 20),
+    a("ACH_FIRST_KNOT", "knot", false, 25),
 ];
 
 /// 지금 기록에서 이룬 업적.
@@ -219,6 +228,72 @@ mod tests {
         }
         std::fs::write("docs/steam/achievements-definitions.csv", defs).unwrap();
         std::fs::write("docs/steam/achievements-localization.csv", loc).unwrap();
+
+        // Epic(0276 E3): EOS 업적 일괄 올리기 꼴(Epic 개발자 포털 BulkTemplate.zip, 2026-11-04 받아 본 그대로) —
+        // `achievementDefinitions.csv`(name,hidden,statThresholds) + `achievementLocalizations.csv`(언어마다 한 줄,
+        // 빈 locale = 기본 = 영어). 아이콘은 Steam 것을 같은 이름으로(`tools/epic/make_eos_zip.py`가 zip으로 묶는다).
+        // Epic 상점 업적 XP는 따로 올리는 표라 `epic-store-xp.csv`(이름·XP·등급)로.
+        let eos_langs = [
+            (Lang::En, ""),
+            (Lang::Ko, "ko"),
+            (Lang::Ja, "ja"),
+            (Lang::ZhHans, "zh-Hans"),
+            (Lang::ZhHant, "zh-Hant"),
+            (Lang::PtBr, "pt-BR"),
+            (Lang::Fr, "fr"),
+            (Lang::Es, "es"),
+            (Lang::De, "de"),
+            (Lang::Ru, "ru"),
+            (Lang::Pl, "pl"),
+        ];
+        let mut edefs = String::from("name,hidden,statThresholds\n");
+        let mut eloc = String::from("name,locale,lockedTitle,lockedDescription,unlockedTitle,unlockedDescription,flavorText,lockedIcon,unlockedIcon\n");
+        let mut exp = String::from("name,xp,tier\n");
+        for x in &ALL {
+            edefs += &format!("{},{},\n", x.api, if x.hidden { "TRUE" } else { "FALSE" });
+            let g = journal::goal(x.goal).unwrap();
+            for (l, code) in eos_langs {
+                let s = l.strings();
+                let (t, d) = ((g.title)(s), (g.desc)(s));
+                eloc += &format!(
+                    "{},{code},{},{},{},{},,{}_UNACHIEVED.png,{}_ACHIEVED.png\n",
+                    x.api,
+                    cell(t),
+                    cell(d),
+                    cell(t),
+                    cell(d),
+                    x.api,
+                    x.api
+                );
+            }
+            let tier = match x.xp {
+                0..=45 => "bronze",
+                50..=95 => "silver",
+                _ => "gold",
+            };
+            exp += &format!("{},{},{tier}\n", x.api, x.xp);
+        }
+        std::fs::create_dir_all("docs/epic").unwrap();
+        std::fs::write("docs/epic/achievementDefinitions.csv", edefs).unwrap();
+        std::fs::write("docs/epic/achievementLocalizations.csv", eloc).unwrap();
+        std::fs::write("docs/epic/epic-store-xp.csv", exp).unwrap();
+    }
+
+    /// Epic Games Store XP 규칙(Epic 업적 문서 2026-11-04): 합 1,000, 하나에 5~200, 5의 배수. 이야기 끝(참 엔딩)이 금.
+    #[test]
+    fn epic_xp_follows_store_rules() {
+        let total: u32 = ALL.iter().map(|x| x.xp as u32).sum();
+        assert_eq!(total, 1000, "Epic 업적 XP 합은 정확히 1,000");
+        for x in &ALL {
+            assert!(
+                (5..=200).contains(&x.xp) && x.xp % 5 == 0,
+                "{} xp {}",
+                x.api,
+                x.xp
+            );
+        }
+        let gold = ALL.iter().find(|x| x.api == "ACH_TRUE_ENDING").unwrap();
+        assert!(gold.xp >= 100, "참 엔딩은 금(100+)");
     }
 
     /// Steam에 올린 API 이름(2026-11-04 확정). **이 목록을 고치지 않는다** — 바꾸면 이미 나간 판의 호출이 조용히 빗나가고,
