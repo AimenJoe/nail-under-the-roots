@@ -365,6 +365,7 @@ pub static CRAYFISH: Species = Species {
 };
 
 /// 소금쟁이(0275 P4): 물길 굴의 물 위를 걷던 이웃. 물든 소금쟁이는 물결로 밀어낸다. 가볍고 약하다.
+/// 그림은 나노바나나 원본 → `mobs_ai.py` → `strider.png`(32칸, `art::STRIDER_ROW`).
 pub static STRIDER: Species = Species {
     name: |s| s.mob_strider,
     lore: |s| s.mob_strider_lore,
@@ -382,7 +383,7 @@ pub static STRIDER: Species = Species {
     glowbugs: (1, 2),
     seed_chance: 0.05,
     color: Color::new(0.30, 0.36, 0.46, 1.0),
-    sheet_row: crate::art::CODE_ROW,
+    sheet_row: crate::art::STRIDER_ROW,
     ..BASE
 };
 

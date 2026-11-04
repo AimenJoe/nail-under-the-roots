@@ -1609,25 +1609,6 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
                 if flash { WHITE } else { tint },
             );
         }
-        None if sp.sheet_row == art::CODE_ROW => {
-            // 그림 시트가 오기 전의 코드 그림(0275 P4).
-            let pose = match e.state {
-                enemy::State::Charge { .. } => CodePose::Strike,
-                enemy::State::Windup { .. } | enemy::State::Aim { .. } => CodePose::Ready,
-                enemy::State::Stunned { .. } | enemy::State::Flip { .. } => CodePose::Hurt,
-                _ => CodePose::Idle,
-            };
-            let strider = matches!(e.kind, crate::enemy::Kind::Strider);
-            draw_code_mob(
-                e.kind,
-                pos,
-                e.facing.x < 0.0,
-                pose,
-                (!flash).then_some(tint),
-                time,
-                strider && marks,
-            );
-        }
         None => {
             let c = if flash {
                 WHITE
@@ -1821,92 +1802,5 @@ mod tests {
             chain_aim_distance(player::State::Free, 1.0),
             t::CHAIN_HOP_DIST
         );
-    }
-}
-
-/// 코드 그림의 자세(0275 P4).
-#[derive(Clone, Copy, PartialEq)]
-pub(crate) enum CodePose {
-    Idle,
-    Ready,
-    Strike,
-    Hurt,
-}
-
-/// 그림 시트가 아직 없는 잡몹의 임시 코드 그림(0275 P4, 나노바나나 시트가 오면 `sheet_row`를 바꾸고 지운다).
-/// `c`는 몸 가운데, `left`면 왼쪽을 본다. `tint`는 곱하는 색, `None`이면 흰 덩어리(맞은 순간).
-/// 소금쟁이: 가는 몸 + 옆·뒤로 길게 뻗은 다리, 발끝에 물 오목(가재는 그림이 왔다 — `crayfish.png`).
-pub(crate) fn draw_code_mob(
-    kind: crate::enemy::Kind,
-    c: Vec2,
-    left: bool,
-    pose: CodePose,
-    tint: Option<Color>,
-    time: f32,
-    dimples: bool,
-) {
-    let sx = if left { -1.0 } else { 1.0 };
-    let mul = |k: Color| match tint {
-        None => WHITE,
-        Some(t) => Color::new(k.r * t.r, k.g * t.g, k.b * t.b, k.a * t.a),
-    };
-    let px = |x: f32, y: f32, w: f32, h: f32, k: Color| {
-        draw_rectangle(
-            (c.x + if sx > 0.0 { x } else { -x - w }).round(),
-            (c.y + y).round(),
-            w,
-            h,
-            mul(k),
-        );
-    };
-    let line = OUTLINE;
-    match kind {
-        crate::enemy::Kind::Strider => {
-            let body = Color::new(0.30, 0.27, 0.24, 1.0);
-            let leg = Color::new(0.20, 0.18, 0.17, 1.0);
-            let shine = Color::new(0.62, 0.66, 0.70, 1.0);
-            // 다리를 구르면(예고) 가운데 다리가 위아래로 떤다.
-            let tap = if pose == CodePose::Ready && ((time * 16.0) as i32) % 2 == 0 {
-                1.0
-            } else {
-                0.0
-            };
-            // 앞다리 짧게, 가운데 다리 옆으로 길게, 뒷다리 뒤로 길게.
-            let legs: [(f32, f32, f32, f32); 6] = [
-                (2.0, -1.0, 5.0, -4.0),
-                (2.0, 1.0, 5.0, 4.0),
-                (0.0, -1.0, 3.0, -8.0 - tap),
-                (0.0, 1.0, 3.0, 8.0 + tap),
-                (-2.0, -1.0, -9.0, -6.0),
-                (-2.0, 1.0, -9.0, 6.0),
-            ];
-            for (ax, ay, bx, by) in legs {
-                let a = vec2(c.x + ax * sx, c.y + ay);
-                let b = vec2(c.x + bx * sx, c.y + by);
-                draw_line(a.x, a.y, b.x, b.y, 1.0, mul(leg));
-                if dimples && !shadow_pass() {
-                    // 발끝의 물 오목(물을 디딘 자리).
-                    let ph = (time * 1.5 + bx * 0.1).sin() * 0.3;
-                    draw_circle_lines(
-                        b.x.round(),
-                        b.y.round(),
-                        1.6 + ph + tap,
-                        1.0,
-                        Color::new(0.80, 0.92, 1.0, 0.35),
-                    );
-                }
-            }
-            // 몸: 가늘고 긴 타원 + 머리.
-            px(-4.0, -2.0, 9.0, 4.0, line);
-            px(-3.0, -1.0, 7.0, 2.0, body);
-            px(-2.0, -1.0, 3.0, 1.0, shine);
-            px(4.0, -1.0, 2.0, 2.0, line);
-            px(5.0, -1.0, 1.0, 1.0, Color::new(0.85, 0.25, 0.30, 1.0));
-            px(-1.0, 0.0, 2.0, 1.0, Color::new(0.62, 0.38, 0.80, 1.0));
-            if pose == CodePose::Hurt {
-                px(-3.0, -1.0, 7.0, 1.0, WHITE);
-            }
-        }
-        _ => draw_circle(c.x, c.y, 5.0, mul(kind.species().color)),
     }
 }

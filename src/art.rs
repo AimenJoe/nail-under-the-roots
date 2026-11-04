@@ -264,8 +264,9 @@ pub const BABY_ROW: u32 = 21;
 /// critters 줄(0..`CRITTER_ROWS`)이 다 찬 뒤의 큰 시트 번호(0275 P4): 이 값부터는 critters.png에 줄이 없고 `BIG_SHEETS`에만 있다.
 /// 번쩍임(흰 실루엣)은 다른 줄처럼 `+ CRITTER_ROWS`.
 pub const BIG_ONLY: u32 = 100;
-/// 가재(0275 P4, `mobs_ai.py` → `crayfish.png` 32칸).
+/// 가재·소금쟁이(0275 P4, `mobs_ai.py` → `crayfish.png`·`strider.png` 32칸).
 pub const CRAYFISH_ROW: u32 = BIG_ONLY;
+pub const STRIDER_ROW: u32 = BIG_ONLY + 1;
 
 /// 시트 줄 번호 → (실루엣을 뺀 줄, 흰 실루엣인가).
 fn row_base(row: u32) -> (u32, bool) {
@@ -276,10 +277,6 @@ fn row_base(row: u32) -> (u32, bool) {
         (row % CRITTER_ROWS, row >= CRITTER_ROWS)
     }
 }
-
-/// 그림 시트가 아직 없는 종(0275 P4: 가재·소금쟁이): 렌더가 코드로 임시 그림을 그린다(`render/actors.rs draw_code_mob`).
-/// critters 줄(`CRITTER_ROWS` 아래)과 겹치지 않는 값.
-pub const CODE_ROW: u32 = 1000;
 
 impl Art {
     /// 시작할 때 읽는 그림 파일(assets 기준). main이 `loading::prefetch`로 한꺼번에 받는다(0092).
@@ -537,7 +534,7 @@ pub mod frame {
     pub const HOWL: u32 = 7;
 }
 
-pub const BIG_SHEETS: [BigSheet; 17] = [
+pub const BIG_SHEETS: [BigSheet; 18] = [
     BigSheet {
         file: "art/momo.png",
         back: MOMO_BLOOM_ROW,
@@ -695,6 +692,16 @@ pub const BIG_SHEETS: [BigSheet; 17] = [
         run4: 0,
         foot: 30.0,
     },
+    // 소금쟁이(0275 P4): 다리를 벌리면 24칸을 넘는다.
+    BigSheet {
+        file: "art/strider.png",
+        back: STRIDER_ROW,
+        tainted: None,
+        cell: 32.0,
+        walk4: 0,
+        run4: 0,
+        foot: 30.0,
+    },
 ];
 /// critters 16칸의 발바닥 줄(critters.py "발바닥 y=14").
 pub const CRITTER_FOOT: f32 = 14.0;
@@ -750,9 +757,6 @@ impl Art {
     /// critters `row`줄 `frame`칸(`row`에 `CRITTER_ROWS`를 더하면 흰 실루엣). 새 그림으로 옮긴 줄(모모·도토, 0206 C3)은
     /// 그 시트로 — 칸 번호의 뜻은 같다(0·1 서기, 2·3 걷기·깡충, 4 웅크림·겨누기, 5 공격, 6 맞음; 큰 시트는 7 쓰러짐도).
     pub fn critter(&self, frame: u32, row: u32) -> Option<CritterCell<'_>> {
-        if row >= CODE_ROW {
-            return None;
-        }
         let (base, sil) = row_base(row);
         if let Some((i, b, tex, r)) = self.big_sheet(base) {
             let body = self
@@ -804,9 +808,6 @@ impl Art {
     /// 걷는 칸: `steps`는 걸음 수(옛 두 칸 시절 `time × 빠르기`, 한 칸 = 한 걸음). 걷기 네 칸이 있으면(`BigSheet::walk4`, 0229)
     /// 한 걸음에 두 칸(디딤·지나감)을 돌아 걸음 박자는 그대로, 없으면 칸 2·3.
     pub fn walk(&self, row: u32, steps: f32) -> u32 {
-        if row >= CODE_ROW {
-            return frame::WALK + steps as u32 % 2;
-        }
         match self.big_sheet(row_base(row).0) {
             Some((_, b, tex, _)) => walk_frame(b, tex, steps),
             None => frame::WALK + steps as u32 % 2,
