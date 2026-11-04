@@ -274,3 +274,4 @@ Using the attached character sheet of Mumu, create one dialogue portrait for the
 ```
 Edit this image. Using the attached portrait of Mumu, change Mumu to how it looks while bound by the violet threads: the pink skin a shade duller and greyer, a faint red glow under the skin where the eyes would be (two small soft red spots under the skin, still no eyes), a few softly glowing violet threads about as thick as the outlines coiled around the neck, the front leg and the base of the gills, the gills pressed flat back along the head, and the mouth a thin, cold straight line. Keep everything else exactly the same: the same size, position, framing, background and pixel style.
 ```
+   → 2026-11-04 받음: `mumu_tainted_glare.png`(✦ 지움) → 칸 41(`Portrait::MUMU_TAINTED`, 만남 컷씬의 "???"). "a shade greyer"가 잿빛 전체로 나왔다 — 다른 물든 이웃(자두빛·잿빛 털)과 같은 결이라 그대로 쓴다. 붉은 빛은 밝게 나와 고치지 않았다.

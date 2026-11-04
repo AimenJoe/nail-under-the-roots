@@ -963,7 +963,11 @@ impl Portrait {
         first: 39,
         faces: 2,
     };
-    /// 풀린 무무(0275): 칸 42 하나(보통). 칸 41은 물든 무무 자리(그림이 오면).
+    /// 물든 무무(0275): 칸 41 하나(차가움 — 피부 밑 붉은 빛). 풀린 무무: 칸 42 하나(보통).
+    pub const MUMU_TAINTED: Portrait = Portrait {
+        first: 41,
+        faces: 1,
+    };
     pub const MUMU: Portrait = Portrait {
         first: 42,
         faces: 1,

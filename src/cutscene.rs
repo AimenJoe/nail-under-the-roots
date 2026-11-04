@@ -1035,7 +1035,12 @@ fn speaker_actor(w: &World, who: Speaker) -> Actor {
             ..story_actor("???", CLOVER_FUR)
         },
         Speaker::Clover => clover_actor(w.player.pos),
-        Speaker::MumuTainted => story_actor("???", MUMU_SKIN),
+        Speaker::MumuTainted => Actor {
+            sprite: Some(Sprite::Critter(crate::art::MUMU_ROW)),
+            portrait: Some(Portrait::MUMU_TAINTED),
+            pos: w.player.pos,
+            ..story_actor("???", MUMU_SKIN)
+        },
         Speaker::NailHome => {
             let mole = crate::equipment::Character::Mole;
             Actor {
