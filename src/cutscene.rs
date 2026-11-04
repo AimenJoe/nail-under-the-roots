@@ -1066,26 +1066,40 @@ pub fn mumu_meet(w: &World) -> Cutscene {
 }
 
 /// 무무를 이겼다(0275 P5): 실이 풀리고, 무무가 이름을 말한다. 마을로 오자는 말에 물길을 지키겠다며 남는다 —
-/// 대신 마을의 샘이 다시 솟는다(`key::MUMU_FREED` → `village::State::spring`). 초상화는 칸 42(풀린 무무), 월드 그림은 아직 없어 빛이 그 자리에 선다.
+/// 대신 마을의 샘이 다시 솟는다(`key::MUMU_FREED` → `village::State::spring`). 초상화는 칸 42(풀린 무무), 월드 그림은 `mumu_freed.png`(`art::MUMU_FREED_ROW`).
 pub fn mumu_freed(w: &World, at: Vec2) -> Cutscene {
     let mut mumu = Actor {
+        sprite: Some(Sprite::Critter(crate::art::MUMU_FREED_ROW)),
         portrait: Some(Portrait::MUMU),
         ..story_actor(i18n::s().name_mumu, MUMU_SKIN)
     };
     mumu.pos = at;
     mumu.facing = (w.player.pos - at).normalize_or(vec2(-1.0, 0.0));
     let actors = vec![nail_actor(w), mumu];
-    let mut steps = unbind_steps(at, 0, false);
+    // 실이 풀리면 그 자리에 풀린 무무가 선다(`unbind_steps`의 Show + 반짝임). 첫마디 뒤 플레이어 곁으로 기어 온다 —
+    // 제자리에 있으면 이긴 자리에 떨어진 뿌리 심장(빛나는 줍는 것)을 몸으로 덮는다(콩이와 같은 걸음).
+    let side = if at.x >= w.player.pos.x { 34.0 } else { -34.0 };
+    let near = w.player.pos + vec2(side, 0.0);
+    let mut steps = unbind_steps(at, 1, false);
     steps.extend([
-        Step::Cue {
-            cue: Cue::Sparkle,
-            at,
-        },
         Step::Face {
             actor: 0,
             dir: at - w.player.pos,
         },
         say(1, Face::Normal, |s| s.mumu_b1),
+        Step::Move {
+            actor: 1,
+            to: near,
+            speed: 30.0,
+        },
+        Step::Face {
+            actor: 1,
+            dir: vec2(-side, 0.0),
+        },
+        Step::Face {
+            actor: 0,
+            dir: vec2(side, 0.0),
+        },
         say(1, Face::Normal, |s| s.mumu_b2),
         say(0, Face::Normal, |s| s.mumu_b3),
         say(1, Face::Normal, |s| s.mumu_b4),

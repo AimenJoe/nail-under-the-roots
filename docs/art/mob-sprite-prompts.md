@@ -214,3 +214,5 @@ Solid magenta background (#FF00FF), figures well separated, no text, no grid lin
 ```
 Edit this image, the pixel art sprite sheet of Mumu, an old blind cave salamander. Make Mumu freed: remove every violet thread wrapped around the body and the faint red glow under the skin, so the skin is clean, soft pale pink with a gentle sheen, and the feathery coral-pink gills stand up relaxed. Mumu still has no eyes at all (smooth skin where the eyes would be). Keep everything else exactly the same: the same 3 columns x 2 rows, the same six poses, the same size and position of every frame, the same dark outlines, the solid magenta background (#FF00FF) and the same pixel style. No text, no grid lines, no shadows, no effects.
 ```
+
+→ 2026-11-04 받음: `sprites/mumu_freed_v1.png`(✦ 지움, 바탕은 조금 다른 마젠타 (228,76,223) — 바탕 판정에 그대로 걸린다). `mobs_ai.py`의 `mumu_freed`(상자만 다시, 표지 옮기기 없음) → `assets/art/mumu_freed.png` 56칸, `art::MUMU_FREED_ROW`. 풀려남 컷씬에서 실이 풀린 자리에 서고, 첫마디 뒤 플레이어 곁으로 기어 온다(이긴 자리의 뿌리 심장을 덮지 않게).

@@ -269,6 +269,8 @@ pub const CRAYFISH_ROW: u32 = BIG_ONLY;
 pub const STRIDER_ROW: u32 = BIG_ONLY + 1;
 /// 무무(넷째 길의 주인, 0275 P5, `mobs_ai.py` → `mumu.png` 56칸 — 몸이 길다).
 pub const MUMU_ROW: u32 = BIG_ONLY + 2;
+/// 풀린 무무(0275, `mumu_freed.png` — 싸움 시트를 고쳐 그린 판): 풀려남 컷씬의 배우.
+pub const MUMU_FREED_ROW: u32 = BIG_ONLY + 3;
 
 /// 시트 줄 번호 → (실루엣을 뺀 줄, 흰 실루엣인가).
 fn row_base(row: u32) -> (u32, bool) {
@@ -536,7 +538,7 @@ pub mod frame {
     pub const HOWL: u32 = 7;
 }
 
-pub const BIG_SHEETS: [BigSheet; 19] = [
+pub const BIG_SHEETS: [BigSheet; 20] = [
     BigSheet {
         file: "art/momo.png",
         back: MOMO_BLOOM_ROW,
@@ -708,6 +710,16 @@ pub const BIG_SHEETS: [BigSheet; 19] = [
     BigSheet {
         file: "art/mumu.png",
         back: MUMU_ROW,
+        tainted: None,
+        cell: 56.0,
+        walk4: 0,
+        run4: 0,
+        foot: 54.0,
+    },
+    // 풀린 무무(0275): 같은 칸·같은 자세, 실·붉은 빛만 없다.
+    BigSheet {
+        file: "art/mumu_freed.png",
+        back: MUMU_FREED_ROW,
         tainted: None,
         cell: 56.0,
         walk4: 0,
