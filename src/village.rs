@@ -276,31 +276,33 @@ pub fn glow_level(banked: u32) -> u8 {
     }
 }
 
-/// 무무가 풀린 뒤(0275, 사장 2026-11-04 "마을에 물길 하나"): 다시 솟는 샘(`W`)에서 큰 나무(`Y`) 밑동까지 흐르는 물길.
-/// 샘 오른쪽 칸부터 나무 칸 바로 아래까지 동쪽으로, 마지막 칸은 위(나무 밑동 속)로 든다. (칸 가운데, 흐르는 쪽).
+/// 무무가 풀린 뒤(0275, 사장 2026-11-04 "마을에 물길 하나" → "우물 옆쪽에"): 돌 우물(`u`) 오른쪽 곁에서 넘친 물이
+/// 동쪽으로 `BROOK_LEN`칸 흐르고, 마지막 칸은 아래(남쪽 땅 밑)로 든다. (칸 가운데, 흐르는 쪽).
 /// 마을에서는 밀지 않는다(`World::stream_push_player` — 쉬는 곳). 그림은 굴과 같은 굽기(`Baker::with_water`)와 `draw_stream`.
 pub fn brook(p: &Parsed) -> Vec<(macroquad::math::Vec2, macroquad::math::Vec2)> {
     use macroquad::math::vec2;
-    let cell = |c: char| {
-        p.marks
-            .iter()
-            .find(|(m, _)| *m == c)
-            .map(|(_, at)| ((at.x / map::TILE) as usize, (at.y / map::TILE) as usize))
-    };
-    let (Some((wx, wy)), Some((tx, _))) = (cell('W'), cell('Y')) else {
+    let Some((ux, uy)) = p
+        .marks
+        .iter()
+        .find(|(m, _)| *m == 'u')
+        .map(|(_, at)| ((at.x / map::TILE) as usize, (at.y / map::TILE) as usize))
+    else {
         return Vec::new();
     };
-    (wx + 1..=tx)
+    let last = ux + BROOK_LEN;
+    (ux + 1..=last)
         .map(|x| {
-            let dir = if x == tx {
-                vec2(0.0, -1.0)
+            let dir = if x == last {
+                vec2(0.0, 1.0)
             } else {
                 vec2(1.0, 0.0)
             };
-            (map::cell_center(x, wy), dir)
+            (map::cell_center(x, uy), dir)
         })
         .collect()
 }
+/// 우물 곁 물길의 칸 수(뿌리 길 `G` 아래까지 닿지 않게).
+pub const BROOK_LEN: usize = 6;
 
 /// 기록 키.
 pub fn key_decor(i: usize) -> String {
@@ -345,22 +347,26 @@ mod tests {
         );
     }
 
-    /// 샘의 물길(0275): 샘 곁에서 시작해 걸을 수 있는 칸만 지나 큰 나무 밑동(벽) 아래에서 끝난다.
+    /// 우물 곁 물길(0275): 우물 바로 오른쪽에서 시작해 걸을 수 있는 빈 칸(다른 자리 표시 없음)만 지나 남쪽 벽 위에서 끝난다.
     #[test]
-    fn brook_runs_from_the_spring_to_the_tree() {
+    fn brook_runs_beside_the_well() {
         let p = parse();
         let b = brook(&p);
-        assert!(b.len() >= 3);
-        let w = p.marks.iter().find(|(c, _)| *c == 'W').unwrap().1;
-        assert!((b[0].0 - w).length() <= 16.0, "샘 바로 곁에서 시작");
+        assert_eq!(b.len(), BROOK_LEN);
+        let u = p.marks.iter().find(|(c, _)| *c == 'u').unwrap().1;
+        assert!((b[0].0 - u).length() <= 16.0, "우물 바로 곁에서 시작");
         for (c, _) in &b {
             let (x, y) = ((c.x / 16.0) as usize, (c.y / 16.0) as usize);
             assert_eq!(p.grid.get(x, y), Cell::Floor);
+            assert!(
+                !p.marks.iter().any(|(_, at)| (*at - *c).length() < 1.0),
+                "자리 표시 위로 흐르지 않는다"
+            );
         }
         let (last, dir) = *b.last().unwrap();
         let (x, y) = ((last.x / 16.0) as usize, (last.y / 16.0) as usize);
-        assert_eq!(dir.y, -1.0);
-        assert_eq!(p.grid.get(x, y - 1), Cell::Wall, "나무 밑동 속으로 든다");
+        assert_eq!(dir.y, 1.0);
+        assert_eq!(p.grid.get(x, y + 1), Cell::Wall, "남쪽 땅 밑으로 든다");
     }
 
     #[test]

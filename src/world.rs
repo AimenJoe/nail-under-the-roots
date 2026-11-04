@@ -3123,7 +3123,7 @@ impl World {
     /// 물살(0275): 걸어서 물살 칸에 있으면 흐르는 쪽으로 민다(땅속·깡충·멀리뛰기는 지나간다). 처음엔 한마디.
     /// 플레이어가 움직인 뒤에 밀어 보간(`prev_pos`)에 들어간다. 가끔 발밑에 물보라.
     fn stream_push_player(&mut self, dt: f32) {
-        // 마을의 물길(0275, 샘 → 큰 나무)은 그림만 — 쉬는 곳이라 밀지 않는다.
+        // 마을의 물길(0275, 우물 곁)은 그림만 — 쉬는 곳이라 밀지 않는다.
         if self.room.streams.is_empty()
             || !self.player.on_foot()
             || !self.player.is_alive()
