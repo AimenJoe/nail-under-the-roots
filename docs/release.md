@@ -35,7 +35,7 @@
    - **페이지 기능 글 대조**: 이번 판(과 지난 판들)에서 바뀐 규칙·수·설정이 페이지 글(조작·지대·이웃·마을·기능·접근성·FAQ·"다음" 칸)과 맞는지 두 언어로 본다 — 소식 한 줄만 고치면 글이 낡는다(v0.7.1에서 찾은 낡은 글 여덟: 발톱 수·재화·포포의 응원·흔들림 설정·PC 기록·"다음" 칸 등). 엔딩 뒤 이야기는 쓰지 않는다(스포일러).
    - `python3 tools/site/make_images.py` — 페이지 글꼴 서브셋(새 글자) 다시 만들기. `site/style.css`의 글꼴 해시가 같이 바뀐다.
 4. 전체 검사(`CONTRIBUTING.md`의 목록 전부). `Cargo.lock`이 버전 때문에 바뀐다 — 함께 커밋.
-5. 커밋 메시지 `v0.x.y: <한 줄>`. 작업 브랜치에 push → 같은 커밋을 `git push origin HEAD:main`.
+5. 커밋 메시지 `v0.x.y: <한 줄>`. 작업 브랜치에 push → **`release/vX → main` PR을 만들고 사장이 Merge**(2026-11-04부터 — main은 규칙 `main-only`로 사장만 쓴다, 아래 "파이프라인 지키기"). Merge 뒤 운영 배포 잡이 `web-production` 승인을 기다리면 사장이 Approve.
 6. 확인(5~10분 뒤): Actions에서 main의 `deploy-web`·`release`·`build-android`·`pages`·`build-ios`가 모두 success, Release `v0.x.y`에 `nail.apk`(약 18 MB)가 붙었는지, 웹 타이틀 오른쪽 아래 버전 글자. Claude 세션이면 `send_later`로 확인 예약을 걸고, 확인 뒤 지운다.
 7. 사장에게 보고: 무엇이 들어갔는지, 볼 것(결정 기록의 "사람이 볼 것").
 
@@ -50,7 +50,7 @@
 | 이어하기·기록이 사라졌다 | `prefs` `MAGIC`을 올렸거나 `profile` 키를 바꿨다 | 키는 바꾸지 않는다. `MAGIC`은 칸 형식이 깨질 때만 |
 
 ## 되돌리기
-- 웹: 문제 커밋을 `git revert`해 main에 push하면 다시 배포된다(Netlify UI에서 이전 배포로 "Publish deploy"도 된다).
+- 웹: 문제 커밋을 `git revert`한 PR을 main에 Merge하면 다시 배포된다(Netlify UI에서 이전 배포로 "Publish deploy"도 된다).
 - APK: Release는 두고 패치 버전을 하나 더 낸다. 이미 받은 사람의 덮어 설치가 되려면 version_code가 커야 한다.
 - 되돌린 것은 결정 기록에 "덧붙임: 철회(새 번호)"로 남긴다.
 
@@ -66,7 +66,8 @@
 - 앞으로 붙는 Steam·Epic 업로드(0276 S4·E4)는 처음부터 Environment `store`(main만 + 사장 승인)에서만 시크릿을 읽는다.
 
 사람이 할 것(Settings, 한 번):
-1. **Rules → Rulesets → New branch ruleset** `release-branches`: 대상 `main`·`release/**`, 규칙 **Restrict updates**·**Restrict deletions**·**Block force pushes**. Bypass list에 **Repository admin**(사장)과 **Claude GitHub App**(Claude가 바로 push한다) — 그 밖에는 누구도 배포 갈래에 못 쓴다. "Require a pull request"는 켜지 않는다(지금처럼 바로 push하는 흐름이 막힌다).
+1. **Rules → Rulesets** 둘(2026-11-04 설정함): `main-only`(대상 `main`, Restrict updates·deletions·Block force pushes, 우회 = Repository admin만) — 운영 반영은 PR을 사장이 Merge. `release-branches`(대상 `release/**`, 같은 규칙 + Restrict creations, 우회 = Repository admin + Claude GitHub App) — 개발판은 Claude가 바로 push. "Require a pull request"는 켜지 않는다.
+   - 알아 둘 것: Claude 세션은 사장 계정의 권한으로 GitHub에 붙는다(API가 이 세션을 `main-only`도 우회할 수 있는 사용자로 본다, 2026-11-04). 그래서 `main-only`는 **남(다른 사람·그 사람의 Claude)** 을 막고, 사장의 Claude는 문서 규칙("main은 PR로")과 운영 배포 승인(2)으로 막는다.
 2. **Environments → New environment** `web-production`: Deployment branches = Selected → `main`. (원하면 Required reviewers = 사장 — 운영 배포마다 승인 버튼.) `web-dev`: Selected → `release/**`. 둘 다에 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`를 넣고, **레포 Secrets의 같은 두 개는 지운다**(지우기 전까지는 레포 시크릿도 읽힌다 — 순서: 환경에 넣기 → 한 번 배포 확인 → 레포 것 지우기).
 3. **Actions → General**: Fork pull request workflows = "Require approval for all external contributors", Workflow permissions = **Read repository contents**(쓰기가 필요한 잡은 워크플로에 따로 적혀 있다), "Allow GitHub Actions to create and approve pull requests" 끔.
 4. **Collaborators**: 다른 사람에게 Write·Admin을 주지 않는다. 기여는 포크 PR로(시크릿에 닿지 않는다).
