@@ -301,8 +301,8 @@ pub fn brook(p: &Parsed) -> Vec<(macroquad::math::Vec2, macroquad::math::Vec2)> 
         })
         .collect()
 }
-/// 우물 곁 물길의 칸 수(뿌리 길 `G` 아래까지 닿지 않게).
-pub const BROOK_LEN: usize = 6;
+/// 우물 곁 물길의 칸 수 — 우물에서 넘친 작은 도랑(여섯은 과했다, 사장 2026-11-04 "조그만 짧게").
+pub const BROOK_LEN: usize = 3;
 
 /// 기록 키.
 pub fn key_decor(i: usize) -> String {
