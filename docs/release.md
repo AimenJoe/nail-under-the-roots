@@ -74,7 +74,7 @@
 3. **Actions → General**: Fork pull request workflows = "Require approval for all external contributors", Workflow permissions = **Read repository contents**(쓰기가 필요한 잡은 워크플로에 따로 적혀 있다), "Allow GitHub Actions to create and approve pull requests" 끔.
 4. **Collaborators**: 다른 사람에게 Write·Admin을 주지 않는다. 기여는 포크 PR로(시크릿에 닿지 않는다).
 5. 계정 2단계 인증.
-6. **main에 빨간 CI가 못 들어가게**(0277): Rules → Rulesets → `main-only` → "Require status checks to pass" 켜기 → 검사 이름 `build`(deploy-web의 빌드·시험 잡, PR에서 돈다)를 더한다. 사장은 우회 목록이라 꼭 필요하면 Merge 화면에서 우회를 골라 넣을 수 있다.
-7. **Settings → Advanced Security(또는 Code security)**: Dependabot alerts 켜기 — cargo 의존성의 알려진 취약점 알림(올리기 PR은 받지 않는다, 위).
+6. **main에 빨간 CI가 못 들어가게**(0277, 2026-11-04 설정함 — API로 `required_status_checks: build`(GitHub Actions 앱) 확인): Rules → Rulesets → `main-only` → "Require status checks to pass" 켜기 → 검사 이름 `build`(deploy-web의 빌드·시험 잡, PR에서 돈다)를 더한다. 사장은 우회 목록이라 꼭 필요하면 Merge 화면에서 우회를 골라 넣을 수 있다.
+7. **Settings → Advanced Security(또는 Code security)**: Dependabot alerts 켜기(2026-11-04 사장이 켬) — cargo 의존성의 알려진 취약점 알림(올리기 PR은 받지 않는다, 위).
 
 남은 틈(알고 둔다): `ASSETS_TOKEN`(비공개 에셋 레포 읽기 전용)·`ANDROID_DEBUG_KEYSTORE_B64`는 아직 레포 시크릿이다 — Write 권한자가 없으면 읽을 사람이 없다(1·4). 협업자를 들이게 되면 이 둘도 Environment로 옮긴다(빌드 워크플로마다 `environment:` 한 줄).
