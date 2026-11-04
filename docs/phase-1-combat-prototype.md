@@ -170,7 +170,8 @@
 - [ ] S4 `steam-deploy.yml`(앱 번호 뒤) · S3 파트너 사이트 Auto-Cloud 설정 · S5 Deck · S6 상점 페이지(Coming Soon 2주 이상)
 - [x] 배포 파이프라인 지키기(사장 2026-11-04, `docs/release.md`): 웹 배포 build/publish 분리 + Environment, CODEOWNERS, 규칙 `main-only`(사장만)·`release-branches`(사장·Claude), main은 PR을 사장이 Merge
 - [x] 사람: 규칙 둘 + Environment 둘에 Netlify 시크릿(2026-11-04)
-- [ ] 사람: 개발판 배포 확인 뒤 레포 Secrets의 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID` 지우기, Actions 설정(포크 승인·읽기 권한), Claude 앱 레포 범위 좁히기, 2단계 인증
+- [x] 사람: 레포 Secrets의 Netlify 두 값 지움, Actions 설정(포크 승인·기본 읽기 권한)(2026-11-04)
+- [ ] (선택) Claude 앱 레포 범위 좁히기(github.com/settings/installations), 2단계 인증 확인
 - [ ] **Epic Games Store 동시 출시**(사장 2026-11-04, 0276 E1~E5): 포털 가입(사람) → EOS 업적 연동(`epic` 기능) → XP 1,000 표 → 빌드 올리기 → IARC·검토. Epic이 늦으면 Steam 먼저
 - [x] 한국 등급(사장 2026-11-04): 등급 없이 열고, 적법한 민원·시정 요구가 오면 한국 판매 중지 또는 GCRB 등급(0276)
 - [x] 사장(2026-11-04): 가격 $0.99, 레포 공개, 웹·APK 무료 전판 그대로 — Steam판은 응원값(0276 "사장 답 둘째"). 상점·Steam 소식에는 무료판을 알리지 않는다(Valve 규칙)
