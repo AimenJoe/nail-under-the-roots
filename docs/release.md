@@ -67,7 +67,7 @@
 
 사람이 할 것(Settings, 한 번):
 1. **Rules → Rulesets** 둘(2026-11-04 설정함): `main-only`(대상 `main`, Restrict updates·deletions·Block force pushes, 우회 = Repository admin만) — 운영 반영은 PR을 사장이 Merge. `release-branches`(대상 `release/**`, 같은 규칙 + Restrict creations, 우회 = Repository admin + Claude GitHub App) — 개발판은 Claude가 바로 push. "Require a pull request"는 켜지 않는다.
-   - 알아 둘 것: Claude 세션은 사장 계정의 권한으로 GitHub에 붙는다(API가 이 세션을 `main-only`도 우회할 수 있는 사용자로 본다, 2026-11-04). 그래서 `main-only`는 **남(다른 사람·그 사람의 Claude)** 을 막고, 사장의 Claude는 문서 규칙("main은 PR로")과 운영 배포 승인(2)으로 막는다.
+   - 알아 둘 것(2026-11-04 확인한 만큼): GitHub API는 이 Claude 세션을 `main-only`도 우회할 수 있는 사용자로 답했다(사장 권한으로 붙는 듯). 한편 `release/v1.0` push는 한 번 "Cannot update this protected ref"가 나온 뒤 들어갔다(앱 자격으로 다시 간 듯). 그래서 사장의 Claude가 main에 직접 쓸 수 있는지는 **확인 못 함**(운영이 배포될 수 있어 일부러 시험하지 않았다). `main-only`는 남(다른 사람·그 사람의 Claude)을 확실히 막고, 사장의 Claude는 문서 규칙("main은 PR로")과 운영 배포 승인(2)으로 막는다.
 2. **Environments → New environment** `web-production`: Deployment branches = Selected → `main`. (원하면 Required reviewers = 사장 — 운영 배포마다 승인 버튼.) `web-dev`: Selected → `release/**`. 둘 다에 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`를 넣고, **레포 Secrets의 같은 두 개는 지운다**(지우기 전까지는 레포 시크릿도 읽힌다 — 순서: 환경에 넣기 → 한 번 배포 확인 → 레포 것 지우기).
 3. **Actions → General**: Fork pull request workflows = "Require approval for all external contributors", Workflow permissions = **Read repository contents**(쓰기가 필요한 잡은 워크플로에 따로 적혀 있다), "Allow GitHub Actions to create and approve pull requests" 끔.
 4. **Collaborators**: 다른 사람에게 Write·Admin을 주지 않는다. 기여는 포크 PR로(시크릿에 닿지 않는다).
