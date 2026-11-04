@@ -150,6 +150,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
         Pic::Signs => pic_signs(c),
         Pic::Road => pic_road(c),
         Pic::Hazards => pic_hazards(c),
+        Pic::Water => pic_water(c),
         Pic::Nodes => pic_nodes(c),
         Pic::Tree => pic_tree(c),
         Pic::Journal => pic_journal(c),
@@ -1009,6 +1010,60 @@ fn pic_hazards(c: PicCtx) {
         draw_circle(p.x, p.y, 3.0, Color::new(0.46, 0.42, 0.44, 1.0));
     }
     fx::draw_web(vec2(w - 20.0, y - 6.0), time, 0.6);
+}
+
+fn pic_water(c: PicCtx) {
+    let PicCtx {
+        art, w, time, y, ..
+    } = c;
+    // 물살 다섯 칸(오른쪽으로 흐른다) 위의 Naïl이 흐르는 쪽으로 밀려 내려간다 · 오른쪽은 물 위로 퍼지는 소금쟁이 물결.
+    let cells = 5;
+    for i in 0..cells {
+        let back = if i == 0 {
+            fx::StreamEnd::Wall
+        } else {
+            fx::StreamEnd::Open
+        };
+        let front = if i == cells - 1 {
+            fx::StreamEnd::Floor
+        } else {
+            fx::StreamEnd::Open
+        };
+        let at = vec2(16.0 + i as f32 * 16.0, y - 2.0);
+        fx::draw_stream(at, vec2(1.0, 0.0), time, back, front, false);
+    }
+    let ph = (time / 2.4).fract();
+    nail(art, 0, 0, vec2(18.0 + ph * 56.0, y - 4.0), false);
+    let strider = vec2(w - 26.0, y - 2.0);
+    // 소금쟁이 밑의 고인 물(밀지 않는다).
+    draw_ellipse(
+        strider.x,
+        strider.y + 2.0,
+        13.0,
+        5.0,
+        0.0,
+        Color::new(0.18, 0.40, 0.48, 0.9),
+    );
+    let k = (time / 1.6).fract();
+    let r = 3.0 + k * 18.0;
+    let fade = 1.0 - k;
+    draw_circle_lines(
+        strider.x,
+        strider.y,
+        r,
+        2.0,
+        Color::new(0.82, 0.94, 1.0, 0.85 * fade),
+    );
+    if r > 6.0 {
+        draw_circle_lines(
+            strider.x,
+            strider.y,
+            r - 5.0,
+            1.0,
+            Color::new(0.55, 0.78, 0.92, 0.5 * fade),
+        );
+    }
+    critter(art, Kind::Strider, F::STRIKE, strider, true, WHITE);
 }
 
 /// 길 지도의 칸 하나(그림 전용, 지도 화면의 `draw_node_icon`과 같은 색).

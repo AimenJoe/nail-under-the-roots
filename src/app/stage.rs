@@ -1087,6 +1087,9 @@ impl App {
             }
             Some(false) => {
                 self.scene = Scene::Game;
+                if self.recording() && self.profile.set(crate::profile::key::SIDE_PATH) {
+                    self.save_profile();
+                }
                 self.world.take_side_path();
             }
             None => {}

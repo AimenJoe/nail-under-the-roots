@@ -100,9 +100,11 @@ pub enum Pic {
     Memory,
     /// 이웃의 부탁(0273 B): 굴 바닥의 부탁 물건을 밟아 줍는다(넷이 번갈아).
     Quest,
+    /// 물길(0275 P7): 물살 위에서 밀려 내려가는 Naïl · 물 위로 퍼지는 소금쟁이 물결.
+    Water,
 }
 
-pub const TOPICS: [Topic; 24] = [
+pub const TOPICS: [Topic; 25] = [
     Topic {
         id: "move",
         title: |s| s.h_move,
@@ -211,6 +213,14 @@ pub const TOPICS: [Topic; 24] = [
         pic: Pic::Hazards,
         gate: Some(ran),
     },
+    // 물길 굴(0275 P7): 위험물 주제에 있던 물살을 따로 — 옆 굴로 내려간 뒤에만(엔딩 뒤 스포일러).
+    Topic {
+        id: "water",
+        title: |s| s.h_water,
+        body: |s| s.h_water_d,
+        pic: Pic::Water,
+        gate: Some(|p| p.flag(key::SIDE_PATH)),
+    },
     Topic {
         id: "nodes",
         title: |s| s.h_nodes,
@@ -286,6 +296,17 @@ pub const TOPICS: [Topic; 24] = [
 mod tests {
     use super::*;
     use crate::i18n::Lang;
+
+    /// 물길 안내(0275 P7)는 옆 굴로 내려간 뒤에만 열린다.
+    #[test]
+    fn water_topic_opens_after_the_side_path() {
+        let mut p = Profile::default();
+        p.add(key::RUNS, 1);
+        let water = TOPICS.iter().find(|t| t.id == "water").unwrap();
+        assert!(!water.open(&p));
+        p.set(key::SIDE_PATH);
+        assert!(water.open(&p) && water.fresh(&p));
+    }
 
     #[test]
     fn topic_ids_are_unique() {

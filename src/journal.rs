@@ -245,6 +245,28 @@ pub const GOALS: &[Goal] = &[
         Some("clover"),
         Tale(crate::tales::CLOVER)
     ),
+    // 옆 굴(0275 P7): 엔딩 뒤 셋째 길 끝에서 물길 굴로 → 그 끝의 주인 무무를 풀어 준다. "가장 깊은 곳"을 받은 뒤에야 보인다
+    // (엔딩 전 스포일러를 막는다).
+    goal!(
+        "side",
+        Story,
+        jg_side,
+        jg_side_d,
+        Flag(key::SIDE_PATH),
+        1,
+        Some("deepest"),
+        Light(40)
+    ),
+    goal!(
+        "mumu",
+        Story,
+        jg_mumu,
+        jg_mumu_d,
+        Flag(key::MUMU_FREED),
+        1,
+        Some("side"),
+        Light(60)
+    ),
     // 모모와 가장 깊은 곳(0056): 모모를 골라 끝까지. 보상은 들꽃 화관(0142, 그 전에는 반딧불 40).
     goal!(
         "momo_deep",
@@ -941,6 +963,20 @@ mod tests {
         assert_eq!(claim(&mut p, kills), None, "두 번 받지 않는다");
         assert_eq!(kills2.progress(&p), 30);
         assert_eq!(ready_count(&p), 0);
+    }
+
+    /// 옆 굴 목표(0275 P7)는 엔딩 전에는 보이지 않는다 — 스포일러.
+    #[test]
+    fn side_path_goals_hide_until_the_ending() {
+        let mut p = Profile::default();
+        let seen = |p: &Profile, id: &str| visible(p).iter().any(|g| g.id == id);
+        assert!(!seen(&p, "side") && !seen(&p, "mumu"));
+        p.set(key::HALF_ENDING);
+        assert!(seen(&p, "side") && !seen(&p, "mumu"));
+        p.set(key::SIDE_PATH);
+        assert!(seen(&p, "mumu"));
+        p.set(key::MUMU_FREED);
+        assert!(by_id("mumu").unwrap().done(&p));
     }
 
     #[test]
