@@ -799,6 +799,11 @@ impl Goal {
     }
 }
 
+/// 아이디로 목표(업적 표 `achievements.rs`도 쓴다, 0276).
+pub fn goal(id: &str) -> Option<&'static Goal> {
+    by_id(id)
+}
+
 fn by_id(id: &str) -> Option<&'static Goal> {
     GOALS.iter().find(|g| g.id == id)
 }

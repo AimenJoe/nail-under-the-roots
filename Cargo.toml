@@ -12,6 +12,9 @@ default = ["dev"]
 dev = []
 # clip: 공식 페이지 클립 찍기 전용(0228) — 플레이어가 피해를 받지 않고, 자동 조종(src/autopilot.rs)이 싸운다. 배포 빌드에 넣지 않는다.
 clip = []
+# steam: Steam 판(0276 S1) — PC 빌드에만 켠다(`cargo build --release --no-default-features --features steam`).
+# Steam이 없거나 앱 번호가 맞지 않으면 조용히 그냥 켜진다(직접 받은 판과 같다). 웹·Android·iOS에는 켜지 않는다.
+steam = ["dep:steamworks"]
 
 [dependencies]
 macroquad = { version = "0.4.16", features = ["audio"] }
@@ -26,6 +29,11 @@ gamepads = { version = "0.1.7", default-features = false }
 # Android는 libc의 시스템 속성(persist.sys.locale)을 읽는다.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 sys-locale = "0.3"
+
+# Steam(0276): SDK는 크레이트가 동적으로 읽는다. 재배포 파일(steam_api64.dll·libsteam_api.so·libsteam_api.dylib)은
+# 레포에 넣지 않는다(Valve SDK 계약) — Steam 빌드 CI가 실행 파일 옆에 둔다.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))'.dependencies]
+steamworks = { version = "0.13", optional = true }
 
 # cargo-quad-apk 설정 (.github/workflows/build-android.yml, docs/decisions/0005)
 [package.metadata.android]

@@ -11,6 +11,7 @@
     windows_subsystem = "windows"
 )]
 
+mod achievements;
 mod adventure;
 mod app;
 mod art;
@@ -54,6 +55,7 @@ mod scenario;
 mod sfx;
 mod shade;
 mod species;
+mod steam;
 mod story;
 mod sunny;
 mod suspend;
