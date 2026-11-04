@@ -182,7 +182,7 @@ Solid magenta background (#FF00FF), figures well separated, no text, no grid lin
 
 ```
 Redraw the creature in the attached image (the right figure) as a pixel art sprite sheet for a cute top-down
-action game: a slender dark brown water strider (pond skater) with a thin body held up on very long thin bent legs. It is corrupted by purple threads: its eyes are GLOWING RED (red, not black), and a few small
+action game: a dark brown water strider (pond skater) with a small chunky body held up on long bent legs. Draw the legs THICK and bold (at least 3 pixel blocks wide, with an outline), because the game shrinks the sheet a lot and thin lines disappear. It is corrupted by purple threads: its eyes are GLOWING RED (red, not black), and a few small
 purple root-threads grow on its back. No mouth line.
 
 Use the attached image for size: draw it as big as the right figure next to the small mole, same pixel block size.

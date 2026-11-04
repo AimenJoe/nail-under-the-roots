@@ -40,10 +40,10 @@ MOBS = [
      "hovering with wings spread wide", "diving forward, wings folded back"),
     ("spore", 18, 17, "a walking mushroom: a dark red cap with pale spots on a short pale stem with tiny feet",
      "cap squashed down, about to burst", "cap puffed up, releasing a puff (no spore cloud, the game draws it)"),
-    # 물길 굴(0275 P4): critters 줄이 없어 게임의 코드 임시 그림(`render/actors.rs draw_code_mob`)을 옮긴 `code_ref`가 기준.
+    # 물길 굴(0275 P4): 가재는 줄이며 가는 팔이 끊겼다 → 소금쟁이는 다리를 굵게 그리라고 적는다. critters 줄이 없어 게임의 코드 임시 그림(`render/actors.rs draw_code_mob`)을 옮긴 `code_ref`가 기준.
     ("crayfish", None, 11, "a small reddish-brown crayfish with two big pincers held forward, a segmented tail and thin feelers",
      "pincers raised and open, about to snap", "lunging forward, snapping both pincers shut"),
-    ("strider", None, 9, "a slender dark brown water strider (pond skater) with a thin body held up on very long thin bent legs",
+    ("strider", None, 9, "a dark brown water strider (pond skater) with a small chunky body held up on long bent legs. Draw the legs THICK and bold (at least 3 pixel blocks wide, with an outline), because the game shrinks the sheet a lot and thin lines disappear",
      "legs bent low, tapping the surface", "legs stamping down hard (no ripple, the game draws it)"),
 ]
 
