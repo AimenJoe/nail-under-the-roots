@@ -577,6 +577,8 @@ impl App {
         if crate::DESKTOP {
             macroquad::input::prevent_quit();
         }
+        // Steam이 먼저: 연결되면 기록 폴더를 계정마다로 정한다(0276 S3) — 기록을 읽기 전에.
+        let steam = crate::steam::Steam::start();
         let saved = crate::prefs::load();
         let settings = Settings {
             volume: saved.map(|p| p.volume).unwrap_or(7),
@@ -686,7 +688,7 @@ impl App {
             pause_ask: None,
             talk_n: [0; crate::story::WHO_COUNT],
             profile: crate::profile::load(),
-            steam: crate::steam::Steam::start(),
+            steam,
             death_noted: false,
             after: after::After::default(),
             erase_armed: false,

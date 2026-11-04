@@ -3,7 +3,9 @@
 //! 이미 이룬 옛 기록도 처음 켤 때 한꺼번에 열린다(Steam은 이미 열린 업적을 다시 열어도 아무 일 없다).
 //!
 //! 아이디(`api`)는 Steamworks 파트너 사이트에 등록하는 "API 이름" — 한 번 올리면 바꾸지 않는다(기록 키처럼, 0041).
-//! `hidden`은 상점·업적 목록에서 이루기 전까지 이름을 숨긴다(엔딩·이야기 뒤의 것 — 스포일러).
+//! 이름 규칙(2026-11-04 확정, 0276): `ACH_` + 조건을 말하는 영어 대문자·밑줄(나중의 진행 막대 통계는 `STAT_`로 갈라 둔다),
+//! 숫자 기준은 넣지 않는다(목표 수를 고쳐도 이름은 그대로). 확정 목록은 시험 `api_names_are_frozen` — 새 업적은 끝에만 더한다.
+//! `hidden`은 Steam의 Spoiler: 이루기 전까지 이름·설명을 감춘다(엔딩·이야기 뒤의 것, 캐릭터 해금을 드러내는 것).
 
 use crate::journal;
 use crate::profile::Profile;
@@ -26,40 +28,40 @@ const fn a(api: &'static str, goal: &'static str, hidden: bool) -> Achievement {
 /// 갈아 넣는 수(처치 1000 같은)는 넣지 않는다 — 저널의 둘째 단계 정도까지만(0276 조사: 반복보다 이야기·발견).
 pub const ALL: [Achievement; 30] = [
     // 이야기
-    a("TUTORIAL", "tutorial", false),
-    a("BORI_BACK", "bori", false),
-    a("MOMO_FIRST", "momo1", false),
-    a("MOMO_BACK", "momo3", false),
-    a("DOTO_MEMORY", "doto", false),
-    a("SUSU_SPROUT", "susu", false),
-    a("KONGI_BACK", "kongi", false),
-    a("DEEPEST", "deepest", false),
-    a("CLOVER_FAMILY", "clover", true),
-    a("ALL_BACK", "all_back", true),
-    a("TRUE_ENDING", "true_end", true),
-    a("LAST_MEMORY", "memory", true),
-    a("SIDE_PATH", "side", true),
-    a("MUMU_FREED", "mumu", true),
-    a("MOMO_DEEP", "momo_deep", true),
-    a("DOTO_DEEP", "doto_deep", true),
+    a("ACH_TUTORIAL", "tutorial", false),
+    a("ACH_BORI_BACK", "bori", false),
+    a("ACH_MOMO_FIRST_WIN", "momo1", false),
+    a("ACH_MOMO_BACK", "momo3", false),
+    a("ACH_DOTO_BACK", "doto", false),
+    a("ACH_SUSU_SPROUT_CLAWS", "susu", false),
+    a("ACH_KONGI_BACK", "kongi", false),
+    a("ACH_DEEPEST_PLACE", "deepest", false),
+    a("ACH_CLOVER_BACK", "clover", true),
+    a("ACH_ALL_NEIGHBORS_BACK", "all_back", true),
+    a("ACH_TRUE_ENDING", "true_end", true),
+    a("ACH_ALL_MEMORIES", "memory", true),
+    a("ACH_SIDE_BURROW", "side", true),
+    a("ACH_MUMU_FREED", "mumu", true),
+    a("ACH_MOMO_DEEPEST", "momo_deep", true),
+    a("ACH_DOTO_DEEPEST", "doto_deep", true),
     // 싸움
-    a("KILLS", "kills2", false),
-    a("AMBUSH", "ambush2", false),
-    a("PARRY", "parry2", false),
-    a("HEAVY", "heavy2", false),
-    a("FINISHER", "finisher", false),
-    a("BOWLING", "bowl", false),
+    a("ACH_KILLS", "kills2", false),
+    a("ACH_BURST_KILLS", "ambush2", false),
+    a("ACH_PARRIES", "parry2", false),
+    a("ACH_HEAVY_HITS", "heavy2", false),
+    a("ACH_FINISHERS", "finisher", false),
+    a("ACH_MOMO_BOWLING", "bowl", true),
     // 탐험
-    a("CHESTS", "chest2", false),
-    a("BREAKER", "break", false),
-    a("FALLS", "falls", false),
+    a("ACH_CHESTS", "chest2", false),
+    a("ACH_BREAKABLES", "break", false),
+    a("ACH_FALLS", "falls", false),
     // 이웃
-    a("BESTIARY", "mobs2", false),
-    a("TALENTS", "talent2", false),
-    a("DREAM_ALL", "dream_all", true),
+    a("ACH_BESTIARY", "mobs2", false),
+    a("ACH_TALENTS", "talent2", false),
+    a("ACH_DREAM_RUSH", "dream_all", true),
     // 마을
-    a("DECOR", "decor2", false),
-    a("KNOTS", "knot", false),
+    a("ACH_VILLAGE_DECOR", "decor2", false),
+    a("ACH_FIRST_KNOT", "knot", false),
 ];
 
 /// 지금 기록에서 이룬 업적.
@@ -111,7 +113,7 @@ mod tests {
         p.set(key::TUTORIAL);
         p.set(key::BORI_BACK);
         let first: Vec<_> = fresh(&p, &[]).map(|x| x.api).collect();
-        assert_eq!(first, ["TUTORIAL", "BORI_BACK"]);
+        assert_eq!(first, ["ACH_TUTORIAL", "ACH_BORI_BACK"]);
         assert_eq!(fresh(&p, &first).count(), 0, "연 것은 다시 열지 않는다");
     }
 
@@ -219,15 +221,71 @@ mod tests {
         std::fs::write("docs/steam/achievements-localization.csv", loc).unwrap();
     }
 
-    /// 엔딩 뒤 이야기(옆 굴·무무·참 엔딩 …)는 숨김 — 상점 업적 목록이 스포일러가 되지 않게.
+    /// Steam에 올린 API 이름(2026-11-04 확정). **이 목록을 고치지 않는다** — 바꾸면 이미 나간 판의 호출이 조용히 빗나가고,
+    /// 지운 업적은 딴 사람에게서도 사라진다(Steamworks 업적 문서). 새 업적은 `ALL`과 이 목록 끝에 함께 더한다.
+    #[test]
+    fn api_names_are_frozen() {
+        const FROZEN: [&str; 30] = [
+            "ACH_TUTORIAL",
+            "ACH_BORI_BACK",
+            "ACH_MOMO_FIRST_WIN",
+            "ACH_MOMO_BACK",
+            "ACH_DOTO_BACK",
+            "ACH_SUSU_SPROUT_CLAWS",
+            "ACH_KONGI_BACK",
+            "ACH_DEEPEST_PLACE",
+            "ACH_CLOVER_BACK",
+            "ACH_ALL_NEIGHBORS_BACK",
+            "ACH_TRUE_ENDING",
+            "ACH_ALL_MEMORIES",
+            "ACH_SIDE_BURROW",
+            "ACH_MUMU_FREED",
+            "ACH_MOMO_DEEPEST",
+            "ACH_DOTO_DEEPEST",
+            "ACH_KILLS",
+            "ACH_BURST_KILLS",
+            "ACH_PARRIES",
+            "ACH_HEAVY_HITS",
+            "ACH_FINISHERS",
+            "ACH_MOMO_BOWLING",
+            "ACH_CHESTS",
+            "ACH_BREAKABLES",
+            "ACH_FALLS",
+            "ACH_BESTIARY",
+            "ACH_TALENTS",
+            "ACH_DREAM_RUSH",
+            "ACH_VILLAGE_DECOR",
+            "ACH_FIRST_KNOT",
+        ];
+        let now: Vec<&str> = ALL.iter().map(|x| x.api).collect();
+        assert!(now.len() >= FROZEN.len(), "업적을 지우지 않는다(Archive)");
+        assert_eq!(
+            &now[..FROZEN.len()],
+            &FROZEN[..],
+            "올린 API 이름은 바꾸지 않는다"
+        );
+        for x in &ALL {
+            assert!(x.api.starts_with("ACH_") && x.api.len() <= 64, "{}", x.api);
+            assert!(
+                !x.api.chars().any(|c| c.is_ascii_digit()),
+                "숫자 기준은 이름에 넣지 않는다: {}",
+                x.api
+            );
+        }
+    }
+
+    /// 엔딩 뒤 이야기(옆 굴·무무·참 엔딩 …)와 캐릭터 해금을 드러내는 것은 Spoiler — 상점 업적 목록이 스포일러가 되지 않게.
     #[test]
     fn after_ending_achievements_are_hidden() {
         for api in [
-            "TRUE_ENDING",
-            "SIDE_PATH",
-            "MUMU_FREED",
-            "LAST_MEMORY",
-            "ALL_BACK",
+            "ACH_TRUE_ENDING",
+            "ACH_SIDE_BURROW",
+            "ACH_MUMU_FREED",
+            "ACH_ALL_MEMORIES",
+            "ACH_ALL_NEIGHBORS_BACK",
+            "ACH_MOMO_DEEPEST",
+            "ACH_DOTO_DEEPEST",
+            "ACH_MOMO_BOWLING",
         ] {
             assert!(ALL.iter().find(|x| x.api == api).unwrap().hidden, "{api}");
         }

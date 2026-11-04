@@ -3,6 +3,8 @@
 //!
 //! 앱 번호: Steam으로 켜면 Steam이 알려 준다. 개발 중에는 실행 파일 옆 `steam_appid.txt`(레포에 넣지 않는다).
 //! 업적은 `achievements.rs` 표 — 기록이 바뀔 때마다 `sync`가 새로 이룬 것만 연다.
+//! 기록 폴더: 연결되면 Steam 계정마다 `<앱 폴더>/steam-<계정 번호>`(`profile::scope_saves`, 0276 S3) — 그래서 `start`는
+//! 기록을 처음 읽기 전에 부른다(`App::new` 맨 앞). Auto-Cloud 경로의 `{Steam3AccountID}`와 같은 번호다.
 
 use crate::profile::Profile;
 
@@ -20,7 +22,11 @@ impl Steam {
         Self {
             #[cfg(feature = "steam")]
             client: match steamworks::Client::init() {
-                Ok(c) => Some(c),
+                Ok(c) => {
+                    let id = c.user().steam_id().account_id().raw();
+                    crate::profile::scope_saves(&format!("steam-{id}"));
+                    Some(c)
+                }
                 Err(e) => {
                     eprintln!("steam: 연결 없이 켠다 ({e})");
                     None

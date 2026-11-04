@@ -5,40 +5,40 @@
 
 | # | API 이름 | 숨김 | 한국어 | English |
 |---|---|---|---|---|
-| 1 | `TUTORIAL` |  | **첫 굴** — 포포에게 싸우는 법을 배운다. | **First Burrow** — Learn how to fight from Popo. |
-| 2 | `BORI_BACK` |  | **들쥐 대장** — 남쪽 공터의 대장을 이겨 보리를 되찾는다. | **Field Mouse Chief** — Beat the chief of the southern glade and bring Bori back. |
-| 3 | `MOMO_FIRST` |  | **그 아이** — 첫 길 끝을 지키는 굴토끼를 이긴다. | **That Child** — Beat the rabbit guarding the end of the first path. |
-| 4 | `MOMO_BACK` |  | **꽃이 피다** — 굴토끼를 세 번 이겨 마을로 데려온다. | **A Flower Blooms** — Beat the rabbit three times and bring her to the village. |
-| 5 | `DOTO_MEMORY` |  | **뿌리 엉킨 곳** — 둘째 길 끝에서 청설모를 정신 차리게 한다. | **Tangled Roots** — Bring the squirrel at the second path's end back to its senses. |
-| 6 | `SUSU_SPROUT` |  | **파는 손** — 첫 쉼터에서 수수에게 새싹 발톱을 받는다. | **Digging Hands** — Get the Sprout Claws from Susu at the first camp. |
-| 7 | `KONGI_BACK` |  | **깊은 곳의 문** — 셋째 길 끝에서 아르마딜로를 정신 차리게 한다. | **The Deep Door** — Bring the armadillo at the third path's end back to its senses. |
-| 8 | `DEEPEST` |  | **가장 깊은 곳** — 셋째 길 끝, 가장 깊은 곳에 닿는다. | **The Deepest Place** — Reach the deepest place at the end of the third path. |
-| 9 | `CLOVER_FAMILY` | 예 | **가족** — 굴토끼 옛 굴의 끝에서 토끼풀과 아기들을 깨운다. | **Family** — Wake Clover and her little ones at the end of the old rabbit warren. |
-| 10 | `ALL_BACK` | 예 | **모두 돌아왔다** — 실에 감겼던 이웃 다섯이 모두 마을로 돌아온다. | **Everyone's Home** — Bring all five neighbors who were bound by the threads back to the village. |
-| 11 | `TRUE_ENDING` | 예 | **마지막 꽃** — 잊힌 씨앗을 가장 깊은 곳에 심는다. | **The Last Bloom** — Plant the forgotten seed in the deepest place. |
-| 12 | `LAST_MEMORY` | 예 | **실의 기억** — 실의 기억 여섯 조각을 모두 본다. | **Threads of Memory** — See all six threads of memory. |
-| 13 | `SIDE_PATH` | 예 | **옆 굴** — 가장 깊은 곳 앞에서 다른 길을 골라 물길 굴로 내려간다. | **The Side Burrow** — At the door of the deepest place, take the other way down into the Waterway Burrow. |
-| 14 | `MUMU_FREED` | 예 | **물길지기** — 물길 굴 끝에서 무무의 실을 풀어 준다. | **The Waterway Keeper** — Free Mumu from the threads at the end of the Waterway Burrow. |
-| 15 | `MOMO_DEEP` | 예 | **꽃잎을 따라** — 모모와 함께 가장 깊은 곳에 닿는다. | **Following the Petal** — Reach the deepest place with Momo. |
-| 16 | `DOTO_DEEP` | 예 | **묻어 둔 길** — 도토와 함께 가장 깊은 곳에 닿는다. | **The Buried Way** — Reach the deepest place with Doto. |
-| 17 | `KILLS` |  | **땅속 사냥꾼** — 물든 이웃 200마리를 쓰러뜨린다. | **Underground Hunter** — Defeat 200 tainted neighbors. |
-| 18 | `AMBUSH` |  | **땅울림** — 솟구치기로 50마리를 쓰러뜨린다. | **Ground Rumble** — Defeat 50 with a burst out of the ground. |
-| 19 | `PARRY` |  | **빛나는 발톱** — 패링을 60번 한다. | **Shining Claws** — Parry 60 times. |
-| 20 | `HEAVY` |  | **땅을 울리는 발톱** — 강공격을 150번 맞힌다. | **Earth-Shaking Claws** — Land 150 heavy strikes. |
-| 21 | `FINISHER` |  | **마지막 타** — 발톱 마지막 타를 100번 맞힌다. | **Final Blow** — Land the last claw hit 100 times. |
-| 22 | `BOWLING` |  | **스트라이크!** — 모모로 날려 보낸 적을 다른 적에 20번 부딪힌다. | **Strike!** — As Momo, send a foe flying into another foe 20 times. |
-| 23 | `CHESTS` |  | **저장고 털이** — 상자를 25개 연다. | **Pantry Raider** — Open 25 chests. |
-| 24 | `BREAKER` |  | **와장창** — 굴에서 부술 수 있는 것을 30개 부순다. | **Crash and Smash** — Break 30 breakable things in the burrows. |
-| 25 | `FALLS` |  | **쓰러져도** — 10번 쓰러지고 다시 일어난다. | **Even If I Fall** — Fall 10 times and get back up. |
-| 26 | `BESTIARY` |  | **낯익은 얼굴들** — 도감에 이웃 10종을 적는다. | **Familiar Faces** — Note 10 kinds of neighbors in the bestiary. |
-| 27 | `TALENTS` |  | **자라는 재주** — 재주 넷을 깨운다. | **Growing Skills** — Awaken four skills. |
-| 28 | `DREAM_ALL` | 예 | **끝나지 않는 실** — 넷을 이어서 꾸는 꿈을 끝까지 깬다. | **Endless Thread** — Clear the dream of all four in a row. |
-| 29 | `DECOR` |  | **북적이는 마을** — 포포의 꾸미기 6개를 다 산다. | **Bustling Village** — Buy all 6 of Popo's decorations. |
-| 30 | `KNOTS` |  | **첫 매듭** — 실뜨기 1단계로 가장 깊은 곳에 닿는다. | **First Knot** — Reach the deepest place on Cat's Cradle level 1. |
+| 1 | `ACH_TUTORIAL` |  | **첫 굴** — 포포에게 싸우는 법을 배운다. | **First Burrow** — Learn how to fight from Popo. |
+| 2 | `ACH_BORI_BACK` |  | **들쥐 대장** — 남쪽 공터의 대장을 이겨 보리를 되찾는다. | **Field Mouse Chief** — Beat the chief of the southern glade and bring Bori back. |
+| 3 | `ACH_MOMO_FIRST_WIN` |  | **그 아이** — 첫 길 끝을 지키는 굴토끼를 이긴다. | **That Child** — Beat the rabbit guarding the end of the first path. |
+| 4 | `ACH_MOMO_BACK` |  | **꽃이 피다** — 굴토끼를 세 번 이겨 마을로 데려온다. | **A Flower Blooms** — Beat the rabbit three times and bring her to the village. |
+| 5 | `ACH_DOTO_BACK` |  | **뿌리 엉킨 곳** — 둘째 길 끝에서 청설모를 정신 차리게 한다. | **Tangled Roots** — Bring the squirrel at the second path's end back to its senses. |
+| 6 | `ACH_SUSU_SPROUT_CLAWS` |  | **파는 손** — 첫 쉼터에서 수수에게 새싹 발톱을 받는다. | **Digging Hands** — Get the Sprout Claws from Susu at the first camp. |
+| 7 | `ACH_KONGI_BACK` |  | **깊은 곳의 문** — 셋째 길 끝에서 아르마딜로를 정신 차리게 한다. | **The Deep Door** — Bring the armadillo at the third path's end back to its senses. |
+| 8 | `ACH_DEEPEST_PLACE` |  | **가장 깊은 곳** — 셋째 길 끝, 가장 깊은 곳에 닿는다. | **The Deepest Place** — Reach the deepest place at the end of the third path. |
+| 9 | `ACH_CLOVER_BACK` | 예 | **가족** — 굴토끼 옛 굴의 끝에서 토끼풀과 아기들을 깨운다. | **Family** — Wake Clover and her little ones at the end of the old rabbit warren. |
+| 10 | `ACH_ALL_NEIGHBORS_BACK` | 예 | **모두 돌아왔다** — 실에 감겼던 이웃 다섯이 모두 마을로 돌아온다. | **Everyone's Home** — Bring all five neighbors who were bound by the threads back to the village. |
+| 11 | `ACH_TRUE_ENDING` | 예 | **마지막 꽃** — 잊힌 씨앗을 가장 깊은 곳에 심는다. | **The Last Bloom** — Plant the forgotten seed in the deepest place. |
+| 12 | `ACH_ALL_MEMORIES` | 예 | **실의 기억** — 실의 기억 여섯 조각을 모두 본다. | **Threads of Memory** — See all six threads of memory. |
+| 13 | `ACH_SIDE_BURROW` | 예 | **옆 굴** — 가장 깊은 곳 앞에서 다른 길을 골라 물길 굴로 내려간다. | **The Side Burrow** — At the door of the deepest place, take the other way down into the Waterway Burrow. |
+| 14 | `ACH_MUMU_FREED` | 예 | **물길지기** — 물길 굴 끝에서 무무의 실을 풀어 준다. | **The Waterway Keeper** — Free Mumu from the threads at the end of the Waterway Burrow. |
+| 15 | `ACH_MOMO_DEEPEST` | 예 | **꽃잎을 따라** — 모모와 함께 가장 깊은 곳에 닿는다. | **Following the Petal** — Reach the deepest place with Momo. |
+| 16 | `ACH_DOTO_DEEPEST` | 예 | **묻어 둔 길** — 도토와 함께 가장 깊은 곳에 닿는다. | **The Buried Way** — Reach the deepest place with Doto. |
+| 17 | `ACH_KILLS` |  | **땅속 사냥꾼** — 물든 이웃 200마리를 쓰러뜨린다. | **Underground Hunter** — Defeat 200 tainted neighbors. |
+| 18 | `ACH_BURST_KILLS` |  | **땅울림** — 솟구치기로 50마리를 쓰러뜨린다. | **Ground Rumble** — Defeat 50 with a burst out of the ground. |
+| 19 | `ACH_PARRIES` |  | **빛나는 발톱** — 패링을 60번 한다. | **Shining Claws** — Parry 60 times. |
+| 20 | `ACH_HEAVY_HITS` |  | **땅을 울리는 발톱** — 강공격을 150번 맞힌다. | **Earth-Shaking Claws** — Land 150 heavy strikes. |
+| 21 | `ACH_FINISHERS` |  | **마지막 타** — 발톱 마지막 타를 100번 맞힌다. | **Final Blow** — Land the last claw hit 100 times. |
+| 22 | `ACH_MOMO_BOWLING` | 예 | **스트라이크!** — 모모로 날려 보낸 적을 다른 적에 20번 부딪힌다. | **Strike!** — As Momo, send a foe flying into another foe 20 times. |
+| 23 | `ACH_CHESTS` |  | **저장고 털이** — 상자를 25개 연다. | **Pantry Raider** — Open 25 chests. |
+| 24 | `ACH_BREAKABLES` |  | **와장창** — 굴에서 부술 수 있는 것을 30개 부순다. | **Crash and Smash** — Break 30 breakable things in the burrows. |
+| 25 | `ACH_FALLS` |  | **쓰러져도** — 10번 쓰러지고 다시 일어난다. | **Even If I Fall** — Fall 10 times and get back up. |
+| 26 | `ACH_BESTIARY` |  | **낯익은 얼굴들** — 도감에 이웃 10종을 적는다. | **Familiar Faces** — Note 10 kinds of neighbors in the bestiary. |
+| 27 | `ACH_TALENTS` |  | **자라는 재주** — 재주 넷을 깨운다. | **Growing Skills** — Awaken four skills. |
+| 28 | `ACH_DREAM_RUSH` | 예 | **끝나지 않는 실** — 넷을 이어서 꾸는 꿈을 끝까지 깬다. | **Endless Thread** — Clear the dream of all four in a row. |
+| 29 | `ACH_VILLAGE_DECOR` |  | **북적이는 마을** — 포포의 꾸미기 6개를 다 산다. | **Bustling Village** — Buy all 6 of Popo's decorations. |
+| 30 | `ACH_FIRST_KNOT` |  | **첫 매듭** — 실뜨기 1단계로 가장 깊은 곳에 닿는다. | **First Knot** — Reach the deepest place on Cat's Cradle level 1. |
 
 ## 모든 언어
 
-### `TUTORIAL`
+### `ACH_TUTORIAL`
 - koreana: **첫 굴** — 포포에게 싸우는 법을 배운다.
 - english: **First Burrow** — Learn how to fight from Popo.
 - japanese: **はじめての穴** — ポポからたたかい方をおそわる。
@@ -52,7 +52,7 @@
 - russian: **Первая нора** — Научись драться у Попо.
 - polish: **Pierwsza nora** — Naucz się walczyć od Popo.
 
-### `BORI_BACK`
+### `ACH_BORI_BACK`
 - koreana: **들쥐 대장** — 남쪽 공터의 대장을 이겨 보리를 되찾는다.
 - english: **Field Mouse Chief** — Beat the chief of the southern glade and bring Bori back.
 - japanese: **ノネズミの親分** — 南の空き地の親分をやっつけて、ボリをとりもどす。
@@ -66,7 +66,7 @@
 - russian: **Староста полёвок** — Победи старосту южной поляны и верни Бори.
 - polish: **Wódz myszy polnych** — Pokonaj wodza z południowej polany i sprowadź Bori z powrotem.
 
-### `MOMO_FIRST`
+### `ACH_MOMO_FIRST_WIN`
 - koreana: **그 아이** — 첫 길 끝을 지키는 굴토끼를 이긴다.
 - english: **That Child** — Beat the rabbit guarding the end of the first path.
 - japanese: **あの子** — 最初の道の先を守るアナウサギをやっつける。
@@ -80,7 +80,7 @@
 - russian: **Та малышка** — Победи крольчиху, стерегущую конец первой тропы.
 - polish: **Tamta mała** — Pokonaj królicę strzegącą końca pierwszej ścieżki.
 
-### `MOMO_BACK`
+### `ACH_MOMO_BACK`
 - koreana: **꽃이 피다** — 굴토끼를 세 번 이겨 마을로 데려온다.
 - english: **A Flower Blooms** — Beat the rabbit three times and bring her to the village.
 - japanese: **花がひらく** — アナウサギを3回やっつけて、村へつれてくる。
@@ -94,7 +94,7 @@
 - russian: **Цветок распустился** — Победи крольчиху трижды и приведи её в деревню.
 - polish: **Kwiat rozkwita** — Pokonaj królicę trzy razy i przyprowadź ją do wioski.
 
-### `DOTO_MEMORY`
+### `ACH_DOTO_BACK`
 - koreana: **뿌리 엉킨 곳** — 둘째 길 끝에서 청설모를 정신 차리게 한다.
 - english: **Tangled Roots** — Bring the squirrel at the second path's end back to its senses.
 - japanese: **根のからまる所** — 2本目の道の先で、キタリスの目をさまさせる。
@@ -108,7 +108,7 @@
 - russian: **Спутанные корни** — Приведи в чувство белку в конце второй тропы.
 - polish: **Splątane korzenie** — Przywróć zmysły wiewiórce z końca drugiej ścieżki.
 
-### `SUSU_SPROUT`
+### `ACH_SUSU_SPROUT_CLAWS`
 - koreana: **파는 손** — 첫 쉼터에서 수수에게 새싹 발톱을 받는다.
 - english: **Digging Hands** — Get the Sprout Claws from Susu at the first camp.
 - japanese: **ほる手** — 最初の休み場で、ススから新芽のツメをもらう。
@@ -122,7 +122,7 @@
 - russian: **Копающие лапки** — Получи когти-ростки у Сусу на первом привале.
 - polish: **Łapki do kopania** — Odbierz kiełkowe pazury od Susu w pierwszym obozie.
 
-### `KONGI_BACK`
+### `ACH_KONGI_BACK`
 - koreana: **깊은 곳의 문** — 셋째 길 끝에서 아르마딜로를 정신 차리게 한다.
 - english: **The Deep Door** — Bring the armadillo at the third path's end back to its senses.
 - japanese: **深いところの門** — 3本目の道の先で、アルマジロの目をさまさせる。
@@ -136,7 +136,7 @@
 - russian: **Глубинная дверь** — Приведи в чувство броненосца в конце третьей тропы.
 - polish: **Głębokie drzwi** — Przywróć zmysły pancernikowi z końca trzeciej ścieżki.
 
-### `DEEPEST`
+### `ACH_DEEPEST_PLACE`
 - koreana: **가장 깊은 곳** — 셋째 길 끝, 가장 깊은 곳에 닿는다.
 - english: **The Deepest Place** — Reach the deepest place at the end of the third path.
 - japanese: **いちばん深いところ** — 3本目の道の先、いちばん深いところに着く。
@@ -150,7 +150,7 @@
 - russian: **Самая глубь** — Дойди до самой глуби в конце третьей тропы.
 - polish: **Najgłębsze miejsce** — Dotrzyj do najgłębszego miejsca na końcu trzeciej ścieżki.
 
-### `CLOVER_FAMILY`
+### `ACH_CLOVER_BACK`
 - koreana: **가족** — 굴토끼 옛 굴의 끝에서 토끼풀과 아기들을 깨운다.
 - english: **Family** — Wake Clover and her little ones at the end of the old rabbit warren.
 - japanese: **家族** — アナウサギの古い巣穴の奥で、クローバーと子どもたちを起こす。
@@ -164,7 +164,7 @@
 - russian: **Семья** — Разбуди Клевер и её малышей в конце старой кроличьей норы.
 - polish: **Rodzina** — Obudź Koniczynkę i jej maluchy na końcu starej króliczej nory.
 
-### `ALL_BACK`
+### `ACH_ALL_NEIGHBORS_BACK`
 - koreana: **모두 돌아왔다** — 실에 감겼던 이웃 다섯이 모두 마을로 돌아온다.
 - english: **Everyone's Home** — Bring all five neighbors who were bound by the threads back to the village.
 - japanese: **みんな帰ってきた** — 糸にからまれていたご近所さん5人が、みんな村に帰ってくる。
@@ -178,7 +178,7 @@
 - russian: **Все дома** — Верни в деревню всех пятерых соседей, опутанных нитями.
 - polish: **Wszyscy w domu** — Sprowadź do wioski wszystkich pięciu sąsiadów spętanych nićmi.
 
-### `TRUE_ENDING`
+### `ACH_TRUE_ENDING`
 - koreana: **마지막 꽃** — 잊힌 씨앗을 가장 깊은 곳에 심는다.
 - english: **The Last Bloom** — Plant the forgotten seed in the deepest place.
 - japanese: **さいごの花** — 忘れられた種を、いちばん深いところに植える。
@@ -192,7 +192,7 @@
 - russian: **Последнее цветение** — Посади забытое семечко в самой глуби.
 - polish: **Ostatnie kwitnienie** — Zasadź zapomniane nasionko w najgłębszym miejscu.
 
-### `LAST_MEMORY`
+### `ACH_ALL_MEMORIES`
 - koreana: **실의 기억** — 실의 기억 여섯 조각을 모두 본다.
 - english: **Threads of Memory** — See all six threads of memory.
 - japanese: **糸の記憶** — 糸の記憶を6つ、ぜんぶ見る。
@@ -206,7 +206,7 @@
 - russian: **Нити памяти** — Увидеть все шесть нитей памяти.
 - polish: **Nici pamięci** — Zobacz wszystkie sześć nici pamięci.
 
-### `SIDE_PATH`
+### `ACH_SIDE_BURROW`
 - koreana: **옆 굴** — 가장 깊은 곳 앞에서 다른 길을 골라 물길 굴로 내려간다.
 - english: **The Side Burrow** — At the door of the deepest place, take the other way down into the Waterway Burrow.
 - japanese: **となりの穴** — いちばん深い場所の手前で別の道をえらび、水みちの巣穴へおりる。
@@ -220,7 +220,7 @@
 - russian: **Соседняя нора** — Перед самой глубью выбери другой путь и спустись в нору у ручья.
 - polish: **Nora obok** — Przed najgłębszym miejscem wybierz drugą drogę i zejdź do nory strumienia.
 
-### `MUMU_FREED`
+### `ACH_MUMU_FREED`
 - koreana: **물길지기** — 물길 굴 끝에서 무무의 실을 풀어 준다.
 - english: **The Waterway Keeper** — Free Mumu from the threads at the end of the Waterway Burrow.
 - japanese: **水みちの番人** — 水みちの巣穴の奥で、ムムの糸をほどく。
@@ -234,7 +234,7 @@
 - russian: **Страж ручья** — Освободи Муму от нитей в конце норы у ручья.
 - polish: **Strzeżony strumień** — Uwolnij Mumu od nici na końcu nory strumienia.
 
-### `MOMO_DEEP`
+### `ACH_MOMO_DEEPEST`
 - koreana: **꽃잎을 따라** — 모모와 함께 가장 깊은 곳에 닿는다.
 - english: **Following the Petal** — Reach the deepest place with Momo.
 - japanese: **花びらをたどって** — モモといっしょに、いちばん深い場所にたどりつく。
@@ -248,7 +248,7 @@
 - russian: **По следу лепестка** — Дойди до самой глуби с Момо.
 - polish: **Śladem płatka** — Dotrzyj z Momo do najgłębszego miejsca.
 
-### `DOTO_DEEP`
+### `ACH_DOTO_DEEPEST`
 - koreana: **묻어 둔 길** — 도토와 함께 가장 깊은 곳에 닿는다.
 - english: **The Buried Way** — Reach the deepest place with Doto.
 - japanese: **うめておいた道** — ドトといっしょに、いちばん深い場所にたどりつく。
@@ -262,7 +262,7 @@
 - russian: **Закопанный путь** — Дойди до самой глуби с Дото.
 - polish: **Zakopana droga** — Dotrzyj z Doto do najgłębszego miejsca.
 
-### `KILLS`
+### `ACH_KILLS`
 - koreana: **땅속 사냥꾼** — 물든 이웃 200마리를 쓰러뜨린다.
 - english: **Underground Hunter** — Defeat 200 tainted neighbors.
 - japanese: **地中のかりうど** — 染まった近所を200ぴきたおす。
@@ -276,7 +276,7 @@
 - russian: **Подземная охота** — Победи 200 опутанных соседей.
 - polish: **Podziemne łowy** — Pokonaj 200 splątanych sąsiadów.
 
-### `AMBUSH`
+### `ACH_BURST_KILLS`
 - koreana: **땅울림** — 솟구치기로 50마리를 쓰러뜨린다.
 - english: **Ground Rumble** — Defeat 50 with a burst out of the ground.
 - japanese: **じなり** — とびだしで50ぴきたおす。
@@ -290,7 +290,7 @@
 - russian: **Гул земли** — Победи 50 врагов, выпрыгнув из-под земли.
 - polish: **Dudnienie ziemi** — Pokonaj 50 wrogów, wyskakując spod ziemi.
 
-### `PARRY`
+### `ACH_PARRIES`
 - koreana: **빛나는 발톱** — 패링을 60번 한다.
 - english: **Shining Claws** — Parry 60 times.
 - japanese: **光るつめ** — はじきを60回する。
@@ -304,7 +304,7 @@
 - russian: **Сияющие когти** — Парируй 60 раз.
 - polish: **Lśniące pazury** — Sparuj 60 razy.
 
-### `HEAVY`
+### `ACH_HEAVY_HITS`
 - koreana: **땅을 울리는 발톱** — 강공격을 150번 맞힌다.
 - english: **Earth-Shaking Claws** — Land 150 heavy strikes.
 - japanese: **地をゆらすツメ** — 強いこうげきを150回当てる。
@@ -318,7 +318,7 @@
 - russian: **Когти, сотрясающие землю** — Попади 150 тяжёлыми ударами.
 - polish: **Pazury wstrząsające ziemią** — Traf 150 ciężkimi ciosami.
 
-### `FINISHER`
+### `ACH_FINISHERS`
 - koreana: **마지막 타** — 발톱 마지막 타를 100번 맞힌다.
 - english: **Final Blow** — Land the last claw hit 100 times.
 - japanese: **さいごの一打** — つめのさいごの打を100回当てる。
@@ -332,7 +332,7 @@
 - russian: **Последний удар** — Нанеси добивающий удар когтями 100 раз.
 - polish: **Ostatni cios** — Zadaj ostatni cios pazurami 100 razy.
 
-### `BOWLING`
+### `ACH_MOMO_BOWLING`
 - koreana: **스트라이크!** — 모모로 날려 보낸 적을 다른 적에 20번 부딪힌다.
 - english: **Strike!** — As Momo, send a foe flying into another foe 20 times.
 - japanese: **ストライク！** — モモでふっとばした敵を、ほかの敵に20回ぶつける。
@@ -346,7 +346,7 @@
 - russian: **Страйк!** — За Момо 20 раз запусти врага в другого врага.
 - polish: **Wszystkie kręgle!** — Jako Momo wybij wroga w innego wroga 20 razy.
 
-### `CHESTS`
+### `ACH_CHESTS`
 - koreana: **저장고 털이** — 상자를 25개 연다.
 - english: **Pantry Raider** — Open 25 chests.
 - japanese: **くらあらし** — 箱を25こあける。
@@ -360,7 +360,7 @@
 - russian: **Набег на кладовые** — Открой 25 сундуков.
 - polish: **Najazd na spiżarnie** — Otwórz 25 skrzyń.
 
-### `BREAKER`
+### `ACH_BREAKABLES`
 - koreana: **와장창** — 굴에서 부술 수 있는 것을 30개 부순다.
 - english: **Crash and Smash** — Break 30 breakable things in the burrows.
 - japanese: **ガッシャーン** — 巣穴でこわせるものを30こ こわす。
@@ -374,7 +374,7 @@
 - russian: **Вдребезги** — Разбей 30 вещей в норах.
 - polish: **Trzask-prask** — Rozbij 30 rzeczy w norach.
 
-### `FALLS`
+### `ACH_FALLS`
 - koreana: **쓰러져도** — 10번 쓰러지고 다시 일어난다.
 - english: **Even If I Fall** — Fall 10 times and get back up.
 - japanese: **倒れても** — 10回倒れて、また立ちあがる。
@@ -388,7 +388,7 @@
 - russian: **Даже если упаду** — Упади и поднимись 10 раз.
 - polish: **Nawet jeśli upadnę** — Upadnij i wstań 10 razy.
 
-### `BESTIARY`
+### `ACH_BESTIARY`
 - koreana: **낯익은 얼굴들** — 도감에 이웃 10종을 적는다.
 - english: **Familiar Faces** — Note 10 kinds of neighbors in the bestiary.
 - japanese: **見なれた顔** — ずかんに近所を10種書く。
@@ -402,7 +402,7 @@
 - russian: **Знакомые лица** — Запиши в бестиарий 10 видов соседей.
 - polish: **Znajome twarze** — Zapisz w bestiariuszu 10 rodzajów sąsiadów.
 
-### `TALENTS`
+### `ACH_TALENTS`
 - koreana: **자라는 재주** — 재주 넷을 깨운다.
 - english: **Growing Skills** — Awaken four skills.
 - japanese: **育つわざ** — わざを4つ起こす。
@@ -416,7 +416,7 @@
 - russian: **Умения растут** — Пробуди четыре умения.
 - polish: **Zdolności rosną** — Obudź cztery zdolności.
 
-### `DREAM_ALL`
+### `ACH_DREAM_RUSH`
 - koreana: **끝나지 않는 실** — 넷을 이어서 꾸는 꿈을 끝까지 깬다.
 - english: **Endless Thread** — Clear the dream of all four in a row.
 - japanese: **終わらない糸** — 四つをつづけて見る夢を最後までやりとげる。
@@ -430,7 +430,7 @@
 - russian: **Бесконечная нить** — Пройди сон всех четырёх подряд.
 - polish: **Nić bez końca** — Przejdź sen całej czwórki pod rząd.
 
-### `DECOR`
+### `ACH_VILLAGE_DECOR`
 - koreana: **북적이는 마을** — 포포의 꾸미기 6개를 다 산다.
 - english: **Bustling Village** — Buy all 6 of Popo's decorations.
 - japanese: **にぎやかな村** — ポポのかざり6つをぜんぶ買う。
@@ -444,7 +444,7 @@
 - russian: **Живая деревня** — Купи у Попо все 6 украшений.
 - polish: **Gwarna wioska** — Kup wszystkie 6 ozdób Popo.
 
-### `KNOTS`
+### `ACH_FIRST_KNOT`
 - koreana: **첫 매듭** — 실뜨기 1단계로 가장 깊은 곳에 닿는다.
 - english: **First Knot** — Reach the deepest place on Cat's Cradle level 1.
 - japanese: **はじめての結び目** — あやとり1段で、いちばん深いところに着く。
