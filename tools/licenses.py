@@ -35,7 +35,7 @@ def license_texts(pkg_dir):
 
 def main():
     meta = json.loads(subprocess.check_output(
-        ['cargo', 'metadata', '--format-version', '1'], cwd=ROOT))
+        ['cargo', 'metadata', '--format-version', '1', '--all-features'], cwd=ROOT))
     groups = {}   # hash -> (filename, text, [crates])
     no_file = []
     for p in sorted(meta['packages'], key=lambda p: (p['name'], p['version'])):
