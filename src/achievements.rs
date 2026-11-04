@@ -115,6 +115,17 @@ mod tests {
         assert_eq!(fresh(&p, &first).count(), 0, "연 것은 다시 열지 않는다");
     }
 
+    /// 업적마다 아이콘 두 장(열림·잠김, 64×64)이 있다 — `tools/steam/achievement_icons.py`의 표와 이 표가 어긋나지 않게.
+    #[test]
+    fn every_achievement_has_both_icons() {
+        for x in &ALL {
+            for f in [format!("{}.png", x.api), format!("{}_locked.png", x.api)] {
+                let p = std::path::Path::new("docs/steam/icons").join(&f);
+                assert!(p.exists(), "아이콘이 없다: {f}");
+            }
+        }
+    }
+
     /// 파트너 사이트에 손으로 옮길 등록표: API 이름·숨김·열한 언어 이름과 설명(저널 글 그대로).
     /// `cargo test write_steam_achievement_sheet -- --ignored`로 `docs/steam/achievements.md`를 다시 만든다.
     #[test]
