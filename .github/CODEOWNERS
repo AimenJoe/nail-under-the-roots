@@ -1,0 +1,7 @@
+# 배포 파이프라인의 주인(docs/release.md "파이프라인 지키기"). 이 파일들을 고치는 PR에는 사장 검토가 걸린다.
+/.github/                @AimenJoe
+/docs/release.md         @AimenJoe
+/docs/releases/          @AimenJoe
+/tools/web/              @AimenJoe
+/tools/steam/            @AimenJoe
+/Cargo.toml              @AimenJoe
