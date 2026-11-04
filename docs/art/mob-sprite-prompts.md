@@ -208,3 +208,9 @@ Solid magenta background (#FF00FF), figures well separated, no text, no grid lin
 1. standing   2. walking (one leg forward)   3. head raised and mouth open, about to spit water (no water, the game draws it)
 4. sliding forward low on its belly, body stretched, tail swinging   5. hurt (flinching back, gills pressed flat)   6. defeated (lying on its side, limp)
 ```
+
+## mumu_freed (풀린 무무 월드 그림, 0275 — 풀려남 컷씬에 서 있을 그림)
+첨부: `tools/art/sources/ai/sprites/mumu_v1.png`(물든 싸움 시트, ✦ 지운 판) 한 장. 새로 그리지 않고 **고쳐 그린다** — 칸·자세·크기가 1px까지 같아야 `mobs_ai.py`가 같은 상자(`frames`)로 자른다.
+```
+Edit this image, the pixel art sprite sheet of Mumu, an old blind cave salamander. Make Mumu freed: remove every violet thread wrapped around the body and the faint red glow under the skin, so the skin is clean, soft pale pink with a gentle sheen, and the feathery coral-pink gills stand up relaxed. Mumu still has no eyes at all (smooth skin where the eyes would be). Keep everything else exactly the same: the same 3 columns x 2 rows, the same six poses, the same size and position of every frame, the same dark outlines, the solid magenta background (#FF00FF) and the same pixel style. No text, no grid lines, no shadows, no effects.
+```
