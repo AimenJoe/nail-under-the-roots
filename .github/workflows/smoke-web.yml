@@ -1,7 +1,7 @@
 name: smoke-web
 # 웹 빌드 연기 시험(docs/decisions/0169 R7). 헤드리스 Chromium으로 타이틀 → 개발 시나리오 몇 개를 띄워 입력을 넣고
 # 콘솔 에러·패닉·멈춘 화면을 잡는다(tools/test/smoke.js). 단위 테스트가 못 보는 wasm·JS 번들·로딩 화면·그리기 경로.
-# main push(관련 파일)와 수동 실행. 스크린숏은 아티팩트로.
+# main·release/** push(관련 파일)와 수동 실행. 운영판 빌드는 시나리오 없이 타이틀까지(0277). 스크린숏은 아티팩트로.
 on:
   push:
     branches: [main, 'release/**']
@@ -26,19 +26,19 @@ jobs:
     env:
       ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # 유료 에셋 팩(레포 밖, 0010). 시크릿이 없으면 건너뛰고 직접 그린 대체 타일로(팩 그림의 404는 smoke.js가 잡음으로 거른다).
       - name: Fetch vendor assets (private repo)
         if: env.ASSETS_REPO != ''
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ secrets.ASSETS_REPO }}
           token: ${{ secrets.ASSETS_TOKEN }}
           path: assets/vendor
-      - uses: dtolnay/rust-toolchain@stable
+      # Rust 버전은 rust-toolchain.toml 한 곳, 툴체인·캐시 액션은 SHA 고정(0277).
+      - uses: ./.github/actions/rust
         with:
           targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
       # 연기 시험은 타이틀 "개발" 메뉴로 장면에 들어가므로 개발 기능을 넣은 빌드로 돈다(main도). 운영판 빌드 자체는
       # deploy-web이 만들고 clippy(--no-default-features)로 본다(0193).
       - run: cargo build --release --target wasm32-unknown-unknown
@@ -47,7 +47,14 @@ jobs:
       - name: Assemble dist
         run: python3 tools/web/assemble.py dist "$GITHUB_SHA" dev
 
-      - uses: actions/setup-node@v7
+      # 운영판(개발 기능 없음)도 한 번 띄워 본다(0277): release/**에서 먼저 보니 main에 합치기 전에 걸린다.
+      # 개발 메뉴가 없어 시나리오 없이 PWA·모바일·타이틀만(smoke.js의 `none`).
+      - name: Build and assemble release flavor
+        run: |
+          cargo build --release --target wasm32-unknown-unknown --no-default-features
+          python3 tools/web/assemble.py dist-release "$GITHUB_SHA" release
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26   # 최신 LTS(Lithium, 2026-10-28 Active LTS). lts/*는 쓰지 않는다 — 다음 LTS로 조용히 넘어가지 않게
       - name: Install Playwright
@@ -55,9 +62,13 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.63.0
           npx playwright install --with-deps chromium
-      - run: node tools/test/smoke.js dist smoke-out
+      - name: Smoke (dev build, scenarios)
+        run: node tools/test/smoke.js dist smoke-out
+      - name: Smoke (release build, title only)
+        if: ${{ !cancelled() }}
+        run: node tools/test/smoke.js dist-release smoke-out/release none
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: smoke-shots

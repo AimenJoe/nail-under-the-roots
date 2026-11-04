@@ -1,0 +1,35 @@
+name: rust
+description: rust-toolchain.toml에 적은 Rust 버전으로 툴체인·대상·부품을 깔고 cargo 캐시를 켠다
+# 워크플로 다섯 곳이 같이 쓴다(docs/decisions/0277). 버전은 rust-toolchain.toml 한 곳 — 올릴 때는 그 줄만 바꾼다.
+# dtolnay/rust-toolchain을 SHA로 고정하면 @stable 같은 rev가 버전을 정하지 못하므로 toolchain을 직접 넘긴다
+# (그 레포 README: 고정할 SHA는 master 역사 안의 것).
+inputs:
+  targets:
+    description: 더 깔 대상(쉼표로)
+    required: false
+    default: ''
+  components:
+    description: 더 깔 부품(쉼표로)
+    required: false
+    default: ''
+  cache-key:
+    description: rust-cache 키에 더할 글(같은 잡의 다른 갈래끼리 캐시를 나눌 때)
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - id: v
+      shell: bash
+      run: |
+        c=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+        [ -n "$c" ] || { echo "::error::rust-toolchain.toml에 channel이 없다"; exit 1; }
+        echo "channel=$c" >> "$GITHUB_OUTPUT"
+    - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master 2026-11
+      with:
+        toolchain: ${{ steps.v.outputs.channel }}
+        targets: ${{ inputs.targets }}
+        components: ${{ inputs.components }}
+    - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      with:
+        key: ${{ inputs.cache-key }}

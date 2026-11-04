@@ -2,7 +2,7 @@
 // 입력을 넣고 몇 초 돌린 뒤 스크린숏을 남긴다. 콘솔 에러·패닉·화면이 한 색으로 멈춤을 잡는다(단위 테스트가 못 보는 wasm·JS 번들·로딩 화면).
 //   cargo build --release --target wasm32-unknown-unknown
 //   python3 tools/web/assemble.py dist local dev
-//   node tools/test/smoke.js dist [출력 폴더] [개발 목록 이름,...]
+//   node tools/test/smoke.js dist [출력 폴더] [개발 목록 이름,... | none]
 // CI: .github/workflows/smoke-web.yml. 이름은 src/scenario.rs LIST의 name(타이틀 "개발"의 묶음 탭 안 줄).
 const { chromium } = require('playwright');
 const http = require('http');
@@ -14,7 +14,10 @@ const OUT = path.resolve(process.argv[3] || 'smoke-out');
 // 기본: 튜토리얼 보스·쉼터·필드·던전·적 다섯 종·마지막 쉼터·가장 깊은 곳·마을·토끼풀.
 // 기본: 튜토리얼 보스·쉼터·필드·던전·적 다섯 종·마지막 쉼터·가장 깊은 곳·마을·실타래 굴(흰 실). 이름으로 고른다(0269: 개발 목록이
 // 묶음 탭으로 갈려 번호가 바뀐다 — src/scenario.rs의 LIST에서 묶음과 그 안의 자리를 읽는다).
-const SCENARIOS = (process.argv[4] || '튜토리얼 보스,쉼터,필드(모험),던전 바로,적 다섯 종,마지막 쉼터,가장 깊은 곳,마을,실타래 굴: 흰 실').split(',');
+// `none`이면 시나리오 없이 PWA·모바일·타이틀만 본다 — 개발 메뉴가 없는 운영판(--no-default-features) 빌드용(0277).
+const SCENARIO_ARG = process.argv[4];
+const SCENARIOS = SCENARIO_ARG === 'none' ? []
+  : (SCENARIO_ARG || '튜토리얼 보스,쉼터,필드(모험),던전 바로,적 다섯 종,마지막 쉼터,가장 깊은 곳,마을,실타래 굴: 흰 실').split(',');
 // 개발 목록의 묶음 순서(scenario::Cat::ALL)와 줄: { 이름 → [묶음 번호, 묶음 안 자리] }.
 const DEV = (() => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'scenario.rs'), 'utf8');

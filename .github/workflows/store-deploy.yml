@@ -54,8 +54,8 @@ jobs:
       BRANCH: ${{ inputs.steam_branch }}
       NOTE: ${{ inputs.note }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: nail-*-steam-${{ github.sha }}
           path: dl
@@ -123,17 +123,17 @@ jobs:
       EPIC_BPT_CLIENT_ID: ${{ secrets.EPIC_BPT_CLIENT_ID }}
       EPIC_BPT_CLIENT_SECRET: ${{ secrets.EPIC_BPT_CLIENT_SECRET }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # BuildPatchTool은 Epic 개발자 포털에서 받는 파일이라 레포에 넣지 않는다 — 비공개 에셋 레포의 eos/BuildPatchTool.
       - name: Fetch BuildPatchTool (private repo)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ secrets.ASSETS_REPO }}
           token: ${{ secrets.ASSETS_TOKEN }}
           path: vendor
           sparse-checkout: eos/BuildPatchTool
           persist-credentials: false
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: nail-*-epic-${{ github.sha }}
           path: dl

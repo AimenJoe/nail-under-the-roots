@@ -1,4 +1,6 @@
+# Rust 버전을 숫자로 고정한다(docs/decisions/0277): "stable"이면 6주마다 새 clippy 경고가 -D warnings를 아무 커밋에서나 빨갛게 만든다.
+# 올릴 때는 이 줄만 바꾸고(CI의 .github/actions/rust도 여기서 읽는다) 커밋 전 검사(CLAUDE.md)를 다 돌린다.
 [toolchain]
-channel = "stable"
+channel = "1.99.1"
 targets = ["wasm32-unknown-unknown"]
 components = ["rustfmt", "clippy"]
