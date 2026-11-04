@@ -267,6 +267,8 @@ pub const BIG_ONLY: u32 = 100;
 /// 가재·소금쟁이(0275 P4, `mobs_ai.py` → `crayfish.png`·`strider.png` 32칸).
 pub const CRAYFISH_ROW: u32 = BIG_ONLY;
 pub const STRIDER_ROW: u32 = BIG_ONLY + 1;
+/// 무무(넷째 길의 주인, 0275 P5, `mobs_ai.py` → `mumu.png` 56칸 — 몸이 길다).
+pub const MUMU_ROW: u32 = BIG_ONLY + 2;
 
 /// 시트 줄 번호 → (실루엣을 뺀 줄, 흰 실루엣인가).
 fn row_base(row: u32) -> (u32, bool) {
@@ -534,7 +536,7 @@ pub mod frame {
     pub const HOWL: u32 = 7;
 }
 
-pub const BIG_SHEETS: [BigSheet; 18] = [
+pub const BIG_SHEETS: [BigSheet; 19] = [
     BigSheet {
         file: "art/momo.png",
         back: MOMO_BLOOM_ROW,
@@ -701,6 +703,16 @@ pub const BIG_SHEETS: [BigSheet; 18] = [
         walk4: 0,
         run4: 0,
         foot: 30.0,
+    },
+    // 무무(0275 P5): 키 15에 몸 길이가 2.6배쯤(꼬리) — 56칸.
+    BigSheet {
+        file: "art/mumu.png",
+        back: MUMU_ROW,
+        tainted: None,
+        cell: 56.0,
+        walk4: 0,
+        run4: 0,
+        foot: 54.0,
     },
 ];
 /// critters 16칸의 발바닥 줄(critters.py "발바닥 y=14").

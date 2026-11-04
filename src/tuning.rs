@@ -764,7 +764,6 @@ pub const MUMU_WAVE_R: f32 = 72.0;
 pub const MUMU_WAVE_TIME: f32 = 0.85;
 pub const MUMU_WAVE_KNOCK: f32 = 170.0;
 pub const MUMU_WAVE_GAP: f32 = 0.4;
-pub const MUMU_ART_SCALE: f32 = 1.8;
 pub const TOAD_TONGUE_WIDTH: f32 = 4.0;
 pub const TOAD_LASH_TIME: f32 = 0.22;
 /// 혀가 다 뻗기까지(0253, 사장 "두꺼비 혀가 보이지도 않고 맞음"): 이 동안 혀끝이 자라며, 맞는 판정도 지금 뻗은 길이까지.

@@ -414,7 +414,7 @@ pub static MUMU: Species = Species {
     glowbugs: (16, 18),
     seed_chance: 1.0,
     color: Color::new(0.86, 0.72, 0.74, 1.0),
-    sheet_row: crate::art::TOAD_ROW,
+    sheet_row: crate::art::MUMU_ROW,
     ..BASE
 };
 

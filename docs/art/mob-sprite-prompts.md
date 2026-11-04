@@ -194,7 +194,7 @@ Solid magenta background (#FF00FF), figures well separated, no text, no grid lin
 4. legs stamping down hard (no ripple, the game draws it)   5. hurt (flinching back, eyes squeezed shut)   6. defeated (lying on its side, eyes closed)
 ```
 
-## mumu (키 16px, 코드 임시 그림)
+## mumu (키 15px, 56칸 — 받음 2026-11-04 `mumu_v1.png`)
 
 ```
 Redraw the creature in the attached image (the right figure) as a pixel art sprite sheet for a cute top-down
