@@ -16,8 +16,8 @@
 | 공식 페이지 | `main` push(`site/`) | `pages.yml` | GitHub Pages(https://aimenjoe.github.io/nail-under-the-roots/). 최신 버전·소식은 `site.js`가 Releases API에서 읽고, 못 읽으면 HTML에 적은 값 |
 
 ## 갈래(0193)
-- `main` = 운영판, 패치만. `release/v0.8` = 개발판이자 작업 갈래(v0.8.0 배포 뒤 v0.8.x, 작업을 여기에 바로 커밋·push — 사장 2026-11-02·11-03). `release/v0.6`은 v0.7.0 배포 뒤 지웠다 — 개발판 별칭 `dev`를 두 갈래가 같이 쓰면 마지막 push가 덮는다.
-- 패치를 main에 넣었으면 `git checkout release/v0.8 && git merge origin/main` 후 push.
+- `main` = 운영판, 패치만. `release/v1.0` = 개발판이자 작업 갈래(v0.9.0 배포 뒤, 작업을 여기에 바로 커밋·push — 사장 2026-11-02·11-04). `release/v0.6`은 v0.7.0 배포 뒤 지웠다 — 개발판 별칭 `dev`를 두 갈래가 같이 쓰면 마지막 push가 덮는다.
+- 패치를 main에 넣었으면 `git checkout release/v1.0 && git merge origin/main` 후 push.
 - 마일스톤을 닫을 때: release 갈래에 main을 합쳐 두고 → 버전 0.x.0·`docs/releases/v0.x.0.md`를 release 갈래에 커밋 → 그 커밋을 `git push origin HEAD:main`(아래 절차 5). 다음 마일스톤 갈래는 새 main에서 판다.
 
 ## 버전 규칙(0079)
