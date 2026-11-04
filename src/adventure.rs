@@ -390,7 +390,13 @@ impl World {
     pub fn village(v: crate::village::State) -> World {
         let p = crate::village::parse();
         let mut w = World::empty();
+        let brook = if v.spring {
+            crate::village::brook(&p)
+        } else {
+            Vec::new()
+        };
         w.room = Room::from_grid(p.grid, p.props, p.spawn_points);
+        w.room.streams = brook;
         for (ch, at) in &p.marks {
             match ch {
                 'K' => w.neighbors.push(Npc::standing(Who::Popo, *at)),

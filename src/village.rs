@@ -276,6 +276,32 @@ pub fn glow_level(banked: u32) -> u8 {
     }
 }
 
+/// 무무가 풀린 뒤(0275, 사장 2026-11-04 "마을에 물길 하나"): 다시 솟는 샘(`W`)에서 큰 나무(`Y`) 밑동까지 흐르는 물길.
+/// 샘 오른쪽 칸부터 나무 칸 바로 아래까지 동쪽으로, 마지막 칸은 위(나무 밑동 속)로 든다. (칸 가운데, 흐르는 쪽).
+/// 마을에서는 밀지 않는다(`World::stream_push_player` — 쉬는 곳). 그림은 굴과 같은 굽기(`Baker::with_water`)와 `draw_stream`.
+pub fn brook(p: &Parsed) -> Vec<(macroquad::math::Vec2, macroquad::math::Vec2)> {
+    use macroquad::math::vec2;
+    let cell = |c: char| {
+        p.marks
+            .iter()
+            .find(|(m, _)| *m == c)
+            .map(|(_, at)| ((at.x / map::TILE) as usize, (at.y / map::TILE) as usize))
+    };
+    let (Some((wx, wy)), Some((tx, _))) = (cell('W'), cell('Y')) else {
+        return Vec::new();
+    };
+    (wx + 1..=tx)
+        .map(|x| {
+            let dir = if x == tx {
+                vec2(0.0, -1.0)
+            } else {
+                vec2(1.0, 0.0)
+            };
+            (map::cell_center(x, wy), dir)
+        })
+        .collect()
+}
+
 /// 기록 키.
 pub fn key_decor(i: usize) -> String {
     format!("decor.{i}")
@@ -317,6 +343,24 @@ mod tests {
             p.grid.get((y.x / 16.0) as usize, (y.y / 16.0) as usize),
             Cell::Wall
         );
+    }
+
+    /// 샘의 물길(0275): 샘 곁에서 시작해 걸을 수 있는 칸만 지나 큰 나무 밑동(벽) 아래에서 끝난다.
+    #[test]
+    fn brook_runs_from_the_spring_to_the_tree() {
+        let p = parse();
+        let b = brook(&p);
+        assert!(b.len() >= 3);
+        let w = p.marks.iter().find(|(c, _)| *c == 'W').unwrap().1;
+        assert!((b[0].0 - w).length() <= 16.0, "샘 바로 곁에서 시작");
+        for (c, _) in &b {
+            let (x, y) = ((c.x / 16.0) as usize, (c.y / 16.0) as usize);
+            assert_eq!(p.grid.get(x, y), Cell::Floor);
+        }
+        let (last, dir) = *b.last().unwrap();
+        let (x, y) = ((last.x / 16.0) as usize, (last.y / 16.0) as usize);
+        assert_eq!(dir.y, -1.0);
+        assert_eq!(p.grid.get(x, y - 1), Cell::Wall, "나무 밑동 속으로 든다");
     }
 
     #[test]
