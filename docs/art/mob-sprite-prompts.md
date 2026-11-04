@@ -193,3 +193,18 @@ Solid magenta background (#FF00FF), figures well separated, no text, no grid lin
 1. standing   2. walking (one leg forward)   3. legs bent low, tapping the surface
 4. legs stamping down hard (no ripple, the game draws it)   5. hurt (flinching back, eyes squeezed shut)   6. defeated (lying on its side, eyes closed)
 ```
+
+## mumu (키 16px, 코드 임시 그림)
+
+```
+Redraw the creature in the attached image (the right figure) as a pixel art sprite sheet for a cute top-down
+action game: a big old blind cave salamander (an olm): a long pale pink body, small stubby legs, a long flat tail, feathery pink gills on both sides of the head and NO eyes at all (smooth skin where eyes would be). It is corrupted by purple threads: a faint red glow shows under the skin where eyes would be, and a few small purple root-threads are wrapped around its body. No mouth line.
+
+Use the attached image for size: draw it as big as the right figure next to the small mole, same pixel block size.
+Keep every frame the same body size.
+
+3 columns x 2 rows, 6 frames. EVERY frame is a side view facing RIGHT (never a back view or front view).
+Solid magenta background (#FF00FF), figures well separated, no text, no grid lines, no shadows, no effects.
+1. standing   2. walking (one leg forward)   3. head raised and mouth open, about to spit water (no water, the game draws it)
+4. sliding forward low on its belly, body stretched, tail swinging   5. hurt (flinching back, gills pressed flat)   6. defeated (lying on its side, limp)
+```

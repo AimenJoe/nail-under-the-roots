@@ -45,6 +45,11 @@ MOBS = [
      "pincers raised and open, about to snap", "lunging forward, snapping both pincers shut"),
     ("strider", None, 9, "a dark brown water strider (pond skater) with a small chunky body held up on long bent legs. Draw the legs THICK and bold (at least 3 pixel blocks wide, with an outline), because the game shrinks the sheet a lot and thin lines disappear",
      "legs bent low, tapping the surface", "legs stamping down hard (no ripple, the game draws it)"),
+    # 넷째 길의 주인 무무(0275 P5): 보스라 크게(키 16·길이 약 36 — 칸 40 꼴). 동굴도롱뇽(olm)처럼 눈이 없고 살빛이 옅은 분홍.
+    ("mumu", None, 16, "a big old blind cave salamander (an olm): a long pale pink body, small stubby legs, a long flat tail, "
+     "feathery pink gills on both sides of the head and NO eyes at all (smooth skin where eyes would be)",
+     "head raised and mouth open, about to spit water (no water, the game draws it)",
+     "sliding forward low on its belly, body stretched, tail swinging"),
 ]
 
 
@@ -59,6 +64,25 @@ def code_ref(name):
                 px[12 + x + xx, 12 + y + yy] = c
 
     line = (34, 24, 30, 255)
+    if name == "mumu":
+        # 옆모습 실루엣(40칸 보스 꼴에 맞춰 길이 약 36): 둥근 긴 몸통 + 가늘어지는 꼬리 + 짧은 다리 넷 + 머리 양옆 깃털 아가미, 눈 없음.
+        from PIL import ImageDraw
+        big = Image.new("RGBA", (48, 24), (0, 0, 0, 0))
+        d = ImageDraw.Draw(big)
+        skin, belly, gill = (226, 186, 190, 255), (240, 210, 212, 255), (232, 120, 140, 255)
+        for (x0, y0, x1, y1) in [(15, 14, 18, 20), (21, 14, 24, 20), (29, 14, 32, 20), (34, 14, 37, 20)]:
+            d.rectangle((x0, y0, x1, y1), fill=line)
+            d.rectangle((x0 + 1, y0, x1 - 1, y1 - 1), fill=skin)
+        d.polygon([(3, 14), (16, 10), (16, 16)], fill=line)            # 꼬리
+        d.polygon([(5, 14), (16, 11), (16, 15)], fill=skin)
+        d.ellipse((12, 8, 40, 18), fill=line)                          # 몸통
+        d.ellipse((13, 9, 39, 17), fill=skin)
+        d.line((16, 15, 36, 15), fill=belly)
+        d.ellipse((35, 7, 46, 16), fill=line)                          # 머리
+        d.ellipse((36, 8, 45, 15), fill=skin)
+        for gx, gy in [(36, 6), (38, 5), (37, 16)]:                    # 아가미
+            d.line((gx, gy, gx + 1, gy + 2), fill=gill)
+        return big
     if name == "crayfish":
         shell, dark, lite = (184, 82, 61, 255), (115, 43, 38, 255), (235, 143, 107, 255)
         for x, y, w, h, c in [(-9, -1, 3, 4, line), (-8, 0, 2, 2, dark), (-7, -2, 3, 5, line), (-6, -1, 2, 3, shell),
@@ -86,8 +110,7 @@ def code_ref(name):
 # 들쥐·생쥐(첫 둘)에서 배운 것: 들쥐는 서기·걷기를 뒷모습으로 그렸고 눈을 검게 그렸다 → "모든 칸 오른쪽 옆모습, 뒷모습 금지",
 # "눈은 빛나는 빨강"을 세게 적는다.
 PROMPT = """Redraw the creature in the attached image (the right figure) as a pixel art sprite sheet for a cute top-down
-action game: {look}. It is corrupted by purple threads: its eyes are GLOWING RED (red, not black), and a few small
-purple root-threads grow on its back. No mouth line.
+action game: {look}. {taint} No mouth line.
 
 Use the attached image for size: draw it as big as the right figure next to the small mole, same pixel block size.
 Keep every frame the same body size.
@@ -95,7 +118,19 @@ Keep every frame the same body size.
 3 columns x 2 rows, 6 frames. EVERY frame is a side view facing RIGHT (never a back view or front view).
 Solid magenta background (#FF00FF), figures well separated, no text, no grid lines, no shadows, no effects.
 1. standing   2. walking (one leg forward)   3. {windup}
-4. {attack}   5. hurt (flinching back, eyes squeezed shut)   6. defeated (lying on its side, eyes closed)"""
+4. {attack}   5. {hurt}   6. {down}"""
+
+TAINT = ("It is corrupted by purple threads: its eyes are GLOWING RED (red, not black), and a few small\n"
+         "purple root-threads grow on its back.")
+# 눈이 없는 것(무무)은 표지·맞음·쓰러짐 글을 바꾼다 — 틀 글대로면 "빛나는 붉은 눈"을 그려 온다.
+OVERRIDE = {
+    "mumu": dict(
+        taint="It is corrupted by purple threads: a faint red glow shows under the skin where eyes would be, and a few "
+              "small purple root-threads are wrapped around its body.",
+        hurt="hurt (flinching back, gills pressed flat)",
+        down="defeated (lying on its side, limp)",
+    ),
+}
 
 
 def board(row, target):
@@ -126,7 +161,10 @@ def main():
         board(name if row is None else row, target).save(OUT / f"ref_mob_{name}.png")
         where = "코드 임시 그림" if row is None else f"critters 줄 {row}"
         lines += [f"## {name} (키 {target}px, {where})", "", "```",
-                  PROMPT.format(look=look, windup=windup, attack=attack), "```", ""]
+                  PROMPT.format(look=look, windup=windup, attack=attack,
+                                **{**dict(taint=TAINT, hurt="hurt (flinching back, eyes squeezed shut)",
+                                          down="defeated (lying on its side, eyes closed)"), **OVERRIDE.get(name, {})}),
+                  "```", ""]
     (ROOT / "docs" / "art" / "mob-sprite-prompts.md").write_text("\n".join(lines))
     print(len(MOBS), "mobs")
 
