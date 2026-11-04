@@ -55,7 +55,7 @@
 - 되돌린 것은 결정 기록에 "덧붙임: 철회(새 번호)"로 남긴다.
 
 ## 필요한 Secrets
-`NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`(웹 — **Environment `web-production`·`web-dev`에**, 아래 "파이프라인 지키기"), `ANDROID_DEBUG_KEYSTORE_B64`(APK 서명 고정), `ASSETS_REPO`·`ASSETS_TOKEN`(비공개 에셋 레포, 만료 최대 1년 — 만료되면 직접 그린 타일로 빌드되고 실패하진 않는다). 없는 시크릿은 그 단계만 건너뛴다.
+`NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`(웹 — **Environment `web-production`·`web-dev`에**, 아래 "파이프라인 지키기"), `ANDROID_DEBUG_KEYSTORE_B64`(APK 서명 고정), `ASSETS_REPO`·`ASSETS_TOKEN`(비공개 에셋 레포, 만료 최대 1년 — 만료되면 받기 단계가 실패한다. 시크릿 자체가 없으면 개발판은 직접 그린 타일로 빌드되지만 운영·상점 판은 실패한다, 0277). 없는 시크릿은 그 단계만 건너뛴다.
 
 ## 파이프라인 지키기(사장 2026-11-04: "공개 레포지만 배포 파이프라인은 다른 개발자가 손댈 수 없게")
 레포는 공개라 누구나 보고 포크·PR은 할 수 있다. 막아야 하는 것은 셋: **배포 갈래(main·release/**)에 직접 쓰기**, **배포 시크릿을 읽기**, **워크플로를 고쳐 시크릿을 빼돌리기**. 원리(GitHub 문서, 2026-11-04 확인): 포크 PR에는 시크릿이 가지 않는다. 같은 레포의 PR·다른 갈래는 레포 시크릿을 읽을 수 있다 — 그래서 배포 시크릿은 Environment에 두고, 그 환경은 정한 갈래에서만 열리게 한다(공개 레포면 무료 플랜에도 다 된다). 파일 경로로 push를 막는 규칙(push ruleset)은 Team 플랜 비공개 레포 전용이라 쓰지 않는다.
@@ -64,6 +64,8 @@
 - `deploy-web.yml`: 빌드·시험(`build`)과 배포(`publish`)를 나눴다. `publish`만 Environment(`web-production` = main, `web-dev` = release/**)에 들어가 Netlify 시크릿을 읽는다. PR은 빌드·시험만(PR 미리 보기 배포는 뺐다).
 - `.github/CODEOWNERS`: 워크플로·릴리스 문서·배포 도구의 주인 = 사장(PR이 그 파일을 고치면 사장 검토가 걸린다).
 - 앞으로 붙는 Steam·Epic 업로드(0276 S4·E4)는 처음부터 Environment `store`(main만 + 사장 승인)에서만 시크릿을 읽는다.
+- 공급망·재현성(0277): 워크플로의 액션은 모두 **커밋 SHA로 고정**(`uses: 주인/이름@<40자> # v태그`). 고정 값은 Dependabot(`.github/dependabot.yml`, github-actions만, 달마다 묶음 PR 하나, `release/v1.0`으로)이 올린다 — **새 마일스톤 갈래를 만들면 `target-branch`도 바꾼다**. Rust 버전은 `rust-toolchain.toml`의 숫자 한 곳(CI는 `.github/actions/rust`가 그 줄을 읽는다).
+- 운영판 확인(0277): smoke-web이 운영판 빌드도 띄워 본다(시나리오 없이 PWA·모바일·타이틀). 운영 배포도 개발판처럼 운영 주소의 `build.txt`가 이 커밋인지 본다(`tools/web/check_live.sh`).
 
 사람이 할 것(Settings, 한 번):
 1. **Rules → Rulesets** 둘(2026-11-04 설정함): `main-only`(대상 `main`, Restrict updates·deletions·Block force pushes, 우회 = Repository admin만) — 운영 반영은 PR을 사장이 Merge. `release-branches`(대상 `release/**`, 같은 규칙 + Restrict creations, 우회 = Repository admin + Claude GitHub App) — 개발판은 Claude가 바로 push. "Require a pull request"는 켜지 않는다.
@@ -72,5 +74,7 @@
 3. **Actions → General**: Fork pull request workflows = "Require approval for all external contributors", Workflow permissions = **Read repository contents**(쓰기가 필요한 잡은 워크플로에 따로 적혀 있다), "Allow GitHub Actions to create and approve pull requests" 끔.
 4. **Collaborators**: 다른 사람에게 Write·Admin을 주지 않는다. 기여는 포크 PR로(시크릿에 닿지 않는다).
 5. 계정 2단계 인증.
+6. **main에 빨간 CI가 못 들어가게**(0277): Rules → Rulesets → `main-only` → "Require status checks to pass" 켜기 → 검사 이름 `build`(deploy-web의 빌드·시험 잡, PR에서 돈다)를 더한다. 사장은 우회 목록이라 꼭 필요하면 Merge 화면에서 우회를 골라 넣을 수 있다.
+7. **Settings → Advanced Security(또는 Code security)**: Dependabot alerts 켜기 — cargo 의존성의 알려진 취약점 알림(올리기 PR은 받지 않는다, 위).
 
 남은 틈(알고 둔다): `ASSETS_TOKEN`(비공개 에셋 레포 읽기 전용)·`ANDROID_DEBUG_KEYSTORE_B64`는 아직 레포 시크릿이다 — Write 권한자가 없으면 읽을 사람이 없다(1·4). 협업자를 들이게 되면 이 둘도 Environment로 옮긴다(빌드 워크플로마다 `environment:` 한 줄).
