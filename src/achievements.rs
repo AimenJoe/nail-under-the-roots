@@ -115,26 +115,32 @@ mod tests {
         assert_eq!(fresh(&p, &first).count(), 0, "연 것은 다시 열지 않는다");
     }
 
-    /// 업적마다 아이콘 두 장(열림·잠김, 64×64)이 있다 — `tools/steam/achievement_icons.py`의 표와 이 표가 어긋나지 않게.
+    /// 업적마다 아이콘 두 장(열림·잠김, 256×256)이 있다 — `tools/steam/achievement_icons.py`의 표와 이 표가 어긋나지 않게.
+    /// 이름은 Steam 일괄 올리기 규칙 `<API>_ACHIEVED.png`·`<API>_UNACHIEVED.png`(이름으로 업적에 붙는다).
     #[test]
     fn every_achievement_has_both_icons() {
         for x in &ALL {
-            for f in [format!("{}.png", x.api), format!("{}_locked.png", x.api)] {
+            for f in [
+                format!("{}_ACHIEVED.png", x.api),
+                format!("{}_UNACHIEVED.png", x.api),
+            ] {
                 let p = std::path::Path::new("docs/steam/icons").join(&f);
                 assert!(p.exists(), "아이콘이 없다: {f}");
             }
         }
     }
 
-    /// 파트너 사이트에 손으로 옮길 등록표: API 이름·숨김·열한 언어 이름과 설명(저널 글 그대로).
-    /// `cargo test write_steam_achievement_sheet -- --ignored`로 `docs/steam/achievements.md`를 다시 만든다.
+    /// 파트너 사이트 등록 자료: 사람이 읽는 표 `docs/steam/achievements.md` + 일괄 올리기 CSV 둘
+    /// (`achievements-definitions.csv`·`achievements-localization.csv`, Steamworks 업적 편집기 "Bulk Import/Export" 꼴).
+    /// `cargo test write_steam_achievement_sheet -- --ignored`로 다시 만든다.
     #[test]
     #[ignore]
     fn write_steam_achievement_sheet() {
         use crate::i18n::Lang;
-        // Steamworks 언어 이름(파트너 사이트의 언어 코드).
+        // Steamworks API 언어 코드(partner.steamgames.com/doc/store/localization/languages — 한국어는 `koreana`).
+        // 스페인어는 지역색 옅은 중립 스페인어라(0084) 스페인(`spanish`)·중남미(`latam`) 두 칸에 같은 글.
         let langs = [
-            (Lang::Ko, "korean"),
+            (Lang::Ko, "koreana"),
             (Lang::En, "english"),
             (Lang::Ja, "japanese"),
             (Lang::ZhHans, "schinese"),
@@ -142,13 +148,16 @@ mod tests {
             (Lang::PtBr, "brazilian"),
             (Lang::Fr, "french"),
             (Lang::Es, "spanish"),
+            (Lang::Es, "latam"),
             (Lang::De, "german"),
             (Lang::Ru, "russian"),
             (Lang::Pl, "polish"),
         ];
         let mut out = String::from(
             "# Steam 업적 등록표(0276 S2)\n\n`src/achievements.rs`가 만든다 — 손으로 고치지 않는다(`cargo test write_steam_achievement_sheet -- --ignored`).\n\
-             파트너 사이트 → 앱 관리 → 통계 및 업적 → 업적에 이 차례로 넣는다. API 이름은 한 번 올리면 바꾸지 않는다.\n\n\
+             파트너 사이트 → Steamworks 설정 편집 → 통계 및 업적 → 업적 편집기 → Bulk Import/Export에 \
+             `achievements-definitions.csv`·`achievements-localization.csv`·`icons/*.png`를 한꺼번에 끌어다 놓는다(머리줄은 편집기에서 받은 틀과 대조). \
+             API 이름은 한 번 올리면 바꾸지 않는다. \"숨김\" = Steam의 Spoiler.\n\n\
              | # | API 이름 | 숨김 | 한국어 | English |\n|---|---|---|---|---|\n",
         );
         for (i, x) in ALL.iter().enumerate() {
@@ -176,6 +185,38 @@ mod tests {
         }
         std::fs::create_dir_all("docs/steam").unwrap();
         std::fs::write("docs/steam/achievements.md", out).unwrap();
+
+        // CSV: 쉼표·따옴표·줄바꿈이 있으면 따옴표로 싸고 안의 따옴표는 둘로.
+        fn cell(s: &str) -> String {
+            if s.contains([',', '"', '\n']) {
+                format!("\"{}\"", s.replace('"', "\"\""))
+            } else {
+                s.to_string()
+            }
+        }
+        let mut defs = String::from(
+            "api_name,setid,permission,spoiler,archived,progress_stat_name,progress_stat_min,progress_stat_max\n",
+        );
+        for x in &ALL {
+            defs += &format!("{},,Client,{},false,,,\n", x.api, x.hidden);
+        }
+        let mut loc = String::from("api_name,field");
+        for (_, code) in langs {
+            loc += &format!(",{code}");
+        }
+        loc += "\n";
+        for x in &ALL {
+            let g = journal::goal(x.goal).unwrap();
+            for (field, text) in [("name", g.title), ("description", g.desc)] {
+                loc += &format!("{},{field}", x.api);
+                for (l, _) in langs {
+                    loc += &format!(",{}", cell(text(l.strings())));
+                }
+                loc += "\n";
+            }
+        }
+        std::fs::write("docs/steam/achievements-definitions.csv", defs).unwrap();
+        std::fs::write("docs/steam/achievements-localization.csv", loc).unwrap();
     }
 
     /// 엔딩 뒤 이야기(옆 굴·무무·참 엔딩 …)는 숨김 — 상점 업적 목록이 스포일러가 되지 않게.

@@ -1,7 +1,8 @@
-"""Steam 업적 아이콘(0276 S2): 업적마다 64×64 두 장 — 열림(색)·잠김(회색). 게임에 이미 있는 그림만 쓴다
+"""Steam 업적 아이콘(0276 S2): 업적마다 두 장(64점 그림 → 256×256 파일) — 열림(색)·잠김(회색). 게임에 이미 있는 그림만 쓴다
 (컷씬 일러스트·초상화·스프라이트 — 모두 나노바나나 원본에서 만든 우리 그림, 타일 팩 그림은 쓰지 않는다).
 
-실행: python3 tools/steam/achievement_icons.py        → docs/steam/icons/<API>.png·<API>_locked.png + 한눈에 보기 sheet.png
+실행: python3 tools/steam/achievement_icons.py        → docs/steam/icons/<API>_ACHIEVED.png·<API>_UNACHIEVED.png(256×256) + 한눈에 보기 sheet.png
+그림은 64점으로 짓고 4배로 키워 낸다(Steam 권장 256, 최소 64 — Steamworks 업적 문서 2026-11-04).
 업적 표는 `src/achievements.rs` — 줄이 바뀌면 여기 `ICONS`도 바꾼다(`cargo test`가 아이콘이 다 있는지 본다).
 
 - 그림: 일러스트·초상화는 게임 점의 2배로 저장돼 있어(초상화 88 = 44점, 일러스트 640 = 320점) 128×128을 잘라 반으로 줄이면
@@ -17,6 +18,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 ART = os.path.join(ROOT, 'assets', 'art')
 OUT = os.path.join(ROOT, 'docs', 'steam', 'icons')
 S = 64
+BIG = 256
 PLUM = (43, 29, 42)
 # journal::Cat::color(0..1) × 255.
 CAT = {
@@ -124,8 +126,10 @@ def main():
         pic = picture(src, CAT[cat])
         on = frame(pic, CAT[cat])
         off = locked(pic)
-        on.convert('RGB').save(os.path.join(OUT, f'{api}.png'))
-        off.convert('RGB').save(os.path.join(OUT, f'{api}_locked.png'))
+        # Steam 권장 256×256(최소 64) — 64점 그림을 4배 최근접으로 키워 점을 그대로 둔다.
+        # 파일 이름은 Steam 일괄 올리기 규칙 `<API>_ACHIEVED.png`·`<API>_UNACHIEVED.png`(이름으로 업적에 붙는다).
+        for im, tag in ((on, 'ACHIEVED'), (off, 'UNACHIEVED')):
+            im.convert('RGB').resize((BIG, BIG), Image.NEAREST).save(os.path.join(OUT, f'{api}_{tag}.png'))
         tiles.append((on, off))
     # 한눈에 보기: 열 여섯 칸씩 열림 줄 + 잠김 줄.
     cols = 10

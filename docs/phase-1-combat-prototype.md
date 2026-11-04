@@ -164,7 +164,7 @@
 ### v1.0 Steam 출시(0276) — 진행 중, `release/v1.0`
 - [x] 범위(사장 2026-11-04): Steam 출시 + 버그 고치기만, OS 셋(Windows·Linux·macOS — 맥은 공증 없이 먼저), 업적 약 서른, Next Fest·데모 안 함, 모바일은 준비 중
 - [x] S1 Steam 연동 뼈대(`steam` 기능·`src/steam.rs`, 없으면 조용히 그냥 켜짐) — 실제 Steam 클라이언트로는 앱 번호가 생긴 뒤
-- [x] S2 업적 서른(`src/achievements.rs`, 저널 목표에서 빌림) + 등록표 열한 언어·아이콘 60장(`docs/steam/`)
+- [x] S2 업적 서른(`src/achievements.rs`, 저널 목표에서 빌림) + 등록표 열한 언어 + 일괄 올리기 CSV 둘 + 아이콘 60장 256px(`docs/steam/`, Steam 원문대로 2026-11-04)
 - [ ] **사람**: 본인 확인 → 앱 만들기(앱·데포 번호), W-8BEN·은행, 빌더 계정, 업적 등록, Auto-Cloud 경로
 - [ ] S4 `steam-deploy.yml`(앱 번호 뒤) · S3 Auto-Cloud · S5 Deck · S6 상점 페이지(Coming Soon 2주 이상)
 - [x] 사장(2026-11-04): 가격 $0.99, 레포 공개, 웹·APK 무료 전판 그대로 — Steam판은 응원값(0276 "사장 답 둘째"). 상점·Steam 소식에는 무료판을 알리지 않는다(Valve 규칙)
