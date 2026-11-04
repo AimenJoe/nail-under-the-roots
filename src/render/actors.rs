@@ -1499,6 +1499,8 @@ pub(super) fn draw_enemy(art: Option<&Art>, e: &Enemy, alpha: f32, time: f32, st
             frame = F::BALL + ((time * 14.0) as u32) % 2
         }
         (crate::species::Behavior::Roller, enemy::State::Windup { .. }) => frame = F::CROUCH,
+        // 가재(0275 P4): 꼬리 치며 뒤로 튀는 동안은 움츠린 칸.
+        (_, enemy::State::Flip { .. }) => frame = F::HURT,
         (_, enemy::State::Lash { .. } | enemy::State::Puff { .. }) => frame = F::STRIKE,
         _ => {}
     }
@@ -1833,7 +1835,7 @@ pub(crate) enum CodePose {
 
 /// 그림 시트가 아직 없는 잡몹의 임시 코드 그림(0275 P4, 나노바나나 시트가 오면 `sheet_row`를 바꾸고 지운다).
 /// `c`는 몸 가운데, `left`면 왼쪽을 본다. `tint`는 곱하는 색, `None`이면 흰 덩어리(맞은 순간).
-/// 가재: 붉은 등딱지 + 마디 꼬리 + 집게 둘. 소금쟁이: 가는 몸 + 옆·뒤로 길게 뻗은 다리, 발끝에 물 오목.
+/// 소금쟁이: 가는 몸 + 옆·뒤로 길게 뻗은 다리, 발끝에 물 오목(가재는 그림이 왔다 — `crayfish.png`).
 pub(crate) fn draw_code_mob(
     kind: crate::enemy::Kind,
     c: Vec2,
@@ -1859,50 +1861,6 @@ pub(crate) fn draw_code_mob(
     };
     let line = OUTLINE;
     match kind {
-        crate::enemy::Kind::Crayfish => {
-            let shell = Color::new(0.72, 0.32, 0.24, 1.0);
-            let dark = Color::new(0.45, 0.17, 0.15, 1.0);
-            let lite = Color::new(0.92, 0.56, 0.42, 1.0);
-            let reach: f32 = match pose {
-                CodePose::Strike => 3.0,
-                CodePose::Ready => -1.0,
-                _ => 0.0,
-            };
-            let open = matches!(pose, CodePose::Ready) && ((time * 10.0) as i32) % 2 == 0;
-            // 꼬리 마디(뒤로 셋, 점점 작게) + 꼬리 부채.
-            px(-9.0, -1.0, 3.0, 4.0, line);
-            px(-8.0, 0.0, 2.0, 2.0, dark);
-            px(-7.0, -2.0, 3.0, 5.0, line);
-            px(-6.0, -1.0, 2.0, 3.0, shell);
-            px(-5.0, -2.0, 3.0, 5.0, line);
-            px(-4.0, -1.0, 2.0, 3.0, shell);
-            // 몸통(등딱지).
-            px(-3.0, -3.0, 8.0, 7.0, line);
-            px(-2.0, -2.0, 6.0, 5.0, shell);
-            px(-1.0, -2.0, 3.0, 1.0, lite);
-            // 물든 표시: 등에 보라 실 한 가닥.
-            px(0.0, 0.0, 3.0, 1.0, Color::new(0.62, 0.38, 0.80, 1.0));
-            // 눈.
-            px(4.0, -3.0, 1.0, 1.0, BLACK);
-            px(4.0, 2.0, 1.0, 1.0, BLACK);
-            // 다리(아래로 짧게).
-            for i in 0..3 {
-                px(-1.0 + i as f32 * 2.0, 4.0, 1.0, 2.0, dark);
-            }
-            // 집게 둘: 팔 + 집게 머리(열리면 가운데가 빈다).
-            for side in [-1.0f32, 1.0] {
-                // 팔은 몸통 앞 모서리(윗줄·아랫줄)에서 나온다 — 몸 밖에서 시작하면 집게가 떠 보인다.
-                let y = side * 3.0;
-                px(4.0, y, 3.0 + reach.max(0.0), 1.0, dark);
-                let hx = 7.0 + reach;
-                px(hx, y - 1.0, 4.0, 3.0, line);
-                px(hx + 1.0, y, 2.0, 1.0, if open { line } else { shell });
-                px(hx, y - 1.0, 1.0, 1.0, lite);
-            }
-            if pose == CodePose::Hurt {
-                px(-2.0, -2.0, 6.0, 1.0, WHITE);
-            }
-        }
         crate::enemy::Kind::Strider => {
             let body = Color::new(0.30, 0.27, 0.24, 1.0);
             let leg = Color::new(0.20, 0.18, 0.17, 1.0);

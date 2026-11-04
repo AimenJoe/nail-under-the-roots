@@ -340,7 +340,7 @@ pub static SPORE_CAP: Species = Species {
 };
 
 /// 가재(0275 P4): 물길 굴의 돌 밑에 살던 이웃. 물든 가재는 집게를 들고 다가온다. 단단하고 덜 밀린다.
-/// 그림이 오기 전엔 코드 그림(`art::CODE_ROW`).
+/// 그림은 나노바나나 원본 → `mobs_ai.py` → `crayfish.png`(32칸, `art::CRAYFISH_ROW`).
 pub static CRAYFISH: Species = Species {
     name: |s| s.mob_crayfish,
     lore: |s| s.mob_crayfish_lore,
@@ -360,7 +360,7 @@ pub static CRAYFISH: Species = Species {
     glowbugs: (1, 3),
     seed_chance: 0.06,
     color: Color::new(0.72, 0.34, 0.26, 1.0),
-    sheet_row: crate::art::CODE_ROW,
+    sheet_row: crate::art::CRAYFISH_ROW,
     ..BASE
 };
 

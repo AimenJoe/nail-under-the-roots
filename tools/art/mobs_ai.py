@@ -120,7 +120,66 @@ MOBS = {
         body_h=15,
         strip=11,
     ),
+    # 가재(0275 P4): 3×2 여섯 칸이 프롬프트대로 왔다. 예고 = 집게를 쳐든 칸, 공격 = 집게를 닫으며 내지른 칸.
+    # 몸이 길어(꼬리 + 집게) 24칸에 안 든다 — 박쥐처럼 칸 32(발바닥 30), 키는 낮게.
+    "crayfish": dict(
+        frames={"stand": (28, 64, 320, 221), "walk": (376, 64, 662, 221), "raise": (711, 42, 996, 221),
+                "snap": (21, 305, 328, 470), "hurt": (384, 312, 655, 470), "down": (696, 341, 1011, 470)},
+        order=["stand", "~stand", "walk", "stand", "raise", "snap", "hurt", "down"],
+        body_h=10,
+        strip=11,
+        cell=(32, 30),
+        bridge=(129, 41, 31),   # 쳐든 집게의 팔이 줄이며 끊긴다 — 짙은 껍데기 색으로 잇는다(외곽선 색이면 여전히 떠 보인다)
+    ),
 }
+
+
+def _parts(alpha):
+    """불투명 점의 이어진 덩어리들(8방향). 큰 것부터 점 목록."""
+    h, w = alpha.shape
+    seen = np.zeros_like(alpha, bool)
+    parts = []
+    for y0, x0 in zip(*np.nonzero(alpha)):
+        if seen[y0, x0]:
+            continue
+        stack, pts = [(y0, x0)], []
+        seen[y0, x0] = True
+        while stack:
+            y, x = stack.pop()
+            pts.append((y, x))
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    yy, xx = y + dy, x + dx
+                    if 0 <= yy < h and 0 <= xx < w and alpha[yy, xx] and not seen[yy, xx]:
+                        seen[yy, xx] = True
+                        stack.append((yy, xx))
+        parts.append(pts)
+    return sorted(parts, key=len, reverse=True)
+
+
+def bridge(cell, ink):
+    """줄이다 가는 팔이 끊겨 떠 버린 조각(가재 집게, 사장 "앞발 떨어졌네")을 몸통에 잇는다: 조각마다 가장 가까운
+    몸통 점까지 `ink` 색 1px 줄. 몸통 = 가장 큰 덩어리."""
+    out = cell.copy()
+    parts = _parts(out[..., 3] > 0)
+    if len(parts) < 2:
+        return out
+    body = np.array(parts[0])
+    for part in parts[1:]:
+        if len(part) < 3:
+            continue
+        p = np.array(part)
+        d = ((p[:, None, :] - body[None, :, :]) ** 2).sum(-1)
+        i, j = np.unravel_index(d.argmin(), d.shape)
+        (y0, x0), (y1, x1) = p[i], body[j]
+        n = max(abs(y1 - y0), abs(x1 - x0))
+        for k in range(1, n):
+            y = round(y0 + (y1 - y0) * k / n)
+            x = round(x0 + (x1 - x0) * k / n)
+            for yy in (y, y + 1):   # 두 줄 두께 — 한 줄이면 줄이 외곽선에 묻혀 여전히 떠 보인다
+                if yy < out.shape[0] and out[yy, x, 3] == 0:
+                    out[yy, x] = (*ink, 255)
+    return out
 
 
 def spec(name):
@@ -150,6 +209,8 @@ def build(name):
         cell = seat(sprite, size, foot)
         for pred, ink, hits in m.get("marks", TAINT) if not src_name.startswith("!") else []:
             cell = transfer(cell, src, m["frames"][base], pred, ink, hits)   # 뒤집은 칸은 자리가 안 맞아 건너뛴다
+        if m.get("bridge"):
+            cell = bridge(cell, m["bridge"])
         if base in m.get("red_eyes", ()):
             cell = redraw_eyes(cell, src, m["frames"][base], False, ink=RED_EYE[1], band=(0.15, 0.7))
         cols.append((cell, cell))

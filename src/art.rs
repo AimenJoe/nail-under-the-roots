@@ -261,6 +261,22 @@ pub const SPORE_ROW: u32 = 18;
 pub const CLOVER_ROW: u32 = 19;
 pub const CLOVER_BACK_ROW: u32 = 20;
 pub const BABY_ROW: u32 = 21;
+/// critters 줄(0..`CRITTER_ROWS`)이 다 찬 뒤의 큰 시트 번호(0275 P4): 이 값부터는 critters.png에 줄이 없고 `BIG_SHEETS`에만 있다.
+/// 번쩍임(흰 실루엣)은 다른 줄처럼 `+ CRITTER_ROWS`.
+pub const BIG_ONLY: u32 = 100;
+/// 가재(0275 P4, `mobs_ai.py` → `crayfish.png` 32칸).
+pub const CRAYFISH_ROW: u32 = BIG_ONLY;
+
+/// 시트 줄 번호 → (실루엣을 뺀 줄, 흰 실루엣인가).
+fn row_base(row: u32) -> (u32, bool) {
+    if row >= BIG_ONLY {
+        let k = row - BIG_ONLY;
+        (BIG_ONLY + k % CRITTER_ROWS, k >= CRITTER_ROWS)
+    } else {
+        (row % CRITTER_ROWS, row >= CRITTER_ROWS)
+    }
+}
+
 /// 그림 시트가 아직 없는 종(0275 P4: 가재·소금쟁이): 렌더가 코드로 임시 그림을 그린다(`render/actors.rs draw_code_mob`).
 /// critters 줄(`CRITTER_ROWS` 아래)과 겹치지 않는 값.
 pub const CODE_ROW: u32 = 1000;
@@ -521,7 +537,7 @@ pub mod frame {
     pub const HOWL: u32 = 7;
 }
 
-pub const BIG_SHEETS: [BigSheet; 16] = [
+pub const BIG_SHEETS: [BigSheet; 17] = [
     BigSheet {
         file: "art/momo.png",
         back: MOMO_BLOOM_ROW,
@@ -669,6 +685,16 @@ pub const BIG_SHEETS: [BigSheet; 16] = [
         run4: 0,
         foot: 22.0,
     },
+    // 가재(0275 P4): 몸이 길어(꼬리 + 집게) 박쥐처럼 32칸. critters 줄이 없어 `BIG_ONLY` 번호.
+    BigSheet {
+        file: "art/crayfish.png",
+        back: CRAYFISH_ROW,
+        tainted: None,
+        cell: 32.0,
+        walk4: 0,
+        run4: 0,
+        foot: 30.0,
+    },
 ];
 /// critters 16칸의 발바닥 줄(critters.py "발바닥 y=14").
 pub const CRITTER_FOOT: f32 = 14.0;
@@ -727,7 +753,7 @@ impl Art {
         if row >= CODE_ROW {
             return None;
         }
-        let (base, sil) = (row % CRITTER_ROWS, row >= CRITTER_ROWS);
+        let (base, sil) = row_base(row);
         if let Some((i, b, tex, r)) = self.big_sheet(base) {
             let body = self
                 .big_body
@@ -747,6 +773,9 @@ impl Art {
                 body,
             });
         }
+        if base >= BIG_ONLY {
+            return None;
+        }
         self.critters.as_ref().map(|tex| CritterCell {
             tex,
             src: cell(frame.min(6), row),
@@ -758,7 +787,7 @@ impl Art {
 
     /// 이 줄에 달리기 네 칸이 있나(`BigSheet::run4`, 시트가 그 칸까지 있어야).
     pub fn has_run(&self, row: u32) -> bool {
-        match self.big_sheet(row % CRITTER_ROWS) {
+        match self.big_sheet(row_base(row).0) {
             Some((_, b, tex, _)) => b.run4 > 0 && (tex.width() / b.cell) as u32 >= b.run4 + 4,
             None => false,
         }
@@ -766,7 +795,7 @@ impl Art {
 
     /// 달리는 칸(`has_run`일 때): 한 걸음에 두 칸.
     pub fn run(&self, row: u32, steps: f32) -> u32 {
-        match self.big_sheet(row % CRITTER_ROWS) {
+        match self.big_sheet(row_base(row).0) {
             Some((_, b, _, _)) => b.run4 + (steps * 2.0) as u32 % 4,
             None => self.walk(row, steps),
         }
@@ -778,7 +807,7 @@ impl Art {
         if row >= CODE_ROW {
             return frame::WALK + steps as u32 % 2;
         }
-        match self.big_sheet(row % CRITTER_ROWS) {
+        match self.big_sheet(row_base(row).0) {
             Some((_, b, tex, _)) => walk_frame(b, tex, steps),
             None => frame::WALK + steps as u32 % 2,
         }
@@ -817,7 +846,7 @@ impl Art {
 
     /// 이 줄이 새 그림 시트에 있나(쓰러짐 칸 7이 있다).
     pub fn critter_is_big(&self, row: u32) -> bool {
-        self.big_sheet(row % CRITTER_ROWS).is_some()
+        self.big_sheet(row_base(row).0).is_some()
     }
 }
 
