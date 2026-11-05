@@ -16,3 +16,7 @@ miniquad를 올릴 때는 새 원본을 받아 같은 패치를 다시 넣는다
   넘겨(`key_down_event(…, false)`) macroquad의 `is_key_pressed`가 누르고 있는 내내 다시 참이 됐다 — 땅파기·강타 모으기가 안 됐다.
   `java/MainActivity.java` `onKey`가 `surfaceOnKeyDown(keyCode, repeat)`로 플래그를 넘기고, `QuadNative.java`·`src/native/android.rs`
   (`Message::KeyDown { repeat }`)가 `key_down_event`까지 전한다. 웹(`event.repeat`)·데스크톱과 같아졌다.
+- 키 자리(0282): `src/native/pc_scancode.rs`(새 파일, `src/native.rs`에 `pub mod`, `src/lib.rs`에서 `scancode_position` 다시 내보냄) —
+  글자·숫자·기호 블록의 PC 스캔코드 = evdev 코드 → `KeyCode`. `src/native/linux_x11.rs`의 KeyPress·KeyRelease(`xkey.keycode − 8`)와
+  `src/native/linux_wayland.rs`의 키 두 곳(`key`)이 이것을 먼저 보고, 없으면 원래 keysym 번역. 원본은 배열(AZERTY 등)을 거친 글자로 정해
+  웹·Windows·macOS(자리)와 달랐다. 게임 시험 `linux_keys_follow_position`이 표를 본다.

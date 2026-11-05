@@ -261,7 +261,7 @@ pub static KO: Strings = Strings {
     ctl_reset: "기본값으로",
     ctl_wait: "누르세요… {0}",
     ctl_hint: "좌우: 키보드/패드 · 확인: 바꾸기 · 겹치면 맞바꿈",
-    ctl_fixed: "고정: 이동 WASD·방향키·스틱 · 메뉴 Esc·Start · 확인 Enter·A · 뒤로 Esc·B",
+    ctl_fixed: "고정: 이동 {0}·방향키·스틱 · 메뉴 Esc·Start · 확인 Enter·A · 뒤로 Esc·B",
     popo_name: "포포",
     popo_hi: "어이, 꼬마 두더지! 괜찮니? 나는 라쿤 포포야.",
     popo_hi2: "뿌리 아래로 간다고? 그럼 몸 쓰는 법부터 알려 줄게. 하나씩 해 보자!",

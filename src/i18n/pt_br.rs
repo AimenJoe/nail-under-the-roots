@@ -261,7 +261,7 @@ pub static PT_BR: Strings = Strings {
     ctl_reset: "Restaurar padrão",
     ctl_wait: "Aperte… {0}",
     ctl_hint: "←/→: tecla/controle · Confirmar: mudar · troca se em uso",
-    ctl_fixed: "Fixos: mover WASD/setas/analógico · menu Esc/Start · confirmar Enter/A · voltar Esc/B",
+    ctl_fixed: "Fixos: mover {0}/setas/analógico · menu Esc/Start · confirmar Enter/A · voltar Esc/B",
     popo_name: "Popo",
     popo_hi: "Ei, toupeirinha! Tudo bem? Eu sou o Popo, o guaxinim.",
     popo_hi2: "Vai descer para baixo das raízes? Então primeiro deixa eu te ensinar a lutar. Um passo de cada vez!",

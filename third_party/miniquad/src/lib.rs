@@ -21,6 +21,8 @@ use std::ops::{Index, IndexMut};
 pub mod log;
 
 pub use event::*;
+// nail-under-the-roots 패치(0282): 게임 쪽 시험이 자리 표를 본다.
+pub use native::pc_scancode::scancode_position;
 
 pub use graphics::*;
 

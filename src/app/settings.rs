@@ -657,7 +657,9 @@ impl App {
         ui.text_center(&hint, 160.0, panel.bottom() - 12.0, FONT_PX, ui::TEXT_DIM);
         // 두 줄이면 둘째 줄 아래가 화면(180) 밖으로 잘렸다: 창 바로 밑에서 10px 간격(0089).
         let mut y = panel.bottom();
-        for l in ui::wrap(ui, s.ctl_fixed, 312.0, FONT_PX).iter().take(2) {
+        // 걷는 키 이름은 지금 배열(AZERTY면 ZQSD, 0282).
+        let fixed = fill(s.ctl_fixed, &[&crate::input::walk_keys()]);
+        for l in ui::wrap(ui, &fixed, 312.0, FONT_PX).iter().take(2) {
             ui.text_center(l, 160.0, y, FONT_PX, ui::TEXT_DIM);
             y += 11.0;
         }

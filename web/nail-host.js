@@ -72,6 +72,41 @@ miniquad_add_plugin({
   }
 });
 
+// 키 이름(src/input.rs `layout::char_at`, 0282): 키는 자리(e.code)로 읽고, 화면에는 지금 배열에서 그 자리에 찍힌 글자를 쓴다.
+// navigator.keyboard.getLayoutMap()은 Chrome 계열만 있다(Safari·Firefox는 없음 → 0, 게임이 QWERTY 이름을 쓴다). 비동기라 미리 읽어
+// 두고, 창이 포커스를 얻을 때와 몇 초마다 다시 읽는다(배열은 바뀔 수 있다). 게임은 KeyCode 값(X11 keysym — 글자·숫자·기호는
+// US 글자 코드)을 넘기고, 여기서 e.code 이름으로 바꿔 찾는다. 없으면 0.
+var nailLayout = null;
+function readLayout() {
+  try {
+    if (navigator.keyboard && navigator.keyboard.getLayoutMap) {
+      navigator.keyboard.getLayoutMap().then(function (m) { nailLayout = m; }).catch(function () {});
+    }
+  } catch (e) {}
+}
+readLayout();
+window.addEventListener("focus", readLayout);
+setInterval(readLayout, 5000);
+var KEY_PUNCT = { 0x20: "Space", 0x27: "Quote", 0x2c: "Comma", 0x2d: "Minus", 0x2e: "Period", 0x2f: "Slash", 0x3b: "Semicolon",
+  0x3d: "Equal", 0x5b: "BracketLeft", 0x5c: "Backslash", 0x5d: "BracketRight", 0x60: "Backquote" };
+function keyCodeName(ks) {
+  if (ks >= 0x41 && ks <= 0x5a) return "Key" + String.fromCharCode(ks);
+  if (ks >= 0x30 && ks <= 0x39) return "Digit" + String.fromCharCode(ks);
+  return KEY_PUNCT[ks] || "";
+}
+miniquad_add_plugin({
+  name: "nail_keys",
+  version: 1,
+  register_plugin: function (importObject) {
+    importObject.env.nail_key_label = function (ks) {
+      var name = keyCodeName(ks);
+      if (!nailLayout || !name) return 0;
+      var c = nailLayout.get(name);
+      return c ? c.codePointAt(0) : 0;
+    };
+  }
+});
+
 // ── PWA·화면(0269, 요구 2.4) ─────────────────────────────────────────────────────────────
 // 전체 화면은 사용자가 누른 입력에서만(게임 설정 "전체 화면" → nail_fs_toggle). 캔버스가 아니라 문서 전체를 올려
 // 회전 안내·로딩이 위에 보이게. 들어간 뒤 가로 잠금을 시도하고(Android Chrome), 안 되면 조용히 넘어간다(iPhone·데스크톱).
