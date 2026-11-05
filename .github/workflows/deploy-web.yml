@@ -106,12 +106,15 @@ jobs:
           persist-credentials: false
 
       # Netlify 시크릿이 설정되기 전에는 아래 두 단계가 건너뛰어진다 (빌드 검증만).
+      # --no-build: netlify-cli는 deploy가 기본으로 로컬 빌드(@netlify/build)를 먼저 돌리고 그 안에서 올린다(23.15.1 소스).
+      # dist는 위 build 잡이 이미 만들었으니 그 단계는 할 일이 없고, 실패하면 이유도 안 남긴다
+      # (2026-11-05 run 41972631542: "Error while running build"만). 그래서 빌드 없이 dist를 그대로 올린다.
 
       # 운영도 개발판처럼 올린 뒤 운영 주소의 build.txt가 이 커밋인지 본다(0277).
       - name: Deploy production
         if: env.NETLIFY_SITE_ID != '' && github.ref == 'refs/heads/main'
         run: |
-          npx netlify-cli@23 deploy --dir=dist --prod --message="${{ github.sha }}" --json > deploy.json
+          npx netlify-cli@23 deploy --no-build --dir=dist --prod --message="${{ github.sha }}" --json > deploy.json
           cat deploy.json
           url=$(node -e 'const j=require("./deploy.json"); console.log((j.url||"").replace(/\/$/,"") || "https://"+j.site_name+".netlify.app")')
           src-tree/tools/web/check_live.sh "$url" "$GITHUB_SHA"
@@ -122,7 +125,7 @@ jobs:
       - name: Deploy dev (alias)
         if: env.NETLIFY_SITE_ID != '' && startsWith(github.ref, 'refs/heads/release/')
         run: |
-          npx netlify-cli@23 deploy --dir=dist --alias=dev --message="${{ github.ref_name }} ${{ github.sha }}" --json > deploy.json
+          npx netlify-cli@23 deploy --no-build --dir=dist --alias=dev --message="${{ github.ref_name }} ${{ github.sha }}" --json > deploy.json
           cat deploy.json
           # 별칭 배포의 deploy_url이 곧 dev--<사이트> 주소다. 없으면 사이트 이름으로 짓는다.
           url=$(node -e 'const j=require("./deploy.json"); const u=(j.deploy_url||"").replace(/\/$/,""); console.log(u.includes("://dev--") ? u : "https://dev--"+j.site_name+".netlify.app")')
