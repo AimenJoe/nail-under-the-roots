@@ -4,7 +4,7 @@
 //!
 //! 칸: 0 표식(MAGIC), 1 소리+1, 2 흔들림+1, 3 언어(0 = 기기 언어), 4..11 키 번호+1, 11..18 패드 번호+1,
 //! 18 음악+1(0081), 19 입자 효과+1(0141), 20 공격 예고 진하기+1(0198), 21 전체 화면+1(데스크톱, 0240),
-//! 22 번쩍임+1·23 패드 진동+1(0269). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
+//! 22 번쩍임+1·23 패드 진동+1(0269), 24..31 보조 키(0278: 0 칸 없음 = 기본 보조 키, 1 빈칸, 번호+2). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
 //! 0은 "없음"(플러그인이 없거나 저장 전). 표식이 다르면 통째로 무시한다(형식이 바뀌면 MAGIC을 올린다).
 
 use crate::i18n::Lang;
@@ -12,7 +12,7 @@ use crate::input::Bindings;
 
 const MAGIC: u32 = 0x4E41_0001;
 /// 저장 칸 수.
-const CELLS: usize = 24;
+const CELLS: usize = 31;
 /// 공격 예고 진하기 기본값(1..=10, 0198).
 pub const TELLS_DEFAULT: u8 = 5;
 /// 패드 진동 기본값(0..=10, 0269).
@@ -90,6 +90,10 @@ fn encode(p: &Prefs) -> [u32; CELLS] {
     for i in 0..7 {
         v[4 + i] = p.bindings.keys[i] as u32 + 1;
         v[11 + i] = p.bindings.pads[i] as u32 + 1;
+        v[24 + i] = match p.bindings.alt[i] {
+            crate::input::NO_KEY => 1,
+            k => k as u32 + 2,
+        };
     }
     v
 }
@@ -102,6 +106,18 @@ fn decode(v: &[u32; CELLS]) -> Option<Prefs> {
     for i in 0..7 {
         b.keys[i] = v[4 + i].saturating_sub(1) as u8;
         b.pads[i] = v[11 + i].saturating_sub(1) as u8;
+    }
+    // 보조 키 칸이 없던 옛 저장(0278 전)은 기본 보조 키 — 주 키와 겹치는 것은 비운다.
+    if v[24..31].iter().all(|x| *x == 0) {
+        b = b.with_default_alt();
+    } else {
+        for i in 0..7 {
+            b.alt[i] = match v[24 + i] {
+                0 => Bindings::DEFAULT.alt[i],
+                1 => crate::input::NO_KEY,
+                k => (k - 2).min(u8::MAX as u32 - 1) as u8,
+            };
+        }
     }
     Some(Prefs {
         volume: (v[1].saturating_sub(1) as u8).min(10),
@@ -292,6 +308,14 @@ mod tests {
         assert_eq!(p.bindings.keys[0], 7);
         assert_eq!(p.bindings.keys[1..], Bindings::DEFAULT.keys[1..]);
         assert_eq!(p.bindings.pads, Bindings::DEFAULT.pads);
+        // 보조 키 칸(24..31, 0278)도 없었다: 기본 보조 키(주 키와 겹치지 않으니 그대로).
+        assert_eq!(p.bindings.alt, Bindings::DEFAULT.alt);
+        // 공격 주 키를 Z(보조 기본값)로 붙여 둔 옛 저장: 공격의 보조 칸만 비고 나머지는 기본 보조 키.
+        let mut z = v;
+        z[4] = 23;
+        let zp = decode(&z).unwrap();
+        assert_eq!(zp.bindings.alt[0], crate::input::NO_KEY);
+        assert_eq!(zp.bindings.alt[1..], Bindings::DEFAULT.alt[1..]);
         // 예고 칸(20, 0198)은 v0.3에 없었다: 기본값으로 읽고, 다시 쓰면 그 칸만 채워진다.
         assert_eq!(p.tells, TELLS_DEFAULT);
         assert_eq!(encode(&p)[..20], v[..20]);

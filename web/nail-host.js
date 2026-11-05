@@ -139,5 +139,73 @@ if ("serviceWorker" in navigator && (location.protocol === "https:" || location.
   window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
 }
 
+// ── 실제 키보드를 캔버스로(0278) ───────────────────────────────────────────────────────────
+// 번들은 `canvas.onkeydown/onkeyup`만 듣고 `e.code`로 키를 가른다. 모바일 브라우저에 블루투스 키보드를 붙이면
+// (1) 포커스가 캔버스 밖(문서 몸통·브라우저 UI)에 있어 키가 캔버스에 오지 않거나 — 터치 처리가 기본 동작을 막아
+// 화면을 짚어도 포커스가 돌아오지 않는다 — (2) 키보드 앱(IME)을 거쳐 `code`가 비어("" · "Unidentified") 온다.
+// 그래서: 캔버스를 만지면 포커스를 되돌리고, 창 전체에서 키를 받아(capture) 캔버스 밖이거나 `code`가 빈 것만
+// `key`·`keyCode`(한글 두벌식 자모 포함)로 `code`를 채워 번들 처리기에 넘긴다. 정상인 것은 건드리지 않는다.
+(function () {
+  var canvas = document.getElementById("glcanvas");
+  if (!canvas) return;
+  function refocus() {
+    if (document.activeElement !== canvas) { try { canvas.focus({ preventScroll: true }); } catch (e) {} }
+  }
+  ["touchstart", "pointerdown", "mousedown"].forEach(function (t) { canvas.addEventListener(t, refocus, { passive: true }); });
+  window.addEventListener("focus", refocus);
+  // 한글 입력 상태의 두벌식 자모 → 그 자리의 영문 키(쌍자음·ㅒ·ㅖ는 Shift 자리).
+  var JAMO = { "ㅂ": "Q", "ㅈ": "W", "ㄷ": "E", "ㄱ": "R", "ㅅ": "T", "ㅛ": "Y", "ㅕ": "U", "ㅑ": "I", "ㅐ": "O", "ㅔ": "P",
+    "ㅁ": "A", "ㄴ": "S", "ㅇ": "D", "ㄹ": "F", "ㅎ": "G", "ㅗ": "H", "ㅓ": "J", "ㅏ": "K", "ㅣ": "L",
+    "ㅋ": "Z", "ㅌ": "X", "ㅊ": "C", "ㅍ": "V", "ㅠ": "B", "ㅜ": "N", "ㅡ": "M",
+    "ㅃ": "Q", "ㅉ": "W", "ㄸ": "E", "ㄲ": "R", "ㅆ": "T", "ㅒ": "O", "ㅖ": "P" };
+  var NAMED = { "Enter": "Enter", "Escape": "Escape", "Esc": "Escape", "Tab": "Tab", "Backspace": "Backspace", " ": "Space",
+    "Spacebar": "Space", "ArrowLeft": "ArrowLeft", "ArrowRight": "ArrowRight", "ArrowUp": "ArrowUp", "ArrowDown": "ArrowDown",
+    "Left": "ArrowLeft", "Right": "ArrowRight", "Up": "ArrowUp", "Down": "ArrowDown", "Shift": "ShiftLeft",
+    "Control": "ControlLeft", "Alt": "AltLeft", ",": "Comma", ".": "Period", "/": "Slash", ";": "Semicolon", "'": "Quote" };
+  var KEYCODE = { 8: "Backspace", 9: "Tab", 13: "Enter", 16: "ShiftLeft", 17: "ControlLeft", 18: "AltLeft", 27: "Escape",
+    32: "Space", 37: "ArrowLeft", 38: "ArrowUp", 39: "ArrowRight", 40: "ArrowDown",
+    186: "Semicolon", 188: "Comma", 190: "Period", 191: "Slash", 222: "Quote" };
+  function good(code) { return !!code && code !== "Unidentified"; }
+  function codeOf(e) {
+    if (good(e.code)) return e.code;
+    var k = e.key || "";
+    if (/^[a-zA-Z]$/.test(k)) return "Key" + k.toUpperCase();
+    if (/^[0-9]$/.test(k)) return "Digit" + k;
+    if (JAMO[k]) return "Key" + JAMO[k];
+    if (NAMED[k]) return NAMED[k];
+    var c = e.keyCode || e.which || 0;
+    if (c >= 65 && c <= 90) return "Key" + String.fromCharCode(c);
+    if (c >= 48 && c <= 57) return "Digit" + (c - 48);
+    if (c >= 112 && c <= 123) return "F" + (c - 111);
+    return KEYCODE[c] || "";
+  }
+  // 번들 처리기를 한 번 감싸, 우리가 대신 넘긴 이벤트는 번들이 빈 `code`로 또 처리하지 않게 한다.
+  function bundled(type) {
+    var h = canvas["on" + type];
+    if (!h) return null;
+    if (h.__nailOrig) return h.__nailOrig;
+    var w = function (ev) { if (!ev.__nailDone) return h.call(this, ev); };
+    w.__nailOrig = h;
+    canvas["on" + type] = w;
+    return h;
+  }
+  function route(type) {
+    return function (e) {
+      if (e.target === canvas && good(e.code)) return;
+      var h = bundled(type), code = codeOf(e);
+      if (!h || !code) return;
+      refocus();
+      e.__nailDone = true;
+      h.call(canvas, {
+        code: code, key: e.key, repeat: e.repeat, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey,
+        metaKey: e.metaKey, charCode: e.charCode, keyCode: e.keyCode,
+        preventDefault: function () { e.preventDefault(); }
+      });
+    };
+  }
+  window.addEventListener("keydown", route("keydown"), true);
+  window.addEventListener("keyup", route("keyup"), true);
+})();
+
 load("nail.wasm");
 })();
