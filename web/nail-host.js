@@ -139,6 +139,18 @@ if ("serviceWorker" in navigator && (location.protocol === "https:" || location.
   window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
 }
 
+// ── iPhone·iPad: touchstart의 preventDefault 막기(0281) ─────────────────────────────────────
+// 번들은 캔버스 touchstart마다 preventDefault를 부른다. WKWebView(홈 화면 웹앱·앱 안 브라우저)에서는 그러면 실제 키보드의
+// keydown이 아예 오지 않고(WebKit 버그 206887, Safari 탭은 된다), iPadOS는 화면을 탭할 때까지 페이지에 키보드 포커스를 주지
+// 않는데(버그 276640) 그 탭도 막혀 키가 영영 안 들어온다. 그래서 iOS에서만 touchstart 이벤트의 preventDefault를 아무것도
+// 안 하는 것으로 덮는다(창 capture가 번들 처리기보다 먼저 돈다). 스크롤·확대는 CSS touch-action: none이, 흉내 클릭은 번들의
+// touchend preventDefault가 그대로 막는다. touchmove·touchend는 건드리지 않는다.
+if (ios) {
+  window.addEventListener("touchstart", function (e) {
+    try { Object.defineProperty(e, "preventDefault", { value: function () {}, configurable: true }); } catch (err) {}
+  }, { capture: true, passive: true });
+}
+
 // ── 실제 키보드를 캔버스로(0278) ───────────────────────────────────────────────────────────
 // 번들은 `canvas.onkeydown/onkeyup`만 듣고 `e.code`로 키를 가른다. 모바일 브라우저에 블루투스 키보드를 붙이면
 // (1) 포커스가 캔버스 밖(문서 몸통·브라우저 UI)에 있어 키가 캔버스에 오지 않거나 — 터치 처리가 기본 동작을 막아

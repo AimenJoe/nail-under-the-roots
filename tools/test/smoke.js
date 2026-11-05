@@ -4,7 +4,7 @@
 //   python3 tools/web/assemble.py dist local dev
 //   node tools/test/smoke.js dist [출력 폴더] [개발 목록 이름,... | none]
 // CI: .github/workflows/smoke-web.yml. 이름은 src/scenario.rs LIST의 name(타이틀 "개발"의 묶음 탭 안 줄).
-const { chromium } = require('playwright');
+const { chromium, devices } = require('playwright');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -180,6 +180,27 @@ async function run() {
     const empty = await kd();
     check(JSON.stringify(empty) === '[74,257,75,74]', `keys: 빈 code를 key·keyCode로 채운다(두 번 들어가지 않는다) ${JSON.stringify(empty)}`);
     await s.ctx.close();
+  }
+  // iPad(0281, web/nail-host.js): touchstart는 막지 않고(WKWebView에서 실제 키보드가 살아 있게) touchend는 그대로 막는다.
+  // 터치는 그대로 게임에 닿는다(번들의 wasm_exports.touch를 엿본다). Chromium이 iPad 흉내를 내는 것이라 키가 오는지까지는 못 본다.
+  {
+    const ctx = await browser.newContext({ ...devices['iPad Pro 11 landscape'], locale: 'ko-KR' });
+    await ctx.addInitScript((p) => { try { localStorage.setItem('nail.profile', p); } catch (e) {} }, PROFILE);
+    const page = await ctx.newPage();
+    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'load' });
+    await page.waitForFunction(() => document.getElementById('loading').classList.contains('done'), null, { timeout: 60000 });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      const ex = wasm_exports, o = {}; for (const k in ex) o[k] = ex[k];
+      window.__touch = 0; o.touch = (...a) => { window.__touch++; return ex.touch(...a); }; wasm_exports = o;
+      window.__prevented = {};
+      for (const t of ['touchstart', 'touchend']) window.addEventListener(t, (e) => { window.__prevented[t] = e.defaultPrevented; });
+    });
+    await page.touchscreen.tap(500, 300);
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(() => ({ p: window.__prevented, n: window.__touch }));
+    check(r.p.touchstart === false && r.p.touchend === true && r.n >= 2, `ipad: touchstart는 막지 않고 touchend는 막는다, 터치는 게임에 닿는다 ${JSON.stringify(r)}`);
+    await ctx.close();
   }
   for (const idx of SCENARIOS) {
     const s = await dev(idx);
