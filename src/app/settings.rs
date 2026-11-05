@@ -128,8 +128,6 @@ const GROUP_LINE: Color = Color::new(0.55, 0.40, 0.28, 0.5);
 const SCROLL_SHUT: Color = Color::new(0.52, 0.48, 0.46, 0.3);
 /// 기록 지우기(되돌릴 수 없는 줄)의 글자색. 색만으로 알리지 않는다 — 맨 끝 따로 묶음 + 한 번 더 묻기.
 const ERASE_INK: Color = Color::new(0.86, 0.47, 0.42, 1.0);
-/// 조작 설정의 칸 수: 키보드 주 키 · 보조 키 · 패드(0278).
-const CONTROL_COLS: usize = 3;
 /// 조작 설정의 줄: 동작들(input::ACTS) + 기본값 + 돌아가기.
 pub(super) const CONTROL_NAMES: [Tr; 7] = [
     |s| s.act_attack,
@@ -282,13 +280,8 @@ impl App {
                 let mut b = input::bindings();
                 let act = ACTS[self.controls_cursor];
                 let ok = match c {
-                    Captured::Key(k) if self.controls_col == 0 => {
-                        b.bind_key_in(act, input::KeySlot::Main, k)
-                    }
-                    Captured::Key(k) if self.controls_col == 1 => {
-                        b.bind_key_in(act, input::KeySlot::Alt, k)
-                    }
-                    Captured::Pad(p) if self.controls_col == 2 => b.bind_pad(act, p),
+                    Captured::Key(k) if self.controls_col == 0 => b.bind_key(act, k),
+                    Captured::Pad(p) if self.controls_col == 1 => b.bind_pad(act, p),
                     _ => false,
                 };
                 if ok {
@@ -308,12 +301,8 @@ impl App {
         if a.down {
             self.controls_cursor = (self.controls_cursor + 1) % n;
         }
-        // 칸: 키보드 주 키 · 보조 키 · 패드(0278).
-        if a.left {
-            self.controls_col = (self.controls_col + CONTROL_COLS - 1) % CONTROL_COLS;
-        }
-        if a.right {
-            self.controls_col = (self.controls_col + 1) % CONTROL_COLS;
+        if a.left || a.right {
+            self.controls_col = 1 - self.controls_col;
         }
         let mut chosen = a.confirm;
         if let Some(Hit::ControlCell(row, col)) = tap_hit {
@@ -573,7 +562,7 @@ impl App {
         }
     }
 
-    /// 조작 설정 화면: 동작 | 키보드 | 보조 | 패드 표. 고른 칸 강조, 기다리는 중이면 "누르세요… 5".
+    /// 조작 설정 화면: 동작 | 키보드 | 패드 표. 고른 칸 강조, 기다리는 중이면 "누르세요… 5".
     pub(super) fn draw_controls(&mut self, ui: &Ui) {
         use crate::input::{self, ACTS};
         let s = i18n::s();
@@ -581,19 +570,24 @@ impl App {
         ui.panel(panel, Some(s.set_controls));
         let b = input::bindings();
         let row_h = FONT_PX + 0.5;
-        let name_w = 100.0;
-        let col_w = (panel.w - 12.0 - name_w) / CONTROL_COLS as f32;
+        let name_w = 110.0;
+        let col_w = (panel.w - 12.0 - name_w) / 2.0;
         let x0 = panel.x + 6.0;
         let y0 = panel.y + 19.0;
-        for (col, head) in [s.ctl_key, s.ctl_alt, s.ctl_pad].into_iter().enumerate() {
-            ui.text(
-                &ui.fit(head, col_w - 6.0, FONT_PX),
-                x0 + name_w + col as f32 * col_w + 4.0,
-                y0,
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
-        }
+        ui.text(
+            &ui.fit(s.ctl_key, col_w - 6.0, FONT_PX),
+            x0 + name_w + 4.0,
+            y0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+        ui.text(
+            &ui.fit(s.ctl_pad, col_w - 6.0, FONT_PX),
+            x0 + name_w + col_w + 4.0,
+            y0,
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
         for row in 0..=CONTROL_BACK {
             let y = y0 + (row as f32 + 1.0) * row_h;
             // 고른 칸은 y − 1부터 한 줄(창이 꽉 차 칸을 더 키울 수 없다) — 글자는 그 칸의 세로 가운데에.
@@ -608,7 +602,7 @@ impl App {
                     FONT_PX,
                     if on { ui::TEXT } else { ui::TEXT_DIM },
                 );
-                for col in 0..CONTROL_COLS {
+                for col in 0..2 {
                     let r = Rect::new(
                         x0 + name_w + col as f32 * col_w,
                         y - 1.0,
@@ -623,13 +617,10 @@ impl App {
                     }
                     let label = if waiting {
                         fill(s.ctl_wait, &[&(self.rebind.unwrap_or(0.0).ceil() as i32)])
+                    } else if col == 0 {
+                        b.key_label(act).to_string()
                     } else {
-                        match col {
-                            0 => b.key_label(act),
-                            1 => b.alt_label(act),
-                            _ => b.pad(act).label(),
-                        }
-                        .to_string()
+                        b.pad(act).label().to_string()
                     };
                     ui.text(
                         &ui.fit(&label, r.w - 6.0, FONT_PX),

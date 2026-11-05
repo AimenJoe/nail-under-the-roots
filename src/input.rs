@@ -5,8 +5,9 @@
 //!
 //! 게임 동작은 바꿀 수 있다(`Bindings`, 설정 → 조작, docs/decisions/0022). 기본: 오른쪽 네 버튼 = 자주 쓰는 넷
 //! (X 공격 · A 굴파기 · B 필살기 · Y 아이템), 덜 쓰는 것은 어깨·가운데(LB/RB 아이템 넘기기, Select 지도, Start 메뉴).
-//! 키보드는 같은 모양의 다이아몬드 J(공격)·K(굴파기)·L(필살기)·I(아이템) + 방향키 손 보조 키 Z·X·C·V(0278).
-//! 메뉴 확인(Enter·Space·공격 키)·뒤로(Esc·Backspace·회피 키)·이동은 고정.
+//! 키보드는 방향키로 걷는다는 전제(0279): 오른손 방향키, 동작은 전부 왼손 — Z 공격 · X 굴파기 · C 필살기 · V 아이템,
+//! Q/E 아이템 넘기기, Tab 지도. 메뉴 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키("Z 확인 · X 취소").
+//! 이동(방향키, WASD도 받는다)·Enter·Esc는 고정.
 //! 화면의 버튼 안내는 `prompt()`로 지금 배치를 읽는다(패드가 있으면 패드 이름, 없으면 키).
 //!
 //! 고정 타임스텝과의 관계: 렌더 프레임마다 `poll()`로 상태를 읽고, "눌림(edge)"은 래치에 모아 둔다.
@@ -185,31 +186,17 @@ const KEYS: [(KeyCode, &str); 44] = [
     (KeyCode::Backspace, "Bksp"),
 ];
 
-/// 동작마다 키 둘(주 키 + 보조 키), 패드 버튼 하나(KEYS·PADS의 번호, 0278).
-/// 주 키는 WASD 손(오른손 J·K·L·I), 보조 키는 방향키 손(왼손 Z·X·C·V) — 방향키로 걷는 사람도 같은 손이 겹치지 않는다.
-/// 보조 키는 비울 수 있다(`NO_KEY`). 한 키는 두 칸을 통틀어 한 동작에만 붙는다.
+/// 동작마다 키 하나, 패드 버튼 하나(KEYS·PADS의 번호).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Bindings {
     pub keys: [u8; 7],
-    pub alt: [u8; 7],
     pub pads: [u8; 7],
 }
 
-/// 보조 키 칸이 비었음.
-pub const NO_KEY: u8 = u8::MAX;
-
-/// 키보드 칸: 주 키(0)·보조 키(1).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum KeySlot {
-    Main,
-    Alt,
-}
-
 impl Bindings {
-    /// J K L I / Q E / M,  보조 Z X C V / - - / Tab,  X A B Y / LB RB / Select.
+    /// Z X C V / Q E / Tab(방향키 손, 0279),  X A B Y / LB RB / Select.
     pub const DEFAULT: Bindings = Bindings {
-        keys: [0, 1, 2, 3, 4, 5, 6],
-        alt: [22, 20, 9, 19, NO_KEY, NO_KEY, 38],
+        keys: [22, 20, 9, 19, 4, 5, 38],
         pads: [2, 0, 1, 3, 4, 5, 8],
     };
 
@@ -221,11 +208,6 @@ impl Bindings {
         KEYS[self.keys[Self::idx(a)] as usize % KEYS.len()].0
     }
 
-    /// 보조 키(비었으면 None).
-    pub fn alt_key(&self, a: Act) -> Option<KeyCode> {
-        KEYS.get(self.alt[Self::idx(a)] as usize).map(|k| k.0)
-    }
-
     pub fn pad(&self, a: Act) -> Pad {
         PADS[self.pads[Self::idx(a)] as usize % PADS.len()]
     }
@@ -234,60 +216,16 @@ impl Bindings {
         KEYS[self.keys[Self::idx(a)] as usize % KEYS.len()].1
     }
 
-    /// 보조 키 이름(비었으면 "-").
-    pub fn alt_label(&self, a: Act) -> &'static str {
-        KEYS.get(self.alt[Self::idx(a)] as usize)
-            .map(|k| k.1)
-            .unwrap_or("-")
-    }
-
-    /// 이 동작의 키(주·보조)가 눌렸나/눌려 있나.
-    fn key_pressed(&self, a: Act) -> bool {
-        is_key_pressed(self.key(a)) || self.alt_key(a).is_some_and(is_key_pressed)
-    }
-
-    fn key_down(&self, a: Act) -> bool {
-        is_key_down(self.key(a)) || self.alt_key(a).is_some_and(is_key_down)
-    }
-
-    /// 키를 동작의 주 키에 붙인다. 다른 칸이 쓰던 키면 서로 바꾼다. 표에 없는 키(이동·Esc 등)면 false.
-    #[cfg(test)]
+    /// 키를 동작에 붙인다. 다른 동작이 쓰던 키면 서로 바꾼다. 표에 없는 키(이동·Esc 등)면 false.
     pub fn bind_key(&mut self, a: Act, k: KeyCode) -> bool {
-        self.bind_key_in(a, KeySlot::Main, k)
-    }
-
-    /// 키를 동작의 한 칸에 붙인다. 주 키·보조 키 열네 칸을 통틀어 이미 그 키를 쓰는 칸이 있으면 서로 바꾼다
-    /// (빈 동작이 생기지 않는다 — 보조 칸의 "빈칸"이 주 칸으로 넘어가는 바꾸기는 하지 않고, 그때는 그 보조 칸만 비운다).
-    pub fn bind_key_in(&mut self, a: Act, slot: KeySlot, k: KeyCode) -> bool {
         let Some(n) = KEYS.iter().position(|(kk, _)| *kk == k) else {
             return false;
         };
-        let n = n as u8;
         let i = Self::idx(a);
-        let mine = match slot {
-            KeySlot::Main => self.keys[i],
-            KeySlot::Alt => self.alt[i],
-        };
-        if let Some(j) = self.keys.iter().position(|x| *x == n) {
-            if mine == NO_KEY {
-                // 빈 보조 칸으로 남의 주 키를 가져오면 그 동작의 주 키가 빈다 → 그 동작의 보조 키를 주 키로 올리거나 막는다.
-                match self.alt[j] {
-                    NO_KEY => return false,
-                    up => {
-                        self.keys[j] = up;
-                        self.alt[j] = NO_KEY;
-                    }
-                }
-            } else {
-                self.keys[j] = mine;
-            }
-        } else if let Some(j) = self.alt.iter().position(|x| *x == n) {
-            self.alt[j] = mine;
+        if let Some(j) = self.keys.iter().position(|x| *x as usize == n) {
+            self.keys[j] = self.keys[i];
         }
-        match slot {
-            KeySlot::Main => self.keys[i] = n,
-            KeySlot::Alt => self.alt[i] = n,
-        }
+        self.keys[i] = n as u8;
         true
     }
 
@@ -305,35 +243,15 @@ impl Bindings {
         true
     }
 
-    /// 보조 키 칸이 없던 옛 저장(0278 전)에 기본 보조 키를 채운다 — 주 키와 겹치는 것만 비운다.
-    pub fn with_default_alt(mut self) -> Bindings {
-        for i in 0..7 {
-            let d = Bindings::DEFAULT.alt[i];
-            self.alt[i] = if self.keys.contains(&d) { NO_KEY } else { d };
-        }
-        self
-    }
-
     /// 저장된 번호가 표 밖이거나 겹치면 기본값.
     pub fn sanitized(self) -> Bindings {
         let ok_k = self.keys.iter().all(|k| (*k as usize) < KEYS.len());
-        let ok_a = self
-            .alt
-            .iter()
-            .all(|k| *k == NO_KEY || (*k as usize) < KEYS.len());
         let ok_p = self
             .pads
             .iter()
             .all(|p| (*p as usize) < PADS.len() && PADS[*p as usize] != Pad::Start);
-        let all_keys: Vec<u8> = self
-            .keys
-            .iter()
-            .chain(self.alt.iter())
-            .copied()
-            .filter(|k| *k != NO_KEY)
-            .collect();
-        let uniq = |v: &[u8]| (0..v.len()).all(|i| (i + 1..v.len()).all(|j| v[i] != v[j]));
-        if ok_k && ok_a && ok_p && uniq(&all_keys) && uniq(&self.pads) {
+        let uniq = |v: &[u8; 7]| (0..7).all(|i| (i + 1..7).all(|j| v[i] != v[j]));
+        if ok_k && ok_p && uniq(&self.keys) && uniq(&self.pads) {
             self
         } else {
             Bindings::DEFAULT
@@ -427,10 +345,7 @@ pub fn verb(v: Verb) -> &'static str {
         Device::Keys => match v {
             Verb::Confirm | Verb::Restart => "Enter",
             Verb::Back | Verb::Menu | Verb::Skip => "Esc",
-            Verb::Walk => match key_hand() {
-                KeySlot::Main => "WASD",
-                KeySlot::Alt => "←↑↓→",
-            },
+            Verb::Walk => "←↑↓→",
             Verb::Pick => "↑↓",
             Verb::Change => "←→",
             Verb::Tabs => "Q/E",
@@ -497,11 +412,7 @@ pub fn prompt(a: Act) -> &'static str {
     let b = bindings();
     match device() {
         Device::Pad => b.pad(a).label(),
-        // 방향키 손이면 보조 키 이름(비었으면 주 키).
-        Device::Keys => match key_hand() {
-            KeySlot::Alt if b.alt_key(a).is_some() => b.alt_label(a),
-            _ => b.key_label(a),
-        },
+        Device::Keys => b.key_label(a),
         // 터치 버튼은 그림(0172)이라 글에는 동작 이름을 쓴다(설정 화면의 이름과 같다).
         Device::Touch => {
             let s = crate::i18n::s();
@@ -1193,37 +1104,33 @@ fn nav_dir(held: (i8, i8), mv: Vec2) -> (i8, i8) {
 fn read_keyboard() -> Actions {
     let b = bindings();
     let mut m = Vec2::ZERO;
-    let wasd = [KeyCode::A, KeyCode::D, KeyCode::W, KeyCode::S];
-    let arrows = [KeyCode::Left, KeyCode::Right, KeyCode::Up, KeyCode::Down];
-    let held = |i: usize| is_key_down(wasd[i]) || is_key_down(arrows[i]);
-    if held(0) {
+    if is_key_down(KeyCode::Left) || is_key_down(KeyCode::A) {
         m.x -= 1.0;
     }
-    if held(1) {
+    if is_key_down(KeyCode::Right) || is_key_down(KeyCode::D) {
         m.x += 1.0;
     }
-    if held(2) {
+    if is_key_down(KeyCode::Up) || is_key_down(KeyCode::W) {
         m.y -= 1.0;
     }
-    if held(3) {
+    if is_key_down(KeyCode::Down) || is_key_down(KeyCode::S) {
         m.y += 1.0;
     }
-    note_key_hand(&b, &wasd, &arrows);
-    let k = |a: Act| b.key_pressed(a);
+    let k = |a: Act| is_key_pressed(b.key(a));
     Actions {
         move_dir: m.normalize_or_zero(),
         aim: Vec2::ZERO,
         attack: k(Act::Attack),
         dodge: k(Act::Dodge),
-        dodge_held: b.key_down(Act::Dodge),
-        attack_held: b.key_down(Act::Attack),
+        dodge_held: is_key_down(b.key(Act::Dodge)),
+        attack_held: is_key_down(b.key(Act::Attack)),
         special: k(Act::Special),
         use_item: k(Act::UseItem),
         item_prev: k(Act::ItemPrev),
         item_next: k(Act::ItemNext),
         map: k(Act::Map),
-        // 메뉴(0278): 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키 — 키보드 관례의 "Z 확인·X 취소"와
-        // 같은 손가락 둘. 공격·회피 키는 주·보조 둘 다. 탭은 Q·E 고정.
+        // 메뉴(0279): 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키 — 기본 Z·X라 관례 "Z 확인 · X 취소".
+        // 탭은 Q·E 고정.
         confirm: is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) || k(Act::Attack),
         cancel: is_key_pressed(KeyCode::Escape)
             || is_key_pressed(KeyCode::Backspace)
@@ -1242,36 +1149,6 @@ fn read_keyboard() -> Actions {
         left: is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A),
         right: is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D),
         ..Default::default()
-    }
-}
-
-/// 키보드의 어느 손 배치를 쓰고 있나(0278): WASD + 주 키면 `Main`, 방향키 + 보조 키면 `Alt`.
-/// 안내 글의 키 이름이 이걸 따른다 — 방향키로 걷는 사람에게 "J"를 보여 주지 않는다.
-static KEY_HAND: AtomicU8 = AtomicU8::new(0);
-
-pub fn key_hand() -> KeySlot {
-    if KEY_HAND.load(Ordering::Relaxed) == 1 {
-        KeySlot::Alt
-    } else {
-        KeySlot::Main
-    }
-}
-
-fn set_key_hand(h: KeySlot) {
-    KEY_HAND.store(h as u8, Ordering::Relaxed);
-}
-
-fn note_key_hand(b: &Bindings, wasd: &[KeyCode; 4], arrows: &[KeyCode; 4]) {
-    let main =
-        wasd.iter().any(|k| is_key_pressed(*k)) || ACTS.iter().any(|a| is_key_pressed(b.key(*a)));
-    let alt = arrows.iter().any(|k| is_key_pressed(*k))
-        || ACTS
-            .iter()
-            .any(|a| b.alt_key(*a).is_some_and(is_key_pressed));
-    if alt && !main {
-        set_key_hand(KeySlot::Alt);
-    } else if main && !alt {
-        set_key_hand(KeySlot::Main);
     }
 }
 
@@ -1465,10 +1342,10 @@ mod tests {
     #[test]
     fn rebinding_swaps_and_rejects_reserved() {
         let mut b = Bindings::DEFAULT;
-        assert_eq!(b.key(Act::Attack), KeyCode::J);
-        assert!(b.bind_key(Act::Attack, KeyCode::K));
-        assert_eq!(b.key(Act::Attack), KeyCode::K);
-        assert_eq!(b.key(Act::Dodge), KeyCode::J, "서로 바뀜");
+        assert_eq!(b.key(Act::Attack), KeyCode::Z);
+        assert!(b.bind_key(Act::Attack, KeyCode::X));
+        assert_eq!(b.key(Act::Attack), KeyCode::X);
+        assert_eq!(b.key(Act::Dodge), KeyCode::Z, "서로 바뀜");
         assert!(!b.bind_key(Act::Attack, KeyCode::W), "이동 키는 안 된다");
         assert!(!b.bind_pad(Act::Attack, Pad::Start));
         assert!(b.bind_pad(Act::UseItem, Pad::West));
@@ -1480,55 +1357,6 @@ mod tests {
             ..b
         };
         assert_eq!(broken.sanitized(), Bindings::DEFAULT);
-    }
-
-    /// 보조 키(0278): 기본은 방향키 손 Z·X·C·V·Tab, 주·보조 열네 칸을 통틀어 겹치지 않는다. 겹치면 서로 바꾸고,
-    /// 빈 보조 칸으로 남의 주 키를 가져오면 그 동작의 보조 키가 주 키로 올라간다(빈 동작 없음).
-    #[test]
-    fn alt_keys_default_and_swap_across_columns() {
-        let d = Bindings::DEFAULT;
-        let names: Vec<_> = ACTS.iter().map(|a| d.alt_label(*a)).collect();
-        assert_eq!(names, ["Z", "X", "C", "V", "-", "-", "Tab"]);
-        assert_eq!(d.sanitized(), d);
-        let mut b = d;
-        // 회피 보조 칸에 공격 보조 키(Z)를 붙이면 둘이 바뀐다.
-        assert!(b.bind_key_in(Act::Dodge, KeySlot::Alt, KeyCode::Z));
-        assert_eq!(b.alt_key(Act::Dodge), Some(KeyCode::Z));
-        assert_eq!(b.alt_key(Act::Attack), Some(KeyCode::X));
-        // 공격 주 칸에 회피 보조 키(Z)를 붙이면: 공격 주 키 J가 회피 보조로.
-        assert!(b.bind_key_in(Act::Attack, KeySlot::Main, KeyCode::Z));
-        assert_eq!(b.key(Act::Attack), KeyCode::Z);
-        assert_eq!(b.alt_key(Act::Dodge), Some(KeyCode::J));
-        // 빈 보조 칸(이전 아이템)으로 지도 주 키 M을 가져오면 지도 보조 Tab이 주 키로 올라간다.
-        let mut c = d;
-        assert!(c.bind_key_in(Act::ItemPrev, KeySlot::Alt, KeyCode::M));
-        assert_eq!(c.alt_key(Act::ItemPrev), Some(KeyCode::M));
-        assert_eq!(c.key(Act::Map), KeyCode::Tab);
-        assert_eq!(c.alt_key(Act::Map), None);
-        // 보조가 없는 동작(다음 아이템 E)의 주 키는 빈 칸으로 가져올 수 없다.
-        let mut e = d;
-        assert!(!e.bind_key_in(Act::ItemPrev, KeySlot::Alt, KeyCode::E));
-        assert_eq!(e, d, "막으면 그대로");
-        for x in [b, c] {
-            assert_eq!(x.sanitized(), x, "바꾼 뒤에도 겹침 없음");
-        }
-        let dup = Bindings {
-            alt: [0, 20, 9, 19, NO_KEY, NO_KEY, 38],
-            ..d
-        };
-        assert_eq!(
-            dup.sanitized(),
-            Bindings::DEFAULT,
-            "주 키 J와 겹치는 보조 키"
-        );
-        // 옛 저장(보조 칸 없음): 기본 보조 키 중 주 키와 겹치는 것만 빈다.
-        let old = Bindings {
-            keys: [22, 1, 2, 3, 4, 5, 6],
-            alt: [NO_KEY; 7],
-            ..d
-        }
-        .with_default_alt();
-        assert_eq!(old.alt, [NO_KEY, 20, 9, 19, NO_KEY, NO_KEY, 38]);
     }
 
     #[test]
@@ -1621,14 +1449,8 @@ mod tests {
         ];
         set_device(Device::Keys);
         assert_eq!(verb(Verb::Confirm), "Enter");
-        assert_eq!(verb(Verb::Walk), "WASD");
-        assert_eq!(prompt(Act::Attack), "J");
-        // 방향키 손(0278): 걷기는 화살표, 동작은 보조 키, 보조가 빈 동작은 주 키.
-        set_key_hand(KeySlot::Alt);
         assert_eq!(verb(Verb::Walk), "←↑↓→");
         assert_eq!(prompt(Act::Attack), "Z");
-        assert_eq!(prompt(Act::ItemNext), "E");
-        set_key_hand(KeySlot::Main);
         set_device(Device::Pad);
         assert_eq!(verb(Verb::Confirm), Pad::South.label());
         assert_eq!(verb(Verb::Tabs), "LB/RB");

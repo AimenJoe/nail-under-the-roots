@@ -183,12 +183,12 @@ async function run() {
   }
   for (const idx of SCENARIOS) {
     const s = await dev(idx);
-    // 입력 한 바퀴: 이동·평타(J) 연타·모으기·회피(K)·특기(L)·확인(Enter, 컷씬·말 걸기 넘김)·일시정지 열고 닫기.
+    // 입력 한 바퀴: 이동·평타(Z) 연타·모으기·회피(X)·특기(C)·확인(Enter, 컷씬·말 걸기 넘김)·일시정지 열고 닫기.
     for (let n = 0; n < 3; n++) {
       for (const k of ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp']) { await s.page.keyboard.down(k); await s.page.waitForTimeout(220); await s.page.keyboard.up(k); }
-      for (let i = 0; i < 4; i++) await s.key('j', 90);
-      await s.page.keyboard.down('j'); await s.page.waitForTimeout(700); await s.page.keyboard.up('j'); await s.page.waitForTimeout(300);
-      await s.key('k', 300); await s.key('l', 400); await s.key('Enter', 400);
+      for (let i = 0; i < 4; i++) await s.key('z', 90);
+      await s.page.keyboard.down('z'); await s.page.waitForTimeout(700); await s.page.keyboard.up('z'); await s.page.waitForTimeout(300);
+      await s.key('x', 300); await s.key('c', 400); await s.key('Enter', 400);
     }
     await s.key('Escape', 300); await s.shot('pause'); await s.key('Escape', 300);
     await s.page.waitForTimeout(1500);
