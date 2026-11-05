@@ -5,7 +5,9 @@
 //!
 //! 게임 동작은 바꿀 수 있다(`Bindings`, 설정 → 조작, docs/decisions/0022). 기본: 오른쪽 네 버튼 = 자주 쓰는 넷
 //! (X 공격 · A 굴파기 · B 필살기 · Y 아이템), 덜 쓰는 것은 어깨·가운데(LB/RB 아이템 넘기기, Select 지도, Start 메뉴).
-//! 키보드는 같은 모양의 다이아몬드 J(공격)·K(굴파기)·L(필살기)·I(아이템). 메뉴 확인·뒤로·이동은 고정.
+//! 키보드는 WASD로 걷고 동작은 오른손 — 같은 모양의 다이아몬드 J(공격)·K(굴파기)·L(필살기)·I(아이템), Q/E, M 지도
+//! (쿼터뷰 액션의 관례, Moonlighter와 거의 같다, 0280). 메뉴 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키.
+//! 이동(WASD·방향키)·Enter·Esc는 고정.
 //! 화면의 버튼 안내는 `prompt()`로 지금 배치를 읽는다(패드가 있으면 패드 이름, 없으면 키).
 //!
 //! 고정 타임스텝과의 관계: 렌더 프레임마다 `poll()`로 상태를 읽고, "눌림(edge)"은 래치에 모아 둔다.
@@ -136,8 +138,9 @@ impl Pad {
     }
 }
 
-/// 바꿀 수 있는 키(저장 번호 = 이 표의 자리). 이동(WASD·화살표)·Enter·Esc는 고정이라 없다.
-const KEYS: [(KeyCode, &str); 44] = [
+/// 바꿀 수 있는 키(저장 번호 = 이 표의 자리 — 새 키는 끝에만 붙인다). 화살표·Enter·Esc는 고정이라 없다.
+/// W·A·S·D는 이동을 다시 붙일 수 있게 되며(0283) 끝에 붙었다.
+const KEYS: [(KeyCode, &str); 48] = [
     (KeyCode::J, "J"),
     (KeyCode::K, "K"),
     (KeyCode::L, "L"),
@@ -182,19 +185,29 @@ const KEYS: [(KeyCode, &str); 44] = [
     (KeyCode::LeftControl, "Ctrl"),
     (KeyCode::LeftAlt, "Alt"),
     (KeyCode::Backspace, "Bksp"),
+    (KeyCode::W, "W"),
+    (KeyCode::A, "A"),
+    (KeyCode::S, "S"),
+    (KeyCode::D, "D"),
 ];
 
-/// 동작마다 키 하나, 패드 버튼 하나(KEYS·PADS의 번호).
+/// 이동 키의 방향 순서(0283): 위·왼쪽·아래·오른쪽 — 기본 W·A·S·D, 안내 글도 이 순서("WASD").
+pub const MOVE_DIRS: usize = 4;
+
+/// 동작마다 키 하나, 패드 버튼 하나(KEYS·PADS의 번호). 이동 키 넷(위·왼쪽·아래·오른쪽)도 다시 붙인다(0283) —
+/// 화살표는 늘 같이 움직이고(고정), 패드 이동은 스틱·D패드 고정.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Bindings {
     pub keys: [u8; 7],
+    pub moves: [u8; MOVE_DIRS],
     pub pads: [u8; 7],
 }
 
 impl Bindings {
-    /// J K L I / Q E / M,  X A B Y / LB RB / Select.
+    /// J K L I / Q E / M,  이동 W A S D,  X A B Y / LB RB / Select.
     pub const DEFAULT: Bindings = Bindings {
         keys: [0, 1, 2, 3, 4, 5, 6],
+        moves: [44, 45, 46, 47],
         pads: [2, 0, 1, 3, 4, 5, 8],
     };
 
@@ -206,25 +219,63 @@ impl Bindings {
         KEYS[self.keys[Self::idx(a)] as usize % KEYS.len()].0
     }
 
+    /// 이동 키(`dir`: 0 위·1 왼쪽·2 아래·3 오른쪽).
+    pub fn move_key(&self, dir: usize) -> KeyCode {
+        KEYS[self.moves[dir % MOVE_DIRS] as usize % KEYS.len()].0
+    }
+
     pub fn pad(&self, a: Act) -> Pad {
         PADS[self.pads[Self::idx(a)] as usize % PADS.len()]
     }
 
+    /// 화면에 쓰는 키 이름: 지금 키보드 배열의 글자(0282, `key_name`).
     pub fn key_label(&self, a: Act) -> &'static str {
-        KEYS[self.keys[Self::idx(a)] as usize % KEYS.len()].1
+        key_name(self.key(a))
     }
 
-    /// 키를 동작에 붙인다. 다른 동작이 쓰던 키면 서로 바꾼다. 표에 없는 키(이동·Esc 등)면 false.
-    pub fn bind_key(&mut self, a: Act, k: KeyCode) -> bool {
+    /// 키 칸 열하나(동작 일곱 + 이동 넷)를 한 줄로 — 한 키는 그중 한 칸에만.
+    fn key_slots(&self) -> [u8; 11] {
+        let mut s = [0u8; 11];
+        s[..7].copy_from_slice(&self.keys);
+        s[7..].copy_from_slice(&self.moves);
+        s
+    }
+
+    fn bind_slot(&mut self, i: usize, k: KeyCode) -> bool {
         let Some(n) = KEYS.iter().position(|(kk, _)| *kk == k) else {
             return false;
         };
-        let i = Self::idx(a);
-        if let Some(j) = self.keys.iter().position(|x| *x as usize == n) {
-            self.keys[j] = self.keys[i];
+        let mut s = self.key_slots();
+        if let Some(j) = s.iter().position(|x| *x as usize == n) {
+            s[j] = s[i];
         }
-        self.keys[i] = n as u8;
+        s[i] = n as u8;
+        self.keys.copy_from_slice(&s[..7]);
+        self.moves.copy_from_slice(&s[7..]);
         true
+    }
+
+    /// 이 키를 `except` 말고 다른 칸(동작·이동)이 쓰고 있나. 고정 메뉴 키(Space 확인·Backspace 뒤로)가 다른 칸에
+    /// 붙어 있으면 그 칸의 뜻만 낸다 — 한 번에 두 동작이 나지 않게(PR #12 리뷰).
+    pub fn uses_except(&self, k: KeyCode, except: Act) -> bool {
+        let Some(n) = KEYS.iter().position(|(kk, _)| *kk == k) else {
+            return false;
+        };
+        let skip = Self::idx(except);
+        self.key_slots()
+            .iter()
+            .enumerate()
+            .any(|(i, x)| i != skip && *x as usize == n)
+    }
+
+    /// 키를 동작에 붙인다. 다른 동작·이동이 쓰던 키면 서로 바꾼다. 표에 없는 키(화살표·Esc 등)면 false.
+    pub fn bind_key(&mut self, a: Act, k: KeyCode) -> bool {
+        self.bind_slot(Self::idx(a), k)
+    }
+
+    /// 이동 키 하나를 붙인다(`dir` 순서는 `move_key`). 겹치면 서로 바꾼다.
+    pub fn bind_move(&mut self, dir: usize, k: KeyCode) -> bool {
+        self.bind_slot(7 + dir % MOVE_DIRS, k)
     }
 
     /// 패드 버튼을 붙인다. Start는 메뉴 고정이라 안 된다. 겹치면 서로 바꾼다.
@@ -243,17 +294,313 @@ impl Bindings {
 
     /// 저장된 번호가 표 밖이거나 겹치면 기본값.
     pub fn sanitized(self) -> Bindings {
-        let ok_k = self.keys.iter().all(|k| (*k as usize) < KEYS.len());
+        let slots = self.key_slots();
+        let ok_k = slots.iter().all(|k| (*k as usize) < KEYS.len());
         let ok_p = self
             .pads
             .iter()
             .all(|p| (*p as usize) < PADS.len() && PADS[*p as usize] != Pad::Start);
-        let uniq = |v: &[u8; 7]| (0..7).all(|i| (i + 1..7).all(|j| v[i] != v[j]));
-        if ok_k && ok_p && uniq(&self.keys) && uniq(&self.pads) {
+        let uniq = |v: &[u8]| (0..v.len()).all(|i| (i + 1..v.len()).all(|j| v[i] != v[j]));
+        if ok_k && ok_p && uniq(&slots) && uniq(&self.pads) {
             self
         } else {
             Bindings::DEFAULT
         }
+    }
+}
+
+/// 키 이름(0282). 키는 **물리 자리**로 읽는다(웹 `e.code`·Windows 스캔코드·macOS 가상 키·Linux evdev — 패치한 miniquad
+/// `pc_scancode`). `KeyCode`의 이름은 US QWERTY 그 자리의 글자일 뿐이라, 화면에는 지금 배열에서 그 자리에 찍힌 글자를 쓴다
+/// (AZERTY면 W 자리 = "Z"). 배열 글자를 못 얻거나(Linux·Android·iOS, 웹은 Chrome 계열만) 라틴 글자가 아니면(키릴 등 —
+/// 그 키보드에도 라틴 글자가 같이 찍혀 있다) QWERTY 이름.
+static LAYOUT: RwLock<Vec<(KeyCode, &'static str)>> = RwLock::new(Vec::new());
+
+/// QWERTY 이름(자리 그대로).
+fn qwerty_name(k: KeyCode) -> &'static str {
+    KEYS.iter()
+        .find(|(kk, _)| *kk == k)
+        .map(|(_, n)| *n)
+        .unwrap_or("?")
+}
+
+/// 화면에 쓰는 키 이름(지금 배열).
+pub fn key_name(k: KeyCode) -> &'static str {
+    LAYOUT
+        .read()
+        .ok()
+        .and_then(|l| l.iter().find(|(kk, _)| *kk == k).map(|(_, n)| *n))
+        .unwrap_or_else(|| qwerty_name(k))
+}
+
+/// 걷는 키 넷의 이름(지금 배열·지금 배치, 0282·0283) — "WASD"처럼 위·왼쪽·아래·오른쪽 순서로 붙여 쓴다.
+/// 배치나 배열이 바뀔 때만 새 글이 생긴다(몇 바이트).
+pub fn walk_keys() -> &'static str {
+    static LAST: RwLock<Option<([&'static str; MOVE_DIRS], &'static str)>> = RwLock::new(None);
+    let b = bindings();
+    let names: [&'static str; MOVE_DIRS] = std::array::from_fn(|d| key_name(b.move_key(d)));
+    if let Ok(last) = LAST.read() {
+        if let Some((n, s)) = *last {
+            if n == names {
+                return s;
+            }
+        }
+    }
+    let joined = join_walk(names);
+    let s: &'static str = if joined == "WASD" {
+        "WASD"
+    } else {
+        Box::leak(joined.into_boxed_str())
+    };
+    if let Ok(mut last) = LAST.write() {
+        *last = Some((names, s));
+    }
+    s
+}
+
+/// 걷는 키 이름 넷을 한 덩어리로. 한 글자 이름끼리는 붙이고("WASD"), 긴 이름이 끼면 띄운다("Tab A S D").
+fn join_walk(names: [&str; MOVE_DIRS]) -> String {
+    if names.iter().all(|n| n.chars().count() == 1) {
+        names.concat()
+    } else {
+        names.join(" ")
+    }
+}
+
+fn tab_keys() -> &'static str {
+    // 탭 = 아이템 넘기기 키(기본 Q·E, 지금 배열 이름). 배치·배열이 바뀔 때만 새 글.
+    static LAST: RwLock<Option<([&'static str; 2], &'static str)>> = RwLock::new(None);
+    let b = bindings();
+    let names = [
+        key_name(b.key(Act::ItemPrev)),
+        key_name(b.key(Act::ItemNext)),
+    ];
+    if let Ok(last) = LAST.read() {
+        if let Some((n, s)) = *last {
+            if n == names {
+                return s;
+            }
+        }
+    }
+    let joined = format!("{}/{}", names[0], names[1]);
+    let s: &'static str = if joined == "Q/E" {
+        "Q/E"
+    } else {
+        Box::leak(joined.into_boxed_str())
+    };
+    if let Ok(mut last) = LAST.write() {
+        *last = Some((names, s));
+    }
+    s
+}
+
+/// 배열이 준 글자를 화면 이름으로: 라틴(ASCII·Latin-1·라틴 확장 A — 글꼴에 있는 범위)의 보이는 글자 하나만, 대문자로.
+fn clean_label(c: char) -> Option<char> {
+    if c.is_control() || c.is_whitespace() || (c as u32) > 0x17F {
+        return None;
+    }
+    let mut up = c.to_uppercase();
+    match (up.next(), up.next()) {
+        (Some(u), None) if (u as u32) <= 0x17F => Some(u),
+        _ => Some(c),
+    }
+}
+
+/// 이름 글자 하나를 &'static str로(바뀐 글자만 한 번씩 — 배열 하나의 글자 수만큼이라 작다).
+fn intern(c: char) -> &'static str {
+    static SEEN: std::sync::Mutex<Vec<(char, &'static str)>> = std::sync::Mutex::new(Vec::new());
+    let Ok(mut seen) = SEEN.lock() else {
+        return "?";
+    };
+    if let Some((_, s)) = seen.iter().find(|(cc, _)| *cc == c) {
+        return s;
+    }
+    let s: &'static str = Box::leak(c.to_string().into_boxed_str());
+    seen.push((c, s));
+    s
+}
+
+/// 배열이 준 글자(`char_at`)로 이름 표를 만든다. 순수 함수라 시험이 가짜 배열로 본다.
+fn names_for(char_at: impl Fn(KeyCode) -> Option<char>) -> Vec<(KeyCode, &'static str)> {
+    let mut table: Vec<(KeyCode, &'static str)> = Vec::new();
+    for k in KEYS.iter().map(|(k, _)| *k) {
+        if let Some(c) = char_at(k).and_then(clean_label) {
+            let name = intern(c);
+            if name != qwerty_name(k) && !table.iter().any(|(kk, _)| *kk == k) {
+                table.push((k, name));
+            }
+        }
+    }
+    table
+}
+
+/// 지금 배열의 글자로 이름 표를 다시 만든다. 켤 때와 몇 초마다(배열은 게임 중에도 바뀔 수 있다). 싸다.
+pub fn refresh_key_names() {
+    let table = names_for(layout::char_at);
+    if let Ok(mut l) = LAYOUT.write() {
+        if *l != table {
+            *l = table;
+        }
+    }
+}
+
+/// 플랫폼마다 "이 자리에 찍힌 글자".
+mod layout {
+    use macroquad::prelude::KeyCode;
+
+    /// 웹: `navigator.keyboard.getLayoutMap()`(Chrome 계열만)을 셸이 읽어 둔다(web/nail-host.js `nail_key_label`).
+    /// `KeyCode` 값은 X11 keysym 기반이라 글자·숫자·기호 키는 US 글자 코드 그대로 — 셸이 그것을 `e.code` 이름으로 바꾼다.
+    #[cfg(target_arch = "wasm32")]
+    pub fn char_at(k: KeyCode) -> Option<char> {
+        extern "C" {
+            fn nail_key_label(keysym: u32) -> u32;
+        }
+        // SAFETY: 정수를 주고받는 JS 함수(web/nail-host.js). 없으면 miniquad가 빈 함수를 끼워 0.
+        let c = unsafe { nail_key_label(k as u32) };
+        char::from_u32(c).filter(|c| *c != '\0')
+    }
+
+    /// Windows: 자리(스캔코드) → 가상 키 → 지금 배열의 글자(`MapVirtualKeyW`, 죽은 키는 윗비트를 떼고 그 글자).
+    #[cfg(target_os = "windows")]
+    pub fn char_at(k: KeyCode) -> Option<char> {
+        #[link(name = "user32")]
+        extern "system" {
+            fn MapVirtualKeyW(code: u32, map_type: u32) -> u32;
+        }
+        const MAPVK_VSC_TO_VK: u32 = 1;
+        const MAPVK_VK_TO_CHAR: u32 = 2;
+        let sc = (1..=0x39).find(|sc| macroquad::miniquad::scancode_position(*sc) == Some(k))?;
+        // SAFETY: 숫자만 주고받는 user32 함수.
+        let vk = unsafe { MapVirtualKeyW(sc, MAPVK_VSC_TO_VK) };
+        if vk == 0 {
+            return None;
+        }
+        // SAFETY: 위와 같다.
+        let ch = unsafe { MapVirtualKeyW(vk, MAPVK_VK_TO_CHAR) } & 0x7FFF_FFFF;
+        char::from_u32(ch).filter(|c| *c != '\0')
+    }
+
+    /// macOS: 자리(가상 키) → 지금 배열(`TISCopyCurrentKeyboardLayoutInputSource` + `UCKeyTranslate`, GLFW `glfwGetKeyName`과 같은 길).
+    #[cfg(target_os = "macos")]
+    pub fn char_at(k: KeyCode) -> Option<char> {
+        use std::ffi::c_void;
+        #[link(name = "Carbon", kind = "framework")]
+        extern "C" {
+            fn TISCopyCurrentKeyboardLayoutInputSource() -> *mut c_void;
+            fn TISGetInputSourceProperty(source: *mut c_void, key: *const c_void) -> *mut c_void;
+            static kTISPropertyUnicodeKeyLayoutData: *const c_void;
+            fn LMGetKbdType() -> u8;
+            fn UCKeyTranslate(
+                layout: *const c_void,
+                virtual_key: u16,
+                action: u16,
+                modifiers: u32,
+                keyboard_type: u32,
+                options: u32,
+                dead_key_state: *mut u32,
+                max_len: usize,
+                actual_len: *mut usize,
+                chars: *mut u16,
+            ) -> i32;
+        }
+        #[link(name = "CoreFoundation", kind = "framework")]
+        extern "C" {
+            fn CFDataGetBytePtr(data: *const c_void) -> *const u8;
+            fn CFRelease(cf: *const c_void);
+        }
+        const KUC_KEY_ACTION_DISPLAY: u16 = 3;
+        const KUC_KEY_TRANSLATE_NO_DEAD_KEYS_MASK: u32 = 1;
+        let vk = mac_virtual_key(k)?;
+        // SAFETY: Carbon TIS·UCKeyTranslate. Copy로 얻은 입력 소스는 CFRelease, Get으로 얻은 자료는 놓지 않는다.
+        // 자판 자료가 없는 입력 소스(일부 입력기)면 None.
+        unsafe {
+            let source = TISCopyCurrentKeyboardLayoutInputSource();
+            if source.is_null() {
+                return None;
+            }
+            let data = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData);
+            let mut out = None;
+            if !data.is_null() {
+                let layout = CFDataGetBytePtr(data) as *const c_void;
+                let mut dead = 0u32;
+                let mut len = 0usize;
+                let mut buf = [0u16; 4];
+                let r = UCKeyTranslate(
+                    layout,
+                    vk,
+                    KUC_KEY_ACTION_DISPLAY,
+                    0,
+                    LMGetKbdType() as u32,
+                    KUC_KEY_TRANSLATE_NO_DEAD_KEYS_MASK,
+                    &mut dead,
+                    buf.len(),
+                    &mut len,
+                    buf.as_mut_ptr(),
+                );
+                if r == 0 && len > 0 {
+                    out = char::decode_utf16(buf[..len].iter().copied())
+                        .next()
+                        .and_then(|c| c.ok());
+                }
+            }
+            CFRelease(source);
+            out
+        }
+    }
+
+    /// macOS 가상 키 번호(ANSI 자리, miniquad `apple_util::get_event_keycode`의 거꾸로).
+    #[cfg(any(target_os = "macos", test))]
+    pub fn mac_virtual_key(k: KeyCode) -> Option<u16> {
+        use KeyCode::*;
+        Some(match k {
+            A => 0x00,
+            S => 0x01,
+            D => 0x02,
+            F => 0x03,
+            H => 0x04,
+            G => 0x05,
+            Z => 0x06,
+            X => 0x07,
+            C => 0x08,
+            V => 0x09,
+            B => 0x0B,
+            Q => 0x0C,
+            W => 0x0D,
+            E => 0x0E,
+            R => 0x0F,
+            Y => 0x10,
+            T => 0x11,
+            Key1 => 0x12,
+            Key2 => 0x13,
+            Key3 => 0x14,
+            Key4 => 0x15,
+            Key6 => 0x16,
+            Key5 => 0x17,
+            Key9 => 0x19,
+            Key7 => 0x1A,
+            Key8 => 0x1C,
+            Key0 => 0x1D,
+            O => 0x1F,
+            U => 0x20,
+            I => 0x22,
+            P => 0x23,
+            L => 0x25,
+            J => 0x26,
+            Apostrophe => 0x27,
+            K => 0x28,
+            Semicolon => 0x29,
+            Comma => 0x2B,
+            Slash => 0x2C,
+            N => 0x2D,
+            M => 0x2E,
+            Period => 0x2F,
+            _ => return None,
+        })
+    }
+
+    /// 그 밖(Linux·Android·iOS): 배열 글자를 묻지 않는다 — QWERTY 이름.
+    #[cfg(not(any(target_arch = "wasm32", target_os = "windows", target_os = "macos")))]
+    pub fn char_at(_k: KeyCode) -> Option<char> {
+        None
     }
 }
 
@@ -313,6 +660,13 @@ pub extern "C" fn nail_device_crate_version() -> u32 {
     1
 }
 
+/// 키 이름 플러그인(0282, web/nail-host.js `nail_keys`).
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn nail_keys_crate_version() -> u32 {
+    1
+}
+
 /// 메뉴·안내 글의 동사 자리. 장치마다 이름이 다르다(키 이름, 패드 버튼, 터치는 낱말).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verb {
@@ -343,10 +697,10 @@ pub fn verb(v: Verb) -> &'static str {
         Device::Keys => match v {
             Verb::Confirm | Verb::Restart => "Enter",
             Verb::Back | Verb::Menu | Verb::Skip => "Esc",
-            Verb::Walk => "WASD",
+            Verb::Walk => walk_keys(),
             Verb::Pick => "↑↓",
             Verb::Change => "←→",
-            Verb::Tabs => "Q/E",
+            Verb::Tabs => tab_keys(),
         },
         Device::Pad => match v {
             Verb::Confirm | Verb::Restart => Pad::South.label(),
@@ -531,6 +885,8 @@ pub struct Input {
     nav: NavRepeat,
     /// 메뉴 모드: 터치는 가상 스틱·버튼 대신 탭이 된다.
     menu_mode: bool,
+    /// 키 이름(배열 글자)을 다시 읽을 때까지 남은 초(0282).
+    names_in: f32,
 }
 
 /// 메뉴 탐색: 이동 방향(키·D패드·스틱)을 한 칸 눌림으로 바꾼다. 방향이 잡히는 순간 한 칸,
@@ -708,6 +1064,7 @@ impl Input {
             touch: TouchState::default(),
             nav: NavRepeat::default(),
             menu_mode: false,
+            names_in: 0.0,
         }
     }
 
@@ -732,6 +1089,12 @@ impl Input {
 
     /// 렌더 프레임마다 한 번.
     pub fn poll(&mut self) {
+        // 키 이름은 지금 배열을 따른다(0282): 켤 때 + 2초마다(배열은 게임 중에도 바뀐다, 웹은 셸이 비동기로 읽어 둔다).
+        self.names_in -= get_frame_time();
+        if self.names_in <= 0.0 {
+            self.names_in = 2.0;
+            refresh_key_names();
+        }
         let kb = read_keyboard();
         let (pad, count) = self.read_gamepads();
         self.gamepad_count = count;
@@ -1101,20 +1464,28 @@ fn nav_dir(held: (i8, i8), mv: Vec2) -> (i8, i8) {
 
 fn read_keyboard() -> Actions {
     let b = bindings();
+    // 이동(0283): 화살표는 늘, 그리고 붙인 이동 키 넷(기본 W·A·S·D). 방향 순서는 위·왼쪽·아래·오른쪽.
+    const ARROWS: [KeyCode; MOVE_DIRS] =
+        [KeyCode::Up, KeyCode::Left, KeyCode::Down, KeyCode::Right];
+    let held = |d: usize| is_key_down(ARROWS[d]) || is_key_down(b.move_key(d));
+    let hit = |d: usize| is_key_pressed(ARROWS[d]) || is_key_pressed(b.move_key(d));
     let mut m = Vec2::ZERO;
-    if is_key_down(KeyCode::Left) || is_key_down(KeyCode::A) {
+    if held(1) {
         m.x -= 1.0;
     }
-    if is_key_down(KeyCode::Right) || is_key_down(KeyCode::D) {
+    if held(3) {
         m.x += 1.0;
     }
-    if is_key_down(KeyCode::Up) || is_key_down(KeyCode::W) {
+    if held(0) {
         m.y -= 1.0;
     }
-    if is_key_down(KeyCode::Down) || is_key_down(KeyCode::S) {
+    if held(2) {
         m.y += 1.0;
     }
     let k = |a: Act| is_key_pressed(b.key(a));
+    // 고정 메뉴 키 Space(확인)·Backspace(뒤로)는 다른 칸에 붙어 있으면 그 칸의 뜻만(공격·회피에 붙은 것은 같은 뜻이라 그대로).
+    let space_confirms = !b.uses_except(KeyCode::Space, Act::Attack);
+    let bksp_cancels = !b.uses_except(KeyCode::Backspace, Act::Dodge);
     Actions {
         move_dir: m.normalize_or_zero(),
         aim: Vec2::ZERO,
@@ -1127,22 +1498,28 @@ fn read_keyboard() -> Actions {
         item_prev: k(Act::ItemPrev),
         item_next: k(Act::ItemNext),
         map: k(Act::Map),
-        // 메뉴: Enter·Space 또는 공격 키로 확인, Esc 또는 필살기 키로 뒤로. 탭은 Q·E(아이템 넘기기 키) 고정.
-        confirm: is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) || k(Act::Attack),
-        cancel: is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Backspace),
+        // 메뉴(0280): 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키 — 기본 J·K, 오른손을 옮기지 않는다.
+        confirm: is_key_pressed(KeyCode::Enter)
+            || (space_confirms && is_key_pressed(KeyCode::Space))
+            || k(Act::Attack),
+        cancel: is_key_pressed(KeyCode::Escape)
+            || (bksp_cancels && is_key_pressed(KeyCode::Backspace))
+            || k(Act::Dodge),
         menu: is_key_pressed(KeyCode::Escape),
-        back_held: is_key_down(KeyCode::Escape) || is_key_down(KeyCode::Backspace),
+        back_held: is_key_down(KeyCode::Escape)
+            || (bksp_cancels && is_key_down(KeyCode::Backspace)),
         restart: false,
-        tab_prev: is_key_pressed(KeyCode::Q),
-        tab_next: is_key_pressed(KeyCode::E),
+        // 탭은 아이템 넘기기 키(기본 Q·E)를 따른다 — 이동을 ESDF로 붙이면 E가 위와 탭을 같이 내던 것(PR #12 리뷰).
+        tab_prev: k(Act::ItemPrev),
+        tab_next: k(Act::ItemNext),
         toggle_debug: is_key_pressed(KeyCode::F1),
         // 판정 상자는 개발판만(0269 D14): 운영판에서 F2는 아무 일도 하지 않는다.
         toggle_hitboxes: cfg!(feature = "dev") && is_key_pressed(KeyCode::F2),
         // 눌렀다 뗀 것이 한 프레임 안에 끝나도 메뉴 탐색은 한 칸 움직여야 한다(is_key_down만 보면 놓친다).
-        up: is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W),
-        down: is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S),
-        left: is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A),
-        right: is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D),
+        up: hit(0),
+        down: hit(2),
+        left: hit(1),
+        right: hit(3),
         ..Default::default()
     }
 }
@@ -1341,7 +1718,10 @@ mod tests {
         assert!(b.bind_key(Act::Attack, KeyCode::K));
         assert_eq!(b.key(Act::Attack), KeyCode::K);
         assert_eq!(b.key(Act::Dodge), KeyCode::J, "서로 바뀜");
-        assert!(!b.bind_key(Act::Attack, KeyCode::W), "이동 키는 안 된다");
+        assert!(
+            !b.bind_key(Act::Attack, KeyCode::Up),
+            "화살표는 안 된다(늘 이동)"
+        );
         assert!(!b.bind_pad(Act::Attack, Pad::Start));
         assert!(b.bind_pad(Act::UseItem, Pad::West));
         assert_eq!(b.pad(Act::UseItem), Pad::West);
@@ -1352,6 +1732,112 @@ mod tests {
             ..b
         };
         assert_eq!(broken.sanitized(), Bindings::DEFAULT);
+    }
+
+    /// Linux 키는 자리로(0282, 패치한 miniquad `pc_scancode`): evdev 코드 = PC 스캔코드. AZERTY에서도 W 자리는 W.
+    /// 배열과 상관없는 키(화살표 103 등)는 표 밖 — 원래 keysym 번역으로 간다.
+    #[test]
+    fn linux_keys_follow_position() {
+        use macroquad::miniquad::scancode_position as pos;
+        let want = [
+            (17, KeyCode::W),
+            (30, KeyCode::A),
+            (31, KeyCode::S),
+            (32, KeyCode::D),
+            (16, KeyCode::Q),
+            (18, KeyCode::E),
+            (36, KeyCode::J),
+            (37, KeyCode::K),
+            (38, KeyCode::L),
+            (23, KeyCode::I),
+            (50, KeyCode::M),
+            (44, KeyCode::Z),
+            (57, KeyCode::Space),
+            (2, KeyCode::Key1),
+            (51, KeyCode::Comma),
+        ];
+        for (sc, k) in want {
+            assert_eq!(pos(sc), Some(k), "스캔코드 {sc}");
+        }
+        for sc in [1, 14, 15, 28, 42, 103, 105] {
+            assert_eq!(pos(sc), None, "자리와 상관없는 키 {sc}");
+        }
+    }
+
+    /// 키 이름은 배열 글자(0282): 가짜 AZERTY(W 자리 z, A 자리 q, Q 자리 a, M 자리 ,)면 W·A 이름 "Z"·"Q", 탭 "A/E", 지도 ",".
+    /// 라틴이 아닌 글자(러시아 배열 키릴)·공백은 QWERTY 이름 그대로. 걷기 글은 넷을 붙이고 긴 이름이 끼면 띄운다(0283).
+    #[test]
+    fn key_names_follow_the_layout() {
+        let azerty = |k: KeyCode| match k {
+            KeyCode::W => Some('z'),
+            KeyCode::A => Some('q'),
+            KeyCode::Q => Some('a'),
+            KeyCode::M => Some(','),
+            KeyCode::Key2 => Some('é'),
+            KeyCode::Space => Some(' '),
+            KeyCode::J => Some('j'),
+            _ => None,
+        };
+        let table = names_for(azerty);
+        let name = |k| table.iter().find(|(kk, _)| *kk == k).map(|(_, n)| *n);
+        assert_eq!((name(KeyCode::W), name(KeyCode::A)), (Some("Z"), Some("Q")));
+        assert_eq!(name(KeyCode::M), Some(","));
+        assert_eq!(name(KeyCode::Key2), Some("É"));
+        assert_eq!(name(KeyCode::J), None, "QWERTY와 같으면 표에 넣지 않는다");
+        assert_eq!(name(KeyCode::Space), None, "공백은 이름이 안 된다");
+        let russian = |k: KeyCode| match k {
+            KeyCode::W => Some('ц'),
+            KeyCode::A => Some('ф'),
+            _ => None,
+        };
+        assert!(names_for(russian).is_empty());
+        assert_eq!(join_walk(["Z", "Q", "S", "D"]), "ZQSD");
+        assert_eq!(join_walk(["Tab", "A", "S", "D"]), "Tab A S D");
+    }
+
+    /// 이동 키(0283): 기본 W·A·S·D, 다시 붙일 수 있고 동작 키와 한 칸씩 맞바꾼다. 화살표는 붙지 않는다(늘 이동).
+    #[test]
+    fn move_keys_rebind_and_swap_with_actions() {
+        let mut b = Bindings::DEFAULT;
+        let dirs: Vec<_> = (0..MOVE_DIRS).map(|d| b.move_key(d)).collect();
+        assert_eq!(dirs, [KeyCode::W, KeyCode::A, KeyCode::S, KeyCode::D]);
+        // ESDF로: 위 E(이전엔 다음 아이템) → 다음 아이템이 W를 가져간다.
+        assert!(b.bind_move(0, KeyCode::E));
+        assert_eq!(b.move_key(0), KeyCode::E);
+        assert_eq!(b.key(Act::ItemNext), KeyCode::W);
+        assert!(b.bind_move(1, KeyCode::S));
+        assert_eq!(
+            (b.move_key(1), b.move_key(2)),
+            (KeyCode::S, KeyCode::A),
+            "이동끼리도 맞바꾼다"
+        );
+        assert!(!b.bind_move(0, KeyCode::Up));
+        assert_eq!(b.sanitized(), b);
+        let dup = Bindings {
+            moves: [44, 44, 46, 47],
+            ..Bindings::DEFAULT
+        };
+        assert_eq!(dup.sanitized(), Bindings::DEFAULT);
+    }
+
+    /// macOS 가상 키 표(0282)는 miniquad `apple_util::get_event_keycode`의 거꾸로 — 한쪽만 고치면 이름이 다른 자리 글자가 된다.
+    #[test]
+    fn mac_virtual_keys_match_patched_miniquad() {
+        let src = include_str!("../third_party/miniquad/src/native/apple/apple_util.rs");
+        for (k, _) in KEYS.iter().chain(
+            [
+                (KeyCode::W, "W"),
+                (KeyCode::A, "A"),
+                (KeyCode::S, "S"),
+                (KeyCode::D, "D"),
+            ]
+            .iter(),
+        ) {
+            if let Some(vk) = layout::mac_virtual_key(*k) {
+                let line = format!("0x{vk:02x} => KeyCode::{k:?},");
+                assert!(src.contains(&line), "miniquad에 `{line}` 없음");
+            }
+        }
     }
 
     #[test]

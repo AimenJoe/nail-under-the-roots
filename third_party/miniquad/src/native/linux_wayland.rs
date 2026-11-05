@@ -297,7 +297,9 @@ impl KeyboardContext {
 
         // The keycodes in Miniquad are obtained without modifiers
         let keysym = libxkb.keymap_key_get_sym_without_mod(keymap.xkb_keymap, key + 8);
-        let keycode = keycodes::translate_keysym(keysym);
+        // nail 패치(0282): 글자·숫자·기호는 자리(evdev), 나머지는 keysym.
+        let keycode = crate::native::pc_scancode::scancode_position(key as u32)
+            .unwrap_or_else(|| keycodes::translate_keysym(keysym));
         events.push(WaylandEvent::KeyDown(keycode, keymods, repeat));
 
         // To obtain the underlying character, we do need to provide the modifiers
@@ -614,7 +616,8 @@ unsafe extern "C" fn keyboard_handle_key(
     // https://wayland-book.com/seat/keyboard.html
     // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
     let keysym = libxkb.keymap_key_get_sym_without_mod(xkb_keymap, key + 8);
-    let keycode = keycodes::translate_keysym(keysym);
+    let keycode = crate::native::pc_scancode::scancode_position(key as u32)
+        .unwrap_or_else(|| keycodes::translate_keysym(keysym));
     let keymods = display.keymap.get_keymods(libxkb, xkb_state);
     match state {
         0 => {

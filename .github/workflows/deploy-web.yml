@@ -3,7 +3,10 @@ name: deploy-web
 # - main: 운영판. 개발 기능을 뺀 빌드(--no-default-features)를 Netlify 운영 주소에.
 # - release/**: 마일스톤 개발판. 개발 기능을 넣은 빌드를 같은 사이트의 별칭 `dev`(dev--<사이트>.netlify.app)에.
 #   운영과 주소(= 브라우저 저장소)가 달라 기록이 섞이지 않는다. 배포 뒤 그 주소의 build.txt가 이 커밋인지 확인한다.
-# - PR: 개발판을 pr-<번호> 별칭에.
+# - PR: 빌드·시험만(배포 없음).
+# 배포는 따로 떨어진 `publish` 잡이 한다(2026-11-04, 파이프라인 지키기 — docs/release.md): Netlify 시크릿은
+# GitHub Environment(`web-production` = main만, `web-dev` = release/**만)에 두고 그 잡만 읽는다. PR·다른 갈래의
+# 워크플로(고친 워크플로 포함)는 시크릿에 닿지 못한다.
 on:
   push:
     branches: [main, 'release/**']
@@ -14,28 +17,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
-      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # 유료 에셋 팩(레포 밖, docs/decisions/0010). 시크릿이 없으면 건너뛰고 직접 그린 대체 타일로 빌드한다.
+      # 운영판은 유료 팩 그림 없이 나가지 않는다(0277) — 시크릿이 없으면 대체 그림으로 조용히 빌드되던 자리.
+      - name: Require vendor assets for release
+        if: env.ASSETS_REPO == '' && github.ref == 'refs/heads/main'
+        run: echo "::error::ASSETS_REPO 시크릿이 없다 — 운영판을 대체 그림으로 내보내지 않는다"; exit 1
       - name: Fetch vendor assets (private repo)
         if: env.ASSETS_REPO != ''
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ secrets.ASSETS_REPO }}
           token: ${{ secrets.ASSETS_TOKEN }}
           path: assets/vendor
-      - uses: dtolnay/rust-toolchain@stable
+      # Rust 버전은 rust-toolchain.toml 한 곳, 툴체인·캐시 액션은 SHA 고정(0277).
+      - uses: ./.github/actions/rust
         with:
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
 
       # 운영판은 개발 기능을 뺀다(0193). 다른 갈래는 기본값(dev)을 쓴다.
       - name: Build flavor
@@ -64,39 +71,60 @@ jobs:
           grep -n "<title>\|robots" dist/index.html
           ls -la dist
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-dist
           path: dist
 
-      - uses: actions/setup-node@v7
+  publish:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # 시크릿은 이 환경에만(사람이 Settings → Environments에 둔다). 환경의 "Deployment branches"가 갈래를 막는다.
+    environment: ${{ github.ref == 'refs/heads/main' && 'web-production' || 'web-dev' }}
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-dist
+          path: dist
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: env.NETLIFY_SITE_ID != ''
         with:
           node-version: 26   # 최신 LTS(Lithium, 2026-10-28 Active LTS). lts/*는 쓰지 않는다 — 다음 LTS로 조용히 넘어가지 않게
 
+      # 배포 확인 스크립트(tools/web/check_live.sh)만 꺼낸다.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: src-tree
+          sparse-checkout: tools/web
+          persist-credentials: false
+
       # Netlify 시크릿이 설정되기 전에는 아래 두 단계가 건너뛰어진다 (빌드 검증만).
+
+      # 운영도 개발판처럼 올린 뒤 운영 주소의 build.txt가 이 커밋인지 본다(0277).
       - name: Deploy production
-        if: env.NETLIFY_SITE_ID != '' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: npx netlify-cli@23 deploy --dir=dist --prod --message="${{ github.sha }}"
+        if: env.NETLIFY_SITE_ID != '' && github.ref == 'refs/heads/main'
+        run: |
+          npx netlify-cli@23 deploy --dir=dist --prod --message="${{ github.sha }}" --json > deploy.json
+          cat deploy.json
+          url=$(node -e 'const j=require("./deploy.json"); console.log((j.url||"").replace(/\/$/,"") || "https://"+j.site_name+".netlify.app")')
+          src-tree/tools/web/check_live.sh "$url" "$GITHUB_SHA"
+          echo "### 운영판: $url (${GITHUB_SHA:0:7})" >> "$GITHUB_STEP_SUMMARY"
 
       # 개발판(0193): 운영(--prod)은 건드리지 않는다. 같은 별칭을 다시 쓰면 그 주소가 새 배포를 가리킨다고 보지만
       # 포럼 답이 엇갈려서, 올린 뒤 별칭 주소의 build.txt를 읽어 이 커밋인지 확인한다(아니면 실패).
       - name: Deploy dev (alias)
-        if: env.NETLIFY_SITE_ID != '' && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')
+        if: env.NETLIFY_SITE_ID != '' && startsWith(github.ref, 'refs/heads/release/')
         run: |
           npx netlify-cli@23 deploy --dir=dist --alias=dev --message="${{ github.ref_name }} ${{ github.sha }}" --json > deploy.json
           cat deploy.json
           # 별칭 배포의 deploy_url이 곧 dev--<사이트> 주소다. 없으면 사이트 이름으로 짓는다.
           url=$(node -e 'const j=require("./deploy.json"); const u=(j.deploy_url||"").replace(/\/$/,""); console.log(u.includes("://dev--") ? u : "https://dev--"+j.site_name+".netlify.app")')
-          for i in 1 2 3 4 5 6; do
-            got=$(curl -fsS "$url/build.txt?t=$(date +%s)" || true)
-            echo "try $i: $got"
-            case "$got" in "$GITHUB_SHA"*) ok=1; break;; esac
-            sleep 10
-          done
-          if [ -z "$ok" ]; then echo "::error::$url 이 이 커밋($GITHUB_SHA)을 가리키지 않는다"; exit 1; fi
+          src-tree/tools/web/check_live.sh "$url" "$GITHUB_SHA"
           echo "### 개발판: $url (${GITHUB_SHA:0:7})" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Deploy PR preview
-        if: env.NETLIFY_SITE_ID != '' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
-        run: npx netlify-cli@23 deploy --dir=dist --alias="pr-${{ github.event.number }}"

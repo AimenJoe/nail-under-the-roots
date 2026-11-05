@@ -445,6 +445,8 @@ pub struct App {
     controls_cursor: usize,
     controls_col: usize,
     rebind: Option<f32>,
+    /// 이동 줄을 다시 붙일 때 지금 받는 방향(0 위·1 왼쪽·2 아래·3 오른쪽, 0283).
+    rebind_dir: usize,
     dev_cursor: usize,
     /// 개발 목록의 탭(`scenario::Cat::ALL` 번호, 0269).
     dev_cat: usize,
@@ -635,6 +637,7 @@ impl App {
             controls_cursor: 0,
             controls_col: 0,
             rebind: None,
+            rebind_dir: 0,
             dev_cursor: 0,
             dev_cat: 0,
             current: Scenario::Normal,

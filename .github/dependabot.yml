@@ -1,0 +1,18 @@
+# 액션 SHA 고정(0277)을 낡지 않게: 한 달에 한 번 GitHub Actions 고정 값을 올리는 PR 하나(묶음).
+# PR은 개발 갈래로 — 마일스톤 갈래가 바뀌면 target-branch도 바꾼다(docs/release.md "파이프라인 지키기").
+# cargo 의존성은 여기 넣지 않는다: 올리면 THIRD_PARTY_LICENSES 갱신·web/*.js 복사본·패치한 miniquad가 같이 움직여야 해서
+# 손으로 한다. 알려진 취약점은 레포 설정의 Dependabot alerts(사람이 켬)로 받는다.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/rust
+    target-branch: release/v1.0
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: 'CI: 액션 올리기'

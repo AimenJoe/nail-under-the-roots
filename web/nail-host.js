@@ -72,6 +72,41 @@ miniquad_add_plugin({
   }
 });
 
+// 키 이름(src/input.rs `layout::char_at`, 0282): 키는 자리(e.code)로 읽고, 화면에는 지금 배열에서 그 자리에 찍힌 글자를 쓴다.
+// navigator.keyboard.getLayoutMap()은 Chrome 계열만 있다(Safari·Firefox는 없음 → 0, 게임이 QWERTY 이름을 쓴다). 비동기라 미리 읽어
+// 두고, 창이 포커스를 얻을 때와 몇 초마다 다시 읽는다(배열은 바뀔 수 있다). 게임은 KeyCode 값(X11 keysym — 글자·숫자·기호는
+// US 글자 코드)을 넘기고, 여기서 e.code 이름으로 바꿔 찾는다. 없으면 0.
+var nailLayout = null;
+function readLayout() {
+  try {
+    if (navigator.keyboard && navigator.keyboard.getLayoutMap) {
+      navigator.keyboard.getLayoutMap().then(function (m) { nailLayout = m; }).catch(function () {});
+    }
+  } catch (e) {}
+}
+readLayout();
+window.addEventListener("focus", readLayout);
+setInterval(readLayout, 5000);
+var KEY_PUNCT = { 0x20: "Space", 0x27: "Quote", 0x2c: "Comma", 0x2d: "Minus", 0x2e: "Period", 0x2f: "Slash", 0x3b: "Semicolon",
+  0x3d: "Equal", 0x5b: "BracketLeft", 0x5c: "Backslash", 0x5d: "BracketRight", 0x60: "Backquote" };
+function keyCodeName(ks) {
+  if (ks >= 0x41 && ks <= 0x5a) return "Key" + String.fromCharCode(ks);
+  if (ks >= 0x30 && ks <= 0x39) return "Digit" + String.fromCharCode(ks);
+  return KEY_PUNCT[ks] || "";
+}
+miniquad_add_plugin({
+  name: "nail_keys",
+  version: 1,
+  register_plugin: function (importObject) {
+    importObject.env.nail_key_label = function (ks) {
+      var name = keyCodeName(ks);
+      if (!nailLayout || !name) return 0;
+      var c = nailLayout.get(name);
+      return c ? c.codePointAt(0) : 0;
+    };
+  }
+});
+
 // ── PWA·화면(0269, 요구 2.4) ─────────────────────────────────────────────────────────────
 // 전체 화면은 사용자가 누른 입력에서만(게임 설정 "전체 화면" → nail_fs_toggle). 캔버스가 아니라 문서 전체를 올려
 // 회전 안내·로딩이 위에 보이게. 들어간 뒤 가로 잠금을 시도하고(Android Chrome), 안 되면 조용히 넘어간다(iPhone·데스크톱).
@@ -138,6 +173,89 @@ miniquad_add_plugin({
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1") && !/^pr-\d+--/.test(location.hostname)) {
   window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
 }
+
+// ── iPhone·iPad: touchstart의 preventDefault 막기(0281) ─────────────────────────────────────
+// 번들은 캔버스 touchstart마다 preventDefault를 부른다. WKWebView(홈 화면 웹앱·앱 안 브라우저)에서는 그러면 실제 키보드의
+// keydown이 아예 오지 않고(WebKit 버그 206887, Safari 탭은 된다), iPadOS는 화면을 탭할 때까지 페이지에 키보드 포커스를 주지
+// 않는데(버그 276640) 그 탭도 막혀 키가 영영 안 들어온다. 그래서 iOS에서만 touchstart 이벤트의 preventDefault를 아무것도
+// 안 하는 것으로 덮는다(창 capture가 번들 처리기보다 먼저 돈다). 스크롤·확대는 CSS touch-action: none이, 흉내 클릭은 번들의
+// touchend preventDefault가 그대로 막는다. touchmove·touchend는 건드리지 않는다.
+if (ios) {
+  window.addEventListener("touchstart", function (e) {
+    try { Object.defineProperty(e, "preventDefault", { value: function () {}, configurable: true }); } catch (err) {}
+  }, { capture: true, passive: true });
+}
+
+// ── 실제 키보드를 캔버스로(0278) ───────────────────────────────────────────────────────────
+// 번들은 `canvas.onkeydown/onkeyup`만 듣고 `e.code`로 키를 가른다. 모바일 브라우저에 블루투스 키보드를 붙이면
+// (1) 포커스가 캔버스 밖(문서 몸통·브라우저 UI)에 있어 키가 캔버스에 오지 않거나 — 터치 처리가 기본 동작을 막아
+// 화면을 짚어도 포커스가 돌아오지 않는다 — (2) 키보드 앱(IME)을 거쳐 `code`가 비어("" · "Unidentified") 온다.
+// 그래서: 캔버스를 만지면 포커스를 되돌리고, 창 전체에서 키를 받아(capture) 캔버스 밖이거나 `code`가 빈 것만
+// `key`·`keyCode`(한글 두벌식 자모 포함)로 `code`를 채워 번들 처리기에 넘긴다. 정상인 것은 건드리지 않는다.
+(function () {
+  var canvas = document.getElementById("glcanvas");
+  if (!canvas) return;
+  function refocus() {
+    if (document.activeElement !== canvas) { try { canvas.focus({ preventScroll: true }); } catch (e) {} }
+  }
+  ["touchstart", "pointerdown", "mousedown"].forEach(function (t) { canvas.addEventListener(t, refocus, { passive: true }); });
+  window.addEventListener("focus", refocus);
+  // 한글 입력 상태의 두벌식 자모 → 그 자리의 영문 키(쌍자음·ㅒ·ㅖ는 Shift 자리).
+  var JAMO = { "ㅂ": "Q", "ㅈ": "W", "ㄷ": "E", "ㄱ": "R", "ㅅ": "T", "ㅛ": "Y", "ㅕ": "U", "ㅑ": "I", "ㅐ": "O", "ㅔ": "P",
+    "ㅁ": "A", "ㄴ": "S", "ㅇ": "D", "ㄹ": "F", "ㅎ": "G", "ㅗ": "H", "ㅓ": "J", "ㅏ": "K", "ㅣ": "L",
+    "ㅋ": "Z", "ㅌ": "X", "ㅊ": "C", "ㅍ": "V", "ㅠ": "B", "ㅜ": "N", "ㅡ": "M",
+    "ㅃ": "Q", "ㅉ": "W", "ㄸ": "E", "ㄲ": "R", "ㅆ": "T", "ㅒ": "O", "ㅖ": "P" };
+  var NAMED = { "Enter": "Enter", "Escape": "Escape", "Esc": "Escape", "Tab": "Tab", "Backspace": "Backspace", " ": "Space",
+    "Spacebar": "Space", "ArrowLeft": "ArrowLeft", "ArrowRight": "ArrowRight", "ArrowUp": "ArrowUp", "ArrowDown": "ArrowDown",
+    "Left": "ArrowLeft", "Right": "ArrowRight", "Up": "ArrowUp", "Down": "ArrowDown", "Shift": "ShiftLeft",
+    "Control": "ControlLeft", "Alt": "AltLeft", ",": "Comma", ".": "Period", "/": "Slash", ";": "Semicolon", "'": "Quote" };
+  var KEYCODE = { 8: "Backspace", 9: "Tab", 13: "Enter", 16: "ShiftLeft", 17: "ControlLeft", 18: "AltLeft", 27: "Escape",
+    32: "Space", 37: "ArrowLeft", 38: "ArrowUp", 39: "ArrowRight", 40: "ArrowDown",
+    186: "Semicolon", 188: "Comma", 190: "Period", 191: "Slash", 222: "Quote" };
+  function good(code) { return !!code && code !== "Unidentified"; }
+  function codeOf(e) {
+    if (good(e.code)) return e.code;
+    var k = e.key || "";
+    if (/^[a-zA-Z]$/.test(k)) return "Key" + k.toUpperCase();
+    if (/^[0-9]$/.test(k)) return "Digit" + k;
+    if (JAMO[k]) return "Key" + JAMO[k];
+    var c = e.keyCode || e.which || 0;
+    var named = NAMED[k] || KEYCODE[c] || "";
+    // Shift·Ctrl·Alt는 좌우가 다른 키다 — location 2 = 오른쪽(PR #12 리뷰).
+    if (e.location === 2 && /Left$/.test(named)) return named.replace(/Left$/, "Right");
+    if (NAMED[k]) return named;
+    if (c >= 65 && c <= 90) return "Key" + String.fromCharCode(c);
+    if (c >= 48 && c <= 57) return "Digit" + (c - 48);
+    if (c >= 112 && c <= 123) return "F" + (c - 111);
+    return named;
+  }
+  // 번들 처리기를 한 번 감싸, 우리가 대신 넘긴 이벤트는 번들이 빈 `code`로 또 처리하지 않게 한다.
+  function bundled(type) {
+    var h = canvas["on" + type];
+    if (!h) return null;
+    if (h.__nailOrig) return h.__nailOrig;
+    var w = function (ev) { if (!ev.__nailDone) return h.call(this, ev); };
+    w.__nailOrig = h;
+    canvas["on" + type] = w;
+    return h;
+  }
+  function route(type) {
+    return function (e) {
+      if (e.target === canvas && good(e.code)) return;
+      var h = bundled(type), code = codeOf(e);
+      if (!h || !code) return;
+      refocus();
+      e.__nailDone = true;
+      h.call(canvas, {
+        code: code, key: e.key, repeat: e.repeat, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey,
+        metaKey: e.metaKey, charCode: e.charCode, keyCode: e.keyCode,
+        preventDefault: function () { e.preventDefault(); }
+      });
+    };
+  }
+  window.addEventListener("keydown", route("keydown"), true);
+  window.addEventListener("keyup", route("keyup"), true);
+})();
 
 load("nail.wasm");
 })();
