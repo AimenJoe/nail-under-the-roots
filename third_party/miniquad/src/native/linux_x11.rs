@@ -60,7 +60,9 @@ impl X11Display {
         match event.type_0 {
             2 => {
                 let keycode = event.xkey.keycode as libc::c_int;
-                let key = keycodes::translate_key(&mut self.libx11, self.display, keycode);
+                // nail 패치(0282): 글자·숫자·기호는 자리(evdev = X 키코드 − 8), 나머지는 keysym.
+                let key = crate::native::pc_scancode::scancode_position((keycode as u32).wrapping_sub(8))
+                    .unwrap_or_else(|| keycodes::translate_key(&mut self.libx11, self.display, keycode));
                 let repeat = self.repeated_keycodes[(keycode & 0xff) as usize];
                 self.repeated_keycodes[(keycode & 0xff) as usize] = true;
                 let mods = keycodes::translate_mod(event.xkey.state as libc::c_int);
@@ -82,7 +84,8 @@ impl X11Display {
             }
             3 => {
                 let keycode = event.xkey.keycode;
-                let key = keycodes::translate_key(&mut self.libx11, self.display, keycode as _);
+                let key = crate::native::pc_scancode::scancode_position((keycode as u32).wrapping_sub(8))
+                    .unwrap_or_else(|| keycodes::translate_key(&mut self.libx11, self.display, keycode as _));
                 self.repeated_keycodes[(keycode & 0xff) as usize] = false;
                 let mods = keycodes::translate_mod(event.xkey.state as libc::c_int);
                 event_handler.key_up_event(key, mods);

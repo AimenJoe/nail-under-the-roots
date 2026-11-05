@@ -4,7 +4,7 @@
 //!
 //! 칸: 0 표식(MAGIC), 1 소리+1, 2 흔들림+1, 3 언어(0 = 기기 언어), 4..11 키 번호+1, 11..18 패드 번호+1,
 //! 18 음악+1(0081), 19 입자 효과+1(0141), 20 공격 예고 진하기+1(0198), 21 전체 화면+1(데스크톱, 0240),
-//! 22 번쩍임+1·23 패드 진동+1(0269). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
+//! 22 번쩍임+1·23 패드 진동+1(0269), 24..28 이동 키 번호+1(0283, 위·왼쪽·아래·오른쪽 — 0이면 기본 W·A·S·D). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
 //! 0은 "없음"(플러그인이 없거나 저장 전). 표식이 다르면 통째로 무시한다(형식이 바뀌면 MAGIC을 올린다).
 
 use crate::i18n::Lang;
@@ -12,7 +12,7 @@ use crate::input::Bindings;
 
 const MAGIC: u32 = 0x4E41_0001;
 /// 저장 칸 수.
-const CELLS: usize = 24;
+const CELLS: usize = 28;
 /// 공격 예고 진하기 기본값(1..=10, 0198).
 pub const TELLS_DEFAULT: u8 = 5;
 /// 패드 진동 기본값(0..=10, 0269).
@@ -91,6 +91,9 @@ fn encode(p: &Prefs) -> [u32; CELLS] {
         v[4 + i] = p.bindings.keys[i] as u32 + 1;
         v[11 + i] = p.bindings.pads[i] as u32 + 1;
     }
+    for d in 0..4 {
+        v[24 + d] = p.bindings.moves[d] as u32 + 1;
+    }
     v
 }
 
@@ -102,6 +105,12 @@ fn decode(v: &[u32; CELLS]) -> Option<Prefs> {
     for i in 0..7 {
         b.keys[i] = v[4 + i].saturating_sub(1) as u8;
         b.pads[i] = v[11 + i].saturating_sub(1) as u8;
+    }
+    // 이동 키 칸이 없던 옛 저장(0283 전, 0)은 기본 W·A·S·D — 옛 표에는 W·A·S·D가 없어 동작 키와 겹치지 않는다.
+    for d in 0..4 {
+        if v[24 + d] != 0 {
+            b.moves[d] = (v[24 + d] - 1) as u8;
+        }
     }
     Some(Prefs {
         volume: (v[1].saturating_sub(1) as u8).min(10),
@@ -292,6 +301,8 @@ mod tests {
         assert_eq!(p.bindings.keys[0], 7);
         assert_eq!(p.bindings.keys[1..], Bindings::DEFAULT.keys[1..]);
         assert_eq!(p.bindings.pads, Bindings::DEFAULT.pads);
+        // 이동 키 칸(24..28, 0283)도 없었다: 기본 W·A·S·D.
+        assert_eq!(p.bindings.moves, Bindings::DEFAULT.moves);
         // 예고 칸(20, 0198)은 v0.3에 없었다: 기본값으로 읽고, 다시 쓰면 그 칸만 채워진다.
         assert_eq!(p.tells, TELLS_DEFAULT);
         assert_eq!(encode(&p)[..20], v[..20]);

@@ -87,6 +87,9 @@ pub trait Clipboard: Send + Sync {
 
 pub mod module;
 
+// nail-under-the-roots 패치(0282): 글자 키를 물리 자리로(X11·Wayland가 쓴다, 시험이 본다).
+pub mod pc_scancode;
+
 #[cfg(target_os = "linux")]
 pub mod linux_x11;
 

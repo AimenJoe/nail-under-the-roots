@@ -4,7 +4,7 @@
 //   python3 tools/web/assemble.py dist local dev
 //   node tools/test/smoke.js dist [출력 폴더] [개발 목록 이름,... | none]
 // CI: .github/workflows/smoke-web.yml. 이름은 src/scenario.rs LIST의 name(타이틀 "개발"의 묶음 탭 안 줄).
-const { chromium } = require('playwright');
+const { chromium, devices } = require('playwright');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -151,6 +151,56 @@ async function run() {
     check(size > MIN_SHOT_BYTES, `title: 로딩이 끝나고 화면이 그려진다 (${size}B)`);
     check(s.errors.length === 0, `title: 콘솔 에러 없음 ${JSON.stringify(s.errors)}`);
     await s.ctx.close();
+  }
+  // 실제 키보드(0278, web/nail-host.js): 포커스가 캔버스 밖이어도, 키보드 앱을 거쳐 code가 비어 와도 키가 게임에 한 번씩 닿는다.
+  // 번들이 게임에 넘기는 key_down을 엿본다(wasm_exports는 번들의 전역 — 내보낸 함수 표를 복사해 하나만 감싼다).
+  {
+    const s = await open('keys');
+    await s.page.evaluate(() => {
+      const ex = wasm_exports, o = {}; for (const k in ex) o[k] = ex[k];
+      window.__kd = []; o.key_down = (c, m, r) => { window.__kd.push(c); return ex.key_down(c, m, r); }; wasm_exports = o;
+    });
+    const kd = () => s.page.evaluate(() => { const v = window.__kd; window.__kd = []; return v; });
+    await s.page.evaluate(() => { document.activeElement.blur(); document.body.tabIndex = -1; document.body.focus(); });
+    await s.key('ArrowDown', 200);
+    const outside = await kd();
+    const back = await s.page.evaluate(() => document.activeElement && document.activeElement.id);
+    check(JSON.stringify(outside) === '[264]' && back === 'glcanvas', `keys: 캔버스 밖 포커스에서도 닿고 포커스가 돌아온다 ${JSON.stringify(outside)} ${back}`);
+    // 빈 code: 한글 자모(ㅓ = J), "Unidentified" + key Enter, keyCode만(75 = K). 정상 code(KeyJ)는 번들이 그대로.
+    await s.page.evaluate(() => {
+      const c = document.getElementById('glcanvas');
+      const send = (key, code, keyCode) => {
+        const e = new KeyboardEvent('keydown', { key, code, bubbles: true });
+        if (keyCode) Object.defineProperty(e, 'keyCode', { get: () => keyCode });
+        c.dispatchEvent(e); c.dispatchEvent(new KeyboardEvent('keyup', { key, code, bubbles: true }));
+      };
+      send('ㅓ', ''); send('Enter', 'Unidentified'); send('Unidentified', '', 75); send('j', 'KeyJ');
+    });
+    await s.page.waitForTimeout(200);
+    const empty = await kd();
+    check(JSON.stringify(empty) === '[74,257,75,74]', `keys: 빈 code를 key·keyCode로 채운다(두 번 들어가지 않는다) ${JSON.stringify(empty)}`);
+    await s.ctx.close();
+  }
+  // iPad(0281, web/nail-host.js): touchstart는 막지 않고(WKWebView에서 실제 키보드가 살아 있게) touchend는 그대로 막는다.
+  // 터치는 그대로 게임에 닿는다(번들의 wasm_exports.touch를 엿본다). Chromium이 iPad 흉내를 내는 것이라 키가 오는지까지는 못 본다.
+  {
+    const ctx = await browser.newContext({ ...devices['iPad Pro 11 landscape'], locale: 'ko-KR' });
+    await ctx.addInitScript((p) => { try { localStorage.setItem('nail.profile', p); } catch (e) {} }, PROFILE);
+    const page = await ctx.newPage();
+    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'load' });
+    await page.waitForFunction(() => document.getElementById('loading').classList.contains('done'), null, { timeout: 60000 });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      const ex = wasm_exports, o = {}; for (const k in ex) o[k] = ex[k];
+      window.__touch = 0; o.touch = (...a) => { window.__touch++; return ex.touch(...a); }; wasm_exports = o;
+      window.__prevented = {};
+      for (const t of ['touchstart', 'touchend']) window.addEventListener(t, (e) => { window.__prevented[t] = e.defaultPrevented; });
+    });
+    await page.touchscreen.tap(500, 300);
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(() => ({ p: window.__prevented, n: window.__touch }));
+    check(r.p.touchstart === false && r.p.touchend === true && r.n >= 2, `ipad: touchstart는 막지 않고 touchend는 막는다, 터치는 게임에 닿는다 ${JSON.stringify(r)}`);
+    await ctx.close();
   }
   for (const idx of SCENARIOS) {
     const s = await dev(idx);
