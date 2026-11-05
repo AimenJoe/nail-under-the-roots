@@ -2,7 +2,7 @@ name: build-desktop
 # PC 빌드(0240): Windows(x64 zip) · macOS(인텔+애플 실리콘 겸용 .app zip) · Linux(x64 tar.gz).
 # - release/** push: 개발판(기본 기능)을 Actions 아티팩트로.
 # - release.yml이 부를 때(release_tag): 운영판(--no-default-features)을 만들어 그 태그의 GitHub Release에 붙인다.
-# - 손으로: Actions → build-desktop → Run workflow(브랜치 고르기, 0169 R8와 같은 방식).
+# - 손으로: Actions → build-desktop → Run workflow(브랜치 고르기, 0169 R8와 같은 방식). release_tag를 넣으면 그 Release에 운영판을 붙인다(릴리스 때 빠진 묶음 채우기).
 # - store-deploy.yml이 부를 때(store = steam | epic, 0276 S4·E4): 운영판 + 상점 기능(--features steam|epic)을 만들어
 #   아티팩트로만 둔다(Release에 붙이지 않는다). epic은 Windows·macOS만(Epic 런처에 Linux 없음) — EOS 아이디는
 #   Environment `store`에서 빌드 때 넣고, EOS SDK(.lib·.dll)는 비공개 에셋 레포의 `eos/sdk`에서 꺼낸다.
@@ -21,6 +21,11 @@ on:
       - 'Cargo.lock'
       - '.github/workflows/build-desktop.yml'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '이미 있는 Release에 운영판 묶음을 다시 붙일 때만(예: v0.9.1). 비우면 개발판 아티팩트만'
+        required: false
+        default: ''
   workflow_call:
     inputs:
       release_tag:
