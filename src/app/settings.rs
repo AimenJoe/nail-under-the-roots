@@ -128,7 +128,8 @@ const GROUP_LINE: Color = Color::new(0.55, 0.40, 0.28, 0.5);
 const SCROLL_SHUT: Color = Color::new(0.52, 0.48, 0.46, 0.3);
 /// 기록 지우기(되돌릴 수 없는 줄)의 글자색. 색만으로 알리지 않는다 — 맨 끝 따로 묶음 + 한 번 더 묻기.
 const ERASE_INK: Color = Color::new(0.86, 0.47, 0.42, 1.0);
-/// 조작 설정의 줄: 동작들(input::ACTS) + 기본값 + 돌아가기.
+/// 조작 설정의 줄(0283): 0 이동(키 넷을 차례로) · 1..=7 동작들(input::ACTS) · 8 기본값으로 | 돌아가기(한 줄에 둘).
+pub(super) const CONTROL_MOVE: usize = 0;
 pub(super) const CONTROL_NAMES: [Tr; 7] = [
     |s| s.act_attack,
     // 지금 캐릭터의 회피 이름(0265).
@@ -139,8 +140,10 @@ pub(super) const CONTROL_NAMES: [Tr; 7] = [
     |s| s.act_item_next,
     |s| s.act_map,
 ];
-pub(super) const CONTROL_RESET: usize = 7;
-pub(super) const CONTROL_BACK: usize = 8;
+/// 마지막 줄: 칸 0 = 기본값으로, 칸 1 = 돌아가기.
+pub(super) const CONTROL_LAST: usize = 8;
+/// 이동 키를 받는 순서의 표시(위·왼쪽·아래·오른쪽, `input::MOVE_DIRS`).
+const MOVE_ARROWS: [&str; 4] = ["↑", "←", "↓", "→"];
 /// 다시 붙이기: 이만큼 아무것도 안 누르면 그만둔다.
 pub(super) const REBIND_TIMEOUT: f32 = 5.0;
 
@@ -260,7 +263,8 @@ impl App {
         });
     }
 
-    /// 조작 설정: 위아래로 동작, 좌우로 키보드/패드 칸, 확인으로 다시 붙이기(다음에 누르는 키·버튼).
+    /// 조작 설정: 위아래로 줄, 좌우로 키보드/패드 칸, 확인으로 다시 붙이기(다음에 누르는 키·버튼).
+    /// 이동 줄은 키 넷을 ↑ ← ↓ → 차례로 받는다(0283) — 화살표는 늘 움직여 여기 없고, 패드 이동(스틱·D패드)은 고정.
     pub(super) fn update_controls(
         &mut self,
         a: &Actions,
@@ -268,7 +272,7 @@ impl App {
         back: Back,
         dt: f32,
     ) {
-        use crate::input::{self, Captured, ACTS};
+        use crate::input::{self, Captured, ACTS, MOVE_DIRS};
         if let Some(left) = self.rebind {
             // 기다리는 중: 다른 입력은 무시. Esc로 그만두기, 시간이 다 돼도 그만.
             let left = left - dt;
@@ -278,23 +282,33 @@ impl App {
             }
             if let Some(c) = self.input.capture() {
                 let mut b = input::bindings();
-                let act = ACTS[self.controls_cursor];
+                let row = self.controls_cursor;
                 let ok = match c {
-                    Captured::Key(k) if self.controls_col == 0 => b.bind_key(act, k),
-                    Captured::Pad(p) if self.controls_col == 1 => b.bind_pad(act, p),
+                    Captured::Key(k) if row == CONTROL_MOVE => b.bind_move(self.rebind_dir, k),
+                    Captured::Key(k) if self.controls_col == 0 => b.bind_key(ACTS[row - 1], k),
+                    Captured::Pad(p) if self.controls_col == 1 && row != CONTROL_MOVE => {
+                        b.bind_pad(ACTS[row - 1], p)
+                    }
                     _ => false,
                 };
                 if ok {
                     input::set_bindings(b);
                     self.sfx.play(crate::sfx::Id::Claw(1));
-                    self.rebind = None;
+                    if row == CONTROL_MOVE && self.rebind_dir + 1 < MOVE_DIRS {
+                        // 다음 방향(같은 프레임의 키가 다음 칸에 또 잡히지 않게 다음 프레임부터).
+                        self.rebind_dir += 1;
+                        self.rebind = Some(REBIND_TIMEOUT + dt);
+                        self.input.take();
+                    } else {
+                        self.rebind = None;
+                    }
                     return;
                 }
             }
             self.rebind = if left <= 0.0 { None } else { Some(left) };
             return;
         }
-        let n = CONTROL_BACK + 1;
+        let n = CONTROL_LAST + 1;
         if a.up {
             self.controls_cursor = (self.controls_cursor + n - 1) % n;
         }
@@ -310,17 +324,22 @@ impl App {
             self.controls_cursor = row;
             self.controls_col = col;
         }
-        if a.cancel || (chosen && self.controls_cursor == CONTROL_BACK) {
+        let last = self.controls_cursor == CONTROL_LAST;
+        if a.cancel || (chosen && last && self.controls_col == 1) {
             self.save_prefs();
             self.scene = Scene::Settings { back };
             return;
         }
-        if chosen && self.controls_cursor == CONTROL_RESET {
+        if chosen && last {
             input::set_bindings(input::Bindings::DEFAULT);
             self.sfx.play(crate::sfx::Id::Claw(0));
+        } else if chosen && self.controls_cursor == CONTROL_MOVE && self.controls_col == 1 {
+            // 패드 이동은 고정(스틱·D패드).
+            self.sfx.play(crate::sfx::Id::Deny);
         } else if chosen {
             // 확인을 누른 그 프레임의 키(Enter·Space·J)가 바로 잡히지 않게 다음 프레임부터.
             self.rebind = Some(REBIND_TIMEOUT + dt);
+            self.rebind_dir = 0;
             self.input.take();
         }
     }
@@ -562,7 +581,7 @@ impl App {
         }
     }
 
-    /// 조작 설정 화면: 동작 | 키보드 | 패드 표. 고른 칸 강조, 기다리는 중이면 "누르세요… 5".
+    /// 조작 설정 화면: 줄 이름 | 키보드 | 패드 표. 고른 칸 강조, 기다리는 중이면 "누르세요… 5"(이동은 앞에 화살표).
     pub(super) fn draw_controls(&mut self, ui: &Ui) {
         use crate::input::{self, ACTS};
         let s = i18n::s();
@@ -588,68 +607,91 @@ impl App {
             FONT_PX,
             ui::TEXT_DIM,
         );
-        for row in 0..=CONTROL_BACK {
+        for row in 0..=CONTROL_LAST {
             let y = y0 + (row as f32 + 1.0) * row_h;
             // 고른 칸은 y − 1부터 한 줄(창이 꽉 차 칸을 더 키울 수 없다) — 글자는 그 칸의 세로 가운데에.
             let ty = ui::mid_y(Rect::new(0.0, y - 1.0, 1.0, row_h));
             let on = row == self.controls_cursor;
-            if row < CONTROL_RESET {
-                let act = ACTS[row];
-                ui.text(
-                    &ui.fit(tr(CONTROL_NAMES[row]), name_w - 4.0, FONT_PX),
-                    x0 + 2.0,
-                    ty,
-                    FONT_PX,
-                    if on { ui::TEXT } else { ui::TEXT_DIM },
-                );
-                for col in 0..2 {
-                    let r = Rect::new(
-                        x0 + name_w + col as f32 * col_w,
-                        y - 1.0,
-                        col_w - 4.0,
-                        row_h,
-                    );
+            if row == CONTROL_LAST {
+                // 기본값으로 | 돌아가기: 한 줄에 반씩, 좌우로 고른다.
+                let half = (panel.w - 12.0) / 2.0;
+                for (col, label) in [s.ctl_reset, s.set_back].into_iter().enumerate() {
+                    let r = Rect::new(x0 + col as f32 * half, y - 1.0, half - 4.0, row_h);
                     let sel = on && col == self.controls_col;
-                    let waiting = sel && self.rebind.is_some();
                     if sel {
                         ui.rect(r, ui::PANEL_LIGHT);
-                        ui.rect_lines(r, ui::ACCENT);
+                        ui.text("▶", r.x + 2.0, ty, FONT_PX, ui::ACCENT);
                     }
-                    let label = if waiting {
-                        fill(s.ctl_wait, &[&(self.rebind.unwrap_or(0.0).ceil() as i32)])
-                    } else if col == 0 {
-                        b.key_label(act).to_string()
-                    } else {
-                        b.pad(act).label().to_string()
-                    };
                     ui.text(
-                        &ui.fit(&label, r.w - 6.0, FONT_PX),
-                        r.x + 4.0,
+                        &ui.fit(label, r.w - 16.0, FONT_PX),
+                        r.x + 14.0,
                         ty,
                         FONT_PX,
-                        if waiting { ui::ACCENT } else { ui::TEXT },
+                        if sel { ui::TEXT } else { ui::TEXT_DIM },
                     );
                     self.hits.push((r, Hit::ControlCell(row, col)));
                 }
+                continue;
+            }
+            let name = if row == CONTROL_MOVE {
+                s.act_move
             } else {
-                let label = if row == CONTROL_RESET {
-                    s.ctl_reset
-                } else {
-                    s.set_back
-                };
-                let r = Rect::new(x0, y - 1.0, panel.w - 12.0, row_h);
-                if on {
+                tr(CONTROL_NAMES[row - 1])
+            };
+            ui.text(
+                &ui.fit(name, name_w - 4.0, FONT_PX),
+                x0 + 2.0,
+                ty,
+                FONT_PX,
+                if on { ui::TEXT } else { ui::TEXT_DIM },
+            );
+            for col in 0..2 {
+                let r = Rect::new(
+                    x0 + name_w + col as f32 * col_w,
+                    y - 1.0,
+                    col_w - 4.0,
+                    row_h,
+                );
+                let sel = on && col == self.controls_col;
+                let waiting = sel && self.rebind.is_some();
+                // 이동 줄의 패드 칸은 고정(스틱) — 흐리게.
+                let fixed = row == CONTROL_MOVE && col == 1;
+                if sel {
                     ui.rect(r, ui::PANEL_LIGHT);
-                    ui.text("▶", r.x + 2.0, ty, FONT_PX, ui::ACCENT);
+                    ui.rect_lines(r, ui::ACCENT);
                 }
+                let label = if waiting {
+                    let wait = fill(s.ctl_wait, &[&(self.rebind.unwrap_or(0.0).ceil() as i32)]);
+                    if row == CONTROL_MOVE {
+                        format!("{} {wait}", MOVE_ARROWS[self.rebind_dir % 4])
+                    } else {
+                        wait
+                    }
+                } else if row == CONTROL_MOVE {
+                    if col == 0 {
+                        input::walk_keys().to_string()
+                    } else {
+                        s.v_stick.to_string()
+                    }
+                } else if col == 0 {
+                    b.key_label(ACTS[row - 1]).to_string()
+                } else {
+                    b.pad(ACTS[row - 1]).label().to_string()
+                };
                 ui.text(
-                    label,
-                    r.x + 14.0,
+                    &ui.fit(&label, r.w - 6.0, FONT_PX),
+                    r.x + 4.0,
                     ty,
                     FONT_PX,
-                    if on { ui::TEXT } else { ui::TEXT_DIM },
+                    if waiting {
+                        ui::ACCENT
+                    } else if fixed {
+                        ui::TEXT_DIM
+                    } else {
+                        ui::TEXT
+                    },
                 );
-                self.hits.push((r, Hit::ControlCell(row, 0)));
+                self.hits.push((r, Hit::ControlCell(row, col)));
             }
         }
         // 안내: 바꾸는 법은 패널 안 아래, 고정된 키는 패널 밖(두 줄까지).
@@ -657,9 +699,8 @@ impl App {
         ui.text_center(&hint, 160.0, panel.bottom() - 12.0, FONT_PX, ui::TEXT_DIM);
         // 두 줄이면 둘째 줄 아래가 화면(180) 밖으로 잘렸다: 창 바로 밑에서 10px 간격(0089).
         let mut y = panel.bottom();
-        // 걷는 키 이름은 지금 배열(AZERTY면 ZQSD, 0282).
-        let fixed = fill(s.ctl_fixed, &[&crate::input::walk_keys()]);
-        for l in ui::wrap(ui, &fixed, 312.0, FONT_PX).iter().take(2) {
+        // 이동은 위 줄에서 바꾸고 화살표는 늘 움직이니 고정 안내에서 뺐다(0283).
+        for l in ui::wrap(ui, s.ctl_fixed, 312.0, FONT_PX).iter().take(2) {
             ui.text_center(l, 160.0, y, FONT_PX, ui::TEXT_DIM);
             y += 11.0;
         }
