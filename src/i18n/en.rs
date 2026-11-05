@@ -261,7 +261,7 @@ pub static EN: Strings = Strings {
     ctl_reset: "Reset to default",
     ctl_wait: "Press… {0}",
     ctl_hint: "Left/Right: key/pad · Confirm: change · Swaps if taken",
-    ctl_fixed: "Fixed: move arrows/WASD/stick · menu Esc/Start · confirm Enter/A · back Esc/B",
+    ctl_fixed: "Fixed: move WASD/arrows/stick · menu Esc/Start · confirm Enter/A · back Esc/B",
     popo_name: "Popo",
     popo_hi: "Hey there, little mole! You okay? I'm Popo the raccoon.",
     popo_hi2: "Going down below the roots? Then let me teach you how to fight first. One step at a time!",

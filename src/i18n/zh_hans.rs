@@ -261,7 +261,7 @@ pub static ZH_HANS: Strings = Strings {
     ctl_reset: "恢复默认",
     ctl_wait: "请按键… {0}",
     ctl_hint: "左右：键盘/手柄·确认：更改·重复时互换",
-    ctl_fixed: "固定：移动 方向键·WASD·左杆·菜单 Esc·Start·确认 Enter·A·返回 Esc·B",
+    ctl_fixed: "固定：移动 WASD·方向键·左杆·菜单 Esc·Start·确认 Enter·A·返回 Esc·B",
     popo_name: "波波",
     popo_hi: "喂，小鼹鼠！你没事吧？我是浣熊波波。",
     popo_hi2: "要去树根下面？那我先教你怎么活动身体。一步一步来！",

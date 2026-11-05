@@ -261,7 +261,7 @@ pub static ES: Strings = Strings {
     ctl_reset: "Restablecer",
     ctl_wait: "Pulsa… {0}",
     ctl_hint: "←/→: tecla/mando · Aceptar: cambiar · ocupada: se cambia",
-    ctl_fixed: "Fijos: mover flechas/WASD/stick · menú Esc/Start · aceptar Enter/A · atrás Esc/B",
+    ctl_fixed: "Fijos: mover WASD/flechas/stick · menú Esc/Start · aceptar Enter/A · atrás Esc/B",
     popo_name: "Popo",
     popo_hi: "¡Hola, topito! ¿Estás bien? Soy Popo, el mapache.",
     popo_hi2: "¿Vas a meterte bajo las raíces? Entonces primero te enseño a pelear. ¡Paso a paso!",

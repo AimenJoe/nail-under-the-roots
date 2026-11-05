@@ -261,7 +261,7 @@ pub static FR: Strings = Strings {
     ctl_reset: "Réinitialiser",
     ctl_wait: "Appuie… {0}",
     ctl_hint: "←/→: clavier/manette · Valider: changer · Échange si pris",
-    ctl_fixed: "Fixes: bouger flèches/WASD/stick · menu Esc/Start · valider Enter/A · retour Esc/B",
+    ctl_fixed: "Fixes: bouger WASD/flèches/stick · menu Esc/Start · valider Enter/A · retour Esc/B",
     popo_name: "Popo",
     popo_hi: "Salut, petite taupe! Ça va? Moi, c'est Popo, le raton laveur.",
     popo_hi2: "Tu descends sous les racines? Alors je vais d'abord t'apprendre à te battre. Une chose à la fois!",

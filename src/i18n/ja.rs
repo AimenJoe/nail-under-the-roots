@@ -261,7 +261,7 @@ pub static JA: Strings = Strings {
     ctl_reset: "初期設定にもどす",
     ctl_wait: "おしてください… {0}",
     ctl_hint: "左右：キー/パッド・決定：変更・かぶると入れかえ",
-    ctl_fixed: "固定：移動 矢印・WASD・スティック・メニュー Esc・Start・決定 Enter・A・もどる Esc・B",
+    ctl_fixed: "固定：移動 WASD・矢印・スティック・メニュー Esc・Start・決定 Enter・A・もどる Esc・B",
     popo_name: "ポポ",
     popo_hi: "おーい、ちびモグラ！だいじょうぶ？ぼくはアライグマのポポ。",
     popo_hi2: "根の下へ行くって？じゃあ、まず体の使い方を教えてあげる。ひとつずつやってみよう！",

@@ -261,7 +261,7 @@ pub static PL: Strings = Strings {
     ctl_reset: "Domyślne",
     ctl_wait: "Naciśnij… {0}",
     ctl_hint: "←/→: klaw./pad · OK: zmień · Zajęte = zamiana",
-    ctl_fixed: "Stałe: ruch strzałki/WASD/gałka · menu Esc/Start · OK Enter/A · wstecz Esc/B",
+    ctl_fixed: "Stałe: ruch WASD/strzałki/gałka · menu Esc/Start · OK Enter/A · wstecz Esc/B",
     popo_name: "Popo",
     popo_hi: "Hej, kreciątko! Wszystko dobrze? Jestem Popo, szop pracz.",
     popo_hi2: "Schodzisz pod korzenie? To najpierw nauczę cię walczyć. Krok po kroku!",

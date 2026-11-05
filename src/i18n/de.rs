@@ -261,7 +261,7 @@ pub static DE: Strings = Strings {
     ctl_reset: "Zurücksetzen",
     ctl_wait: "Drücke… {0}",
     ctl_hint: "←/→: Tasten/Pad · OK: ändern · Tauscht, falls belegt",
-    ctl_fixed: "Fest: Laufen Pfeile, WASD, Stick · Menü Esc/Start · OK Enter/A · Zurück Esc/B",
+    ctl_fixed: "Fest: Laufen WASD, Pfeile, Stick · Menü Esc/Start · OK Enter/A · Zurück Esc/B",
     popo_name: "Popo",
     popo_hi: "Hallo, Maulwürfchen! Alles okay? Ich bin Popo, der Waschbär.",
     popo_hi2: "Du willst unter die Wurzeln? Dann bring ich dir erst mal das Kämpfen bei. Schritt für Schritt!",

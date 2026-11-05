@@ -30,19 +30,19 @@ function keysAt(n) {
     // 4.2초 고리: 걷기 0.5 → 콤보 셋(박자 0.42) → 걷기 → 강타 쥐기 0.9 → 걷기 → 굴파기 0.7
     const c = Math.floor(t / 4.2), u = t % 4.2, d = dirs[c % 4];
     if (u < 0.5) s.add(d);
-    else if (u < 1.8) { const v = (u - 0.5) % 0.42; if (v < 0.07) s.add('z'); }
+    else if (u < 1.8) { const v = (u - 0.5) % 0.42; if (v < 0.07) s.add('j'); }
     else if (u < 2.2) s.add(dirs[(c + 1) % 4]);
-    else if (u < 2.3) s.add('z');
+    else if (u < 2.3) s.add('j');
     else if (u < 2.4) {}
-    else if (u < 3.3) s.add('z');
+    else if (u < 3.3) s.add('j');
     else if (u < 3.5) s.add(dirs[(c + 2) % 4]);
-    else if (u < 4.1) { s.add('x'); s.add(dirs[(c + 3) % 4]); }
+    else if (u < 4.1) { s.add('k'); s.add(dirs[(c + 3) % 4]); }
   } else if (plan === 'run') {
     // 쥐고 달리기 → 떼서 멀리뛰기 → 공격 몇 번
     const c = Math.floor(t / 3.0), u = t % 3.0, d = dirs[c % 4];
-    if (u < 1.1) { s.add('x'); s.add(d); }
+    if (u < 1.1) { s.add('k'); s.add(d); }
     else if (u < 1.3) s.add(d);
-    else if (u < 2.8) { const v = (u - 1.3) % 0.42; if (v < 0.07) s.add('z'); }
+    else if (u < 2.8) { const v = (u - 1.3) % 0.42; if (v < 0.07) s.add('j'); }
   } else if (plan === 'auto') {
     // 손은 놓고 자동 조종(`--features clip`의 autopilot, 0228)이 친다.
     // SKIP=<초>면 그동안 0.4초마다 Enter(보스 만남 말풍선 넘기기) — 그 칸은 잘라 낸다.

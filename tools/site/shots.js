@@ -37,7 +37,7 @@ async function dev(browser, idx, wait = 1500, prof = base, locale = 'ko-KR') {
 }
 
 // 공격을 세 번씩 누르며 여러 장 찍는다(예고·타격이 보이는 칸을 고른다).
-async function swings(s, name, n = 8, k = 'z') {
+async function swings(s, name, n = 8, k = 'j') {
   for (let i = 0; i < n; i++) {
     await s.key(k, 90); await s.key(k, 90); await s.key(k, 40);
     await s.shot(`${name}_${i}`); await s.page.waitForTimeout(250);
@@ -58,7 +58,7 @@ async function swings(s, name, n = 8, k = 'z') {
   for (const [loc, name] of [['ko-KR', 'route'], ['en-US', 'route_en']]) {
     const s = await dev(browser, 1, 1500, base, loc);
     for (let i = 0; i < 4; i++) await s.key('Enter', 400);
-    await s.hold('ArrowRight', 150); await s.hold('ArrowDown', 900); await s.key('z', 1500);
+    await s.hold('ArrowRight', 150); await s.hold('ArrowDown', 900); await s.key('j', 1500);
     await s.shot(name); await s.ctx.close();
   }
   // 지대 넷: 잠깐 걸어 적이 다가오게 한 뒤. 꽃 핀 입구는 환경 시나리오, 뿌리·흰 실은 실타래 굴(덤불·그물), 심층은 새 졸개 다섯.

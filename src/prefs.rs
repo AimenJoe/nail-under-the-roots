@@ -4,7 +4,7 @@
 //!
 //! 칸: 0 표식(MAGIC), 1 소리+1, 2 흔들림+1, 3 언어(0 = 기기 언어), 4..11 키 번호+1, 11..18 패드 번호+1,
 //! 18 음악+1(0081), 19 입자 효과+1(0141), 20 공격 예고 진하기+1(0198), 21 전체 화면+1(데스크톱, 0240),
-//! 22 번쩍임+1·23 패드 진동+1(0269), 24 키 배치 판(0279: 0 = 옛 J·K·L·I 기본값 시절, 1 = 방향키 손 기본값 뒤). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
+//! 22 번쩍임+1·23 패드 진동+1(0269). 뒤에 붙인 칸이라 옛 저장은 0 = 기본값으로 읽는다 → MAGIC은 그대로.
 //! 0은 "없음"(플러그인이 없거나 저장 전). 표식이 다르면 통째로 무시한다(형식이 바뀌면 MAGIC을 올린다).
 
 use crate::i18n::Lang;
@@ -12,10 +12,7 @@ use crate::input::Bindings;
 
 const MAGIC: u32 = 0x4E41_0001;
 /// 저장 칸 수.
-const CELLS: usize = 25;
-/// 0279 전의 키보드 기본값(J K L I / Q E / M). 판 칸이 0이고 키가 이것 그대로면 손대지 않은 것으로 보고 새 기본값으로.
-const OLD_DEFAULT_KEYS: [u8; 7] = [0, 1, 2, 3, 4, 5, 6];
-const KEY_LAYOUT: u32 = 1;
+const CELLS: usize = 24;
 /// 공격 예고 진하기 기본값(1..=10, 0198).
 pub const TELLS_DEFAULT: u8 = 5;
 /// 패드 진동 기본값(0..=10, 0269).
@@ -90,7 +87,6 @@ fn encode(p: &Prefs) -> [u32; CELLS] {
     v[21] = p.fullscreen as u32 + 1;
     v[22] = p.flash as u32 + 1;
     v[23] = p.rumble as u32 + 1;
-    v[24] = KEY_LAYOUT;
     for i in 0..7 {
         v[4 + i] = p.bindings.keys[i] as u32 + 1;
         v[11 + i] = p.bindings.pads[i] as u32 + 1;
@@ -106,10 +102,6 @@ fn decode(v: &[u32; CELLS]) -> Option<Prefs> {
     for i in 0..7 {
         b.keys[i] = v[4 + i].saturating_sub(1) as u8;
         b.pads[i] = v[11 + i].saturating_sub(1) as u8;
-    }
-    // 0279 전 저장에서 키를 한 번도 바꾸지 않았으면(옛 기본값 그대로) 새 기본값(방향키 손)으로.
-    if v[24] == 0 && b.keys == OLD_DEFAULT_KEYS {
-        b.keys = Bindings::DEFAULT.keys;
     }
     Some(Prefs {
         volume: (v[1].saturating_sub(1) as u8).min(10),
@@ -287,13 +279,10 @@ mod tests {
         v[18] = 4; // 음악 3
         v[19] = 11; // 입자 10
         for i in 0..7 {
+            v[4 + i] = Bindings::DEFAULT.keys[i] as u32 + 1;
             v[11 + i] = Bindings::DEFAULT.pads[i] as u32 + 1;
         }
-        // v0.3 시절 기본 키(J K L I Q E M)에서 공격만 표의 7번(Space)으로 바꿔 둔 저장 — 바꾼 적이 있으니 그대로 읽는다.
-        for i in 0..7 {
-            v[4 + i] = OLD_DEFAULT_KEYS[i] as u32 + 1;
-        }
-        v[4] = 8;
+        v[4] = 8; // 공격 키를 표의 7번(Space)으로 바꿔 둔 저장(기본 키와 겹치면 sanitized가 되돌린다)
         let p = decode(&v).unwrap();
         assert_eq!(p.volume, 7);
         assert_eq!(p.shake, 0);
@@ -301,16 +290,7 @@ mod tests {
         assert_eq!(p.music, 3);
         assert_eq!(p.effects, 10);
         assert_eq!(p.bindings.keys[0], 7);
-        assert_eq!(p.bindings.keys[1..], OLD_DEFAULT_KEYS[1..]);
-        // 키를 바꾸지 않은 옛 저장(옛 기본값 그대로, 판 칸 0)은 새 기본값(0279), 판 칸이 있으면 그대로.
-        let mut untouched = v;
-        untouched[4] = OLD_DEFAULT_KEYS[0] as u32 + 1;
-        assert_eq!(
-            decode(&untouched).unwrap().bindings.keys,
-            Bindings::DEFAULT.keys
-        );
-        untouched[24] = KEY_LAYOUT;
-        assert_eq!(decode(&untouched).unwrap().bindings.keys, OLD_DEFAULT_KEYS);
+        assert_eq!(p.bindings.keys[1..], Bindings::DEFAULT.keys[1..]);
         assert_eq!(p.bindings.pads, Bindings::DEFAULT.pads);
         // 예고 칸(20, 0198)은 v0.3에 없었다: 기본값으로 읽고, 다시 쓰면 그 칸만 채워진다.
         assert_eq!(p.tells, TELLS_DEFAULT);

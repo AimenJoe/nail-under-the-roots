@@ -109,7 +109,7 @@ impl Tutorial {
         };
         let body = match arg {
             Some(a) => fill(crate::i18n::tr(text), &[&crate::ui::key(input::prompt(a))]),
-            // 걷기: 키보드 방향키(0279), 패드 스틱, 터치 왼쪽 끌기.
+            // 걷기: 키보드 WASD, 패드 스틱, 터치 왼쪽 끌기.
             None if self.stage == Stage::Move => fill(
                 crate::i18n::tr(text),
                 &[&crate::ui::key(input::verb(input::Verb::Walk))],

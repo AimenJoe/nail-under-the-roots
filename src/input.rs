@@ -5,9 +5,9 @@
 //!
 //! 게임 동작은 바꿀 수 있다(`Bindings`, 설정 → 조작, docs/decisions/0022). 기본: 오른쪽 네 버튼 = 자주 쓰는 넷
 //! (X 공격 · A 굴파기 · B 필살기 · Y 아이템), 덜 쓰는 것은 어깨·가운데(LB/RB 아이템 넘기기, Select 지도, Start 메뉴).
-//! 키보드는 방향키로 걷는다는 전제(0279): 오른손 방향키, 동작은 전부 왼손 — Z 공격 · X 굴파기 · C 필살기 · V 아이템,
-//! Q/E 아이템 넘기기, Tab 지도. 메뉴 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키("Z 확인 · X 취소").
-//! 이동(방향키, WASD도 받는다)·Enter·Esc는 고정.
+//! 키보드는 WASD로 걷고 동작은 오른손 — 같은 모양의 다이아몬드 J(공격)·K(굴파기)·L(필살기)·I(아이템), Q/E, M 지도
+//! (쿼터뷰 액션의 관례, Moonlighter와 거의 같다, 0280). 메뉴 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키.
+//! 이동(WASD·방향키)·Enter·Esc는 고정.
 //! 화면의 버튼 안내는 `prompt()`로 지금 배치를 읽는다(패드가 있으면 패드 이름, 없으면 키).
 //!
 //! 고정 타임스텝과의 관계: 렌더 프레임마다 `poll()`로 상태를 읽고, "눌림(edge)"은 래치에 모아 둔다.
@@ -194,9 +194,9 @@ pub struct Bindings {
 }
 
 impl Bindings {
-    /// Z X C V / Q E / Tab(방향키 손, 0279),  X A B Y / LB RB / Select.
+    /// J K L I / Q E / M,  X A B Y / LB RB / Select.
     pub const DEFAULT: Bindings = Bindings {
-        keys: [22, 20, 9, 19, 4, 5, 38],
+        keys: [0, 1, 2, 3, 4, 5, 6],
         pads: [2, 0, 1, 3, 4, 5, 8],
     };
 
@@ -345,7 +345,7 @@ pub fn verb(v: Verb) -> &'static str {
         Device::Keys => match v {
             Verb::Confirm | Verb::Restart => "Enter",
             Verb::Back | Verb::Menu | Verb::Skip => "Esc",
-            Verb::Walk => "←↑↓→",
+            Verb::Walk => "WASD",
             Verb::Pick => "↑↓",
             Verb::Change => "←→",
             Verb::Tabs => "Q/E",
@@ -1129,7 +1129,7 @@ fn read_keyboard() -> Actions {
         item_prev: k(Act::ItemPrev),
         item_next: k(Act::ItemNext),
         map: k(Act::Map),
-        // 메뉴(0279): 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키 — 기본 Z·X라 관례 "Z 확인 · X 취소".
+        // 메뉴(0280): 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키 — 기본 J·K, 오른손을 옮기지 않는다.
         // 탭은 Q·E 고정.
         confirm: is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) || k(Act::Attack),
         cancel: is_key_pressed(KeyCode::Escape)
@@ -1342,10 +1342,10 @@ mod tests {
     #[test]
     fn rebinding_swaps_and_rejects_reserved() {
         let mut b = Bindings::DEFAULT;
-        assert_eq!(b.key(Act::Attack), KeyCode::Z);
-        assert!(b.bind_key(Act::Attack, KeyCode::X));
-        assert_eq!(b.key(Act::Attack), KeyCode::X);
-        assert_eq!(b.key(Act::Dodge), KeyCode::Z, "서로 바뀜");
+        assert_eq!(b.key(Act::Attack), KeyCode::J);
+        assert!(b.bind_key(Act::Attack, KeyCode::K));
+        assert_eq!(b.key(Act::Attack), KeyCode::K);
+        assert_eq!(b.key(Act::Dodge), KeyCode::J, "서로 바뀜");
         assert!(!b.bind_key(Act::Attack, KeyCode::W), "이동 키는 안 된다");
         assert!(!b.bind_pad(Act::Attack, Pad::Start));
         assert!(b.bind_pad(Act::UseItem, Pad::West));
@@ -1449,8 +1449,7 @@ mod tests {
         ];
         set_device(Device::Keys);
         assert_eq!(verb(Verb::Confirm), "Enter");
-        assert_eq!(verb(Verb::Walk), "←↑↓→");
-        assert_eq!(prompt(Act::Attack), "Z");
+        assert_eq!(verb(Verb::Walk), "WASD");
         set_device(Device::Pad);
         assert_eq!(verb(Verb::Confirm), Pad::South.label());
         assert_eq!(verb(Verb::Tabs), "LB/RB");
