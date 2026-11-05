@@ -13,7 +13,7 @@
 | 웹 연기 시험 | `main` push(`src/`·`assets/`·`web/`·`Cargo.*`·`tools/test/`), 또는 수동 | `smoke-web.yml` | 헤드리스 Chromium으로 타이틀·개발 시나리오 아홉 개(콘솔 에러·패닉·멈춘 화면), 스크린숏 아티팩트 `smoke-shots` |
 | iOS(서명 없음) | `main`·`release/**` push | `build-ios.yml` | 아티팩트 `nail-ios-unsigned-release`/`-dev`(.ipa, 개발판은 번들 아이디 `….dev`). 기기 시험은 Sideloadly·AltStore로 직접 서명 |
 | PC 묶음(0240) | `release/**` push(`src/`·`assets/`·…), 손으로, 그리고 릴리스 때 `release.yml`이 부른다 | `build-desktop.yml` | Windows zip(`Nail.exe`)·macOS zip(`Nail.app`, 겸용·임시 서명)·Linux tar.gz. 개발판은 Actions 아티팩트, 릴리스는 Release에 `nail-<os>-release.*` |
-| 공식 페이지 | `main` push(`site/`) | `pages.yml` | GitHub Pages(https://aimenjoe.github.io/nail-under-the-roots/). 최신 버전·소식은 `site.js`가 Releases API에서 읽고, 못 읽으면 HTML에 적은 값 |
+| 공식 페이지 | `main` push(`site/`) | `pages.yml` | GitHub Pages(https://nail.beardworks.io/). 최신 버전·소식은 `site.js`가 Releases API에서 읽고, 못 읽으면 HTML에 적은 값 |
 
 ## 갈래(0193)
 - `main` = 운영판, 패치만. `release/v1.0` = 개발판이자 작업 갈래(v0.9.0 배포 뒤, 작업을 여기에 바로 커밋·push — 사장 2026-11-02·11-04). `release/v0.6`은 v0.7.0 배포 뒤 지웠다 — 개발판 별칭 `dev`를 두 갈래가 같이 쓰면 마지막 push가 덮는다.

@@ -4,7 +4,7 @@
 - 사장: "깃헙 페이지로 공식 페이지 만들자."
 
 ## 결정
-1. **주소**: https://aimenjoe.github.io/nail-under-the-roots/ (영어 `/en/`). 원본은 이 레포의 `site/`다.
+1. **주소**: https://nail.beardworks.io/ (영어 `/en/`, 2026-11-05부터 — 그 전에는 https://aimenjoe.github.io/nail-under-the-roots/ 였고 GitHub가 새 주소로 넘긴다, 0276 "E1 메모"). 원본은 이 레포의 `site/`다.
    - `pages.yml`이 main의 `site/**`가 바뀔 때 올린다.
    - 쓰는 액션: `configure-pages@v6`·`upload-pages-artifact@v5`·`deploy-pages@v5`. 모두 2주 넘은 판이고 Node 24다(태그 날짜는 각 레포에서 확인).
    - 처음 한 번 사람이 Settings → Pages → Source를 "GitHub Actions"로 둔다. `GITHUB_TOKEN`으로는 켤 수 없다(`configure-pages`의 `enablement`는 다른 토큰이 필요).
