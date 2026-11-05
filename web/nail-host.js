@@ -219,12 +219,15 @@ if (ios) {
     if (/^[a-zA-Z]$/.test(k)) return "Key" + k.toUpperCase();
     if (/^[0-9]$/.test(k)) return "Digit" + k;
     if (JAMO[k]) return "Key" + JAMO[k];
-    if (NAMED[k]) return NAMED[k];
     var c = e.keyCode || e.which || 0;
+    var named = NAMED[k] || KEYCODE[c] || "";
+    // Shift·Ctrl·Alt는 좌우가 다른 키다 — location 2 = 오른쪽(PR #12 리뷰).
+    if (e.location === 2 && /Left$/.test(named)) return named.replace(/Left$/, "Right");
+    if (NAMED[k]) return named;
     if (c >= 65 && c <= 90) return "Key" + String.fromCharCode(c);
     if (c >= 48 && c <= 57) return "Digit" + (c - 48);
     if (c >= 112 && c <= 123) return "F" + (c - 111);
-    return KEYCODE[c] || "";
+    return named;
   }
   // 번들 처리기를 한 번 감싸, 우리가 대신 넘긴 이벤트는 번들이 빈 `code`로 또 처리하지 않게 한다.
   function bundled(type) {

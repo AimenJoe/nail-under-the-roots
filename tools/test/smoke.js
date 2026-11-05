@@ -169,16 +169,16 @@ async function run() {
     // 빈 code: 한글 자모(ㅓ = J), "Unidentified" + key Enter, keyCode만(75 = K). 정상 code(KeyJ)는 번들이 그대로.
     await s.page.evaluate(() => {
       const c = document.getElementById('glcanvas');
-      const send = (key, code, keyCode) => {
-        const e = new KeyboardEvent('keydown', { key, code, bubbles: true });
+      const send = (key, code, keyCode, location) => {
+        const e = new KeyboardEvent('keydown', { key, code, location: location || 0, bubbles: true });
         if (keyCode) Object.defineProperty(e, 'keyCode', { get: () => keyCode });
         c.dispatchEvent(e); c.dispatchEvent(new KeyboardEvent('keyup', { key, code, bubbles: true }));
       };
-      send('ㅓ', ''); send('Enter', 'Unidentified'); send('Unidentified', '', 75); send('j', 'KeyJ');
+      send('ㅓ', ''); send('Enter', 'Unidentified'); send('Unidentified', '', 75); send('j', 'KeyJ'); send('Shift', '', 16, 2);
     });
     await s.page.waitForTimeout(200);
     const empty = await kd();
-    check(JSON.stringify(empty) === '[74,257,75,74]', `keys: 빈 code를 key·keyCode로 채운다(두 번 들어가지 않는다) ${JSON.stringify(empty)}`);
+    check(JSON.stringify(empty) === '[74,257,75,74,344]', `keys: 빈 code를 key·keyCode로 채운다(두 번 들어가지 않는다, 오른쪽 Shift는 오른쪽) ${JSON.stringify(empty)}`);
     await s.ctx.close();
   }
   // iPad(0281, web/nail-host.js): touchstart는 막지 않고(WKWebView에서 실제 키보드가 살아 있게) touchend는 그대로 막는다.
