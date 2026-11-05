@@ -255,6 +255,19 @@ impl Bindings {
         true
     }
 
+    /// 이 키를 `except` 말고 다른 칸(동작·이동)이 쓰고 있나. 고정 메뉴 키(Space 확인·Backspace 뒤로)가 다른 칸에
+    /// 붙어 있으면 그 칸의 뜻만 낸다 — 한 번에 두 동작이 나지 않게(PR #12 리뷰).
+    pub fn uses_except(&self, k: KeyCode, except: Act) -> bool {
+        let Some(n) = KEYS.iter().position(|(kk, _)| *kk == k) else {
+            return false;
+        };
+        let skip = Self::idx(except);
+        self.key_slots()
+            .iter()
+            .enumerate()
+            .any(|(i, x)| i != skip && *x as usize == n)
+    }
+
     /// 키를 동작에 붙인다. 다른 동작·이동이 쓰던 키면 서로 바꾼다. 표에 없는 키(화살표·Esc 등)면 false.
     pub fn bind_key(&mut self, a: Act, k: KeyCode) -> bool {
         self.bind_slot(Self::idx(a), k)
@@ -301,7 +314,6 @@ impl Bindings {
 /// (AZERTY면 W 자리 = "Z"). 배열 글자를 못 얻거나(Linux·Android·iOS, 웹은 Chrome 계열만) 라틴 글자가 아니면(키릴 등 —
 /// 그 키보드에도 라틴 글자가 같이 찍혀 있다) QWERTY 이름.
 static LAYOUT: RwLock<Vec<(KeyCode, &'static str)>> = RwLock::new(Vec::new());
-static TABS: RwLock<&'static str> = RwLock::new("Q/E");
 
 /// QWERTY 이름(자리 그대로).
 fn qwerty_name(k: KeyCode) -> &'static str {
@@ -355,7 +367,30 @@ fn join_walk(names: [&str; MOVE_DIRS]) -> String {
 }
 
 fn tab_keys() -> &'static str {
-    TABS.read().map(|t| *t).unwrap_or("Q/E")
+    // 탭 = 아이템 넘기기 키(기본 Q·E, 지금 배열 이름). 배치·배열이 바뀔 때만 새 글.
+    static LAST: RwLock<Option<([&'static str; 2], &'static str)>> = RwLock::new(None);
+    let b = bindings();
+    let names = [
+        key_name(b.key(Act::ItemPrev)),
+        key_name(b.key(Act::ItemNext)),
+    ];
+    if let Ok(last) = LAST.read() {
+        if let Some((n, s)) = *last {
+            if n == names {
+                return s;
+            }
+        }
+    }
+    let joined = format!("{}/{}", names[0], names[1]);
+    let s: &'static str = if joined == "Q/E" {
+        "Q/E"
+    } else {
+        Box::leak(joined.into_boxed_str())
+    };
+    if let Ok(mut last) = LAST.write() {
+        *last = Some((names, s));
+    }
+    s
 }
 
 /// 배열이 준 글자를 화면 이름으로: 라틴(ASCII·Latin-1·라틴 확장 A — 글꼴에 있는 범위)의 보이는 글자 하나만, 대문자로.
@@ -384,8 +419,8 @@ fn intern(c: char) -> &'static str {
     s
 }
 
-/// 배열이 준 글자(`char_at`)로 이름 표·탭 글을 만든다. 순수 함수라 시험이 가짜 배열로 본다.
-fn names_for(char_at: impl Fn(KeyCode) -> Option<char>) -> (Vec<(KeyCode, &'static str)>, String) {
+/// 배열이 준 글자(`char_at`)로 이름 표를 만든다. 순수 함수라 시험이 가짜 배열로 본다.
+fn names_for(char_at: impl Fn(KeyCode) -> Option<char>) -> Vec<(KeyCode, &'static str)> {
     let mut table: Vec<(KeyCode, &'static str)> = Vec::new();
     for k in KEYS.iter().map(|(k, _)| *k) {
         if let Some(c) = char_at(k).and_then(clean_label) {
@@ -395,33 +430,16 @@ fn names_for(char_at: impl Fn(KeyCode) -> Option<char>) -> (Vec<(KeyCode, &'stat
             }
         }
     }
-    let name = |k: KeyCode| {
-        table
-            .iter()
-            .find(|(kk, _)| *kk == k)
-            .map(|(_, n)| *n)
-            .unwrap_or_else(|| qwerty_name(k))
-    };
-    let tabs = format!("{}/{}", name(KeyCode::Q), name(KeyCode::E));
-    (table, tabs)
+    table
 }
 
 /// 지금 배열의 글자로 이름 표를 다시 만든다. 켤 때와 몇 초마다(배열은 게임 중에도 바뀔 수 있다). 싸다.
 pub fn refresh_key_names() {
-    let (table, tabs) = names_for(layout::char_at);
+    let table = names_for(layout::char_at);
     if let Ok(mut l) = LAYOUT.write() {
-        if *l == table {
-            return;
+        if *l != table {
+            *l = table;
         }
-        *l = table;
-    }
-    // 배열이 바뀔 때만 새 글이 생긴다(몇 바이트, 바뀐 횟수만큼).
-    if let Ok(mut t) = TABS.write() {
-        *t = if tabs == "Q/E" {
-            "Q/E"
-        } else {
-            Box::leak(tabs.into_boxed_str())
-        };
     }
 }
 
@@ -1465,6 +1483,9 @@ fn read_keyboard() -> Actions {
         m.y += 1.0;
     }
     let k = |a: Act| is_key_pressed(b.key(a));
+    // 고정 메뉴 키 Space(확인)·Backspace(뒤로)는 다른 칸에 붙어 있으면 그 칸의 뜻만(공격·회피에 붙은 것은 같은 뜻이라 그대로).
+    let space_confirms = !b.uses_except(KeyCode::Space, Act::Attack);
+    let bksp_cancels = !b.uses_except(KeyCode::Backspace, Act::Dodge);
     Actions {
         move_dir: m.normalize_or_zero(),
         aim: Vec2::ZERO,
@@ -1478,16 +1499,19 @@ fn read_keyboard() -> Actions {
         item_next: k(Act::ItemNext),
         map: k(Act::Map),
         // 메뉴(0280): 확인 = Enter·Space·공격 키, 뒤로 = Esc·Backspace·회피 키 — 기본 J·K, 오른손을 옮기지 않는다.
-        // 탭은 Q·E 고정.
-        confirm: is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) || k(Act::Attack),
+        confirm: is_key_pressed(KeyCode::Enter)
+            || (space_confirms && is_key_pressed(KeyCode::Space))
+            || k(Act::Attack),
         cancel: is_key_pressed(KeyCode::Escape)
-            || is_key_pressed(KeyCode::Backspace)
+            || (bksp_cancels && is_key_pressed(KeyCode::Backspace))
             || k(Act::Dodge),
         menu: is_key_pressed(KeyCode::Escape),
-        back_held: is_key_down(KeyCode::Escape) || is_key_down(KeyCode::Backspace),
+        back_held: is_key_down(KeyCode::Escape)
+            || (bksp_cancels && is_key_down(KeyCode::Backspace)),
         restart: false,
-        tab_prev: is_key_pressed(KeyCode::Q),
-        tab_next: is_key_pressed(KeyCode::E),
+        // 탭은 아이템 넘기기 키(기본 Q·E)를 따른다 — 이동을 ESDF로 붙이면 E가 위와 탭을 같이 내던 것(PR #12 리뷰).
+        tab_prev: k(Act::ItemPrev),
+        tab_next: k(Act::ItemNext),
         toggle_debug: is_key_pressed(KeyCode::F1),
         // 판정 상자는 개발판만(0269 D14): 운영판에서 F2는 아무 일도 하지 않는다.
         toggle_hitboxes: cfg!(feature = "dev") && is_key_pressed(KeyCode::F2),
@@ -1754,8 +1778,7 @@ mod tests {
             KeyCode::J => Some('j'),
             _ => None,
         };
-        let (table, tabs) = names_for(azerty);
-        assert_eq!(tabs, "A/E");
+        let table = names_for(azerty);
         let name = |k| table.iter().find(|(kk, _)| *kk == k).map(|(_, n)| *n);
         assert_eq!((name(KeyCode::W), name(KeyCode::A)), (Some("Z"), Some("Q")));
         assert_eq!(name(KeyCode::M), Some(","));
@@ -1767,7 +1790,7 @@ mod tests {
             KeyCode::A => Some('ф'),
             _ => None,
         };
-        assert!(names_for(russian).0.is_empty());
+        assert!(names_for(russian).is_empty());
         assert_eq!(join_walk(["Z", "Q", "S", "D"]), "ZQSD");
         assert_eq!(join_walk(["Tab", "A", "S", "D"]), "Tab A S D");
     }
