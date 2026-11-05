@@ -181,7 +181,7 @@
 - [ ] (선택) Claude 앱 레포 범위 좁히기(github.com/settings/installations), 2단계 인증 확인
 - [x] 코드·자료(2026-11-04, 실기 전): Epic XP 표·EOS 일괄 파일, `src/epic.rs`(기능 `epic`), PC 묶기 `tools/pc/package.sh`, `build-desktop` 상점 판, `store-deploy.yml`(Steam 베타 갈래·Epic UploadBinary)
 - [ ] 사람: Environment `store`(main 등 + 사장 승인)와 값들(`docs/release.md` "상점 업로드"), 비공개 에셋 레포에 `eos/sdk`·`eos/BuildPatchTool`
-- [ ] **Epic Games Store 동시 출시**(사장 2026-11-04, 0276 E1~E5): 포털 가입(사람) → EOS 업적 연동(`epic` 기능) → XP 1,000 표 → 빌드 올리기 → IARC·검토. Epic이 늦으면 Steam 먼저
+- [ ] **Epic Games Store 동시 출시**(사장 2026-11-04, 0276 E1~E5): 포털 가입·상품(2026-11-05 됨) → 클라이언트·EAS 브랜드 검토(자체 도메인 필요, 0276 "E1 메모") → EOS 업적 연동(`epic` 기능) → XP 1,000 표 → 빌드 올리기 → IARC·검토. Epic이 늦으면 Steam 먼저
 - [x] 한국 등급(사장 2026-11-04): 등급 없이 열고, 적법한 민원·시정 요구가 오면 한국 판매 중지 또는 GCRB 등급(0276)
 - [x] 사장(2026-11-04): 가격 $0.99, 레포 공개, 웹·APK 무료 전판 그대로 — Steam판은 응원값(0276 "사장 답 둘째"). 상점·Steam 소식에는 무료판을 알리지 않는다(Valve 규칙)
 - [x] 키보드 기본값(0280, 사장 2026-11-05 — 0278 보조 키·0279 방향키는 거둠): 쿼터뷰 액션 관례대로 WASD + 오른손 J·K·L·I·Q/E·M 그대로, 메뉴 뒤로에 회피 키(K) — 확인 J·뒤로 K. 웹은 포커스가 캔버스 밖이거나 `code`가 빈 키도 게임에 닿게(0278, `web/nail-host.js`)

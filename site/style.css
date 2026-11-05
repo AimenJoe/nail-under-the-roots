@@ -4,7 +4,7 @@
    움직임(반딧불·걷는 스프라이트)은 prefers-reduced-motion이면 멈춘다. */
 @font-face {
   font-family: "Galmuri11";
-  src: url("fonts/galmuri11-sub.woff2?v=df40937b") format("woff2");
+  src: url("fonts/galmuri11-sub.woff2?v=70a9f758") format("woff2");
   font-display: swap;
 }
 :root {
@@ -278,3 +278,14 @@ footer a { color: var(--muted); }
   .parade .walker { animation: none; left: 12%; }
   .parade .w2 { left: calc(12% + 56px); }
 }
+
+/* 개인정보처리방침 같은 글 페이지(privacy.html) */
+.legal { padding-block: 2.6rem 3.4rem; }
+.legal .wrap { max-width: 46rem; }
+.legal h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); line-height: 1.3; margin: .3rem 0 .4rem; }
+.legal h2 { font-size: 1.3rem; margin: 2.1rem 0 .5rem; }
+.legal h3 { font-size: 1.05rem; margin: 1.3rem 0 .3rem; color: var(--glow); }
+.legal .meta { color: var(--muted); font-size: .92rem; margin: 0; }
+.legal ul { padding-left: 1.2rem; }
+.legal li + li { margin-top: .35rem; }
+.legal a { color: var(--glow); }
