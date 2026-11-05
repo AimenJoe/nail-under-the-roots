@@ -35,7 +35,7 @@
    - **페이지 기능 글 대조**: 이번 판(과 지난 판들)에서 바뀐 규칙·수·설정이 페이지 글(조작·지대·이웃·마을·기능·접근성·FAQ·"다음" 칸)과 맞는지 두 언어로 본다 — 소식 한 줄만 고치면 글이 낡는다(v0.7.1에서 찾은 낡은 글 여덟: 발톱 수·재화·포포의 응원·흔들림 설정·PC 기록·"다음" 칸 등). 엔딩 뒤 이야기는 쓰지 않는다(스포일러).
    - `python3 tools/site/make_images.py` — 페이지 글꼴 서브셋(새 글자) 다시 만들기. `site/style.css`의 글꼴 해시가 같이 바뀐다.
 4. 전체 검사(`CONTRIBUTING.md`의 목록 전부). `Cargo.lock`이 버전 때문에 바뀐다 — 함께 커밋.
-5. 커밋 메시지 `v0.x.y: <한 줄>`. 작업 브랜치에 push → **`release/vX → main` PR을 만들고 사장이 Merge**(2026-11-04부터 — main은 규칙 `main-only`로 사장만 쓴다, 아래 "파이프라인 지키기"). Merge 뒤 운영 배포 잡이 `web-production` 승인을 기다리면 사장이 Approve.
+5. 커밋 메시지 `v0.x.y: <한 줄>`. 작업 브랜치에 push → **`release/vX`(또는 패치 갈래 `fix/…`) → main PR을 만들고 사장이 Merge**(2026-11-04부터 — main은 규칙 `main-only`로 PR로만·CI 초록일 때만, 승인 0명, 아래 "파이프라인 지키기"). Claude는 Merge하지 않는다. Merge 뒤 운영 배포 잡이 `web-production` 승인을 기다리면 사장이 Approve.
 6. 확인(5~10분 뒤): Actions에서 main의 `deploy-web`·`release`·`build-android`·`pages`·`build-ios`가 모두 success, Release `v0.x.y`에 `nail.apk`(약 18 MB)가 붙었는지, 웹 타이틀 오른쪽 아래 버전 글자. Claude 세션이면 `send_later`로 확인 예약을 걸고, 확인 뒤 지운다.
 7. 사장에게 보고: 무엇이 들어갔는지, 볼 것(결정 기록의 "사람이 볼 것").
 
@@ -68,13 +68,17 @@
 - 운영판 확인(0277): smoke-web이 운영판 빌드도 띄워 본다(시나리오 없이 PWA·모바일·타이틀). 운영 배포도 개발판처럼 운영 주소의 `build.txt`가 이 커밋인지 본다(`tools/web/check_live.sh`).
 
 사람이 할 것(Settings, 한 번):
-1. **Rules → Rulesets** 둘(2026-11-04 설정함): `main-only`(대상 `main`, Restrict updates·deletions·Block force pushes, 우회 = Repository admin만) — 운영 반영은 PR을 사장이 Merge. `release-branches`(대상 `release/**`, 같은 규칙 + Restrict creations, 우회 = Repository admin + Claude GitHub App) — 개발판은 Claude가 바로 push. "Require a pull request"는 켜지 않는다.
-   - 알아 둘 것(2026-11-04 확인한 만큼): GitHub API는 이 Claude 세션을 `main-only`도 우회할 수 있는 사용자로 답했다(사장 권한으로 붙는 듯). 한편 `release/v1.0` push는 한 번 "Cannot update this protected ref"가 나온 뒤 들어갔다(앱 자격으로 다시 간 듯). 그래서 사장의 Claude가 main에 직접 쓸 수 있는지는 **확인 못 함**(운영이 배포될 수 있어 일부러 시험하지 않았다). `main-only`는 남(다른 사람·그 사람의 Claude)을 확실히 막고, 사장의 Claude는 문서 규칙("main은 PR로")과 운영 배포 승인(2)으로 막는다.
-2. **Environments → New environment** `web-production`: Deployment branches = Selected → `main`. (원하면 Required reviewers = 사장 — 운영 배포마다 승인 버튼.) `web-dev`: Selected → `release/**`. 둘 다에 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`를 넣고, **레포 Secrets의 같은 두 개는 지운다**(지우기 전까지는 레포 시크릿도 읽힌다 — 순서: 환경에 넣기 → 한 번 배포 확인 → 레포 것 지우기).
+1. **Rules → Rulesets** 둘(https://github.com/AimenJoe/nail-under-the-roots/settings/rules):
+   - `main-only`(대상 `main`, 2026-11-05 바꿈): **Require a pull request before merging**(Required approvals = **0**) + **Require status checks to pass**(`build`, 아래 6) + Restrict deletions + Block force pushes. **Restrict updates는 끈다.** 우회 = Repository admin만.
+     - 왜(2026-11-05, v0.9.1 PR #12): Restrict updates는 우회 목록 밖의 **모든** main 변경을 막아 PR Merge도 "병합할 수 없음"이 되고, 사장이 매번 "요구사항을 충족하지 않고 병합하기"(우회)를 골라야 했다. 승인 1명 이상은 쓸 수 없다 — **GitHub은 PR 작성자가 자기 PR을 승인하지 못하게** 하고, 이 세션의 GitHub 도구는 사장 계정으로 PR을 연다(작성자 = 사장). 그래서 "PR로만, CI가 초록일 때만, 승인은 0명".
+     - 이렇게 해도 막히는 것: main에 직접 push(PR 없이), 빨간 CI의 Merge, 갈래 지우기·force push. Merge할 수 있는 사람 = Write 이상 = 지금 사장 한 명(4). 포크 PR은 열 수만 있고 Merge는 못 한다.
+   - `release-branches`(대상 `release/**`): Restrict updates·deletions·creations·Block force pushes, 우회 = Repository admin + Claude GitHub App — 개발판은 Claude가 바로 push.
+   - 알아 둘 것(2026-11-04 확인한 만큼): GitHub API는 이 Claude 세션을 `main-only`도 우회할 수 있는 사용자로 답했다(사장 권한으로 붙는 듯). 한편 `release/v1.0` push는 한 번 "Cannot update this protected ref"가 나온 뒤 들어갔다(앱 자격으로 다시 간 듯). 그래서 사장의 Claude가 main에 직접 쓸 수 있는지는 **확인 못 함**(운영이 배포될 수 있어 일부러 시험하지 않았다). 사장 계정으로 PR을 여는 만큼 그 자격으로 Merge도 될 수 있다고 본다(시험하지 않음). `main-only`는 남(다른 사람·그 사람의 Claude)을 확실히 막고, 사장의 Claude는 문서 규칙("main은 PR로, Merge는 사장" — CLAUDE.md)과 **운영 배포 승인(2, Required reviewers = 사장)**으로 막는다.
+2. **Environments → New environment**(https://github.com/AimenJoe/nail-under-the-roots/settings/environments) `web-production`: Deployment branches = Selected → `main`. **Required reviewers = 사장**(운영 배포마다 승인 버튼 — main에 무엇이 들어가도 사장이 누르기 전엔 운영에 안 나간다, 켜 두기를 권한다). `web-dev`: Selected → `release/**`. 둘 다에 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`를 넣고, **레포 Secrets의 같은 두 개는 지운다**(지우기 전까지는 레포 시크릿도 읽힌다 — 순서: 환경에 넣기 → 한 번 배포 확인 → 레포 것 지우기).
 3. **Actions → General**: Fork pull request workflows = "Require approval for all external contributors", Workflow permissions = **Read repository contents**(쓰기가 필요한 잡은 워크플로에 따로 적혀 있다), "Allow GitHub Actions to create and approve pull requests" 끔.
 4. **Collaborators**: 다른 사람에게 Write·Admin을 주지 않는다. 기여는 포크 PR로(시크릿에 닿지 않는다).
 5. 계정 2단계 인증.
-6. **main에 빨간 CI가 못 들어가게**(0277, 2026-11-04 설정함 — API로 `required_status_checks: build`(GitHub Actions 앱) 확인): Rules → Rulesets → `main-only` → "Require status checks to pass" 켜기 → 검사 이름 `build`(deploy-web의 빌드·시험 잡, PR에서 돈다)를 더한다. 사장은 우회 목록이라 꼭 필요하면 Merge 화면에서 우회를 골라 넣을 수 있다.
+6. **main에 빨간 CI가 못 들어가게**(0277, 2026-11-04 설정함 — API로 `required_status_checks: build`(GitHub Actions 앱) 확인): Rules → Rulesets → `main-only` → "Require status checks to pass" 켜기 → 검사 이름 `build`(deploy-web의 빌드·시험 잡, PR에서 돈다)를 더한다. PR 화면의 검사 원이 반만 차 보이는 것은 `publish`(배포 잡)가 PR에서는 건너뛰어서다 — 정상. 사장은 우회 목록이라 꼭 필요하면 Merge 화면에서 우회를 골라 넣을 수 있다.
 7. **Settings → Advanced Security(또는 Code security)**: Dependabot alerts 켜기(2026-11-04 사장이 켬) — cargo 의존성의 알려진 취약점 알림(올리기 PR은 받지 않는다, 위).
 
 남은 틈(알고 둔다): `ASSETS_TOKEN`(비공개 에셋 레포 읽기 전용)·`ANDROID_DEBUG_KEYSTORE_B64`는 아직 레포 시크릿이다 — Write 권한자가 없으면 읽을 사람이 없다(1·4). 협업자를 들이게 되면 이 둘도 Environment로 옮긴다(빌드 워크플로마다 `environment:` 한 줄).
