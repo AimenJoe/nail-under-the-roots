@@ -98,7 +98,7 @@ Environment `store` 만들기(사람): Settings → Environments → New `store`
 | Variable | `STEAM_APP_ID`·`STEAM_DEPOT_WINDOWS`·`STEAM_DEPOT_MACOS`·`STEAM_DEPOT_LINUX` | 파트너 사이트의 앱 번호·데포 번호 |
 | Secret | `NAIL_EOS_PRODUCT_ID`·`NAIL_EOS_SANDBOX_ID`·`NAIL_EOS_DEPLOYMENT_ID`·`NAIL_EOS_CLIENT_ID`·`NAIL_EOS_CLIENT_SECRET` | 게임 안 EOS 연결(업적)에 박는 아이디 — Epic 포털의 제품 설정(Live 샌드박스·배포, GameClient 정책의 클라이언트) |
 | Secret | `EPIC_BPT_CLIENT_ID`·`EPIC_BPT_CLIENT_SECRET` | BuildPatchTool 업로드용 자격(포털에서 발급) |
-| Variable | `EPIC_ORG_ID`·`EPIC_PRODUCT_ID`·`EPIC_ARTIFACT_WINDOWS`·`EPIC_ARTIFACT_MACOS` | 조직·제품·아티팩트 아이디 |
+| Variable | `EPIC_ORG_ID`·`EPIC_PRODUCT_ID`·`EPIC_ARTIFACT_WINDOWS`·`EPIC_ARTIFACT_MACOS` | 조직·제품·아티팩트 아이디. 아티팩트는 오퍼(기본 게임)마다 하나가 자동으로 생기고 플랫폼은 올린 바이너리마다 고른다(Manage Platforms) — **두 칸에 같은 아이디**. `BuildVersion`은 아티팩트 안에서 플랫폼까지 겹치면 안 돼서 끝에 `-windows`·`-macos`를 붙인다(Epic Manage Artifacts·BPT 원문, 2026-11-06) |
 
 비공개 에셋 레포(`ASSETS_REPO`)에 넣을 것(포털에서 받는 파일이라 공개 레포에 두지 않는다): `eos/sdk/`(EOS SDK의 `Include`·`Lib`·`Bin` — 빌드가 `EOSSDK-Win64-Shipping.lib`로 링크하고 `.dll`을 실행 파일 옆에 둔다), `eos/BuildPatchTool/`(압축을 푼 그대로, Linux 실행 파일을 쓴다). 묶음은 이 `eos/` 폴더를 빼고 assets를 싣는다(`tools/pc/package.sh`). Steam 재배포 파일은 크레이트가 빌드 때 내놓은 것을 실행 파일 옆에 둔다.
 
