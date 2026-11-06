@@ -8,7 +8,10 @@
 set -euo pipefail
 what=${1:?sdk|bpt}; out=${2:?작업 폴더}
 mkdir -p "$out/zip" "$out/x"
-gh release download eos -R "$ASSETS_REPO" -p '*.zip' -D "$out/zip" --clobber >&2
+# 쓸 것만 먼저 이름으로(SDK zip 600MB 가까이 — BPT만 쓰는 업로드 잡이 같이 받지 않게), 이름이 안 맞으면 전부.
+case $what in sdk) pat='*SDK*.zip' ;; *) pat='*BuildPatchTool*.zip' ;; esac
+gh release download eos -R "$ASSETS_REPO" -p "$pat" -D "$out/zip" --clobber >&2 \
+  || gh release download eos -R "$ASSETS_REPO" -p '*.zip' -D "$out/zip" --clobber >&2
 for z in "$out"/zip/*.zip; do
   d="$out/x/$(basename "$z" .zip)"
   # 풀다 몇 파일이 실패해도(Windows에서 macOS 심볼릭 링크 등) 계속 — 필요한 파일이 있는지는 아래에서 본다.
