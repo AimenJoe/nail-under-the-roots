@@ -9,7 +9,8 @@
 //!
 //! 개발 중에는 EOS Developer Authentication Tool로: 환경 변수 `NAIL_EOS_DEV=<host:port>/<자격 이름>`이면 Developer 로그인.
 //! EOS 아이디는 빌드 때 환경 변수(`NAIL_EOS_PRODUCT_ID`·`_SANDBOX_ID`·`_DEPLOYMENT_ID`·`_CLIENT_ID`·`_CLIENT_SECRET`)로 넣는다 —
-//! 공개 레포에 적지 않는다(Epic 업로드 CI가 Environment `store`에서 넣는다).
+//! 공개 레포에 적지 않는다(Epic 업로드 CI가 Environment `store`에서 넣는다). 박은 샌드박스·배포는 Live 것이고, 런처가
+//! `-epicdeploymentid=`(+ `-epicsandboxid=`)를 넘기면 그쪽을 쓴다 — Dev·Stage 시험(2026-11-06).
 //! 업적 표는 `achievements.rs` — Steam과 같은 API 이름이 EOS 업적 아이디다.
 
 use crate::profile::Profile;
@@ -110,18 +111,43 @@ mod imp {
             .and_then(|s| CString::new(s).ok())
     }
 
-    /// 런처가 넘기는 인자에서 값 하나(`-AUTH_PASSWORD=…` 꼴).
+    /// 런처가 넘기는 인자에서 값 하나(`-AUTH_PASSWORD=…` 꼴). 이름은 대소문자를 가리지 않는다.
     fn arg(key: &str) -> Option<String> {
-        let pre = format!("-{key}=");
-        std::env::args().find_map(|a| a.strip_prefix(&pre).map(str::to_string))
+        let pre = format!("-{key}=").to_ascii_lowercase();
+        std::env::args().find_map(|a| {
+            let head = a.get(..pre.len())?;
+            head.eq_ignore_ascii_case(&pre)
+                .then(|| a[pre.len()..].to_string())
+        })
+    }
+
+    /// 샌드박스·배포: 런처가 `-epicsandboxid=`·`-epicdeploymentid=`를 넘기면(아티팩트에 배포를 정해 두면 넘긴다)
+    /// 그것을 — 그래야 같은 빌드가 Dev·Stage에서 시험되고 Live에서도 돈다. 배포가 안 오면 둘 다 빌드에 박은 값
+    /// (샌드박스만 바꾸면 배포와 짝이 어긋나 `EOS_Platform_Create`가 실패한다).
+    fn sandbox_and_deployment(
+        baked: (Option<CString>, Option<CString>),
+    ) -> (Option<CString>, Option<CString>) {
+        match arg("epicdeploymentid").and_then(|d| CString::new(d).ok()) {
+            Some(d) => (
+                arg("epicsandboxid")
+                    .and_then(|s| CString::new(s).ok())
+                    .or(baked.0),
+                Some(d),
+            ),
+            None => baked,
+        }
     }
 
     impl Eos {
         pub fn start() -> Option<Self> {
-            let (Some(product), Some(sandbox), Some(deployment), Some(client), Some(secret)) = (
-                id(option_env!("NAIL_EOS_PRODUCT_ID")),
+            let (sandbox, deployment) = sandbox_and_deployment((
                 id(option_env!("NAIL_EOS_SANDBOX_ID")),
                 id(option_env!("NAIL_EOS_DEPLOYMENT_ID")),
+            ));
+            let (Some(product), Some(sandbox), Some(deployment), Some(client), Some(secret)) = (
+                id(option_env!("NAIL_EOS_PRODUCT_ID")),
+                sandbox,
+                deployment,
                 id(option_env!("NAIL_EOS_CLIENT_ID")),
                 id(option_env!("NAIL_EOS_CLIENT_SECRET")),
             ) else {
