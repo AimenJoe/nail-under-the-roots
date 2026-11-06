@@ -12,7 +12,10 @@ Epic 템플릿 규칙: 기본 언어(en) 칸은 올려도 무시된다 — 영�
 import csv
 import sys
 
-# Epic CSV 열 이름 → 글. es와 es-ES에는 같은 스페인어(스페인)를 넣는다. pt(포르투갈)는 비워 둔다(영어로 보인다 — 게임은 pt-BR).
+# Epic CSV 열 이름 → 글. es와 es-ES에는 같은 스페인어(스페인)를 넣는다.
+# Epic 업로드는 영어 칸에 값이 있는 줄의 모든 언어 칸이 차 있어야 받는다(빈칸 = "Required information", 2026-11-06 업로드 오류 보고서).
+# 그래서 우리가 번역하지 않은 칸(지원하지 않는 언어·게임 이름·개발사·법적 푸터·사양)은 영어 원문을, pt(포르투갈)는 pt-BR 글을 넣는다 —
+# 비워 두면 어차피 영어로 보이는 칸이라 화면은 같다.
 T = {}
 
 T["ko"] = dict(
@@ -281,6 +284,10 @@ def fill(src: str, dst: str) -> int:
     with open(src, encoding="utf-8-sig", newline="") as f:
         rows = list(csv.reader(f))
     head = rows[0]
+    if "Field Errors" in head:  # 오류 보고서를 다시 넣었으면 그 열을 뺀다(원래 템플릿 꼴로)
+        k = head.index("Field Errors")
+        rows = [r[:k] + r[k + 1:] if len(r) > k else r for r in rows]
+        head = rows[0]
     col = {name: i for i, name in enumerate(head)}
     missing = [lang for lang in T if lang not in col]
     assert not missing, f"템플릿에 없는 언어 열: {missing}"
@@ -289,10 +296,19 @@ def fill(src: str, dst: str) -> int:
         if len(r) < len(head):
             continue
         kind = FIELDS.get((r[0], r[4]))
-        if not kind:
+        if kind:
+            for lang, txt in T.items():
+                r[col[lang]] = txt[kind]
+                n += 1
+        en = r[col["en"]]
+        if not en:
             continue
-        for lang, txt in T.items():
-            r[col[lang]] = txt[kind]
+        # 포털 영어 칸의 알려진 흠(2026-11-06)은 옮겨 적을 때 고친다 — 영어 칸 자체는 포털에서 고친다
+        en = en.replace(" Description is not set", "").replace("Naïl:Under", "Naïl: Under").strip()
+        for name, i in col.items():
+            if i <= col["en"] or name == "Field Errors" or r[i]:
+                continue
+            r[i] = r[col["pt-BR"]] if name == "pt" and r[col["pt-BR"]] else en
             n += 1
     with open(dst, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f, quoting=csv.QUOTE_ALL, lineterminator="\n")
