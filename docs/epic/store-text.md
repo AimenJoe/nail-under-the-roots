@@ -44,7 +44,7 @@ About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 
 
 법적 정보 푸터:
 
-    © 2026 Beardworks (털보네공업사). All rights reserved. Naïl: Under the Roots is a trademark of Beardworks.
+    © 2026 Beardworks (털보네공업사). All rights reserved.
     Environment art: Sunnyside World by danieldiggle. Music and sound effects: CC0 works by Cleyton Kauffman, fluffclipse, Kistol, Aureolus_Omicron, Yoiyami, KarateStudios, Juhani Junkala, mutantleg, Umplix, RandomMind, Écrivain, cynicmusic, beardalaxy, Trex0n, Kenney, artisticdude, Bobjt, themightyglider, qubodup, syncopika, cinameng and JaggedStone. Fonts: Galmuri, Ark Pixel and Cubic 11 (SIL Open Font License 1.1).
     Character sprites, portraits and illustrations were made from originals generated with a Google Gemini image model, then converted to pixel art and touched up by hand.
     Full third-party licenses are listed in the game under Settings → Licenses.
