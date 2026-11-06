@@ -241,7 +241,10 @@ mod tests {
             (Lang::ZhHant, "zh-Hant"),
             (Lang::PtBr, "pt-BR"),
             (Lang::Fr, "fr"),
-            (Lang::Es, "es"),
+            // 포털이 받는 언어 코드는 지역까지(`es` 거절 — 받는 것: es-ES·es-MX …, 2026-11-06). 우리 스페인어는 스페인 것이라
+            // es-ES, 중남미(es-MX)에도 같은 글을 — 없으면 영어로 나온다.
+            (Lang::Es, "es-ES"),
+            (Lang::Es, "es-MX"),
             (Lang::De, "de"),
             (Lang::Ru, "ru"),
             (Lang::Pl, "pl"),
