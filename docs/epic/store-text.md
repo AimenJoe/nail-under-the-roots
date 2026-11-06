@@ -21,6 +21,8 @@
 | `carousel-1…6-*.png` | 1920×1080 ≤4MB | Pages → Product home → Media carousel(최소 1개, 영상 1개를 권장) |
 | `social-1200x1200.jpg` | 1200×1200 JPG | Pages → Social preview(선택) |
 
+
+
 About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 써도 된다. 추가 이미지(선택)는 1920×1080 **JPG ≤1MB**라 PNG를 그대로 못 쓴다 — 필요하면 변환.
 
 ## 스토어 설정 → 제품 구성 → 제품 세부 정보 (2026-11-06)
