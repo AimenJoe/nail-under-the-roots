@@ -118,8 +118,8 @@ jobs:
       ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
       EPIC_ORG_ID: ${{ vars.EPIC_ORG_ID }}
       EPIC_PRODUCT_ID: ${{ vars.EPIC_PRODUCT_ID }}
-      EPIC_ARTIFACT_WINDOWS: ${{ vars.EPIC_ARTIFACT_WINDOWS }}
-      EPIC_ARTIFACT_MACOS: ${{ vars.EPIC_ARTIFACT_MACOS }}
+      # 아티팩트는 오퍼(기본 게임)마다 하나 — Windows·macOS 바이너리를 같은 곳에 올리고 플랫폼은 포털에서 바이너리마다 고른다(Epic Manage Artifacts)
+      EPIC_ARTIFACT_ID: ${{ vars.EPIC_ARTIFACT_ID }}
       EPIC_BPT_CLIENT_ID: ${{ secrets.EPIC_BPT_CLIENT_ID }}
       EPIC_BPT_CLIENT_SECRET: ${{ secrets.EPIC_BPT_CLIENT_SECRET }}
     steps:
@@ -140,7 +140,7 @@ jobs:
           merge-multiple: true
       - name: Check settings
         run: |
-          for v in EPIC_ORG_ID EPIC_PRODUCT_ID EPIC_ARTIFACT_WINDOWS EPIC_ARTIFACT_MACOS EPIC_BPT_CLIENT_ID EPIC_BPT_CLIENT_SECRET; do
+          for v in EPIC_ORG_ID EPIC_PRODUCT_ID EPIC_ARTIFACT_ID EPIC_BPT_CLIENT_ID EPIC_BPT_CLIENT_SECRET; do
             [ -n "${!v}" ] || { echo "::error::Environment store에 $v가 없다(docs/release.md 상점 업로드)"; exit 1; }
           done
           BPT=$(find vendor/eos/BuildPatchTool -path '*Linux*' -name BuildPatchTool -type f | head -1)
@@ -155,11 +155,12 @@ jobs:
       - name: Upload to Epic
         run: |
           VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-          up() { # 플랫폼 아티팩트 빌드 폴더 실행 파일
-            "$BPT" -OrganizationId="$EPIC_ORG_ID" -ProductId="$EPIC_PRODUCT_ID" -ArtifactId="$2" \
+          # 같은 아티팩트에 두 번 올린다. BuildVersion은 아티팩트 안에서 플랫폼까지 겹치면 안 돼서 끝에 플랫폼을 붙인다(BPT 원문)
+          up() { # 플랫폼 빌드 폴더 실행 파일
+            "$BPT" -OrganizationId="$EPIC_ORG_ID" -ProductId="$EPIC_PRODUCT_ID" -ArtifactId="$EPIC_ARTIFACT_ID" \
               -ClientId="$EPIC_BPT_CLIENT_ID" -ClientSecretEnvVar=EPIC_BPT_CLIENT_SECRET \
-              -mode=UploadBinary -BuildRoot="$PWD/$3" -CloudDir="$RUNNER_TEMP/bpt-$1" \
-              -BuildVersion="$VERSION-${GITHUB_SHA:0:7}-$1" -AppLaunch="$4" -AppArgs=""
+              -mode=UploadBinary -BuildRoot="$PWD/$2" -CloudDir="$RUNNER_TEMP/bpt-$1" \
+              -BuildVersion="$VERSION-${GITHUB_SHA:0:7}-$1" -AppLaunch="$3" -AppArgs=""
           }
-          up windows "$EPIC_ARTIFACT_WINDOWS" build/windows Nail.exe
-          up macos "$EPIC_ARTIFACT_MACOS" build/macos Nail.app/Contents/MacOS/nail
+          up windows build/windows Nail.exe
+          up macos build/macos Nail.app/Contents/MacOS/nail
