@@ -116,6 +116,7 @@ jobs:
     environment: store
     env:
       ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+      ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN }}
       EPIC_ORG_ID: ${{ vars.EPIC_ORG_ID }}
       EPIC_PRODUCT_ID: ${{ vars.EPIC_PRODUCT_ID }}
       # 아티팩트는 오퍼(기본 게임)마다 하나 — Windows·macOS 바이너리를 같은 곳에 올리고 플랫폼은 포털에서 바이너리마다 고른다(Epic Manage Artifacts)
@@ -124,15 +125,6 @@ jobs:
       EPIC_BPT_CLIENT_SECRET: ${{ secrets.EPIC_BPT_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # BuildPatchTool은 Epic 개발자 포털에서 받는 파일이라 레포에 넣지 않는다 — 비공개 에셋 레포의 eos/BuildPatchTool.
-      - name: Fetch BuildPatchTool (private repo)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: ${{ secrets.ASSETS_REPO }}
-          token: ${{ secrets.ASSETS_TOKEN }}
-          path: vendor
-          sparse-checkout: eos/BuildPatchTool
-          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: nail-*-epic-${{ github.sha }}
@@ -143,9 +135,9 @@ jobs:
           for v in EPIC_ORG_ID EPIC_PRODUCT_ID EPIC_ARTIFACT_ID EPIC_BPT_CLIENT_ID EPIC_BPT_CLIENT_SECRET; do
             [ -n "${!v}" ] || { echo "::error::Environment store에 $v가 없다(docs/release.md 상점 업로드)"; exit 1; }
           done
-          BPT=$(find vendor/eos/BuildPatchTool -path '*Linux*' -name BuildPatchTool -type f | head -1)
-          [ -n "$BPT" ] || { echo "::error::비공개 에셋 레포에 eos/BuildPatchTool(Linux)이 없다"; exit 1; }
-          chmod +x "$BPT"; echo "BPT=$BPT" >> "$GITHUB_ENV"
+          # BuildPatchTool은 Epic 포털에서 받는 큰 파일이라 레포에 넣지 않는다 — 비공개 에셋 레포의 Release `eos` 첨부(0276 E4).
+          BPT=$(GH_TOKEN="$ASSETS_TOKEN" bash tools/epic/fetch_eos.sh bpt .eos | tail -1)
+          echo "BPT=$PWD/$BPT" >> "$GITHUB_ENV"
       - name: Unpack
         run: |
           mkdir -p build/windows build/macos

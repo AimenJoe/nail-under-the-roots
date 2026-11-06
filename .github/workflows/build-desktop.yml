@@ -5,7 +5,7 @@ name: build-desktop
 # - 손으로: Actions → build-desktop → Run workflow(브랜치 고르기, 0169 R8와 같은 방식). release_tag를 넣으면 그 Release에 운영판을 붙인다(릴리스 때 빠진 묶음 채우기).
 # - store-deploy.yml이 부를 때(store = steam | epic, 0276 S4·E4): 운영판 + 상점 기능(--features steam|epic)을 만들어
 #   아티팩트로만 둔다(Release에 붙이지 않는다). epic은 Windows·macOS만(Epic 런처에 Linux 없음) — EOS 아이디는
-#   Environment `store`에서 빌드 때 넣고, EOS SDK(.lib·.dll)는 비공개 에셋 레포의 `eos/sdk`에서 꺼낸다.
+#   Environment `store`에서 빌드 때 넣고, EOS SDK(.lib·.dll)는 비공개 에셋 레포의 Release `eos`에서 받는다(tools/epic/fetch_eos.sh).
 # main push마다는 돌리지 않는다: macOS 러너는 분당 비용이 리눅스의 약 10배라(레포를 비공개로 바꾸면 유료, 0237) 릴리스·개발판에서만.
 # 묶음 안: 실행 파일 + assets(웹 전용 mp3·vendor/.git 뺌) + 제3자 고지. 게임은 실행 파일 옆(또는 .app/Contents/Resources)의
 # assets를 찾는다(src/main.rs `assets_dir`). 서명: macOS는 임시(ad-hoc) 서명만, Windows는 서명 없음 — docs/decisions/0240.
@@ -111,6 +111,7 @@ jobs:
           EOS_DEPLOYMENT_ID: ${{ secrets.NAIL_EOS_DEPLOYMENT_ID }}
           EOS_CLIENT_ID: ${{ secrets.NAIL_EOS_CLIENT_ID }}
           EOS_CLIENT_SECRET: ${{ secrets.NAIL_EOS_CLIENT_SECRET }}
+          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN }}
         run: |
           if [ "$STORE" = steam ] && [ "${{ matrix.name }}" = linux ]; then
             echo "RUSTFLAGS=-C link-arg=-Wl,-rpath,\$ORIGIN" >> "$GITHUB_ENV"
@@ -121,8 +122,9 @@ jobs:
               v="EOS_$k"; echo "NAIL_EOS_$k=${!v}" >> "$GITHUB_ENV"
             done
             if [ "${{ matrix.name }}" = windows ]; then
-              test -d assets/vendor/eos/sdk/Lib || { echo "::error::비공개 에셋 레포에 eos/sdk가 없다(EOS SDK — Epic 포털에서 받아 넣는다)"; exit 1; }
-              echo "EOS_SDK_DIR=$GITHUB_WORKSPACE/assets/vendor/eos/sdk" >> "$GITHUB_ENV"
+              # 큰 파일이라 레포가 아니라 Release 첨부(0276 E4). 작업 폴더 안 상대 경로로(Git Bash의 Windows 경로 섞임을 피한다), 묶음엔 안 실린다.
+              sdk=$(GH_TOKEN="$ASSETS_TOKEN" bash tools/epic/fetch_eos.sh sdk .eos | tail -1)
+              echo "EOS_SDK_DIR=$GITHUB_WORKSPACE/$sdk" >> "$GITHUB_ENV"
             fi
           fi
 
