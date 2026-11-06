@@ -8,6 +8,7 @@
 | 파일 | 규격 | 쓰는 곳 |
 |---|---|---|
 | product-logo-960x540.png | 960×540 PNG ≤1MB, 투명 | Store Settings → Product details |
+| product-icon-512.png | 512×512 PNG ≤1MB | Store Settings → Product details(선택) — 앱 아이콘(tools/icons) 그대로 |
 | offer-landscape-2560x1440.png | 2560×1440 | Offers → Images(일반·라이브러리) |
 | offer-portrait-1200x1600.png | 1200×1600 | Offers → Images(일반·라이브러리) |
 | carousel-*.png | 1920×1080 ≤4MB | Pages → Media carousel |
@@ -81,6 +82,7 @@ def main() -> None:
     logo = Image.new("RGBA", (960, 540), (0, 0, 0, 0))
     place(logo, up(wm, k), 480, 270)
     logo.save(OUT / "product-logo-960x540.png", optimize=True)
+    Image.open(ROOT / "web" / "icons" / "icon-512.png").save(OUT / "product-icon-512.png", optimize=True)
 
     # 가로 판: 타이틀 그림 ×4, 로고는 하늘(가운데 위)
     title = Image.open(ILL / "title.png").convert("RGBA")

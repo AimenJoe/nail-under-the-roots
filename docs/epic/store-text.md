@@ -22,3 +22,29 @@
 | `social-1200x1200.jpg` | 1200×1200 JPG | Pages → Social preview(선택) |
 
 About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 써도 된다. 추가 이미지(선택)는 1920×1080 **JPG ≤1MB**라 PNG를 그대로 못 쓴다 — 필요하면 변환.
+
+## 스토어 설정 → 제품 구성 → 제품 세부 정보 (2026-11-06)
+| 칸 | 값 |
+|---|---|
+| 제품 로고 * | `media/product-logo-960x540.png` |
+| 제품 아이콘 | `media/product-icon-512.png`(앱 아이콘 `web/icons/icon-512.png` 그대로) |
+| 제품 표시명 * (64) | `Naïl: Under the Roots` — 특수 문자가 안 들어가면 `Nail: Under the Roots` |
+| 짧은 설명 * (280) | 위 "짧은 설명" 영어(한국어는 현지화 메뉴에서) |
+| 장르 * | Action · Rogue-Lite · Indie (목록에 있는 이름으로) |
+| 기능 * | Single Player · Controller Support · Achievements. 클라우드 저장(Epic)은 아직 안 만들었으니 고르지 않는다 |
+| 로그인 요건 | 없음(게임 안 계정 없음 — Epic 런처 로그인만) |
+| 지원 언어 · 오디오 | 비움(음성 없음) |
+| 지원 언어 · 텍스트 * | English · Korean · Japanese · Chinese (Simplified) · Chinese (Traditional) · Portuguese (Brazil) · French · Spanish (Spain) · German · Russian · Polish |
+| 법적 정보 푸터 * | 아래 |
+| 개인정보 보호 링크 | `https://beardworks.io/en/privacy.html` |
+| 이용 약관 · EULA | 비움(따로 만든 것 없음) |
+| 지원 페이지 링크 | `https://github.com/AimenJoe/nail-under-the-roots/issues` |
+| 지원 이메일 | `support@beardworks.io` |
+| 개발자 · 퍼블리셔 이름 * | `Beardworks` · `Beardworks` |
+
+법적 정보 푸터:
+
+    © 2026 Beardworks (털보네공업사). All rights reserved. Naïl: Under the Roots is a trademark of Beardworks.
+    Environment art: Sunnyside World by danieldiggle. Music and sound effects: CC0 works by Cleyton Kauffman, fluffclipse, Kistol, Aureolus_Omicron, Yoiyami, KarateStudios, Juhani Junkala, mutantleg, Umplix, RandomMind, Écrivain, cynicmusic, beardalaxy, Trex0n, Kenney, artisticdude, Bobjt, themightyglider, qubodup, syncopika, cinameng and JaggedStone. Fonts: Galmuri, Ark Pixel and Cubic 11 (SIL Open Font License 1.1).
+    Character sprites, portraits and illustrations were made from originals generated with a Google Gemini image model, then converted to pixel art and touched up by hand.
+    Full third-party licenses are listed in the game under Settings → Licenses.
