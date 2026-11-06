@@ -52,6 +52,10 @@ About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 
 ## 페이지 → Product home → About (필수: 글 + 그림 1장 이상, 10,000자 안)
 그림은 `media/carousel-1-meadow.png`(폭 700px 이상이면 된다). 상점 글에는 무료판(웹·APK)을 알리지 않는다(0276).
 
+### 헤드라인 (About 위 한 줄, 글자 수 제한은 원문에서 못 찾음 — 짧게)
+- EN: `The great tree is withering. A baby mole sets out alone.`
+- KO: `큰 나무가 시들어 간다. 아기 두더지가 혼자 길을 나선다.`
+
 ### English
     The great tree is withering. Purple threads have crept along its roots and wrapped the underground folk one by one, turning them against anyone who passes. Naïl, a baby mole, leaves the burrow alone for the first time to follow the roots down.
 
