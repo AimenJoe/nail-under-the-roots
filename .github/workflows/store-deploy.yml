@@ -14,11 +14,11 @@ on:
         type: choice
         options: [steam, epic]
       steam_branch:
-        description: 'Steam 베타 갈래 이름(SetLive). 기본 갈래로는 사람이 옮긴다'
+        description: '(Steam만) 베타 갈래 이름(SetLive). 기본 갈래로는 사람이 옮긴다 — epic이면 안 쓴다'
         type: string
         default: beta
       note:
-        description: '빌드 설명(상점 빌드 목록에만 보인다)'
+        description: '(Steam만) 빌드 설명(파트너 사이트 빌드 목록에만 보인다) — epic이면 안 쓴다(Epic은 BuildVersion이 버전-커밋-플랫폼)'
         type: string
         default: ''
 
