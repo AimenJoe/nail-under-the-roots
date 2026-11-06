@@ -13,6 +13,7 @@
 ## Epic Android — 조사(2026-11-06)와 모르는 것
 - Epic은 2026-03 GDC에서 "2026-08부터 iOS·Android 자체 퍼블리싱"을 발표했다. Android가 먼저 많이 쓰일 것으로 본다. [2차: PocketGamer.biz·gameapps.cc 기사]
 - 엔진 제한은 없다: Epic 배포 FAQ가 상점은 "engine-agnostic"라고 한다. Unreal에만 있는 것은 Unreal 로열티 할인(5% → 3.5%)뿐이다. 모바일(iOS·Android)은 **업적이 필수가 아니다**(→ A5: v1.0 Android는 업적 없이). 한때 모바일 자체 퍼블리싱은 **초대제 베타**였다. [2차: 검색 요약 — store.epicgames.com/distribution FAQ, 상점 요건 문서, 2026-11-06]
+- **포털에서 본 것(사장 2026-11-06, 1차)**: Epic 문서의 모바일 업로드 안내(Upload Your iOS/Android Builds)는 **Mobile Early Adopter 프로그램** 가입자만 볼 수 있다 — 우리 조직은 "권한이 없다"가 뜨고, 대신 unrealengine.com의 문의 양식을 쓰라는데 그 양식에 Mobile Early Adopter 항목은 없다. 즉 지금 Epic 모바일 출시는 **초대·가입제**이고, 우리는 아직 들어가 있지 않다.
 - **아직 확인 못 함**: 8월에 실제로 열렸는지, 포털 어디서 하는지(아티팩트 Manage Platforms에 Android가 보이는지), APK·AAB 중 무엇을 받는지, 업적 의무가 모바일에도 있는지, 모바일 상점 그림 규격. 이 세션은 dev.epicgames.com에 닿지 못한다 — 사장이 포털에서 보거나 세션 네트워크에 그 도메인을 허용하면 원문으로 확인한다.
 
 ## Epic Android에서 정할 것 — 사장 2026-11-06: "제안대로" (A1~A5 모두 아래 제안 칸으로 정함)
