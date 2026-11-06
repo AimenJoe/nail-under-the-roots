@@ -48,3 +48,53 @@ About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 
     Environment art: Sunnyside World by danieldiggle. Music and sound effects: CC0 works by Cleyton Kauffman, fluffclipse, Kistol, Aureolus_Omicron, Yoiyami, KarateStudios, Juhani Junkala, mutantleg, Umplix, RandomMind, Écrivain, cynicmusic, beardalaxy, Trex0n, Kenney, artisticdude, Bobjt, themightyglider, qubodup, syncopika, cinameng and JaggedStone. Fonts: Galmuri, Ark Pixel and Cubic 11 (SIL Open Font License 1.1).
     Character sprites, portraits and illustrations were made from originals generated with a Google Gemini image model, then converted to pixel art and touched up by hand.
     Full third-party licenses are listed in the game under Settings → Licenses.
+
+## 페이지 → Product home → About (필수: 글 + 그림 1장 이상, 10,000자 안)
+그림은 `media/carousel-1-meadow.png`(폭 700px 이상이면 된다). 상점 글에는 무료판(웹·APK)을 알리지 않는다(0276).
+
+### English
+    The great tree is withering. Purple threads have crept along its roots and wrapped the underground folk one by one, turning them against anyone who passes. Naïl, a baby mole, leaves the burrow alone for the first time to follow the roots down.
+
+    FIGHT LIKE A MOLE
+    Claw combos that hit harder on the beat, heavy strikes that slam foes into walls, burrowing under attacks and bursting up into a ram, and parries that knock charges and thrown attacks back. Every enemy shows its strike in red first — parry the lanes, dodge the circles.
+
+    A NEW PATH EVERY RUN
+    Pick your way on a branching path map: burrows, nests, caches, springs and tangles, each dug fresh every time. Four zones grow darker the deeper you go, each with its own creatures and dangerous ground, and a Path Keeper waits at the end of every path. Gathered glowbugs and seeds are never lost when you fall.
+
+    WAKE THE NEIGHBORS, BRING THEM HOME
+    Beat a tangled neighbor and the threads come loose. Momo the rabbit, Doto the squirrel, Kongi the armadillo and more settle in the village under the great tree, and the tree blooms again. Wake Momo and Doto and play as them too — hind-leg kicks and leaps, or acorns from range.
+
+    KEEP DIGGING
+    • Great Tree talents: three branches of eight steps, a separate tree for each hero
+    • Cat's Cradle difficulty 1–10, the Thread Dream boss rush, neighbors' requests, journal goals, bestiary and album
+    • A fourth path that opens after you see an ending
+
+    PLAY YOUR WAY
+    Keyboard or gamepad, with remappable controls. Popo's Cheer assist mode, warnings readable without color, and options to tone down shake, flashes and rumble. Eleven languages.
+
+    Character sprites, portraits and illustrations were made from originals generated with a Google Gemini image model, then converted to pixel art and touched up by hand.
+
+### 한국어 (현지화)
+    큰 나무가 시들어 간다. 뿌리를 타고 번진 보라색 실이 땅속 이웃들을 하나둘 감아, 지나는 이를 막아서게 만들었다. 아기 두더지 나일이 처음으로 혼자 굴을 나서 뿌리를 따라 내려간다.
+
+    두더지답게 싸운다
+    박자에 맞추면 더 세지는 발톱 콤보, 적을 벽까지 밀어붙이는 강타, 땅속으로 파고들어 공격을 흘리고 솟구쳐 들이받기, 돌진과 던지기를 되받아치는 받아치기. 적은 공격하기 전에 붉게 예고한다 — 띠는 받아치고, 원은 피하자.
+
+    런마다 새 길
+    갈래 지도에서 다음 굴을 고른다. 굴·둥지·곳간·샘·실타래, 매번 새로 파인다. 깊이 내려갈수록 어두워지는 지대 넷, 지대마다 다른 생물과 위험한 바닥, 길 끝마다 기다리는 길의 주인. 모은 반딧불과 씨앗은 쓰러져도 잃지 않는다.
+
+    이웃을 깨워 마을로
+    실에 물든 이웃을 이기면 실이 풀린다. 토끼 모모, 다람쥐 도토, 아르마딜로 콩이…… 깨어난 이웃은 큰 나무 아래 마을에 자리를 잡고, 나무는 다시 꽃을 피운다. 모모와 도토를 깨우면 직접 골라 내려갈 수도 있다 — 뒷발차기와 멀리뛰기, 또는 멀리서 던지는 도토리.
+
+    더 파고들 것
+    • 큰 나무 재주: 세 갈래 × 여덟 깊이, 캐릭터마다 따로
+    • 실뜨기 1~10 단계, 실의 꿈(보스 다시 싸우기), 이웃의 부탁, 발자국 목표, 도감과 앨범
+    • 엔딩을 본 뒤 열리는 넷째 길
+
+    내 방식대로
+    키보드·게임패드, 버튼 바꾸기. 포포의 응원(도움 모드), 색 없이도 읽히는 예고, 흔들림·번쩍임·진동 줄이기. 열한 언어.
+
+    캐릭터 스프라이트·초상화·일러스트는 Google Gemini 이미지 모델로 그린 원본을 도트로 옮겨 손으로 다듬은 것입니다.
+
+## 페이지 → Media carousel (필수: 1개 이상, 1920×1080)
+순서대로 `carousel-1-meadow` → `2-roots` → `3-boss` → `4-village` → `5-silk` → `6-hall`. Epic은 영상 하나를 권한다(1920×1080 MP4, 30·60fps, ≤300MB, AAC 스테레오 48kHz) — 트레일러는 따로.
