@@ -1,0 +1,158 @@
+name: store-deploy
+# 상점 업로드(0276 S4·E4) — 사람이 손으로 돌린다(Actions → store-deploy → Run workflow). 실기 확인 전(앱·아이디가 생기면 처음 돌려 본다).
+# 1) build-desktop.yml을 store 판으로 불러 묶음을 만든다(운영판 + --features steam|epic).
+# 2) Environment `store`(배포 갈래·사람 승인, docs/release.md "파이프라인 지키기")에 들어간 잡만 상점 자격을 읽고 올린다.
+#    - Steam: steamcmd + 업로드 전용 빌더 계정의 config.vdf로 app build를 올리고 `SetLive`로 베타 갈래에만 건다
+#      (기본 갈래는 SteamPipe가 자동으로 못 건다 — 사람이 파트너 사이트에서, Steamworks "Uploading to Steam").
+#    - Epic: BuildPatchTool `-mode=UploadBinary`로 아티팩트에 올린다(라벨·출시는 사람이 개발자 포털에서).
+# 필요한 값(Environment `store`): docs/release.md "상점 업로드".
+on:
+  workflow_dispatch:
+    inputs:
+      store:
+        description: 'steam | epic'
+        type: choice
+        options: [steam, epic]
+      steam_branch:
+        description: 'Steam 베타 갈래 이름(SetLive). 기본 갈래로는 사람이 옮긴다'
+        type: string
+        default: beta
+      note:
+        description: '빌드 설명(상점 빌드 목록에만 보인다)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-${{ inputs.store }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    permissions:
+      contents: write   # build-desktop의 잡이 요구하는 권한(상점 판은 Release에 붙이지 않는다)
+    uses: ./.github/workflows/build-desktop.yml
+    with:
+      release_tag: ''
+      store: ${{ inputs.store }}
+    secrets: inherit
+
+  steam:
+    if: inputs.store == 'steam'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: store
+    env:
+      STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+      STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+      STEAM_APP_ID: ${{ vars.STEAM_APP_ID }}
+      DEPOT_WINDOWS: ${{ vars.STEAM_DEPOT_WINDOWS }}
+      DEPOT_MACOS: ${{ vars.STEAM_DEPOT_MACOS }}
+      DEPOT_LINUX: ${{ vars.STEAM_DEPOT_LINUX }}
+      BRANCH: ${{ inputs.steam_branch }}
+      NOTE: ${{ inputs.note }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: nail-*-steam-${{ github.sha }}
+          path: dl
+          merge-multiple: true
+      - name: Check settings
+        run: |
+          for v in STEAM_USERNAME STEAM_CONFIG_VDF STEAM_APP_ID DEPOT_WINDOWS DEPOT_MACOS DEPOT_LINUX; do
+            [ -n "${!v}" ] || { echo "::error::Environment store에 $v가 없다(docs/release.md 상점 업로드)"; exit 1; }
+          done
+          case "$BRANCH" in ''|default|public) echo "::error::기본 갈래로는 올리지 않는다 — 베타 갈래 이름을 쓴다"; exit 1;; esac
+      - name: Unpack into depots
+        run: |
+          set -e
+          mkdir -p content/windows content/macos content/linux
+          (cd content/windows && unzip -q ../../dl/nail-windows-steam.zip && mv Nail-Under-the-Roots/* . && rmdir Nail-Under-the-Roots)
+          (cd content/macos && unzip -q ../../dl/nail-macos-steam.zip)
+          (cd content/linux && tar xzf ../../dl/nail-linux-steam.tar.gz && mv Nail-Under-the-Roots/* . && rmdir Nail-Under-the-Roots)
+          ls content/windows content/macos content/linux
+      - name: steamcmd
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq && sudo apt-get install -y -qq lib32gcc-s1
+          mkdir -p steamcmd && cd steamcmd
+          curl -sSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | tar xz
+          # 업로드 전용 빌더 계정으로 한 번 로그인해 만든 config.vdf(Steam Guard를 지난 자격). 가끔 만료된다 — 그러면 다시 만들어 시크릿을 바꾼다.
+          for d in "$HOME/Steam/config" "$PWD/config"; do mkdir -p "$d"; echo "$STEAM_CONFIG_VDF" | base64 -d > "$d/config.vdf"; done
+      - name: Write app build script
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          DESC="v$VERSION ${GITHUB_SHA:0:7} $NOTE"
+          cat > app_build.vdf <<VDF
+          "AppBuild"
+          {
+            "AppID" "$STEAM_APP_ID"
+            "Desc" "$DESC"
+            "SetLive" "$BRANCH"
+            "ContentRoot" "$PWD/content/"
+            "BuildOutput" "$PWD/build_output/"
+            "Depots"
+            {
+              "$DEPOT_WINDOWS" { "FileMapping" { "LocalPath" "windows/*" "DepotPath" "." "recursive" "1" } }
+              "$DEPOT_MACOS"   { "FileMapping" { "LocalPath" "macos/*"   "DepotPath" "." "recursive" "1" } }
+              "$DEPOT_LINUX"   { "FileMapping" { "LocalPath" "linux/*"   "DepotPath" "." "recursive" "1" } }
+            }
+          }
+          VDF
+          cat app_build.vdf
+      - name: Upload to Steam
+        run: ./steamcmd/steamcmd.sh +login "$STEAM_USERNAME" +run_app_build "$PWD/app_build.vdf" +quit
+      - name: Logs
+        if: always()
+        run: ls -la build_output 2>/dev/null && tail -n 50 build_output/*.log 2>/dev/null || true
+
+  epic:
+    if: inputs.store == 'epic'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: store
+    env:
+      ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+      ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+      EPIC_ORG_ID: ${{ vars.EPIC_ORG_ID }}
+      EPIC_PRODUCT_ID: ${{ vars.EPIC_PRODUCT_ID }}
+      # 아티팩트는 오퍼(기본 게임)마다 하나 — Windows·macOS 바이너리를 같은 곳에 올리고 플랫폼은 포털에서 바이너리마다 고른다(Epic Manage Artifacts)
+      EPIC_ARTIFACT_ID: ${{ vars.EPIC_ARTIFACT_ID }}
+      EPIC_BPT_CLIENT_ID: ${{ secrets.EPIC_BPT_CLIENT_ID }}
+      EPIC_BPT_CLIENT_SECRET: ${{ secrets.EPIC_BPT_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: nail-*-epic-${{ github.sha }}
+          path: dl
+          merge-multiple: true
+      - name: Check settings
+        run: |
+          for v in EPIC_ORG_ID EPIC_PRODUCT_ID EPIC_ARTIFACT_ID EPIC_BPT_CLIENT_ID EPIC_BPT_CLIENT_SECRET; do
+            [ -n "${!v}" ] || { echo "::error::Environment store에 $v가 없다(docs/release.md 상점 업로드)"; exit 1; }
+          done
+          # BuildPatchTool은 Epic 포털에서 받는 큰 파일이라 레포에 넣지 않는다 — 비공개 에셋 레포의 Release `eos` 첨부(0276 E4).
+          BPT=$(GH_TOKEN="$ASSETS_TOKEN" bash tools/epic/fetch_eos.sh bpt .eos | tail -1)
+          echo "BPT=$PWD/$BPT" >> "$GITHUB_ENV"
+      - name: Unpack
+        run: |
+          mkdir -p build/windows build/macos
+          (cd build/windows && unzip -q ../../dl/nail-windows-epic.zip && mv Nail-Under-the-Roots/* . && rmdir Nail-Under-the-Roots)
+          (cd build/macos && unzip -q ../../dl/nail-macos-epic.zip)
+          ls build/windows build/macos
+      - name: Upload to Epic
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          # 같은 아티팩트에 두 번 올린다. BuildVersion은 아티팩트 안에서 플랫폼까지 겹치면 안 돼서 끝에 플랫폼을 붙인다(BPT 원문)
+          up() { # 플랫폼 빌드 폴더 실행 파일
+            "$BPT" -OrganizationId="$EPIC_ORG_ID" -ProductId="$EPIC_PRODUCT_ID" -ArtifactId="$EPIC_ARTIFACT_ID" \
+              -ClientId="$EPIC_BPT_CLIENT_ID" -ClientSecretEnvVar=EPIC_BPT_CLIENT_SECRET \
+              -mode=UploadBinary -BuildRoot="$PWD/$2" -CloudDir="$RUNNER_TEMP/bpt-$1" \
+              -BuildVersion="$VERSION-${GITHUB_SHA:0:7}-$1" -AppLaunch="$3" -AppArgs=""
+          }
+          up windows build/windows Nail.exe
+          up macos build/macos Nail.app/Contents/MacOS/nail
