@@ -14,7 +14,7 @@
 - Epic은 2026-03 GDC에서 "2026-08부터 iOS·Android 자체 퍼블리싱"을 발표했다. Android가 먼저 많이 쓰일 것으로 본다. [2차: PocketGamer.biz·gameapps.cc 기사]
 - **아직 확인 못 함**: 8월에 실제로 열렸는지, 포털 어디서 하는지(아티팩트 Manage Platforms에 Android가 보이는지), APK·AAB 중 무엇을 받는지, 업적 의무가 모바일에도 있는지, 모바일 상점 그림 규격. 이 세션은 dev.epicgames.com에 닿지 못한다 — 사장이 포털에서 보거나 세션 네트워크에 그 도메인을 허용하면 원문으로 확인한다.
 
-## Epic Android에서 정해야 할 것(사장)
+## Epic Android에서 정할 것 — 사장 2026-11-06: "제안대로" (A1~A5 모두 아래 제안 칸으로 정함)
 | # | 무엇 | 왜 | 제안 |
 |---|---|---|---|
 | A1 | 패키지 이름 | 지금 APK는 `io.github.aimenjoe.nail`(개발판 `.nail.dev`). Android는 패키지마다 기록이 따로라, 바꾸면 무료 APK 사용자의 기록이 상점판으로 넘어가지 않고 둘이 나란히 깔린다 | 상점판은 새 이름(예: `io.beardworks.nail`) — 무료 APK와 섞이지 않고, 서명 키도 새로 시작한다. 기록 옮기기는 하지 않는다(Android 기록은 앱마다 갇혀 있다) |
@@ -25,7 +25,7 @@
 
 ## 할 일(순서)
 - [ ] 사장: 포털에서 Epic Android 자체 퍼블리싱이 열렸는지(아티팩트 Manage Platforms·제품 설정에 Android), 열렸으면 요건 화면을 Claude에게
-- [ ] 위 A1~A5 정하기
+- [x] 위 A1~A5 정하기 — 제안대로(2026-11-06)
 - [ ] Claude: 상점용 Android 빌드(기능·패키지·정식 서명) + `store-deploy`에 Android 업로드(BPT가 Android를 받는지부터 확인)
 - [ ] 터치로 처음부터 끝까지 한 바퀴(사람, 0086 방식으로 내 기기)
 - [ ] 모바일 상점 그림(아이콘 512 — `docs/epic/media/product-icon-512.png`는 이미 있다)
