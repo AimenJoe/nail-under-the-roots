@@ -1054,10 +1054,35 @@ pub(super) fn draw_telegraphs(w: &World, alpha: f32) {
                         | Behavior::Mumu
                 ) =>
             {
+                // 채움은 몸이 닿는 순간 다 찬다(`Enemy::lane_fill`, 2026-11-07) — 예고 끝(돌진 시작)이 아니라.
                 let dir = e.facing.normalize_or(vec2(1.0, 0.0));
                 let r = e.radius();
                 let len = w.room.ray_len(pos, dir, r, sp.dash_speed * sp.dash_time);
-                draw_tele_lane(pos + dir * r, pos + dir * (len + r), r, k);
+                draw_tele_lane(
+                    pos + dir * r,
+                    pos + dir * (len + r),
+                    r,
+                    e.lane_fill().unwrap_or(k),
+                );
+            }
+            // 돌진하는 동안은 남은 길만, 닿거나(쉼으로 바뀐다) 길 끝이면 사라진다.
+            enemy::State::Charge { dir, .. }
+                if matches!(
+                    sp.behavior,
+                    Behavior::Charger
+                        | Behavior::Chief
+                        | Behavior::Kongi
+                        | Behavior::Darter
+                        | Behavior::Roller
+                        | Behavior::Swooper
+                        | Behavior::Pincer
+                        | Behavior::Mumu
+                ) =>
+            {
+                if let (Some(left), Some(fill)) = (e.lane_left(), e.lane_fill()) {
+                    let r = e.radius();
+                    draw_tele_lane(pos + dir * r, pos + dir * (left + r), r, fill);
+                }
             }
             enemy::State::Lash { time, dir } => {
                 actors::draw_tongue(w, pos, e.radius(), dir, time);

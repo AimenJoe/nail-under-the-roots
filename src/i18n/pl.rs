@@ -1123,7 +1123,7 @@ pub static PL: Strings = Strings {
     h_eat: "Jedzenie",
     h_eat_d: "Przycisk przedmiotu zjada malinę (1 serce) lub dżdżownicę (pełne zdrowie). Jeśli masz dżdżownicę i upadniesz, zjesz ją sam i wstaniesz. Miejsce w torbie wybieraj lewo/prawo. Jedząc, idziesz powoli.",
     h_enemy: "Czytanie zamachu wroga",
-    h_enemy_d: "Wróg, który drży i czerwienieje, bierze zamach. Na ziemi widać obszar ataku z brzegiem, a w środku rośnie kolor brzegu: pas poszerza się od linii środkowej na obie strony, koło rośnie od środka na zewnątrz. Atak trafia w chwili, gdy wypełnienie dojdzie do brzegu i zleje się z nim. Pasy można odbić (szarże, rzuty, języki); koła z X pośrodku trzeba ominąć (skoki, zarodniki, tupnięcia). Bestiariusz ma radę do każdego gatunku.",
+    h_enemy_d: "Wróg, który drży i czerwienieje, bierze zamach. Na ziemi widać obszar ataku z brzegiem, a w środku rośnie kolor brzegu: pas poszerza się od linii środkowej na obie strony, koło rośnie od środka na zewnątrz. Atak trafia w chwili, gdy wypełnienie dojdzie do brzegu i zleje się z nim. Przy szarży pas wypełnia się w chwili, gdy ciało do ciebie dotrze. Pasy można odbić (szarże, rzuty, języki); koła z X pośrodku trzeba ominąć (skoki, zarodniki, tupnięcia). Bestiariusz ma radę do każdego gatunku.",
     h_loot: "Świetliki i nasiona",
     h_loot_d: "Świetliki wypadają z pokonanych wrogów. Wydawaj je przy Wielkim Drzewie w wiosce, by budzić talenty. Nasiona to pieniądze sklepu; gdy wyprawa się skończy, pozostałe nasiona zmienią się w nasiona wioski. Upadek nie zabiera ani jednych, ani drugich. Zjedzenie serca korzenia daje +1 serce maksymalne.",
     h_camp: "Obozy i korzonki",
