@@ -1123,7 +1123,7 @@ pub static EN: Strings = Strings {
     h_eat: "Eating",
     h_eat_d: "The item button eats a raspberry (1 heart) or a worm (full health). Carry a worm and if you fall, you eat it and get back up on your own. Pick the bag slot with the left/right buttons. You walk slowly while eating.",
     h_enemy: "Reading enemy tells",
-    h_enemy_d: "An enemy that trembles and flushes red is winding up. The floor shows the area the attack will cover, outlined, and the border's color grows inside it: lanes widen from their center line out to both sides, circles grow from the center outward. The attack lands the moment the fill reaches the border and they become one. Lanes can be parried (charges, throws, tongues); circles with an X in the middle must be dodged (pounces, spores, stomps). The bestiary has tips for each kind.",
+    h_enemy_d: "An enemy that trembles and flushes red is winding up. The floor shows the area the attack will cover, outlined, and the border's color grows inside it: lanes widen from their center line out to both sides, circles grow from the center outward. The attack lands the moment the fill reaches the border and they become one. A charge lane fills up the moment the body reaches you. Lanes can be parried (charges, throws, tongues); circles with an X in the middle must be dodged (pounces, spores, stomps). The bestiary has tips for each kind.",
     h_loot: "Glowbugs and seeds",
     h_loot_d: "Glowbugs drop from fallen enemies. Spend them at the Great Tree in the village to wake up talents. Seeds are shop money; when an adventure ends, your leftover seeds become village seeds. You lose neither when you fall. Eating a root heart adds 1 max heart.",
     h_camp: "Camps and rootlets",

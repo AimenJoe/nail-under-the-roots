@@ -164,6 +164,13 @@ pub struct Enemy {
     pub windup_mul: f32,
     /// 예고 중 겨눈 쪽을 돌리는 지금 빠르기(rad/s, 0254). 예고가 시작되면 0부터.
     pub turn_speed: f32,
+    /// 돌진 띠 예고(2026-11-07, Knellroot 0070 10을 옮김): 채움이 예고 끝이 아니라 **몸이 플레이어에 닿는 순간** 다 찬다 —
+    /// 거리마다 박자가 달라 헷갈리지 않게. 예고 동안 잰 "돌진 시작 → 닿기"까지의 초(길 밖이면 길 끝까지)·길이(px)·방향,
+    /// 그리고 채움이 되돌아가지 않게 붙드는 값(`lane_fill`).
+    pub lane_eta: f32,
+    pub lane_len: f32,
+    pub lane_dir: Vec2,
+    pub lane_mem: f32,
     pub speed_mul: f32,
     /// 실뜨기를 이미 걸었나(월드가 새로 나온 적에 한 번).
     pub knotted: bool,
@@ -313,6 +320,10 @@ impl Enemy {
             max_hp: hp,
             windup_mul: 1.0,
             turn_speed: 0.0,
+            lane_eta: 0.0,
+            lane_len: 0.0,
+            lane_dir: Vec2::ZERO,
+            lane_mem: 0.0,
             speed_mul: 1.0,
             knotted: false,
             roused: false,
@@ -415,6 +426,48 @@ impl Enemy {
             State::Lash { dir, time } if time <= t::TOAD_EXTEND_TIME => Some(dir),
             _ => None,
         }
+    }
+
+    /// 돌진 띠 예고의 채움(0..1, 그림 전용): 예고 + 달려오는 시간을 한 막대로 채워 **몸이 닿는 때** 다 찬다
+    /// (`TELE_FULL_HOLD` 먼저 차서 남는 것은 `tele_progress` 그대로, 0188). 돌진 중에도 남은 길 동안 이어진다.
+    /// 받아칠 위협·박자 스냅이 보는 `telegraph()`(예고 끝 기준)는 그대로다.
+    pub fn lane_fill(&self) -> Option<f32> {
+        let elapsed = match self.state {
+            State::Windup { time } => time,
+            State::Charge { time, dir } if dir == self.lane_dir => self.windup() + time,
+            _ => return None,
+        };
+        let total = self.windup() + self.lane_eta;
+        Some(tele_progress(elapsed, total).max(self.lane_mem))
+    }
+
+    /// 돌진 중 남은 띠의 길이(px). 벽에 튕겨 방향이 바뀌었거나(콩이) 몸 하나 남짓 남았으면 없다.
+    pub fn lane_left(&self) -> Option<f32> {
+        match self.state {
+            State::Charge { time, dir } if dir == self.lane_dir => {
+                let left = self.lane_len - time * self.sp().dash_speed;
+                (left > self.radius()).then_some(left)
+            }
+            _ => None,
+        }
+    }
+
+    /// 지금 겨눈 쪽으로 돌진하면 몸이 `player`에 닿기까지의 초와 길 길이(px). 길 밖이거나 벽이 먼저면 길 끝까지.
+    pub(super) fn lane_eta_to(&self, room: &Room, player: Vec2) -> (f32, f32) {
+        let sp = self.sp();
+        let dir = self.facing.normalize_or(vec2(1.0, 0.0));
+        let r = self.radius();
+        let len = room.ray_len(self.pos, dir, r, sp.dash_speed * sp.dash_time);
+        let to = player - self.pos;
+        let along = to.dot(dir);
+        let side = (to - dir * along).length();
+        let touch = r + t::PLAYER_RADIUS;
+        let reach = if along > 0.0 && side < touch {
+            (along - (touch * touch - side * side).sqrt()).max(0.0)
+        } else {
+            f32::INFINITY
+        };
+        (reach.min(len) / sp.dash_speed.max(1e-3), len)
     }
 
     /// 피해 판정 반지름(내려앉는·튀어나오는 순간은 둘레까지).
@@ -534,6 +587,7 @@ impl Enemy {
             projectiles,
             events,
         };
+        let was_charging = matches!(self.state, State::Charge { .. });
         match self.state {
             State::Stunned { time } => self.tick_stunned(&mut c, time),
             State::Approach
@@ -567,6 +621,11 @@ impl Enemy {
             State::Aim { time } => self.tick_aim(&mut c, time),
             State::Flip { time, dir } => self.tick_flip(&mut c, time, dir),
         }
+        // 돌진 띠의 채움은 되돌아가지 않는다(플레이어가 물러서 닿는 때가 늦어져도). 다시 겨누는 둘째 물기는 새로.
+        if was_charging && matches!(self.state, State::Windup { .. }) {
+            self.lane_mem = 0.0;
+        }
+        self.lane_mem = self.lane_fill().unwrap_or(0.0);
 
         self.launched = (self.launched - dt).max(0.0);
         self.bowl_cd = (self.bowl_cd - dt).max(0.0);
@@ -1246,6 +1305,71 @@ mod tests {
     }
 
     const FIELD_HP: i32 = species::FIELD_MOUSE.hp;
+
+    /// 돌진 띠(2026-11-07, Knellroot 0070 10): 채움은 예고 끝이 아니라 몸이 플레이어에 닿는 틱에 다 찬다 —
+    /// 거리가 달라도. 채움은 되돌아가지 않고, 닿으면(쉼) 띠가 사라진다. 길 밖이면 길 끝에서 다 찬다.
+    #[test]
+    fn a_charge_lane_fills_up_when_the_body_reaches_you() {
+        let room = Room::new();
+        for far in [24.0_f32, 45.0, 70.0] {
+            let mut e = Enemy::new(Kind::FieldMouse, room.center());
+            let player = room.center() + vec2(far, 0.0);
+            e.facing = vec2(1.0, 0.0);
+            e.state = State::Windup { time: 0.0 };
+            let (mut pr, mut ev) = (Vec::new(), Vec::new());
+            let mut last = 0.0;
+            let mut touched = None;
+            let mut first_charge = None;
+            for _ in 0..120 {
+                e.update(player, true, &room, t::TICK_DT, &mut pr, &mut ev);
+                if let Some(k) = e.lane_fill() {
+                    assert!(
+                        k + 1e-5 >= last,
+                        "{far}px: 채움은 되돌아가지 않는다 {k} < {last}"
+                    );
+                    last = k;
+                }
+                if matches!(e.state, State::Charge { .. }) {
+                    first_charge.get_or_insert(last);
+                    if (e.pos - player).length() <= e.radius() + t::PLAYER_RADIUS {
+                        touched = Some(last);
+                        break;
+                    }
+                }
+            }
+            let at_dash = first_charge.expect("돌진한다");
+            // 아주 가까우면 닿기까지가 `TELE_FULL_HOLD`보다 짧아 돌진 전에 이미 다 차 있다(0188 그대로).
+            if far >= 45.0 {
+                assert!(
+                    at_dash < 0.99,
+                    "{far}px: 돌진을 시작할 땐 아직 덜 찼다 {at_dash}"
+                );
+            }
+            let k = touched.expect("닿는다");
+            assert!(k > 0.99, "{far}px: 닿는 틱엔 다 찼다 {k}");
+            e.on_hit_player();
+            assert_eq!(e.lane_fill(), None, "닿으면 띠가 사라진다");
+        }
+        // 길 밖(옆으로 비켜 섬): 길 끝에서 다 찬다.
+        let mut e = Enemy::new(Kind::FieldMouse, room.center());
+        e.facing = vec2(1.0, 0.0);
+        e.state = State::Windup { time: e.windup() };
+        let (mut pr, mut ev) = (Vec::new(), Vec::new());
+        e.update(
+            room.center() + vec2(40.0, 60.0),
+            false,
+            &room,
+            t::TICK_DT,
+            &mut pr,
+            &mut ev,
+        );
+        assert!(matches!(e.state, State::Charge { .. }));
+        let full = e.lane_eta;
+        assert!(
+            (full - e.lane_len / e.sp().dash_speed).abs() < 1e-4,
+            "길 끝까지의 시간"
+        );
+    }
 
     /// 청설모: 웅크렸다가 뛰고, 내려앉는 순간에만 둘레 피해.
     #[test]
