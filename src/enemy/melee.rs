@@ -44,7 +44,12 @@ impl Enemy {
         if player_targetable {
             self.aim_toward(dir_to_player, time, dt);
         }
+        // 돌진 띠(2026-11-07): 겨눈 쪽이 바뀌는 동안 몸이 닿는 때를 다시 잰다 — 돌진을 시작하면 그대로 굳는다.
+        let (eta, len) = self.lane_eta_to(c.room, c.player_pos);
+        self.lane_eta = eta;
+        self.lane_len = len;
         if time >= self.windup() {
+            self.lane_dir = self.facing;
             self.state = State::Charge {
                 time: 0.0,
                 dir: self.facing,
