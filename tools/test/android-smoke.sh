@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Android 에뮬레이터에서 APK를 켜 보고 로그를 남긴다(2026-11-07, Knellroot 045ff55·bab436d를 옮김 — nail 0286).
 #   bash tools/test/android-smoke.sh <apk> <나갈 폴더> [패키지]
-# 패키지를 주지 않으면 APK에서 읽는다(aapt2). 하는 일: 깔기 → 켜기 → 20초 뒤 화면·살아 있나
+# 패키지를 주지 않으면 APK에서 읽는다(aapt2 — 개발판은 io.github.aimenjoe.dev.nail, 0286). 하는 일: 깔기 → 켜기 → 20초 뒤 화면·살아 있나
 # → Enter 둘(타이틀 → 시작) → 15초 뒤 화면·살아 있나 → logcat. 켜고 20초 뒤 죽어 있으면 실패(종료 코드 1).
 # Rust 패닉은 logcat의 RustStdoutStderr·"panicked", 라이브러리를 못 찾으면 "UnsatisfiedLinkError",
 # 네이티브 크래시는 "Fatal signal"·"backtrace"로 남는다.

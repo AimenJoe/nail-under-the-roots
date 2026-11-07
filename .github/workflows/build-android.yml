@@ -4,7 +4,7 @@ name: build-android
 #   작업 브랜치의 APK가 필요하면 Actions → build-android → Run workflow에서 그 브랜치를 고른다(0169 R8: 브랜치 push마다 돌리지 않는다).
 # - `v*` 태그 push, 또는 release.yml이 부를 때(release_tag): 같은 APK를 GitHub Release에 첨부한다.
 # 갈래(0193): main·태그·release_tag = 운영판(--no-default-features, io.github.aimenjoe.nail).
-#   그 밖(release/** push, 작업 브랜치 수동 실행) = 개발판: 개발 기능을 넣고 패키지 이름을 `.dev`로 바꿔
+#   그 밖(release/** push, 작업 브랜치 수동 실행) = 개발판: 개발 기능을 넣고 패키지 이름을 `io.github.aimenjoe.dev.nail`로 바꿔(마지막 조각은 nail — 0286)
 #   운영 앱과 나란히 깔린다(기록도 따로). release/** push면 미리 보기 릴리스 `dev`의 `nail-dev.apk`를 갈아 끼운다.
 # 러너(ubuntu-latest)에 Android SDK(build-tools, platforms;android-36)·NDK·JDK 17이 미리 깔려 있어 설치 단계가 없다.
 on:
@@ -117,9 +117,11 @@ jobs:
           else
             echo "FEATURES=" >> "$GITHUB_ENV"; echo "FLAVOR=dev" >> "$GITHUB_ENV"
             # 운영 앱 위에 덮어 깔리지 않게 패키지·이름을 바꾼다(빌드 안에서만, 커밋하지 않는다).
-            sed -i -e 's/^package_name = "io.github.aimenjoe.nail"$/package_name = "io.github.aimenjoe.nail.dev"/' \
+            # 패키지 이름의 **마지막 조각은 nail로 둔다**(0286): cargo-quad-apk가 그것을 네이티브 라이브러리 이름으로 써서
+            # (MainActivity의 System.loadLibrary) 옛 `….nail.dev`는 libdev.so를 찾다 켜자마자 죽었다(android-smoke logcat).
+            sed -i -e 's/^package_name = "io.github.aimenjoe.nail"$/package_name = "io.github.aimenjoe.dev.nail"/' \
                    -e 's/^label = "Naïl: Under the Roots"$/label = "Naïl dev"/' Cargo.toml
-            grep -q 'package_name = "io.github.aimenjoe.nail.dev"' Cargo.toml
+            grep -q 'package_name = "io.github.aimenjoe.dev.nail"' Cargo.toml
             grep -n '^package_name\|^label' Cargo.toml
           fi
 
@@ -147,6 +149,12 @@ jobs:
             echo "::error::APK에 앱 아이콘이 없다(Cargo.toml의 res·icon, android/res)"; exit 1
           fi
           "$BT/aapt2" dump badging "$APK" | grep "application-icon" || true
+          # MainActivity가 loadLibrary하는 이름 = 패키지 이름의 마지막 조각(cargo-quad-apk). 그 .so가 APK에 없으면 켜자마자 죽는다(0286)
+          # — 빌드·서명·badging 검사는 다 지나서 켜 봐야 알던 것.
+          PKG=$("$BT/aapt2" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          if ! unzip -l "$APK" | grep -q "lib/arm64-v8a/lib${PKG##*.}.so"; then
+            echo "::error::패키지 $PKG → MainActivity가 lib${PKG##*.}.so를 찾는데 APK에 없다(패키지 이름의 마지막 조각 = 라이브러리 이름)"; exit 1
+          fi
           unzip -l "$APK" | grep -c "res/mipmap" || true
           unzip -l "$APK"
           sha256sum "$APK"
@@ -177,7 +185,7 @@ jobs:
           cp target/android-artifacts/release/apk/nail.apk nail-dev.apk
           git tag -f dev "$GITHUB_SHA"
           git push -f origin refs/tags/dev
-          notes="개발판 — \`${GITHUB_REF_NAME}\` ${GITHUB_SHA:0:7} ($(date -u +%Y-%m-%dT%H:%MZ)). 운영판과 따로 깔리는 Naïl dev(io.github.aimenjoe.nail.dev), 개발 메뉴 포함. 운영판은 Latest 릴리스."
+          notes="개발판 — \`${GITHUB_REF_NAME}\` ${GITHUB_SHA:0:7} ($(date -u +%Y-%m-%dT%H:%MZ)). 운영판과 따로 깔리는 Naïl dev(io.github.aimenjoe.dev.nail), 개발 메뉴 포함. 운영판은 Latest 릴리스."
           if gh release view dev >/dev/null 2>&1; then
             gh release edit dev --prerelease --title "개발판 (${GITHUB_REF_NAME})" --notes "$notes"
           else

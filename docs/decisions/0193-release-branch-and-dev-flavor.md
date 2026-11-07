@@ -30,7 +30,7 @@
 
 ### 개발판의 따로 열기·따로 깔기
 - **웹**: 같은 Netlify 사이트의 별칭 `dev`(`netlify deploy --alias=dev`, `--prod` 없이). 주소(오리진)가 달라 브라우저 기록이 운영판과 섞이지 않는다. 탭 이름에 `(dev)`, `<meta name="robots" content="noindex, nofollow">`. 같은 별칭을 다시 쓰면 그 주소가 새 배포를 가리킨다는 설명과, 옛 배포에 머문다는 포럼 답이 엇갈려서(공식 문서는 이 세션 네트워크에서 열리지 않았다) 배포 뒤 `dev--…/build.txt`가 이 커밋인지 읽어 보고 아니면 CI를 실패시킨다.
-- **Android**: 패키지 `io.github.aimenjoe.nail.dev`, 이름 "Naïl dev"(CI가 빌드 안에서만 `Cargo.toml`을 바꾼다). 운영 앱과 나란히 깔리고 기록 폴더도 따로다. 기록 폴더는 `/data/data/<패키지>/files`인데 패키지 이름이 박혀 있었다 — 이제 `/proc/self/cmdline`(앱 프로세스 이름 = 패키지 이름)에서 읽는다(`profile::android_package`, 우리 두 이름 말고는 운영 이름). cargo-quad-apk는 `package_name`으로 Java 패키지와 JNI 함수 이름을 함께 짓는다(소스 확인).
+- **Android**: (0286에서 `io.github.aimenjoe.dev.nail`로 바꿈 — 아래 이름은 켜자마자 죽었다) 패키지 `io.github.aimenjoe.nail.dev`, 이름 "Naïl dev"(CI가 빌드 안에서만 `Cargo.toml`을 바꾼다). 운영 앱과 나란히 깔리고 기록 폴더도 따로다. 기록 폴더는 `/data/data/<패키지>/files`인데 패키지 이름이 박혀 있었다 — 이제 `/proc/self/cmdline`(앱 프로세스 이름 = 패키지 이름)에서 읽는다(`profile::android_package`, 우리 두 이름 말고는 운영 이름). cargo-quad-apk는 `package_name`으로 Java 패키지와 JNI 함수 이름을 함께 짓는다(소스 확인).
 - **내려받기**: 미리 보기(prerelease) Release `dev` 하나를 release/** push마다 갈아 끼운다 — 태그 `dev`를 그 커밋으로 옮기고 `nail-dev.apk`를 `--clobber`로. 주소 https://github.com/AimenJoe/nail-under-the-roots/releases/download/dev/nail-dev.apk. `releases/latest`와 공식 페이지(`site.js`, 미리 보기를 건너뛰고 넷만)는 운영판만 본다.
 - **iOS**: 번들 아이디 `….dev`, 이름 "Naïl dev"로 아티팩트만.
 

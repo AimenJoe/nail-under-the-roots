@@ -286,7 +286,7 @@ mod store {
             PathBuf::from(d)
         } else if cfg!(target_os = "android") {
             // 앱 전용 내부 폴더(다른 앱은 못 본다). 패키지 이름은 Cargo.toml [package.metadata.android]이지만,
-            // 개발판은 CI가 `.dev`로 바꿔 짓는다(0193) — 그래서 프로세스 이름(= 패키지 이름)에서 읽는다.
+            // 개발판은 CI가 `io.github.aimenjoe.dev.nail`로 바꿔 짓는다(0193 → 0286) — 그래서 프로세스 이름(= 패키지 이름)에서 읽는다.
             let cmdline = std::fs::read_to_string("/proc/self/cmdline").unwrap_or_default();
             PathBuf::from(format!(
                 "/data/data/{}/files",
@@ -546,13 +546,20 @@ pub fn save_run(i: usize, p: Option<&Profile>) -> bool {
 }
 
 /// Android 앱의 패키지 이름. `/proc/self/cmdline`의 첫 칸이 프로세스 이름이고, 앱 프로세스는 패키지 이름을 쓴다.
-/// 우리 패키지(운영 `io.github.aimenjoe.nail`, 개발판 `….dev`, 0193)가 아니면 운영 이름으로.
+/// 우리 패키지(운영 `io.github.aimenjoe.nail`, 개발판 `io.github.aimenjoe.dev.nail`, 0193 → 0286)가 아니면 운영 이름으로
+/// — 남의 폴더(쓸 권한이 없다)에 쓰려다 저장이 실패하지 않게. 옛 개발판 이름 `….nail.dev`는 받지 않는다: 그 판은
+/// 네이티브 라이브러리를 못 찾아(`libdev.so`) Rust 코드가 돌기 전에 죽었으니 이 함수에 닿은 적이 없다(0286).
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 fn android_package(cmdline: &str) -> String {
     const BASE: &str = "io.github.aimenjoe.nail";
+    const DEV: &str = "io.github.aimenjoe.dev.nail";
     let name = cmdline.split('\0').next().unwrap_or("").trim();
-    let ours = name == BASE || name.strip_prefix(BASE) == Some(".dev");
-    if ours { name } else { BASE }.to_string()
+    if name == BASE || name == DEV {
+        name
+    } else {
+        BASE
+    }
+    .to_string()
 }
 
 #[cfg(test)]
@@ -561,9 +568,15 @@ mod tests {
     fn android_save_dir_follows_the_package() {
         use super::android_package as pkg;
         assert_eq!(pkg("io.github.aimenjoe.nail\0"), "io.github.aimenjoe.nail");
+        // 개발판(0286): 패키지 이름의 마지막 조각이 네이티브 라이브러리 이름이라 `nail`로 끝난다.
         assert_eq!(
-            pkg("io.github.aimenjoe.nail.dev\0\0"),
-            "io.github.aimenjoe.nail.dev"
+            pkg("io.github.aimenjoe.dev.nail\0\0"),
+            "io.github.aimenjoe.dev.nail"
+        );
+        // 옛 개발판 이름은 켜지지도 않던 것 — 받지 않는다.
+        assert_eq!(
+            pkg("io.github.aimenjoe.nail.dev\0"),
+            "io.github.aimenjoe.nail"
         );
         // 읽지 못했거나 남의 이름이면 운영 이름.
         assert_eq!(pkg(""), "io.github.aimenjoe.nail");
