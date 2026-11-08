@@ -9,3 +9,7 @@
 __pycache__/
 smoke-out/
 tools/test/node_modules/
+
+# 공식 페이지 배포본(make_images.py --stamp, 0287) — 글꼴 서브셋·해시는 배포 때 만든다
+/_site/
+site/fonts/galmuri11-sub.woff2
