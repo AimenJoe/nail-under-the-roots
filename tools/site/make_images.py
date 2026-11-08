@@ -1,19 +1,23 @@
 """공식 페이지(site/) 그림·글꼴 만들기(docs/decisions/0069).
 
 게임 그림(assets/art, 초상화·일러스트는 나노바나나)에서 초상화를 잘라 내고 일러스트를 복사한다. 게임 PNG는 고치지 않는다.
-글꼴은 게임의 Galmuri11을 페이지(site/**/*.html)에 나오는 글자만 남겨 woff2로 줄인다(OFL, 예약 이름 없음).
-페이지 글을 고치면 다시 돌린다. 스크린숏은 따로 찍는다(tools/site/shots.js).
+스크린숏은 따로 찍는다(tools/site/shots.js).
 
-    python3 tools/site/make_images.py
+배포용 찍기(0287): 글꼴(Galmuri11을 페이지에 나오는 글자만 남긴 woff2, OFL·예약 이름 없음)과 캐시 깨기 해시(`?v=`)는
+레포에 두지 않는다 — 두 갈래가 페이지를 고칠 때마다 이 생성물끼리 충돌했다. `--stamp <폴더>`가 site/를 그 폴더에 복사하고
+거기에만 글꼴·해시를 만든다. pages.yml이 배포 때 부르고, 로컬에서 볼 때도 같은 것으로 찍어 그 폴더를 띄운다.
+
+    python3 tools/site/make_images.py                 # 그림(초상화·일러스트·걷는 띠·파비콘)
+    python3 tools/site/make_images.py --stamp _site   # 배포본: site/ 복사 + 글꼴 + 해시
 """
+
+from __future__ import annotations
 
 import re
 import shutil
 from html import unescape
 from pathlib import Path
 
-from fontTools import subset
-from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 ART = ROOT / "assets" / "art"
@@ -73,6 +77,8 @@ CELLS = {"nail.png": 28, "momo.png": 32, "doto.png": 40, "popo.png": 32, "bat.pn
 
 
 def main() -> None:
+    from PIL import Image
+
     OUT.mkdir(parents=True, exist_ok=True)
     sheet = Image.open(ART / "portraits.png").convert("RGBA")
     for name, i in PORTRAITS.items():
@@ -101,16 +107,22 @@ def main() -> None:
     # 파비콘: 나일 스프라이트 첫 칸.
     c = CELLS["nail.png"]
     Image.open(ART / "nail.png").convert("RGBA").crop((0, 0, c, c)).save(OUT / "favicon.png")
-    subset_font()
-    bust_cache()
 
 
-def bust_cache() -> None:
+def stamp(out: Path) -> None:
+    """site/를 out에 복사하고 거기에만 글꼴 서브셋·캐시 해시를 만든다(0287). 레포의 site/는 건드리지 않는다."""
+    if out.exists():
+        shutil.rmtree(out)
+    shutil.copytree(ROOT / "site", out)
+    subset_font(out)
+    bust_cache(out)
+
+
+def bust_cache(site: Path) -> None:
     """style.css·site.js 주소에 내용 해시를 붙인다(0155). Pages는 파일을 몇 분 캐시해서, 새 HTML이 옛 CSS와
     만나면 깊이 눈금이 맨 위 번호 목록으로, 숨긴 "본문으로" 링크가 보였다(사장 피드백 2026-10-27)."""
     import hashlib
 
-    site = ROOT / "site"
     # 글꼴(페이지 글자 서브셋)도 글을 바꾸면 바뀐다: CSS 안의 주소에 먼저 붙이고, 그 CSS로 해시를 잰다.
     css = site / "style.css"
     font = hashlib.sha1((site / "fonts" / "galmuri11-sub.woff2").read_bytes()).hexdigest()[:8]
@@ -138,8 +150,9 @@ def bust_cache() -> None:
         page.write_text(text, encoding="utf-8")
 
 
-def subset_font() -> None:
-    site = ROOT / "site"
+def subset_font(site: Path) -> None:
+    from fontTools import subset
+
     text = ""
     for page in site.rglob("*.html"):
         raw = re.sub(r"<[^>]+>", " ", page.read_text(encoding="utf-8"))
@@ -160,4 +173,9 @@ def subset_font() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    if len(sys.argv) == 3 and sys.argv[1] == "--stamp":
+        stamp(Path(sys.argv[2]).resolve())
+    else:
+        main()

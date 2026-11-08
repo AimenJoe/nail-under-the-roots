@@ -33,7 +33,7 @@
    - `docs/releases/v0.x.y.md`: 제목 `# Naïl: Under the Roots v0.x.y — <한 줄>`, "## 바뀐 것"(플레이어가 느끼는 말로, 결정 번호 없이), "## 해 보기"(웹·APK), "## 출처"(앞 판 복사), 끝에 `**English (short)**:` 한 문단. 앞 판 파일을 복사해 고치는 게 빠르다.
    - `site/index.html`·`site/en/index.html`: `data-latest-version`을 새 버전으로, `<ul class="news">`에 새 `<li>`를 맨 위에 넣고 가장 오래된 줄을 빼 현재 목록 길이를 유지한다.
    - **페이지 기능 글 대조**: 이번 판(과 지난 판들)에서 바뀐 규칙·수·설정이 페이지 글(조작·지대·이웃·마을·기능·접근성·FAQ·"다음" 칸)과 맞는지 두 언어로 본다 — 소식 한 줄만 고치면 글이 낡는다(v0.7.1에서 찾은 낡은 글 여덟: 발톱 수·재화·포포의 응원·흔들림 설정·PC 기록·"다음" 칸 등). 엔딩 뒤 이야기는 쓰지 않는다(스포일러).
-   - `python3 tools/site/make_images.py` — 페이지 글꼴 서브셋(새 글자) 다시 만들기. `site/style.css`의 글꼴 해시가 같이 바뀐다.
+   - 페이지 글꼴 서브셋·캐시 해시는 따로 만들지 않는다 — `pages.yml`이 배포 때 `make_images.py --stamp`로 만든다(0287). 새 글자가 맞게 나오는지 보려면 `python3 tools/site/make_images.py --stamp /tmp/site`로 찍어 띄운다.
 4. 전체 검사(`CONTRIBUTING.md`의 목록 전부). `Cargo.lock`이 버전 때문에 바뀐다 — 함께 커밋.
 5. 커밋 메시지 `v0.x.y: <한 줄>`. 작업 브랜치에 push → **`release/vX → main` PR을 만들고 사장이 Merge**(2026-11-04부터 — main은 규칙 `main-only`로 사장만 쓴다, 아래 "파이프라인 지키기"). Merge 뒤 운영 배포 잡이 `web-production` 승인을 기다리면 사장이 Approve.
 6. 확인(5~10분 뒤): Actions에서 main의 `deploy-web`·`release`·`build-android`·`pages`·`build-ios`가 모두 success, Release `v0.x.y`에 `nail.apk`(약 18 MB)가 붙었는지, 웹 타이틀 오른쪽 아래 버전 글자. Claude 세션이면 `send_later`로 확인 예약을 걸고, 확인 뒤 지운다.
