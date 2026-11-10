@@ -46,9 +46,9 @@ python3 -m http.server 8000 --directory dist   # http://127.0.0.1:8000
 
 - **장비**: 캐릭터마다 전용 무기 종류가 있고 가방은 캐릭터별로 관리한다. Naïl은 새싹·두더지·바위·딱정벌레 발톱, 모모는 발차기 무기 넷, 도토는 도토리 무기 넷을 쓴다. 독 발톱은 무기가 아니라 Naïl의 고유 재주다. 가방에서 확인으로 장착한다(0011·0246·0247·0251).
 - **무기 획득**: Naïl은 튜토리얼에서 두더지 발톱을 받고, 런 중 길에서 캐릭터별 무기 하나를 찾을 수 있다. 나머지는 보스·이웃·저널·상자 등 진행에 따라 얻는다. 상자 보상은 반딧불이 대부분이고 나머지는 물건이다(0012·0251).
-- **초상화**: 대화창에 88×88 2배 밀도 초상화. 아홉 캐릭터 열세 묶음(물든 모습 포함), 나노바나나 원본(`tools/art/sources/ai/`)을 `ai_portraits.py`가 칸에 끼운다(0108~0122). 틀·남은 칸은 `portraits.py`(0015).
+- **초상화**: 대화창에 88×88 2배 밀도 초상화. 캐릭터·이웃·길의 주인마다(물든 모습 포함), 나노바나나 원본(`tools/art/sources/ai/`)을 `ai_portraits.py`가 칸에 끼운다(0108~0122). 틀·남은 칸은 `portraits.py`(0015).
 - **장신구·퀵 아이템**: 장신구 두 칸과 뿌리 심장으로 능력치·최대 체력을 보탠다. 기본 체력은 3, 최대 체력은 12다. 캐릭터 전용 장신구는 해당 캐릭터의 런에서만 얻는다. 산딸기는 기본 1칸을 회복하며, 잃은 체력과 최근 산딸기 획득 여부에 따라 드롭 확률이 보정된다. 쥬시 지렁이는 체력을 채우며 쓰러졌을 때 부활시킨다. 가방에서 I/Y로 쓰고 Q·E/LB·RB로 넘긴다(0017·0252·0253).
-- **적 = 물든 이웃**: 지대마다 다른 잡몹 열 종(들쥐·생쥐 떼·시궁쥐·다람쥐·청설모·땃쥐·고슴도치·두꺼비·박쥐·포자버섯)과 길의 주인(보리·모모·도토·콩이·토끼풀), 가장 깊은 곳의 누룩 할매. 종류 표는 `src/species.rs`, 그림은 `tools/art/mobs_ai.py` 등. 메뉴 → 도감에 만난 이웃이 말로 된 능력(체력·힘·빠르기)과 이야기·요령으로 적힌다(docs/decisions/0021). 개발 시나리오 "적 다섯 종".
+- **적 = 물든 이웃**: 지대마다 다른 잡몹 열두 종(들쥐·생쥐 떼·시궁쥐·다람쥐·청설모·땃쥐·고슴도치·두꺼비·박쥐·포자버섯·가재·소금쟁이)과 길의 주인(보리·모모·도토·콩이·토끼풀, 엔딩 뒤 옆 굴의 무무 0275), 가장 깊은 곳의 누룩 할매. 종류 표는 `src/species.rs`, 그림은 `tools/art/mobs_ai.py` 등. 메뉴 → 도감에 만난 이웃이 말로 된 능력(체력·힘·빠르기)과 이야기·요령으로 적힌다(docs/decisions/0021). 개발 시나리오 "적 다섯 종".
 - **공격 예고**: 적이 공격을 준비하면 맞을 자리(돌진 띠·내려앉을 원)가 바닥에 옅은 붉은 면 + 테두리로 뜨고, 안쪽 채움이 자라 테두리에 닿는 순간이 공격이다. 띠는 받아칠 수 있고 가운데 X가 있는 원은 피해야 한다. 진하기는 설정 "공격 예고"(0176~0198).
 - **화폐**: 반딧불(재주 해금) · 씨앗(상점). 둘 다 HUD 왼쪽 위에 표시한다. 쓰러져도 잃지 않으며 런이 끝나면 반딧불과 남은 씨앗이 마을로 간다. 마을의 포포 가게에서는 씨앗으로 꾸미기와 다음 런 물품을 준비할 수 있다(0021·0259).
 - **스테이지 고리**: 첫 런은 필드 남쪽 공터의 튜토리얼 보스(들쥐 대장 보리) → 쉼터 → 길 지도 → 갈래마다 다른 굴 → 그 길의 보스 → 다음 쉼터다(0030~0032). 이후 마을 뿌리 길에서 첫 길 지도를 열고, 고른 굴로 곧장 내려간다. 쉼터는 쓰러졌을 때 깨어나는 곳과 이어하기 지점으로 남는다(0226·0259). 쉼터 뒤에는 쓰러질 때마다 실뿌리가 감기며 셋째에 런이 끝난다. 모은 재화는 쓰러져도 잃지 않고, 런이 끝나면 마을로 가져간다(0210·0259).
@@ -74,31 +74,37 @@ cargo clippy --target wasm32-unknown-unknown --no-default-features -- -D warning
 cargo test                                        # 단위·규칙 테스트(무브셋·번역·폰트 글자·지도·굽기·패드 키 등)
 cargo build --release --target wasm32-unknown-unknown
 cargo check --target aarch64-linux-android
-cargo check --release --target aarch64-apple-ios
+cargo clippy --release --target x86_64-pc-windows-msvc --no-default-features -- -D warnings   # PC(0240). macOS는 aarch64-apple-darwin
+cargo clippy --release --target x86_64-pc-windows-msvc --no-default-features --features steam -- -D warnings   # Steam 판(0276)
+cargo clippy --release --target aarch64-apple-ios -- -D warnings   # iOS(0288)
 python3 tools/licenses.py                         # 의존성을 바꿨을 때만: 고지 파일 다시 만들기
 ```
 
-웹 빌드 연기 시험(0169): `dist/`를 조립한 뒤 `node tools/test/smoke.js dist` — 헤드리스 Chromium으로 타이틀·개발 시나리오 몇 개에 들어가 입력을 넣고 콘솔 에러·패닉·멈춘 화면을 잡는다(Playwright 필요). CI는 `smoke-web.yml`이 main push마다 돌리고 스크린숏을 아티팩트로 남긴다.
+웹 빌드 연기 시험(0169): `dist/`를 조립한 뒤 `node tools/test/smoke.js dist` — 헤드리스 Chromium으로 타이틀·개발 시나리오 몇 개에 들어가 입력을 넣고 콘솔 에러·패닉·멈춘 화면을 잡는다(Playwright 필요). CI는 `smoke-web.yml`이 main·release/** push마다 돌리고(운영판은 타이틀까지, 0277) 스크린숏을 아티팩트로 남긴다. Android는 `android-smoke.yml`이 개발판 APK를 에뮬레이터에서 켜 본다(0286).
 
 ## 배포
 
 ### 웹 (Netlify)
 - 사이트: https://nail-under-the-roots.netlify.app (Netlify Site ID `a0bc4242-4bdd-4fc8-8266-adeaf143e59c`, Git 연동 없음)
-- PR을 열면 `pr-<번호>--nail-under-the-roots.netlify.app` 에 미리보기가 올라간다.
-- `main`에 push하면 `deploy-web.yml`이 wasm을 빌드하고, 레포 Secrets에 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`가 있으면 배포한다. 시크릿이 없으면 빌드 검증만. Netlify 사이트는 **Git 연동 없이**(Deploy manually) 만든다. 이유와 절차: KB `guides/macroquad-wasm-netlify-github-actions.md`.
+- `release/**`에 push하면 개발판이 별칭 `dev`(https://dev--nail-under-the-roots.netlify.app)로 올라간다. PR은 빌드만 하고 배포하지 않는다.
+- 운영판은 `main`에 들어가면(`release/vX → main` PR을 사장이 Merge, 직접 push하지 않는다) `deploy-web.yml`이 빌드(`build` 잡)한 뒤, 따로 떨어진 `publish` 잡이 Environment `web-production`(개발판은 `web-dev`)의 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`로 배포한다(0277, `docs/release.md` "파이프라인 지키기"). Netlify 사이트는 **Git 연동 없이**(Deploy manually) 만든다. 이유와 절차: KB `guides/macroquad-wasm-netlify-github-actions.md`.
 
 ### Android (APK)
-- `build-android.yml`이 `src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`가 바뀐 push마다 `cargo quad-apk build --release`로 **디버그 키 서명 APK**를 만들어 Actions 아티팩트(`nail-apk-<release 또는 dev>-<sha>`)로 올린다(main·release/** push, 작업 브랜치는 Actions에서 Run workflow). Actions 탭 → 해당 실행 → Artifacts에서 받는다.
+- `build-android.yml`이 `src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`가 바뀐 push마다 `cargo quad-apk build --release`로 **디버그 키 서명 APK**를 만들어 Actions 아티팩트(`nail-apk-<release 또는 dev>-<sha>`)로 올린다(main·release/** push, 작업 브랜치는 Actions에서 Run workflow). release/** push면 미리 보기 Release `dev`의 `nail-dev.apk`(패키지 `io.github.aimenjoe.dev.nail` — 운영 앱과 나란히 깔린다, 0286)도 갈아 끼운다. Actions 탭 → 해당 실행 → Artifacts에서 받는다.
 - 보통은 아래 "릴리스 = 버전 올리기"(`release.yml`)로 낸다. 손으로 `v*` 태그를 push해도 같은 APK가 Release에 붙는다(세션 프록시는 태그 push를 받지 않는다).
 - 실기 설치: 아티팩트 **zip을 풀어** 안의 `nail.apk`만 설치한다(`nail.apk.idsig`는 무시). `adb install -r nail.apk` 또는 사이드로드(알 수 없는 출처 허용). arm64 전용, Android 8.0+.
-- **제3자 에셋(Sunnyside)**: 원본은 `assets/vendor/`(gitignore). CI는 비공개 레포 `AimenJoe/nail-assets`를 Secrets `ASSETS_REPO`(=`AimenJoe/nail-assets`)·`ASSETS_TOKEN`(그 레포만 Contents 읽기, fine-grained 토큰, 만료 최대 1년)으로 받는다. 팩에서 새 파일을 쓰면 `src/art.rs` 경로와 같은 자리로 `nail-assets`에도 올린다. 토큰이 만료되면 빌드는 직접 그린 그림으로 돌아간다(실패하지 않는다).
-- **릴리스 = 버전 올리기**: `Cargo.toml`의 `version`(과 `[package.metadata.android]`의 `version_code`)을 올리고 `docs/releases/v<버전>.md`(릴리스 본문)를 함께 main에 push하면 `release.yml`이 태그 `v<버전>`을 만들고 `build-android`를 불러 APK를 GitHub Release에 붙인다. 태그가 이미 있거나 본문이 없으면 아무것도 안 한다. Actions 탭에서 `release`를 손으로 돌려도 된다. 손으로 `v*` 태그를 push해도 예전처럼 Release가 생긴다(본문 파일은 있어야 한다).
+- **제3자 에셋(Sunnyside)**: 원본은 `assets/vendor/`(gitignore). CI는 비공개 레포 `AimenJoe/nail-assets`를 Secrets `ASSETS_REPO`(=`AimenJoe/nail-assets`)·`ASSETS_TOKEN`(그 레포만 Contents 읽기, fine-grained 토큰, 만료 최대 1년)으로 받는다. 팩에서 새 파일을 쓰면 `src/art.rs` 경로와 같은 자리로 `nail-assets`에도 올린다. 시크릿이 없으면 개발판은 직접 그린 그림으로 빌드되지만 운영·상점 판은 실패한다(0277). 토큰이 만료되면 받기 단계가 실패한다.
+- **릴리스 = 버전 올리기**: `Cargo.toml`의 `version`(과 `[package.metadata.android]`의 `version_code`)을 올리고 `docs/releases/v<버전>.md`(릴리스 본문)를 함께 main에 push하면 `release.yml`이 태그 `v<버전>`을 만들고 `build-android`·`build-desktop`을 불러 APK와 PC 묶음 셋을 GitHub Release에 붙인다(main에는 PR Merge로). 태그가 이미 있거나 본문이 없으면 아무것도 안 한다. Actions 탭에서 `release`를 손으로 돌려도 된다. 손으로 `v*` 태그를 push해도 예전처럼 Release가 생긴다(본문 파일은 있어야 한다).
 - **서명 키 고정**: 레포 Secrets에 `ANDROID_DEBUG_KEYSTORE_B64`(디버그 키스토어의 base64, 비밀번호 `android`)가 있어야 모든 빌드가 같은 키로 서명되어 기기에서 덮어 설치가 된다. 없으면 Actions 캐시의 키를 쓰고, 그것도 없으면 새 키를 만들어 경고를 남긴다. 키가 바뀐 APK는 **기기에서 앱을 삭제한 뒤** 설치해야 한다("패키지가 유효하지 않음"의 흔한 원인). 키 만들기: `keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000 && base64 -w0 debug.keystore`.
 - 로컬에서 만들려면 Android SDK(build-tools, platforms;android-36)·NDK·JDK 17과 `cargo install --git https://github.com/not-fl3/cargo-quad-apk --rev <build-android.yml의 CARGO_QUAD_APK_REV>`, 그리고 `ANDROID_HOME`·`NDK_HOME` 환경 변수가 필요하다. 보통은 CI에 맡긴다(docs/decisions/0005).
-- Android 게임패드 버튼은 패치한 miniquad(`third_party/miniquad`)가 F13~F25 키로 넘긴다(docs/decisions/0075). 스틱은 D패드(디지털)로 들어온다.
+- Android 게임패드 버튼은 패치한 miniquad(`third_party/miniquad`)가 F13~F25 키로 넘긴다(docs/decisions/0075). 스틱·HAT D패드는 아날로그 축(`joystick_axes`)으로 들어온다(0143).
 - 앱 아이콘: `android/res/mipmap-*`(옛 + 적응형, `tools/icons/make_icons.py`로 생성). CI가 APK에 아이콘이 없으면 실패한다(0087).
 
+### PC (Windows·macOS·Linux)
+- `build-desktop.yml`(0240)이 release/** push·손으로·릴리스 때 Windows zip·macOS 겸용 `.app` zip·Linux tar.gz를 만든다. 게임은 실행 파일 옆(macOS는 `Contents/Resources`)의 `assets`를 찾는다. 묶기는 `tools/pc/package.sh` 한 곳.
+- 상점(0276·0284): Cargo 기능 `steam`(`src/steam.rs`·업적 `src/achievements.rs`)·`epic`(Windows만, `src/epic.rs`). 상점 업로드는 `store-deploy.yml`(손으로, Environment `store`). 등록 자료는 `docs/steam/`·`docs/epic/`, 절차는 `docs/release.md` "상점 업로드".
+
 ### iOS (빌드만)
-- `build-ios.yml`(macOS 러너)이 main·release/** push마다 `aarch64-apple-ios`로 빌드해 **서명하지 않은** `nail-ios-unsigned`(.ipa)를 Actions 아티팩트로 올린다. Info.plist는 `ios/Info.plist`, 아이콘은 `ios/icons/`(docs/decisions/0086).
-- 그대로는 기기에 깔리지 않는다. 내 기기 시험은 Sideloadly·AltStore(Windows·Mac)로 내 Apple ID 서명(무료면 7일마다 다시). TestFlight까지 하기로 했지만 Apple Developer Program 가입·CI 서명은 아직 남아 있다(0232).
+- `build-ios.yml`(macOS 러너)이 main·release/** push마다 `aarch64-apple-ios`로 빌드해 **서명하지 않은** `nail-ios-unsigned-<release 또는 dev>`(.ipa)를 Actions 아티팩트로 올린다. Info.plist는 `ios/Info.plist`, 아이콘은 `ios/icons/`(docs/decisions/0086).
+- 그대로는 기기에 깔리지 않는다. 내 기기 시험은 Sideloadly·AltStore(Windows·Mac)로 내 Apple ID 서명(무료면 7일마다 다시). TestFlight는 v1.0 밖이다(0284).
 - iOS 게임패드는 Apple GameController(`GCController`)를 직접 읽는다(gilrs에 iOS 백엔드가 없어서, 0288 — 실기 확인 전). 저장은 앱 샌드박스 `Library/Application Support/nail`.
