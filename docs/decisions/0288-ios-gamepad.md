@@ -16,6 +16,7 @@
 6. **iOS 앱의 첫 장치 = 터치**(Android와 같다). 전엔 키보드여서 인트로 안내가 키 이름으로 나올 수 있었다. 패드를 만지면 그때부터 패드 이름(Xbox 글자 A·B·X·Y — Android와 같다).
 7. `ios/Info.plist`에 Xcode의 Game Controllers 기능이 넣는 두 키: `GCSupportsControllerUserInteraction` = true, `GCSupportedGameControllers` = [`ExtendedGamepad`]. App Store에 "게임 컨트롤러 지원" 표시가 붙는 근거(2차 — libGDX 위키).
 8. `build-ios.yml`이 실행 파일에 `GameController.framework`가 링크됐는지 `otool -L`로 본다.
+9. `GCController` 클래스는 `Class::get`으로 찾고 없으면 패드 없음(`class!`는 못 찾으면 panic — objc-rs 소스). 같은 날 Knellroot 0137이 miniquad 패치 쪽으로 같은 다리를 놓으며 정리한 "두 길 모두 꼭" 다섯(링크 보장·`Class::get`·알림·autoreleasepool·합치기)과 견주어 빠진 이것만 더했다(KB `reference/macroquad/ios-build.md`).
 
 ## 하지 않은 것
 - **진동**: GCController 진동은 Core Haptics 엔진(`controller.haptics`)을 거쳐야 해 코드가 크다. Android처럼 지금은 없다 — 설정의 "진동" 줄도 iOS에서는 그대로 숨긴다.

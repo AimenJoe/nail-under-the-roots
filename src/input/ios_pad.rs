@@ -11,10 +11,11 @@
 //!   Select = buttonOptions, 스틱 누르기 = thumbstick 버튼(앞의 둘은 iOS 13+, 스틱 누르기는 12.1+, 우리 최소판은 14).
 //!   홈 버튼은 시스템 몫(게임 센터·스크린숏)이라 읽지 않고 시스템 제스처도 끄지 않는다(Apple: "드문 경우에만").
 //! - 옛 패드에 없는 단추는 nil이다 — 메시지를 보내지 않고 안 눌린 것으로 센다.
+//! - GameController 클래스는 `Class::get`으로 찾는다(`class!`는 없으면 panic) — 없으면 패드 없음.
 
 use macroquad::prelude::{vec2, Vec2};
 use objc::declare::ClassDecl;
-use objc::runtime::{Object, Sel, BOOL, NO};
+use objc::runtime::{Class, Object, Sel, BOOL, NO};
 use objc::{class, msg_send, sel, sel_impl};
 use std::sync::Once;
 
@@ -120,7 +121,11 @@ pub(super) fn read() -> (PadFrame, usize) {
         // SAFETY: 클래스 메서드 `controllers`는 NSArray<GCController*>를 돌려준다. 원소의 `extendedGamepad`는 nil일 수 있다
         // (확장 프로필이 없는 패드·리모컨) — 거른다. 메인 스레드에서 부른다.
         unsafe {
-            let list: Id = msg_send![class!(GCController), controllers];
+            // `class!`는 클래스를 못 찾으면 panic한다 — 찾지 못하면 패드 없음으로(KB ios-build "두 길 모두 꼭").
+            let Some(gc) = Class::get("GCController") else {
+                return;
+            };
+            let list: Id = msg_send![gc, controllers];
             if list.is_null() {
                 return;
             }
