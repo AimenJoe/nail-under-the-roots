@@ -162,6 +162,9 @@
 
 ## 사람이 할 일 (다음 세션 전)
 
+### 웹 호스팅은 나중에 Cloudflare로(0290, 2026-11-10 — 방향만)
+- [ ] 사람: Netlify 대시보드 → Team → Billing에서 Legacy(월 100 GB)인지 크레딧제(≈ 15 GB, 다 쓰면 모든 사이트 멈춤)인지와 이번 달 사용량 — 옮길 시점을 정하는 근거
+
 ### v1.0.0 정식 출시 — 나일의 생일(0289, 2026-11-10)
 - [ ] 사람: release/v1.0 → main PR이 합쳐지면 운영 배포 잡의 `web-production` 승인(Approve), Release `v1.0.0`에 `nail.apk`·PC 셋이 붙었는지, https://nail.beardworks.io 첫 화면 "정식 출시 2026-11-10"·"다음" 칸.
 - [ ] 상점판(Epic PC → Steam)은 출시 대기 — 나가면 v1.0.x(0284·0289).
