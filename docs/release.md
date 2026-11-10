@@ -12,7 +12,7 @@
 | APK(시험용) | `main` push(`src/`·`assets/`·`android/`·`third_party/`·`Cargo.*`), 또는 Actions → build-android → Run workflow에서 브랜치를 골라 수동 실행(0169 R8) | `build-android.yml` | Actions 아티팩트 `nail-apk-<release 또는 dev>-<sha>`(main은 운영판, 수동 실행한 작업 브랜치는 개발판) |
 | 웹 연기 시험 | `main` push(`src/`·`assets/`·`web/`·`Cargo.*`·`tools/test/`), 또는 수동 | `smoke-web.yml` | 헤드리스 Chromium으로 타이틀·개발 시나리오 아홉 개(콘솔 에러·패닉·멈춘 화면), 스크린숏 아티팩트 `smoke-shots` |
 | Android 에뮬레이터 연기 시험(0286) | `release/**` push(`.github/workflows/android-smoke.yml`·`tools/test/android-smoke.sh`) | `android-smoke.yml` | 개발판 APK(Release `dev`의 `nail-dev.apk`, 그 push가 APK를 다시 만들면 그 커밋 것을 기다림)를 x86_64 에뮬레이터(API 31, ARM 번역)에 깔아 켜고 20초 뒤 살아 있나·화면 둘·logcat을 아티팩트로. 켜자마자 죽으면 실패 — 빌드·서명·badging 검사로는 못 잡는 것 |
-| iOS(서명 없음) | `main`·`release/**` push | `build-ios.yml` | 아티팩트 `nail-ios-unsigned-release`/`-dev`(.ipa, 개발판은 번들 아이디 `….dev`). 기기 시험은 Sideloadly·AltStore로 직접 서명 |
+| iOS(서명 없음) | `main`·`release/**` push, 릴리스 때 `release.yml`(Release에 `nail.ipa`, 0291) | `build-ios.yml` | 아티팩트 `nail-ios-unsigned-release`/`-dev`(.ipa, 개발판은 번들 아이디 `….dev`). 기기 시험은 Sideloadly·AltStore로 직접 서명 |
 | PC 묶음(0240) | `release/**` push(`src/`·`assets/`·…), 손으로, 그리고 릴리스 때 `release.yml`이 부른다 | `build-desktop.yml` | Windows zip(`Nail.exe`)·macOS zip(`Nail.app`, 겸용·임시 서명)·Linux tar.gz. 개발판은 Actions 아티팩트, 릴리스는 Release에 `nail-<os>-release.*` |
 | 공식 페이지 | `main` push(`site/`) | `pages.yml` | GitHub Pages(https://nail.beardworks.io/). 최신 버전·소식은 `site.js`가 Releases API에서 읽고, 못 읽으면 HTML에 적은 값 |
 

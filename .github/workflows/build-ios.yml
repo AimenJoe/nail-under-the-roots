@@ -1,7 +1,7 @@
 name: build-ios
 # iOS 빌드(docs/decisions/0086). **서명하지 않은 .ipa**를 만든다 — 받는 사람이 Sideloadly·AltStore로 자기 Apple ID로 서명해 설치(무료 계정은 7일마다 다시).
 # - push·손으로: Actions 아티팩트(nail-ios-unsigned.ipa).
-# - release.yml이 부를 때(release_tag): 운영판을 그 태그의 GitHub Release에 nail-ios.ipa로 붙인다(공식 페이지 "직접 설치", 0291).
+# - release.yml이 부를 때(release_tag): 운영판을 그 태그의 GitHub Release에 nail.ipa로 붙인다(nail.apk와 같은 꼴, 공식 페이지 "직접 설치", 0291).
 # - 손으로 release_tag를 넣으면 이미 있는 Release에 운영판 ipa를 붙인다(릴리스 때 빠진 것 채우기 — main에서 돌린다).
 # 나중에 TestFlight·App Store로 내려면 Apple Developer Program 인증서·프로비저닝 프로필을 Secrets에 두고 서명 단계를 더한다.
 # 공개 레포의 macOS 러너는 무료. main push(관련 파일)와 수동 실행(작업 브랜치는 Run workflow에서 고른다, 0169 R8).
@@ -110,12 +110,17 @@ jobs:
           path: nail-ios-unsigned.ipa
           if-no-files-found: error
 
-      # 공식 페이지의 iOS "직접 설치"가 releases/latest/download/nail-ios.ipa를 가리킨다(0291).
+      # 공식 페이지의 iOS 버튼이 releases/latest/download/nail.ipa를 가리킨다(0291).
+      # 처음 하루는 nail-ios.ipa로 붙였다 — 그 Release에 남아 있으면 지운다(없으면 그냥 지나간다).
       - name: Attach to Release
         if: inputs.release_tag != ''
-        run: cp nail-ios-unsigned.ipa nail-ios.ipa
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp nail-ios-unsigned.ipa nail.ipa
+          gh release delete-asset "$RELEASE_TAG" nail-ios.ipa --yes --repo "$GITHUB_REPOSITORY" || true
       - if: inputs.release_tag != ''
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ inputs.release_tag }}
-          files: nail-ios.ipa
+          files: nail.ipa
