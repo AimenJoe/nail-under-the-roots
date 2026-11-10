@@ -107,6 +107,14 @@ def main() -> None:
     # 파비콘: 나일 스프라이트 첫 칸.
     c = CELLS["nail.png"]
     Image.open(ART / "nail.png").convert("RGBA").crop((0, 0, c, c)).save(OUT / "favicon.png")
+    og_image()
+
+
+def og_image() -> None:
+    """링크 미리보기(og:image) 1280×720: 타이틀 그림을 점 그대로 2배(SNS 권장 1200px 이상, 0290)."""
+    from PIL import Image
+
+    Image.open(OUT / "i_title.png").convert("RGB").resize((1280, 720), Image.NEAREST).save(OUT / "og.png", optimize=True)
 
 
 def stamp(out: Path) -> None:
