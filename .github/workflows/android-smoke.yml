@@ -1,0 +1,58 @@
+# Android 에뮬레이터 연기 시험(2026-11-07, Knellroot 045ff55를 옮김): 개발판 APK(미리 보기 릴리스 `dev`의 nail-dev.apk)를
+# x86_64 에뮬레이터(ARM 번역)에 깔아 켜고·시작해 보고, 화면 둘·살아 있나·logcat을 아티팩트로 남긴다.
+# 빌드·apksigner·aapt2 검사를 다 지나도 켜자마자 죽는 것(개발판 libdev.so, 0286)은 켜 봐야 잡힌다.
+# 이 파일이나 스크립트를 고쳐 release/**에 push하면 돈다. 그 push가 APK를 다시 만드는 것이면(build-android의 경로)
+# 그 커밋의 개발판 APK가 올라오길 기다리고, 아니면 지금 올라가 있는 개발판 APK를 켠다.
+name: android-smoke
+
+on:
+  push:
+    branches: ['release/**']
+    paths:
+      - .github/workflows/android-smoke.yml
+      - tools/test/android-smoke.sh
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - name: Wait for this commit's dev APK if this push rebuilds it, then download
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -qE '^(src/|assets/|android/|third_party/|Cargo\.(toml|lock)$|\.cargo/|\.github/workflows/build-android\.yml$)'; then
+            for i in $(seq 1 40); do
+              tag=$(git ls-remote origin refs/tags/dev | cut -f1)
+              [ "$tag" = "$GITHUB_SHA" ] && { echo "dev APK is this commit"; break; }
+              echo "dev tag at ${tag:0:7}, waiting for ${GITHUB_SHA:0:7}…"; sleep 30
+            done
+          else
+            echo "this push does not rebuild the APK — using the dev APK as it is ($(git ls-remote origin refs/tags/dev | cut -c1-7))"
+          fi
+          curl -fsSL -o app.apk "https://github.com/${GITHUB_REPOSITORY}/releases/download/dev/nail-dev.apk"
+          ls -la app.apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run on emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 31
+          arch: x86_64
+          target: google_apis
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: bash tools/test/android-smoke.sh app.apk smoke
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: android-smoke-${{ github.sha }}
+          path: smoke/

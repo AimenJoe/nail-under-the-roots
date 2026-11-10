@@ -141,6 +141,7 @@
 | 컷씬 일러스트 | `illust.rs`, `cutscene.rs`(Step::Illust·Narrate, cut_to, 이야기 장면), `render.rs`(draw_illust), `tools/art/illust.py` | 2배 밀도 한 장 그림(기본 640×360, 패닝 장면은 더 큼) + 느린 패닝 + 입자, 내레이션 띠. 처음 8장(0039) → 지금 11장(+도토 기억 0053·모모 깊은 곳 0056·콩이의 문 0085), 모두 이야기 컷씬에서 나오고 앨범에 모인다. 개발 "이야기 일러스트"는 바로 보기용. 그림은 11장 모두 나노바나나(0125~0136), 내레이션 아홉 언어(0037, 0039) |
 | 튜토리얼 보스 | `enemy.rs`(Chief), `species.rs`(CHIEF), `field.rs`(공터), `tools/art/chief.py`, `render.rs`(보스 막대) | 들쥐 대장 보리: 돌진 ↔ 뛰어 찍기, 반 아래면 생쥐 떼, 공격 중 슈퍼아머, 벽에 박으면 2.2초 틈. 32×32 그림, 초상화 3, 처치 컷씬 → 쉼터의 이웃. 헤드리스로 공터 잠금·막대·처치 컷씬·쉼터·가게·길 지도 확인(docs/decisions/0032) |
 | iOS 빌드 1단계(0086) | `.github/workflows/build-ios.yml`, `ios/Info.plist`, `ios/icons/`, `profile.rs`(iOS 저장 자리) | macOS 러너에서 `aarch64-apple-ios` 빌드 → 서명 안 한 `.ipa` 아티팩트. 실기 실행은 미확인. TestFlight까지 하기로 했으나 계정·서명·iOS 패드는 v0.6.x 사람 몫(gilrs, 0232) |
+| iOS 게임패드(0288) | `src/input/ios_pad.rs`(GCController 읽기·연결 알림), `src/input.rs`(`PadFrame`·`pad_frame_actions`, iOS `read_gamepads`·`capture`, 첫 장치 터치), `Cargo.toml`(iOS는 gamepads 빼고 objc-rs), `ios/Info.plist`(`GCSupportsControllerUserInteraction`·`GCSupportedGameControllers`), `build-ios.yml`(GameController 링크 확인) | 패드 버튼·D패드·스틱 둘을 다른 플랫폼과 같은 짝으로. 진동은 없음(Core Haptics). 실기 미확인 |
 | 앱 아이콘(0087) | `tools/icons/make_icons.py`, `android/res/mipmap-*`, `Cargo.toml`(res·icon), `build-android.yml`(application-icon 검사) | iOS·Android 아이콘(그림은 0123에서 큰 나무·뿌리 실루엣으로 바꿈). Android는 옛 mipmap + 적응형(8+). CI가 APK에 아이콘이 없으면 실패 |
 | 솟구치기·마무리 타(0090) | `tuning.rs`(EMERGE_*·CLAW_*), `moveset.rs`, `world.rs`(emerge_push·충격), `sfx.rs`(Impact) | 첫 바깥 판정 2·3("숨는 용도", "그저 그렇다") 뒤: 솟구침 반지름 22·피해 2(0158부터 톡 1·모으면 2)·넉백 340 + 반지름 44 밀쳐내기(잡몹만), 두 겹 고리·쿵. 마무리 타 넉백 ×1.35~1.45, 멈춤·흔들림↑, 충격 고리·쿵. 단위 테스트(밀쳐내기) |
 | HUD·퀵 슬롯(0091) | `render.rs`(hud_plate·draw_quick_slots·draw_hud_bars), `items.rs`(Bag::take·flash) | 바탕판 셋·테두리 글자, 게이지 34px, 퀵 슬롯 22px·아이콘 2배·고른 칸 금빛 2px, 다 쓰면 가진 다른 것으로 저절로 + 1.2초 깜빡임(쓰러져 지렁이가 쓰여도). 가게 창 밑 HUD 숨김. 단위 테스트 |
@@ -161,14 +162,52 @@
 
 ## 사람이 할 일 (다음 세션 전)
 
-### v0.9.2 패치 — 돌진 띠 예고 = 몸이 닿는 순간(0285, 2026-11-07)
+### v1.0.0 정식 출시 — 나일의 생일(0289, 2026-11-10)
+- [ ] 사람: release/v1.0 → main PR이 합쳐지면 운영 배포 잡의 `web-production` 승인(Approve), Release `v1.0.0`에 `nail.apk`·PC 셋이 붙었는지, https://nail.beardworks.io 첫 화면 "정식 출시 2026-11-10"·"다음" 칸.
+- [ ] 상점판(Epic PC → Steam)은 출시 대기 — 나가면 v1.0.x(0284·0289).
+
+### iOS 게임패드(0288, 2026-11-10, release/v1.0)
+- [x] iOS 앱이 GCController를 프레임마다 읽는다(`src/input/ios_pad.rs`, 짝은 다른 패드와 같다, 첫 장치 = 터치, Info.plist 컨트롤러 키 둘)
+- [ ] 사람: 실기 — 개발판 `.ipa`(Actions `build-ios` → `nail-ios-unsigned-dev`)를 Sideloadly로 깔고 블루투스 패드로 메뉴·걷기·조준·강타 모으기·일시정지·다시 붙이기·켠 뒤 붙이고 떼기·안내 글이 장치를 따라 바뀌는지(0288 "사람이 할 일")
+
+### 개발판 APK가 켜자마자 죽던 것(0286, 2026-11-07, release/v1.0)
+- [ ] 사람: 폰에 깔린 옛 "Naïl dev"(켜지지 않는 것, 패키지 `io.github.aimenjoe.nail.dev`)는 지우고, 미리 보기 Release `dev`의 새 `nail-dev.apk`를 깔기 — 패키지가 `io.github.aimenjoe.dev.nail`로 바뀌어 덮어 깔리지 않고 따로 깔린다. 개발판 기록은 원래 운영판과 따로였고 옛 개발판은 켜지지도 않았으니 잃는 것은 없다(패키지가 바뀌면 옛 개발판 기록 폴더는 새 개발판에서 안 보인다)
+
+### v0.9.2 패치 — 돌진 띠 예고 = 몸이 닿는 순간(0285, 2026-11-07, main에서 합침)
 - [ ] 사람: 손맛 판정 — 들쥐·뒤쥐·대장·콩이·무무 돌진에서 띠가 다 차는 때가 몸이 닿는 때와 맞는지, 멀리서 오는 돌진도 같은 박자로 받아쳐지는지
 
 ### v0.9.1 패치 — 키보드(사장 2026-11-05, release/v1.0에서 옮김)
 - [x] 웹 키 입력: 포커스가 캔버스 밖이거나 `code`가 빈 키도 게임에(0278), 메뉴 뒤로에 회피 키 K(0280), iOS touchstart를 막지 않음(0281), 키는 자리로·이름은 배열 글자로(0282, Linux 자리 패치), 화살표 고정·WASD 다시 붙이기(0283)
 - [x] 배포 파이프라인(0277 등): 웹 배포 build/publish + Environment(레포 Netlify 시크릿을 지웠으므로 이것 없이는 운영 배포가 건너뛰어진다), 액션 SHA 고정·Rust 1.99.1, 운영판 연기 시험·배포 확인. `build-desktop.yml`의 SHA 고정·상점 묶기는 v1.0과 함께
 - [x] 알려진 문제: iPad 홈 화면 웹앱은 클릭으로 포커스를 주기 전엔 실제 키보드가 안 듣는다(사장 실기)
-- [ ] 사람: PR Merge → 운영 배포 승인(`web-production`) → Release 확인. 그 뒤 main을 release/v1.0에 합친다
+- [x] PR #12 Merge(사장 2026-11-05) → main을 release/v1.0에 합침
+- [ ] 사람: 운영 배포 승인(`web-production`, 걸어 두었다면) → v0.9.1 Release 확인
+
+### v1.0 Steam 출시(0276) — 진행 중, `release/v1.0`
+- [x] 범위(사장 2026-11-04): Steam 출시 + 버그 고치기만, OS 셋(Windows·Linux·macOS — 맥은 공증 없이 먼저), 업적 약 서른, Next Fest·데모 안 함, 모바일은 준비 중
+- [x] S1 Steam 연동 뼈대(`steam` 기능·`src/steam.rs`, 없으면 조용히 그냥 켜짐) — 실제 Steam 클라이언트로는 앱 번호가 생긴 뒤
+- [x] S2 업적 서른(`src/achievements.rs`, 저널 목표에서 빌림) + 등록표 열한 언어 + 일괄 올리기 CSV 둘 + 아이콘 60장 256px(`docs/steam/`, Steam 원문대로 2026-11-04)
+- [ ] **사람**: 본인 확인 → 앱 만들기(앱·데포 번호), W-8BEN·은행, 빌더 계정, 업적 등록, Auto-Cloud 경로
+- [x] 업적 API 이름 확정(`ACH_` 서른, 시험으로 얼림) · S3 코드: Steam 계정별 기록 폴더 + 옛 기록 가져오기(2026-11-04)
+- [ ] S4 `steam-deploy.yml`(앱 번호 뒤) · S3 파트너 사이트 Auto-Cloud 설정 · S5 Deck · S6 상점 페이지(Coming Soon 2주 이상)
+- [x] 배포 파이프라인 지키기(사장 2026-11-04, `docs/release.md`): 웹 배포 build/publish 분리 + Environment, CODEOWNERS, 규칙 `main-only`(사장만)·`release-branches`(사장·Claude), main은 PR을 사장이 Merge
+- [x] 사람: 규칙 둘 + Environment 둘에 Netlify 시크릿(2026-11-04)
+- [x] 사람: 레포 Secrets의 Netlify 두 값 지움, Actions 설정(포크 승인·기본 읽기 권한)(2026-11-04)
+- [ ] (선택) Claude 앱 레포 범위 좁히기(github.com/settings/installations), 2단계 인증 확인
+- [x] 코드·자료(2026-11-04, 실기 전): Epic XP 표·EOS 일괄 파일, `src/epic.rs`(기능 `epic`), PC 묶기 `tools/pc/package.sh`, `build-desktop` 상점 판, `store-deploy.yml`(Steam 베타 갈래·Epic UploadBinary)
+- [ ] 사람: Environment `store`(main 등 + 사장 승인)와 값들(`docs/release.md` "상점 업로드"), 비공개 에셋 레포의 Release `eos`에 EOS C SDK zip·BuildPatchTool zip 첨부
+- [ ] **Epic Games Store 동시 출시** — **2026-11-10 사장: 빌드가 Dev → Stage → Live 검토 중**, 그 밖의 사람이 할 일도 대부분 끝냄(칸별로 무엇이 남았는지는 사장 확인 뒤 고침)(사장 2026-11-04, 0276 E1~E5): 포털 가입·상품(2026-11-05 됨) → 클라이언트·EAS 브랜드 검토(자체 도메인 필요, 0276 "E1 메모") → EOS 업적 연동(`epic` 기능) → XP 1,000 표 → 빌드 올리기 → IARC·검토. Epic이 늦으면 Steam 먼저
+- [x] 한국 등급(사장 2026-11-04): 등급 없이 열고, 적법한 민원·시정 요구가 오면 한국 판매 중지 또는 GCRB 등급(0276)
+- [x] 사장(2026-11-04): 가격 $0.99, 레포 공개, 웹·APK 무료 전판 그대로 — Steam판은 응원값(0276 "사장 답 둘째"). 상점·Steam 소식에는 무료판을 알리지 않는다(Valve 규칙)
+- [x] 키보드 기본값(0280, 사장 2026-11-05 — 0278 보조 키·0279 방향키는 거둠): 쿼터뷰 액션 관례대로 WASD + 오른손 J·K·L·I·Q/E·M 그대로, 메뉴 뒤로에 회피 키(K) — 확인 J·뒤로 K. 웹은 포커스가 캔버스 밖이거나 `code`가 빈 키도 게임에 닿게(0278, `web/nail-host.js`)
+- [x] iPad 홈 화면 웹앱에서 실제 키보드가 안 듣던 것(0281): iOS에서 touchstart를 막지 않는다(WebKit 206887·276640)
+- [x] 키는 자리로·이름은 배열 글자로(0282): Linux X11·Wayland도 자리(miniquad `pc_scancode`, Xvfb AZERTY로 확인), 이름은 웹(Chrome 계열)·Windows·macOS가 지금 배열 글자
+- [x] 화살표는 늘 이동·WASD는 다시 붙이기(0283, 사장 2026-11-05): 조작 설정 첫 줄 "이동"(↑←↓→ 차례로), 기본값으로|돌아가기 한 줄
+- [ ] **실기로 볼 것(0282)**: Windows·macOS를 프랑스(AZERTY) 배열로 — 조작 설정·튜토리얼에 ZQSD·A/E가 보이는지, 움직임은 그대로인지
+- [x] 실기(0281, 사장 iPad 2026-11-05): 홈 화면 웹앱은 마우스로 한 번 클릭해 포커스를 주기 전엔 키가 안 듣는다 — **알려진 문제**로 둔다(저절로 포커스 안 감)
+- [ ] **실기로 볼 것(0278·0280)**: 휴대폰 브라우저 + 블루투스 키보드에서 첫 화면부터 키가 듣는지(한글 입력 상태 포함), 기기·브라우저·키보드 앱 이름
+- [ ] 출시 전 손질: 아래 쌓인 "실기로 볼 것", 번역 검수
+- 자세한 순서·고려할 것은 0276 "현황"
 
 ### v0.9 "옆 굴"(0275) — 닫음, v0.9.0 배포 2026-11-04
 - [x] 마일스톤 종류·자리(사장 2026-11-03): **넷째 길**, **엔딩 뒤 갈래**(셋째 길 끝에서 가장 깊은 곳 / 옆 굴)

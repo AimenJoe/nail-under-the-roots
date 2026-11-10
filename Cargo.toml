@@ -1,6 +1,6 @@
 [package]
 name = "nail"
-version = "0.9.2"
+version = "1.0.0"
 authors = ["Beardworks"]
 edition = "2021"
 description = "Naïl: Under the Roots — 귀여운 탑다운 액션 로그라이트"
@@ -12,6 +12,12 @@ default = ["dev"]
 dev = []
 # clip: 공식 페이지 클립 찍기 전용(0228) — 플레이어가 피해를 받지 않고, 자동 조종(src/autopilot.rs)이 싸운다. 배포 빌드에 넣지 않는다.
 clip = []
+# steam: Steam 판(0276 S1) — PC 빌드에만 켠다(`cargo build --release --no-default-features --features steam`).
+# Steam이 없거나 앱 번호가 맞지 않으면 조용히 그냥 켜진다(직접 받은 판과 같다). 웹·Android·iOS에는 켜지 않는다.
+steam = ["dep:steamworks"]
+# epic: Epic Games Store 판(0276 E2) — Windows 빌드에만 켠다(`--target x86_64-pc-windows-msvc --no-default-features --features epic`).
+# Epic 런처가 넘긴 로그인 코드가 없거나 EOS 아이디(빌드 때 환경 변수)가 없으면 조용히 그냥 켜진다. macOS는 Epic 업적 의무 면제.
+epic = ["dep:eos-sys"]
 
 [dependencies]
 macroquad = { version = "0.4.16", features = ["audio"] }
@@ -19,13 +25,28 @@ macroquad = { version = "0.4.16", features = ["audio"] }
 # gamepads 0.1.7은 Android에서 `android-winit` feature 없이는 컴파일되지 않는다(poll_android_winit 미정의).
 # 그 feature는 winit 전용이라 miniquad와 맞지 않으므로 Android 빌드에서는 크레이트를 아예 뺀다.
 # Android 게임패드는 miniquad 포크로 해결 (docs/decisions/0002, KB reference/macroquad/gamepad-and-android-input.md).
-[target.'cfg(not(target_os = "android"))'.dependencies]
+# iOS에서는 gilrs에 백엔드가 없어(빈 백엔드) 크레이트를 빼고 Apple GameController를 직접 읽는다(0288).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 gamepads = { version = "0.1.7", default-features = false }
+
+# iOS 게임패드(0288): GCController를 Objective-C 메시지로 읽는다. miniquad가 이미 쓰는 objc-rs(같은 판)라 새 크레이트가 없다.
+[target.'cfg(target_os = "ios")'.dependencies]
+objc = { package = "objc-rs", version = "0.2.8" }
 
 # 기기 언어 감지(docs/decisions/0013). 웹은 wasm-bindgen 없이 index.html 플러그인으로 읽으므로 뺀다.
 # Android는 libc의 시스템 속성(persist.sys.locale)을 읽는다.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 sys-locale = "0.3"
+
+# Steam(0276): SDK는 크레이트가 동적으로 읽는다. 재배포 파일(steam_api64.dll·libsteam_api.so·libsteam_api.dylib)은
+# 레포에 넣지 않는다(Valve SDK 계약) — Steam 빌드 CI가 실행 파일 옆에 둔다.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))'.dependencies]
+steamworks = { version = "0.13", optional = true }
+
+# Epic Online Services(0276 E2): 미리 만든 바인딩(eos-sys, MIT/Apache)만 쓰고 SDK는 레포에 넣지 않는다 —
+# 링크·실행에 필요한 EOSSDK-Win64-Shipping.lib·.dll은 Epic 포털에서 받아 비공개 에셋 레포에 두고 CI가 `EOS_SDK_DIR`로 준다.
+[target.'cfg(windows)'.dependencies]
+eos-sys = { version = "0.1.1", optional = true }
 
 # cargo-quad-apk 설정 (.github/workflows/build-android.yml, docs/decisions/0005)
 [package.metadata.android]
@@ -45,7 +66,7 @@ assets = "assets"
 res = "android/res"
 icon = "@mipmap/ic_launcher"
 # 앱 스토어 업데이트 판정용 정수. 배포할 때마다 올린다.
-version_code = 96
+version_code = 97
 
 [package.metadata.android.activity_attributes]
 "android:screenOrientation" = "sensorLandscape"

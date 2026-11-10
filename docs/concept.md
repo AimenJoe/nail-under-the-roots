@@ -43,7 +43,7 @@
 - 웹(브라우저, Netlify). 키보드 + 게임패드 + 터치(보조).
 - Android 게임 핸드헬드: APK(GitHub Release, 0005·0074), 패드 버튼(0075). **컨트롤러 지원 필수.** UI는 처음부터 커서 없이(좌우 이동 + 확인).
 - PC: Windows·macOS·Linux 빌드가 있다(0240). Steam Deck 실기 확인과 판매 준비는 남아 있다.
-- iOS: 현재는 서명 안 한 .ipa 빌드만(0086). TestFlight까지 하기로 했으며, Apple 계정·서명·iOS 게임패드 지원은 v0.6.x에 남아 있다(0232).
+- iOS: 현재는 서명 안 한 .ipa 빌드만(0086). TestFlight까지 하기로 했으며, Apple 계정·서명은 남아 있다(0232, 상점 일정은 v1.0 밖 0284). iOS 게임패드는 GCController로 넣었다(0288, 실기 확인 전).
 - 입력은 `Actions` 레이어로 추상화. 코드는 KeyCode를 보지 않는다.
 
 ## 단계

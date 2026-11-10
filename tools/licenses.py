@@ -1,6 +1,7 @@
 """제3자 라이선스 고지 파일 생성기. 의존성이 바뀌면 다시 돌린다(CLAUDE.md "커밋 전").
 
-실행: python3 tools/licenses.py  → assets/THIRD_PARTY_LICENSES.txt
+실행: python3 tools/licenses.py  → assets/THIRD_PARTY_LICENSES.txt (손으로 고치지 않는다)
+- 이 파일은 게임 설정의 라이선스 창에 그대로 보인다: 만드는 법·도구 경로 같은 개발 메모는 여기(코드)에만 둔다.
 - cargo metadata로 모든 크레이트(모든 플랫폼)의 이름·버전·SPDX를 모으고, 크레이트 폴더의 LICENSE*/COPYING*/NOTICE* 원문을 붙인다.
 - 같은 원문은 한 번만 싣고 해당 크레이트를 나열한다.
 - 웹 JS 복사본(mq_js_bundle.js = macroquad, macroquad-gamepads = gamepads)과 폰트(Galmuri, Ark Pixel 서브셋, Cubic 11 — 모두 OFL),
@@ -35,7 +36,7 @@ def license_texts(pkg_dir):
 
 def main():
     meta = json.loads(subprocess.check_output(
-        ['cargo', 'metadata', '--format-version', '1'], cwd=ROOT))
+        ['cargo', 'metadata', '--format-version', '1', '--all-features'], cwd=ROOT))
     groups = {}   # hash -> (filename, text, [crates])
     no_file = []
     for p in sorted(meta['packages'], key=lambda p: (p['name'], p['version'])):
@@ -52,7 +53,6 @@ def main():
 
     lines = [
         'Naïl: Under the Roots — 제3자 라이선스 고지 / Third-party license notices',
-        '이 파일은 tools/licenses.py가 만든다. 손으로 고치지 않는다.',
         '',
         '== 웹 JS ==',
         'web/mq_js_bundle.js: macroquad(not-fl3) — MIT OR Apache-2.0 (아래 macroquad 항목의 원문)',
@@ -63,7 +63,7 @@ def main():
         '원문: assets/fonts/OFL.md (예약 폰트 이름 없음. 글리프를 추린 서브셋)',
         'assets/fonts/NailCJK-ja.ttf, NailCJK-zh-Hans.ttf, NailCJK-zh-Hant.ttf — Ark Pixel Font(https://github.com/TakWolf/ark-pixel-font),',
         '  Copyright (c) 2021, TakWolf (https://takwolf.com), SIL Open Font License 1.1. 원문: assets/fonts/OFL-ArkPixel.txt',
-        '  (예약 폰트 이름 없음. 게임에 쓰는 글자만 뽑아 다시 지은 수정본, 이름 Nail CJK 12 — tools/fonts/build_cjk.py)',
+        '  (예약 폰트 이름 없음. 게임에 쓰는 글자만 뽑아 다시 지은 수정본, 이름 Nail CJK 12)',
         'assets/fonts/NailCJK-zh-Hant.ttf의 한자 일부 — Cubic 11 (Traditional Chinese name in the font metadata)(https://github.com/ACh-K/Cubic-11), SIL Open Font License 1.1.',
         '  JF Dot M+H 12(Copyright (c) 2005 M+ FONTS PROJECT)·M+ BITMAP FONTS(Copyright (C) 2002-2004 COZ)에서 나왔다.',
         '  원문과 원 고지: assets/fonts/OFL-Cubic11.txt (예약 폰트 이름 없음)',

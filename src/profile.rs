@@ -244,6 +244,24 @@ mod store {
 #[cfg(not(target_arch = "wasm32"))]
 mod store {
     use std::path::PathBuf;
+    use std::sync::OnceLock;
+
+    /// Steam 판은 계정마다 하위 폴더(0276 S3, `steam-<계정 번호>`). 기록을 처음 읽기 전에 한 번 정한다.
+    static SCOPE: OnceLock<String> = OnceLock::new();
+
+    #[cfg(feature = "steam")]
+    pub fn set_scope(scope: String) {
+        let _ = SCOPE.set(scope);
+    }
+
+    /// 기록 파일 폴더 = 앱 폴더(`data_dir`) 또는 그 아래 계정 폴더. 설정(`prefs.txt`)은 늘 앱 폴더 — 기기마다의 것이다.
+    pub fn save_dir() -> Option<PathBuf> {
+        let base = data_dir()?;
+        Some(match SCOPE.get() {
+            Some(s) => base.join(s),
+            None => base,
+        })
+    }
 
     /// 칸 → 파일 이름. 슬롯 1은 예전 한 칸 저장의 이름 그대로.
     pub fn file_name(cell: u32) -> String {
@@ -259,7 +277,7 @@ mod store {
 
     /// 저장 파일 자리. `NAIL_SAVE_DIR`이 있으면 그곳(테스트·휴대용).
     fn path(cell: u32) -> Option<PathBuf> {
-        Some(data_dir()?.join(file_name(cell)))
+        Some(save_dir()?.join(file_name(cell)))
     }
 
     /// 기록·설정 파일을 두는 앱 전용 폴더(설정 파일 `prefs.txt`도 여기, 0175).
@@ -268,7 +286,7 @@ mod store {
             PathBuf::from(d)
         } else if cfg!(target_os = "android") {
             // 앱 전용 내부 폴더(다른 앱은 못 본다). 패키지 이름은 Cargo.toml [package.metadata.android]이지만,
-            // 개발판은 CI가 `.dev`로 바꿔 짓는다(0193) — 그래서 프로세스 이름(= 패키지 이름)에서 읽는다.
+            // 개발판은 CI가 `io.github.aimenjoe.dev.nail`로 바꿔 짓는다(0193 → 0286) — 그래서 프로세스 이름(= 패키지 이름)에서 읽는다.
             let cmdline = std::fs::read_to_string("/proc/self/cmdline").unwrap_or_default();
             PathBuf::from(format!(
                 "/data/data/{}/files",
@@ -311,10 +329,52 @@ mod store {
     }
 }
 
-/// 기록·설정 파일 폴더(데스크톱·Android·iOS). 웹은 localStorage라 없다.
+/// 앱 폴더(데스크톱·Android·iOS) — 설정 `prefs.txt`가 여기. 기록은 Steam 판이면 그 아래 계정 폴더(`scope_saves`).
+/// 웹은 localStorage라 없다.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn data_dir() -> Option<std::path::PathBuf> {
     store::data_dir()
+}
+
+/// 바깥 폴더에 남기는 표: 옛 기록을 가져간 Steam 계정 폴더 이름.
+#[cfg(all(not(target_arch = "wasm32"), any(feature = "steam", test)))]
+const CLAIMED: &str = "steam-claimed.txt";
+
+/// Steam 판(0276 S3): 기록을 Steam 계정마다 `<앱 폴더>/<scope>`에 둔다 — 한 PC의 두 Steam 계정이 같은 슬롯을 덮지 않게
+/// (Steamworks Cloud 문서: 저장 경로는 Steam 사용자마다 갈리게). 기록을 처음 읽기 전에 한 번 부른다.
+/// 그 계정 폴더가 비어 있으면 바깥의 옛 기록(Steam 전·직접 받은 판)을 가져온다 — `adopt_saves`.
+#[cfg(feature = "steam")]
+pub fn scope_saves(scope: &str) {
+    if let Some(base) = store::data_dir() {
+        match adopt_saves(&base, scope) {
+            Ok(true) => eprintln!("기록: 옛 기록을 {scope}로 가져왔다"),
+            Ok(false) => {}
+            Err(e) => eprintln!("기록: 옛 기록을 가져오지 못했다 ({e})"),
+        }
+    }
+    store::set_scope(scope.to_string());
+}
+
+/// 계정 폴더에 기록이 하나도 없고, 바깥 폴더에 기록이 있고, 아직 아무 계정도 가져가지 않았으면 복사한다(옮기지 않는다 —
+/// 직접 받은 판은 바깥 기록을 계속 쓴다). 가져간 계정은 `steam-claimed.txt`에 남겨 둘째 계정은 새로 시작한다
+/// (같은 진행을 두 계정에 나눠 주지 않는다). 가져왔으면 true.
+#[cfg(all(not(target_arch = "wasm32"), any(feature = "steam", test)))]
+fn adopt_saves(base: &std::path::Path, scope: &str) -> std::io::Result<bool> {
+    let dir = base.join(scope);
+    let names: Vec<String> = (0..CELLS as u32).map(store::file_name).collect();
+    let has = |d: &std::path::Path| names.iter().any(|n| d.join(n).is_file());
+    if has(&dir) || !has(base) || base.join(CLAIMED).exists() {
+        return Ok(false);
+    }
+    std::fs::create_dir_all(&dir)?;
+    for n in &names {
+        let from = base.join(n);
+        if from.is_file() {
+            std::fs::copy(&from, dir.join(n))?;
+        }
+    }
+    std::fs::write(base.join(CLAIMED), scope)?;
+    Ok(true)
 }
 
 /// miniquad가 플러그인 버전을 맞춰 보는 함수(mq_js_bundle.js의 init_plugins).
@@ -486,13 +546,20 @@ pub fn save_run(i: usize, p: Option<&Profile>) -> bool {
 }
 
 /// Android 앱의 패키지 이름. `/proc/self/cmdline`의 첫 칸이 프로세스 이름이고, 앱 프로세스는 패키지 이름을 쓴다.
-/// 우리 패키지(운영 `io.github.aimenjoe.nail`, 개발판 `….dev`, 0193)가 아니면 운영 이름으로.
+/// 우리 패키지(운영 `io.github.aimenjoe.nail`, 개발판 `io.github.aimenjoe.dev.nail`, 0193 → 0286)가 아니면 운영 이름으로
+/// — 남의 폴더(쓸 권한이 없다)에 쓰려다 저장이 실패하지 않게. 옛 개발판 이름 `….nail.dev`는 받지 않는다: 그 판은
+/// 네이티브 라이브러리를 못 찾아(`libdev.so`) Rust 코드가 돌기 전에 죽었으니 이 함수에 닿은 적이 없다(0286).
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 fn android_package(cmdline: &str) -> String {
     const BASE: &str = "io.github.aimenjoe.nail";
+    const DEV: &str = "io.github.aimenjoe.dev.nail";
     let name = cmdline.split('\0').next().unwrap_or("").trim();
-    let ours = name == BASE || name.strip_prefix(BASE) == Some(".dev");
-    if ours { name } else { BASE }.to_string()
+    if name == BASE || name == DEV {
+        name
+    } else {
+        BASE
+    }
+    .to_string()
 }
 
 #[cfg(test)]
@@ -501,9 +568,15 @@ mod tests {
     fn android_save_dir_follows_the_package() {
         use super::android_package as pkg;
         assert_eq!(pkg("io.github.aimenjoe.nail\0"), "io.github.aimenjoe.nail");
+        // 개발판(0286): 패키지 이름의 마지막 조각이 네이티브 라이브러리 이름이라 `nail`로 끝난다.
         assert_eq!(
-            pkg("io.github.aimenjoe.nail.dev\0\0"),
-            "io.github.aimenjoe.nail.dev"
+            pkg("io.github.aimenjoe.dev.nail\0\0"),
+            "io.github.aimenjoe.dev.nail"
+        );
+        // 옛 개발판 이름은 켜지지도 않던 것 — 받지 않는다.
+        assert_eq!(
+            pkg("io.github.aimenjoe.nail.dev\0"),
+            "io.github.aimenjoe.nail"
         );
         // 읽지 못했거나 남의 이름이면 운영 이름.
         assert_eq!(pkg(""), "io.github.aimenjoe.nail");
@@ -512,6 +585,44 @@ mod tests {
     }
 
     use super::*;
+
+    /// Steam 계정 폴더(0276 S3): 첫 계정만 옛 기록을 복사해 가고(바깥은 그대로), 둘째 계정은 새로 시작하며,
+    /// 이미 기록이 있는 계정 폴더는 덮지 않는다.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn first_steam_account_adopts_old_saves_once() {
+        let base = std::env::temp_dir().join(format!("nail-adopt-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        // 기록이 없으면 가져올 것도 없다.
+        assert!(!adopt_saves(&base, "steam-1").unwrap());
+        std::fs::write(base.join("profile.txt"), "old").unwrap();
+        std::fs::write(base.join("prefs.txt"), "1 2 3").unwrap();
+        assert!(adopt_saves(&base, "steam-1").unwrap());
+        assert_eq!(
+            std::fs::read_to_string(base.join("steam-1/profile.txt")).unwrap(),
+            "old"
+        );
+        assert!(
+            !base.join("steam-1/prefs.txt").exists(),
+            "설정은 기기마다 — 앱 폴더에 남는다"
+        );
+        assert!(
+            base.join("profile.txt").exists(),
+            "옮기지 않고 복사한다(직접 받은 판이 계속 쓴다)"
+        );
+        // 같은 계정은 다시 가져오지 않는다(이미 기록이 있다).
+        std::fs::write(base.join("steam-1/profile.txt"), "new").unwrap();
+        assert!(!adopt_saves(&base, "steam-1").unwrap());
+        assert_eq!(
+            std::fs::read_to_string(base.join("steam-1/profile.txt")).unwrap(),
+            "new"
+        );
+        // 둘째 계정은 새로 시작한다.
+        assert!(!adopt_saves(&base, "steam-2").unwrap());
+        assert!(!base.join("steam-2").exists());
+        let _ = std::fs::remove_dir_all(&base);
+    }
 
     /// v0.3.8이 쓴 기록 글의 고정 샘플(0169 R8): 형식이 바뀌어도 옛 저장을 같은 값으로 읽어야 한다.
     /// 모르는 줄·빈 줄은 버리고, 다시 쓰면 키 순서로 정렬된 같은 형식이다.
