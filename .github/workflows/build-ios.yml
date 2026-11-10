@@ -1,6 +1,8 @@
 name: build-ios
-# iOS 빌드(docs/decisions/0086). 지금은 **서명하지 않은 .ipa**만 만든다(Actions 아티팩트).
-# 내 기기에서 시험: 받은 nail-ios-unsigned.ipa를 Sideloadly·AltStore로 내 Apple ID로 서명해 설치(무료 계정은 7일마다 다시).
+# iOS 빌드(docs/decisions/0086). **서명하지 않은 .ipa**를 만든다 — 받는 사람이 Sideloadly·AltStore로 자기 Apple ID로 서명해 설치(무료 계정은 7일마다 다시).
+# - push·손으로: Actions 아티팩트(nail-ios-unsigned.ipa).
+# - release.yml이 부를 때(release_tag): 운영판을 그 태그의 GitHub Release에 nail-ios.ipa로 붙인다(공식 페이지 "직접 설치", 0291).
+# - 손으로 release_tag를 넣으면 이미 있는 Release에 운영판 ipa를 붙인다(릴리스 때 빠진 것 채우기 — main에서 돌린다).
 # 나중에 TestFlight·App Store로 내려면 Apple Developer Program 인증서·프로비저닝 프로필을 Secrets에 두고 서명 단계를 더한다.
 # 공개 레포의 macOS 러너는 무료. main push(관련 파일)와 수동 실행(작업 브랜치는 Run workflow에서 고른다, 0169 R8).
 # 갈래(0193): main = 운영판(--no-default-features). release/**·수동 실행 = 개발판(개발 기능 + 번들 아이디 `.dev`, 이름 "Naïl dev").
@@ -16,18 +18,36 @@ on:
       - 'Cargo.lock'
       - '.github/workflows/build-ios.yml'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '이미 있는 Release에 운영판 ipa를 붙일 때만(예: v1.0.0, main에서 돌린다). 비우면 아티팩트만'
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        required: true
 
 concurrency:
-  group: ios-${{ github.ref }}
+  group: ios-${{ inputs.release_tag || github.ref }}
   cancel-in-progress: true
 
 jobs:
   ipa:
     runs-on: macos-latest
+    permissions:
+      contents: write   # release_tag일 때 Release에 붙이기
     env:
       ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 운영판은 유료 팩 그림 없이 나가지 않는다(0277, build-desktop과 같다).
+      - name: Require vendor assets for release
+        if: env.ASSETS_REPO == '' && inputs.release_tag != ''
+        run: echo "::error::ASSETS_REPO 시크릿이 없다 — 운영판을 대체 그림으로 내보내지 않는다"; exit 1
 
       # 유료 에셋 팩(레포 밖, docs/decisions/0010). 시크릿이 없으면 건너뛰고 직접 그린 대체 타일로 빌드한다.
       - name: Fetch vendor assets (private repo)
@@ -37,6 +57,7 @@ jobs:
           repository: ${{ secrets.ASSETS_REPO }}
           token: ${{ secrets.ASSETS_TOKEN }}
           path: assets/vendor
+          persist-credentials: false
       # Rust 버전은 rust-toolchain.toml 한 곳, 툴체인·캐시 액션은 SHA 고정(0277).
       - uses: ./.github/actions/rust
         with:
@@ -44,7 +65,7 @@ jobs:
 
       - name: Build flavor
         run: |
-          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+          if [ -n "$RELEASE_TAG" ] || [ "$GITHUB_REF" = "refs/heads/main" ]; then
             echo "FEATURES=--no-default-features" >> "$GITHUB_ENV"; echo "FLAVOR=release" >> "$GITHUB_ENV"
           else
             echo "FEATURES=" >> "$GITHUB_ENV"; echo "FLAVOR=dev" >> "$GITHUB_ENV"
@@ -88,3 +109,13 @@ jobs:
           name: nail-ios-unsigned-${{ env.FLAVOR }}
           path: nail-ios-unsigned.ipa
           if-no-files-found: error
+
+      # 공식 페이지의 iOS "직접 설치"가 releases/latest/download/nail-ios.ipa를 가리킨다(0291).
+      - name: Attach to Release
+        if: inputs.release_tag != ''
+        run: cp nail-ios-unsigned.ipa nail-ios.ipa
+      - if: inputs.release_tag != ''
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: nail-ios.ipa

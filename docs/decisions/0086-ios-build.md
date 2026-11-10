@@ -25,6 +25,7 @@
   - `cargo build --release --target aarch64-apple-ios`로 빌드한다.
   - `Payload/Nail.app`에 실행 파일·assets·아이콘·Info.plist·PkgInfo를 넣는다.
   - `nail-ios-unsigned.ipa`를 Actions 아티팩트로 올린다. Release에는 아직 붙이지 않는다(서명 없는 파일은 그대로 설치되지 않는다).
+    - **바뀜(0291)**: 릴리스마다 운영판을 Release에 `nail-ios.ipa`로 붙이고 공식 페이지에서 "직접 설치"(받는 사람이 자기 Apple ID로 서명)로 알린다.
 - `ios/Info.plist`: 번들 아이디는 Android와 같은 `io.github.aimenjoe.nail`이다.
   - 버전·빌드 번호는 Cargo.toml의 `version`·`version_code`를 쓴다.
   - 가로 화면만 쓰고, 상태 표시줄을 숨긴다. `UILaunchScreen`(스토리보드 없이 전체 화면, iOS 14+).

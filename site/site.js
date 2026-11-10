@@ -22,6 +22,9 @@
       document.querySelectorAll("[data-latest-version]").forEach((el) => { el.textContent = latest.tag_name; });
       document.querySelectorAll("[data-latest-date]").forEach((el) => { el.textContent = fmt(latest.published_at); });
       if (apk) document.querySelectorAll("[data-apk]").forEach((el) => { el.href = apk.browser_download_url; });
+      // iOS ipa(0291): 최신 릴리스에 없으면(붙기 전) 없는 파일 대신 릴리스 페이지로.
+      const ipa = (latest.assets || []).find((a) => a.name.endsWith(".ipa"));
+      document.querySelectorAll("[data-ipa]").forEach((el) => { el.href = ipa ? ipa.browser_download_url : latest.html_url; });
       // PC 묶음(0240): nail-<windows|macos|linux>-release.(zip|tar.gz).
       document.querySelectorAll("[data-pc]").forEach((el) => {
         const pc = (latest.assets || []).find((a) => a.name.startsWith(`nail-${el.dataset.pc}-`));
