@@ -1,5 +1,7 @@
 # Epic Games Store 상점 글·그림 (0276 E5, 2026-11-06)
 
+> 2026-11-11 Epic 검토 반려 세 가지를 반영: 법적 정보 푸터는 영어로만, 지원 페이지 링크에 GitHub 금지(비우거나 게임 사이트 안 페이지), 로그인 요건에 Epic ID(출시일을 정하기 전까지는 막지 않음). 근거는 Epic이 보낸 검토 글 — 원문 문서(dev.epicgames.com content-guidelines "Localization policies"·"Linked-to content", store-config "Product details")는 이번에 직접 못 읽었다.
+
 규격은 Epic "Storefront Media Guide"·"Offer Details" 원문(2026-11-06 확인). 짧은 설명의 글자 수 제한은 원문에서 못 찾았다 — 상점 곳곳과 검색·공유 미리보기에 쓰인다고만 되어 있어 200자 안쪽으로 썼다. 필수 언어는 영어뿐.
 
 ## 짧은 설명 (Offers → General Details → Short Description)
@@ -34,19 +36,19 @@ About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 
 | 짧은 설명 * (280) | 위 "짧은 설명" 영어(한국어는 현지화 메뉴에서) |
 | 장르 * | Action · Rogue-Lite · Indie (목록에 있는 이름으로) |
 | 기능 * | Single Player · Controller Support · Achievements. 클라우드 저장(Epic)은 아직 안 만들었으니 고르지 않는다 |
-| 로그인 요건 | 없음(게임 안 계정 없음 — Epic 런처 로그인만) |
+| 로그인 요건 | **Epic ID** — EAS(EOS Connect로 Epic 계정 로그인·업적)를 쓰니 넣어야 한다. 출시일을 정하기 전까지는 막지 않는다(Epic 검토 2026-11-11) |
 | 지원 언어 · 오디오 | 비움(음성 없음) |
 | 지원 언어 · 텍스트 * | English · Korean · Japanese · Chinese (Simplified) · Chinese (Traditional) · Portuguese (Brazil) · French · Spanish (Spain) · German · Russian · Polish |
 | 법적 정보 푸터 * | 아래 |
 | 개인정보 보호 링크 | `https://beardworks.io/en/privacy.html` |
 | 이용 약관 · EULA | 비움(따로 만든 것 없음) |
-| 지원 페이지 링크 | `https://github.com/AimenJoe/nail-under-the-roots/issues` |
+| 지원 페이지 링크 | **비움** — GitHub 같은 제3자 저장소 링크는 금지, 지원 이메일이 있으면 비워도 된다(Epic 검토 2026-11-11). 페이지를 둔다면 게임 사이트(`nail.beardworks.io`) 안의 지원·연락처 페이지 |
 | 지원 이메일 | `support@beardworks.io` |
 | 개발자 · 퍼블리셔 이름 * | `Beardworks` · `Beardworks` |
 
-법적 정보 푸터:
+법적 정보 푸터 — **영어로만**(Epic 출판 도구는 영어로 읽히지 않는 상품 페이지를 받지 않는다. 한글 상호 `털보네공업사`를 넣었다가 반려됨, Epic 검토 2026-11-11):
 
-    © 2026 Beardworks (털보네공업사). All rights reserved.
+    © 2026 Beardworks. All rights reserved.
     Environment art: Sunnyside World by danieldiggle. Music and sound effects: CC0 works by Cleyton Kauffman, fluffclipse, Kistol, Aureolus_Omicron, Yoiyami, KarateStudios, Juhani Junkala, mutantleg, Umplix, RandomMind, Écrivain, cynicmusic, beardalaxy, Trex0n, Kenney, artisticdude, Bobjt, themightyglider, qubodup, syncopika, cinameng and JaggedStone. Fonts: Galmuri, Ark Pixel and Cubic 11 (SIL Open Font License 1.1).
     Character sprites, portraits and illustrations were made from originals generated with a Google Gemini image model, then converted to pixel art and touched up by hand.
     Full third-party licenses are listed in the game under Settings → Licenses.
