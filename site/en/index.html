@@ -142,8 +142,8 @@
       <div class="cta">
         <div class="cta-line">
           <a class="btn" href="https://nail-under-the-roots.netlify.app" target="_blank" rel="noopener">Play in browser</a>
-          <a class="btn alt" data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest/download/nail.apk">Android</a>
-          <span class="btn alt soon" aria-disabled="true" title="iOS — coming soon (TestFlight)">iOS <small>soon</small></span>
+          <a class="btn alt" data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest/download/nail.apk">Android <small>.apk</small></a>
+          <a class="btn alt" data-ipa href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest/download/nail-ios.ipa" title="iPhone · iPad — unsigned ipa, see &quot;Play&quot; below for how to install">iOS <small>.ipa</small></a>
         </div>
         <div class="cta-line">
           <a class="btn alt" data-pc="windows" href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest/download/nail-windows-release.zip">Windows</a>
@@ -407,6 +407,17 @@
           </ul>
           <p><a class="btn small alt" data-apk href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest/download/nail.apk">Get the latest APK</a></p>
         </div>
+        <div id="ios">
+          <h3>iPhone · iPad (sideload)</h3>
+          <p>The easiest way is the browser above (in Safari, "Add to Home Screen"). If you want the app, it isn't on the App Store yet, so you install it yourself.</p>
+          <ul>
+            <li>Download <code>nail-ios.ipa</code> (unsigned) from the releases page.</li>
+            <li>Sign and install it with your own Apple ID using Sideloadly or AltStore on a computer (Windows or Mac).</li>
+            <li>On iOS 16 and later, turn on "Settings → Privacy &amp; Security → Developer Mode", then trust your Apple ID developer in "Settings → General → VPN &amp; Device Management".</li>
+            <li>With a free Apple ID you have to re-sign every 7 days, and up to three apps can be installed this way.</li>
+          </ul>
+          <p><a class="btn small alt" data-ipa href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest/download/nail-ios.ipa">Get the ipa</a></p>
+        </div>
         <div>
           <h3>PC (Windows · macOS · Linux)</h3>
           <ul>
@@ -416,7 +427,7 @@
           </ul>
           <p class="cta-row"><a class="btn small alt" data-pc="windows" href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest/download/nail-windows-release.zip">Windows</a> <a class="btn small alt" data-pc="macos" href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest/download/nail-macos-release.zip">macOS</a> <a class="btn small alt" data-pc="linux" href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest/download/nail-linux-release.tar.gz">Linux</a></p>
         </div>
-        <p class="small-note files">Files: <code>nail.apk</code> · <code>nail-windows-release.zip</code> · <code>nail-macos-release.zip</code> · <code>nail-linux-release.tar.gz</code> — <a href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">release notes</a> · <a href="https://github.com/AimenJoe/nail-under-the-roots/releases">older versions</a></p>
+        <p class="small-note files">Files: <code>nail.apk</code> · <code>nail-ios.ipa</code> · <code>nail-windows-release.zip</code> · <code>nail-macos-release.zip</code> · <code>nail-linux-release.tar.gz</code> — <a href="https://github.com/AimenJoe/nail-under-the-roots/releases/latest">release notes</a> · <a href="https://github.com/AimenJoe/nail-under-the-roots/releases">older versions</a></p>
         <div class="keytable">
           <h3>Controls (default)</h3>
           <table>
@@ -445,7 +456,7 @@
       </div>
       <dl class="facts">
         <div><dt>Genre</dt><dd>Top-down action roguelite</dd></div>
-        <div><dt>Platforms</dt><dd>Web browser · Android · Windows · macOS · Linux · iOS in progress</dd></div>
+        <div><dt>Platforms</dt><dd>Web browser · Android · Windows · macOS · Linux · iOS (sideload)</dd></div>
         <div><dt>Price</dt><dd>Free</dd></div>
         <div><dt>Languages</dt><dd>11</dd></div>
         <div><dt>Made by</dt><dd><a href="https://beardworks.io/en/">Beardworks</a> · one person</dd></div>
@@ -460,8 +471,8 @@
     <div class="wrap">
       <header class="head"><p class="tag">FAQ</p><h2>Questions</h2></header>
       <div class="faq">
-        <details><summary>Where is my progress saved?</summary><p>On the web, in that browser; on Android and PC, on the device. There are three save slots. Clearing browser data also clears web progress. On iPhone, a home-screen app keeps its progress separate from Safari.</p></details>
-        <details><summary>Does it support gamepads?</summary><p>Yes, in desktop and phone browsers and on Android. It was built with Android handhelds with built-in controls in mind. Gamepads don't work on iOS yet.</p></details>
+        <details><summary>Where is my progress saved?</summary><p>On the web, in that browser; on Android, PC and the iOS app, on the device. There are three save slots. Clearing browser data also clears web progress. On iPhone, a home-screen app keeps its progress separate from Safari.</p></details>
+        <details><summary>Does it support gamepads?</summary><p>Yes, in desktop and phone browsers and on Android. It was built with Android handhelds with built-in controls in mind. The sideloaded iOS app supports them too.</p></details>
         <details><summary>Can I play on my phone?</summary><p>Yes. A move stick and buttons appear on screen, though a keyboard or gamepad is the most comfortable.</p></details>
         <details><summary>Is it hard?</summary><p>You learn by falling, but you can turn on "Popo's Cheer" so you take less damage the more you fall. Once it feels easy, raise the challenge with the cat's cradle.</p></details>
       </div>

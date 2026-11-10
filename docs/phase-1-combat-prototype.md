@@ -162,6 +162,11 @@
 
 ## 사람이 할 일 (다음 세션 전)
 
+### iOS ipa를 공식 페이지에(0291, 2026-11-10, main 패치)
+- [x] Release에 `nail-ios.ipa`(운영판, 서명 안 함)를 붙이는 길(`release.yml` `ios` 잡·`build-ios.yml` `release_tag`), 공식 페이지 두 언어 "직접 설치" 칸·버튼·FAQ
+- [x] PR #23 Merge·build-ios 수동 실행(main, `release_tag` = `v1.0.0`)은 Claude가 함(사장 2026-11-10 "실행해") → Release에 `nail-ios.ipa`가 붙었는지, 페이지 "ipa 받기"가 파일로 가는지
+- [ ] 문의가 오면: 설치·실행·패드 문제(실기 확인 없이 열었다, 사장 결정)
+
 ### 웹 호스팅은 나중에 Cloudflare로(0290, 2026-11-10 — 방향만)
 - [x] Netlify 요금제는 **Legacy**(월 100 GB, 사장 2026-11-10) — 급하지 않다, 상점 출시·홍보 전에 다시 본다
 - [ ] (때때로) Netlify 대시보드의 이번 달 대역폭 — 100 GB에 가까워지면 옮길 시점
