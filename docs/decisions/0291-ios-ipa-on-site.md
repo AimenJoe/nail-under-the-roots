@@ -7,7 +7,7 @@
 ## 정한 것
 1. **릴리스마다 운영판 ipa를 Release에 `nail-ios.ipa`로 붙인다**: `release.yml`의 `ios` 잡이 `build-ios.yml`을 `release_tag`로 부른다(APK 잡이 Release를 만든 뒤). 손으로 돌릴 때도 `release_tag`를 넣으면 이미 있는 Release에 붙인다 — build-desktop과 같은 꼴. 운영판은 비공개 에셋이 없으면 실패(0277), 에셋 체크아웃은 `persist-credentials: false`.
 2. **공식 페이지(두 언어)**:
-   - 첫 화면 iOS 버튼: "준비 중(TestFlight 예정)" → "직접 설치", 설치 칸 `#ios`로 간다(파일로 바로 가지 않는다 — 안내를 먼저 읽게).
+   - 첫 화면 버튼은 파일 형식으로: "Android .apk"·"iOS .ipa"(사장 2026-11-10 — APK와 같은 꼴로). iOS는 "준비 중(TestFlight 예정)"이었다. 설치 방법은 해 보기 칸.
    - 해 보기에 "iPhone · iPad (직접 설치)" 칸: 쉬운 길은 브라우저(홈 화면에 추가)라고 먼저 말하고, Sideloadly·AltStore로 내 Apple ID 서명, iOS 16+ 개발자 모드·설정에서 개발자 신뢰, 무료 Apple ID는 7일마다 다시·앱 셋까지.
    - `site.js`: 최신 Release에 `.ipa`가 있으면 그 주소, 없으면(붙기 전) 없는 파일 대신 Release 페이지로.
    - 파일 줄·플랫폼 칸·기록 저장 FAQ·게임패드 FAQ("직접 설치한 iOS 앱에서도 된다")를 고침. 구조화 데이터(`gamePlatform`)에는 iOS를 넣지 않는다 — 상점판이 아니고 실기 확인 전이라.
