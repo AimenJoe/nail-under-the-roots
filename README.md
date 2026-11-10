@@ -100,5 +100,5 @@ python3 tools/licenses.py                         # 의존성을 바꿨을 때�
 
 ### iOS (빌드만)
 - `build-ios.yml`(macOS 러너)이 main·release/** push마다 `aarch64-apple-ios`로 빌드해 **서명하지 않은** `nail-ios-unsigned`(.ipa)를 Actions 아티팩트로 올린다. Info.plist는 `ios/Info.plist`, 아이콘은 `ios/icons/`(docs/decisions/0086).
-- 그대로는 기기에 깔리지 않는다. 내 기기 시험은 Sideloadly·AltStore(Windows·Mac)로 내 Apple ID 서명(무료면 7일마다 다시). TestFlight까지 하기로 했지만 Apple Developer Program 가입·CI 서명·iOS 게임패드 지원은 아직 남아 있다(0232).
-- iOS에서는 게임패드가 아직 안 된다(gilrs에 iOS 백엔드가 없다). 저장은 앱 샌드박스 `Library/Application Support/nail`.
+- 그대로는 기기에 깔리지 않는다. 내 기기 시험은 Sideloadly·AltStore(Windows·Mac)로 내 Apple ID 서명(무료면 7일마다 다시). TestFlight까지 하기로 했지만 Apple Developer Program 가입·CI 서명은 아직 남아 있다(0232).
+- iOS 게임패드는 Apple GameController(`GCController`)를 직접 읽는다(gilrs에 iOS 백엔드가 없어서, 0288 — 실기 확인 전). 저장은 앱 샌드박스 `Library/Application Support/nail`.

@@ -501,6 +501,7 @@ dependencies = [
  "eos-sys",
  "gamepads",
  "macroquad",
+ "objc-rs",
  "steamworks",
  "sys-locale",
 ]

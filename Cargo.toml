@@ -25,8 +25,13 @@ macroquad = { version = "0.4.16", features = ["audio"] }
 # gamepads 0.1.7은 Android에서 `android-winit` feature 없이는 컴파일되지 않는다(poll_android_winit 미정의).
 # 그 feature는 winit 전용이라 miniquad와 맞지 않으므로 Android 빌드에서는 크레이트를 아예 뺀다.
 # Android 게임패드는 miniquad 포크로 해결 (docs/decisions/0002, KB reference/macroquad/gamepad-and-android-input.md).
-[target.'cfg(not(target_os = "android"))'.dependencies]
+# iOS에서는 gilrs에 백엔드가 없어(빈 백엔드) 크레이트를 빼고 Apple GameController를 직접 읽는다(0288).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 gamepads = { version = "0.1.7", default-features = false }
+
+# iOS 게임패드(0288): GCController를 Objective-C 메시지로 읽는다. miniquad가 이미 쓰는 objc-rs(같은 판)라 새 크레이트가 없다.
+[target.'cfg(target_os = "ios")'.dependencies]
+objc = { package = "objc-rs", version = "0.2.8" }
 
 # 기기 언어 감지(docs/decisions/0013). 웹은 wasm-bindgen 없이 index.html 플러그인으로 읽으므로 뺀다.
 # Android는 libc의 시스템 속성(persist.sys.locale)을 읽는다.

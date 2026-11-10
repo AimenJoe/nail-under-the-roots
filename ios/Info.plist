@@ -81,6 +81,16 @@
 			<string>AppIcon</string>
 		</dict>
 	</dict>
+	<!-- 게임 패드(0288): 확장 프로필(ABXY·어깨·트리거·스틱 둘)을 쓴다. Xcode의 Game Controllers 기능이 넣는 두 키와 같다. -->
+	<key>GCSupportsControllerUserInteraction</key>
+	<true/>
+	<key>GCSupportedGameControllers</key>
+	<array>
+		<dict>
+			<key>ProfileName</key>
+			<string>ExtendedGamepad</string>
+		</dict>
+	</array>
 	<!-- 저장은 앱 안(Library/Application Support)에만 한다. 파일 앱에 보이지 않게. -->
 	<key>UIFileSharingEnabled</key>
 	<false/>

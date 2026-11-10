@@ -141,6 +141,7 @@
 | 컷씬 일러스트 | `illust.rs`, `cutscene.rs`(Step::Illust·Narrate, cut_to, 이야기 장면), `render.rs`(draw_illust), `tools/art/illust.py` | 2배 밀도 한 장 그림(기본 640×360, 패닝 장면은 더 큼) + 느린 패닝 + 입자, 내레이션 띠. 처음 8장(0039) → 지금 11장(+도토 기억 0053·모모 깊은 곳 0056·콩이의 문 0085), 모두 이야기 컷씬에서 나오고 앨범에 모인다. 개발 "이야기 일러스트"는 바로 보기용. 그림은 11장 모두 나노바나나(0125~0136), 내레이션 아홉 언어(0037, 0039) |
 | 튜토리얼 보스 | `enemy.rs`(Chief), `species.rs`(CHIEF), `field.rs`(공터), `tools/art/chief.py`, `render.rs`(보스 막대) | 들쥐 대장 보리: 돌진 ↔ 뛰어 찍기, 반 아래면 생쥐 떼, 공격 중 슈퍼아머, 벽에 박으면 2.2초 틈. 32×32 그림, 초상화 3, 처치 컷씬 → 쉼터의 이웃. 헤드리스로 공터 잠금·막대·처치 컷씬·쉼터·가게·길 지도 확인(docs/decisions/0032) |
 | iOS 빌드 1단계(0086) | `.github/workflows/build-ios.yml`, `ios/Info.plist`, `ios/icons/`, `profile.rs`(iOS 저장 자리) | macOS 러너에서 `aarch64-apple-ios` 빌드 → 서명 안 한 `.ipa` 아티팩트. 실기 실행은 미확인. TestFlight까지 하기로 했으나 계정·서명·iOS 패드는 v0.6.x 사람 몫(gilrs, 0232) |
+| iOS 게임패드(0288) | `src/input/ios_pad.rs`(GCController 읽기·연결 알림), `src/input.rs`(`PadFrame`·`pad_frame_actions`, iOS `read_gamepads`·`capture`, 첫 장치 터치), `Cargo.toml`(iOS는 gamepads 빼고 objc-rs), `ios/Info.plist`(`GCSupportsControllerUserInteraction`·`GCSupportedGameControllers`), `build-ios.yml`(GameController 링크 확인) | 패드 버튼·D패드·스틱 둘을 다른 플랫폼과 같은 짝으로. 진동은 없음(Core Haptics). 실기 미확인 |
 | 앱 아이콘(0087) | `tools/icons/make_icons.py`, `android/res/mipmap-*`, `Cargo.toml`(res·icon), `build-android.yml`(application-icon 검사) | iOS·Android 아이콘(그림은 0123에서 큰 나무·뿌리 실루엣으로 바꿈). Android는 옛 mipmap + 적응형(8+). CI가 APK에 아이콘이 없으면 실패 |
 | 솟구치기·마무리 타(0090) | `tuning.rs`(EMERGE_*·CLAW_*), `moveset.rs`, `world.rs`(emerge_push·충격), `sfx.rs`(Impact) | 첫 바깥 판정 2·3("숨는 용도", "그저 그렇다") 뒤: 솟구침 반지름 22·피해 2(0158부터 톡 1·모으면 2)·넉백 340 + 반지름 44 밀쳐내기(잡몹만), 두 겹 고리·쿵. 마무리 타 넉백 ×1.35~1.45, 멈춤·흔들림↑, 충격 고리·쿵. 단위 테스트(밀쳐내기) |
 | HUD·퀵 슬롯(0091) | `render.rs`(hud_plate·draw_quick_slots·draw_hud_bars), `items.rs`(Bag::take·flash) | 바탕판 셋·테두리 글자, 게이지 34px, 퀵 슬롯 22px·아이콘 2배·고른 칸 금빛 2px, 다 쓰면 가진 다른 것으로 저절로 + 1.2초 깜빡임(쓰러져 지렁이가 쓰여도). 가게 창 밑 HUD 숨김. 단위 테스트 |
@@ -160,6 +161,10 @@
 확인한 것: 데스크톱(Xvfb) 실행 캡처로 렌더 방향·공격 반원·굴파기·히트박스 표시, 헤드리스 Chromium으로 웹 빌드 로드·입력·콘솔(mismatch 없음). 확인 못 한 것: 판정 2·3 다시(0090 뒤), 데스크톱 실기 패드, 소리의 실제 느낌(컨테이너에 오디오 장치 없음).
 
 ## 사람이 할 일 (다음 세션 전)
+
+### iOS 게임패드(0288, 2026-11-10, release/v1.0)
+- [x] iOS 앱이 GCController를 프레임마다 읽는다(`src/input/ios_pad.rs`, 짝은 다른 패드와 같다, 첫 장치 = 터치, Info.plist 컨트롤러 키 둘)
+- [ ] 사람: 실기 — 개발판 `.ipa`(Actions `build-ios` → `nail-ios-unsigned-dev`)를 Sideloadly로 깔고 블루투스 패드로 메뉴·걷기·조준·강타 모으기·일시정지·다시 붙이기·켠 뒤 붙이고 떼기·안내 글이 장치를 따라 바뀌는지(0288 "사람이 할 일")
 
 ### 개발판 APK가 켜자마자 죽던 것(0286, 2026-11-07, release/v1.0)
 - [ ] 사람: 폰에 깔린 옛 "Naïl dev"(켜지지 않는 것, 패키지 `io.github.aimenjoe.nail.dev`)는 지우고, 미리 보기 Release `dev`의 새 `nail-dev.apk`를 깔기 — 패키지가 `io.github.aimenjoe.dev.nail`로 바뀌어 덮어 깔리지 않고 따로 깔린다. 개발판 기록은 원래 운영판과 따로였고 옛 개발판은 켜지지도 않았으니 잃는 것은 없다(패키지가 바뀌면 옛 개발판 기록 폴더는 새 개발판에서 안 보인다)

@@ -17,11 +17,14 @@
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::RwLock;
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use gamepads::{Button, Gamepads};
 use macroquad::prelude::*;
 
 use crate::tuning;
+
+#[cfg(target_os = "ios")]
+mod ios_pad;
 
 /// 바꿀 수 있는 게임 동작.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -45,7 +48,8 @@ pub const ACTS: [Act; 7] = [
     Act::Map,
 ];
 
-/// 패드 버튼(W3C 표준 배치 위치). gamepads 크레이트가 없는 Android에서도 컴파일되게 따로 둔다.
+/// 패드 버튼(W3C 표준 배치 위치). gamepads 크레이트가 없는 Android·iOS에서도 컴파일되게 따로 둔다.
+/// 선언 순서 = `PADS` 순서(`PadFrame`이 `p as usize`로 칸을 찾는다 — 시험 `pad_order_matches_pads`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Pad {
     South,
@@ -97,7 +101,7 @@ impl Pad {
         }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn button(self) -> Button {
         match self {
             Pad::South => Button::ActionDown,
@@ -630,7 +634,7 @@ fn set_device(d: Device) {
     DEVICE.store(d as u8, Ordering::Relaxed);
 }
 
-/// 처음 장치: 손가락이 주 포인터인 기기(폰·태블릿 브라우저, Android)면 터치. 아무것도 누르기 전의 첫 화면(인트로)용.
+/// 처음 장치: 손가락이 주 포인터인 기기(폰·태블릿 브라우저, Android·iOS 앱)면 터치. 아무것도 누르기 전의 첫 화면(인트로)용.
 fn initial_device() -> Device {
     #[cfg(target_arch = "wasm32")]
     {
@@ -643,11 +647,11 @@ fn initial_device() -> Device {
         }
         Device::Keys
     }
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         Device::Touch
     }
-    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
     {
         Device::Keys
     }
@@ -871,11 +875,17 @@ impl Actions {
 pub struct Input {
     /// Android에서는 gamepads 크레이트가 빠진다. 패드 버튼은 패치한 miniquad가 F13~F25 키로(0075),
     /// 스틱·HAT D패드는 축으로(joystick_axes, 0143), 키코드로 오는 D패드는 화살표 키로 넘긴다.
-    #[cfg(not(target_os = "android"))]
+    /// iOS도 빠진다(gilrs에 백엔드가 없다) — GCController를 프레임마다 읽는다(`ios_pad`, 0288).
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pads: Gamepads,
     /// Android: 패드 버튼을 한 번이라도 받았나(연결된 패드 수 대신).
     #[cfg(target_os = "android")]
     pad_seen: bool,
+    /// iOS: 지난 프레임·이번 프레임의 패드(눌림 에지는 둘을 견준다, 0288).
+    #[cfg(target_os = "ios")]
+    pad_prev: PadFrame,
+    #[cfg(target_os = "ios")]
+    pad_cur: PadFrame,
     /// 아직 틱이 소비하지 않은 눌림.
     pending: Actions,
     /// 가장 최근 프레임의 축 상태.
@@ -1054,10 +1064,14 @@ impl Input {
         simulate_mouse_with_touch(false);
         set_device(initial_device());
         Self {
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             pads: Gamepads::new(),
             #[cfg(target_os = "android")]
             pad_seen: false,
+            #[cfg(target_os = "ios")]
+            pad_prev: PadFrame::default(),
+            #[cfg(target_os = "ios")]
+            pad_cur: PadFrame::default(),
             pending: Actions::default(),
             held: Actions::default(),
             gamepad_count: 0,
@@ -1326,14 +1340,23 @@ impl Input {
         a
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     fn read_gamepads(&mut self) -> (Actions, usize) {
         self.pads.poll();
         read_gamepads(&self.pads)
     }
 
+    /// iOS(0288): GCController의 지금 값을 읽어 지난 프레임과 견준다. 연결된 패드 수는 프레임워크가 아는 그대로.
+    #[cfg(target_os = "ios")]
+    fn read_gamepads(&mut self) -> (Actions, usize) {
+        let (frame, count) = ios_pad::read();
+        self.pad_prev = std::mem::replace(&mut self.pad_cur, frame);
+        (pad_frame_actions(&self.pad_prev, &self.pad_cur), count)
+    }
+
     /// 패드 진동(0269): 연결된 패드 모두를 `strength`(0..1)로 `ms` 동안. 웹은 `vibrationActuator`(지원하는 브라우저만),
-    /// PC는 gilrs 힘 되돌림. Android(패치한 miniquad에 진동 없음)·iOS(패드 없음)는 아무것도 안 한다.
+    /// PC는 gilrs 힘 되돌림. Android(패치한 miniquad에 진동 없음)·iOS(GCController 진동은 Core Haptics라 아직 안 함, 0288)는
+    /// 아무것도 안 한다.
     pub fn rumble(&mut self, strength: f32, ms: u32) {
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
@@ -1357,7 +1380,7 @@ impl Input {
                 return Some(Captured::Key(k));
             }
         }
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         for pad in self.pads.all() {
             for p in PADS {
                 if pad.is_just_pressed(p.button()) {
@@ -1370,6 +1393,13 @@ impl Input {
             if is_key_pressed(p.key()) {
                 return Some(Captured::Pad(p));
             }
+        }
+        #[cfg(target_os = "ios")]
+        if let Some(p) = PADS
+            .into_iter()
+            .find(|&p| self.pad_cur.just(&self.pad_prev, p))
+        {
+            return Some(Captured::Pad(p));
         }
         None
     }
@@ -1562,7 +1592,7 @@ fn read_mouse() -> Actions {
 
 /// 연결된 모든 패드를 합친다(1인 게임이라 어느 패드든 같은 플레이어).
 /// 스틱 y는 두 백엔드(gilrs, 브라우저 플러그인) 모두 위가 +이므로 화면 좌표(아래가 +)로 뒤집는다.
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
     let mut a = Actions::default();
     let mut count = 0;
@@ -1618,6 +1648,85 @@ fn read_gamepads(pads: &Gamepads) -> (Actions, usize) {
     (a, count)
 }
 
+/// iOS 패드 한 프레임(0288): 연결된 패드를 모두 합친 지금 상태. `ios_pad::read`가 채운다.
+/// 버튼은 `PADS` 순서, D패드는 위·아래·왼쪽·오른쪽, 스틱은 GameController 그대로 위가 +y.
+/// 순수한 값이라 리눅스 시험이 짝(`pad_frame_actions`)을 본다.
+#[cfg(any(target_os = "ios", test))]
+#[derive(Clone, Copy, Default, PartialEq, Debug)]
+pub(crate) struct PadFrame {
+    pub buttons: [bool; PADS.len()],
+    /// 위·아래·왼쪽·오른쪽.
+    pub dpad: [bool; 4],
+    pub left: Vec2,
+    pub right: Vec2,
+}
+
+#[cfg(any(target_os = "ios", test))]
+impl PadFrame {
+    fn down(&self, p: Pad) -> bool {
+        self.buttons[p as usize]
+    }
+
+    /// 이번 프레임에 막 눌렸나(지난 프레임 `prev`엔 안 눌림).
+    fn just(&self, prev: &PadFrame, p: Pad) -> bool {
+        self.down(p) && !prev.down(p)
+    }
+
+    /// 패드 둘 이상: 버튼은 어느 쪽이든 눌리면, 스틱은 더 기운 쪽(1인 게임이라 어느 패드든 같은 플레이어).
+    pub fn merge(&mut self, o: &PadFrame) {
+        for (a, b) in self.buttons.iter_mut().zip(o.buttons) {
+            *a |= b;
+        }
+        for (a, b) in self.dpad.iter_mut().zip(o.dpad) {
+            *a |= b;
+        }
+        if o.left.length_squared() > self.left.length_squared() {
+            self.left = o.left;
+        }
+        if o.right.length_squared() > self.right.length_squared() {
+            self.right = o.right;
+        }
+    }
+}
+
+/// iOS 패드 한 프레임 → 동작. 짝은 데스크톱·웹(`read_gamepads`)·Android와 같다: 게임 동작은 배치표대로,
+/// 메뉴는 A 확인·B 뒤로·Start 메뉴·LB·RB 탭(고정), D패드는 이동 + 메뉴 한 칸, 스틱 y는 화면 좌표로 뒤집는다.
+#[cfg(any(target_os = "ios", test))]
+fn pad_frame_actions(prev: &PadFrame, cur: &PadFrame) -> Actions {
+    let mut a = Actions::default();
+    let [up, down, left, right] = cur.dpad;
+    let mut mv = vec2(cur.left.x, -cur.left.y);
+    mv.x += f32::from(u8::from(right)) - f32::from(u8::from(left));
+    mv.y += f32::from(u8::from(down)) - f32::from(u8::from(up));
+    a.move_dir = apply_deadzone(mv);
+    let aim = apply_deadzone(vec2(cur.right.x, -cur.right.y));
+    if aim != Vec2::ZERO {
+        a.aim = aim.normalize();
+    }
+    let b = bindings();
+    let j = |x: Act| cur.just(prev, b.pad(x));
+    a.attack = j(Act::Attack);
+    a.dodge = j(Act::Dodge);
+    a.dodge_held = cur.down(b.pad(Act::Dodge));
+    a.attack_held = cur.down(b.pad(Act::Attack));
+    a.special = j(Act::Special);
+    a.use_item = j(Act::UseItem);
+    a.item_prev = j(Act::ItemPrev);
+    a.item_next = j(Act::ItemNext);
+    a.map = j(Act::Map);
+    a.confirm = cur.just(prev, Pad::South);
+    a.cancel = cur.just(prev, Pad::East);
+    a.menu = cur.just(prev, Pad::Start);
+    a.back_held = cur.down(Pad::East) || cur.down(Pad::Start);
+    a.tab_prev = cur.just(prev, Pad::L1);
+    a.tab_next = cur.just(prev, Pad::R1);
+    a.up = up && !prev.dpad[0];
+    a.down = down && !prev.dpad[1];
+    a.left = left && !prev.dpad[2];
+    a.right = right && !prev.dpad[3];
+    a
+}
+
 /// 반지름 데드존. 데드존 바깥을 0..1로 다시 펴서 작은 기울기도 쓸 수 있게 한다.
 fn apply_deadzone(v: Vec2) -> Vec2 {
     let len = v.length();
@@ -1631,6 +1740,72 @@ fn apply_deadzone(v: Vec2) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `Pad` 선언 순서 = `PADS` 순서(`PadFrame`이 `p as usize`로 칸을 찾는다, 0288).
+    #[test]
+    fn pad_order_matches_pads() {
+        for (i, p) in PADS.into_iter().enumerate() {
+            assert_eq!(p as usize, i, "{p:?}");
+        }
+    }
+
+    /// iOS 패드 한 프레임 → 동작(0288): 눌림은 에지만, 누르고 있기는 상태, 스틱 y 뒤집기, D패드 = 이동 + 메뉴 한 칸.
+    #[test]
+    fn ios_pad_frame_maps_like_other_pads() {
+        let idle = PadFrame::default();
+        assert_eq!(pad_frame_actions(&idle, &idle).move_dir, Vec2::ZERO);
+        let b = bindings();
+        let mut f = PadFrame::default();
+        f.buttons[b.pad(Act::Attack) as usize] = true;
+        f.buttons[Pad::South as usize] = true;
+        f.left = vec2(0.0, 1.0); // GameController: 위가 +
+        let a = pad_frame_actions(&idle, &f);
+        assert!(a.attack && a.attack_held && a.confirm);
+        assert!(
+            a.move_dir.y < -0.9,
+            "위로 기울이면 화면 위(−y): {:?}",
+            a.move_dir
+        );
+        // 누르고 있는 다음 프레임: 에지는 없고 누르고 있기만.
+        let a = pad_frame_actions(&f, &f);
+        assert!(!a.attack && a.attack_held && !a.confirm);
+        // 데드존 안 떨림은 움직이지 않는다.
+        let mut g = PadFrame::default();
+        g.left = vec2(0.05, -0.05);
+        g.right = vec2(0.05, 0.0);
+        let a = pad_frame_actions(&idle, &g);
+        assert_eq!((a.move_dir, a.aim), (Vec2::ZERO, Vec2::ZERO));
+        // D패드 오른쪽: 이동 + 메뉴 한 칸(처음 프레임만).
+        let mut d = PadFrame::default();
+        d.dpad = [false, false, false, true];
+        let a = pad_frame_actions(&idle, &d);
+        assert!(a.right && a.move_dir.x > 0.9);
+        assert!(!pad_frame_actions(&d, &d).right);
+        // 오른쪽 스틱 = 조준 방향(길이 1), 아래로 기울이면 +y.
+        let mut r = PadFrame::default();
+        r.right = vec2(0.0, -0.5);
+        assert_eq!(pad_frame_actions(&idle, &r).aim, vec2(0.0, 1.0));
+        // B·Start = 뒤로 누르고 있기, Start 눌림 = 메뉴.
+        let mut m = PadFrame::default();
+        m.buttons[Pad::Start as usize] = true;
+        let a = pad_frame_actions(&idle, &m);
+        assert!(a.menu && a.back_held && !a.cancel);
+    }
+
+    /// 패드 둘: 버튼은 어느 쪽이든, 스틱은 더 기운 쪽.
+    #[test]
+    fn ios_pad_frames_merge() {
+        let mut a = PadFrame::default();
+        a.buttons[Pad::North as usize] = true;
+        a.left = vec2(0.2, 0.0);
+        let mut b = PadFrame::default();
+        b.buttons[Pad::R1 as usize] = true;
+        b.left = vec2(0.0, -0.8);
+        b.dpad[0] = true;
+        a.merge(&b);
+        assert!(a.down(Pad::North) && a.down(Pad::R1) && a.dpad[0]);
+        assert_eq!(a.left, vec2(0.0, -0.8));
+    }
 
     /// Android 패드 축(0143): 왼쪽 스틱은 세기 그대로, 데드존 안이면 D패드(HAT·화살표), 오른쪽 스틱은 조준 방향.
     #[test]
