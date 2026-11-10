@@ -162,6 +162,10 @@
 
 ## 사람이 할 일 (다음 세션 전)
 
+### v1.0.0 정식 출시 — 나일의 생일(0289, 2026-11-10)
+- [ ] 사람: release/v1.0 → main PR이 합쳐지면 운영 배포 잡의 `web-production` 승인(Approve), Release `v1.0.0`에 `nail.apk`·PC 셋이 붙었는지, https://nail.beardworks.io 첫 화면 "정식 출시 2026-11-10"·"다음" 칸.
+- [ ] 상점판(Epic PC → Steam)은 출시 대기 — 나가면 v1.0.x(0284·0289).
+
 ### iOS 게임패드(0288, 2026-11-10, release/v1.0)
 - [x] iOS 앱이 GCController를 프레임마다 읽는다(`src/input/ios_pad.rs`, 짝은 다른 패드와 같다, 첫 장치 = 터치, Info.plist 컨트롤러 키 둘)
 - [ ] 사람: 실기 — 개발판 `.ipa`(Actions `build-ios` → `nail-ios-unsigned-dev`)를 Sideloadly로 깔고 블루투스 패드로 메뉴·걷기·조준·강타 모으기·일시정지·다시 붙이기·켠 뒤 붙이고 떼기·안내 글이 장치를 따라 바뀌는지(0288 "사람이 할 일")
