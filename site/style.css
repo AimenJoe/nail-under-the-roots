@@ -72,8 +72,13 @@ p { margin: 0; }
 .logo { font-size: clamp(2.8rem, 8vw, 5rem); line-height: 1; margin: 0; color: var(--glow); text-shadow: 0 3px 0 #5a3a20, 0 0 24px rgba(242, 205, 92, .35); }
 .logo small { display: block; font-size: .4em; color: var(--text); margin-top: .4rem; letter-spacing: .06em; text-shadow: 0 2px 0 #000; }
 .lede { font-size: 1.12rem; max-width: 32rem; text-shadow: 0 1px 2px #000; }
-.cta { display: flex; flex-direction: column; gap: .7rem; align-items: flex-start; }
-.cta-line { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
+.cta { display: flex; flex-direction: column; gap: 1.1rem; align-items: flex-start; }
+.cta-line { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; }
+/* 영웅 칸 둘째 줄: 직접 받는 파일은 작은 글자 링크로 — 큰 버튼은 브라우저·상점 둘만 */
+.cta-line.sub { gap: .35rem .9rem; font-size: .92rem; text-shadow: 0 1px 2px #000; }
+.cta-label { color: var(--muted); }
+.chip { color: var(--glow); text-decoration: none; border-bottom: 1px dotted rgba(242, 205, 92, .55); padding: .15rem 0; }
+.chip:hover { border-bottom-style: solid; }
 .btn.soon { border-style: dashed; color: var(--muted); border-color: var(--muted); box-shadow: none; cursor: default; }
 .btn.soon small { font-size: .7em; opacity: .85; }
 .btn.soon:hover { transform: none; box-shadow: none; }
