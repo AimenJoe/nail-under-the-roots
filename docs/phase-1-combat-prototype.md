@@ -163,9 +163,13 @@
 ## 사람이 할 일 (다음 세션 전)
 
 ### iOS ipa를 공식 페이지에(0291, 2026-11-10, main 패치)
-- [x] Release에 `nail.ipa`(운영판, 서명 안 함)를 붙이는 길(`release.yml` `ios` 잡·`build-ios.yml` `release_tag`), 공식 페이지 두 언어 "직접 설치" 칸·버튼·FAQ
-- [ ] 사람: PR Merge 뒤 Actions → build-ios → Run workflow(main), `release_tag` = `v1.0.0` → Release에 `nail.ipa`가 붙었는지, 페이지 "ipa 받기"가 파일로 가는지
+- [x] Release에 `nail.ipa`(운영판, 서명 안 함 — 처음 하루는 `nail-ios.ipa`, #24에서 이름을 `nail.apk`와 같은 꼴로)를 붙이는 길(`release.yml` `ios` 잡·`build-ios.yml` `release_tag`), 공식 페이지 두 언어 "직접 설치" 칸·버튼·FAQ
+- [x] PR #23·#24 Merge·build-ios 수동 실행(main, `release_tag` = `v1.0.0`)은 Claude가 함(사장 2026-11-10 "실행해") → v1.0.0 Release에 `nail.ipa`
 - [ ] 문의가 오면: 설치·실행·패드 문제(실기 확인 없이 열었다, 사장 결정)
+
+### 웹 호스팅은 나중에 Cloudflare로(0290, 2026-11-10 — 방향만)
+- [x] Netlify 요금제는 **Legacy**(월 100 GB, 사장 2026-11-10) — 급하지 않다, 상점 출시·홍보 전에 다시 본다
+- [ ] (때때로) Netlify 대시보드의 이번 달 대역폭 — 100 GB에 가까워지면 옮길 시점
 
 ### v1.0.0 정식 출시 — 나일의 생일(0289, 2026-11-10)
 - [ ] 사람: release/v1.0 → main PR이 합쳐지면 운영 배포 잡의 `web-production` 승인(Approve), Release `v1.0.0`에 `nail.apk`·PC 셋이 붙었는지, https://nail.beardworks.io 첫 화면 "정식 출시 2026-11-10"·"다음" 칸.
