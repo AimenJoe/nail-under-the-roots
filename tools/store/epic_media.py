@@ -28,8 +28,10 @@ CREAM = (236, 229, 218, 255)
 GLOW = (242, 205, 92, 255)
 INK = (23, 19, 15, 255)
 
-# 상점 캐러셀에 넣을 스크린숏(공식 페이지의 960×540 = 게임 320×180의 3배 → 2배 하면 1920×1080)
-CAROUSEL = ["s_meadow", "s_roots", "s_boss", "s_village", "s_silk", "s_hall"]
+# 상점 캐러셀에 넣을 스크린숏: 영어 화면(Epic은 영어로 읽히지 않는 글이 든 그림을 받지 않는다 — 검토 2026-11-13).
+# tools/store/shots_en.js로 찍어 고른 것(960×540 = 게임 320×180의 3배 → 2배 하면 1920×1080). 공식 페이지의 s_*.png는 한국어라 쓰지 않는다.
+EN_SHOTS = ROOT / "docs" / "epic" / "shots"
+CAROUSEL = ["meadow", "hall", "boss", "village", "water", "doto"]
 
 
 def text_layer(text: str, px: int, color, outline=INK, bold: bool = True) -> Image.Image:
@@ -102,7 +104,7 @@ def main() -> None:
 
     # 캐러셀: 스크린숏 ×2 = 1920×1080
     for i, name in enumerate(CAROUSEL, 1):
-        up(Image.open(SHOTS / f"{name}.png").convert("RGB"), 2).save(OUT / f"carousel-{i}-{name[2:]}.png", optimize=True)
+        up(Image.open(EN_SHOTS / f"{name}.png").convert("RGB"), 2).save(OUT / f"carousel-{i}-{name}.png", optimize=True)
 
     # 소셜 미리보기: 타이틀 그림 왼쪽(굴 속 나일) 300×300 ×4 = 1200×1200, 작은 로고
     soc = up(title.crop((0, 60, 300, 360)), 4)
