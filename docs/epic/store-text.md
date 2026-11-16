@@ -20,7 +20,7 @@
 | `product-logo-960x540.png` | 960×540 PNG ≤1MB, 투명 | Store Settings → Product configuration → Product details |
 | `offer-landscape-2560x1440.png` | 2560×1440 | Offers → Images: 일반(general) + 라이브러리(library) — "copy"로 같은 그림을 써도 된다 |
 | `offer-portrait-1200x1600.png` | 1200×1600 | 같은 곳(가로·세로 하나씩 필수) |
-| `carousel-1…6-*.png` | 1920×1080 ≤4MB | Pages → Product home → Media carousel(최소 1개, 영상 1개를 권장) |
+| `carousel-1…6-*.png` | 1920×1080 ≤4MB | Pages → Product home → Media carousel(최소 1개, 영상 1개를 권장) — **영어 화면만**(아래) |
 | `social-1200x1200.jpg` | 1200×1200 JPG | Pages → Social preview(선택) |
 
 
@@ -105,4 +105,5 @@ About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 
     캐릭터 스프라이트·초상화·일러스트는 Google Gemini 이미지 모델로 그린 원본을 도트로 옮겨 손으로 다듬은 것입니다.
 
 ## 페이지 → Media carousel (필수: 1개 이상, 1920×1080)
-순서대로 `carousel-1-meadow` → `2-roots` → `3-boss` → `4-village` → `5-silk` → `6-hall`. Epic은 영상 하나를 권한다(1920×1080 MP4, 30·60fps, ≤300MB, AAC 스테레오 48kHz) — 트레일러는 따로.
+순서대로 `carousel-1-meadow` → `2-hall` → `3-boss` → `4-village` → `5-water` → `6-doto`.
+**게임 화면은 영어로**(Epic 검토 2026-11-13 반려: "Media Carousel 그림에 영어가 아닌 글" — 처음엔 한국어 공식 페이지 스크린숏을 썼다). 원본은 `docs/epic/shots/*.png`(960×540, `tools/store/shots_en.js`가 en-US로 찍은 것에서 고름) → `epic_media.py`가 ×2. 다른 언어 화면을 보이고 싶으면 그 언어의 현지화(Localization) 페이지에만 넣는다. Epic은 영상 하나를 권한다(1920×1080 MP4, 30·60fps, ≤300MB, AAC 스테레오 48kHz) — 트레일러는 따로.
