@@ -1,6 +1,7 @@
 // 공식 페이지(0069, 0155): GitHub Releases에서 최신 버전·APK 주소·소식을 읽어 채운다.
 // 반딧불(.flies[data-flies])을 뿌리고, 깊이 눈금(.depth)에서 지금 층을 밝히고 나일을 스크롤만큼 내린다.
 // 읽지 못하면(오프라인·요청 제한) 페이지에 적어 둔 값과 릴리스 목록 링크가 그대로 남는다.
+// 읽는 차례: 소식 캐시 api.beardworks.io → GitHub 직접 → 적어 둔 값.
 (() => {
   const REPO = "AimenJoe/nail-under-the-roots";
   const lang = document.documentElement.lang || "ko";
@@ -11,8 +12,11 @@
     const i = first.indexOf("—");
     return i >= 0 ? first.slice(i + 1).trim() : "";
   };
-  fetch(`https://api.github.com/repos/${REPO}/releases?per_page=8`, { headers: { Accept: "application/vnd.github+json" } })
-    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+  // 소식 캐시(api.beardworks.io — beardworks 레포 ops/, 10분 캐시)부터, 안 되면 GitHub 직접. 브라우저가 GitHub를
+  // 직접 부르면 익명 한도(IP당 시간 60회)에 걸려 IP를 나눠 쓰는 곳에서 막힌다. 둘 다 안 되면 적어 둔 값.
+  const getJson = (url, headers) => fetch(url, { headers }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+  getJson(`https://api.beardworks.io/releases/${REPO.split("/")[1]}`)
+    .catch(() => getJson(`https://api.github.com/repos/${REPO}/releases?per_page=8`, { Accept: "application/vnd.github+json" }))
     .then((list) => {
       // 개발판(미리 보기 릴리스 `dev`, 0193)은 건너뛴다. 넉넉히 읽고 넷만.
       const rel = list.filter((r) => !r.draft && !r.prerelease).slice(0, 4);

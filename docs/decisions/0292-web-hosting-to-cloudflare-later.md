@@ -1,6 +1,7 @@
-# 0290. 웹 호스팅은 나중에 Netlify → Cloudflare로 — 방향만, 시점은 따로
+# 0292. 웹 호스팅은 나중에 Netlify → Cloudflare로 — 방향만, 시점은 따로
 
 - 날짜: 2026-11-10
+- 번호: 처음엔 0290이었으나 같은 날 SEO 결정(0290-site-seo)과 겹쳐 0292로 옮김(2026-11-18).
 - 상태: **방향 채택, 시점 미정**(사장 2026-11-10: "Nail 도, knellroot 도 나중에는 cloudflare 로 가야겠다"). 옮기는 일 자체는 정할 때 새 번호로.
 - 근거(KB): `reference/netlify/free-plan-limits.md`·`reference/cloudflare/static-site-extras.md`, 결정 0001 덧붙임(2026-11-10, 공식 문서 라이브 대조).
 
