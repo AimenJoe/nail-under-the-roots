@@ -826,7 +826,8 @@ pub(super) fn draw_hud_screen(w: &World, scale: f32, ox: f32, oy: f32, gamepad_c
     // 월드 HUD(체력 핍 8px 높이) 아래부터 텍스트.
     let mut y = oy + 9.0 * scale + fs;
     // 웨이브·처치 수는 아레나(웨이브 시험장)에서만. 실의 꿈(0055)도 아레나지만 보이지 않는다.
-    if w.adv.place == crate::adventure::Place::Arena && !w.dream {
+    // 클립 찍기 빌드(`clip`)에서도 숨긴다 — 상점 영상에 개발용 글이 찍혔다.
+    if w.adv.place == crate::adventure::Place::Arena && !w.dream && !cfg!(feature = "clip") {
         draw_text(
             format!("wave {}  kills {}", w.wave, w.stats.kills),
             ox + 4.0,
