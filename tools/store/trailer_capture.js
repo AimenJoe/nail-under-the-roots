@@ -6,7 +6,8 @@
 //   cargo build --release --target wasm32-unknown-unknown --features clip    # 피해 없음 + 자동 조종(src/autopilot.rs)
 //   python3 tools/web/assemble.py <dist> local dev && cp target/wasm32-unknown-unknown/release/nail.wasm <dist>/
 //   node tools/store/trailer_capture.js <dist> <out> "<개발 목록 이름>" <초> [auto|walk] [base|full]
-//     ESC=1 — 보스 만남 컷씬을 뒤로 길게 눌러 건너뛴다(그동안의 칸은 찍지 않는다)
+//     ESC=1 — 보스 만남 컷씬을 뒤로 길게 눌러 건너뛴다(그동안의 칸은 찍지 않는다). ESC_MS·ESC_AFTER로 누르는·기다리는 시간
+//     (너무 길면 싸움이 이미 흘러 보스가 찍기 전에 쓰러진다)
 //     WAIT=<ms> — 장면이 뜨기를 기다리는 가짜 시계 시간(기본 3000)
 // 나오는 것: <out>/f_0000.png…(960×540), <out>/audio.json(사건 목록·칸 수·fps), <out>/bufs/<번호>.bin(소리 원본)
 const { chromium } = require('playwright');
@@ -89,7 +90,7 @@ const srv = http.createServer((q, r) => {
   for (let i = 0; i < at[0]; i++) await press('ArrowRight', 120);
   for (let i = 0; i < at[1]; i++) await press('ArrowDown', 120);
   await press('Enter', +(process.env.WAIT || 3000));
-  if (process.env.ESC) { await pg.keyboard.down('Escape'); await tick(2500); await pg.keyboard.up('Escape'); await tick(1500); }
+  if (process.env.ESC) { await pg.keyboard.down('Escape'); await tick(+(process.env.ESC_MS || 1100)); await pg.keyboard.up('Escape'); await tick(+(process.env.ESC_AFTER || 300)); }
   if (profKind === 'full') { await pg.keyboard.down('Escape'); await tick(2500); await pg.keyboard.up('Escape'); await tick(1200); }
   const t0 = await pg.evaluate(() => Date.now());
   const dirs = ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'];
