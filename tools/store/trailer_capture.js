@@ -5,7 +5,7 @@
 //
 //   cargo build --release --target wasm32-unknown-unknown --features clip    # 피해 없음 + 자동 조종(src/autopilot.rs)
 //   python3 tools/web/assemble.py <dist> local dev && cp target/wasm32-unknown-unknown/release/nail.wasm <dist>/
-//   node tools/store/trailer_capture.js <dist> <out> "<개발 목록 이름>" <초> [auto|walk] [base|full]
+//   node tools/store/trailer_capture.js <dist> <out> "<개발 목록 이름>" <초> [auto|walk|keys] [base|full]
 //     ESC=1 — 보스 만남 컷씬을 뒤로 길게 눌러 건너뛴다(그동안의 칸은 찍지 않는다). ESC_MS·ESC_AFTER로 누르는·기다리는 시간
 //     (너무 길면 싸움이 이미 흘러 보스가 찍기 전에 쓰러진다)
 //     WAIT=<ms> — 장면이 뜨기를 기다리는 가짜 시계 시간(기본 3000)
@@ -98,6 +98,13 @@ const srv = http.createServer((q, r) => {
   for (let n = 0; n < N; n++) {
     const want = new Set();
     if (plan === 'walk') { const t = n / F, c = Math.floor(t / 2.0); if (t % 2.0 < 1.6) want.add(dirs[c % 4]); }
+    // KEYS="ArrowLeft:0.9,-:1.5,ArrowUp:0.6" — 키:초 차례(- = 손 놓기). 정해 둔 길로 걷는다(아무 데로나 걸으면 벽에 박았다).
+    if (plan === 'keys') {
+      let t = n / F;
+      for (const part of (process.env.KEYS || '').split(',').filter(Boolean)) {
+        const [k, d] = part.split(':'); if (t < +d) { if (k !== '-') want.add(k); break; } t -= +d;
+      }
+    }
     for (const k of held) if (!want.has(k)) await pg.keyboard.up(k);
     for (const k of want) if (!held.has(k)) await pg.keyboard.down(k);
     held = want;
