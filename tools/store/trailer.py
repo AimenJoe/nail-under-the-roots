@@ -26,16 +26,14 @@ MUSIC = ROOT / "assets" / "music"
 SR = 48_000
 FPS = 30
 
-# (찍은 장면 폴더, 시작 초, 길이 초, 곡). 곡 이름은 assets/music/<이름>.ogg(src/music.rs Track::file과 같은 이름).
+# (찍은 장면 폴더, 시작 초, 길이 초, 곡). 곡 이름은 assets/music/<이름>.ogg(src/music.rs Track::file과 같은 이름),
+# "이름@초"면 그 초부터 튼다(머리가 조용한 곡).
 SCENES = [
-    ("meadow", 1.0, 5.0, "field_overworld"),
-    ("hall", 0.5, 6.0, "roots_explorer"),
-    ("kongi", 0.5, 6.0, "boss"),
-    ("doto", 0.5, 5.0, "boss"),
-    ("momo", 0.5, 5.0, "boss_rise"),
-    ("water", 0.5, 5.0, "side_path"),
-    ("mumu", 0.5, 5.0, "side_keeper"),
-    ("village", 0.0, 5.0, "village_springs"),
+    ("hall", 0.3, 4.5, "roots_explorer@14"),
+    ("kongi", 0.2, 1.6, "boss"),
+    ("momo", 0.5, 4.0, "boss"),
+    ("mumu", 0.0, 5.0, "side_keeper"),
+    ("village", 1.0, 4.0, "village_springs"),
 ]
 INTRO = (3.0, "title_light")   # 처음 카드: 길이, 곡
 OUTRO = (4.0, "ending")        # 끝 카드
@@ -111,8 +109,9 @@ def sfx_bus(scene: Path, start: float, dur: float) -> np.ndarray:
             b_i = len(sig) if i + 1 == len(gains) else max(0, int(round((gains[i + 1][0] - p["t"]) * SR)))
             g[a_i:b_i] = gv
         sig = sig * g[:, None]
-        lo = max(0, s0)
-        out[lo:s0 + len(sig)] += sig[lo - s0:]
+        lo, hi = max(0, s0), min(n, s0 + len(sig))
+        if hi > lo:
+            out[lo:hi] += sig[lo - s0:hi - s0]
     return out * SFX_GAIN
 
 
@@ -127,8 +126,9 @@ def music_bus(blocks):
         while j < len(blocks) and blocks[j][1] == name:
             length += blocks[j][0]
             j += 1
+        file, _, off = name.partition("@")  # "곡@초" = 그 초부터(조용한 머리를 건너뛴다)
         if name not in tracks:
-            tracks[name] = decode(MUSIC / f"{name}.ogg")
+            tracks[name] = decode(MUSIC / f"{file}.ogg")[int(float(off or 0) * SR):]
         a = tracks[name]
         n = int(round(length * SR))
         tail = int(XFADE * SR) if j < len(blocks) else 0
