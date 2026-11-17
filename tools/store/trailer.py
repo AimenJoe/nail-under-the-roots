@@ -2,6 +2,7 @@
 """상점 영상(트레일러) 잇기: 장면 칸 + 게임이 낸 효과음(기록에서 다시 섞음) + 장면마다 고른 음악 → 1920×1080 MP4.
 
     python3 tools/store/trailer.py <찍은 폴더(tr)> <출력.mp4>
+    python3 tools/store/trailer.py --site <찍은 폴더(tr)> site/img/play_en.mp4   # 공식 페이지(영어)용: 같은 장면, 카드·소리 없이 960×540
 
 - 장면은 `tools/store/trailer_capture.js`로 찍는다(영어 화면, 칸 + audio.json + bufs/).
 - 효과음: 게임이 낸 그대로(언제·어느 소리·크기·멈춤)를 칸 시각에 맞춰 다시 섞는다 — 타격감은 게임의 것.
@@ -162,7 +163,27 @@ def run(*args):
     subprocess.run(args, check=True)
 
 
+def site_clip(tr: Path, out: Path):
+    """공식 페이지 영어판의 반복 클립(소리 없이 자동 재생): 장면만 960×540 그대로(게임 3배), 첫 칸은 <out>_poster.png."""
+    tmp = Path(tempfile.mkdtemp(prefix="siteclip_"))
+    seq = tmp / "seq"
+    seq.mkdir()
+    k = 0
+    for name, start, dur, _ in SCENES:
+        f0, nf = int(round(start * FPS)), int(round(dur * FPS))
+        for i in range(f0, f0 + nf):
+            (seq / f"r_{k:04d}.png").symlink_to(tr / name / f"f_{i:04d}.png")
+            k += 1
+    run("ffmpeg", "-v", "error", "-y", "-framerate", str(FPS), "-i", str(seq / "r_%04d.png"), "-c:v", "libx264",
+        "-preset", "slow", "-tune", "animation", "-crf", "16", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", str(out))
+    Image.open(seq / "r_0000.png").convert("RGB").save(out.with_name(out.stem + "_poster.png"), optimize=True)
+    print(out, f"{k / FPS:.1f}s")
+
+
 def main():
+    if sys.argv[1] == "--site":
+        site_clip(Path(sys.argv[2]), Path(sys.argv[3]))
+        return
     tr, out = Path(sys.argv[1]), Path(sys.argv[2])
     tmp = Path(tempfile.mkdtemp(prefix="trailer_"))
     parts, blocks, sfx = [], [], []
