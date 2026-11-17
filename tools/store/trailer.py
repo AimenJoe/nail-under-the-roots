@@ -29,12 +29,12 @@ FPS = 30
 # (찍은 장면 폴더, 시작 초, 길이 초, 곡). 곡 이름은 assets/music/<이름>.ogg(src/music.rs Track::file과 같은 이름),
 # "이름@초"면 그 초부터 튼다(머리가 조용한 곡).
 SCENES = [
-    ("chief", 0.2, 4.3, "field_overworld"),       # 들판: 들쥐 대장의 돌진 띠
+    ("wave", 0.2, 4.3, "field_overworld"),        # 들판: 무리 싸움("웨이브 3부터" — "튜토리얼 보스"는 보스 체력이 이상해 보였다)
     ("hall", 0.3, 4.0, "roots_explorer@14"),      # 뿌리 굴: 넓은 방 무리
     ("kongi", 0.2, 1.6, "boss"),                  # 보스: 물든 아르마딜로(자동 조종이 금방 이긴다 — 짧게)
     ("momo", 0.5, 3.5, "boss"),                   # 모모로 싸우기
     ("mumu", 0.0, 4.5, "side_keeper"),            # 넷째 길 물길 보스
-    ("village", 1.0, 4.0, "village_springs"),     # 다 자란 마을
+    ("village", 1.0, 4.0, "village_springs"),     # 다 자란 마을(KEYS="ArrowLeft:0.8,-:0.4,ArrowUp:0.5,-:4" — 아무 데로나 걸으면 벽에 박았다)
 ]
 INTRO = (3.0, "title_light")   # 처음 카드: 길이, 곡
 OUTRO = (4.0, "ending")        # 끝 카드
