@@ -3,6 +3,33 @@
 // 서비스 워커(sw.js)가 미리 받는 목록에 이 파일도 있다.
 (function () {
 "use strict";
+// 옛 주소에서 넘어온 기록 받기(0294). 옛 주소(nail-under-the-roots.netlify.app)의 넘김 페이지(web/moved/)가 그 주소의
+// localStorage "nail.*"를 주소의 # 뒤에 실어 이리 보낸다 — # 뒤는 서버로 가지 않는다. 출처가 바뀌면 브라우저 저장소가
+// 따로라(KB reference/web/pwa-install-fullscreen-orientation.md) 이것 없이는 기록이 사라진 것처럼 보인다.
+// 이 주소에 기록(nail.profile*)이 이미 있으면 덮지 않는다. 게임이 저장소를 읽기 전(아래 load 전)에 끝나야 해서 동기로 한다.
+(function () {
+  var m = /^#nail-import=([A-Za-z0-9_-]*)$/.exec(location.hash);
+  if (!m) return;
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+  try {
+    var b64 = m[1].replace(/-/g, "+").replace(/_/g, "/");
+    var bin = atob(b64 + "===".slice(0, (4 - b64.length % 4) % 4));
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var data = JSON.parse(new TextDecoder().decode(bytes));
+    var ls = window.localStorage;
+    for (var j = 0; j < ls.length; j++) {
+      if (/^nail\.profile/.test(ls.key(j))) { console.log("nail-import: 이 주소에 기록이 있어 넘어온 기록을 덮지 않는다"); return; }
+    }
+    var n = 0;
+    Object.keys(data).forEach(function (k) {
+      if (/^nail\./.test(k) && typeof data[k] === "string") { ls.setItem(k, data[k]); n++; }
+    });
+    console.log("nail-import: " + n + "칸을 받았다");
+  } catch (e) {
+    console.warn("nail-import: 받지 못했다", e);
+  }
+})();
 // 브라우저 선호 언어 → 게임 언어(src/i18n.rs가 고른다: 가진 첫 언어, 없으면 영어).
 // nail_locale(i, k): i번째 선호 언어 태그(예 "zh-Hant-TW")의 k번째 네 글자를 u32 하나로(빅엔디언). 끝이면 0. ASCII만.
 miniquad_add_plugin({

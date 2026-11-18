@@ -5,7 +5,7 @@
 ## 무엇이 어디로 나가나
 | 대상 | 트리거 | 워크플로 | 결과 |
 |---|---|---|---|
-| 웹(게임) | `main` push | `deploy-web.yml` | fmt·clippy(두 갈래)·test·운영판 wasm 빌드(`--no-default-features`) → Netlify 프로덕션(https://nail-under-the-roots.netlify.app). PR이면 미리보기 `pr-<번호>--…` |
+| 웹(게임) | `main` push | `deploy-web.yml` | fmt·clippy(두 갈래)·test·운영판 wasm 빌드(`--no-default-features`) → Cloudflare Worker `web-game`(https://nail.beardworks.io/play/, 0294) — 확인 뒤 옛 Netlify 프로덕션은 기록 넘김 페이지로. PR은 빌드·dry-run만 |
 | 웹(개발판, 0193) | `release/**` push | `deploy-web.yml` | 개발 기능을 넣은 빌드 → 별칭 `dev`(https://dev--nail-under-the-roots.netlify.app, noindex). 올린 뒤 `build.txt`가 그 커밋인지 확인 |
 | APK(개발판, 0193) | `release/**` push(`src/`·`assets/`·…) | `build-android.yml` | 패키지 `io.github.aimenjoe.dev.nail`("Naïl dev" — 마지막 조각은 `nail`이어야 한다: 네이티브 라이브러리 이름, 0286) → 미리 보기 Release `dev`의 `nail-dev.apk`를 갈아 끼움(태그 `dev`도 그 커밋으로) |
 | Release + APK + PC | `main` push에 `Cargo.toml` 버전이 새 값 **그리고** `docs/releases/v<버전>.md`가 있음 | `release.yml` → `build-android.yml` → `build-desktop.yml` | 태그 `v<버전>`, GitHub Release(본문 = 그 md), `nail.apk` + PC 셋 첨부 |
@@ -51,7 +51,7 @@
 | 이어하기·기록이 사라졌다 | `prefs` `MAGIC`을 올렸거나 `profile` 키를 바꿨다 | 키는 바꾸지 않는다. `MAGIC`은 칸 형식이 깨질 때만 |
 
 ## 되돌리기
-- 웹: 문제 커밋을 `git revert`한 PR을 main에 Merge하면 다시 배포된다(Netlify UI에서 이전 배포로 "Publish deploy"도 된다).
+- 웹: 문제 커밋을 `git revert`한 PR을 main에 Merge하면 다시 배포된다(Cloudflare 대시보드 → Worker `web-game` → Deployments에서 이전 버전으로 되돌리기도 된다, 0294).
 - APK: Release는 두고 패치 버전을 하나 더 낸다. 이미 받은 사람의 덮어 설치가 되려면 version_code가 커야 한다.
 - 되돌린 것은 결정 기록에 "덧붙임: 철회(새 번호)"로 남긴다.
 

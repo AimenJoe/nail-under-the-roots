@@ -6,10 +6,11 @@
 // - skipWaiting을 쓰지 않는다: 게임 도중 새 판 파일(음악은 들을 때 받는다)이 섞이지 않게, 새 판은 다음 실행부터.
 // - index.html·build.txt·manifest는 네트워크 먼저(못 받으면 캐시), 나머지는 이 판 캐시 먼저(없으면 받아서 담는다).
 // - 기록(localStorage)은 건드리지 않는다.
+// - 페이지는 "./"로만 담는다(0294): Cloudflare 정적 파일은 index.html을 "./"로 돌려보내(307) 그 응답을 페이지 이동에 쓰면 브라우저가 거절한다.
 const BUILD = "__BUILD__";
 const CACHE = "nail-" + BUILD;
 // CI가 조립한 dist의 파일 목록(음악 빼고)을 __PRECACHE__ 자리에 넣는다. 로컬에서 그대로 띄우면 빈 목록 — 받는 대로 담는다.
-const PRECACHE = ["./", "index.html", "nail-host.js", "mq_js_bundle.js", "macroquad-gamepads-0.1.js", "nail.wasm", "manifest.webmanifest"].concat(/*__PRECACHE__*/[]);
+const PRECACHE = ["./", "nail-host.js", "mq_js_bundle.js", "macroquad-gamepads-0.1.js", "nail.wasm", "manifest.webmanifest"].concat(/*__PRECACHE__*/[]);
 const NETWORK_FIRST = /(\/|index\.html|build\.txt|manifest\.webmanifest)$/;
 
 self.addEventListener("install", (e) => {
@@ -42,7 +43,7 @@ self.addEventListener("fetch", (e) => {
           }
           return res;
         })
-        .catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || caches.match("index.html")))
+        .catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || caches.match("./")))
     );
     return;
   }

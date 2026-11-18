@@ -106,6 +106,6 @@ About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 
 
 ## 페이지 → Media carousel (필수: 1개 이상, 1920×1080)
 **영상(2026-11-17)**: 영어 게임 화면 + 게임이 낸 효과음 + 장면마다 고른 곡, 29초 1920×1080 H.264 30fps·AAC 48kHz(Epic 권장). 레포에는 넣지 않고(바뀔 때마다 12MB) 도구로 다시 만든다:
-`cargo build --release --target wasm32-unknown-unknown --features clip` → `tools/web/assemble.py` + clip wasm → `node tools/store/trailer_capture.js`(장면마다, 이름은 `trailer.py`의 `SCENES`) → `python3 tools/store/trailer.py <찍은 폴더> nail_trailer_en.mp4`. 효과음은 녹음이 아니라 오디오 플러그인 기록으로 다시 섞는다(가짜 시계로 찍으니 실제 소리가 칸과 맞지 않는다).
+영상 덮개(썸네일) `docs/epic/media/video-cover-1920x1080.png`·`.jpg` = 영상 속 한 칸(넓은 방 "Parried!", 찍은 칸 ×2 — 꾸민 카드는 영상과 달라 어색했다, 사장 2026-11-17), 대안 `video-cover-alt-*`(무무). `cargo build --release --target wasm32-unknown-unknown --features clip` → `tools/web/assemble.py` + clip wasm → `node tools/store/trailer_capture.js`(장면마다, 이름은 `trailer.py`의 `SCENES`) → `python3 tools/store/trailer.py <찍은 폴더> nail_trailer_en.mp4`. 효과음은 녹음이 아니라 오디오 플러그인 기록으로 다시 섞는다(가짜 시계로 찍으니 실제 소리가 칸과 맞지 않는다).
 순서대로 `carousel-1-meadow` → `2-hall` → `3-boss` → `4-village` → `5-water` → `6-doto`.
 **게임 화면은 영어로**(Epic 검토 2026-11-13 반려: "Media Carousel 그림에 영어가 아닌 글" — 처음엔 한국어 공식 페이지 스크린숏을 썼다). 원본은 `docs/epic/shots/*.png`(960×540, `tools/store/shots_en.js`가 en-US로 찍은 것에서 고름) → `epic_media.py`가 ×2. 다른 언어 화면을 보이고 싶으면 그 언어의 현지화(Localization) 페이지에만 넣는다. Epic은 영상 하나를 권한다(1920×1080 MP4, 30·60fps, ≤300MB, AAC 스테레오 48kHz) — 트레일러는 따로.

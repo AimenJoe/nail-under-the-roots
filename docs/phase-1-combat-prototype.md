@@ -162,12 +162,17 @@
 
 ## 사람이 할 일 (다음 세션 전)
 
+### 운영 웹판을 nail.beardworks.io/play/ 로(0294, 2026-11-18)
+- [x] Worker `web-game` 만들기(사장)
+- [ ] API 토큰(Worker `web-game` Editor + beardworks.io Workers Routes Edit) → GitHub Environment **`web-production`에만** `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`
+- [ ] 다음 `release/v1.0 → main` Merge 때 바뀐다: 새 주소 배포 확인 → 옛 Netlify 주소는 기록 넘김 페이지. 그 뒤 beardworks `ops/src/config.js` nail `prod`·상점 등록 정보의 웹 링크
+
 ### iOS ipa를 공식 페이지에(0291, 2026-11-10, main 패치)
 - [x] Release에 `nail.ipa`(운영판, 서명 안 함 — 처음 하루는 `nail-ios.ipa`, #24에서 이름을 `nail.apk`와 같은 꼴로)를 붙이는 길(`release.yml` `ios` 잡·`build-ios.yml` `release_tag`), 공식 페이지 두 언어 "직접 설치" 칸·버튼·FAQ
 - [x] PR #23·#24 Merge·build-ios 수동 실행(main, `release_tag` = `v1.0.0`)은 Claude가 함(사장 2026-11-10 "실행해") → v1.0.0 Release에 `nail.ipa`
 - [ ] 문의가 오면: 설치·실행·패드 문제(실기 확인 없이 열었다, 사장 결정)
 
-### 웹 호스팅은 나중에 Cloudflare로(0290, 2026-11-10 — 방향만)
+### 웹 호스팅은 나중에 Cloudflare로(0292, 2026-11-10 — 방향만)
 - [x] Netlify 요금제는 **Legacy**(월 100 GB, 사장 2026-11-10) — 급하지 않다, 상점 출시·홍보 전에 다시 본다
 - [ ] (때때로) Netlify 대시보드의 이번 달 대역폭 — 100 GB에 가까워지면 옮길 시점
 

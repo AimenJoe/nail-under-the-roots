@@ -1,0 +1,22 @@
+// 운영 웹판 = Cloudflare Workers 정적 파일, 주소 https://nail.beardworks.io/play/ (0294).
+// 공식 페이지(같은 호스트의 / 나머지)는 GitHub Pages 그대로 — 이 Worker는 /play 아래만 받는다.
+// Worker 코드는 없다(정적 파일만 → 요청 무료·무제한). deploy-web.yml publish 잡이 이 파일을 dist 옆(작업 폴더 뿌리)에 복사해 쓴다:
+//   cp tools/web/wrangler.jsonc . && npx wrangler@<버전> deploy
+// dist-play는 `assemble.py dist-play <sha> release /play`로 조립한다(_headers 경로에 /play가 붙는다).
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "web-game",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "nail.beardworks.io/play", "zone_name": "beardworks.io" },
+    { "pattern": "nail.beardworks.io/play/*", "zone_name": "beardworks.io" }
+  ],
+  "assets": {
+    "directory": "./dist-play",
+    "base_path": "/play",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  }
+}
