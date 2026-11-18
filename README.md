@@ -2,7 +2,7 @@
 
 귀엽지만 쓸쓸한 땅속 세계에서, 아기 두더지 Naïl이 발톱과 굴파기로 방을 돌파하며 시들어 가는 나무의 뿌리를 따라 내려가는 탑다운 액션 로그라이트. Rust + macroquad.
 
-- 공식 페이지: https://nail.beardworks.io/ (원본 `site/`, `pages.yml`이 GitHub Pages에 올린다, docs/decisions/0069). 게임은 https://nail-under-the-roots.netlify.app
+- 공식 페이지: https://nail.beardworks.io/ (원본 `site/`, `pages.yml`이 GitHub Pages에 올린다, docs/decisions/0069). 게임은 https://nail.beardworks.io/play/ (Cloudflare Workers 정적 파일, 0294 — 옛 주소 nail-under-the-roots.netlify.app는 기록을 들고 넘긴다)
 - 컨셉: [`docs/concept.md`](docs/concept.md)
 - 현재 단계: [`docs/phase-1-combat-prototype.md`](docs/phase-1-combat-prototype.md)의 "구현 상태"·"사람이 할 일"을 본다. 현재 v0.6.16이며, v0.6.0 "팔 수 있는 판"은 PC 빌드와 함께 배포했다. 나머지 판매 준비는 v0.6.x에서 진행한다(0232).
 - 에셋 라이선스: [`assets/LICENSES.md`](assets/LICENSES.md). 캐릭터·적·이웃·소품·마을 물건 스프라이트, 초상화·일러스트·타이틀은 나노바나나 원본(`tools/art/sources/ai/`)을 코드가 게임 칸으로 옮긴다(공용 변환기 `tools/art/sprite_ai.py` + 그림마다 `*_ai.py`, 걷기 네 칸은 `walk_ai.py`, 0206·0229; 초상화·일러스트는 `ai_portraits.py`·`ai_illust.py`, 새 원본은 먼저 `strip_logo.py`). `python3 tools/art/<이름>.py`로 PNG를 다시 만든다. 대체 타일은 직접 그림(`tiles.py`). 앱 아이콘은 `tools/icons/make_icons.py`. 유료 팩은 `assets/vendor/`(레포 밖, docs/decisions/0010)
@@ -84,8 +84,9 @@ python3 tools/licenses.py                         # 의존성을 바꿨을 때�
 
 ## 배포
 
-### 웹 (Netlify)
-- 사이트: https://nail-under-the-roots.netlify.app (Netlify Site ID `a0bc4242-4bdd-4fc8-8266-adeaf143e59c`, Git 연동 없음)
+### 웹 (운영 = Cloudflare `/play`, 개발판 = Netlify)
+- 운영판: https://nail.beardworks.io/play/ — Worker `web-game`(`tools/web/wrangler.jsonc`, 0294). 옛 운영 주소 https://nail-under-the-roots.netlify.app 에는 기록 넘김 페이지(`web/moved/`).
+- Netlify 사이트(개발판·넘김 페이지): Site ID `a0bc4242-4bdd-4fc8-8266-adeaf143e59c`, Git 연동 없음)
 - `release/**`에 push하면 개발판이 별칭 `dev`(https://dev--nail-under-the-roots.netlify.app)로 올라간다. PR은 빌드만 하고 배포하지 않는다.
 - 운영판은 `main`에 들어가면(`release/vX → main` PR을 사장이 Merge, 직접 push하지 않는다) `deploy-web.yml`이 빌드(`build` 잡)한 뒤, 따로 떨어진 `publish` 잡이 Environment `web-production`(개발판은 `web-dev`)의 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`로 배포한다(0277, `docs/release.md` "파이프라인 지키기"). Netlify 사이트는 **Git 연동 없이**(Deploy manually) 만든다. 이유와 절차: KB `guides/macroquad-wasm-netlify-github-actions.md`.
 
