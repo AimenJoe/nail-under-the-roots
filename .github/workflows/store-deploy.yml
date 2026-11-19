@@ -5,14 +5,16 @@ name: store-deploy
 #    - Steam: steamcmd + 업로드 전용 빌더 계정의 config.vdf로 app build를 올리고 `SetLive`로 베타 갈래에만 건다
 #      (기본 갈래는 SteamPipe가 자동으로 못 건다 — 사람이 파트너 사이트에서, Steamworks "Uploading to Steam").
 #    - Epic: BuildPatchTool `-mode=UploadBinary`로 아티팩트에 올린다(라벨·출시는 사람이 개발자 포털에서).
+# 3) play(0295): build-android.yml을 상점판으로 불러 올리기 키로 서명한 AAB를 아티팩트(`nail-aab-play-<sha>`)로만 남긴다.
+#    Play Console에는 사람이 올린다(새 앱의 첫 번들은 콘솔에서만 — API 자동 올리기는 앱이 생긴 뒤에 붙인다).
 # 필요한 값(Environment `store`): docs/release.md "상점 업로드".
 on:
   workflow_dispatch:
     inputs:
       store:
-        description: 'steam | epic'
+        description: 'steam | epic | play'
         type: choice
-        options: [steam, epic]
+        options: [steam, epic, play]
       steam_branch:
         description: '(Steam만) 베타 갈래 이름(SetLive). 기본 갈래로는 사람이 옮긴다 — epic이면 안 쓴다'
         type: string
@@ -31,12 +33,22 @@ concurrency:
 
 jobs:
   build:
+    if: inputs.store != 'play'
     permissions:
       contents: write   # build-desktop의 잡이 요구하는 권한(상점 판은 Release에 붙이지 않는다)
     uses: ./.github/workflows/build-desktop.yml
     with:
       release_tag: ''
       store: ${{ inputs.store }}
+    secrets: inherit
+
+  play:
+    if: inputs.store == 'play'
+    permissions:
+      contents: write   # build-android의 잡이 요구하는 권한(상점판은 Release에 붙이지 않는다)
+    uses: ./.github/workflows/build-android.yml
+    with:
+      store: play
     secrets: inherit
 
   steam:

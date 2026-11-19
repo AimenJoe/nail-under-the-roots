@@ -162,6 +162,14 @@
 
 ## 사람이 할 일 (다음 세션 전)
 
+### Google Play 준비(0295, 2026-11-19)
+- [ ] 법적 이름 표기(사업자등록증 한글 그대로 / 홈택스 영문 상호로 통일) — D&B·결제 프로필에 똑같이
+- [ ] 사업장 주소 공개 여부(유료 앱이면 Play에 보인다) — 옮길 거면 D-U-N-S 신청 전에
+- [ ] D-U-N-S 조회(my.dnb.com/lookup) → 없으면 D&B 무료 신청(최대 30영업일)
+- [ ] 번호가 나오면 Play Console 조직 계정($25), 개발자 이름 `Beardworks`
+- [ ] 올리기 키(`docs/release.md` "Google Play") → Environment `store`에 `ANDROID_UPLOAD_KEYSTORE_B64`·`ANDROID_UPLOAD_KEYSTORE_PASS`
+- [x] AAB 빌드(APK → aapt2 proto → bundletool, `tools/android/make_aab.sh`) + 16KB 정렬 검사 + store-deploy `play` — 첫 CI 결과 확인은 Claude
+
 ### 운영 웹판을 nail.beardworks.io/play/ 로(0294, 2026-11-18)
 - [x] Worker `web-game-nail` 만들기(사장)
 - [ ] API 토큰(Worker `web-game-nail` Editor + beardworks.io Workers Routes Edit) → GitHub Environment **`web-production`에만** `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`

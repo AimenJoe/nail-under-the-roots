@@ -87,7 +87,7 @@
 
 남은 틈(알고 둔다): `ASSETS_TOKEN`(비공개 에셋 레포 읽기 전용)·`ANDROID_DEBUG_KEYSTORE_B64`는 아직 레포 시크릿이다 — Write 권한자가 없으면 읽을 사람이 없다(1·4). 협업자를 들이게 되면 이 둘도 Environment로 옮긴다(빌드 워크플로마다 `environment:` 한 줄).
 
-## 상점 업로드(Steam·Epic, 0276 S4·E4 — 실기 확인 전)
+## 상점 업로드(Steam·Epic 0276 S4·E4, Google Play 0295 — 실기 확인 전)
 `store-deploy.yml`을 손으로 돌린다(Actions → store-deploy → Run workflow → store = steam | epic). 순서: `build-desktop.yml`이 상점 판(운영판 + `--features steam|epic`)을 묶고 → Environment **`store`**에 들어간 업로드 잡만 상점 자격을 읽어 올린다. Steam은 **베타 갈래에만**(`SetLive`, 기본 갈래로는 사람이 파트너 사이트에서 옮긴다 — SteamPipe가 자동으로 못 건다), Epic은 아티팩트에 바이너리만(라벨·출시는 사람이 포털에서).
 
 Environment `store` 만들기(사람): Settings → Environments → New `store` → Deployment branches = `main`(+ 출시 전 베타 시험을 하려면 `release/**`), **Required reviewers = 사장**. 넣을 값:
@@ -102,5 +102,15 @@ Environment `store` 만들기(사람): Settings → Environments → New `store`
 | Variable | `EPIC_ORG_ID`·`EPIC_PRODUCT_ID`·`EPIC_ARTIFACT_ID` | 조직·제품·아티팩트 아이디. 아티팩트는 오퍼(기본 게임)마다 하나가 자동으로 생기고, Windows·macOS 바이너리를 같은 아티팩트에 올린 뒤 포털에서 바이너리마다 플랫폼을 고른다(Manage Platforms). `BuildVersion`은 아티팩트 안에서 플랫폼까지 겹치면 안 돼서 workflow가 끝에 `-windows`·`-macos`를 붙인다(Epic Manage Artifacts·BPT 원문, 2026-11-06 — 처음엔 Steam 데포처럼 OS마다 따로라고 짐작해 둘로 나눴다) |
 
 Epic 포털에서 받는 큰 파일 둘(EOS **C SDK** zip·BuildPatchTool zip)은 비공개 에셋 레포(`ASSETS_REPO`)의 **Release `eos`에 첨부**한다 — 공개 레포에 두지 않고, 파일이 웹 업로드 25MB·git 100MB 한도를 넘어 레포 대신 Release(첨부 하나에 2GB까지)에 둔다(2026-11-06). zip 이름은 아무거나, 새 판을 받으면 같은 Release의 첨부를 바꾼다(태그 `eos`는 그대로). `tools/epic/fetch_eos.sh`가 `ASSETS_TOKEN`으로 받아 풀고 찾는다: Windows Epic 빌드는 SDK 뿌리(`Include`·`Lib/EOSSDK-Win64-Shipping.lib`·`Bin/EOSSDK-Win64-Shipping.dll`)를 `EOS_SDK_DIR`로 링크하고 `.dll`을 실행 파일 옆에 둔다(`tools/pc/package.sh`), `store-deploy`의 epic 잡은 경로에 `Linux`가 든 `BuildPatchTool`을 쓴다. 푼 파일은 작업 폴더 `.eos/`에만 — 묶음에 실리지 않는다. Steam 재배포 파일은 크레이트가 빌드 때 내놓은 것을 실행 파일 옆에 둔다.
+
+### Google Play(0295)
+store = **play**는 올리지 않고 **서명한 AAB만 만든다**(아티팩트 `nail-aab-play-<sha>`, 운영판 + 패키지 `io.beardworks.nail`) — Play Console → 앱 → 테스트 또는 프로덕션 → 새 버전에 사람이 올린다. 새로 넣을 값(Environment `store`):
+
+| 종류 | 이름 | 무엇 |
+|---|---|---|
+| Secret | `ANDROID_UPLOAD_KEYSTORE_B64` | 올리기 키 저장소(`upload.jks`)를 base64로(`base64 -w0 upload.jks`, macOS는 `base64 -i upload.jks`) |
+| Secret | `ANDROID_UPLOAD_KEYSTORE_PASS` | 그 저장소·키 비밀번호(둘을 같게 만든다) |
+
+올리기 키 만들기(사장 컴퓨터에서, JDK의 `keytool`): `keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Beardworks"` — 비밀번호를 물으면 같은 것을 두 번. 파일은 레포에 넣지 않고 레포 밖에 백업한다. Play App Signing을 켜 두면(새 앱 기본) 앱 서명 키는 Google이 쥐고, 이 올리기 키는 잃어도 콘솔에서 바꿀 수 있다. `version_code`는 Play판도 같은 `Cargo.toml` 값 — 올릴 때마다 커야 한다.
 
 Steam 파트너 사이트에서 사람이: 데포 셋(OS마다), 실행 옵션(Windows `Nail.exe`, macOS `Nail.app`, Linux `nail`), 업로드 뒤 빌드 목록에서 기본 갈래로 옮기기. Epic 포털에서: 올린 바이너리마다 플랫폼(Windows·macOS)과 업데이트 종류, 실행 파일·인자, 활성화·라벨, EOS·Epic 상점 업적 일괄 올리기(`python3 tools/epic/make_eos_zip.py` → EOS 탭 zip, `--egs` → Epic Games Store 탭 zip — 정의 표에 XP 칸 `user_epic_achievements_xp`, 값은 `docs/epic/epic-store-xp.csv`). 한국에 내면 업데이트마다 content notes.
