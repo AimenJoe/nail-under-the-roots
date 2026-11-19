@@ -86,6 +86,7 @@
           box.classList.add("done");
           setTimeout(function () { box.remove(); }, 400);
           var c = document.getElementById("glcanvas"); if (c) c.focus();
+          if (window.nailCanvasSoon) window.nailCanvasSoon(); // 시작부터 가로인 iPhone(nail-host.js)
         }
       };
     })();
