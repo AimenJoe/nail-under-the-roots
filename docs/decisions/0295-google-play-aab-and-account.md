@@ -28,7 +28,9 @@ Play는 새 앱을 AAB로만 받는데 `cargo-quad-apk`는 APK만 만든다(aapt
 
 APK 하나에서 바꾸니 기기에서 확인한 APK와 번들 속 내용이 같다. bundletool은 버전 + sha256으로 고정(`build-android.yml` env).
 
-**16KB 페이지**: Play는 targetSdk 35+ 앱의 64비트 네이티브 라이브러리가 16KB 정렬이기를 요구한다(2차: Android Developers 공지 — 원문 날짜 확인 전). `llvm-readelf`로 LOAD 정렬을 보고, 상점판은 못 맞으면 실패·그 밖은 경고. 첫 CI 결과를 보고 필요하면 링크 인자(`-z max-page-size=16384`)를 더한다.
+**16KB 페이지**: Play는 targetSdk 35+ 앱의 64비트 네이티브 라이브러리가 16KB 정렬이기를 요구한다(2차: Android Developers 공지 — 원문 날짜 확인 전). `llvm-readelf`로 LOAD 정렬을 보고, 상점판은 못 맞으면 실패·그 밖은 경고. **첫 CI(2026-11-19, run 44495342893)에서 `libnail.so`의 LOAD 넷이 모두 0x10000(64KB) 정렬** — 지금 NDK·러스트 링크 그대로 맞는다.
+
+첫 CI 결과: AAB 34MB(APK 35MB와 거의 같다), 번들에서 뽑은 universal APK의 패키지·targetSdk 36·아이콘·`arm64-v8a`·exported 모두 그대로.
 
 ## 흐름
 - 평소 빌드(`build-android.yml`): APK + 디버그 서명 AAB 아티팩트 `nail-aab-<dev|release>-<sha>`.
@@ -45,4 +47,4 @@ APK 하나에서 바꾸니 기기에서 확인한 APK와 번들 속 내용이 �
 ## 모르는 것
 - GRAC 자체등급분류 DB의 등록자명이 Play의 법적 이름인지 개발자 이름인지.
 - 한국 D-U-N-S 신청이 나이스디앤비로 넘어가는지, 그 경로의 수수료(nicednb.com은 세션에서 닿지 않았다).
-- 16KB 정렬이 지금 NDK·러스트 링크로 이미 맞는지(첫 CI).
+- 번들에서 뽑은 APK가 기기에서 켜지는지(연기 시험은 아직 APK만 — 상점판 첫 빌드 뒤 내부 테스트 트랙으로 실기).
