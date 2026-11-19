@@ -184,6 +184,38 @@ if (rot) rot.addEventListener("click", function () {
   showRotate();
   var c = document.getElementById("glcanvas"); if (c) c.focus();
 });
+// 캔버스 크기 다시 맞추기(0298, knellroot 0187·0243을 옮김 — 사장 2026-11-19 "아이폰 가로모드 버그는 nail에도 동일하게 있네, 아예 시작시부터
+// 가로모드면 아래쪽에 여백 생김", iPhone 13 Pro Max). 번들은 window.onresize 때 한 번만 캔버스의 CSS 크기를 읽어 그리기 크기를 정한다
+// (miniquad js/gl.js resize). iOS Safari는 처음 그릴 때·주소창이 접힐 때·돌릴 때 그 값을 레이아웃이 끝나기 전에 주기도 해서, 그때의
+// (작은) 높이가 박혀 아래가 빈 채로 남았다. 번들은 고치지 않고 크기가 바뀔 만한 일 뒤에 몇 번 더 재서, 어긋나 있으면 번들의 처리기를
+// 다시 부른다(ResizeObserver는 레이아웃이 끝난 크기를 준다). 로딩 중에는 처리기가 아직 없어 넘어가므로 다 그린 순간(ready)에 다시 잰다.
+(function () {
+  var c = document.getElementById("glcanvas");
+  if (!c) return;
+  function check() {
+    if (typeof window.onresize !== "function") return; // 번들이 아직 처리기를 달기 전
+    var d = window.high_dpi ? (window.devicePixelRatio || 1) : 1;
+    if (c.width !== Math.floor(c.clientWidth * d) || c.height !== Math.floor(c.clientHeight * d)) window.onresize();
+  }
+  var timers = [];
+  function soon() {
+    timers.forEach(clearTimeout);
+    timers = [50, 150, 350, 700, 1200].map(function (ms) { return setTimeout(check, ms); });
+    requestAnimationFrame(check);
+  }
+  window.addEventListener("resize", soon);
+  window.addEventListener("orientationchange", soon);
+  document.addEventListener("fullscreenchange", soon);
+  document.addEventListener("webkitfullscreenchange", soon);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", soon);
+  if (window.ResizeObserver) new ResizeObserver(check).observe(c);
+  window.nailCanvasCheck = check; // 헤드리스 시험이 부를 수 있다
+  // 다 그린 순간(index.html __nailLoading.ready): 한 번 더 재고, 처음 몇 초는 1초마다(주소창이 늦게 접히는 iPhone).
+  window.nailCanvasSoon = function () {
+    soon();
+    for (var i = 1; i <= 5; i++) setTimeout(check, i * 1000);
+  };
+})();
 miniquad_add_plugin({
   name: "nail_web",
   version: 1,
@@ -196,7 +228,7 @@ miniquad_add_plugin({
   }
 });
 
-// ── 탭이 숨으면 소리 멈추기(0296) ─────────────────────────────────────────────────────────────
+// ── 탭이 숨으면 소리 멈추기(0298) ─────────────────────────────────────────────────────────────
 // 번들의 오디오 플러그인은 숨김을 게임에 "포커스 잃음"으로만 넘기고 소리는 그대로 둔다(Android 네이티브만 엔진이 멈춘다) —
 // 휴대폰 브라우저·앱 안 웹뷰에서 탭을 바꿔도 음악이 계속 났다. 번들은 AudioContext 클래스를 읽어 둔 뒤라 생성자를 바꿀 수
 // 없으니, 소리마다 부르는 createGain에서 컨텍스트를 모아 두고 숨으면 suspend, 보이면 resume. iOS처럼 돌아와서 resume이

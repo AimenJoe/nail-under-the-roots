@@ -202,7 +202,7 @@ async function run() {
     check(r.p.touchstart === false && r.p.touchend === true && r.n >= 2, `ipad: touchstart는 막지 않고 touchend는 막는다, 터치는 게임에 닿는다 ${JSON.stringify(r)}`);
     await ctx.close();
   }
-  // 앱이 내려감(0296): 탭을 숨기면 소리가 멈추고(web/nail-host.js) 게임은 일시정지 창을 연다(src/app.rs `Away`, 소리 없이),
+  // 앱이 내려감(0298): 탭을 숨기면 소리가 멈추고(web/nail-host.js) 게임은 일시정지 창을 연다(src/app.rs `Away`, 소리 없이),
   // 보이면 소리가 돌아온다. 창이 열렸는지는 그다음 뒤로(Esc)의 소리로 본다 — 멈춤 창에서는 닫는 소리, 게임에서는 여는 소리.
   // 두 소리는 손으로 열고 닫아 먼저 듣는다(소리는 AudioBufferSourceNode.start의 버퍼로 가른다).
   // 숨김은 visibilityState를 덮고 사건을 보낸다(헤드리스는 진짜로 숨지 않는다).
