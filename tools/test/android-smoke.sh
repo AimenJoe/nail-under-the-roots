@@ -2,7 +2,8 @@
 # Android 에뮬레이터에서 APK를 켜 보고 로그를 남긴다(2026-11-07, Knellroot 045ff55·bab436d를 옮김 — nail 0286).
 #   bash tools/test/android-smoke.sh <apk> <나갈 폴더> [패키지]
 # 패키지를 주지 않으면 APK에서 읽는다(aapt2 — 개발판은 io.github.aimenjoe.dev.nail, 0286). 하는 일: 깔기 → 켜기 → 20초 뒤 화면·살아 있나
-# → Enter 둘(타이틀 → 시작) → 15초 뒤 화면·살아 있나 → logcat. 켜고 20초 뒤 죽어 있으면 실패(종료 코드 1).
+# → Enter 둘(타이틀 → 시작) → 15초 뒤 화면·살아 있나 → 홈 키로 내려 보냈다가 다시 켜기(0296: 게임 중이면 일시정지 창이 떠 있어야
+# 한다 — 화면 3-back.png) → logcat. 켜고 20초 뒤 죽어 있거나, 내려갔다 돌아온 뒤 죽어 있으면 실패(종료 코드 1).
 # Rust 패닉은 logcat의 RustStdoutStderr·"panicked", 라이브러리를 못 찾으면 "UnsatisfiedLinkError",
 # 네이티브 크래시는 "Fatal signal"·"backtrace"로 남는다.
 set -u
@@ -30,8 +31,17 @@ for _ in 1 2; do adb shell input keyevent 66; sleep 2; done
 sleep 15
 adb exec-out screencap -p > "$OUT/2-start.png"
 echo "after start: $(alive)" | tee -a "$OUT/alive.txt"
+# 앱 내려가기(0296): 홈 → 5초 → 다시 앞으로(실행 중인 작업을 띄운다).
+adb shell input keyevent 3
+sleep 5
+adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
+sleep 5
+adb exec-out screencap -p > "$OUT/3-back.png"
+back=$(alive)
+echo "after background: $back" | tee -a "$OUT/alive.txt"
 adb logcat -d > "$OUT/logcat.txt"
 grep -inE "panicked|RustStdoutStderr|UnsatisfiedLinkError|Fatal signal|backtrace|SIGSEGV|SIGABRT|AndroidRuntime|nail" "$OUT/logcat.txt" | head -200 > "$OUT/crash.txt" || true
 echo "----- crash lines -----"
 cat "$OUT/crash.txt"
 [ "$first" = alive ] || { echo "::error::$PKG가 켜고 20초 안에 죽었다(위 crash lines·아티팩트 logcat)"; exit 1; }
+[ "$back" = alive ] || { echo "::error::$PKG가 내려갔다 돌아온 뒤 죽었다(0296, 위 crash lines·아티팩트 logcat)"; exit 1; }

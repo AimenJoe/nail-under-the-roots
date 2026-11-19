@@ -196,6 +196,34 @@ miniquad_add_plugin({
   }
 });
 
+// ── 탭이 숨으면 소리 멈추기(0296) ─────────────────────────────────────────────────────────────
+// 번들의 오디오 플러그인은 숨김을 게임에 "포커스 잃음"으로만 넘기고 소리는 그대로 둔다(Android 네이티브만 엔진이 멈춘다) —
+// 휴대폰 브라우저·앱 안 웹뷰에서 탭을 바꿔도 음악이 계속 났다. 번들은 AudioContext 클래스를 읽어 둔 뒤라 생성자를 바꿀 수
+// 없으니, 소리마다 부르는 createGain에서 컨텍스트를 모아 두고 숨으면 suspend, 보이면 resume. iOS처럼 돌아와서 resume이
+// 막히면(interrupted) 다음 손길·키에서 다시 깨운다. 게임은 같은 사건으로 일시정지 창을 연다(src/app.rs `Away`).
+(function () {
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC || !AC.prototype.createGain) return;
+  var seen = [];
+  var orig = AC.prototype.createGain;
+  AC.prototype.createGain = function () {
+    if (seen.indexOf(this) < 0) seen.push(this);
+    return orig.apply(this, arguments);
+  };
+  window.nailAudioContexts = seen; // 연기 시험(tools/test/smoke.js `bg:`)이 상태를 본다
+  var each = function (f) { seen.forEach(function (c) { try { var p = f(c); if (p && p.catch) p.catch(function () {}); } catch (e) {} }); };
+  var hidden = function () { return document.visibilityState === "hidden"; };
+  var sync = function () { each(function (c) { return hidden() ? c.suspend() : c.resume(); }); };
+  document.addEventListener("visibilitychange", sync);
+  window.addEventListener("pagehide", function () { each(function (c) { return c.suspend(); }); });
+  window.addEventListener("pageshow", sync);
+  ["touchend", "keydown", "mousedown"].forEach(function (t) {
+    window.addEventListener(t, function () {
+      if (!hidden()) each(function (c) { return c.state !== "running" ? c.resume() : null; });
+    }, true);
+  });
+})();
+
 // 서비스 워커(sw.js): https(또는 localhost)에서만, PR 미리 보기 주소(pr-N--)에는 걸지 않는다. 새 판은 다음 실행부터(sw.js 머리 주석).
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1") && !/^pr-\d+--/.test(location.hostname)) {
   window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });

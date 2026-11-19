@@ -202,6 +202,48 @@ async function run() {
     check(r.p.touchstart === false && r.p.touchend === true && r.n >= 2, `ipad: touchstart는 막지 않고 touchend는 막는다, 터치는 게임에 닿는다 ${JSON.stringify(r)}`);
     await ctx.close();
   }
+  // 앱이 내려감(0296): 탭을 숨기면 소리가 멈추고(web/nail-host.js) 게임은 일시정지 창을 연다(src/app.rs `Away`, 소리 없이),
+  // 보이면 소리가 돌아온다. 창이 열렸는지는 그다음 뒤로(Esc)의 소리로 본다 — 멈춤 창에서는 닫는 소리, 게임에서는 여는 소리.
+  // 두 소리는 손으로 열고 닫아 먼저 듣는다(소리는 AudioBufferSourceNode.start의 버퍼로 가른다).
+  // 숨김은 visibilityState를 덮고 사건을 보낸다(헤드리스는 진짜로 숨지 않는다).
+  if (SCENARIOS.length) {
+    const s = await dev(SCENARIOS.includes('던전 바로') ? '던전 바로' : SCENARIOS[0]);
+    await s.page.evaluate(() => {
+      const ids = new WeakMap(); let next = 1; window.__played = [];
+      const start = AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start = function (...a) {
+        const b = this.buffer; if (b && !ids.has(b)) ids.set(b, next++);
+        window.__played.push(b ? ids.get(b) : 0); return start.apply(this, a);
+      };
+    });
+    const played = () => s.page.evaluate(() => { const v = window.__played; window.__played = []; return v; });
+    const vis = (state) => s.page.evaluate((st) => {
+      Object.defineProperty(document, 'visibilityState', { value: st, configurable: true });
+      Object.defineProperty(document, 'hidden', { value: st === 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, state);
+    const states = () => s.page.evaluate(() => (window.nailAudioContexts || []).map((c) => c.state));
+    await s.page.waitForTimeout(500); await played();
+    await s.key('Escape', 400);
+    const opened = await played();
+    await s.key('Escape', 400);
+    const closed = await played();
+    const open = opened[opened.length - 1], close = closed[closed.length - 1];
+    await vis('hidden'); await s.page.waitForTimeout(400);
+    const whileHidden = await states();
+    await vis('visible'); await s.page.waitForTimeout(400);
+    const afterBack = await states();
+    await s.shot('bg_pause');
+    await played();
+    await s.key('Escape', 400);
+    const esc = await played();
+    check(whileHidden.length > 0 && whileHidden.every((x) => x === 'suspended'), `bg: 숨으면 소리 컨텍스트가 멈춘다 ${JSON.stringify(whileHidden)}`);
+    check(afterBack.length > 0 && afterBack.some((x) => x === 'running'), `bg: 보이면 소리가 돌아온다 ${JSON.stringify(afterBack)}`);
+    check(open !== undefined && close !== undefined && open !== close && esc.includes(close) && !esc.includes(open),
+      `bg: 숨었다 돌아오면 일시정지 창이 열려 있다(Esc = 닫는 소리 ${close}, 여는 소리 ${open} 아님) ${JSON.stringify(esc)}`);
+    check(s.errors.length === 0, `bg: 콘솔 에러 없음 ${JSON.stringify(s.errors)}`);
+    await s.ctx.close();
+  }
   for (const idx of SCENARIOS) {
     const s = await dev(idx);
     // 입력 한 바퀴: 이동·평타(J) 연타·모으기·회피(K)·특기(L)·확인(Enter, 컷씬·말 걸기 넘김)·일시정지 열고 닫기.
