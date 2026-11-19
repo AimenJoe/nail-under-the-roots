@@ -85,7 +85,7 @@ python3 tools/licenses.py                         # 의존성을 바꿨을 때�
 ## 배포
 
 ### 웹 (운영 = Cloudflare `/play`, 개발판 = Netlify)
-- 운영판: https://nail.beardworks.io/play/ — Worker `web-game`(`tools/web/wrangler.jsonc`, 0294). 옛 운영 주소 https://nail-under-the-roots.netlify.app 에는 기록 넘김 페이지(`web/moved/`).
+- 운영판: https://nail.beardworks.io/play/ — Worker `web-game-nail`(`tools/web/wrangler.jsonc`, 0294). 옛 운영 주소 https://nail-under-the-roots.netlify.app 에는 기록 넘김 페이지(`web/moved/`).
 - Netlify 사이트(개발판·넘김 페이지): Site ID `a0bc4242-4bdd-4fc8-8266-adeaf143e59c`, Git 연동 없음)
 - `release/**`에 push하면 개발판이 별칭 `dev`(https://dev--nail-under-the-roots.netlify.app)로 올라간다. PR은 빌드만 하고 배포하지 않는다.
 - 운영판은 `main`에 들어가면(`release/vX → main` PR을 사장이 Merge, 직접 push하지 않는다) `deploy-web.yml`이 빌드(`build` 잡)한 뒤, 따로 떨어진 `publish` 잡이 Environment `web-production`(개발판은 `web-dev`)의 `NETLIFY_AUTH_TOKEN`·`NETLIFY_SITE_ID`로 배포한다(0277, `docs/release.md` "파이프라인 지키기"). Netlify 사이트는 **Git 연동 없이**(Deploy manually) 만든다. 이유와 절차: KB `guides/macroquad-wasm-netlify-github-actions.md`.

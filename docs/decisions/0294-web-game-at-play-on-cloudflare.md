@@ -1,7 +1,7 @@
 # 0294. 운영 웹판은 https://nail.beardworks.io/play/ — Cloudflare Workers 정적 파일, 옛 주소는 기록을 들고 넘긴다
 
 - 날짜: 2026-11-18
-- 상태: 채택(사장 2026-11-18: "nail.beardworks.io/play 이런식으론 못하나?" → 이 방식, Worker 이름 `web-game`은 사장이 만듦). 0292(언젠가 Cloudflare로)의 nail 운영판 몫을 실행한다. 개발판은 Netlify 별칭 `dev` 그대로.
+- 상태: 채택(사장 2026-11-18: "nail.beardworks.io/play 이런식으론 못하나?" → 이 방식, Worker 이름 `web-game-nail`은 사장이 만듦). 0292(언젠가 Cloudflare로)의 nail 운영판 몫을 실행한다. 개발판은 Netlify 별칭 `dev` 그대로.
 - 근거(KB): `reference/web/pwa-install-fullscreen-orientation.md`(웹 기록·PWA·서비스 워커는 출처마다 따로 — "웹 게임의 주소를 옮기지 않는다"), `reference/netlify/free-plan-limits.md`, `reference/cloudflare/static-site-extras.md`.
 
 ## 왜
@@ -11,7 +11,7 @@
 - 공식 페이지(같은 호스트의 나머지 경로)는 GitHub Pages 그대로 — Worker는 route `nail.beardworks.io/play`·`/play/*`만 받는다. Worker 코드가 없으니 모든 요청이 정적 파일(무료)이다.
 
 ## 무엇을
-- `tools/web/wrangler.jsonc`: Worker `web-game`, route 둘(끝 `/` 없는 `/play`는 `/play/`로 307), `assets.base_path: "/play"`, `workers_dev`·`preview_urls` 끔.
+- `tools/web/wrangler.jsonc`: Worker `web-game-nail`, route 둘(끝 `/` 없는 `/play`는 `/play/`로 307), `assets.base_path: "/play"`, `workers_dev`·`preview_urls` 끔.
   Wrangler가 "Will match assets: dist-play/play"라고 경고하지만 `base_path`를 셈하지 않은 옛 경고다 — `wrangler dev`(4.156.2)에서 `/play/`·`/play/nail.wasm`·`_headers`가 맞게 나오는 것을 봤다.
 - `tools/web/assemble.py dist-play <id> release /play`: `_headers`의 경로 앞에 `/play`(Workers 정적 파일은 `_headers`에 공개 경로 전체를 쓴다). 게임 파일은 서로 상대 경로라 그대로.
 - 서비스 워커는 페이지를 `./`로만 담는다: Cloudflare는 `/play/index.html`을 `/play/`로 돌려보내는데(307), 그 응답을 페이지 이동에 쓰면 브라우저가 거절해 오프라인 실행이 깨진다.
@@ -21,8 +21,11 @@
 - 배포(`deploy-web.yml`): main은 ① Cloudflare `wrangler deploy` → 새 주소의 `build.txt`가 이 커밋인지 확인 → ② 그 뒤에만 Netlify 프로덕션을 넘김 페이지로(앞이 실패하면 옛 주소의 게임이 남는다). release/**·PR은 `wrangler deploy --dry-run`(토큰 없이)으로 설정만 본다. **Cloudflare 토큰은 `web-production`(main 전용)에만** — 개발 갈래가 운영 Worker에 닿지 않게(0277의 파이프라인 지키기와 같은 까닭).
 - 시험: `tools/test/moved.js`(두 출처를 흉내 내 셋 — 넘어오고 `#`이 지워짐·덮지 않음·옛 기록 없음, 2026-11-18 로컬 통과), `wrangler dev`로 서비스 워커 범위 `/play/`·오프라인 다시 열기.
 
+## 덧붙임(2026-11-19) — Worker 이름 `web-game` → `web-game-nail`
+- knellroot도 같은 꼴로 옮기며(knellroot 0246, Worker `web-game-knellroot`) 이름을 짝지었다(사장 2026-11-19, 대시보드에서 이름 바꿈 — route·주소는 그대로 이어졌다, `/play/` 200 확인). `tools/web/wrangler.jsonc`의 `name`도 같이 — 다르면 다음 배포가 옛 이름의 새 Worker를 만들려 한다(토큰은 그 Worker 하나만이라 실패).
+
 ## 사람이 할 일
-- [x] Worker `web-game` 만들기(사장 2026-11-18).
-- [ ] API 토큰: Worker `web-game`의 **Editor** + **Zone → Workers Routes → Edit**(beardworks.io). GitHub nail 레포 → Settings → Environments → **`web-production`에만** `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`.
+- [x] Worker `web-game-nail` 만들기(사장 2026-11-18).
+- [ ] API 토큰: Worker `web-game-nail`의 **Editor** + **Zone → Workers Routes → Edit**(beardworks.io). GitHub nail 레포 → Settings → Environments → **`web-production`에만** `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`.
 - [ ] 다음 `release/v1.0 → main` Merge 때 바뀐다(공식 페이지 링크도 같이). 그 뒤: beardworks `ops/src/config.js`의 nail `prod`를 새 주소로, 상점(Epic·Steam) 등록 정보의 웹 링크.
 - [ ] (나중) knellroot도 같은 꼴 — Worker는 따로(한 Worker에 두면 하나를 올릴 때 둘 다 바뀐다).
