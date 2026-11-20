@@ -114,3 +114,15 @@ About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 
 - Global Rating ID: `e2dc4e64-c235-82d2-8a40-3fbbabbe1eed` — 제품 Naïl: Under the Roots, 회사 Beardworks. **IARC에 참여한 다른 상점**(Google Play·Microsoft·ONE store 등)에 낼 때 "Global Rating ID / IARC Certificate ID"를 묻는 칸에 이 값을 넣으면 같은 설문을 다시 하지 않는다. Steam은 IARC 참여 상점이 아니다.
 - 지역별 등급(한국 게임위 포함)은 IARC "Live Rating Notice" 메일의 표에 있다 — 앱인토스 같은 IARC 밖 플랫폼은 그 한국 등급을 따로 적는다.
 - 업데이트로 설문 답(폭력·결제·이용자 간 소통 등)이 바뀌면 설문을 다시 해 새 등급을 받는다. 한국 판매를 켰다면 업데이트마다 content notes(0276 E5).
+
+## 업데이트마다 content notes (한국 판매, 0276 E5)
+한국에 팔면 **모든 업데이트에 content notes**(무엇이 바뀌었나)를 낸다 — 등급에 걸리는 변화면 Epic이 게임위로 보낸다(Epic "Game Rating Korea" 원문, 2026-11-04 KB `reference/game-business/selling-an-indie-game-rules-and-numbers.md`). 포털에서 어느 칸에 넣는지는 아직 화면으로 확인 못 함 — 업데이트를 검토에 낼 때 묻는 칸에. 영어로 쓰고, 등급 설문 답(폭력·결제·이용자 간 소통·확률형 아이템)이 바뀌었는지를 꼭 적는다.
+
+### 2026-11-20 — 1.0.0 (빌드 `1.0.0-be1ac3f`, 앞 빌드 0.9.1-63f5da6)
+    Bug fixes and quality-of-life changes only. No new content.
+    No changes to violence, language, in-game purchases, user interaction, or randomized items; the IARC questionnaire answers are unchanged.
+    - Charge attack warnings: the warning lane now fills exactly when the charging enemy reaches the player (timing aid only; damage and enemy behavior unchanged).
+    - The game now pauses and saves when its window is minimized.
+    - The in-game version label now shows 1.0.0.
+    - Help text updated in all 11 languages to describe the new warning timing.
+
