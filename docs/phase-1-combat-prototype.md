@@ -167,6 +167,8 @@
 
 ### 앱인토스(0299, 2026-11-20)
 - [ ] 사람: 콘솔에 미니앱(게임) 등록 — 등급은 나중에 채널톡 문의(Epic IARC가 되는지, 안 되면 Google Play 등급으로)
+- [x] API 키 → Environment `store` `TOSS_API_KEY`(사장 2026-11-20)
+- [ ] 사람: Environment `store`에 Variable `TOSS_APP_NAME`(콘솔의 appName) → Actions → store-deploy → toss → 실행 요약의 테스트 스킴을 토스 앱에서 열어 실기(가로·X 버튼 겹침·뒤로 키·소리, 0300)
 
 ### 앱이 내려갔을 때(0298, 2026-11-19)
 - [x] 게임 중 내려가면 일시정지 창 + 적기(모든 플랫폼), 웹은 탭이 숨으면 소리를 멈춘다 — 웹 연기 시험 `bg:` 통과

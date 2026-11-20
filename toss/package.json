@@ -1,0 +1,15 @@
+{
+  "name": "nail-apps-in-toss",
+  "private": true,
+  "description": "앱인토스(토스 미니앱) 묶음 — 운영 웹 빌드를 .ait로(docs/decisions/0300). tools/toss/build.sh가 쓴다.",
+  "type": "module",
+  "scripts": {
+    "bridge": "esbuild bridge.js --bundle --format=iife --target=es2019 --minify --outfile=dist/nail-toss.js",
+    "build": "ait build",
+    "deploy": "ait deploy"
+  },
+  "devDependencies": {
+    "@apps-in-toss/web-framework": "3.10.0",
+    "esbuild": "0.28.2"
+  }
+}

@@ -257,7 +257,8 @@ miniquad_add_plugin({
 })();
 
 // 서비스 워커(sw.js): https(또는 localhost)에서만, PR 미리 보기 주소(pr-N--)에는 걸지 않는다. 새 판은 다음 실행부터(sw.js 머리 주석).
-if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1") && !/^pr-\d+--/.test(location.hostname)) {
+// 앱인토스 묶음(0300, toss/bridge.js가 NAIL_TOSS를 세운다)에서는 걸지 않는다 — 파일은 토스가 묶음째 준다.
+if (!window.NAIL_TOSS && "serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1") && !/^pr-\d+--/.test(location.hostname)) {
   window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
 }
 

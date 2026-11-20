@@ -113,4 +113,12 @@ store = **play**는 올리지 않고 **서명한 AAB만 만든다**(아티팩트
 
 올리기 키 만들기(사장 컴퓨터에서, JDK의 `keytool`): `keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Beardworks"` — 비밀번호를 물으면 같은 것을 두 번. 파일은 레포에 넣지 않고 레포 밖에 백업한다. Play App Signing을 켜 두면(새 앱 기본) 앱 서명 키는 Google이 쥐고, 이 올리기 키는 잃어도 콘솔에서 바꿀 수 있다. `version_code`는 Play판도 같은 `Cargo.toml` 값 — 올릴 때마다 커야 한다.
 
+### 앱인토스(0300)
+store = **toss**는 운영판 웹 빌드를 `.ait`로 묶어(`tools/toss/build.sh`) 콘솔에 올리고, 테스트 스킴을 실행 요약에 적는다 — 토스 앱으로 열어 시험, 검수 요청·출시는 콘솔에서(0299). 넣을 값(Environment `store`):
+
+| 종류 | 이름 | 무엇 |
+|---|---|---|
+| Secret | `TOSS_API_KEY` | 콘솔 → 워크스페이스 → 키에서 발급한 배포 API 키(이 앱만 권한) |
+| Variable | `TOSS_APP_NAME` | 콘솔에 등록한 미니앱의 appName(묶음 이름·딥링크 `intoss://<appName>`) |
+
 Steam 파트너 사이트에서 사람이: 데포 셋(OS마다), 실행 옵션(Windows `Nail.exe`, macOS `Nail.app`, Linux `nail`), 업로드 뒤 빌드 목록에서 기본 갈래로 옮기기. Epic 포털에서: 올린 바이너리마다 플랫폼(Windows·macOS)과 업데이트 종류, 실행 파일·인자, 활성화·라벨, EOS·Epic 상점 업적 일괄 올리기(`python3 tools/epic/make_eos_zip.py` → EOS 탭 zip, `--egs` → Epic Games Store 탭 zip — 정의 표에 XP 칸 `user_epic_achievements_xp`, 값은 `docs/epic/epic-store-xp.csv`). 한국에 내면 업데이트마다 content notes.
