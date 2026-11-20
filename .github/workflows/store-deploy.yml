@@ -22,7 +22,7 @@ on:
         type: string
         default: beta
       note:
-        description: '(Steam만) 빌드 설명(파트너 사이트 빌드 목록에만 보인다) — epic이면 안 쓴다(Epic은 BuildVersion이 버전-커밋-플랫폼)'
+        description: '빌드 설명 — Steam: 파트너 사이트 빌드 목록에만 보인다. toss: 콘솔 번들의 메모(비우면 "v<버전> · <커밋>"). epic이면 안 쓴다'
         type: string
         default: ''
 
@@ -61,6 +61,7 @@ jobs:
       ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
       TOSS_API_KEY: ${{ secrets.TOSS_API_KEY }}
       TOSS_APP_NAME: ${{ vars.TOSS_APP_NAME }}
+      NOTE: ${{ inputs.note }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check settings
@@ -95,7 +96,9 @@ jobs:
         working-directory: toss
         run: |
           VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' ../Cargo.toml | head -1)
-          scheme=$(npx ait deploy --api-key "$TOSS_API_KEY" --location "$TOSS_APP_NAME.ait" --scheme-only -m "$VERSION ${GITHUB_SHA:0:7}" | tail -1)
+          # 콘솔의 "메모"(검토자에게 가는 "출시 노트"는 콘솔에서 따로 쓴다 — docs/toss/store-text.md).
+          MEMO="v$VERSION · ${GITHUB_SHA:0:7}${NOTE:+ — $NOTE}"
+          scheme=$(npx ait deploy --api-key "$TOSS_API_KEY" --location "$TOSS_APP_NAME.ait" --scheme-only -m "$MEMO" | tail -1)
           echo "$scheme"
           case "$scheme" in intoss-private://*) ;; *) echo "::error::업로드 실패: $scheme"; exit 1;; esac
           echo "### 앱인토스 테스트 스킴(토스 앱에서 열기): \`$scheme\`" >> "$GITHUB_STEP_SUMMARY"
