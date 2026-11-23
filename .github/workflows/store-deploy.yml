@@ -9,14 +9,17 @@ name: store-deploy
 #    (Environment `store`의 TOSS_API_KEY·TOSS_APP_NAME). 나오는 테스트 스킴(QR)으로 토스 앱에서 시험 — 검수 요청·출시는 콘솔에서.
 # 3) play(0295): build-android.yml을 상점판으로 불러 올리기 키로 서명한 AAB를 아티팩트(`nail-aab-play-<sha>`)로만 남긴다.
 #    Play Console에는 사람이 올린다(새 앱의 첫 번들은 콘솔에서만 — API 자동 올리기는 앱이 생긴 뒤에 붙인다).
+# 5) msstore(0301): build-desktop.yml을 Microsoft Store 판으로 불러 서명하지 않은 MSIX(`nail-windows-msstore-<sha>`)를
+#    아티팩트로만 남긴다(상점 자격이 필요 없어 Environment에 들어가지 않는다). Partner Center에는 사람이 올린다 —
+#    패키지 아이디는 `pc/msix/identity.env`(비밀 아님), 자동 제출(msstore CLI)은 첫 제출이 통과한 뒤에 붙인다.
 # 필요한 값(Environment `store`): docs/release.md "상점 업로드".
 on:
   workflow_dispatch:
     inputs:
       store:
-        description: 'steam | epic | play | toss'
+        description: 'steam | epic | play | toss | msstore'
         type: choice
-        options: [steam, epic, play, toss]
+        options: [steam, epic, play, toss, msstore]
       steam_branch:
         description: '(Steam만) 베타 갈래 이름(SetLive). 기본 갈래로는 사람이 옮긴다 — epic이면 안 쓴다'
         type: string
@@ -42,6 +45,16 @@ jobs:
     with:
       release_tag: ''
       store: ${{ inputs.store }}
+    secrets: inherit
+
+  msstore:
+    if: inputs.store == 'msstore'
+    permissions:
+      contents: write   # build-desktop의 잡이 요구하는 권한(상점 판은 Release에 붙이지 않는다)
+    uses: ./.github/workflows/build-desktop.yml
+    with:
+      release_tag: ''
+      store: msstore
     secrets: inherit
 
   play:

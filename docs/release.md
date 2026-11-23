@@ -87,7 +87,7 @@
 
 남은 틈(알고 둔다): `ASSETS_TOKEN`(비공개 에셋 레포 읽기 전용)·`ANDROID_DEBUG_KEYSTORE_B64`는 아직 레포 시크릿이다 — Write 권한자가 없으면 읽을 사람이 없다(1·4). 협업자를 들이게 되면 이 둘도 Environment로 옮긴다(빌드 워크플로마다 `environment:` 한 줄).
 
-## 상점 업로드(Steam·Epic 0276 S4·E4, Google Play 0295 — 실기 확인 전)
+## 상점 업로드(Steam·Epic 0276 S4·E4, Google Play 0295, Microsoft Store 0301 — 실기 확인 전)
 `store-deploy.yml`을 손으로 돌린다(Actions → store-deploy → Run workflow → store = steam | epic). 순서: `build-desktop.yml`이 상점 판(운영판 + `--features steam|epic`)을 묶고 → Environment **`store`**에 들어간 업로드 잡만 상점 자격을 읽어 올린다. Steam은 **베타 갈래에만**(`SetLive`, 기본 갈래로는 사람이 파트너 사이트에서 옮긴다 — SteamPipe가 자동으로 못 건다), Epic은 아티팩트에 바이너리만(라벨·출시는 사람이 포털에서).
 
 Environment `store` 만들기(사람): Settings → Environments → New `store` → Deployment branches = `main`(+ 출시 전 베타 시험을 하려면 `release/**`), **Required reviewers = 사장**. 넣을 값:
@@ -120,5 +120,8 @@ store = **toss**는 운영판 웹 빌드를 `.ait`로 묶어(`tools/toss/build.s
 |---|---|---|
 | Secret | `TOSS_API_KEY` | 콘솔 → 워크스페이스 → 키에서 발급한 배포 API 키(이 앱만 권한) |
 | Variable | `TOSS_APP_NAME` | 콘솔에 등록한 미니앱의 appName(묶음 이름·딥링크 `intoss://<appName>`) |
+
+### Microsoft Store(0301)
+store = **msstore**는 올리지 않고 **서명하지 않은 MSIX만 만든다**(아티팩트 `nail-windows-msstore-<sha>`, 운영판 그대로) — 상점이 서명한다. Environment가 필요 없다(상점 자격 없음). 패키지 아이디는 `pc/msix/identity.env`(Partner Center 제품 ID, 비밀 아님)에 커밋한다 — 비어 있으면 시험용 아이디로 묶이고 상점이 받지 않는다. 판은 `Cargo.toml` X.Y.Z + `.0`, 같은 판은 다시 못 올린다. 첫 제출·등급(Epic의 Global Rating ID 가져오기)은 `docs/msstore/store-text.md`.
 
 Steam 파트너 사이트에서 사람이: 데포 셋(OS마다), 실행 옵션(Windows `Nail.exe`, macOS `Nail.app`, Linux `nail`), 업로드 뒤 빌드 목록에서 기본 갈래로 옮기기. Epic 포털에서: 올린 바이너리마다 플랫폼(Windows·macOS)과 업데이트 종류, 실행 파일·인자, 활성화·라벨, EOS·Epic 상점 업적 일괄 올리기(`python3 tools/epic/make_eos_zip.py` → EOS 탭 zip, `--egs` → Epic Games Store 탭 zip — 정의 표에 XP 칸 `user_epic_achievements_xp`, 값은 `docs/epic/epic-store-xp.csv`). 한국에 내면 업데이트마다 content notes.

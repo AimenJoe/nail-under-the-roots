@@ -164,6 +164,19 @@ def pc(src):
     print('pc nail.ico nail.icns')
 
 
+def msix(src):
+    """Microsoft Store MSIX(0301): 매니페스트가 가리키는 로고 `pc/msix/*.png`. 이름에 크기 꼬리(scale-200 등)를 붙이지 않는다 —
+    resources.pri 없이 묶어서(tools/pc/package.sh) 꼬리 붙은 파일은 찾지 못한다. 넓은 타일은 바탕색에 가운데 정사각 그림."""
+    out = os.path.join(ROOT, 'pc', 'msix')
+    os.makedirs(out, exist_ok=True)
+    for name, size in (('Square44x44Logo', 44), ('Square150x150Logo', 150), ('StoreLogo', 50)):
+        render(src, size).save(os.path.join(out, f'{name}.png'), optimize=True)
+    wide = Image.new('RGBA', (310, 150), BASE + (255,))
+    wide.alpha_composite(render(src, 150).convert('RGBA'), (80, 0))
+    wide.save(os.path.join(out, 'Wide310x150Logo.png'), optimize=True)
+    print('msix logos 44 150 50 wide')
+
+
 def web(src):
     """웹 PWA(0269): 매니페스트 아이콘 192·512, 둥근 모양으로 깎이는 maskable 512(바탕색을 꽉 채우고 그림은
     안드로이드 적응형과 같은 가운데 72/108 — 지름 80% 안전 원 안), iOS 홈 화면 apple-touch-icon 180. 산출물은 `web/icons/`."""
@@ -184,8 +197,8 @@ def web(src):
 def main():
     src = art()
     # 인자로 고를 수 있다(`make_icons.py web`): 다른 플랫폼 산출물을 다시 쓰지 않게.
-    only = set(sys.argv[1:]) or {'ios', 'android', 'pc', 'web'}
-    for name, f in (('ios', ios), ('android', android), ('pc', pc), ('web', web)):
+    only = set(sys.argv[1:]) or {'ios', 'android', 'pc', 'msix', 'web'}
+    for name, f in (('ios', ios), ('android', android), ('pc', pc), ('msix', msix), ('web', web)):
         if name in only:
             f(src)
 

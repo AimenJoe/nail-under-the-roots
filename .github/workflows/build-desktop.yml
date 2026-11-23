@@ -3,12 +3,13 @@ name: build-desktop
 # - release/** push: 개발판(기본 기능)을 Actions 아티팩트로.
 # - release.yml이 부를 때(release_tag): 운영판(--no-default-features)을 만들어 그 태그의 GitHub Release에 붙인다.
 # - 손으로: Actions → build-desktop → Run workflow(브랜치 고르기, 0169 R8와 같은 방식). release_tag를 넣으면 그 Release에 운영판을 붙인다(릴리스 때 빠진 묶음 채우기).
-# - store-deploy.yml이 부를 때(store = steam | epic, 0276 S4·E4): 운영판 + 상점 기능(--features steam|epic)을 만들어
+# - store-deploy.yml이 부를 때(store = steam | epic | msstore, 0276 S4·E4·0301): 운영판 + 상점 기능(--features steam|epic)을 만들어
 #   아티팩트로만 둔다(Release에 붙이지 않는다). epic은 Windows·macOS만(Epic 런처에 Linux 없음) — EOS 아이디는
 #   Environment `store`에서 빌드 때 넣고, EOS SDK(.lib·.dll)는 비공개 에셋 레포의 Release `eos`에서 받는다(tools/epic/fetch_eos.sh).
 # main push마다는 돌리지 않는다: macOS 러너는 분당 비용이 리눅스의 약 10배라(레포를 비공개로 바꾸면 유료, 0237) 릴리스·개발판에서만.
 # 묶음 안: 실행 파일 + assets(웹 전용 mp3·vendor/.git 뺌) + 제3자 고지. 게임은 실행 파일 옆(또는 .app/Contents/Resources)의
 # assets를 찾는다(src/main.rs `assets_dir`). 서명: macOS는 임시(ad-hoc) 서명만, Windows는 서명 없음 — docs/decisions/0240.
+# msstore(0301)는 Windows만, zip 대신 서명하지 않은 .msix(Microsoft Store가 서명한다).
 on:
   push:
     branches: ['release/**']
@@ -17,6 +18,8 @@ on:
       - 'assets/**'
       - 'third_party/**'
       - 'pc/**'
+      - 'tools/pc/**'
+      - '.cargo/config.toml'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.github/workflows/build-desktop.yml'
@@ -46,7 +49,8 @@ jobs:
       fail-fast: false
       matrix:
         # glibc를 낮게: 오래된 배포판·Steam Deck(SteamOS)에서도 뜨게 리눅스는 22.04에서 빌드한다. Epic 판은 Linux가 없다.
-        include: ${{ fromJSON(inputs.store == 'epic' && '[{"os":"windows-latest","name":"windows"},{"os":"macos-latest","name":"macos"}]' || '[{"os":"windows-latest","name":"windows"},{"os":"macos-latest","name":"macos"},{"os":"ubuntu-22.04","name":"linux"}]') }}
+        # Microsoft Store 판(0301)은 Windows만.
+        include: ${{ fromJSON(inputs.store == 'msstore' && '[{"os":"windows-latest","name":"windows"}]' || inputs.store == 'epic' && '[{"os":"windows-latest","name":"windows"},{"os":"macos-latest","name":"macos"}]' || '[{"os":"windows-latest","name":"windows"},{"os":"macos-latest","name":"macos"},{"os":"ubuntu-22.04","name":"linux"}]') }}
     runs-on: ${{ matrix.os }}
     # Epic 판만 EOS 아이디가 필요하다 — 그때만 Environment `store`(배포 갈래·사람 승인)에 들어간다.
     environment: ${{ inputs.store == 'epic' && 'store' || '' }}
@@ -92,7 +96,10 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          if [ -n "$STORE" ]; then
+          if [ "$STORE" = msstore ]; then
+            # Microsoft Store 판(0301): 운영판 그대로(상점 SDK 없음) — 묶음만 MSIX.
+            echo "FEATURES=--no-default-features" >> "$GITHUB_ENV"; echo "FLAVOR=msstore" >> "$GITHUB_ENV"
+          elif [ -n "$STORE" ]; then
             # 상점 판: 운영판 + 상점 기능. 묶음 이름 = 상점 이름.
             echo "FEATURES=--no-default-features --features $STORE" >> "$GITHUB_ENV"; echo "FLAVOR=$STORE" >> "$GITHUB_ENV"
           elif [ -n "$RELEASE_TAG" ]; then

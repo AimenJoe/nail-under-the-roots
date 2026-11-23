@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # PC 묶음 만들기(0240, 0276 S4·E4) — build-desktop.yml이 부른다. 빌드는 끝나 있어야 한다.
 #   tools/pc/package.sh <windows|macos|linux> <flavor> [store]
-#   flavor: dev | release | steam | epic (묶음 이름에 들어간다)
+#   flavor: dev | release | steam | epic | msstore (묶음 이름에 들어간다)
 #   store:  ''(직접 받는 판) | steam(Steam 재배포 파일을 실행 파일 옆에) | epic(EOS SDK DLL을 실행 파일 옆에, Windows)
+#           | msstore(Windows만, zip 대신 서명하지 않은 .msix — Microsoft Store가 서명한다, 0301)
 # 묶음 안: 실행 파일 + assets(웹 전용 mp3·vendor의 .git·비공개 SDK 폴더 뺌) + 제3자 고지.
 # 게임은 실행 파일 옆(또는 .app/Contents/Resources)의 assets를 찾는다(src/main.rs `assets_dir`).
 # 끝나면 묶음 파일 이름을 $GITHUB_ENV의 PKG에 적는다(없으면 표준 출력).
@@ -15,6 +16,35 @@ out() { if [ -n "${GITHUB_ENV:-}" ]; then echo "PKG=$1" >> "$GITHUB_ENV"; fi; ec
 steam_lib() {
   local f="$1"
   find target -path '*steamworks-sys-*/out/*' -name "$f" -print -quit
+}
+
+# Microsoft Store(0301): 실행 파일 폴더 + 로고 + 매니페스트를 makeappx로 묶는다. 서명은 하지 않는다(상점이 한다).
+# 버전은 Cargo 버전 X.Y.Z에 .0 — 넷째 자리는 상점 몫이라 0이어야 하고, 같은 버전은 다시 올릴 수 없다(올리려면 패치를 올린다).
+msix() {
+  local D="$1" L="msix-layout" tpl
+  # shellcheck disable=SC1091
+  . pc/msix/identity.env
+  if [ -z "$MSIX_NAME" ] || [ -z "$MSIX_PUBLISHER" ]; then
+    echo "::warning::pc/msix/identity.env가 비어 있다 — 시험용 아이디로 묶는다(상점에 올릴 수 없다)"
+    MSIX_NAME="Beardworks.NailUnderTheRoots.Test"; MSIX_PUBLISHER="CN=00000000-0000-0000-0000-000000000000"
+  fi
+  rm -rf "$L"; cp -R "$D" "$L"
+  mkdir -p "$L/Assets"; cp pc/msix/*.png "$L/Assets/"
+  tpl=$(cat pc/msix/AppxManifest.xml.in)
+  tpl=${tpl//@NAME@/$MSIX_NAME}; tpl=${tpl//@PUBLISHER@/$MSIX_PUBLISHER}
+  tpl=${tpl//@PUBLISHER_DISPLAY@/$MSIX_PUBLISHER_DISPLAY}; tpl=${tpl//@DISPLAY_NAME@/$MSIX_DISPLAY_NAME}
+  tpl=${tpl//@VERSION@/$VERSION.0}
+  printf '%s\n' "$tpl" > "$L/AppxManifest.xml"
+  # Windows SDK의 makeappx(GitHub windows 러너에 있다) — 가장 새 판.
+  local mk
+  mk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/bin/"10.*/x64/makeappx.exe 2>/dev/null | sort -V | tail -1)
+  [ -n "$mk" ] || { echo "::error::makeappx.exe를 못 찾았다(Windows SDK)"; exit 1; }
+  local out="nail-windows-msstore.msix"
+  rm -f "$out"
+  # /o 덮어쓰기, /h SHA256. 매니페스트 형식은 묶을 때 makeappx가 검사한다.
+  "$mk" pack /d "$L" /p "$out" /o /h SHA256
+  ls -la "$out"
+  out "$out"
 }
 
 rm -rf stage
@@ -43,6 +73,14 @@ windows)
   fi
   if [ "$STORE" = epic ]; then
     cp "$EOS_SDK_DIR/Bin/EOSSDK-Win64-Shipping.dll" "$D/"
+  fi
+  # C 런타임은 실행 파일에 넣는다(.cargo/config.toml crt-static) — VC++ 재배포 패키지가 없는 PC·MSIX에서도 켜지게(0301).
+  if grep -a -i -q 'vcruntime140.dll' "$D/Nail.exe"; then
+    echo "::error::Nail.exe가 VCRUNTIME140.dll을 찾는다 — crt-static이 빠졌다"; exit 1
+  fi
+  if [ "$STORE" = msstore ]; then
+    msix "$D"
+    exit 0
   fi
   7z a -tzip "nail-windows-$FLAVOR.zip" "$D" > /dev/null
   ls -la "nail-windows-$FLAVOR.zip"
