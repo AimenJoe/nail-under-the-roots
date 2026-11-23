@@ -167,7 +167,8 @@ PR #30(`release/v1.0 → main`)은 **MS Store 인증이 끝날 때까지 Merge�
 - [x] 버전 1.0.1·version_code 98, `docs/releases/v1.0.1.md`, 공식 페이지 소식(한·영 — 날짜는 Merge 날로 고친다), Epic content notes 1.0.1, 토스 1.0.1 출시 노트
 - [x] MS Store 상점 그림(`tools/store/msstore_media.py` → `docs/msstore/media/`)·등록 글(`docs/msstore/store-text.md`)
 - [ ] 사람: MS Store 계정 → 이름 예약 → "제품 ID" 세 값 → (Claude) `pc/msix/identity.env` 커밋 → store-deploy `msstore` → 사람: Partner Center 제출(게시 방법은 **"인증 뒤 수동 게시"**로 — 다른 상점과 같은 날 내려고)
-- [ ] (Claude 실행 · 사람 승인) store-deploy `epic`(정적 링크 1.0.1 바이너리 — 1.0.0-be1ac3f를 바꿈)·`toss`(1.0.1 번들) — 올리기만, 출시는 아직
+- [x] (Claude 실행 · 사람 승인 2026-11-23) store-deploy `epic` → Epic 아티팩트에 `1.0.1-9b4480d-windows`·`-macos` 등록, `toss` → 1.0.1 번들(deploymentId `01a208a4-c5b8-72c6-b12c-19e46f069850`, 메모 `v1.0.1 · 9b4480d — 1.0.1 후보`) — 올리기만, 출시는 아직
+- [ ] 사람: 토스 앱으로 1.0.1 번들 실기(QR — 내려 두기·큰 나무 고르기 칸)
 - [ ] 사람: Windows PC(VC++ 없는 것이면 더 좋음)에서 1.0.1 zip(build-desktop 아티팩트)이 켜지는지
 - [ ] MS 인증 통과 → 같은 날: PR #30 Merge·`web-production` 승인 → MS "지금 게시" → Epic 1.0.1 바이너리 활성화 + content notes → 토스 검수 요청
 - [ ] Steam: 앱·데포가 준비되면 같은 판으로(아직 대기)
