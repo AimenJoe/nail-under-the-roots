@@ -42,7 +42,8 @@ msix() {
   local out="nail-windows-msstore.msix"
   rm -f "$out"
   # /o 덮어쓰기, /h SHA256. 매니페스트 형식은 묶을 때 makeappx가 검사한다.
-  "$mk" pack /d "$L" /p "$out" /o /h SHA256
+  # Git Bash(MSYS)는 /d·/p 같은 인자를 경로(D:/…)로 바꿔 버린다 — 이 호출만 바꾸지 않게.
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$mk" pack /d "$L" /p "$out" /o /h SHA256
   ls -la "$out"
   out "$out"
 }
