@@ -1283,11 +1283,12 @@ impl App {
             self.profile.set_count(key_pack(p.kind), 0);
         }
         // 텃밭에서 거둔 산딸기(0304 G1): 짐 꾸리기 한도와 따로.
-        let picked = crate::garden::take_berries(&mut self.profile);
+        // 가방이 가득이면 넘치는 것은 텃밭 쪽에 남아 다음 런에 들어온다.
+        let room = (t::BERRY_MAX as u32).saturating_sub(self.world.inv.bag.berries as u32);
+        let picked = crate::garden::take_berries(&mut self.profile, room);
         if picked > 0 {
             any = true;
-            let bag = &mut self.world.inv.bag;
-            bag.berries = (bag.berries as u32 + picked).min(t::BERRY_MAX as u32) as u8;
+            self.world.inv.bag.berries += picked as u8;
         }
         if any {
             crate::profile::save(&self.profile);

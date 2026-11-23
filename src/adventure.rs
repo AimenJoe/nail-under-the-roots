@@ -2931,18 +2931,26 @@ mod economy_probe {
     use crate::route::{NodeKind, Route};
     use crate::tuning as t;
 
-    /// 경제 재기(돌리지 않는 시험): 길마다 처음부터 끝까지 한 줄로 걸었을 때 기대 반딧불·씨앗.
-    /// cargo test economy_probe -- --ignored --nocapture
+    /// 경제 재기(0305): 런 하나(길 셋)를 여러 번 돌려 반딧불·런 씨앗의 기대값과 분포를 낸다.
+    /// 처치(물결 남은 무리 다, 버티기 남은 무리는 70% 잡는다고 보고)·길의 주인·끝방 보상·상자(반딧불 90%)·
+    /// 곁방 보상·부술 것·숨은 자리(마을에서 내려가면 첫 쉼터는 지나치니 둘째·셋째 쉼터만)까지. 실타래 칸의 장신구·가게는 뺀다.
+    /// `cargo test economy_probe -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn economy_probe() {
-        let (mut tot_b, mut tot_s) = (0.0, 0.0);
-        for stage in 1..=t::FINAL_STAGE {
-            let (mut sb, mut ss, mut kills, mut nodes) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
-            let runs = 40;
-            for seed in 0..runs {
-                let r = Route::generate(seed * 7919 + 13, stage, false);
-                let mut i = (seed as usize) % r.layers[0].len();
+        let n = 200u64;
+        let mut runs_b: Vec<f32> = Vec::new();
+        let mut runs_s: Vec<f32> = Vec::new();
+        let mut road_b = [0.0f32; 3];
+        let mut road_s = [0.0f32; 3];
+        let (mut chests, mut bounties, mut kills) = (0.0f32, 0.0f32, 0.0f32);
+        for seed in 0..n {
+            let (mut b, mut s) = (0.0f32, 0.0f32);
+            for stage in 1..=t::FINAL_STAGE {
+                let (b0, s0) = (b, s);
+                let rs = seed * 7919 + 13 + stage as u64 * 104_729;
+                let r = Route::generate(rs, stage, false);
+                let mut i = (rs as usize) % r.layers[0].len();
                 for l in 0..r.layers.len() {
                     let node = &r.layers[l][i];
                     if node.kind != NodeKind::Spring {
@@ -2951,64 +2959,101 @@ mod economy_probe {
                             biome: node.biome,
                             ..prm
                         };
-                        let (d, room) = dungeon::generate(seed * 31 + l as u64, &prm);
-                        nodes += 1.0;
+                        let (d, room) = dungeon::generate(rs * 31 + l as u64, &prm);
                         for dr in &d.rooms {
-                            for (k, _) in &dr.enemies {
-                                let (lo, hi) = crate::loot::glowbugs_for(*k);
-                                let keep = if crate::bosses::of(*k).is_some() {
+                            let hold = dr.encounter == dungeon::Encounter::Hold;
+                            let main = dr.enemies.iter().map(|e| (e.0, 1.0f32));
+                            let rest = dr
+                                .reserve
+                                .iter()
+                                .flatten()
+                                .map(|e| (e.0, if hold { 0.7 } else { 1.0 }));
+                            for (k, w) in main.chain(rest) {
+                                let (lo, hi) = crate::loot::glowbugs_for(k);
+                                let keep = if crate::bosses::of(k).is_some() {
                                     1.0
                                 } else {
                                     t::KILL_LOOT_KEEP
                                 };
-                                sb += (lo + hi) as f32 / 2.0 * keep;
-                                ss += k.species().seed_chance * keep;
-                                kills += 1.0;
+                                b += (lo + hi) as f32 / 2.0 * keep * w;
+                                s += k.species().seed_chance * keep * w;
+                                kills += w;
                             }
+                            match dr.bounty {
+                                Some(dungeon::Bounty::Seeds) => s += t::BOUNTY_SEEDS as f32,
+                                Some(dungeon::Bounty::Glowbugs) => b += t::BOUNTY_GLOWBUGS as f32,
+                                Some(dungeon::Bounty::Gift) => {
+                                    b += (1.0 - t::CHEST_GEAR) * t::CHEST_GLOWBUGS as f32
+                                }
+                                Some(dungeon::Bounty::Berry) | None => {}
+                            }
+                            bounties += dr.bounty.is_some() as u8 as f32;
                         }
                         if let Some(k) = d.boss {
                             let (lo, hi) = crate::loot::glowbugs_for(k);
-                            sb += (lo + hi) as f32 / 2.0;
-                            ss += k.species().seed_chance;
+                            b += (lo + hi) as f32 / 2.0;
+                            s += k.species().seed_chance;
                         }
                         match d.goal {
-                            Goal::Boss => ss += t::BOSS_SEEDS as f32,
-                            Goal::Pack => ss += t::PACK_SEEDS as f32,
+                            Goal::Boss => s += t::BOSS_SEEDS as f32,
+                            Goal::Pack => s += t::PACK_SEEDS as f32,
                             _ => {}
                         }
                         for p in &room.props {
                             match p.kind {
                                 PropKind::Chest { .. } => {
-                                    ss += (t::CHEST_SEEDS.0 + t::CHEST_SEEDS.1) as f32 / 2.0
+                                    s += (t::CHEST_SEEDS.0 + t::CHEST_SEEDS.1) as f32 / 2.0;
+                                    b += (1.0 - t::CHEST_GEAR) * t::CHEST_GLOWBUGS as f32;
+                                    chests += 1.0;
                                 }
                                 PropKind::Breakable(_) => {
-                                    ss += t::BREAK_SEED;
-                                    sb += t::BREAK_GLOWBUG;
+                                    s += t::BREAK_SEED;
+                                    b += t::BREAK_GLOWBUG;
                                 }
                                 _ => {}
                             }
                         }
                     }
                     if l + 1 < r.layers.len() {
-                        i = node.next[(seed as usize + l) % node.next.len()];
+                        i = node.next[(rs as usize + l) % node.next.len()];
                     }
                 }
+                if stage > 1 {
+                    b += t::CAMP_NOOK_BUGS as f32;
+                    s += t::CAMP_NOOK_SEEDS as f32;
+                }
+                road_b[stage as usize - 1] += b - b0;
+                road_s[stage as usize - 1] += s - s0;
             }
-            let n = runs as f32;
-            println!(
-                "길 {stage}: 굴 {:.1}, 처치 {:.1}, 반딧불 {:.0}, 씨앗 {:.0}",
-                nodes / n,
-                kills / n,
-                sb / n,
-                ss / n
-            );
-            tot_b += sb / n;
-            tot_s += ss / n;
+            runs_b.push(b);
+            runs_s.push(s);
         }
+        let nf = n as f32;
+        for k in 0..3 {
+            println!(
+                "길 {}: 반딧불 {:.0}, 씨앗 {:.0}",
+                k + 1,
+                road_b[k] / nf,
+                road_s[k] / nf
+            );
+        }
+        let spread = |v: &mut Vec<f32>| {
+            v.sort_by(|a, b| a.total_cmp(b));
+            let m = v.iter().sum::<f32>() / v.len() as f32;
+            format!(
+                "평균 {m:.0} (p10 {:.0} · 중앙 {:.0} · p90 {:.0})",
+                v[v.len() / 10],
+                v[v.len() / 2],
+                v[v.len() * 9 / 10]
+            )
+        };
         println!(
-            "한 런(길 셋, 쉼터 숨은 자리 빼고): 반딧불 {tot_b:.0}, 씨앗 {tot_s:.0} (+ 숨은 자리 쉼터마다 반딧불 {} 씨앗 {})",
-            t::CAMP_NOOK_BUGS,
-            t::CAMP_NOOK_SEEDS
+            "한 런(길 셋): 처치 {:.0}, 상자 {:.1}, 곁방 보상 {:.1}",
+            kills / nf,
+            chests / nf,
+            bounties / nf
         );
+        println!("반딧불 {}", spread(&mut runs_b));
+        println!("런 씨앗 {}", spread(&mut runs_s));
     }
 }

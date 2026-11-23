@@ -390,7 +390,7 @@ pub const LOOT_MAGNET_RADIUS: f32 = 44.0;
 pub const LOOT_MAGNET_ACCEL: f32 = 900.0;
 pub const LOOT_MAGNET_MAX_SPEED: f32 = 230.0;
 /// 산딸기가 떨어질 확률 = 기본 + 깎인 **비율** × 이것. 체력이 가득이면 0.
-/// 기본 체력(`PLAYER_HP` 5칸)에서 한 칸에 5%(사장 2026-10-29, 예전 칸마다 8%). 칸 수가 아니라 비율이라
+/// 정할 때의 기본 체력(5칸, 지금 `PLAYER_HP`는 3 — 0253)에서 한 칸에 5%(사장 2026-10-29, 예전 칸마다 8%). 칸 수가 아니라 비율이라
 /// 최대 체력이 커도(뿌리 심장·장신구) 같은 비율만큼 깎였으면 같은 확률이다(0252, 사장 "최대 체력이 높을수록 더 잘 나오면 부당").
 pub const BERRY_BASE_CHANCE: f32 = 0.03; // 0254: 6% → 3%(사장 "확률은 아직도 꽤나 높아")
 pub const BERRY_CHANCE_MISSING_ALL: f32 = 0.05 * PLAYER_HP as f32; // 시작 체력 3이면 다 깎여도 +15%
@@ -730,7 +730,7 @@ pub const BOUNTY_SEEDS: u32 = 2;
 pub const BOUNTY_GLOWBUGS: u32 = 3;
 /// 굴이 넓어져(방이 약 1.6배) 싸움이 늘었으니, 쓰러진 적이 떨어뜨리는 반딧불 한 마리·씨앗이 실제로 나올 확률(0244, 경제 0148을 지킨다).
 pub const KILL_LOOT_KEEP: f32 = 0.65;
-/// 상자에서 물건 대신 나오는 반딧불 한 줌(0250 → 0251). 한 런 ≈ +15마리(런 반딧불 ≈ 242의 6%).
+/// 상자에서 물건 대신 나오는 반딧불 한 줌(0250 → 0251). 한 런 ≈ +15마리(상자 ≈ 2.9개, 런 반딧불 ≈ 285의 5% — 0305 `economy_probe`).
 pub const CHEST_GLOWBUGS: u32 = 6;
 
 pub const SHREW_BITES: u32 = 2;
@@ -946,7 +946,7 @@ pub const INTERACT_RADIUS: f32 = 22.0;
 
 // 큰 나무 갈래 셋 × 깊이 여덟(0246).
 /// 덤 칸 값(깊이마다, 처음 정한 값 — 실제는 `TALENT_PRICE_MUL`배). 깊이 0은 늘 고르기 칸이라 쓰지 않는다.
-/// 한 캐릭터를 다 깨우면 약 6천 반딧불 ≈ 25~30런(한 런 벌이 ≈ 240, 0225).
+/// 한 캐릭터를 다 깨우면 6,555(고르기 칸은 한쪽만)~7,245 반딧불 ≈ 23~25런(끝까지 간 런 벌이 ≈ 285, 0305 `economy_probe`).
 pub const TREE_COST: [u32; 8] = [40, 45, 55, 70, 90, 110, 135, 165];
 pub const TREE_STUN: f32 = 0.1;
 pub const TREE_KNOCK: f32 = 1.2;

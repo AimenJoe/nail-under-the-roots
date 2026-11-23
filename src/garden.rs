@@ -184,13 +184,14 @@ pub fn harvest(p: &mut Profile, i: usize) -> Option<Crop> {
     Some(crop)
 }
 
-/// 새 런 가방에 넣을 거둔 산딸기 — 꺼내면서 지운다.
-pub fn take_berries(p: &mut Profile) -> u32 {
+/// 새 런 가방에 넣을 거둔 산딸기: 가방 빈자리 `room`만큼 꺼내고, 넘치는 것은 다음 런에 넣게 남긴다(조용히 버리지 않는다).
+pub fn take_berries(p: &mut Profile, room: u32) -> u32 {
     let n = p.count(KEY_BERRIES);
-    if n > 0 {
-        p.set_count(KEY_BERRIES, 0);
+    let take = n.min(room);
+    if take > 0 {
+        p.set_count(KEY_BERRIES, n - take);
     }
-    n
+    take
 }
 
 #[cfg(test)]
@@ -226,8 +227,9 @@ mod tests {
         assert_eq!(plot(&p, 0), Plot::Ripe(Crop::Berry), "다 자란 뒤엔 그대로");
         assert_eq!(harvest(&mut p, 0), Some(Crop::Berry));
         assert_eq!(plot(&p, 0), Plot::Empty);
-        assert_eq!(take_berries(&mut p), 1);
-        assert_eq!(take_berries(&mut p), 0, "한 번만 꺼낸다");
+        assert_eq!(take_berries(&mut p, 0), 0, "가방이 가득이면 남긴다");
+        assert_eq!(take_berries(&mut p, 5), 1);
+        assert_eq!(take_berries(&mut p, 5), 0, "한 번만 꺼낸다");
         assert!(!grow(&mut p), "빈 텃밭은 자라지 않는다");
     }
 

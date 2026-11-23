@@ -19,7 +19,7 @@ use crate::profile::{key, Profile};
 use crate::talents::KEY_LIGHT;
 use crate::world::Who;
 
-/// 단계마다 값(반딧불). 재주 나무 한 칸(120~495)·런 하나(약 240)와 견준 처음 값(0304).
+/// 단계마다 값(반딧불). 재주 나무 한 칸(120~495)·끝까지 간 런 하나(약 285, 0305)와 견준 처음 값(0304) — 이웃 하나 ≈ 2.2런, 여섯 ≈ 13런.
 pub const COST: [u32; 3] = [120, 200, 300];
 
 pub struct Scene {
