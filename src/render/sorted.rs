@@ -401,6 +401,14 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
         Drawable::Neighbor(i) => {
             let n = &w.neighbors[i];
             let left = (w.player.pos.x < n.pos.x) != n.face_left;
+            // 이웃 등불(0304): 셋째 이야기까지 들은 이웃 곁, 뒤쪽(먼저 그린다). 그림자 패스에는 넣지 않는다.
+            let lamp = crate::lanterns::ALL
+                .iter()
+                .position(|l| l.who == n.who)
+                .is_some_and(|k| w.adv.village.is_some_and(|v| v.lamps[k]));
+            if lamp && !shadow_pass() {
+                draw_neighbor_lamp(n.pos + vec2(21.0, 3.0), w.time);
+            }
             match n.who {
                 world::Who::Popo => {
                     draw_critter_at(art, art::RACCOON_ROW, n.pos, left, false, w.time)

@@ -2021,6 +2021,7 @@ impl App {
             clover: self.profile.flag(key::CLOVER_BACK),
             spring: self.profile.flag(key::MUMU_FREED),
             traces: std::array::from_fn(|i| crate::quests::done(&self.profile, i)),
+            lamps: std::array::from_fn(|i| crate::lanterns::level(&self.profile, i) >= 3),
             // 거꾸로 Naïl은 다른 캐릭터로 걸을 때 큰 나무 곁에 남는다(0249).
             nail: self.picked() != Character::Mole,
             decor,

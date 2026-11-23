@@ -1689,6 +1689,29 @@ pub(super) fn draw_decor_sunny(sunny: &art::Sunny, i: usize, at: Vec2, time: f32
     }
 }
 
+/// 이웃 곁에 걸린 등불 하나(0304): 반딧불 등 꾸미기(2)의 등 하나 모양 — 막대 + 숨 쉬는 빛.
+pub(super) fn draw_neighbor_lamp(at: Vec2, time: f32) {
+    let (x, y) = (at.x.round(), at.y.round());
+    let pulse = 0.6 + 0.3 * (time * 1.6).sin();
+    draw_circle(x, y - 9.0, 6.0, Color::new(0.55, 0.95, 1.0, 0.14 * pulse));
+    draw_rectangle(
+        x - 0.5,
+        y - 8.0,
+        1.0,
+        8.0,
+        Color::new(0.88, 0.90, 0.86, 1.0),
+    );
+    draw_ellipse(x, y - 9.0, 3.0, 2.0, 0.0, OUTLINE);
+    draw_ellipse(
+        x,
+        y - 9.0,
+        2.5,
+        1.5,
+        0.0,
+        Color::new(0.55, 0.95, 1.0, pulse),
+    );
+}
+
 /// 마을 꾸미기 `i`(지운 1·6은 아무것도 그리지 않는다, 0269).
 pub(super) fn draw_decor(i: usize, at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round() + 4.0);

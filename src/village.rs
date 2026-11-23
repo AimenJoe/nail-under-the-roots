@@ -255,6 +255,8 @@ pub struct State {
     pub nail: bool,
     /// 들어준 부탁의 흔적(0273 B, `quests::ALL` 번호): 포포 샘 그릇·보리 피리·모모 꽃밭·큰 나무 밑동의 깍정이·모닥불 곁 풀 방석·콩이 버섯 등·토끼풀 솜털 잠자리.
     pub traces: [bool; 7],
+    /// 이웃 등불(0304): 셋째 이야기까지 들은 이웃 곁에 등불이 걸린다(`lanterns::ALL` 번호).
+    pub lamps: [bool; crate::lanterns::ALL.len()],
     pub decor: [bool; DECOR_ALL],
     /// 큰 나무의 잎(0 = 거의 없음 … 4 = 꽃).
     pub growth: u8,

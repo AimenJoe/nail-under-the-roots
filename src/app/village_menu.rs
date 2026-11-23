@@ -40,6 +40,14 @@ pub(super) const VILLAGE_TABS: &[VillageTab] = &[
         draw: |app, ui, r| app.draw_pack_tab(ui, r),
         say: |app| tr(PACK[app.decor_cursor.min(PACK.len() - 1)].desc).to_string(),
     },
+    // 이웃 등불(0304, v1.1): 맡긴 반딧불로 등불을 건네면 그 이웃의 이야기가 하나씩.
+    VillageTab {
+        name: |s| s.lamp_tab,
+        lr: false,
+        update: |app, a, tap| app.update_lamp_tab(a, tap),
+        draw: |app, ui, r| app.draw_lamp_tab(ui, r),
+        say: |_| i18n::s().lamp_say.to_string(),
+    },
     // 마을 수첩(0269 2.7): 장소·이웃 이야기. 사는 것이 없다 — 고르면 포포가 위 말 칸에서 읽어 준다.
     VillageTab {
         name: |s| s.notes_tab,
@@ -513,6 +521,144 @@ impl App {
         }
     }
 
+    // ---- 이웃 등불(0304) ----------------------------------------------------
+
+    /// 등불 탭의 줄: 마을에 서 있는 이웃(`lanterns::rows`).
+    fn lamp_rows(&self) -> Vec<usize> {
+        crate::lanterns::rows(&self.profile, self.world.character)
+    }
+
+    fn update_lamp_tab(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        let rows = self.lamp_rows();
+        if rows.is_empty() {
+            return;
+        }
+        let (moved, again) = self.village_pick(a, tap_hit, rows.len());
+        let i = rows[self.decor_cursor.min(rows.len() - 1)];
+        if a.confirm || again {
+            self.give_lamp(i);
+        } else if moved && tap_hit.is_some() {
+            self.shop_msg = Some((|s| s.tap_again, 2.5));
+        }
+    }
+
+    /// 등불을 건넨다: 반딧불을 내고, 창을 닫고, 그 이웃의 이야기(컷씬)를 튼다. 셋째면 곁에 등불이 걸린다.
+    fn give_lamp(&mut self, i: usize) {
+        use crate::lanterns::{give, next, Next, ALL};
+        let ch = self.world.character;
+        let have = self.profile.count(crate::talents::KEY_LIGHT);
+        let stage = match next(&self.profile, i, ch) {
+            Next::Ready { stage, cost } if have >= cost => stage,
+            Next::Ready { .. } => {
+                self.shop_msg = Some((|s| s.lamp_poor, 2.5));
+                self.sfx.play(crate::sfx::Id::Deny);
+                return;
+            }
+            Next::Done => {
+                self.shop_msg = Some((|s| s.lamp_done, 2.5));
+                return;
+            }
+            Next::Later => {
+                self.shop_msg = Some((|s| s.lamp_later, 2.5));
+                self.sfx.play(crate::sfx::Id::Deny);
+                return;
+            }
+            Next::Other => {
+                self.shop_msg = Some((|s| s.lamp_other, 2.5));
+                self.sfx.play(crate::sfx::Id::Deny);
+                return;
+            }
+        };
+        // 개발 시나리오는 기록 없이 이번에만 듣는다(부탁과 같게).
+        if self.recording() {
+            give(&mut self.profile, i, ch);
+            self.save_profile();
+        }
+        if stage == 2 {
+            if let Some(v) = self.world.adv.village.as_mut() {
+                v.lamps[i] = true;
+            }
+        }
+        // 맡긴 반딧불이 줄었다: 우물 위 반딧불·큰 나무 빛도 따라서.
+        let (glow, ready) = (
+            crate::village::glow_level(self.profile.count(crate::talents::KEY_LIGHT)),
+            self.tree_affordable(),
+        );
+        if let Some(v) = self.world.adv.village.as_mut() {
+            v.glow = glow;
+            v.tree_ready = ready;
+        }
+        self.sfx.play(crate::sfx::Id::Buy);
+        let who = crate::story::speaker(ALL[i].who);
+        let lines: Vec<_> = ALL[i].scenes[stage]
+            .lines
+            .iter()
+            .map(|(t, f)| (who, *t, *f))
+            .collect();
+        self.shop_msg = None;
+        self.scene = Scene::Game;
+        self.play(cutscene::talk(&self.world, &lines));
+    }
+
+    fn draw_lamp_tab(&mut self, ui: &Ui, body: Rect) {
+        use crate::lanterns::{level, next, Next, ALL};
+        let s = i18n::s();
+        let ch = self.world.character;
+        let have = self.profile.count(crate::talents::KEY_LIGHT);
+        let ids = self.lamp_rows();
+        if ids.is_empty() {
+            return;
+        }
+        let rows: Vec<(VillagePic, String, String, bool)> = ids
+            .iter()
+            .map(|&i| {
+                let n = next(&self.profile, i, ch);
+                let dim = match n {
+                    Next::Ready { cost, .. } => have < cost,
+                    _ => true,
+                };
+                (
+                    VillagePic::Neighbor(lamp_spot(ALL[i].who)),
+                    tr(ALL[i].name).to_string(),
+                    format!("{}/3", level(&self.profile, i)),
+                    dim,
+                )
+            })
+            .collect();
+        let list = Rect::new(body.x, body.y, LIST_W, body.h - 4.0);
+        self.draw_village_list(ui, list, &rows);
+        let i = ids[self.decor_cursor.min(ids.len() - 1)];
+        let detail = Rect::new(
+            list.right() + 8.0,
+            body.y,
+            body.right() - list.right() - 8.0,
+            body.h,
+        );
+        let info = match next(&self.profile, i, ch) {
+            Next::Ready { stage, cost } => {
+                fill(s.lamp_next, &[&tr(ALL[i].scenes[stage].title), &cost])
+            }
+            Next::Done => s.lamp_done.to_string(),
+            Next::Later => s.lamp_later.to_string(),
+            Next::Other => s.lamp_other.to_string(),
+        };
+        let y = self.draw_village_detail(
+            ui,
+            detail,
+            VillagePic::Neighbor(lamp_spot(ALL[i].who)),
+            tr(ALL[i].name),
+            &info,
+        );
+        // 가진 반딧불(큰 나무 창과 같은 글).
+        ui.text(
+            &fill(s.tree_light, &[&have]),
+            detail.x,
+            (y + 4.0).min(detail.bottom() - FONT_PX - 4.0),
+            FONT_PX,
+            ui::TEXT_DIM,
+        );
+    }
+
     fn pack_name(p: &crate::village::Pack) -> String {
         if p.kind == PackKind::Pouch {
             fill(tr(p.name), &[&PACK_POUCH_SEEDS])
@@ -595,6 +741,22 @@ impl App {
             FONT_PX,
             ui::TEXT,
         );
+    }
+}
+
+/// 등불 탭의 이웃 그림: 수첩과 같은 이웃 자리(포포는 좌판).
+fn lamp_spot(who: crate::world::Who) -> crate::village_notes::Spot {
+    use crate::village_notes::Spot;
+    use crate::world::Who;
+    match who {
+        Who::Popo => Spot::Stall,
+        Who::Bori => Spot::Bori,
+        Who::Momo => Spot::Momo,
+        Who::Doto => Spot::Doto,
+        Who::Kongi => Spot::Kongi,
+        Who::Clover => Spot::Clover,
+        Who::Halmae => Spot::Halmae,
+        Who::Susu | Who::Nail => Spot::Stall,
     }
 }
 
