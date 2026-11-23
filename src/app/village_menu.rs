@@ -61,6 +61,15 @@ pub(super) const VILLAGE_TABS: &[VillageTab] = &[
     },
 ];
 
+/// 텃밭 칸 앞에서 여는 마을 창(0304 G1): 탭은 텃밭 하나. 좌우 = 심을 씨앗(꽃씨·산딸기 씨) 바꾸기.
+pub(super) const GARDEN_TABS: &[VillageTab] = &[VillageTab {
+    name: |s| s.garden_tab,
+    lr: true,
+    update: |app, a, tap| app.update_garden_tab(a, tap),
+    draw: |app, ui, r| app.draw_garden_tab(ui, r),
+    say: |_| i18n::s().garden_say.to_string(),
+}];
+
 /// 꾸미기 탭의 줄: 가게 꾸미기(더한 것 포함) + 저널 꾸미기, 지운 1번 등·6번 병은 빼고(0269).
 fn decor_rows() -> Vec<usize> {
     (0..DECOR.len())
@@ -79,6 +88,7 @@ fn pic_zoom(p: VillagePic) -> f32 {
         VillagePic::Spot(_) => 1.5,
         // 목록 줄에서는 이 반(0.5배): 32칸 몸이 줄 높이(17px) 안에 다 든다. 화면 배율이 곱해지니 점은 그대로 또렷하다.
         VillagePic::Neighbor(_) => 1.0,
+        VillagePic::Plot(_) => 2.0,
     }
 }
 
@@ -94,10 +104,22 @@ const LIST_W: f32 = 150.0;
 
 impl App {
     pub(super) fn open_village_menu(&mut self) {
+        self.village_tabs = VILLAGE_TABS;
         self.decor_cursor = 0;
         self.decor_tab = 0;
         // 처음 열면 포포의 인사(자세히 칸의 말 자리, 몇 초 뒤 설명으로).
         self.shop_msg = Some((|s| s.decor_hi, 3.5));
+        self.village_view = Default::default();
+        self.world.freeze();
+        self.scene = Scene::Decor;
+    }
+
+    /// 텃밭 칸 `i` 앞에서: 텃밭 탭 하나짜리 마을 창을 그 칸에 맞춰 연다(0304 G1).
+    pub(super) fn open_garden(&mut self, i: usize) {
+        self.village_tabs = GARDEN_TABS;
+        self.decor_tab = 0;
+        self.decor_cursor = i.min(crate::garden::PLOTS - 1);
+        self.shop_msg = None;
         self.village_view = Default::default();
         self.world.freeze();
         self.scene = Scene::Decor;
@@ -115,9 +137,10 @@ impl App {
             self.scene = Scene::Game;
             return;
         }
-        let n = VILLAGE_TABS.len();
+        let tabs = self.village_tabs;
+        let n = tabs.len();
         let cur = self.decor_tab.min(n - 1);
-        let lr = VILLAGE_TABS[cur].lr;
+        let lr = tabs[cur].lr;
         let mut tab = cur;
         if a.tab_prev || (!lr && a.left) {
             tab = (tab + n - 1) % n;
@@ -136,7 +159,7 @@ impl App {
             self.sfx.play(crate::sfx::Id::UiMove);
             return;
         }
-        (VILLAGE_TABS[cur].update)(self, a, tap_hit);
+        (tabs[cur].update)(self, a, tap_hit);
     }
 
     /// 위아래·끌기로 줄을 옮기고, 누른 줄을 돌려준다: (고른 줄이 바뀌었나, 이미 고른 줄을 다시 눌렀나).
@@ -275,9 +298,10 @@ impl App {
             FONT_PX,
             ui::TEXT,
         );
-        let n = VILLAGE_TABS.len();
+        let tabs = self.village_tabs;
+        let n = tabs.len();
         let tab_w = ((PANEL.w - 30.0 - seeds_w) / n as f32).clamp(30.0, 90.0);
-        for (i, t) in VILLAGE_TABS.iter().enumerate() {
+        for (i, t) in tabs.iter().enumerate() {
             let r = Rect::new(
                 PANEL.x + 3.0 + i as f32 * tab_w,
                 PANEL.y + 1.0,
@@ -310,7 +334,7 @@ impl App {
         ui.rect_lines(face, ui::BORDER);
         let say = match self.shop_msg {
             Some((m, _)) => tr(m).to_string(),
-            None => (VILLAGE_TABS[self.decor_tab.min(n - 1)].say)(self),
+            None => (tabs[self.decor_tab.min(n - 1)].say)(self),
         };
         let tx = face.right() + 6.0;
         for (k, l) in ui::wrap(ui, &say, PANEL.right() - tx - 6.0, FONT_PX)
@@ -328,9 +352,14 @@ impl App {
             PANEL.bottom() - 4.0 - top,
         );
         let tab = self.decor_tab.min(n - 1);
-        (VILLAGE_TABS[tab].draw)(self, ui, body);
+        (tabs[tab].draw)(self, ui, body);
         // 아래 안내: 탭마다 동사가 다르다.
-        let hint = if VILLAGE_TABS[tab].lr {
+        let hint = if std::ptr::eq(tabs, GARDEN_TABS) {
+            super::vfill(
+                s.garden_hint,
+                &[Verb::Pick, Verb::Change, Verb::Confirm, Verb::Back],
+            )
+        } else if tabs[tab].lr {
             super::vfill(
                 s.pack_hint,
                 &[Verb::Pick, Verb::Change, Verb::Tabs, Verb::Back],
@@ -597,6 +626,140 @@ impl App {
             ALL[i].scenes[stage].title,
             &crate::lanterns::lines(i, stage),
         ));
+    }
+
+    /// 텃밭 탭: 위아래 = 칸, 빈 칸에서 좌우 = 심을 씨앗, 확인 = 심기 / 거두기(다 자란 칸) / 기다리라는 말(자라는 칸).
+    /// 개발 시나리오는 저장하지 않는다(이번 세션의 기록 사본에만 — 다시 열면 그대로 보인다).
+    fn update_garden_tab(&mut self, a: &Actions, tap_hit: Option<Hit>) {
+        use crate::garden::{self, Crop, No, Plot, PLOTS};
+        let (moved, again) = self.village_pick(a, tap_hit, PLOTS);
+        let i = self.decor_cursor.min(PLOTS - 1);
+        let plot = garden::plot(&self.profile, i);
+        if (a.left || a.right) && plot == Plot::Empty {
+            self.garden_crop = (self.garden_crop + 1) % Crop::ALL.len();
+            self.shop_msg = None;
+            self.sfx.play(crate::sfx::Id::UiMove);
+            return;
+        }
+        if !(a.confirm || again) {
+            if moved && tap_hit.is_some() {
+                self.shop_msg = Some((|s| s.tap_again, 2.5));
+            }
+            return;
+        }
+        let crop = Crop::ALL[self.garden_crop % Crop::ALL.len()];
+        let done = match plot {
+            Plot::Empty => match garden::plant(&mut self.profile, i, crop) {
+                Ok(()) => Some((|s: &i18n::Strings| s.garden_planted) as Tr),
+                Err(No::Poor) => {
+                    self.shop_msg = Some((|s| s.decor_poor, 3.0));
+                    None
+                }
+                Err(No::FlowersFull) => {
+                    self.shop_msg = Some((|s| s.garden_full, 3.0));
+                    None
+                }
+                Err(No::Busy) => None,
+            },
+            Plot::Growing { .. } => {
+                self.shop_msg = Some((|s| s.garden_wait, 2.5));
+                None
+            }
+            Plot::Ripe(_) => match garden::harvest(&mut self.profile, i) {
+                Some(Crop::Berry) => Some((|s: &i18n::Strings| s.garden_picked) as Tr),
+                Some(Crop::Flower) => Some((|s: &i18n::Strings| s.garden_moved) as Tr),
+                None => None,
+            },
+        };
+        let Some(msg) = done else {
+            self.sfx.play(crate::sfx::Id::Deny);
+            return;
+        };
+        let (plots, flowers) = (garden::plots(&self.profile), garden::flowers(&self.profile));
+        if let Some(v) = self.world.adv.village.as_mut() {
+            v.plots = plots;
+            v.flowers = flowers;
+        }
+        if self.recording() {
+            self.save_profile();
+        }
+        self.shop_msg = Some((msg, 3.0));
+        self.sfx.play(crate::sfx::Id::Buy);
+    }
+
+    fn draw_garden_tab(&mut self, ui: &Ui, body: Rect) {
+        use crate::garden::{self, Crop, Plot, GROW, PLOTS};
+        let s = i18n::s();
+        let plots = garden::plots(&self.profile);
+        let rows: Vec<(VillagePic, String, String, bool)> = plots
+            .iter()
+            .map(|&p| {
+                let (name, right) = match p {
+                    Plot::Empty => (s.garden_empty.to_string(), String::new()),
+                    Plot::Growing { crop, age } => {
+                        (tr(crop.name()).to_string(), format!("{age}/{GROW}"))
+                    }
+                    Plot::Ripe(crop) => (tr(crop.name()).to_string(), s.garden_ripe.to_string()),
+                };
+                (VillagePic::Plot(p), name, right, false)
+            })
+            .collect();
+        let list = Rect::new(body.x, body.y, LIST_W, body.h - 4.0);
+        self.draw_village_list(ui, list, &rows);
+        let i = self.decor_cursor.min(PLOTS - 1);
+        let detail = Rect::new(
+            list.right() + 8.0,
+            body.y,
+            body.right() - list.right() - 8.0,
+            body.h,
+        );
+        let crop = Crop::ALL[self.garden_crop % Crop::ALL.len()];
+        let (pic, name, info) = match plots[i] {
+            Plot::Empty => (
+                VillagePic::Plot(Plot::Ripe(crop)),
+                format!("◀ {} ▶", tr(crop.name())),
+                fill(s.garden_plant, &[&crop.price()]),
+            ),
+            Plot::Growing { crop, age } => (
+                VillagePic::Plot(plots[i]),
+                tr(crop.name()).to_string(),
+                fill(s.garden_growing, &[&(GROW - age)]),
+            ),
+            Plot::Ripe(Crop::Berry) => (
+                VillagePic::Plot(plots[i]),
+                tr(Crop::Berry.name()).to_string(),
+                s.garden_ripe_berry.to_string(),
+            ),
+            Plot::Ripe(Crop::Flower) => (
+                VillagePic::Plot(plots[i]),
+                tr(Crop::Flower.name()).to_string(),
+                s.garden_ripe_flower.to_string(),
+            ),
+        };
+        let y = self.draw_village_detail(ui, detail, pic, &name, &info);
+        // 거둬 둔 산딸기(다음 길 가방에), 마을에 옮겨 심은 꽃.
+        let p = &self.profile;
+        let stock = fill(
+            s.garden_stock,
+            &[
+                &p.count(garden::KEY_BERRIES),
+                &garden::flowers(p),
+                &garden::FLOWER_SPOTS.len(),
+            ],
+        );
+        for (k, l) in ui::wrap(ui, &stock, detail.w, FONT_PX)
+            .iter()
+            .take(2)
+            .enumerate()
+        {
+            ui.text(
+                l,
+                detail.x,
+                (y + 4.0 + k as f32 * 12.0).min(detail.bottom() - FONT_PX - 4.0),
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
     }
 
     fn draw_lamp_tab(&mut self, ui: &Ui, body: Rect) {

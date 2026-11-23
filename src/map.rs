@@ -163,6 +163,7 @@ pub fn parse(rows: &[&str]) -> Parsed {
                     | 'u'
                     | 'h'
                     | 'p'
+                    | 'f'
                     | '1'..='9'
             ) {
                 marks.push((ch, at));

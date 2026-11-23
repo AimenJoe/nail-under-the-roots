@@ -540,6 +540,10 @@ pub struct App {
     decor_cursor: usize,
     /// 마을 가게 탭(0259): 0 꾸미기, 1 짐 꾸리기.
     decor_tab: usize,
+    /// 마을 창의 탭 표: 포포에게서 열면 `VILLAGE_TABS`, 텃밭 칸 앞에서 열면 `GARDEN_TABS`(0304 G1).
+    village_tabs: &'static [village_menu::VillageTab],
+    /// 텃밭 탭에서 심을 씨앗(`garden::Crop::ALL` 번호).
+    garden_crop: usize,
     /// 마을 창 목록의 창(0269).
     village_view: crate::ui::ListView,
     /// 재주 창 커서(자리, 갈래).
@@ -740,6 +744,8 @@ impl App {
             after_cutscene: AfterCut::Game,
             decor_cursor: 0,
             decor_tab: 0,
+            village_tabs: village_menu::VILLAGE_TABS,
+            garden_crop: 0,
             village_view: Default::default(),
             tree_cursor: (0, 0),
             pause_tree_cursor: (0, 0),
@@ -1267,6 +1273,10 @@ impl App {
         self.fill_inventory(s, ch, start, veteran);
         // 마을에서 꾸려 둔 짐(0259): 새 이야기 런에만(이어하기는 이미 받았다).
         if s == Scenario::Normal && !self.resuming {
+            // 텃밭(0304 G1): 이야기 런을 새로 떠날 때마다 한 단계. 거둔 산딸기는 꾸린 짐과 함께 꺼낸다.
+            if self.recording() && crate::garden::grow(&mut self.profile) {
+                crate::profile::save(&self.profile);
+            }
             self.unpack();
         }
         self.gift = None;
@@ -2025,6 +2035,8 @@ impl App {
             spring: self.profile.flag(key::MUMU_FREED),
             traces: std::array::from_fn(|i| crate::quests::done(&self.profile, i)),
             lamps: std::array::from_fn(|i| crate::lanterns::level(&self.profile, i) >= 3),
+            plots: crate::garden::plots(&self.profile),
+            flowers: crate::garden::flowers(&self.profile),
             // 거꾸로 Naïl은 다른 캐릭터로 걸을 때 큰 나무 곁에 남는다(0249).
             nail: self.picked() != Character::Mole,
             decor,

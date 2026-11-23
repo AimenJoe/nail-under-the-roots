@@ -2407,3 +2407,113 @@ pub(super) fn ground_ellipse(g: Vec2, along: f32, across: f32) -> (f32, f32, f32
         ang.to_degrees(),
     )
 }
+
+/// 텃밭 칸의 흙(0304 G1): 바닥에 먼저 그린다. 테 + 갈아엎은 흙 + 고랑 두 줄. `at`은 칸 가운데.
+pub(super) fn draw_plot_soil(at: Vec2) {
+    let (x, y) = (at.x.round(), at.y.round());
+    let rim = Color::new(0.28, 0.19, 0.14, 1.0);
+    let soil = Color::new(0.47, 0.32, 0.22, 1.0);
+    let furrow = Color::new(0.36, 0.24, 0.17, 1.0);
+    draw_rectangle(x - 7.0, y - 4.0, 14.0, 10.0, rim);
+    draw_rectangle(x - 6.0, y - 3.0, 12.0, 8.0, soil);
+    draw_rectangle(x - 5.0, y - 1.0, 10.0, 1.0, furrow);
+    draw_rectangle(x - 5.0, y + 2.0, 10.0, 1.0, furrow);
+}
+
+/// 텃밭 칸에 자라는 것(0304 G1): 갓 심은 씨앗 → 새싹 → 다 자란 꽃·산딸기 덤불. 팩 칸(`sunny`)이 없으면 점으로.
+pub(super) fn draw_crop(
+    sunny: Option<&art::Sunny>,
+    plot: crate::garden::Plot,
+    at: Vec2,
+    time: f32,
+) {
+    use crate::garden::{Crop, Plot};
+    use crate::sunny as sn;
+    let foot = vec2(at.x.round(), at.y.round() + 4.0);
+    let sway = ((time * 1.3 + at.x * 0.1).sin() * 0.6).round();
+    match plot {
+        Plot::Empty => {}
+        // 갓 심은 칸: 흙 위에 씨앗 셋.
+        Plot::Growing { age: 0, .. } => {
+            let seed = Color::new(0.86, 0.74, 0.50, 1.0);
+            for dx in [-4.0, 0.0, 4.0] {
+                draw_rectangle(foot.x + dx, foot.y - 6.0, 1.0, 1.0, seed);
+            }
+        }
+        Plot::Growing { .. } => match sunny {
+            Some(s) => sn::draw_at_foot(&s.sheet, sn::SPROUT, foot + vec2(sway, -1.0), WHITE),
+            None => {
+                let g = Color::new(0.40, 0.68, 0.30, 1.0);
+                draw_rectangle(foot.x, foot.y - 6.0, 1.0, 5.0, g);
+                draw_rectangle(foot.x - 2.0 + sway, foot.y - 7.0, 2.0, 1.0, g);
+                draw_rectangle(foot.x + 1.0 + sway, foot.y - 8.0, 2.0, 1.0, g);
+            }
+        },
+        Plot::Ripe(Crop::Berry) => {
+            match sunny {
+                Some(s) => sn::draw_at_foot(&s.sheet, sn::BUSH_SMALL, foot, WHITE),
+                None => draw_ellipse(
+                    foot.x,
+                    foot.y - 6.0,
+                    7.0,
+                    6.0,
+                    0.0,
+                    Color::new(0.30, 0.55, 0.28, 1.0),
+                ),
+            }
+            let red = Color::new(0.86, 0.20, 0.24, 1.0);
+            let hi = Color::new(1.0, 0.62, 0.60, 1.0);
+            for (dx, dy) in [(-4.0, -7.0), (2.0, -10.0), (3.0, -5.0)] {
+                draw_rectangle(foot.x + dx, foot.y + dy, 2.0, 2.0, red);
+                draw_rectangle(foot.x + dx, foot.y + dy, 1.0, 1.0, hi);
+            }
+        }
+        Plot::Ripe(Crop::Flower) => draw_flower_tuft(sunny, 0, foot, sway),
+    }
+}
+
+/// 꽃 한 무더기: 팩의 작은 꽃 둘(번호 `k`로 색을 돌린다). 텃밭에서 다 핀 꽃과 마을에 옮겨 심은 꽃이 같이 쓴다.
+fn draw_flower_tuft(sunny: Option<&art::Sunny>, k: usize, foot: Vec2, sway: f32) {
+    use crate::sunny as sn;
+    let sets = [sn::FLOWERS_RED, sn::FLOWERS_WHITE, sn::FLOWERS_BLUE];
+    let (a, b) = (sets[k % 3], sets[(k + 1) % 3]);
+    match sunny {
+        Some(s) => {
+            sn::draw_at_foot(&s.sheet, a[3], foot + vec2(-3.0 + sway, 0.0), WHITE);
+            sn::draw_at_foot(&s.sheet, b[2], foot + vec2(4.0, 1.0), WHITE);
+        }
+        None => {
+            let cols = [
+                Color::new(0.90, 0.32, 0.36, 1.0),
+                Color::new(0.96, 0.94, 0.88, 1.0),
+                Color::new(0.45, 0.60, 0.95, 1.0),
+            ];
+            let g = Color::new(0.36, 0.58, 0.32, 1.0);
+            for (dx, c) in [(-3.0, cols[k % 3]), (3.0, cols[(k + 1) % 3])] {
+                draw_rectangle(foot.x + dx, foot.y - 4.0, 1.0, 4.0, g);
+                draw_rectangle(foot.x + dx - 1.0 + sway, foot.y - 6.0, 3.0, 2.0, c);
+            }
+        }
+    }
+}
+
+/// 마을에 옮겨 심은 꽃(0304 G1, `garden::FLOWER_SPOTS`의 `k`째): 풀 포기 위에 같은 빛깔 꽃 셋 — 지도에 구운 작은 들꽃과
+/// 구별되게 한 무더기로 모아 심은 모양.
+pub(super) fn draw_garden_flower(sunny: Option<&art::Sunny>, k: usize, at: Vec2, time: f32) {
+    use crate::sunny as sn;
+    let foot = vec2(at.x.round(), at.y.round() + 4.0);
+    if !shadow_pass() {
+        draw_ellipse(foot.x, foot.y, 7.0, 2.0, 0.0, SHADOW_SOFT);
+    }
+    let sway = ((time * 1.1 + k as f32).sin() * 0.6).round();
+    match sunny {
+        Some(s) => {
+            let set = [sn::FLOWERS_RED, sn::FLOWERS_WHITE, sn::FLOWERS_BLUE][k % 3];
+            sn::draw_at_foot(&s.sheet, sn::GRASS[k % 2], foot + vec2(0.0, 1.0), WHITE);
+            sn::draw_at_foot(&s.sheet, set[3], foot + vec2(-4.0 + sway, -1.0), WHITE);
+            sn::draw_at_foot(&s.sheet, set[3], foot + vec2(4.0, -2.0), WHITE);
+            sn::draw_at_foot(&s.sheet, set[2], foot + vec2(sway, 1.0), WHITE);
+        }
+        None => draw_flower_tuft(None, k + 1, foot, sway),
+    }
+}

@@ -21,6 +21,9 @@ pub(super) enum Drawable {
     DreamLoop(Vec2),
     /// 들어준 부탁의 흔적(0273 B, `quests::ALL` 번호, 자리).
     Trace(usize, Vec2),
+    /// 텃밭 칸에 자라는 것(0304 G1)·마을에 옮겨 심은 꽃(번호, 자리).
+    Crop(crate::garden::Plot, Vec2),
+    Flower(usize, Vec2),
 }
 
 /// 3/4 시점: 발 위치(y)가 아래인 것이 앞. 그림자는 모두 먼저.
@@ -81,6 +84,25 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
         }
     }
     if let Some(v) = &w.adv.village {
+        // 텃밭(0304 G1): 흙은 바닥(먼저), 자라는 것은 앞뒤를 가린다. 옮겨 심은 꽃은 정한 자리에 수만큼.
+        for (k, at) in w.garden_plots().into_iter().enumerate() {
+            if ground {
+                draw_plot_soil(at);
+            }
+            if let Some(&p) = v.plots.get(k) {
+                if p != crate::garden::Plot::Empty {
+                    list.push((at.y + 4.0, Drawable::Crop(p, at)));
+                }
+            }
+        }
+        for (k, &(cx, cy)) in crate::garden::FLOWER_SPOTS
+            .iter()
+            .enumerate()
+            .take(v.flowers as usize)
+        {
+            let at = crate::map::cell_center(cx as usize, cy as usize);
+            list.push((at.y + 4.0, Drawable::Flower(k, at)));
+        }
         for (c, at) in &w.adv.marks {
             match c {
                 'Y' => {
@@ -488,6 +510,8 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
         }
         Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
         Drawable::Trace(i, at) => draw_quest_trace(i, at, w.time),
+        Drawable::Crop(p, at) => draw_crop(art.sunny.as_ref(), p, at, w.time),
+        Drawable::Flower(k, at) => draw_garden_flower(art.sunny.as_ref(), k, at, w.time),
     }
 }
 
@@ -533,7 +557,9 @@ pub(super) fn drawable_x(w: &World, alpha: f32, d: &Drawable) -> f32 {
         Drawable::Tree(at, _)
         | Drawable::Decor(_, at)
         | Drawable::DreamLoop(at)
-        | Drawable::Trace(_, at) => at.x,
+        | Drawable::Trace(_, at)
+        | Drawable::Crop(_, at)
+        | Drawable::Flower(_, at) => at.x,
     }
 }
 

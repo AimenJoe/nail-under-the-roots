@@ -102,9 +102,11 @@ pub enum Pic {
     Quest,
     /// 물길(0275 P7): 물살 위에서 밀려 내려가는 Naïl · 물 위로 퍼지는 소금쟁이 물결.
     Water,
+    /// 텃밭(0304 G1): 씨앗 → 새싹 → 산딸기 덤불·꽃이 칸마다 차례로.
+    Garden,
 }
 
-pub const TOPICS: [Topic; 25] = [
+pub const TOPICS: [Topic; 26] = [
     Topic {
         id: "move",
         title: |s| s.h_move,
@@ -262,6 +264,13 @@ pub const TOPICS: [Topic; 25] = [
         title: |s| s.h_journal,
         body: |s| s.h_journal_d,
         pic: Pic::Journal,
+        gate: Some(village),
+    },
+    Topic {
+        id: "garden",
+        title: |s| s.h_garden,
+        body: |s| s.h_garden_d,
+        pic: Pic::Garden,
         gate: Some(village),
     },
     Topic {

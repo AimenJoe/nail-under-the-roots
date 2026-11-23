@@ -158,6 +158,8 @@ pub enum Interact {
     Chest(usize),
     /// 굴 출구(내려가는 구멍): 버튼으로 내려간다(사장 2026-10-30, 예전엔 밟으면 내려갔다).
     Exit,
+    /// 마을 텃밭 칸(0304 G1, `garden.rs`): 마을 창의 텃밭 탭을 그 칸에 맞춰 연다.
+    Garden(usize),
 }
 
 /// 어두워졌다(반) → 장소를 바꾸고 → 밝아진다(반). 그동안 로직은 멈춘다.
@@ -575,6 +577,9 @@ impl World {
         if self.dream_loop().is_some_and(near) {
             return Some(Interact::Dream);
         }
+        if let Some(i) = self.garden_plots().iter().position(|q| near(*q)) {
+            return Some(Interact::Garden(i));
+        }
         let gates = self
             .room
             .grid
@@ -608,6 +613,22 @@ impl World {
 
     /// 마을 물웅덩이(W).
     /// 마을 실 고리(할매가 온 뒤에만 선다, 0055).
+    /// 마을 텃밭 칸 자리(지도 `f`, 왼쪽부터 — `garden::PLOTS`와 같은 수).
+    pub fn garden_plots(&self) -> Vec<Vec2> {
+        if self.adv.village.is_none() {
+            return Vec::new();
+        }
+        let mut v: Vec<Vec2> = self
+            .adv
+            .marks
+            .iter()
+            .filter(|(c, _)| *c == 'f')
+            .map(|(_, at)| *at)
+            .collect();
+        v.sort_by(|a, b| a.x.total_cmp(&b.x));
+        v
+    }
+
     pub fn dream_loop(&self) -> Option<Vec2> {
         let v = self.adv.village?;
         if !v.halmae {
@@ -645,6 +666,9 @@ impl World {
         }
         if let Some(b) = self.dream_loop() {
             consider(b, 18.0);
+        }
+        for q in self.garden_plots() {
+            consider(q, 10.0);
         }
         if let Some(g) = &self.room.grid {
             for q in g.find(Cell::Gate) {

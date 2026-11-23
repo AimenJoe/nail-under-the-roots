@@ -31,6 +31,7 @@ mod enemy;
 mod epic;
 mod equipment;
 mod field;
+mod garden;
 mod help;
 mod i18n;
 mod illust;

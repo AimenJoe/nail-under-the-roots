@@ -562,6 +562,8 @@ impl App {
             }
             // 실 고리: 실의 꿈 고르기(0055). 물웅덩이(털빛 비춰 보기)는 0272에서 뺐다 — 풍경으로만 남는다.
             Interact::Dream => self.open_dream(),
+            // 텃밭(0304 G1): 마을 창의 텃밭 탭.
+            Interact::Garden(i) => self.open_garden(i),
             // 큰 나무: 반딧불로 재주를 깨운다(0047).
             Interact::Tree => {
                 self.tree_cursor = (0, 0);
@@ -1220,6 +1222,7 @@ impl App {
             Interact::Seat => s.ia_look,
             Interact::Tree => s.ia_tree,
             Interact::Dream => s.ia_dream,
+            Interact::Garden(_) => s.ia_garden,
             Interact::Gate if village => s.ia_descend,
             Interact::Gate => s.ia_route,
             Interact::Chest(_) => s.ia_open,
@@ -1278,6 +1281,13 @@ impl App {
                 PackKind::Pouch => self.world.inv.seeds += n * PACK_POUCH_SEEDS,
             }
             self.profile.set_count(key_pack(p.kind), 0);
+        }
+        // 텃밭에서 거둔 산딸기(0304 G1): 짐 꾸리기 한도와 따로.
+        let picked = crate::garden::take_berries(&mut self.profile);
+        if picked > 0 {
+            any = true;
+            let bag = &mut self.world.inv.bag;
+            bag.berries = (bag.berries as u32 + picked).min(t::BERRY_MAX as u32) as u8;
         }
         if any {
             crate::profile::save(&self.profile);

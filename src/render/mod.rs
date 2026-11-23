@@ -46,6 +46,8 @@ pub enum VillagePic {
     Spot(crate::village_notes::Spot),
     /// 수첩 목록 줄의 이웃 아이콘(사장 2026-11-23): 마을 지도에 선 그 모습 그대로. 자세히 칸은 초상화.
     Neighbor(crate::village_notes::Spot),
+    /// 텃밭 칸 하나(0304 G1): 흙 + 자라는 것.
+    Plot(crate::garden::Plot),
 }
 pub use shadow::*;
 use sorted::*;
@@ -983,6 +985,11 @@ impl Renderer {
             }
             VillagePic::Spot(spot) => self.draw_note_spot(spot, foot, t),
             VillagePic::Neighbor(spot) => self.draw_note_neighbor(spot, foot, t),
+            VillagePic::Plot(p) => {
+                let at = foot - vec2(0.0, 4.0);
+                props::draw_plot_soil(at);
+                props::draw_crop(self.art.as_ref().and_then(|a| a.sunny.as_ref()), p, at, t);
+            }
         }
         let gl = unsafe { get_internal_gl() };
         gl.quad_gl.pop_model_matrix();

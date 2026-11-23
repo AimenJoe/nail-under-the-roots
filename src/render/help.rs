@@ -154,6 +154,7 @@ pub(super) fn draw_pic(art: Option<&Art>, pic: Pic, w: f32, h: f32, time: f32) {
         Pic::Nodes => pic_nodes(c),
         Pic::Tree => pic_tree(c),
         Pic::Journal => pic_journal(c),
+        Pic::Garden => pic_garden(c),
         Pic::Knot => pic_knot(c),
         Pic::Memory => pic_pickup(c, crate::world::StoryItem::Memory),
         Pic::Quest => pic_pickup(
@@ -1200,4 +1201,31 @@ fn pic_knot(c: PicCtx) {
         vec2(mid - 18.0, y),
         false,
     );
+}
+
+fn pic_garden(c: PicCtx) {
+    use crate::garden::{Crop, Plot};
+    let PicCtx {
+        art, w, time, y, ..
+    } = c;
+    // 텃밭 칸 셋: 한 박자마다 한 단계씩(씨앗 → 새싹 → 다 자람), 오른쪽 칸은 산딸기·꽃이 번갈아. Naïl이 곁에서 본다.
+    let sunny = art.and_then(|a| a.sunny.as_ref());
+    let step = (time / 1.2) as u32;
+    for k in 0..3u32 {
+        let at = vec2((w * (0.42 + 0.2 * k as f32)).round(), y - 2.0);
+        props::draw_plot_soil(at);
+        let stage = (step + k) % 3;
+        let crop = if (step / 3).is_multiple_of(2) {
+            Crop::Berry
+        } else {
+            Crop::Flower
+        };
+        let plot = match stage {
+            0 => Plot::Growing { crop, age: 0 },
+            1 => Plot::Growing { crop, age: 1 },
+            _ => Plot::Ripe(crop),
+        };
+        props::draw_crop(sunny, plot, at, time);
+    }
+    nail(art, ((time * 2.0) as u32) % 2, 0, vec2(18.0, y), false);
 }
