@@ -162,11 +162,15 @@
 
 ## 사람이 할 일 (다음 세션 전)
 
-### v1.0.1 패치(2026-11-23, 사장 "바로 PR")
-- [x] 버전 1.0.1·version_code 98, `docs/releases/v1.0.1.md`, 공식 페이지 소식(한·영), Epic content notes 1.0.1
-- [ ] 사람: `release/v1.0 → main` PR Merge → `web-production` 승인 → Release `v1.0.1`(APK·PC 셋·ipa) 확인
-- [ ] Merge 뒤(Claude): Epic 바이너리 다시 올리기(정적 링크 판, 1.0.0-be1ac3f를 바꿈)·토스 번들 v1.0.1(`store-deploy` epic·toss — 사장 승인 필요)
-- [ ] 사람: Windows PC(VC++ 없는 것이면 더 좋음)에서 zip 판이 켜지는지
+### v1.0.1 — 상점과 함께 내기(2026-11-23, 사장 "Ms store 준비되면 1.0.1 같이 배포하자")
+PR #30(`release/v1.0 → main`)은 **MS Store 인증이 끝날 때까지 Merge하지 않는다** — Merge가 곧 웹·APK·PC Release v1.0.1이다. 순서:
+- [x] 버전 1.0.1·version_code 98, `docs/releases/v1.0.1.md`, 공식 페이지 소식(한·영 — 날짜는 Merge 날로 고친다), Epic content notes 1.0.1, 토스 1.0.1 출시 노트
+- [x] MS Store 상점 그림(`tools/store/msstore_media.py` → `docs/msstore/media/`)·등록 글(`docs/msstore/store-text.md`)
+- [ ] 사람: MS Store 계정 → 이름 예약 → "제품 ID" 세 값 → (Claude) `pc/msix/identity.env` 커밋 → store-deploy `msstore` → 사람: Partner Center 제출(게시 방법은 **"인증 뒤 수동 게시"**로 — 다른 상점과 같은 날 내려고)
+- [ ] (Claude 실행 · 사람 승인) store-deploy `epic`(정적 링크 1.0.1 바이너리 — 1.0.0-be1ac3f를 바꿈)·`toss`(1.0.1 번들) — 올리기만, 출시는 아직
+- [ ] 사람: Windows PC(VC++ 없는 것이면 더 좋음)에서 1.0.1 zip(build-desktop 아티팩트)이 켜지는지
+- [ ] MS 인증 통과 → 같은 날: PR #30 Merge·`web-production` 승인 → MS "지금 게시" → Epic 1.0.1 바이너리 활성화 + content notes → 토스 검수 요청
+- [ ] Steam: 앱·데포가 준비되면 같은 판으로(아직 대기)
 
 ### 2026-11-23 수정 목록(0301·0302·0303)
 - [x] Microsoft Store: store-deploy `msstore` → 서명하지 않은 MSIX(CI 통과, 35MB), Windows C 런타임 정적 링크(0301)
