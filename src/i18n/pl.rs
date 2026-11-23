@@ -1091,6 +1091,8 @@ pub static PL: Strings = Strings {
     vn_tr_kongi_d: "Kapelusz grzyba świecący łagodnie przy kamieniu Kongiego. Co noc Kongi zwija się w kulkę i patrzy na to światło.",
     vn_tr_clover: "Puchowe posłanie",
     vn_tr_clover_d: "Puch dmuchawca, który Koniczynka wyścieliła maluchom. Gdy wieje wiatr, kilka puszków odlatuje.",
+    vn_lamps: "Lampiony sąsiadów",
+    vn_lamps_d: "Przy każdym sąsiedzie, który opowiedział swoją historię do końca, wisi lampion ze świetlików. Nocą wiejskie ścieżki biegną od światła do światła.",
     run_momo: "Momo, dziś twoja kolej! Naïl czeka przy Wielkim Drzewie. Zaufaj tylnym łapkom i przyskacz z powrotem cała i zdrowa!",
     run_doto: "Doto, dziś twoja kolej! Sakiewka pełna żołędzi? Nie zapomnij, gdzie je zakopujesz — i wróć cały!",
     seat_momo: "Moje miejsce. Naïl pewnie jest teraz w wiosce i dogląda Wielkiego Drzewa.",

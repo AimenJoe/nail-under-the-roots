@@ -589,15 +589,14 @@ impl App {
             v.tree_ready = ready;
         }
         self.sfx.play(crate::sfx::Id::Buy);
-        let who = crate::story::speaker(ALL[i].who);
-        let lines: Vec<_> = ALL[i].scenes[stage]
-            .lines
-            .iter()
-            .map(|(t, f)| (who, *t, *f))
-            .collect();
         self.shop_msg = None;
         self.scene = Scene::Game;
-        self.play(cutscene::talk(&self.world, &lines));
+        self.play(cutscene::lamp_scene(
+            &self.world,
+            tr(ALL[i].name),
+            ALL[i].scenes[stage].title,
+            &crate::lanterns::lines(i, stage),
+        ));
     }
 
     fn draw_lamp_tab(&mut self, ui: &Ui, body: Rect) {
@@ -745,7 +744,7 @@ impl App {
 }
 
 /// 등불 탭의 이웃 그림: 수첩과 같은 이웃 자리(포포는 좌판).
-fn lamp_spot(who: crate::world::Who) -> crate::village_notes::Spot {
+pub(super) fn lamp_spot(who: crate::world::Who) -> crate::village_notes::Spot {
     use crate::village_notes::Spot;
     use crate::world::Who;
     match who {

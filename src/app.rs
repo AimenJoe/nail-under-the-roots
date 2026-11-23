@@ -205,6 +205,8 @@ enum AfterCut {
     Respawn,
     /// 할매의 한마디 뒤 실뜨기 고르기(0270).
     KnotPick,
+    /// 앨범에서 다시 들은 등불 이야기(0304): 끝나면 앨범으로.
+    Album,
     /// 대화 검수에서 틀어 본 줄(0269, 개발판): 끝나면 그 화면으로.
     #[cfg(feature = "dev")]
     Dialogue,
@@ -972,6 +974,7 @@ impl App {
                                 self.lose_run(flow::back_to_village(self.current))
                             }
                             AfterCut::KnotPick => self.open_knot_pick(),
+                            AfterCut::Album => self.scene = Scene::Album,
                             #[cfg(feature = "dev")]
                             AfterCut::Dialogue => self.scene = Scene::Dialogue,
                             AfterCut::Respawn => {

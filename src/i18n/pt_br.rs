@@ -1091,6 +1091,8 @@ pub static PT_BR: Strings = Strings {
     vn_tr_kongi_d: "Um chapéu de cogumelo brilhando de leve ao lado da pedra do Kongi. Toda noite o Kongi se enrola olhando essa luz.",
     vn_tr_clover: "Caminha de penugem",
     vn_tr_clover_d: "A penugem de dente-de-leão que a Trevo forrou para os pequenos. Quando venta, alguns fiapos voam.",
+    vn_lamps: "Lanternas dos vizinhos",
+    vn_lamps_d: "Ao lado de cada vizinho que contou a história até o fim, pende uma lanterna de vaga-lumes. À noite, os caminhos da vila vão de luz em luz.",
     run_momo: "Momo, hoje é a sua vez! O Naïl vai te esperar perto da Grande árvore. Confia nessas patas e volta saltitando!",
     run_doto: "Doto, hoje é a sua vez! Bolsa cheia de bolotas? Não esquece onde enterrou — e volta inteiro!",
     seat_momo: "Meu lugar. A essa hora o Naïl deve estar na vila, cuidando da Grande árvore.",

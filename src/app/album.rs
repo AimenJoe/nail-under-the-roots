@@ -1,15 +1,19 @@
 //! 앨범: 본 일러스트 고르기·크게 보기. 일러스트 뒤에 실의 기억 여섯(0273 A), 그 뒤에 이야기 조각(0273 C) —
-//! 칸은 그 조각의 그림, 크게 보면 조각 글(이야기 조각은 제목도).
+//! 칸은 그 조각의 그림, 크게 보면 조각 글(이야기 조각은 제목도). 맨 뒤는 이웃 등불 이야기(0304, 이웃 × 셋) —
+//! 칸은 그 이웃, 고르면 마을을 배경으로 그 장면을 대화창으로 다시 튼다.
 
 use super::*;
 
 pub(super) const ALBUM_COLS: usize = 5;
 /// 앨범에 한 번에 보이는 줄. 그림이 더 많으면 굴린다(0085).
 pub(super) const ALBUM_ROWS: usize = 2;
+/// 등불 이야기 칸: 이웃 × 셋.
+const LAMP_ITEMS: usize = crate::lanterns::ALL.len() * 3;
 
 /// 앨범 칸 하나(0273): 그림, 본·받은 적 있나, 무슨 칸인가.
 struct AlbumItem {
-    illust: crate::illust::Illust,
+    /// 칸 그림(등불 이야기는 없다 — 이웃을 그린다).
+    illust: Option<crate::illust::Illust>,
     seen: bool,
     kind: AlbumKind,
 }
@@ -21,6 +25,8 @@ enum AlbumKind {
     Memory(Tr),
     /// 이야기 조각(제목, 글).
     Tale(Tr, Tr),
+    /// 이웃 등불 이야기(이웃 번호, 단계).
+    Lamp(usize, usize),
 }
 
 impl App {
@@ -36,7 +42,7 @@ impl App {
         if i < Illust::ALL.len() {
             let il = Illust::ALL[i];
             return AlbumItem {
-                illust: il,
+                illust: Some(il),
                 seen: self.album_seen(il),
                 kind: AlbumKind::Illust,
             };
@@ -46,22 +52,55 @@ impl App {
             let n = k as u8 + 1;
             let m = crate::memories::get(n);
             return AlbumItem {
-                illust: m.illust,
+                illust: Some(m.illust),
                 seen: crate::memories::seen(&self.profile, n),
                 kind: AlbumKind::Memory(m.text),
             };
         }
-        let t = (k - mems).min(crate::tales::ALL.len() - 1);
-        let tale = &crate::tales::ALL[t];
+        let t = k - mems;
+        if t < crate::tales::ALL.len() {
+            let tale = &crate::tales::ALL[t];
+            return AlbumItem {
+                illust: Some(tale.illust),
+                seen: crate::tales::owned(&self.profile, t),
+                kind: AlbumKind::Tale(tale.title, tale.text),
+            };
+        }
+        let l = (t - crate::tales::ALL.len()).min(LAMP_ITEMS - 1);
+        let (who, stage) = (l / 3, l % 3);
         AlbumItem {
-            illust: tale.illust,
-            seen: crate::tales::owned(&self.profile, t),
-            kind: AlbumKind::Tale(tale.title, tale.text),
+            illust: None,
+            seen: crate::lanterns::level(&self.profile, who) > stage,
+            kind: AlbumKind::Lamp(who, stage),
         }
     }
 
     fn album_len() -> usize {
-        crate::illust::Illust::ALL.len() + crate::world::MEMORIES as usize + crate::tales::ALL.len()
+        crate::illust::Illust::ALL.len()
+            + crate::world::MEMORIES as usize
+            + crate::tales::ALL.len()
+            + LAMP_ITEMS
+    }
+
+    /// 들은 등불 이야기를 다시 튼다: 마을(이웃 모두 제자리, Naïl로 걷는 모습)을 배경으로, 끝나면 앨범으로.
+    /// 타이틀 위라 월드는 비어 있다 — 이어하기는 기록에서 되살리니 바꿔도 된다(대화 검수와 같게).
+    fn replay_lamp(&mut self, who: usize, stage: usize) {
+        use crate::lanterns::{lines, ALL};
+        use crate::profile::key;
+        let mut v = self.village_state();
+        v.momo = self.profile.flag(key::MOMO_BACK);
+        v.doto = self.profile.flag(key::DOTO_MEMORY);
+        v.nail = false;
+        self.world = World::village(v);
+        self.tally = Tally::of(&self.world);
+        self.cutscene = Some(cutscene::lamp_scene(
+            &self.world,
+            tr(ALL[who].name),
+            ALL[who].scenes[stage].title,
+            &lines(who, stage),
+        ));
+        self.after_cutscene = AfterCut::Album;
+        self.scene = Scene::Cutscene;
     }
 
     /// 앨범: 5×2 칸에서 고르고, 본 그림은 크게(패닝·입자 그대로). 확인·뒤로·탭으로 닫는다.
@@ -112,8 +151,11 @@ impl App {
             None
         };
         if let Some(i) = chosen {
-            if self.album_item(i).seen {
-                self.album_view = Some(0.0);
+            let item = self.album_item(i);
+            match item.kind {
+                AlbumKind::Lamp(who, stage) if item.seen => self.replay_lamp(who, stage),
+                _ if item.seen => self.album_view = Some(0.0),
+                _ => {}
             }
         }
         if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
@@ -125,10 +167,12 @@ impl App {
         let s = i18n::s();
         if let Some(t) = self.album_view {
             let item = self.album_item(self.album_cursor);
-            self.renderer.draw_illust(ui, item.illust, t);
+            if let Some(il) = item.illust {
+                self.renderer.draw_illust(ui, il, t);
+            }
             // 실의 기억·이야기 조각은 그림 아래에 글(컷씬의 내레이션처럼 어두운 띠 위에). 이야기 조각은 제목이 한 줄 위에.
             let (title, text) = match item.kind {
-                AlbumKind::Illust => (None, None),
+                AlbumKind::Illust | AlbumKind::Lamp(..) => (None, None),
                 AlbumKind::Memory(text) => (None, Some(text)),
                 AlbumKind::Tale(title, text) => (Some(title), Some(text)),
             };
@@ -184,11 +228,50 @@ impl App {
                 cw,
                 ch,
             );
-            if item.seen {
-                self.renderer.draw_illust_thumb(ui, item.illust, r);
+            if let (true, AlbumKind::Lamp(who, stage)) = (item.seen, item.kind) {
+                // 등불 이야기: 마을 풀빛 바탕에 그 이웃, 오른쪽 위에 작은 등불, 아래에 몇째 이야기인지 점.
+                ui.rect(r, Color::new(0.20, 0.30, 0.18, 1.0));
+                let spot = super::village_menu::lamp_spot(crate::lanterns::ALL[who].who);
+                self.renderer.draw_village_pic(
+                    ui,
+                    crate::render::VillagePic::Neighbor(spot),
+                    Rect::new(
+                        r.center().x - (r.h - 2.0) / 2.0 - 4.0,
+                        r.y + 1.0,
+                        r.h - 2.0,
+                        r.h - 2.0,
+                    ),
+                    get_time() as f32,
+                    0.8,
+                );
+                let (lx, ly) = (r.right() - 9.0, r.y + 4.0);
+                ui.rect(Rect::new(lx + 2.0, ly - 2.0, 1.0, 2.0), ui::TEXT_DIM);
+                ui.rect(
+                    Rect::new(lx, ly, 5.0, 4.0),
+                    Color::new(0.10, 0.07, 0.09, 1.0),
+                );
+                ui.rect(
+                    Rect::new(lx + 1.0, ly + 1.0, 3.0, 2.0),
+                    Color::new(0.55, 0.95, 1.0, 1.0),
+                );
+                for k in 0..3 {
+                    let c = if k <= stage { ui::ACCENT } else { ui::BORDER };
+                    ui.rect(
+                        Rect::new(
+                            r.right() - 16.0 + k as f32 * 5.0,
+                            r.bottom() - 5.0,
+                            3.0,
+                            3.0,
+                        ),
+                        c,
+                    );
+                }
+            } else if item.seen {
+                let il = item.illust.expect("그림 칸");
+                self.renderer.draw_illust_thumb(ui, il, r);
                 // 그림이 일러스트와 겹치니 모서리 표시: 실의 기억은 흰 실, 이야기 조각은 펼친 책.
                 match item.kind {
-                    AlbumKind::Illust => {}
+                    AlbumKind::Illust | AlbumKind::Lamp(..) => {}
                     AlbumKind::Memory(_) => {
                         ui.rect(Rect::new(r.right() - 7.0, r.y + 2.0, 5.0, 3.0), ui::TEXT);
                         ui.rect(

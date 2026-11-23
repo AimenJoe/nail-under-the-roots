@@ -1091,6 +1091,8 @@ pub static FR: Strings = Strings {
     vn_tr_kongi_d: "Un chapeau de champignon qui luit doucement près du rocher de Kongi. Chaque soir, Kongi se roule en boule en regardant sa lumière.",
     vn_tr_clover: "Lit de duvet",
     vn_tr_clover_d: "Le duvet de pissenlit que Trèfle a étalé pour ses petits. Quand le vent souffle, quelques brins s'envolent.",
+    vn_lamps: "Lanternes des voisins",
+    vn_lamps_d: "Près de chaque voisin qui a raconté son histoire jusqu'au bout pend une lanterne de lucioles. La nuit, les chemins du village vont de lumière en lumière.",
     run_momo: "Momo, c'est ton tour aujourd'hui! Naïl t'attend près du Grand Arbre. Fais confiance à tes pattes arrière et reviens en sautillant!",
     run_doto: "Doto, c'est ton tour aujourd'hui! Ta bourse est pleine de glands? N'oublie pas où tu les enterres — et reviens entier!",
     seat_momo: "Ma place. Naïl doit être au village en ce moment, à veiller sur le Grand Arbre.",

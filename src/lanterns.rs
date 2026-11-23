@@ -312,6 +312,16 @@ pub const ALL: [Lamp; 6] = [
     },
 ];
 
+/// 이웃 `i`의 장면 `stage`를 대화 줄로(말하는 이는 그 이웃).
+pub fn lines(i: usize, stage: usize) -> Vec<(crate::cutscene::Speaker, Tr, Face)> {
+    let who = crate::story::speaker(ALL[i].who);
+    ALL[i].scenes[stage]
+        .lines
+        .iter()
+        .map(|(t, f)| (who, *t, *f))
+        .collect()
+}
+
 /// 들은 장면 수(0..=3).
 pub fn level(p: &Profile, i: usize) -> usize {
     (p.count(ALL[i].key) as usize).min(3)

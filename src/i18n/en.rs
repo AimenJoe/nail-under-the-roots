@@ -1091,6 +1091,8 @@ pub static EN: Strings = Strings {
     vn_tr_kongi_d: "A mushroom cap glowing softly by Kongi's rock. Every night Kongi curls up and watches its light.",
     vn_tr_clover: "Fluff bed",
     vn_tr_clover_d: "Dandelion fluff Clover laid out for her little ones. When the wind blows, a few wisps drift up.",
+    vn_lamps: "Lanterns by the neighbors",
+    vn_lamps_d: "Glowbug lanterns hang beside the neighbors who told their whole story. At night, the village paths run from light to light.",
     run_momo: "Momo, it's your turn today! Naïl's waiting by the Great Tree. Trust those hind legs and hop on back safe!",
     run_doto: "Doto, it's your turn today! Pouch full of acorns? Don't forget where you bury them — and come back safe!",
     seat_momo: "My seat. Naïl's probably back in the village right now, looking after the Great Tree.",

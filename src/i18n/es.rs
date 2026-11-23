@@ -1091,6 +1091,8 @@ pub static ES: Strings = Strings {
     vn_tr_kongi_d: "Un sombrero de seta que brilla suave junto a la roca de Kongi. Cada noche Kongi se enrosca mirando su luz.",
     vn_tr_clover: "Camita de pelusa",
     vn_tr_clover_d: "La pelusa de diente de león que Trébol extendió para sus pequeños. Cuando sopla el viento, unas hebras salen volando.",
+    vn_lamps: "Faroles de los vecinos",
+    vn_lamps_d: "Junto a cada vecino que contó su historia hasta el final cuelga un farol de luciérnagas. De noche, los caminos de la aldea van de luz en luz.",
     run_momo: "¡Momo, hoy te toca a ti! Naïl te espera junto al Gran Árbol. ¡Confía en esas patas traseras y vuelve sana y salva dando saltitos!",
     run_doto: "¡Doto, hoy te toca a ti! ¿Bolsa llena de bellotas? No olvides dónde las entierras… ¡y vuelve sano y salvo!",
     seat_momo: "Mi asiento. Seguro que Naïl está ahora en la aldea, cuidando del Gran Árbol.",

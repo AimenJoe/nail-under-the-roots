@@ -1091,6 +1091,8 @@ pub static DE: Strings = Strings {
     vn_tr_kongi_d: "Ein Pilzhut, der neben Kongis Felsen sanft leuchtet. Jeden Abend rollt sich Kongi ein und schaut in sein Licht.",
     vn_tr_clover: "Flaumbett",
     vn_tr_clover_d: "Der Löwenzahnflaum, den Klee für ihre Kleinen ausgebreitet hat. Wenn der Wind weht, schweben ein paar Härchen davon.",
+    vn_lamps: "Laternen der Nachbarn",
+    vn_lamps_d: "Neben jedem Nachbarn, der seine Geschichte zu Ende erzählt hat, hängt eine Glühwürmchenlaterne. Nachts führen die Dorfwege von Licht zu Licht.",
     run_momo: "Momo, heute bist du dran! Naïl wartet am Großen Baum. Vertrau deinen Hinterbeinen und hüpf heil zurück!",
     run_doto: "Doto, heute bist du dran! Beutel voller Eicheln? Vergiss nicht, wo du sie vergräbst — und komm heil zurück!",
     seat_momo: "Mein Platz. Naïl ist jetzt wohl im Dorf und kümmert sich um den Großen Baum.",

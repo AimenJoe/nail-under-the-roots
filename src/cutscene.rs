@@ -1427,6 +1427,25 @@ pub fn talk(w: &World, lines: &[(Speaker, Tr, Face)]) -> Cutscene {
     Cutscene::new(actors, steps)
 }
 
+/// 이웃 등불 이야기(0304): 이름 카드(이웃 이름 · 장면 제목) 뒤에 이웃의 말. 등불을 건넬 때와 앨범에서 다시 볼 때가 같이 쓴다.
+pub fn lamp_scene(
+    w: &World,
+    name: &'static str,
+    title: Tr,
+    lines: &[(Speaker, Tr, Face)],
+) -> Cutscene {
+    let mut c = talk(w, lines);
+    c.steps.insert(
+        0,
+        Step::Card {
+            name,
+            sub: title,
+            secs: 2.0,
+        },
+    );
+    c
+}
+
 /// 이웃의 말 + 무기 하나(획득 창, 0246: 콩이가 모모에게 조약돌 덧신, 수수가 도토에게 호두).
 pub fn talk_give(w: &World, lines: &[(Speaker, Tr, Face)], weapon: usize) -> Cutscene {
     let mut c = talk(w, lines);

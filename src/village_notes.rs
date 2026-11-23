@@ -29,6 +29,8 @@ pub enum Spot {
     Loop,
     /// 들어준 부탁의 흔적(0273 B, `quests::ALL` 번호) — 그림은 마을의 흔적 그대로.
     Trace(u8),
+    /// 이웃 곁의 등불(0304) — 그림은 걸린 등불 하나.
+    Lamps,
 }
 
 impl Spot {
@@ -65,7 +67,7 @@ fn halmae(p: &Profile) -> bool {
     p.flag(key::HALF_ENDING) || p.flag(key::TRUE_ENDING)
 }
 
-pub const NOTES: [Note; 21] = [
+pub const NOTES: [Note; 22] = [
     Note {
         spot: Spot::Tree,
         title: |s| s.vn_tree,
@@ -195,6 +197,13 @@ pub const NOTES: [Note; 21] = [
         body: |s| s.vn_tr_clover_d,
         gate: Some(|p| crate::quests::done(p, 6)),
     },
+    // 이웃 등불(0304): 셋째 이야기까지 들어 곁에 등불이 걸린 이웃이 하나라도 있으면.
+    Note {
+        spot: Spot::Lamps,
+        title: |s| s.vn_lamps,
+        body: |s| s.vn_lamps_d,
+        gate: Some(|p| (0..crate::lanterns::ALL.len()).any(|i| crate::lanterns::level(p, i) >= 3)),
+    },
 ];
 
 /// 지금 기록에서 보이는 수첩 줄(표 순서).
@@ -225,5 +234,8 @@ mod tests {
         p.set(key::HALF_ENDING);
         let s = spots(&p);
         assert!(s.contains(&Spot::Halmae) && s.contains(&Spot::Loop));
+        assert!(!s.contains(&Spot::Lamps), "등불은 걸린 뒤에");
+        p.set_count(crate::lanterns::ALL[0].key, 3);
+        assert!(spots(&p).contains(&Spot::Lamps));
     }
 }
