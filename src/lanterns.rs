@@ -10,7 +10,7 @@
 //!   제삼자로 말하지 않는다(0264).
 //! - 셋째 장면을 들으면 그 이웃 곁에 등불이 걸린다(`village::State::lamps`).
 //!
-//! 글은 열한 언어 표(`lamp_<이웃>_<단계>_t`·`_<줄>`). 지금은 포포 셋 — 나머지 이웃은 한국어 초안을 사장이 본 뒤(0304).
+//! 글은 열한 언어 표(`lamp_<이웃>_<단계>_t`·`_<줄>`). 이웃 여섯(포포·보리·모모·도토·콩이·토끼풀) × 셋 — 수수는 쉼터에 살아 뺐다(0304).
 
 use crate::art::Face;
 use crate::equipment::Character;
@@ -45,50 +45,272 @@ fn after_release(p: &Profile) -> bool {
     p.flag(key::HALF_ENDING) || p.flag(key::TRUE_ENDING)
 }
 
-pub const ALL: [Lamp; 1] = [Lamp {
-    who: Who::Popo,
-    name: |s| s.popo_name,
-    key: "lamp.popo",
-    present: |_, _| true,
-    scenes: [
-        Scene {
-            title: |s| s.lamp_popo_1_t,
-            lines: &[
-                (|s| s.lamp_popo_1_1, Face::Happy),
-                (|s| s.lamp_popo_1_2, Face::Normal),
-                (|s| s.lamp_popo_1_3, Face::Normal),
-                (|s| s.lamp_popo_1_4, Face::Worried),
-                (|s| s.lamp_popo_1_5, Face::Happy),
-            ],
-            about: None,
-            gate: None,
-        },
-        Scene {
-            title: |s| s.lamp_popo_2_t,
-            lines: &[
-                (|s| s.lamp_popo_2_1, Face::Normal),
-                (|s| s.lamp_popo_2_2, Face::Happy),
-                (|s| s.lamp_popo_2_3, Face::Worried),
-                (|s| s.lamp_popo_2_4, Face::Normal),
-            ],
-            about: Some(Character::Momo),
-            gate: Some(|p| p.flag(key::MOMO_BACK)),
-        },
-        Scene {
-            title: |s| s.lamp_popo_3_t,
-            lines: &[
-                (|s| s.lamp_popo_3_1, Face::Normal),
-                (|s| s.lamp_popo_3_2, Face::Normal),
-                (|s| s.lamp_popo_3_3, Face::Normal),
-                (|s| s.lamp_popo_3_4, Face::Happy),
-                (|s| s.lamp_popo_3_5, Face::Happy),
-            ],
-            about: None,
-            // 셋째는 샘 그릇(포포의 부탁, 0273 B)이 있어야 말이 된다.
-            gate: Some(|p| after_release(p) && crate::quests::done(p, crate::quests::POPO)),
-        },
-    ],
-}];
+pub const ALL: [Lamp; 6] = [
+    Lamp {
+        who: Who::Popo,
+        name: |s| s.popo_name,
+        key: "lamp.popo",
+        present: |_, _| true,
+        scenes: [
+            Scene {
+                title: |s| s.lamp_popo_1_t,
+                lines: &[
+                    (|s| s.lamp_popo_1_1, Face::Happy),
+                    (|s| s.lamp_popo_1_2, Face::Normal),
+                    (|s| s.lamp_popo_1_3, Face::Normal),
+                    (|s| s.lamp_popo_1_4, Face::Worried),
+                    (|s| s.lamp_popo_1_5, Face::Happy),
+                ],
+                about: None,
+                gate: None,
+            },
+            Scene {
+                title: |s| s.lamp_popo_2_t,
+                lines: &[
+                    (|s| s.lamp_popo_2_1, Face::Normal),
+                    (|s| s.lamp_popo_2_2, Face::Happy),
+                    (|s| s.lamp_popo_2_3, Face::Worried),
+                    (|s| s.lamp_popo_2_4, Face::Normal),
+                ],
+                about: Some(Character::Momo),
+                gate: Some(|p| p.flag(key::MOMO_BACK)),
+            },
+            Scene {
+                title: |s| s.lamp_popo_3_t,
+                lines: &[
+                    (|s| s.lamp_popo_3_1, Face::Normal),
+                    (|s| s.lamp_popo_3_2, Face::Normal),
+                    (|s| s.lamp_popo_3_3, Face::Normal),
+                    (|s| s.lamp_popo_3_4, Face::Happy),
+                    (|s| s.lamp_popo_3_5, Face::Happy),
+                ],
+                about: None,
+                // 셋째는 샘 그릇(포포의 부탁, 0273 B)이 있어야 말이 된다.
+                gate: Some(|p| after_release(p) && crate::quests::done(p, crate::quests::POPO)),
+            },
+        ],
+    },
+    Lamp {
+        who: Who::Bori,
+        name: |s| s.bori_name,
+        key: "lamp.bori",
+        present: |p, _| p.flag(key::BORI_BACK),
+        scenes: [
+            Scene {
+                title: |s| s.lamp_bori_1_t,
+                lines: &[
+                    (|s| s.lamp_bori_1_1, Face::Happy),
+                    (|s| s.lamp_bori_1_2, Face::Normal),
+                    (|s| s.lamp_bori_1_3, Face::Normal),
+                    (|s| s.lamp_bori_1_4, Face::Normal),
+                    (|s| s.lamp_bori_1_5, Face::Happy),
+                ],
+                about: None,
+                gate: None,
+            },
+            Scene {
+                title: |s| s.lamp_bori_2_t,
+                lines: &[
+                    (|s| s.lamp_bori_2_1, Face::Worried),
+                    (|s| s.lamp_bori_2_2, Face::Worried),
+                    (|s| s.lamp_bori_2_3, Face::Normal),
+                    (|s| s.lamp_bori_2_4, Face::Happy),
+                    (|s| s.lamp_bori_2_5, Face::Happy),
+                ],
+                about: None,
+                // 둘째부터는 갈대 피리(보리의 부탁, 0273 B)를 찾은 뒤 — 다시 부는 피리 이야기다.
+                gate: Some(|p| crate::quests::done(p, crate::quests::BORI)),
+            },
+            Scene {
+                title: |s| s.lamp_bori_3_t,
+                lines: &[
+                    (|s| s.lamp_bori_3_1, Face::Happy),
+                    (|s| s.lamp_bori_3_2, Face::Normal),
+                    (|s| s.lamp_bori_3_3, Face::Normal),
+                    (|s| s.lamp_bori_3_4, Face::Happy),
+                    (|s| s.lamp_bori_3_5, Face::Happy),
+                ],
+                about: None,
+                gate: Some(|p| after_release(p) && crate::quests::done(p, crate::quests::BORI)),
+            },
+        ],
+    },
+    Lamp {
+        who: Who::Momo,
+        name: |s| s.name_momo,
+        key: "lamp.momo",
+        present: |p, ch| p.flag(key::MOMO_BACK) && ch != Character::Momo,
+        scenes: [
+            Scene {
+                title: |s| s.lamp_momo_1_t,
+                lines: &[
+                    (|s| s.lamp_momo_1_1, Face::Happy),
+                    (|s| s.lamp_momo_1_2, Face::Normal),
+                    (|s| s.lamp_momo_1_3, Face::Worried),
+                    (|s| s.lamp_momo_1_4, Face::Normal),
+                    (|s| s.lamp_momo_1_5, Face::Happy),
+                ],
+                about: None,
+                gate: None,
+            },
+            Scene {
+                title: |s| s.lamp_momo_2_t,
+                lines: &[
+                    (|s| s.lamp_momo_2_1, Face::Normal),
+                    (|s| s.lamp_momo_2_2, Face::Worried),
+                    (|s| s.lamp_momo_2_3, Face::Happy),
+                    (|s| s.lamp_momo_2_4, Face::Happy),
+                ],
+                about: None,
+                gate: Some(|p| p.flag(key::CLOVER_BACK)),
+            },
+            Scene {
+                title: |s| s.lamp_momo_3_t,
+                lines: &[
+                    (|s| s.lamp_momo_3_1, Face::Normal),
+                    (|s| s.lamp_momo_3_2, Face::Worried),
+                    (|s| s.lamp_momo_3_3, Face::Worried),
+                    (|s| s.lamp_momo_3_4, Face::Determined),
+                    (|s| s.lamp_momo_3_5, Face::Happy),
+                ],
+                about: None,
+                gate: Some(after_release),
+            },
+        ],
+    },
+    Lamp {
+        who: Who::Doto,
+        name: |s| s.name_doto,
+        key: "lamp.doto",
+        present: |p, ch| p.flag(key::DOTO_MEMORY) && ch != Character::Doto,
+        scenes: [
+            Scene {
+                title: |s| s.lamp_doto_1_t,
+                lines: &[
+                    (|s| s.lamp_doto_1_1, Face::Happy),
+                    (|s| s.lamp_doto_1_2, Face::Normal),
+                    (|s| s.lamp_doto_1_3, Face::Worried),
+                    (|s| s.lamp_doto_1_4, Face::Normal),
+                    (|s| s.lamp_doto_1_5, Face::Happy),
+                ],
+                about: None,
+                gate: None,
+            },
+            Scene {
+                title: |s| s.lamp_doto_2_t,
+                lines: &[
+                    (|s| s.lamp_doto_2_1, Face::Normal),
+                    (|s| s.lamp_doto_2_2, Face::Worried),
+                    (|s| s.lamp_doto_2_3, Face::Normal),
+                    (|s| s.lamp_doto_2_4, Face::Happy),
+                    (|s| s.lamp_doto_2_5, Face::Happy),
+                ],
+                about: None,
+                gate: Some(|p| p.flag(key::KONGI_BACK)),
+            },
+            Scene {
+                title: |s| s.lamp_doto_3_t,
+                lines: &[
+                    (|s| s.lamp_doto_3_1, Face::Normal),
+                    (|s| s.lamp_doto_3_2, Face::Normal),
+                    (|s| s.lamp_doto_3_3, Face::Normal),
+                    (|s| s.lamp_doto_3_4, Face::Happy),
+                    (|s| s.lamp_doto_3_5, Face::Happy),
+                ],
+                about: None,
+                gate: Some(after_release),
+            },
+        ],
+    },
+    Lamp {
+        who: Who::Kongi,
+        name: |s| s.name_kongi,
+        key: "lamp.kongi",
+        present: |p, _| p.flag(key::KONGI_BACK),
+        scenes: [
+            Scene {
+                title: |s| s.lamp_kongi_1_t,
+                lines: &[
+                    (|s| s.lamp_kongi_1_1, Face::Happy),
+                    (|s| s.lamp_kongi_1_2, Face::Worried),
+                    (|s| s.lamp_kongi_1_3, Face::Normal),
+                    (|s| s.lamp_kongi_1_4, Face::Normal),
+                    (|s| s.lamp_kongi_1_5, Face::Happy),
+                ],
+                about: None,
+                gate: None,
+            },
+            Scene {
+                title: |s| s.lamp_kongi_2_t,
+                lines: &[
+                    (|s| s.lamp_kongi_2_1, Face::Worried),
+                    (|s| s.lamp_kongi_2_2, Face::Normal),
+                    (|s| s.lamp_kongi_2_3, Face::Normal),
+                    (|s| s.lamp_kongi_2_4, Face::Happy),
+                    (|s| s.lamp_kongi_2_5, Face::Happy),
+                ],
+                about: Some(Character::Doto),
+                gate: Some(|p| p.flag(key::DOTO_MEMORY)),
+            },
+            Scene {
+                title: |s| s.lamp_kongi_3_t,
+                lines: &[
+                    (|s| s.lamp_kongi_3_1, Face::Normal),
+                    (|s| s.lamp_kongi_3_2, Face::Worried),
+                    (|s| s.lamp_kongi_3_3, Face::Normal),
+                    (|s| s.lamp_kongi_3_4, Face::Determined),
+                    (|s| s.lamp_kongi_3_5, Face::Happy),
+                ],
+                about: None,
+                gate: Some(after_release),
+            },
+        ],
+    },
+    Lamp {
+        who: Who::Clover,
+        name: |s| s.name_clover,
+        key: "lamp.clover",
+        present: |p, _| p.flag(key::CLOVER_BACK),
+        scenes: [
+            Scene {
+                title: |s| s.lamp_clover_1_t,
+                lines: &[
+                    (|s| s.lamp_clover_1_1, Face::Happy),
+                    (|s| s.lamp_clover_1_2, Face::Normal),
+                    (|s| s.lamp_clover_1_3, Face::Normal),
+                    (|s| s.lamp_clover_1_4, Face::Worried),
+                    (|s| s.lamp_clover_1_5, Face::Worried),
+                ],
+                about: None,
+                gate: None,
+            },
+            Scene {
+                title: |s| s.lamp_clover_2_t,
+                lines: &[
+                    (|s| s.lamp_clover_2_1, Face::Normal),
+                    (|s| s.lamp_clover_2_2, Face::Happy),
+                    (|s| s.lamp_clover_2_3, Face::Worried),
+                    (|s| s.lamp_clover_2_4, Face::Happy),
+                    (|s| s.lamp_clover_2_5, Face::Happy),
+                ],
+                about: Some(Character::Momo),
+                gate: None,
+            },
+            Scene {
+                title: |s| s.lamp_clover_3_t,
+                lines: &[
+                    (|s| s.lamp_clover_3_1, Face::Normal),
+                    (|s| s.lamp_clover_3_2, Face::Worried),
+                    (|s| s.lamp_clover_3_3, Face::Normal),
+                    (|s| s.lamp_clover_3_4, Face::Worried),
+                    (|s| s.lamp_clover_3_5, Face::Happy),
+                ],
+                about: None,
+                gate: Some(after_release),
+            },
+        ],
+    },
+];
 
 /// 들은 장면 수(0..=3).
 pub fn level(p: &Profile, i: usize) -> usize {
@@ -228,6 +450,70 @@ mod tests {
             next(&p, 0, Character::Mole),
             Next::Ready { stage: 2, .. }
         ));
+    }
+
+    /// 이웃이 마을에 있을 때만 줄이 보이고, 짝 이웃·부탁·엔딩 조건과 "그 캐릭터 이야기"가 이웃마다 맞다.
+    #[test]
+    fn neighbors_show_up_and_wait_for_their_pairs() {
+        let at = |who: Who| ALL.iter().position(|l| l.who == who).unwrap();
+        let mut p = rich();
+        assert_eq!(
+            rows(&p, Character::Mole),
+            vec![at(Who::Popo)],
+            "처음엔 포포만"
+        );
+        for k in [
+            key::BORI_BACK,
+            key::MOMO_BACK,
+            key::DOTO_MEMORY,
+            key::KONGI_BACK,
+            key::CLOVER_BACK,
+        ] {
+            p.set(k);
+        }
+        assert_eq!(rows(&p, Character::Mole).len(), ALL.len());
+        assert!(
+            !rows(&p, Character::Momo).contains(&at(Who::Momo)),
+            "모모로 걸으면 모모 자리는 비었다"
+        );
+        assert!(!rows(&p, Character::Doto).contains(&at(Who::Doto)));
+
+        // 보리: 둘째부터 갈대 피리(부탁)를 찾은 뒤.
+        let bori = at(Who::Bori);
+        give(&mut p, bori, Character::Mole);
+        assert_eq!(next(&p, bori, Character::Mole), Next::Later);
+        crate::quests::advance(&mut p, crate::quests::BORI, crate::quests::Step::Ask);
+        crate::quests::advance(&mut p, crate::quests::BORI, crate::quests::Step::Thanks);
+        assert!(matches!(
+            next(&p, bori, Character::Mole),
+            Next::Ready { stage: 1, .. }
+        ));
+
+        // 콩이 둘째는 도토 이야기, 토끼풀 둘째는 모모 이야기.
+        let kongi = at(Who::Kongi);
+        let clover = at(Who::Clover);
+        give(&mut p, kongi, Character::Mole);
+        give(&mut p, clover, Character::Mole);
+        assert_eq!(next(&p, kongi, Character::Doto), Next::Other);
+        assert_eq!(next(&p, clover, Character::Momo), Next::Other);
+        assert!(matches!(
+            next(&p, kongi, Character::Momo),
+            Next::Ready { stage: 1, .. }
+        ));
+
+        // 셋째는 모두 할매를 놓아준 뒤.
+        for i in 0..ALL.len() {
+            while level(&p, i) < 2 {
+                give(&mut p, i, Character::Mole).expect("둘째까지는 열려 있다");
+            }
+            assert_eq!(next(&p, i, Character::Mole), Next::Later, "{}", ALL[i].key);
+        }
+        p.set(key::HALF_ENDING);
+        crate::quests::advance(&mut p, crate::quests::POPO, crate::quests::Step::Ask);
+        crate::quests::advance(&mut p, crate::quests::POPO, crate::quests::Step::Thanks);
+        for i in 0..ALL.len() {
+            assert_eq!(give(&mut p, i, Character::Mole), Some(2), "{}", ALL[i].key);
+        }
     }
 
     /// 장면마다 줄이 있고, 이웃마다 셋, 기록 키는 겹치지 않는다.
