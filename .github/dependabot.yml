@@ -8,7 +8,7 @@ updates:
     directories:
       - /
       - /.github/actions/rust
-    target-branch: release/v1.0
+    target-branch: release/v1.1
     schedule:
       interval: monthly
     groups:
