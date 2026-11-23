@@ -412,7 +412,7 @@ strings! {
     // 이웃 말 걸기(docs/decisions/0051)
     bori_t_momo, bori_t_halmae, bori_t_falls, bori_t_tree, momo_t_deep, momo_t_bori,
     // 도토(docs/decisions/0052)
-    mob_doto, mob_doto_lore, mob_doto_atk, mob_doto_tip, name_doto, doto_meet_1, doto_meet_1b, doto_b1, doto_b2, doto_b3, doto_b4, doto_b5, doto_b6, doto_memory, doto_v1, doto_v2, doto_v3, bori_t_doto, momo_t_doto, popo_doto, sig_venom_d, sig_venom, sig_thorns, sig_thorns_d, sig_split, sig_split_d, tree_path, tree_short, tree_goal_set, tree_goal_clear, tree_goal_line, tree_always, tree_on_far, tree_off_far, jg_doto, jg_doto_d, jg_true, jg_true_d,
+    mob_doto, mob_doto_lore, mob_doto_atk, mob_doto_tip, name_doto, doto_meet_1, doto_meet_1b, doto_b1, doto_b2, doto_b3, doto_b4, doto_b5, doto_b6, doto_memory, doto_v1, doto_v2, doto_v3, bori_t_doto, momo_t_doto, popo_doto, sig_venom_d, sig_venom, sig_thorns, sig_thorns_d, sig_split, sig_split_d, tree_path, tree_short, tree_pick_other, tree_always, tree_on_far, tree_off_far, jg_doto, jg_doto_d, jg_true, jg_true_d,
     // 수수(docs/decisions/0053)
     name_susu, susu_1, susu_2, susu_3, susu_4, susu_5, susu_v1, susu_v2, susu_v3, jg_susu, jg_susu_d,
     // 진행을 따르는 이웃 말 더(docs/decisions/0053)

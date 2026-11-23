@@ -5,7 +5,7 @@
 // dist-play는 `assemble.py dist-play <sha> release /play`로 조립한다(_headers 경로에 /play가 붙는다).
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "web-game",
+  "name": "web-game-nail",
   "compatibility_date": "2026-11-01",
   "workers_dev": false,
   "preview_urls": false,

@@ -85,17 +85,6 @@ impl App {
         self.tree_view(ch).cell_awake(row, cell)
     }
 
-    pub(super) fn tree_goal(&self, ch: Character) -> Option<(usize, usize)> {
-        self.tree_view(ch).goal()
-    }
-
-    fn set_tree_goal(&mut self, ch: Character, goal: Option<(usize, usize)>) {
-        self.profile.set_count(
-            &crate::talents::goal_key(ch),
-            crate::talents::goal_code(goal),
-        );
-    }
-
     pub(super) fn tree_path(&self, ch: Character, row: usize, cell: usize) -> (usize, u32) {
         self.tree_view(ch).path(row, cell)
     }
@@ -104,33 +93,9 @@ impl App {
         self.tree_view(ch).on_path(row, cell, target)
     }
 
-    /// 목표 한 줄(일시정지 상태 탭): "목표 이름: 반딧불 가진 것/드는 것". 목표가 없거나 다 깼으면 없음.
-    pub(super) fn tree_goal_text(&self, ch: Character) -> Option<String> {
-        let (r, c) = self.tree_goal(ch)?;
-        let (n, cost) = self.tree_path(ch, r, c);
-        if n == 0 {
-            return None;
-        }
-        let (d, side) = Self::tree_cells(r)[c];
-        let name = self.tree_node(ch, r, d, side).1;
-        let have = self.profile.count(crate::talents::KEY_LIGHT);
-        Some(fill(i18n::s().tree_goal_line, &[&name, &have, &cost]))
-    }
-
-    /// 목표로 정하거나(다른 칸이면) 푼다(그 칸이면).
-    fn toggle_tree_goal(&mut self, ch: Character, here: (usize, usize)) {
-        if self.tree_goal(ch) == Some(here) {
-            self.set_tree_goal(ch, None);
-            self.shop_msg = Some((|s| s.tree_goal_clear, 2.0));
-        } else {
-            self.set_tree_goal(ch, Some(here));
-            self.shop_msg = Some((|s| s.tree_goal_set, 2.5));
-        }
-        crate::profile::save(&self.profile);
-    }
-
     /// 큰 나무(0047 → 0246 → 0247): 줄 = 갈래 셋(뿌리·가지·잎, 발톱 캐릭터는 독 발톱 줄 하나 더), 좌우 = 깊이(고르기 칸은 두 칸),
-    /// 확인 = 깨우기(반딧불, 앞 칸을 깨워야)·고르기 칸은 끼기·빼기, 아직 못 깨우는 칸은 목표로 정하기·풀기.
+    /// 확인 = 깨우기(반딧불, 앞 칸을 깨워야)·고르기 칸은 끼기·빼기. 아직 못 깨우는 칸은 "안 돼" 소리만 — 왜인지(몇 칸·얼마 모자람)는
+    /// 아래 상태 줄에 늘 보인다(목표 정하기 0247은 뺐다, 사장 2026-11-23).
     /// 닫기: 뒤로·✕·바깥. 캐릭터 탭은 LB·RB(0142·0195).
     pub(super) fn update_tree(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
         use crate::talents::{key_awake, key_pick, Node, KEY_LIGHT};
@@ -177,15 +142,14 @@ impl App {
             self.shop_msg = None;
         }
         self.tree_cursor = (row, cell);
-        let goal = self.tree_goal(ch);
         if act {
             let (depth, side) = Self::tree_cells(row)[cell];
             let (cost, _, _, awake) = self.tree_node(ch, row, depth, side);
             let have = self.profile.count(KEY_LIGHT);
             match tree(ch)[row].1[depth] {
-                // 아직 못 깨우는 칸(앞 칸이 잠들었거나 반딧불이 모자란다)은 목표로(0247): 길이 밝게 남는다.
+                // 아직 못 깨우는 칸(앞 칸이 잠들었거나 반딧불이 모자란다): 상태 줄이 길과 모자란 값을 보여 준다.
                 _ if !awake && (!self.node_open(ch, row, depth) || have < cost) => {
-                    self.toggle_tree_goal(ch, (row, cell));
+                    self.sfx.play(crate::sfx::Id::Deny);
                 }
                 Node::Pick(slot) => {
                     let pick = key_pick(ch, slot);
@@ -215,10 +179,6 @@ impl App {
                     self.shop_msg = Some((|s| s.tree_awake, 2.5));
                     self.sfx.play(crate::sfx::Id::Heal);
                 }
-            }
-            // 목표 칸을 깨웠으면 목표는 끝.
-            if goal == Some((row, cell)) && self.tree_cell_awake(ch, row, cell) {
-                self.set_tree_goal(ch, None);
             }
             crate::profile::save(&self.profile);
             if ch == self.world.character {
@@ -282,8 +242,7 @@ impl App {
         ((row, cell), pushed)
     }
 
-    /// 일시정지 재주 탭(0247): 칸을 옮겨 보고, 확인(또는 같은 칸 다시 누르기)으로 아직 못 깨운 칸을 목표로 정하거나 푼다.
-    /// 깨우기·끼기는 마을 큰 나무에서만. `lr`: 이번 입력 전부터 이 탭에 있었다(들어온 프레임의 좌우는 칸을 옮기지 않는다).
+    /// 일시정지 재주 탭(0247): 칸을 옮겨 보기만 한다 — 깨우기·끼기는 마을 큰 나무에서만. `lr`: 이번 입력 전부터 이 탭에 있었다(들어온 프레임의 좌우는 칸을 옮기지 않는다).
     /// 줄 끝에서 좌우로 밀었으면 true(옆 탭으로).
     pub(super) fn update_pause_tree(
         &mut self,
@@ -291,7 +250,6 @@ impl App {
         tap_hit: Option<Hit>,
         lr: bool,
     ) -> bool {
-        let ch = self.world.character;
         let mut nav = *a;
         if !lr {
             nav.left = false;
@@ -301,18 +259,13 @@ impl App {
         if pushed {
             return true;
         }
-        let mut act = a.confirm;
         if let Some(Hit::TreeCell(r, c)) = tap_hit {
-            act = cur == (r, c);
             cur = (r, c);
         }
         if cur != self.pause_tree_cursor {
             self.shop_msg = None;
         }
         self.pause_tree_cursor = cur;
-        if act && !self.tree_cell_awake(ch, cur.0, cur.1) {
-            self.toggle_tree_goal(ch, cur);
-        }
         false
     }
 
@@ -338,7 +291,7 @@ impl App {
     /// 큰 나무 칸 그림(0247): 큰 나무 창과 일시정지 재주 탭이 같이 쓴다. `xs` = (줄 이름 x, 첫 칸 x),
     /// `y_at(줄 위 y)`가 그릴 화면 y(다 안 보이면 None). `cursor`가 있으면 그 칸을 밝히고 누를 자리를 남긴다.
     /// 칸 = 덤의 그림(고르기는 갈림 그림, 고유 재주는 캐릭터마다). 밝기: 켜짐 > 깨었지만 안 낌 > 지금 깨울 수 있음 > 잠김.
-    /// 금빛 테두리 = 고른 칸(아직 안 깬)까지, 없으면 목표 칸까지 깨워야 할 길. 목표 칸은 오른쪽 위 금빛 귀.
+    /// 금빛 테두리 = 고른 칸(아직 안 깬)까지 깨워야 할 길.
     pub(super) fn draw_tree_grid(
         &mut self,
         ui: &Ui,
@@ -351,10 +304,7 @@ impl App {
         use crate::talents::{key_pick, Node, KEY_LIGHT};
         let (cell_w, gap) = (14.0, 4.0);
         let have = self.profile.count(KEY_LIGHT);
-        let goal = self.tree_goal(ch);
-        let target = cursor
-            .filter(|&(r, c)| !self.tree_cell_awake(ch, r, c))
-            .or(goal);
+        let target = cursor.filter(|&(r, c)| !self.tree_cell_awake(ch, r, c));
         let label_w = x0 - label_x - 4.0;
         for (b, (bname, nodes)) in tree(ch).iter().enumerate() {
             let Some(y) = y_at(b as f32 * row_h) else {
@@ -400,23 +350,23 @@ impl App {
                     awake,
                     open,
                     path: target.is_some_and(|tg| self.tree_on_path(ch, b, c, tg)),
-                    goal: goal == Some((b, c)),
                     ready: open && !awake && cost <= have,
                 };
                 let pic = match nodes[d] {
-                    Node::Pick(_) => Pic::Pick,
+                    Node::Pick(_) => Pic::Pick(side as u8),
                     Node::Plus(boon) => Pic::Boon(boon),
                     Node::Sig => Pic::Sig(ch.def().signature),
                 };
                 draw_cell(ui, cell, pic, look);
                 if pick_pair && side == 1 {
-                    // 고르기 짝: 아래에 괄호 줄.
-                    ui.rect(
+                    // 고르기 짝(사장 2026-11-23 "둘 중 하나가 안 보인다"): 두 칸을 한 틀로 묶는다 — 칸 그림은 갈림의 왼쪽·오른쪽 가지.
+                    ui.rect_lines(
+                        // 위아래는 1px만 — 일시정지 재주 탭은 줄 간격이 16px(칸 14)이라 더 크면 다음 줄 칸에 닿는다.
                         Rect::new(
-                            cell.x - cell_w - 1.0,
-                            cell.bottom() + 1.0,
-                            cell_w * 2.0 + 1.0,
-                            1.0,
+                            cell.x - cell_w - 3.0,
+                            cell.y - 1.0,
+                            cell_w * 2.0 + 5.0,
+                            cell_w + 2.0,
                         ),
                         ui::TEXT_DIM,
                     );
@@ -452,12 +402,17 @@ impl App {
             l
         };
         let mut cost_tag: Option<u32> = None;
+        // 고르기 칸이면 짝의 이름(둘 중 하나만 낀다).
+        let mut other: Option<String> = None;
         let (name, desc, state) = {
             let cells = Self::tree_cells(cur_r);
             let (d, side) = cells[cur_c.min(cells.len() - 1)];
             let (cost, name, desc, awake) = self.tree_node(ch, cur_r, d, side);
             if !awake {
                 cost_tag = Some(cost);
+            }
+            if matches!(tree(ch)[cur_r].1[d], Node::Pick(_)) {
+                other = Some(self.tree_node(ch, cur_r, d, 1 - side).1);
             }
             let state = match (self.shop_msg, tree(ch)[cur_r].1[d]) {
                 (Some((m, _)), _) => tr(m).to_string(),
@@ -474,25 +429,32 @@ impl App {
             };
             (name, tr(desc), state)
         };
-        let goal_here = self.tree_goal(ch) == Some(cursor);
         let tag = cost_tag.map(|c| c.to_string()).unwrap_or_default();
         let tag_w = if tag.is_empty() {
             0.0
         } else {
             ui.text_w(&tag, FONT_PX) + 8.0
         };
-        let mark_w = if goal_here { 9.0 } else { 0.0 };
-        let name = ui.fit(&name, r.w - tag_w - mark_w, FONT_PX);
-        if goal_here {
-            draw_goal_mark(ui, vec2(r.x, r.y + 2.0));
-        }
-        ui.text(&name, r.x + mark_w, r.y, FONT_PX, ui::ACCENT);
+        let name = ui.fit(&name, r.w - tag_w, FONT_PX);
+        ui.text(&name, r.x, r.y, FONT_PX, ui::ACCENT);
         if let Some(c) = cost_tag {
             let col = if have >= c { ui::ACCENT } else { ui::TEXT_DIM };
             ui.text_right(&tag, r.right(), r.y, FONT_PX, col);
         }
         // 설명은 칸이 허락하는 만큼(이름 줄·상태 줄을 빼고 2~4줄), 상태 줄은 그 아래 같은 자리.
-        let lines = (((r.h - 13.0 - 14.0) / 12.0).floor() as usize).clamp(2, 4);
+        // 고르기 칸은 설명 한 줄을 "둘 중 하나 · 옆 칸: 이름"에 내준다.
+        let mut lines = (((r.h - 13.0 - 14.0) / 12.0).floor() as usize).clamp(2, 4);
+        if let Some(o) = &other {
+            lines -= 1;
+            let l = ui.fit(&fill(s.tree_pick_other, &[o]), r.w, FONT_PX);
+            ui.text(
+                &l,
+                r.x,
+                r.y + 13.0 + lines as f32 * 12.0,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
         for (k, l) in ui::wrap(ui, desc, r.w, FONT_PX)
             .iter()
             .take(lines)
@@ -501,7 +463,7 @@ impl App {
             ui.text(l, r.x, r.y + 13.0 + k as f32 * 12.0, FONT_PX, ui::TEXT);
         }
         let state = ui.fit(&state, r.w, FONT_PX);
-        let sy = r.y + 15.0 + lines as f32 * 12.0;
+        let sy = r.y + 15.0 + (lines + other.is_some() as usize) as f32 * 12.0;
         ui.text(&state, r.x, sy, FONT_PX, ui::ACCENT);
     }
 
@@ -587,7 +549,7 @@ impl App {
     }
 }
 
-/// 금빛: 목표 칸·거기까지 깨울 길(0247).
+/// 금빛: 고른 칸까지 깨울 길(0247).
 pub(super) const GOLD: Color = Color::new(0.98, 0.84, 0.36, 1.0);
 
 /// 칸 하나의 상태(그리기용).
@@ -598,16 +560,15 @@ struct Look {
     awake: bool,
     open: bool,
     path: bool,
-    goal: bool,
     /// 지금 가진 반딧불로 깨울 수 있다.
     ready: bool,
 }
 
-/// 칸 속 그림(0247): 덤의 종류마다 하나, 고르기 칸은 갈림, 고유 재주는 캐릭터마다(독 방울·가시·갈라진 열매).
+/// 칸 속 그림(0247): 덤의 종류마다 하나, 고르기 칸은 갈림(쪽 0 = 왼쪽 가지, 1 = 오른쪽 가지가 밝다), 고유 재주는 캐릭터마다(독 방울·가시·갈라진 열매).
 #[derive(Clone, Copy)]
 enum Pic {
     Boon(crate::talents::Boon),
-    Pick,
+    Pick(u8),
     Sig(crate::talents::Signature),
 }
 
@@ -801,9 +762,16 @@ fn pic_pattern(p: Pic) -> ([&'static str; 7], Color) {
             ],
             Color::new(0.86, 0.62, 0.32, 1.0),
         ),
-        Pic::Pick => (
+        // 갈림: 줄기 + 이 칸의 가지만(다른 가지는 `draw_cell`이 옅게).
+        Pic::Pick(0) => (
             [
-                "#.....#", ".#...#.", "..#.#..", "...#...", "...#...", "...#...", "...#...",
+                "##.....", "###....", ".###...", "..####.", "...#...", "...#...", "..###..",
+            ],
+            ui::ACCENT,
+        ),
+        Pic::Pick(_) => (
+            [
+                ".....##", "....###", "...###.", ".####..", "...#...", "...#...", "..###..",
             ],
             ui::ACCENT,
         ),
@@ -853,15 +821,24 @@ fn draw_cell(ui: &Ui, cell: Rect, pic: Pic, l: Look) {
     };
     let col = Color::new(col.r, col.g, col.b, alpha);
     let (ox, oy) = (cell.x + 3.5, cell.y + 3.5);
+    if let Pic::Pick(side) = pic {
+        // 고르지 않은 쪽 가지를 옅게: 두 칸이 한 갈림의 왼쪽·오른쪽이라는 것이 보인다.
+        let (rows, _) = pic_pattern(Pic::Pick(1 - side));
+        let faint = Color::new(col.r, col.g, col.b, alpha * 0.3);
+        for (y, line) in rows.iter().take(3).enumerate() {
+            for (x, ch) in line.bytes().enumerate() {
+                if ch == b'#' {
+                    ui.rect(Rect::new(ox + x as f32, oy + y as f32, 1.0, 1.0), faint);
+                }
+            }
+        }
+    }
     for (y, line) in rows.iter().enumerate() {
         for (x, ch) in line.bytes().enumerate() {
             if ch == b'#' {
                 ui.rect(Rect::new(ox + x as f32, oy + y as f32, 1.0, 1.0), col);
             }
         }
-    }
-    if l.goal {
-        draw_goal_mark(ui, vec2(cell.right() - 5.0, cell.y + 1.0));
     }
     if l.ready {
         // 지금 깨울 수 있다: 오른쪽 아래 작은 빛.
@@ -870,12 +847,4 @@ fn draw_cell(ui: &Ui, cell: Rect, pic: Pic, l: Look) {
             ui::ACCENT,
         );
     }
-}
-
-/// 목표 표시(금빛 작은 깃발, 4×5).
-fn draw_goal_mark(ui: &Ui, at: Vec2) {
-    ui.rect(Rect::new(at.x, at.y, 1.0, 5.0), GOLD);
-    ui.rect(Rect::new(at.x + 1.0, at.y, 3.0, 1.0), GOLD);
-    ui.rect(Rect::new(at.x + 1.0, at.y + 1.0, 2.0, 1.0), GOLD);
-    ui.rect(Rect::new(at.x + 1.0, at.y + 2.0, 1.0, 1.0), GOLD);
 }

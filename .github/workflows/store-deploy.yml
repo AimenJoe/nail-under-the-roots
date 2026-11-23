@@ -5,20 +5,27 @@ name: store-deploy
 #    - Steam: steamcmd + 업로드 전용 빌더 계정의 config.vdf로 app build를 올리고 `SetLive`로 베타 갈래에만 건다
 #      (기본 갈래는 SteamPipe가 자동으로 못 건다 — 사람이 파트너 사이트에서, Steamworks "Uploading to Steam").
 #    - Epic: BuildPatchTool `-mode=UploadBinary`로 아티팩트에 올린다(라벨·출시는 사람이 개발자 포털에서).
+# 4) toss(0300): 운영판 웹 빌드를 앱인토스 묶음(.ait, tools/toss/build.sh)으로 만들어 `ait deploy`로 콘솔에 올린다
+#    (Environment `store`의 TOSS_API_KEY·TOSS_APP_NAME). 나오는 테스트 스킴(QR)으로 토스 앱에서 시험 — 검수 요청·출시는 콘솔에서.
+# 3) play(0295): build-android.yml을 상점판으로 불러 올리기 키로 서명한 AAB를 아티팩트(`nail-aab-play-<sha>`)로만 남긴다.
+#    Play Console에는 사람이 올린다(새 앱의 첫 번들은 콘솔에서만 — API 자동 올리기는 앱이 생긴 뒤에 붙인다).
+# 5) msstore(0301): build-desktop.yml을 Microsoft Store 판으로 불러 서명하지 않은 MSIX(`nail-windows-msstore-<sha>`)를
+#    아티팩트로만 남긴다(상점 자격이 필요 없어 Environment에 들어가지 않는다). Partner Center에는 사람이 올린다 —
+#    패키지 아이디는 `pc/msix/identity.env`(비밀 아님), 자동 제출(msstore CLI)은 첫 제출이 통과한 뒤에 붙인다.
 # 필요한 값(Environment `store`): docs/release.md "상점 업로드".
 on:
   workflow_dispatch:
     inputs:
       store:
-        description: 'steam | epic'
+        description: 'steam | epic | play | toss | msstore'
         type: choice
-        options: [steam, epic]
+        options: [steam, epic, play, toss, msstore]
       steam_branch:
         description: '(Steam만) 베타 갈래 이름(SetLive). 기본 갈래로는 사람이 옮긴다 — epic이면 안 쓴다'
         type: string
         default: beta
       note:
-        description: '(Steam만) 빌드 설명(파트너 사이트 빌드 목록에만 보인다) — epic이면 안 쓴다(Epic은 BuildVersion이 버전-커밋-플랫폼)'
+        description: '빌드 설명 — Steam: 파트너 사이트 빌드 목록에만 보인다. toss: 콘솔 번들의 메모(비우면 "v<버전> · <커밋>"). epic이면 안 쓴다'
         type: string
         default: ''
 
@@ -31,6 +38,7 @@ concurrency:
 
 jobs:
   build:
+    if: inputs.store == 'steam' || inputs.store == 'epic'
     permissions:
       contents: write   # build-desktop의 잡이 요구하는 권한(상점 판은 Release에 붙이지 않는다)
     uses: ./.github/workflows/build-desktop.yml
@@ -38,6 +46,75 @@ jobs:
       release_tag: ''
       store: ${{ inputs.store }}
     secrets: inherit
+
+  msstore:
+    if: inputs.store == 'msstore'
+    permissions:
+      contents: write   # build-desktop의 잡이 요구하는 권한(상점 판은 Release에 붙이지 않는다)
+    uses: ./.github/workflows/build-desktop.yml
+    with:
+      release_tag: ''
+      store: msstore
+    secrets: inherit
+
+  play:
+    if: inputs.store == 'play'
+    permissions:
+      contents: write   # build-android의 잡이 요구하는 권한(상점판은 Release에 붙이지 않는다)
+    uses: ./.github/workflows/build-android.yml
+    with:
+      store: play
+    secrets: inherit
+
+  toss:
+    if: inputs.store == 'toss'
+    runs-on: ubuntu-latest
+    environment: store
+    env:
+      ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+      TOSS_API_KEY: ${{ secrets.TOSS_API_KEY }}
+      TOSS_APP_NAME: ${{ vars.TOSS_APP_NAME }}
+      NOTE: ${{ inputs.note }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check settings
+        run: |
+          for v in ASSETS_REPO TOSS_API_KEY TOSS_APP_NAME; do
+            [ -n "${!v}" ] || { echo "::error::Environment store에 $v가 없다(docs/release.md 앱인토스)"; exit 1; }
+          done
+      - name: Fetch vendor assets (private repo)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ secrets.ASSETS_REPO }}
+          token: ${{ secrets.ASSETS_TOKEN }}
+          path: assets/vendor
+      - uses: ./.github/actions/rust
+        with:
+          targets: wasm32-unknown-unknown
+      # 운영판(개발 메뉴 없음, 0193)을 웹과 같은 조립으로.
+      - run: cargo build --release --target wasm32-unknown-unknown --no-default-features
+      - run: python3 tools/web/assemble.py web-release "$GITHUB_SHA" release
+      # ait 묶음 형식(@apps-in-toss/ait-format)은 Node 24 이상.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Build .ait
+        run: bash tools/toss/build.sh web-release
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nail-toss-${{ github.sha }}
+          path: toss/*.ait
+          if-no-files-found: error
+      - name: Upload to Apps in Toss
+        working-directory: toss
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' ../Cargo.toml | head -1)
+          # 콘솔의 "메모"(검토자에게 가는 "출시 노트"는 콘솔에서 따로 쓴다 — docs/toss/store-text.md).
+          MEMO="v$VERSION · ${GITHUB_SHA:0:7}${NOTE:+ — $NOTE}"
+          scheme=$(npx ait deploy --api-key "$TOSS_API_KEY" --location "$TOSS_APP_NAME.ait" --scheme-only -m "$MEMO" | tail -1)
+          echo "$scheme"
+          case "$scheme" in intoss-private://*) ;; *) echo "::error::업로드 실패: $scheme"; exit 1;; esac
+          echo "### 앱인토스 테스트 스킴(토스 앱에서 열기): \`$scheme\`" >> "$GITHUB_STEP_SUMMARY"
 
   steam:
     if: inputs.store == 'steam'

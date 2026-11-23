@@ -4,3 +4,8 @@
 # (miniquad 자체는 `#[link(wasm_import_module = "env")]`를 써서 이 플래그 없이도 링크된다.)
 [target.wasm32-unknown-unknown]
 rustflags = ["-C", "link-arg=--import-undefined"]
+
+# Windows(0301): C 런타임을 실행 파일에 넣는다 — VC++ 재배포 패키지(VCRUNTIME140.dll)가 없는 PC나
+# Microsoft Store MSIX(프레임워크 의존성을 따로 걸지 않는다)에서도 켜지게. tools/pc/package.sh가 확인한다.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

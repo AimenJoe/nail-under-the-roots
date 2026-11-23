@@ -44,6 +44,8 @@ pub enum VillagePic {
     Pack(crate::village::PackKind),
     /// 마을 수첩의 장소(0269 2.7). 이웃은 그림 칸 대신 초상화(`app/village_menu.rs`) — 여기서는 아무것도 그리지 않는다.
     Spot(crate::village_notes::Spot),
+    /// 수첩 목록 줄의 이웃 아이콘(사장 2026-11-23): 마을 지도에 선 그 모습 그대로. 자세히 칸은 초상화.
+    Neighbor(crate::village_notes::Spot),
 }
 pub use shadow::*;
 use sorted::*;
@@ -972,17 +974,37 @@ impl Renderer {
             VillagePic::Pack(crate::village::PackKind::Worm) => {
                 actors::draw_worm(foot - vec2(0.0, 3.0), t * 6.0, 0.9)
             }
+            // 씨앗 주머니: 알 셋만. 바닥에 놓인 줍는 것의 표시(빛 자리·퍼지는 고리·별, `draw_pickup_mark`)는 창에서 그리지 않는다 —
+            // 셋이 제각각 반짝여 너무 빨랐다(사장 2026-11-23).
             VillagePic::Pack(crate::village::PackKind::Pouch) => {
                 for (dx, dy) in [(-3.0, 0.0), (3.0, 0.0), (0.0, -3.0)] {
-                    let l = loot::Loot::place(loot::LootKind::Seed, foot + vec2(dx, dy - 2.0));
-                    draw_loot(&l, 1.0, t, false);
+                    draw_seed((foot + vec2(dx, dy - 4.0)).round());
                 }
             }
             VillagePic::Spot(spot) => self.draw_note_spot(spot, foot, t),
+            VillagePic::Neighbor(spot) => self.draw_note_neighbor(spot, foot, t),
         }
         let gl = unsafe { get_internal_gl() };
         gl.quad_gl.pop_model_matrix();
         gl.quad_gl.scissor(None);
+    }
+
+    /// 수첩 이웃 아이콘: 마을 지도에서 서 있는 모습 그대로(`sorted.rs` Neighbor와 같은 줄·함수, 발밑 `foot`).
+    fn draw_note_neighbor(&self, spot: crate::village_notes::Spot, foot: Vec2, t: f32) {
+        use crate::village_notes::Spot;
+        let Some(art) = self.art.as_ref() else {
+            return;
+        };
+        match spot {
+            Spot::Stall => draw_critter_at(art, art::RACCOON_ROW, foot, false, false, t),
+            Spot::Bori => draw_bori_at(art, foot, false, false, t),
+            Spot::Momo => draw_critter_at(art, art::MOMO_BLOOM_ROW, foot, false, false, t),
+            Spot::Doto => draw_critter_at(art, art::DOTO_BACK_ROW, foot, false, false, t),
+            Spot::Kongi => draw_critter_at(art, art::KONGI_BACK_ROW, foot, false, false, t),
+            Spot::Clover => draw_critter_at(art, art::CLOVER_BACK_ROW, foot, false, false, t),
+            Spot::Halmae => draw_halmae_at(art, foot, t, true),
+            _ => self.draw_note_spot(spot, foot, t),
+        }
     }
 
     /// 수첩 장소 그림: 마을 지도에서 쓰는 그림 그대로(발밑 `foot`).

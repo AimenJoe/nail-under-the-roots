@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Microsoft Store MSIX 매니페스트(0301). tools/pc/package.sh가 @…@ 자리를 pc/msix/identity.env와 Cargo 버전으로 채운다.
+     데스크톱 앱(Win32, runFullTrust) — 기록은 %APPDATA%\nail에 쓰고 MSIX가 그 자리를 패키지 전용 폴더로 돌린다. -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+  <Identity Name="@NAME@" Publisher="@PUBLISHER@" Version="@VERSION@" ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>@DISPLAY_NAME@</DisplayName>
+    <PublisherDisplayName>@PUBLISHER_DISPLAY@</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <!-- 게임이 고르는 열한 언어(0084·0085·0144) — 상점 목록 언어와 맞춘다 -->
+  <Resources>
+    <Resource Language="en-US" />
+    <Resource Language="ko-KR" />
+    <Resource Language="ja-JP" />
+    <Resource Language="zh-CN" />
+    <Resource Language="zh-TW" />
+    <Resource Language="pt-BR" />
+    <Resource Language="fr-FR" />
+    <Resource Language="es-ES" />
+    <Resource Language="de-DE" />
+    <Resource Language="ru-RU" />
+    <Resource Language="pl-PL" />
+  </Resources>
+  <Applications>
+    <Application Id="Nail" Executable="Nail.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="@DISPLAY_NAME@"
+        Description="@DISPLAY_NAME@"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

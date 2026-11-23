@@ -565,9 +565,42 @@ pub struct App {
     /// 앨범에서 보이는 첫 줄(그림이 두 줄을 넘으면 굴린다, 0085).
     /// 앨범의 줄 창(0199, 다섯 칸이 한 줄).
     album_rows: crate::ui::ListView,
+    /// 앱이 내려간 것을 엔진에서 듣는 귀(0298).
+    away: Away,
     /// 클립 찍기 전용 자동 조종(`--features clip`, 0228).
     #[cfg(feature = "clip")]
     pilot: crate::autopilot::Pilot,
+}
+
+/// 앱이 내려갔다(0298): 엔진이 내는 "최소화" 사건 — Android onPause, iOS 비활성, 웹 탭 숨김·창 포커스 잃음, PC 창 최소화.
+/// macroquad 입력 구독 하나로 듣고, 앱은 프레임마다 `take`로 한 번 묻는다(구독은 매 프레임 비워야 쌓이지 않는다).
+struct Away {
+    sub: usize,
+    went: bool,
+}
+
+impl Away {
+    fn new() -> Self {
+        Self {
+            sub: macroquad::input::utils::register_input_subscriber(),
+            went: false,
+        }
+    }
+
+    /// 지난 물음 뒤로 내려간 적이 있나.
+    fn take(&mut self) -> bool {
+        let sub = self.sub;
+        macroquad::input::utils::repeat_all_miniquad_input(self, sub);
+        std::mem::take(&mut self.went)
+    }
+}
+
+impl macroquad::miniquad::EventHandler for Away {
+    fn update(&mut self) {}
+    fn draw(&mut self) {}
+    fn window_minimized_event(&mut self) {
+        self.went = true;
+    }
 }
 
 impl App {
@@ -716,6 +749,7 @@ impl App {
             char_cursor: 0,
             knot_level: 0,
             title_note: None,
+            away: Away::new(),
             #[cfg(feature = "clip")]
             pilot: Default::default(),
         }
@@ -841,6 +875,11 @@ impl App {
         // 웹(0269): 전체 화면 표시는 브라우저를 따라가고, 세로로 든 터치 기기라 회전 안내가 떠 있으면 싸움을 멈춘다.
         self.sync_web_fullscreen();
         if self.scene == Scene::Game && crate::web::portrait_blocked() {
+            self.open_pause();
+        }
+        // 앱이 내려가면(0298) 싸움·모험을 멈추고 적는다(`open_pause`가 `save_progress`) — 돌아왔을 때 적이 먼저 움직이지 않고,
+        // 내려간 사이 OS가 앱을 정리해도 방 하나만큼만 잃는다. 다른 장면은 이미 입력을 기다린다.
+        if self.away.take() && self.scene == Scene::Game {
             self.open_pause();
         }
         let dt = get_frame_time().min(t::MAX_FRAME_DT);

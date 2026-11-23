@@ -6,6 +6,9 @@ name: build-android
 # 갈래(0193): main·태그·release_tag = 운영판(--no-default-features, io.github.aimenjoe.nail).
 #   그 밖(release/** push, 작업 브랜치 수동 실행) = 개발판: 개발 기능을 넣고 패키지 이름을 `io.github.aimenjoe.dev.nail`로 바꿔(마지막 조각은 nail — 0286)
 #   운영 앱과 나란히 깔린다(기록도 따로). release/** push면 미리 보기 릴리스 `dev`의 `nail-dev.apk`를 갈아 끼운다.
+# - store = play(store-deploy.yml이 부를 때, 0295): 상점판(운영판 + 패키지 `io.beardworks.nail`)을 AAB로 묶어
+#   Environment `store`의 올리기 키로 서명해 아티팩트로 올린다(Play Console에는 사람이 올린다 — 첫 출시는 콘솔에서만 된다).
+#   그 밖의 빌드도 같은 APK에서 AAB를 만들어 본다(디버그 키 서명, 아티팩트) — 변환 길이 늘 도는지 보려고.
 # 러너(ubuntu-latest)에 Android SDK(build-tools, platforms;android-36)·NDK·JDK 17이 미리 깔려 있어 설치 단계가 없다.
 on:
   push:
@@ -21,35 +24,52 @@ on:
       - '.cargo/**'
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
+    inputs:
+      store:
+        description: '상점판(play = Google Play AAB, Environment store의 올리기 키). 비우면 평소 빌드'
+        type: choice
+        options: ['', play]
+        default: ''
   # release.yml(버전 올리기 = 릴리스)이 태그를 만든 뒤 부른다.
   workflow_call:
     inputs:
       release_tag:
         type: string
-        required: true
+        required: false
+        default: ''
+      store:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
   # 릴리스 빌드는 main push 빌드와 따로 돈다(같은 ref라 서로 취소하지 않게).
-  group: android-${{ inputs.release_tag || github.ref }}
+  group: android-${{ inputs.store }}${{ inputs.release_tag || github.ref }}
   cancel-in-progress: true
 
 env:
   # not-fl3/cargo-quad-apk master, 2026-07-28 (NDK 29 lib64 대응, API 36). 올릴 때 README 체크리스트 참조.
   CARGO_QUAD_APK_REV: d411c8fe1c08339e46d7dc6b40ac04ea5e3a01b6
+  # APK → AAB(tools/android/make_aab.sh, 0295). 받은 jar는 sha256으로 확인한다 — 올릴 때 둘 다 바꾼다.
+  BUNDLETOOL_VERSION: 1.18.3
+  BUNDLETOOL_SHA256: a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29
 
 jobs:
   apk:
     runs-on: ubuntu-latest
     permissions:
       contents: write   # 태그 push 시 Release 생성
+    # 상점판만 Environment `store`(배포 갈래·사람 승인)에 들어가 올리기 키를 읽는다(docs/release.md "상점 업로드").
+    environment: ${{ inputs.store == 'play' && 'store' || '' }}
     env:
       ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+      STORE: ${{ inputs.store }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # 운영·상점 판은 유료 팩 그림 없이 나가지 않는다(0277) — 시크릿이 없으면 대체 그림으로 조용히 빌드되던 자리.
       - name: Require vendor assets for release
-        if: env.ASSETS_REPO == '' && (inputs.release_tag != '' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        if: env.ASSETS_REPO == '' && (inputs.release_tag != '' || inputs.store != '' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         run: echo "::error::ASSETS_REPO 시크릿이 없다 — 운영·상점 판을 대체 그림으로 내보내지 않는다"; exit 1
 
       # 유료 에셋 팩(레포 밖, docs/decisions/0010). 시크릿이 없으면 건너뛰고 직접 그린 대체 타일로 빌드한다.
@@ -112,7 +132,13 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          if [ -n "$RELEASE_TAG" ] || [ "$GITHUB_REF" = "refs/heads/main" ] || [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+          if [ "$STORE" = play ]; then
+            # 상점판(0284 A1): 운영판 + 새 패키지 이름(무료 APK와 따로 깔린다 — 마지막 조각은 nail, 0286). 빌드 안에서만 바꾼다.
+            echo "FEATURES=--no-default-features" >> "$GITHUB_ENV"; echo "FLAVOR=play" >> "$GITHUB_ENV"
+            sed -i -e 's/^package_name = "io.github.aimenjoe.nail"$/package_name = "io.beardworks.nail"/' Cargo.toml
+            grep -q 'package_name = "io.beardworks.nail"' Cargo.toml
+            grep -n '^package_name\|^label\|^version_code' Cargo.toml
+          elif [ -n "$RELEASE_TAG" ] || [ "$GITHUB_REF" = "refs/heads/main" ] || [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "FEATURES=--no-default-features" >> "$GITHUB_ENV"; echo "FLAVOR=release" >> "$GITHUB_ENV"
           else
             echo "FEATURES=" >> "$GITHUB_ENV"; echo "FLAVOR=dev" >> "$GITHUB_ENV"
@@ -158,6 +184,73 @@ jobs:
           unzip -l "$APK" | grep -c "res/mipmap" || true
           unzip -l "$APK"
           sha256sum "$APK"
+
+      # Google Play는 64비트 앱의 네이티브 라이브러리가 16KB 페이지에 맞기를 요구한다(targetSdk 35+, 0295).
+      # 상점판은 못 맞으면 실패, 다른 판은 경고만.
+      - name: Check 16 KB page alignment
+        run: |
+          RE=$(ls "$ANDROID_NDK_HOME"/toolchains/llvm/prebuilt/*/bin/llvm-readelf | head -1)
+          SO=$(ls target/android-artifacts/release/lib/arm64-v8a/*.so 2>/dev/null | head -1)
+          [ -n "$SO" ] || { mkdir -p so && unzip -q -o target/android-artifacts/release/apk/nail.apk 'lib/*' -d so && SO=$(ls so/lib/arm64-v8a/*.so | head -1); }
+          "$RE" -lW "$SO" | grep LOAD
+          bad=$("$RE" -lW "$SO" | awk '$1=="LOAD"{print $NF}' | while read -r a; do [ $((a)) -ge 16384 ] || echo "$a"; done | wc -l)
+          if [ "$bad" != 0 ]; then
+            msg="$(basename "$SO")의 LOAD 세그먼트 정렬이 16KB보다 작다(Play 거절)"
+            if [ "$STORE" = play ]; then echo "::error::$msg"; exit 1; else echo "::warning::$msg"; fi
+          fi
+
+      - name: Build AAB
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          curl -fsSL -o bundletool.jar "https://github.com/google/bundletool/releases/download/$BUNDLETOOL_VERSION/bundletool-all-$BUNDLETOOL_VERSION.jar"
+          echo "$BUNDLETOOL_SHA256  bundletool.jar" | sha256sum -c -
+          mkdir -p aab
+          bash tools/android/make_aab.sh target/android-artifacts/release/apk/nail.apk aab/nail.aab bundletool.jar "$BT/aapt2"
+
+      # 서명: 상점판은 올리기 키(Play App Signing — 앱 서명 키는 Google이 쥐고, 이 키는 잃어도 콘솔에서 바꿀 수 있다),
+      # 그 밖은 디버그 키(변환 길 시험용 — Play는 디버그 키 번들을 받지 않는다).
+      - name: Sign AAB
+        env:
+          UPLOAD_KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+          UPLOAD_KEYSTORE_PASS: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASS }}
+        run: |
+          if [ "$STORE" = play ]; then
+            [ -n "$UPLOAD_KEYSTORE_B64" ] && [ -n "$UPLOAD_KEYSTORE_PASS" ] || { echo "::error::Environment store에 ANDROID_UPLOAD_KEYSTORE_B64·ANDROID_UPLOAD_KEYSTORE_PASS가 없다(docs/release.md 상점 업로드)"; exit 1; }
+            echo "$UPLOAD_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            KS="$RUNNER_TEMP/upload.jks"; PASS="$UPLOAD_KEYSTORE_PASS"
+          else
+            KS=~/.android/debug.keystore; PASS=android
+          fi
+          ALIAS=$(keytool -list -keystore "$KS" -storepass "$PASS" 2>/dev/null | awk -F, '/PrivateKeyEntry/{print $1; exit}')
+          [ -n "$ALIAS" ] || { echo "::error::키 저장소에 개인 키 항목이 없다"; exit 1; }
+          jarsigner -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$KS" -storepass "$PASS" aab/nail.aab "$ALIAS"
+          jarsigner -verify aab/nail.aab | tail -1
+          echo "KS=$KS" >> "$GITHUB_ENV"; echo "ALIAS=$ALIAS" >> "$GITHUB_ENV"
+          [ "$STORE" = play ] && echo "$PASS" > "$RUNNER_TEMP/ks.pass" || echo android > "$RUNNER_TEMP/ks.pass"
+
+      # 번들에서 기기용 APK를 다시 뽑아 APK 검사와 같은 것을 본다(패키지·SDK·아이콘·라이브러리 이름·exported).
+      - name: Verify AAB
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          java -jar bundletool.jar build-apks --bundle=aab/nail.aab --output=aab/universal.apks --mode=universal \
+            --ks="$KS" --ks-key-alias="$ALIAS" --ks-pass="file:$RUNNER_TEMP/ks.pass" --overwrite
+          unzip -q -o aab/universal.apks universal.apk -d aab
+          U=aab/universal.apk
+          "$BT/aapt2" dump badging "$U" | grep -E "^package|sdkVersion|targetSdkVersion|native-code|application-label|application-icon" || true
+          PKG=$("$BT/aapt2" dump badging "$U" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          [ "$STORE" != play ] || [ "$PKG" = io.beardworks.nail ] || { echo "::error::상점판 패키지가 $PKG"; exit 1; }
+          "$BT/aapt2" dump badging "$U" | grep -q "application-icon" || { echo "::error::번들에서 뽑은 APK에 아이콘이 없다"; exit 1; }
+          "$BT/aapt2" dump xmltree "$U" --file AndroidManifest.xml | grep -q "android:exported" || { echo "::error::exported가 없다"; exit 1; }
+          unzip -l "$U" | grep -q "lib/arm64-v8a/lib${PKG##*.}.so" || { echo "::error::lib${PKG##*.}.so가 없다"; exit 1; }
+          unzip -l "$U" | grep -c "^.*assets/" || true
+          ls -la aab; sha256sum aab/nail.aab
+          rm -f "$RUNNER_TEMP/ks.pass" "$RUNNER_TEMP/upload.jks"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nail-aab-${{ env.FLAVOR }}-${{ github.sha }}
+          path: aab/nail.aab
+          if-no-files-found: error
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

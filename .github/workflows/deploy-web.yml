@@ -1,6 +1,6 @@
 name: deploy-web
 # 웹 빌드·배포(0001). 갈래(0193):
-# - main: 운영판. 개발 기능을 뺀 빌드(--no-default-features)를 Cloudflare Workers `web-game` = https://nail.beardworks.io/play/ 에(0294),
+# - main: 운영판. 개발 기능을 뺀 빌드(--no-default-features)를 Cloudflare Workers `web-game-nail` = https://nail.beardworks.io/play/ 에(0294),
 #   옛 운영 주소(Netlify 프로덕션)에는 기록을 들고 새 주소로 보내는 넘김 페이지(web/moved/)를.
 # - release/**: 마일스톤 개발판. 개발 기능을 넣은 빌드를 같은 사이트의 별칭 `dev`(dev--<사이트>.netlify.app)에.
 #   운영과 주소(= 브라우저 저장소)가 달라 기록이 섞이지 않는다. 배포 뒤 그 주소의 build.txt가 이 커밋인지 확인한다.
@@ -111,7 +111,7 @@ jobs:
     env:
       NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-      # 운영(web-production)에만 둔다(0294). Worker `web-game` 하나의 편집 + beardworks.io의 Workers Routes 편집.
+      # 운영(web-production)에만 둔다(0294). Worker `web-game-nail` 하나의 편집 + beardworks.io의 Workers Routes 편집.
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       WRANGLER: 4.156.2

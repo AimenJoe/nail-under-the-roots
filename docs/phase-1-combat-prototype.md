@@ -162,9 +162,47 @@
 
 ## 사람이 할 일 (다음 세션 전)
 
+### v1.0.1 — 상점과 함께 내기(2026-11-23, 사장 "Ms store 준비되면 1.0.1 같이 배포하자")
+PR #30(`release/v1.0 → main`)은 **MS Store 인증이 끝날 때까지 Merge하지 않는다** — Merge가 곧 웹·APK·PC Release v1.0.1이다. 순서:
+- [x] 버전 1.0.1·version_code 98, `docs/releases/v1.0.1.md`, 공식 페이지 소식(한·영 — 날짜는 Merge 날로 고친다), Epic content notes 1.0.1, 토스 1.0.1 출시 노트
+- [x] MS Store 상점 그림(`tools/store/msstore_media.py` → `docs/msstore/media/`)·등록 글(`docs/msstore/store-text.md`)
+- [ ] 사람: MS Store 계정 → 이름 예약 → "제품 ID" 세 값 → (Claude) `pc/msix/identity.env` 커밋 → store-deploy `msstore` → 사람: Partner Center 제출(게시 방법은 **"인증 뒤 수동 게시"**로 — 다른 상점과 같은 날 내려고)
+- [x] (Claude 실행 · 사람 승인 2026-11-23) store-deploy `epic` → Epic 아티팩트에 `1.0.1-9b4480d-windows`·`-macos` 등록, `toss` → 1.0.1 번들(deploymentId `01a208a4-c5b8-72c6-b12c-19e46f069850`, 메모 `v1.0.1 · 9b4480d — 1.0.1 후보`) — 올리기만, 출시는 아직
+- [ ] 사람: 토스 앱으로 1.0.1 번들 실기(QR — 내려 두기·큰 나무 고르기 칸)
+- [ ] 사람: Windows PC(VC++ 없는 것이면 더 좋음)에서 1.0.1 zip(build-desktop 아티팩트)이 켜지는지
+- [ ] MS 인증 통과 → 같은 날: PR #30 Merge·`web-production` 승인 → MS "지금 게시" → Epic 1.0.1 바이너리 활성화 + content notes → 토스 검수 요청
+- [ ] Steam: 앱·데포가 준비되면 같은 판으로(아직 대기)
+
+### 2026-11-23 수정 목록(0301·0302·0303)
+- [x] Microsoft Store: store-deploy `msstore` → 서명하지 않은 MSIX(CI 통과, 35MB), Windows C 런타임 정적 링크(0301)
+- [ ] 사람: storedeveloper.microsoft.com 계정(개인/회사) → 앱 이름 예약 → "제품 ID" 세 값을 알려 주면 `pc/msix/identity.env`에 넣는다 → 첫 제출·등급(Epic Global Rating ID 가져오기)·가격(`docs/msstore/store-text.md`)
+- [x] M으로 메뉴 닫기·맞선 키 최근 입력 우선·수첩 이웃 아이콘·씨앗 주머니 반짝임·짐 ●○ 빼기·재주 목표 빼기·고르기 칸(0302)
+- [ ] 사람: 개발판에서 수첩 이웃 아이콘·짐 꾸리기 그림·재주 고르기 칸(틀·한쪽 가지)이 눈에 맞는지
+- [ ] 사람: 0303 제안 — 다회차 재화(이웃 등불·텃밭)·사이드 스토리·더 깊이 도망가는 누룩의 방향과 마일스톤
+
+- [ ] **iPhone 가로 시작 여백(0296, 2026-11-19)**: 가로로 든 채 웹을 열어 아래·옆에 빈 띠가 없는지, 주소창이 접힐 때·돌릴 때도 꽉 차는지(iPhone 13 Pro Max) — 개발판 https://dev--nail-under-the-roots.netlify.app 에서 확인 뒤 배포 여부
+- [x] **iOS 홈 화면 앱 가로 시작(0297, 2026-11-19 — 사장 실기 확인)**: 홈 화면에 깐 앱을 가로로 든 채 켰을 때 아래 띠 없이 꽉 차는지(0296으로 안 고쳐졌다 — 상자 높이를 lvh로 + 모자라면 화면 높이로). 앱을 닫았다 다시 열어 새 빌드인지 먼저
+
+### 앱인토스(0299, 2026-11-20)
+- [ ] 사람: 콘솔에 미니앱(게임) 등록 — 등급은 나중에 채널톡 문의(Epic IARC가 되는지, 안 되면 Google Play 등급으로)
+- [x] API 키 → Environment `store` `TOSS_API_KEY`(사장 2026-11-20)
+- [ ] 사람: Environment `store`에 Variable `TOSS_APP_NAME`(콘솔의 appName) → Actions → store-deploy → toss → 실행 요약의 테스트 스킴을 토스 앱에서 열어 실기(가로·X 버튼 겹침·뒤로 키·소리, 0300)
+
+### 앱이 내려갔을 때(0298, 2026-11-19)
+- [x] 게임 중 내려가면 일시정지 창 + 적기(모든 플랫폼), 웹은 탭이 숨으면 소리를 멈춘다 — 웹 연기 시험 `bg:` 통과
+- [ ] 사람: 실기 — Android(홈 키·알림·전화 뒤 돌아오기)와 휴대폰 브라우저(탭 바꾸기)에서 소리가 멈추고 돌아오면 일시정지 창인지
+
+### Google Play 준비(0295, 2026-11-19)
+- [ ] 법적 이름 표기(사업자등록증 한글 그대로 / 홈택스 영문 상호로 통일) — D&B·결제 프로필에 똑같이
+- [ ] 사업장 주소 공개 여부(유료 앱이면 Play에 보인다) — 옮길 거면 D-U-N-S 신청 전에
+- [ ] D-U-N-S 조회(my.dnb.com/lookup) → 없으면 D&B 무료 신청(최대 30영업일)
+- [ ] 번호가 나오면 Play Console 조직 계정($25), 개발자 이름 `Beardworks`
+- [ ] 올리기 키(`docs/release.md` "Google Play") → Environment `store`에 `ANDROID_UPLOAD_KEYSTORE_B64`·`ANDROID_UPLOAD_KEYSTORE_PASS`
+- [x] AAB 빌드(APK → aapt2 proto → bundletool, `tools/android/make_aab.sh`) + 16KB 정렬 검사 + store-deploy `play` — 첫 CI 결과 확인은 Claude
+
 ### 운영 웹판을 nail.beardworks.io/play/ 로(0294, 2026-11-18)
-- [x] Worker `web-game` 만들기(사장)
-- [ ] API 토큰(Worker `web-game` Editor + beardworks.io Workers Routes Edit) → GitHub Environment **`web-production`에만** `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`
+- [x] Worker `web-game-nail` 만들기(사장)
+- [ ] API 토큰(Worker `web-game-nail` Editor + beardworks.io Workers Routes Edit) → GitHub Environment **`web-production`에만** `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`
 - [ ] 다음 `release/v1.0 → main` Merge 때 바뀐다: 새 주소 배포 확인 → 옛 Netlify 주소는 기록 넘김 페이지. 그 뒤 beardworks `ops/src/config.js` nail `prod`·상점 등록 정보의 웹 링크
 
 ### iOS ipa를 공식 페이지에(0291, 2026-11-10, main 패치)

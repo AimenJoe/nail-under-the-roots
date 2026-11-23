@@ -5,7 +5,7 @@
 ## 무엇이 어디로 나가나
 | 대상 | 트리거 | 워크플로 | 결과 |
 |---|---|---|---|
-| 웹(게임) | `main` push | `deploy-web.yml` | fmt·clippy(두 갈래)·test·운영판 wasm 빌드(`--no-default-features`) → Cloudflare Worker `web-game`(https://nail.beardworks.io/play/, 0294) — 확인 뒤 옛 Netlify 프로덕션은 기록 넘김 페이지로. PR은 빌드·dry-run만 |
+| 웹(게임) | `main` push | `deploy-web.yml` | fmt·clippy(두 갈래)·test·운영판 wasm 빌드(`--no-default-features`) → Cloudflare Worker `web-game-nail`(https://nail.beardworks.io/play/, 0294) — 확인 뒤 옛 Netlify 프로덕션은 기록 넘김 페이지로. PR은 빌드·dry-run만 |
 | 웹(개발판, 0193) | `release/**` push | `deploy-web.yml` | 개발 기능을 넣은 빌드 → 별칭 `dev`(https://dev--nail-under-the-roots.netlify.app, noindex). 올린 뒤 `build.txt`가 그 커밋인지 확인 |
 | APK(개발판, 0193) | `release/**` push(`src/`·`assets/`·…) | `build-android.yml` | 패키지 `io.github.aimenjoe.dev.nail`("Naïl dev" — 마지막 조각은 `nail`이어야 한다: 네이티브 라이브러리 이름, 0286) → 미리 보기 Release `dev`의 `nail-dev.apk`를 갈아 끼움(태그 `dev`도 그 커밋으로) |
 | Release + APK + PC | `main` push에 `Cargo.toml` 버전이 새 값 **그리고** `docs/releases/v<버전>.md`가 있음 | `release.yml` → `build-android.yml` → `build-desktop.yml` | 태그 `v<버전>`, GitHub Release(본문 = 그 md), `nail.apk` + PC 셋 첨부 |
@@ -51,7 +51,7 @@
 | 이어하기·기록이 사라졌다 | `prefs` `MAGIC`을 올렸거나 `profile` 키를 바꿨다 | 키는 바꾸지 않는다. `MAGIC`은 칸 형식이 깨질 때만 |
 
 ## 되돌리기
-- 웹: 문제 커밋을 `git revert`한 PR을 main에 Merge하면 다시 배포된다(Cloudflare 대시보드 → Worker `web-game` → Deployments에서 이전 버전으로 되돌리기도 된다, 0294).
+- 웹: 문제 커밋을 `git revert`한 PR을 main에 Merge하면 다시 배포된다(Cloudflare 대시보드 → Worker `web-game-nail` → Deployments에서 이전 버전으로 되돌리기도 된다, 0294).
 - APK: Release는 두고 패치 버전을 하나 더 낸다. 이미 받은 사람의 덮어 설치가 되려면 version_code가 커야 한다.
 - 되돌린 것은 결정 기록에 "덧붙임: 철회(새 번호)"로 남긴다.
 
@@ -87,7 +87,7 @@
 
 남은 틈(알고 둔다): `ASSETS_TOKEN`(비공개 에셋 레포 읽기 전용)·`ANDROID_DEBUG_KEYSTORE_B64`는 아직 레포 시크릿이다 — Write 권한자가 없으면 읽을 사람이 없다(1·4). 협업자를 들이게 되면 이 둘도 Environment로 옮긴다(빌드 워크플로마다 `environment:` 한 줄).
 
-## 상점 업로드(Steam·Epic, 0276 S4·E4 — 실기 확인 전)
+## 상점 업로드(Steam·Epic 0276 S4·E4, Google Play 0295, Microsoft Store 0301 — 실기 확인 전)
 `store-deploy.yml`을 손으로 돌린다(Actions → store-deploy → Run workflow → store = steam | epic). 순서: `build-desktop.yml`이 상점 판(운영판 + `--features steam|epic`)을 묶고 → Environment **`store`**에 들어간 업로드 잡만 상점 자격을 읽어 올린다. Steam은 **베타 갈래에만**(`SetLive`, 기본 갈래로는 사람이 파트너 사이트에서 옮긴다 — SteamPipe가 자동으로 못 건다), Epic은 아티팩트에 바이너리만(라벨·출시는 사람이 포털에서).
 
 Environment `store` 만들기(사람): Settings → Environments → New `store` → Deployment branches = `main`(+ 출시 전 베타 시험을 하려면 `release/**`), **Required reviewers = 사장**. 넣을 값:
@@ -102,5 +102,26 @@ Environment `store` 만들기(사람): Settings → Environments → New `store`
 | Variable | `EPIC_ORG_ID`·`EPIC_PRODUCT_ID`·`EPIC_ARTIFACT_ID` | 조직·제품·아티팩트 아이디. 아티팩트는 오퍼(기본 게임)마다 하나가 자동으로 생기고, Windows·macOS 바이너리를 같은 아티팩트에 올린 뒤 포털에서 바이너리마다 플랫폼을 고른다(Manage Platforms). `BuildVersion`은 아티팩트 안에서 플랫폼까지 겹치면 안 돼서 workflow가 끝에 `-windows`·`-macos`를 붙인다(Epic Manage Artifacts·BPT 원문, 2026-11-06 — 처음엔 Steam 데포처럼 OS마다 따로라고 짐작해 둘로 나눴다) |
 
 Epic 포털에서 받는 큰 파일 둘(EOS **C SDK** zip·BuildPatchTool zip)은 비공개 에셋 레포(`ASSETS_REPO`)의 **Release `eos`에 첨부**한다 — 공개 레포에 두지 않고, 파일이 웹 업로드 25MB·git 100MB 한도를 넘어 레포 대신 Release(첨부 하나에 2GB까지)에 둔다(2026-11-06). zip 이름은 아무거나, 새 판을 받으면 같은 Release의 첨부를 바꾼다(태그 `eos`는 그대로). `tools/epic/fetch_eos.sh`가 `ASSETS_TOKEN`으로 받아 풀고 찾는다: Windows Epic 빌드는 SDK 뿌리(`Include`·`Lib/EOSSDK-Win64-Shipping.lib`·`Bin/EOSSDK-Win64-Shipping.dll`)를 `EOS_SDK_DIR`로 링크하고 `.dll`을 실행 파일 옆에 둔다(`tools/pc/package.sh`), `store-deploy`의 epic 잡은 경로에 `Linux`가 든 `BuildPatchTool`을 쓴다. 푼 파일은 작업 폴더 `.eos/`에만 — 묶음에 실리지 않는다. Steam 재배포 파일은 크레이트가 빌드 때 내놓은 것을 실행 파일 옆에 둔다.
+
+### Google Play(0295)
+store = **play**는 올리지 않고 **서명한 AAB만 만든다**(아티팩트 `nail-aab-play-<sha>`, 운영판 + 패키지 `io.beardworks.nail`) — Play Console → 앱 → 테스트 또는 프로덕션 → 새 버전에 사람이 올린다. 새로 넣을 값(Environment `store`):
+
+| 종류 | 이름 | 무엇 |
+|---|---|---|
+| Secret | `ANDROID_UPLOAD_KEYSTORE_B64` | 올리기 키 저장소(`upload.jks`)를 base64로(`base64 -w0 upload.jks`, macOS는 `base64 -i upload.jks`) |
+| Secret | `ANDROID_UPLOAD_KEYSTORE_PASS` | 그 저장소·키 비밀번호(둘을 같게 만든다) |
+
+올리기 키 만들기(사장 컴퓨터에서, JDK의 `keytool`): `keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Beardworks"` — 비밀번호를 물으면 같은 것을 두 번. 파일은 레포에 넣지 않고 레포 밖에 백업한다. Play App Signing을 켜 두면(새 앱 기본) 앱 서명 키는 Google이 쥐고, 이 올리기 키는 잃어도 콘솔에서 바꿀 수 있다. `version_code`는 Play판도 같은 `Cargo.toml` 값 — 올릴 때마다 커야 한다.
+
+### 앱인토스(0300)
+store = **toss**는 운영판 웹 빌드를 `.ait`로 묶어(`tools/toss/build.sh`) 콘솔에 올리고, 테스트 스킴을 실행 요약에 적는다 — 토스 앱으로 열어 시험, 검수 요청·출시는 콘솔에서(0299). 넣을 값(Environment `store`):
+
+| 종류 | 이름 | 무엇 |
+|---|---|---|
+| Secret | `TOSS_API_KEY` | 콘솔 → 워크스페이스 → 키에서 발급한 배포 API 키(이 앱만 권한) |
+| Variable | `TOSS_APP_NAME` | 콘솔에 등록한 미니앱의 appName(묶음 이름·딥링크 `intoss://<appName>`) |
+
+### Microsoft Store(0301)
+store = **msstore**는 올리지 않고 **서명하지 않은 MSIX만 만든다**(아티팩트 `nail-windows-msstore-<sha>`, 운영판 그대로) — 상점이 서명한다. Environment가 필요 없다(상점 자격 없음). 패키지 아이디는 `pc/msix/identity.env`(Partner Center 제품 ID, 비밀 아님)에 커밋한다 — 비어 있으면 시험용 아이디로 묶이고 상점이 받지 않는다. 판은 `Cargo.toml` X.Y.Z + `.0`, 같은 판은 다시 못 올린다. 첫 제출·등급(Epic의 Global Rating ID 가져오기)은 `docs/msstore/store-text.md`.
 
 Steam 파트너 사이트에서 사람이: 데포 셋(OS마다), 실행 옵션(Windows `Nail.exe`, macOS `Nail.app`, Linux `nail`), 업로드 뒤 빌드 목록에서 기본 갈래로 옮기기. Epic 포털에서: 올린 바이너리마다 플랫폼(Windows·macOS)과 업데이트 종류, 실행 파일·인자, 활성화·라벨, EOS·Epic 상점 업적 일괄 올리기(`python3 tools/epic/make_eos_zip.py` → EOS 탭 zip, `--egs` → Epic Games Store 탭 zip — 정의 표에 XP 칸 `user_epic_achievements_xp`, 값은 `docs/epic/epic-store-xp.csv`). 한국에 내면 업데이트마다 content notes.
