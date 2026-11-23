@@ -888,6 +888,8 @@ pub struct Input {
     pad_cur: PadFrame,
     /// 아직 틱이 소비하지 않은 눌림.
     pending: Actions,
+    /// 키보드 맞선 방향의 최근 입력(가로·세로, 0302).
+    socd: [i8; 2],
     /// 가장 최근 프레임의 축 상태.
     held: Actions,
     pub gamepad_count: usize,
@@ -1073,6 +1075,7 @@ impl Input {
             #[cfg(target_os = "ios")]
             pad_cur: PadFrame::default(),
             pending: Actions::default(),
+            socd: [0; 2],
             held: Actions::default(),
             gamepad_count: 0,
             touch: TouchState::default(),
@@ -1109,7 +1112,7 @@ impl Input {
             self.names_in = 2.0;
             refresh_key_names();
         }
-        let kb = read_keyboard();
+        let kb = read_keyboard(&mut self.socd);
         let (pad, count) = self.read_gamepads();
         self.gamepad_count = count;
         // 안내 글: 패드를 만지면 패드 이름, 키를 누르면 키 이름, 화면을 만지면 터치 글.
@@ -1492,26 +1495,41 @@ fn nav_dir(held: (i8, i8), mv: Vec2) -> (i8, i8) {
     (0, 0)
 }
 
-fn read_keyboard() -> Actions {
+/// 한 축의 키 둘(음·양)을 값 하나로(0302): 하나만 쥐면 그쪽, 둘 다 쥐면 나중에 누른 쪽, 나중 것을 떼면 아직 쥔 앞의 것.
+/// `last`는 축마다 기억(-1·0·1). 같은 틱에 둘을 함께 누르면 앞의 기억을 따른다(없으면 멈춤).
+fn socd_axis(neg: bool, pos: bool, neg_hit: bool, pos_hit: bool, last: &mut i8) -> f32 {
+    if neg_hit != pos_hit {
+        *last = if neg_hit { -1 } else { 1 };
+    }
+    match (neg, pos) {
+        (true, false) => {
+            *last = -1;
+            -1.0
+        }
+        (false, true) => {
+            *last = 1;
+            1.0
+        }
+        (true, true) => *last as f32,
+        (false, false) => {
+            *last = 0;
+            0.0
+        }
+    }
+}
+
+fn read_keyboard(socd: &mut [i8; 2]) -> Actions {
     let b = bindings();
     // 이동(0283): 화살표는 늘, 그리고 붙인 이동 키 넷(기본 W·A·S·D). 방향 순서는 위·왼쪽·아래·오른쪽.
     const ARROWS: [KeyCode; MOVE_DIRS] =
         [KeyCode::Up, KeyCode::Left, KeyCode::Down, KeyCode::Right];
     let held = |d: usize| is_key_down(ARROWS[d]) || is_key_down(b.move_key(d));
     let hit = |d: usize| is_key_pressed(ARROWS[d]) || is_key_pressed(b.move_key(d));
-    let mut m = Vec2::ZERO;
-    if held(1) {
-        m.x -= 1.0;
-    }
-    if held(3) {
-        m.x += 1.0;
-    }
-    if held(0) {
-        m.y -= 1.0;
-    }
-    if held(2) {
-        m.y += 1.0;
-    }
+    // 맞선 두 방향(왼쪽+오른쪽)을 같이 쥐면 나중에 누른 쪽(SOCD 최근 입력 우선, 0302) — 손가락을 굴려 방향을 바꿀 때 멈칫하지 않게.
+    let m = vec2(
+        socd_axis(held(1), held(3), hit(1), hit(3), &mut socd[0]),
+        socd_axis(held(0), held(2), hit(0), hit(2), &mut socd[1]),
+    );
     let k = |a: Act| is_key_pressed(b.key(a));
     // 고정 메뉴 키 Space(확인)·Backspace(뒤로)는 다른 칸에 붙어 있으면 그 칸의 뜻만(공격·회피에 붙은 것은 같은 뜻이라 그대로).
     let space_confirms = !b.uses_except(KeyCode::Space, Act::Attack);
@@ -1739,6 +1757,19 @@ fn apply_deadzone(v: Vec2) -> Vec2 {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn opposing_keys_take_the_latest() {
+        let mut last = 0;
+        // 왼쪽만 → 오른쪽을 더 누름 → 오른쪽 → 오른쪽을 뗌 → 다시 왼쪽.
+        assert_eq!(socd_axis(true, false, true, false, &mut last), -1.0);
+        assert_eq!(socd_axis(true, true, false, true, &mut last), 1.0);
+        assert_eq!(socd_axis(true, true, false, false, &mut last), 1.0);
+        assert_eq!(socd_axis(true, false, false, false, &mut last), -1.0);
+        assert_eq!(socd_axis(false, false, false, false, &mut last), 0.0);
+        // 같은 틱에 둘 다 누르면 기억이 없으니 멈춘다.
+        assert_eq!(socd_axis(true, true, true, true, &mut last), 0.0);
+    }
     use super::*;
 
     /// `Pad` 선언 순서 = `PADS` 순서(`PadFrame`이 `p as usize`로 칸을 찾는다, 0288).

@@ -69,6 +69,8 @@ fn pic_zoom(p: VillagePic) -> f32 {
         VillagePic::Pack(_) => 2.0,
         VillagePic::Spot(crate::village_notes::Spot::Tree) => 0.5,
         VillagePic::Spot(_) => 1.5,
+        // 목록 줄에서는 이 반(0.5배): 32칸 몸이 줄 높이(17px) 안에 다 든다. 화면 배율이 곱해지니 점은 그대로 또렷하다.
+        VillagePic::Neighbor(_) => 1.0,
     }
 }
 
@@ -475,12 +477,13 @@ impl App {
                 .iter()
                 .map(|&i| {
                     let n = &NOTES[i];
-                    (
-                        VillagePic::Spot(n.spot),
-                        tr(n.title).to_string(),
-                        String::new(),
-                        false,
-                    )
+                    // 이웃 줄은 마을에 선 모습을 아이콘으로(사장 2026-11-23: 인물만 아이콘이 비어 어색했다).
+                    let pic = if n.spot.neighbor() {
+                        VillagePic::Neighbor(n.spot)
+                    } else {
+                        VillagePic::Spot(n.spot)
+                    };
+                    (pic, tr(n.title).to_string(), String::new(), false)
                 })
                 .collect();
         let list = Rect::new(body.x, body.y, LIST_W, body.h - 4.0);
@@ -525,9 +528,8 @@ impl App {
             .iter()
             .map(|p| {
                 let n = self.profile.count(key_pack(p.kind));
-                // 칸마다 ●○ 점: 싼 수 / 최대.
-                let pips: String = (0..p.max).map(|k| if k < n { '●' } else { '○' }).collect();
-                let right = format!("{pips} {}", fill(s.shop_price, &[&p.price]));
+                // 오른쪽은 값만 — 싼 수는 자세히 칸의 n/최대와 목록 아래 줄에(●○ 점은 뺐다, 사장 2026-11-23).
+                let right = fill(s.shop_price, &[&p.price]);
                 (
                     VillagePic::Pack(p.kind),
                     Self::pack_name(p),

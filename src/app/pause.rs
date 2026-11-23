@@ -194,7 +194,8 @@ impl App {
             self.update_pause_ask(a, tap_hit);
             return;
         }
-        if a.cancel || a.menu {
+        // 연 키로 닫는다: 지도 키(기본 M·패드 Select)는 메뉴를 지도 탭에 여니, 다시 누르면 닫힌다(사장 2026-11-23).
+        if a.cancel || a.menu || a.map {
             self.scene = Scene::Game;
             return;
         }
@@ -626,10 +627,6 @@ impl App {
             *y += 2.0;
         };
         block(&mut y, &fill(s.stat_talents, &[&talents]), ui::ACCENT);
-        // 큰 나무의 목표(0247) 한 줄. 나무 그림은 재주 탭에.
-        if let Some(goal) = self.tree_goal_text(self.world.character) {
-            block(&mut y, &goal, super::tree::GOLD);
-        }
         // 화폐 설명.
         block(&mut y, s.wallet_note, ui::TEXT_DIM);
         // 다 그린 높이로 내릴 수 있는 끝을 잰다(언어를 바꾸거나 재주를 끼면 달라진다).

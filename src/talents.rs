@@ -996,15 +996,7 @@ pub fn plus_rank(ch: Character, branch: usize, depth: usize) -> usize {
 
 // ---- 큰 나무 셈(0248 R28): 기록만 보고 계산하는 순수한 쪽. 앱은 그리기·입력만 ----------------
 
-/// 목표 칸의 기록 키(0247, 캐릭터마다).
-pub fn goal_key(ch: Character) -> String {
-    format!("tree_goal.{ch:?}")
-}
-
-/// 목표 칸 ↔ 기록의 수: 줄 × 16 + 칸 + 1, 0 = 없음.
-pub fn goal_code(goal: Option<(usize, usize)>) -> u32 {
-    goal.map_or(0, |(r, c)| (r * 16 + c + 1) as u32)
-}
+// 옛 목표 칸 기록 키 `tree_goal.<캐릭터>`(0247)는 2026-11-23에 목표 정하기를 빼며 더 쓰지 않는다 — 다른 뜻으로 다시 쓰지 않는다.
 
 /// 한 칸의 내용(그리기·설명용). 이름은 `name` + 같은 덤의 몇째(`rank`, 0 = 처음 — II·III…).
 pub struct NodeInfo {
@@ -1107,16 +1099,6 @@ impl TreeView<'_> {
         self.node(row, d, side).awake
     }
 
-    /// 목표 칸. 표가 바뀌어 없는 칸이면 없음.
-    pub fn goal(&self) -> Option<(usize, usize)> {
-        let v = self.p.count(&goal_key(self.ch));
-        if v == 0 {
-            return None;
-        }
-        let (r, c) = (((v - 1) / 16) as usize, ((v - 1) % 16) as usize);
-        (r < BRANCH_COUNT && c < Self::width(r)).then_some((r, c))
-    }
-
     /// 그 칸까지 아직 안 깬 칸 수와 드는 반딧불. 지나가는 고르기 깊이는 싼 쪽, 그 칸이면 그 쪽.
     pub fn path(&self, row: usize, cell: usize) -> (usize, u32) {
         let cells = Self::cells(row);
@@ -1142,8 +1124,8 @@ impl TreeView<'_> {
         (n, cost)
     }
 
-    /// 칸이 목표(또는 고른 칸)까지 깨울 길 위에 있나: 같은 갈래, 그 깊이 이하, 아직 안 깸.
-    /// 고르기 짝 중 하나가 깬 깊이는 지나간 깊이. 목표 칸 자신은 (안 깼으면) 늘 길.
+    /// 칸이 고른 칸까지 깨울 길 위에 있나: 같은 갈래, 그 깊이 이하, 아직 안 깸.
+    /// 고르기 짝 중 하나가 깬 깊이는 지나간 깊이. 고른 칸 자신은 (안 깼으면) 늘 길.
     pub fn on_path(&self, row: usize, cell: usize, target: (usize, usize)) -> bool {
         let (tr_, tc) = target;
         if row != tr_ {
@@ -1200,9 +1182,9 @@ impl TreeView<'_> {
 mod tests {
     use super::*;
 
-    /// 큰 나무 셈(0248 R28): 길·합계·길 위·목표 번호·깨우기 한도.
+    /// 큰 나무 셈(0248 R28): 길·합계·길 위·깨우기 한도.
     #[test]
-    fn tree_view_paths_goals_and_affordability() {
+    fn tree_view_paths_and_affordability() {
         use crate::profile::Profile;
         let ch = Character::Mole;
         let mut p = Profile::default();
@@ -1227,7 +1209,7 @@ mod tests {
         assert_eq!(v.path(1, sig_cell), (1, plus_cost(6)));
         assert!(v.open(1, 6) && !v.awake(1, 6));
         assert!(v.affordable(plus_cost(6)) && !v.affordable(0));
-        // 깬 칸은 길 위가 아니고, 목표 칸은 길 위.
+        // 깬 칸은 길 위가 아니고, 고른 칸은 길 위.
         assert!(!v.on_path(1, 0, (1, sig_cell)));
         assert!(v.on_path(1, sig_cell, (1, sig_cell)));
         assert!(!v.on_path(0, 0, (1, sig_cell)), "다른 갈래");
@@ -1237,15 +1219,6 @@ mod tests {
         let v = TreeView { p: &p, ch };
         assert_eq!(v.path(1, sig_cell), (0, 0));
         assert!(v.talents().sig);
-        // 목표 번호 왕복, 없는 칸은 없음.
-        for g in [None, Some((0, 0)), Some((2, 8)), Some((1, sig_cell))] {
-            p.set_count(&goal_key(ch), goal_code(g));
-            assert_eq!(TreeView { p: &p, ch }.goal(), g);
-        }
-        p.set_count(&goal_key(ch), goal_code(Some((2, 15))));
-        assert_eq!(TreeView { p: &p, ch }.goal(), None);
-        p.set_count(&goal_key(ch), goal_code(Some((7, 0))));
-        assert_eq!(TreeView { p: &p, ch }.goal(), None);
     }
 
     fn with(slot: Slot, side: u8) -> Talents {

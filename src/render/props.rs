@@ -2017,6 +2017,22 @@ pub(super) fn draw_pickup_mark(feet: Vec2, top: Vec2, time: f32, seed: f32, glin
     }
 }
 
+/// 씨앗 한 알(몸만): 통통한 갈색 알 + 초록 새싹 한 잎. 바닥 표시 없이 — 마을 창 짐 그림도 이것(사장 2026-11-23).
+pub(super) fn draw_seed(p: Vec2) {
+    draw_rectangle(p.x - 2.0, p.y - 1.0, 4.0, 4.0, OUTLINE);
+    draw_rectangle(p.x - 1.0, p.y - 2.0, 2.0, 6.0, OUTLINE);
+    draw_rectangle(p.x - 1.0, p.y - 1.0, 2.0, 4.0, world::SEED);
+    draw_rectangle(p.x, p.y + 1.0, 1.0, 2.0, Color::new(0.62, 0.44, 0.24, 1.0));
+    draw_rectangle(
+        p.x - 1.0,
+        p.y - 1.0,
+        1.0,
+        1.0,
+        Color::new(1.0, 0.92, 0.72, 1.0),
+    );
+    draw_rectangle(p.x, p.y - 3.0, 2.0, 1.0, Color::new(0.45, 0.78, 0.35, 1.0));
+}
+
 pub(super) fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool) {
     let q = lerp(l.prev_pos, l.pos, alpha);
     let ph = time * 6.0 + l.phase * 10.0;
@@ -2131,18 +2147,7 @@ pub(super) fn draw_loot(l: &loot::Loot, alpha: f32, time: f32, light_only: bool)
             if light_only {
                 return;
             }
-            draw_rectangle(p.x - 2.0, p.y - 1.0, 4.0, 4.0, OUTLINE);
-            draw_rectangle(p.x - 1.0, p.y - 2.0, 2.0, 6.0, OUTLINE);
-            draw_rectangle(p.x - 1.0, p.y - 1.0, 2.0, 4.0, world::SEED);
-            draw_rectangle(p.x, p.y + 1.0, 1.0, 2.0, Color::new(0.62, 0.44, 0.24, 1.0));
-            draw_rectangle(
-                p.x - 1.0,
-                p.y - 1.0,
-                1.0,
-                1.0,
-                Color::new(1.0, 0.92, 0.72, 1.0),
-            );
-            draw_rectangle(p.x, p.y - 3.0, 2.0, 1.0, Color::new(0.45, 0.78, 0.35, 1.0));
+            draw_seed(p);
         }
         loot::LootKind::Berry => {
             draw_pickup_mark(
