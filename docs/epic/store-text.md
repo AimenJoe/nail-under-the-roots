@@ -118,6 +118,15 @@ About 칸 그림은 폭 700px 이상이면 되므로 캐러셀 그림을 다시 
 ## 업데이트마다 content notes (한국 판매, 0276 E5)
 한국에 팔면 **모든 업데이트에 content notes**(무엇이 바뀌었나)를 낸다 — 등급에 걸리는 변화면 Epic이 게임위로 보낸다(Epic "Game Rating Korea" 원문, 2026-11-04 KB `reference/game-business/selling-an-indie-game-rules-and-numbers.md`). 포털에서 어느 칸에 넣는지는 아직 화면으로 확인 못 함 — 업데이트를 검토에 낼 때 묻는 칸에. 영어로 쓰고, 등급 설문 답(폭력·결제·이용자 간 소통·확률형 아이템)이 바뀌었는지를 꼭 적는다.
 
+### 2026-11-23 — 1.0.1 (빌드 `1.0.1-<커밋>` — 올릴 때 채운다, 앞 빌드 1.0.0-be1ac3f)
+    Bug fixes and quality-of-life changes only. No new content.
+    No changes to violence, language, in-game purchases, user interaction, or randomized items; the IARC questionnaire answers are unchanged.
+    - Windows: the C runtime is now built into the executable, so the game starts on PCs without the Visual C++ Redistributable.
+    - Menus: the map key also closes the menu it opened; holding two opposite movement keys follows the one pressed last.
+    - Great Tree (talent screen): removed the goal pin; pick-one-of-two cells are framed together and show the other option's name.
+    - Village window: neighbor icons in the notebook; removed a flickering highlight in the packing tab.
+    - Text updated in all 11 languages for the talent screen changes.
+
 ### 2026-11-20 — 1.0.0 (빌드 `1.0.0-be1ac3f`, 앞 빌드 0.9.1-63f5da6)
     Bug fixes and quality-of-life changes only. No new content.
     No changes to violence, language, in-game purchases, user interaction, or randomized items; the IARC questionnaire answers are unchanged.

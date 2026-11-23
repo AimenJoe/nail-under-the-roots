@@ -162,6 +162,12 @@
 
 ## 사람이 할 일 (다음 세션 전)
 
+### v1.0.1 패치(2026-11-23, 사장 "바로 PR")
+- [x] 버전 1.0.1·version_code 98, `docs/releases/v1.0.1.md`, 공식 페이지 소식(한·영), Epic content notes 1.0.1
+- [ ] 사람: `release/v1.0 → main` PR Merge → `web-production` 승인 → Release `v1.0.1`(APK·PC 셋·ipa) 확인
+- [ ] Merge 뒤(Claude): Epic 바이너리 다시 올리기(정적 링크 판, 1.0.0-be1ac3f를 바꿈)·토스 번들 v1.0.1(`store-deploy` epic·toss — 사장 승인 필요)
+- [ ] 사람: Windows PC(VC++ 없는 것이면 더 좋음)에서 zip 판이 켜지는지
+
 ### 2026-11-23 수정 목록(0301·0302·0303)
 - [x] Microsoft Store: store-deploy `msstore` → 서명하지 않은 MSIX(CI 통과, 35MB), Windows C 런타임 정적 링크(0301)
 - [ ] 사람: storedeveloper.microsoft.com 계정(개인/회사) → 앱 이름 예약 → "제품 ID" 세 값을 알려 주면 `pc/msix/identity.env`에 넣는다 → 첫 제출·등급(Epic Global Rating ID 가져오기)·가격(`docs/msstore/store-text.md`)
