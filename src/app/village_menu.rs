@@ -431,15 +431,29 @@ impl App {
         ui.rect_lines(art, ui::BORDER);
         let tx = art.right() + 6.0;
         let mut y = r.y + 2.0;
-        for l in ui::wrap(ui, name, r.right() - tx, FONT_PX).iter().take(2) {
+        let names = ui::wrap(ui, name, r.right() - tx, FONT_PX);
+        let names = &names[..names.len().min(2)];
+        for l in names {
             ui.text(l, tx, y, FONT_PX, ui::ACCENT);
             y += 12.0;
         }
-        for l in ui::wrap(ui, info, r.right() - tx, FONT_PX).iter().take(2) {
-            ui.text(l, tx, y + 2.0, FONT_PX, ui::TEXT);
+        // 그림 오른쪽은 세 줄 자리(44px). 이름과 함께 넘치면 설명은 그림 아래에 칸 폭 그대로 — 등불 다음 이야기·텃밭 자라는 중처럼
+        // 긴 글이 잘려 값이 안 보이던 것(0306 뒤 검토). 아래로 간 줄 수만큼 돌려주는 y가 내려간다.
+        let side = ui::wrap(ui, info, r.right() - tx, FONT_PX);
+        if names.len() + side.len() <= 3 {
+            for l in &side {
+                ui.text(l, tx, y + 2.0, FONT_PX, ui::TEXT);
+                y += 12.0;
+            }
+            return art.bottom() + 4.0;
+        }
+        let mut y = art.bottom() + 4.0;
+        let fits = ((r.bottom() - y) / 12.0).floor().max(1.0) as usize;
+        for l in ui::wrap(ui, info, r.w, FONT_PX).iter().take(fits) {
+            ui.text(l, r.x, y, FONT_PX, ui::TEXT);
             y += 12.0;
         }
-        art.bottom() + 4.0
+        y
     }
 
     /// 꾸미기 탭에서 포포가 하는 말: 고른 꾸미기의 설명(발자국 꾸미기는 얻는 곳까지).
@@ -750,18 +764,17 @@ impl App {
                 &garden::FLOWER_SPOTS.len(),
             ],
         );
+        // 남은 자리만큼(설명이 그림 아래로 내려오면 한 줄로 줄어든다).
+        let room = ((detail.bottom() - FONT_PX - 2.0 - y) / 12.0)
+            .floor()
+            .max(0.0) as usize
+            + 1;
         for (k, l) in ui::wrap(ui, &stock, detail.w, FONT_PX)
             .iter()
-            .take(2)
+            .take(room.min(2))
             .enumerate()
         {
-            ui.text(
-                l,
-                detail.x,
-                (y + 4.0 + k as f32 * 12.0).min(detail.bottom() - FONT_PX - 4.0),
-                FONT_PX,
-                ui::TEXT_DIM,
-            );
+            ui.text(l, detail.x, y + k as f32 * 12.0, FONT_PX, ui::TEXT_DIM);
         }
     }
 
@@ -814,14 +827,16 @@ impl App {
             tr(ALL[i].name),
             &info,
         );
-        // 가진 반딧불(큰 나무 창과 같은 글).
-        ui.text(
-            &fill(s.tree_light, &[&have]),
-            detail.x,
-            (y + 4.0).min(detail.bottom() - FONT_PX - 4.0),
-            FONT_PX,
-            ui::TEXT_DIM,
-        );
+        // 가진 반딧불(큰 나무 창과 같은 글) — 설명이 길어 자리가 없으면 뺀다(마을 화면 오른쪽 위에도 보인다).
+        if y + 12.0 <= detail.bottom() {
+            ui.text(
+                &fill(s.tree_light, &[&have]),
+                detail.x,
+                y,
+                FONT_PX,
+                ui::TEXT_DIM,
+            );
+        }
     }
 
     fn pack_name(p: &crate::village::Pack) -> String {
