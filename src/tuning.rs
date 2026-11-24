@@ -730,6 +730,8 @@ pub const BOUNTY_SEEDS: u32 = 2;
 pub const BOUNTY_GLOWBUGS: u32 = 3;
 /// 굴이 넓어져(방이 약 1.6배) 싸움이 늘었으니, 쓰러진 적이 떨어뜨리는 반딧불 한 마리·씨앗이 실제로 나올 확률(0244, 경제 0148을 지킨다).
 pub const KILL_LOOT_KEEP: f32 = 0.65;
+/// 들판 빈 풀밭 칸에 작은 들꽃(CC0 SpiderDave, 0306)을 굽는 확률. 팩 꽃 무리가 없는 칸만.
+pub const WILD_PLANT_CHANCE: f32 = 0.07;
 /// 상자에서 물건 대신 나오는 반딧불 한 줌(0250 → 0251). 한 런 ≈ +15마리(상자 ≈ 2.9개, 런 반딧불 ≈ 285의 5% — 0305 `economy_probe`).
 pub const CHEST_GLOWBUGS: u32 = 6;
 

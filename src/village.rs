@@ -260,7 +260,7 @@ pub struct State {
     pub lamps: [bool; crate::lanterns::ALL.len()],
     /// 텃밭 칸(0304 G1)과 마을에 옮겨 심은 꽃 수.
     pub plots: [crate::garden::Plot; crate::garden::PLOTS],
-    pub flowers: u32,
+    pub blooms: [Option<crate::garden::Bloom>; crate::garden::FLOWER_SPOTS.len()],
     pub decor: [bool; DECOR_ALL],
     /// 큰 나무의 잎(0 = 거의 없음 … 4 = 꽃).
     pub growth: u8,

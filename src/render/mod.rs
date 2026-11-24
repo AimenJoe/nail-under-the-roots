@@ -320,7 +320,8 @@ impl Renderer {
                     .collect();
                 let key = crate::terrain::key(g, w.biome, &paths)
                     ^ u64::from(sunny_img.is_some())
-                    ^ crate::terrain::water_key(&water);
+                    ^ crate::terrain::water_key(&water)
+                    ^ (u64::from(art.plants_img.is_some()) << 1);
                 if let Some(i) = self.terrain.iter().position(|(k, _)| *k == key) {
                     let hit = self.terrain.remove(i);
                     self.terrain.insert(0, hit);
@@ -330,7 +331,8 @@ impl Renderer {
                         self.baking = Some((
                             key,
                             crate::terrain::Baker::new(g, w.biome, &paths, &campfires(w))
-                                .with_water(&water),
+                                .with_water(&water)
+                                .with_wild(art.plants_img.as_ref()),
                         ));
                     }
                     let (_, baker) = self.baking.as_mut().unwrap();
@@ -988,7 +990,14 @@ impl Renderer {
             VillagePic::Plot(p) => {
                 let at = foot - vec2(0.0, 4.0);
                 props::draw_plot_soil(at);
-                props::draw_crop(self.art.as_ref().and_then(|a| a.sunny.as_ref()), p, at, t);
+                let art = self.art.as_ref();
+                props::draw_crop(
+                    art.and_then(|a| a.sunny.as_ref()),
+                    art.and_then(|a| a.plants.as_ref()),
+                    p,
+                    at,
+                    t,
+                );
             }
         }
         let gl = unsafe { get_internal_gl() };

@@ -1218,14 +1218,14 @@ fn pic_garden(c: PicCtx) {
         let crop = if (step / 3).is_multiple_of(2) {
             Crop::Berry
         } else {
-            Crop::Flower
+            Crop::Flower(crate::garden::Bloom::Pink)
         };
         let plot = match stage {
             0 => Plot::Growing { crop, age: 0 },
             1 => Plot::Growing { crop, age: 1 },
             _ => Plot::Ripe(crop),
         };
-        props::draw_crop(sunny, plot, at, time);
+        props::draw_crop(sunny, art.and_then(|a| a.plants.as_ref()), plot, at, time);
     }
     nail(art, ((time * 2.0) as u32) % 2, 0, vec2(18.0, y), false);
 }

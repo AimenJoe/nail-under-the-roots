@@ -2036,7 +2036,7 @@ impl App {
             traces: std::array::from_fn(|i| crate::quests::done(&self.profile, i)),
             lamps: std::array::from_fn(|i| crate::lanterns::level(&self.profile, i) >= 3),
             plots: crate::garden::plots(&self.profile),
-            flowers: crate::garden::flowers(&self.profile),
+            blooms: crate::garden::spots(&self.profile),
             // 거꾸로 Naïl은 다른 캐릭터로 걸을 때 큰 나무 곁에 남는다(0249).
             nail: self.picked() != Character::Mole,
             decor,
