@@ -1275,7 +1275,7 @@ pub static EN: Strings = Strings {
     lamp_bori_3_t: "The Pipe and the Thread",
     lamp_bori_3_1: "Granny's fond of my pipe. She closes her eyes and keeps the beat.",
     lamp_bori_3_2: "Once she asked me how a pipe holds on to its sound.",
-    lamp_bori_3_3: "I told her the flute doesn't hold the sound; it lets it flow. You have to let your breath go to make a sound.",
+    lamp_bori_3_3: "I told her the pipe doesn't hold the sound; it lets it flow. You have to let your breath go to make a sound.",
     lamp_bori_3_4: "She laughed a long while, then said thread is the same.",
     lamp_bori_3_5: "I'll hang this lantern by my pipe, so the evening song carries farther.",
     lamp_momo_1_t: "Flower Ears",
