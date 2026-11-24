@@ -525,6 +525,11 @@ impl Renderer {
             // 두 배 크기 글(타이틀 로고·쓰러짐)도 미리 굽는다. 그리는 도중 아틀라스가 커지면 그 프레임 글이 지워진 텍스처를 본다.
             let big = format!("Naïl{}", crate::i18n::s().dead);
             ui.warm(&big, crate::ui::FONT_PX * 2.0);
+            // 개발 화면(시나리오 목록·대화 검수 등)은 번역하지 않는 한국어라(0013) 다른 언어에서는 그 글자가 표 밖이다 —
+            // 처음 그릴 때 아틀라스가 넘쳐 "already deleted texture"(KB text-rendering). 개발 판에서만 Galmuri 한글 2,350자를 다 굽는다.
+            #[cfg(feature = "dev")]
+            ui.with_base_font()
+                .warm(include_str!("../dev_hangul.txt"), crate::ui::FONT_PX);
         }
         ui
     }
