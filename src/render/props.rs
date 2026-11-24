@@ -2420,9 +2420,10 @@ pub(super) fn draw_plot_soil(at: Vec2) {
     draw_rectangle(x - 5.0, y + 2.0, 10.0, 1.0, furrow);
 }
 
-/// 텃밭 칸에 자라는 것(0304 G1): 갓 심은 씨앗 → 새싹 → 다 자란 꽃·산딸기 덤불. 팩 칸(`sunny`)이 없으면 점으로.
+/// 텃밭 칸에 자라는 것(0304 G1): 갓 심은 씨앗 → 새싹 → 다 자란 꽃·산딸기 덤불. 팩 칸(`sunny`)·식물 시트(`plants`)가 없으면 점으로.
 pub(super) fn draw_crop(
     sunny: Option<&art::Sunny>,
+    plants: Option<&Texture2D>,
     plot: crate::garden::Plot,
     at: Vec2,
     time: f32,
@@ -2468,11 +2469,51 @@ pub(super) fn draw_crop(
                 draw_rectangle(foot.x + dx, foot.y + dy, 1.0, 1.0, hi);
             }
         }
-        Plot::Ripe(Crop::Flower) => draw_flower_tuft(sunny, 0, foot, sway),
+        Plot::Ripe(Crop::Flower(b)) => draw_bloom(sunny, plants, b, 0, foot - vec2(0.0, 1.0), sway),
     }
 }
 
-/// 꽃 한 무더기: 팩의 작은 꽃 둘(번호 `k`로 색을 돌린다). 텃밭에서 다 핀 꽃과 마을에 옮겨 심은 꽃이 같이 쓴다.
+/// 화단 꽃 하나(0306): 들꽃은 팩의 작은 꽃 둘(번호 `k`로 색을 돌린다), 나머지는 식물 시트 0줄의 16칸(CC0 Idylwild).
+fn draw_bloom(
+    sunny: Option<&art::Sunny>,
+    plants: Option<&Texture2D>,
+    b: crate::garden::Bloom,
+    k: usize,
+    foot: Vec2,
+    sway: f32,
+) {
+    match (b.sheet(), plants) {
+        (Some(i), Some(tex)) => draw_texture_ex(
+            tex,
+            foot.x - 8.0,
+            foot.y - 15.0,
+            WHITE,
+            DrawTextureParams {
+                source: Some(Rect::new(i as f32 * 16.0, 0.0, 16.0, 16.0)),
+                ..Default::default()
+            },
+        ),
+        (Some(i), None) => {
+            // 시트가 없는 빌드: 꽃 빛깔만 점으로.
+            let c = [
+                Color::new(0.30, 0.45, 0.95, 1.0),
+                Color::new(0.50, 0.30, 0.80, 1.0),
+                Color::new(0.95, 0.40, 0.45, 1.0),
+                Color::new(0.72, 0.58, 0.95, 1.0),
+                Color::new(0.98, 0.58, 0.18, 1.0),
+                Color::new(0.98, 0.85, 0.25, 1.0),
+            ][i as usize % 6];
+            let g = Color::new(0.36, 0.58, 0.32, 1.0);
+            draw_rectangle(foot.x - 5.0, foot.y - 4.0, 10.0, 4.0, g);
+            for (dx, dy) in [(-4.0, -7.0), (0.0, -9.0), (3.0, -6.0)] {
+                draw_rectangle(foot.x + dx + sway, foot.y + dy, 2.0, 2.0, c);
+            }
+        }
+        (None, _) => draw_flower_tuft(sunny, k, foot, sway),
+    }
+}
+
+/// 꽃 한 무더기: 팩의 작은 꽃 둘(번호 `k`로 색을 돌린다).
 fn draw_flower_tuft(sunny: Option<&art::Sunny>, k: usize, foot: Vec2, sway: f32) {
     use crate::sunny as sn;
     let sets = [sn::FLOWERS_RED, sn::FLOWERS_WHITE, sn::FLOWERS_BLUE];
@@ -2497,23 +2538,30 @@ fn draw_flower_tuft(sunny: Option<&art::Sunny>, k: usize, foot: Vec2, sway: f32)
     }
 }
 
-/// 마을에 옮겨 심은 꽃(0304 G1, `garden::FLOWER_SPOTS`의 `k`째): 풀 포기 위에 같은 빛깔 꽃 셋 — 지도에 구운 작은 들꽃과
-/// 구별되게 한 무더기로 모아 심은 모양.
-pub(super) fn draw_garden_flower(sunny: Option<&art::Sunny>, k: usize, at: Vec2, time: f32) {
+/// 마을 화단에 핀 꽃(0304 G1·0306, `garden::FLOWER_SPOTS`의 `k`째 자리). 들꽃은 풀 포기 위 같은 빛깔 셋(구운 작은 들꽃과
+/// 구별되게 한 무더기로), 나머지는 그 꽃 그림.
+pub(super) fn draw_garden_flower(
+    sunny: Option<&art::Sunny>,
+    plants: Option<&Texture2D>,
+    b: crate::garden::Bloom,
+    k: usize,
+    at: Vec2,
+    time: f32,
+) {
     use crate::sunny as sn;
     let foot = vec2(at.x.round(), at.y.round() + 4.0);
     if !shadow_pass() {
         draw_ellipse(foot.x, foot.y, 7.0, 2.0, 0.0, SHADOW_SOFT);
     }
     let sway = ((time * 1.1 + k as f32).sin() * 0.6).round();
-    match sunny {
-        Some(s) => {
+    match (b, sunny) {
+        (crate::garden::Bloom::Meadow, Some(s)) => {
             let set = [sn::FLOWERS_RED, sn::FLOWERS_WHITE, sn::FLOWERS_BLUE][k % 3];
             sn::draw_at_foot(&s.sheet, sn::GRASS[k % 2], foot + vec2(0.0, 1.0), WHITE);
             sn::draw_at_foot(&s.sheet, set[3], foot + vec2(-4.0 + sway, -1.0), WHITE);
             sn::draw_at_foot(&s.sheet, set[3], foot + vec2(4.0, -2.0), WHITE);
             sn::draw_at_foot(&s.sheet, set[2], foot + vec2(sway, 1.0), WHITE);
         }
-        None => draw_flower_tuft(None, k + 1, foot, sway),
+        _ => draw_bloom(sunny, plants, b, k + 1, foot, sway),
     }
 }

@@ -655,30 +655,33 @@ impl App {
                     self.shop_msg = Some((|s| s.decor_poor, 3.0));
                     None
                 }
-                Err(No::FlowersFull) => {
-                    self.shop_msg = Some((|s| s.garden_full, 3.0));
-                    None
-                }
                 Err(No::Busy) => None,
             },
             Plot::Growing { .. } => {
                 self.shop_msg = Some((|s| s.garden_wait, 2.5));
                 None
             }
-            Plot::Ripe(_) => match garden::harvest(&mut self.profile, i) {
-                Some(Crop::Berry) => Some((|s: &i18n::Strings| s.garden_picked) as Tr),
-                Some(Crop::Flower) => Some((|s: &i18n::Strings| s.garden_moved) as Tr),
-                None => None,
-            },
+            Plot::Ripe(_) => {
+                // 화단이 다 찼으면 가장 오래된 자리가 바뀐다 — 그렇다고 알려 준다.
+                let (_, replaces) = garden::next_spot(&self.profile);
+                match garden::harvest(&mut self.profile, i) {
+                    Some(Crop::Berry) => Some((|s: &i18n::Strings| s.garden_picked) as Tr),
+                    Some(Crop::Flower(_)) if replaces => {
+                        Some((|s: &i18n::Strings| s.garden_replant) as Tr)
+                    }
+                    Some(Crop::Flower(_)) => Some((|s: &i18n::Strings| s.garden_moved) as Tr),
+                    None => None,
+                }
+            }
         };
         let Some(msg) = done else {
             self.sfx.play(crate::sfx::Id::Deny);
             return;
         };
-        let (plots, flowers) = (garden::plots(&self.profile), garden::flowers(&self.profile));
+        let (plots, blooms) = (garden::plots(&self.profile), garden::spots(&self.profile));
         if let Some(v) = self.world.adv.village.as_mut() {
             v.plots = plots;
-            v.flowers = flowers;
+            v.blooms = blooms;
         }
         if self.recording() {
             self.save_profile();
@@ -730,9 +733,9 @@ impl App {
                 tr(Crop::Berry.name()).to_string(),
                 s.garden_ripe_berry.to_string(),
             ),
-            Plot::Ripe(Crop::Flower) => (
+            Plot::Ripe(Crop::Flower(b)) => (
                 VillagePic::Plot(plots[i]),
-                tr(Crop::Flower.name()).to_string(),
+                tr(b.name()).to_string(),
                 s.garden_ripe_flower.to_string(),
             ),
         };

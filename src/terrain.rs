@@ -257,6 +257,12 @@ pub fn decor_at(b: Biome, cx: i32, cy: i32) -> Option<(Decor, f32, f32)> {
     Some((d, ox, oy))
 }
 
+/// 바탕 들꽃 시트의 칸(`assets/art/plants.png` 1줄, `tools/art/plants_cc0.py`의 `WILD`와 같은 수·크기).
+pub const WILD_PLANTS: u32 = 16;
+const WILD_W: u16 = 12;
+const WILD_H: u16 = 24;
+const WILD_Y: u16 = 16;
+
 /// 장식 타일의 칸(tiles.png). render.rs의 decor_src와 같은 표.
 pub fn decor_cell(d: Decor) -> (u32, u32) {
     match d {
@@ -389,6 +395,8 @@ pub struct Baker {
     /// 물살 칸(0275, 칸 좌표)과 1px마다 물인가. 물은 바닥보다 낮다: 위 물가는 땅이 떨어지는 면, 그 아래 그늘.
     water_cells: Vec<(i32, i32)>,
     water: Vec<bool>,
+    /// 바탕에 섞어 굽는 작은 들꽃 시트(`art::Art::plants_img`, 0306). 들판(`Biome::Meadow`)에서만 찍는다.
+    wild: Option<Image>,
     img: Image,
 }
 
@@ -436,8 +444,15 @@ impl Baker {
             patch_n: vec![0.0; hw * hh],
             water_cells: Vec::new(),
             water: Vec::new(),
+            wild: None,
             img: Image::gen_image_color(w as u16, h as u16, Color::new(0.0, 0.0, 0.0, 1.0)),
         }
+    }
+
+    /// 바탕 들꽃 시트(0306, `assets/art/plants.png` 1줄 — CC0 SpiderDave). 없으면 찍지 않는다. 열쇠는 부르는 쪽이 섞는다.
+    pub fn with_wild(mut self, plants: Option<&Image>) -> Self {
+        self.wild = plants.cloned();
+        self
     }
 
     /// 물살 칸(칸 가운데 월드 좌표, `Room::streams`)을 바닥에 굽는다(0275). 열쇠는 `water_key`로.
@@ -741,6 +756,7 @@ impl Baker {
             solid,
             img,
             fires,
+            wild,
             ..
         } = self;
         let (w, h, b) = (*w, *h, *b);
@@ -779,6 +795,22 @@ impl Baker {
                 continue;
             }
             let Some((d, ox, oy)) = decor_at(b, cx, cy) else {
+                // 빈 풀밭 칸에 가끔 작은 들꽃 한 포기(0306): 팩 꽃 무리와 섞여 들판이 덜 한결같게.
+                if let (Some(sheet), Biome::Meadow) = (wild.as_ref(), b) {
+                    let roll = hash(cx, cy, 71);
+                    if (roll % 1000) as f32 / 1000.0 < crate::tuning::WILD_PLANT_CHANCE {
+                        let k = (hash(cx, cy, 72) % WILD_PLANTS) as u16;
+                        let r = (k * WILD_W, WILD_Y, WILD_W, WILD_H);
+                        let ox = (hash(cx, cy, 73) % 7) as i32 - 3;
+                        let (fx, fy) = (cx * T + 2 + ox, cy * T + 14 - WILD_H as i32);
+                        let foot =
+                            vec2((fx + WILD_W as i32 / 2) as f32, (fy + WILD_H as i32) as f32);
+                        if let Some(sh) = shadow_for(foot, crate::tuning::DECOR_LIFT_FLOWER) {
+                            crate::sunny::stamp_sun_shadow(img, sheet, r, (fx, fy), &sh, is_solid);
+                        }
+                        crate::sunny::stamp(img, sheet, r, fx, fy, ft, is_solid);
+                    }
+                }
                 continue;
             };
             // 팩이 있으면 꽃·풀·조약돌은 Sunnyside 그림으로(0066). 칸 가운데 아래에 발을 둔다.

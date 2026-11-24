@@ -34,6 +34,10 @@ pub struct Art {
     pub halmae: Option<Texture2D>,
     /// 소품(tools/art/props_ai.py, 0222): 24칸 여섯(`PROP_*`) — 부술 수 있는 것 넷 + 상자 닫힘·열림. 없으면 코드 그림.
     pub props: Option<Texture2D>,
+    /// CC0 식물(tools/art/plants_cc0.py, 0306): 0줄 마을 화단 꽃 여섯(16칸, `garden::Bloom`), 1줄 바탕 들꽃 열여섯(12×24, 굽기).
+    /// 굽기가 CPU 그림을 쓰니 그림도 둔다. 없으면 화단은 코드 그림, 바탕 들꽃은 없음.
+    pub plants: Option<Texture2D>,
+    pub plants_img: Option<Image>,
     /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸 여섯(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리·뿌리 길 입구. 없으면 팩·코드 그림.
     pub hub: Option<Texture2D>,
     /// 큰 나무 잎 단계 다섯 칸(tree.png, `tools/art/tree_ai.py`, 0238).
@@ -297,6 +301,7 @@ impl Art {
                 "art/chief.png",
                 "art/halmae.png",
                 "art/props.png",
+                "art/plants.png",
                 "art/hub.png",
                 "art/tree.png",
                 "art/dig.png",
@@ -343,6 +348,12 @@ impl Art {
         if let Some(p) = &props {
             p.set_filter(FilterMode::Nearest);
         }
+        let plants_img = crate::loading::image("art/plants.png").await.ok();
+        let plants = plants_img.as_ref().map(|img| {
+            let t = Texture2D::from_image(img);
+            t.set_filter(FilterMode::Nearest);
+            t
+        });
         let hub = crate::loading::texture("art/hub.png").await.ok();
         if let Some(h) = &hub {
             h.set_filter(FilterMode::Nearest);
@@ -414,6 +425,8 @@ impl Art {
             chief_body,
             halmae,
             props,
+            plants,
+            plants_img,
             hub,
             tree,
             dig,
