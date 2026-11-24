@@ -1297,7 +1297,7 @@ pub static PL: Strings = Strings {
     lamp_momo_2_4: "Tylko nie mów Miętce i Dmuchawcowi!",
     lamp_momo_3_t: "Kwiatek, który puszczę",
     lamp_momo_3_1: "Babcia popatrzyła na mój kwiatek i powiedziała, że widziała go przez nici.",
-    lamp_momo_3_2: "Zwiędła, trzymała się do samego końca.",
+    lamp_momo_3_2: "Nawet kiedy byłam zaplątana, kwiatek nie spadł. Zwiędły, trzymał się do samego końca.",
     lamp_momo_3_3: "Bała się tego. Nieumiejętność odpuszczenia była aż nazbyt podobna do niej samej.",
     lamp_momo_3_4: "Więc tej wiosny sama puszczę kwiatek. Żeby zakwitły nowe.",
     lamp_momo_3_5: "Powieszę ten lampion przy moim miejscu. Żeby nasionka, które puszczę, nie bały się w nocy.",
