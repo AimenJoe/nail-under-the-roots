@@ -1101,7 +1101,7 @@ pub static FR: Strings = Strings {
     garden_empty: "Carré vide",
     garden_ripe: "A poussé",
     garden_plant: "Planter · Graines du village {0}",
-    garden_growing: "Pousse — départs avant récolte : {0}",
+    garden_growing: "Pousse — départs avant la récolte : {0}",
     garden_ripe_berry: "Mûre — à cueillir pour ton prochain sac.",
     garden_ripe_flower: "En pleine floraison — à replanter au village.",
     garden_planted: "C'est planté ! Ça aura poussé à ton retour des terriers.",
