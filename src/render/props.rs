@@ -1602,6 +1602,22 @@ pub(super) fn draw_well_fireflies(at: Vec2, time: f32, glow: u8) {
     }
 }
 
+/// 꾸미기 하나를 가진 그림으로: `hub.png`의 그림(바람종, 시트 E3) → 팩 그림 → 코드 그림 차례. 마을과 마을 창이 같이 쓴다.
+pub(super) fn draw_decor_art(art: Option<&art::Art>, i: usize, at: Vec2, time: f32) {
+    if let (Some(hub), 4) = (art.and_then(|a| a.hub.as_ref()), i) {
+        let foot = vec2(at.x.round(), at.y.round() + 6.0);
+        if !shadow_pass() {
+            draw_ellipse(foot.x, foot.y - 1.0, 5.0, 2.0, 0.0, SHADOW_SOFT);
+        }
+        art::draw_hub(hub, art::HUB_CHIME, foot, WHITE);
+        return;
+    }
+    match art.and_then(|a| a.sunny.as_ref()) {
+        Some(sunny) if decor_uses_pack(i) => draw_decor_sunny(sunny, i, at, time),
+        _ => draw_decor(i, at, time),
+    }
+}
+
 /// 이 꾸미기를 팩 그림으로 그리나(팩이 있을 때). 아니면 `draw_decor`의 코드 그림.
 pub(super) fn decor_uses_pack(i: usize) -> bool {
     matches!(i, 0 | 2 | 3 | 7 | 9 | 10 | 11)
@@ -1692,27 +1708,44 @@ pub(super) fn draw_decor_sunny(sunny: &art::Sunny, i: usize, at: Vec2, time: f32
     }
 }
 
-/// 이웃 곁에 걸린 등불 하나(0304): 반딧불 등 꾸미기(2)의 등 하나 모양 — 막대 + 숨 쉬는 빛.
-pub(super) fn draw_neighbor_lamp(at: Vec2, time: f32) {
+/// 이웃 곁에 걸린 등불 하나(0304). 그림은 `hub.png`의 등(막대에 걸린 유리 등, 시트 E1) — 유리 속 반딧불 빛만 코드가 얹는다.
+/// 그림이 없으면 예전 코드 그림(막대 + 숨 쉬는 빛). `at` = 막대 발.
+pub(super) fn draw_neighbor_lamp(hub: Option<&Texture2D>, at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round());
     let pulse = 0.6 + 0.3 * (time * 1.6).sin();
-    draw_circle(x, y - 9.0, 6.0, Color::new(0.55, 0.95, 1.0, 0.14 * pulse));
-    draw_rectangle(
-        x - 0.5,
-        y - 8.0,
-        1.0,
-        8.0,
-        Color::new(0.88, 0.90, 0.86, 1.0),
-    );
-    draw_ellipse(x, y - 9.0, 3.0, 2.0, 0.0, OUTLINE);
-    draw_ellipse(
-        x,
-        y - 9.0,
-        2.5,
-        1.5,
-        0.0,
-        Color::new(0.55, 0.95, 1.0, pulse),
-    );
+    let Some(hub) = hub else {
+        draw_circle(x, y - 9.0, 6.0, Color::new(0.55, 0.95, 1.0, 0.14 * pulse));
+        draw_rectangle(
+            x - 0.5,
+            y - 8.0,
+            1.0,
+            8.0,
+            Color::new(0.88, 0.90, 0.86, 1.0),
+        );
+        draw_ellipse(x, y - 9.0, 3.0, 2.0, 0.0, OUTLINE);
+        draw_ellipse(
+            x,
+            y - 9.0,
+            2.5,
+            1.5,
+            0.0,
+            Color::new(0.55, 0.95, 1.0, pulse),
+        );
+        return;
+    };
+    draw_ellipse(x, y - 1.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+    art::draw_hub(hub, art::HUB_LAMP, vec2(x, y), WHITE);
+    // 유리 속 반딧불: 따뜻한 빛 무리 두 겹 + 천천히 도는 밝은 점 둘(우물 위 반딧불과 같은 색).
+    let g = vec2(x, y) + art::HUB_LAMP_GLASS;
+    let glow = 0.8 + 0.2 * (time * 1.6).sin();
+    draw_circle(g.x, g.y, 9.0, Color::new(1.0, 0.90, 0.35, 0.16 * glow));
+    draw_circle(g.x, g.y, 5.0, Color::new(1.0, 0.93, 0.45, 0.38 * glow));
+    draw_circle(g.x, g.y, 2.5, Color::new(1.0, 0.96, 0.60, 0.90 * glow));
+    for k in 0..2 {
+        let a = time * 1.3 + k as f32 * 3.1;
+        let p = (g + vec2(a.cos() * 1.5, (a * 1.7).sin() * 1.5)).round();
+        draw_rectangle(p.x, p.y, 1.0, 1.0, Color::new(1.0, 1.0, 0.82, 1.0));
+    }
 }
 
 /// 마을 꾸미기 `i`(지운 1·6은 아무것도 그리지 않는다, 0269).
@@ -2412,8 +2445,18 @@ pub(super) fn ground_ellipse(g: Vec2, along: f32, across: f32) -> (f32, f32, f32
 }
 
 /// 텃밭 칸의 흙(0304 G1): 바닥에 먼저 그린다. 테 + 갈아엎은 흙 + 고랑 두 줄. `at`은 칸 가운데.
-pub(super) fn draw_plot_soil(at: Vec2) {
+/// 텃밭 흙 칸. 그림은 `hub.png`(시트 E5): 빈 칸, 갓 심은 칸(`sown` — 씨앗 둔덕과 표지 막대). 그림이 없으면 코드 그림.
+pub(super) fn draw_plot_soil(hub: Option<&Texture2D>, at: Vec2, sown: bool) {
     let (x, y) = (at.x.round(), at.y.round());
+    if let Some(hub) = hub {
+        let frame = if sown {
+            art::HUB_PLOT_SOWN
+        } else {
+            art::HUB_PLOT
+        };
+        art::draw_hub(hub, frame, vec2(x, y + 7.0), WHITE);
+        return;
+    }
     let rim = Color::new(0.28, 0.19, 0.14, 1.0);
     let soil = Color::new(0.47, 0.32, 0.22, 1.0);
     let furrow = Color::new(0.36, 0.24, 0.17, 1.0);
@@ -2425,6 +2468,7 @@ pub(super) fn draw_plot_soil(at: Vec2) {
 
 /// 텃밭 칸에 자라는 것(0304 G1): 갓 심은 씨앗 → 새싹 → 다 자란 꽃·산딸기 덤불. 팩 칸(`sunny`)·식물 시트(`plants`)가 없으면 점으로.
 pub(super) fn draw_crop(
+    hub: Option<&Texture2D>,
     sunny: Option<&art::Sunny>,
     plants: Option<&Texture2D>,
     plot: crate::garden::Plot,
@@ -2437,7 +2481,8 @@ pub(super) fn draw_crop(
     let sway = ((time * 1.3 + at.x * 0.1).sin() * 0.6).round();
     match plot {
         Plot::Empty => {}
-        // 갓 심은 칸: 흙 위에 씨앗 셋.
+        // 갓 심은 칸: 흙 위에 씨앗 셋. 그림이 있으면 흙 칸 그림(`draw_plot_soil`의 `sown`)에 이미 들어 있다.
+        Plot::Growing { age: 0, .. } if hub.is_some() => {}
         Plot::Growing { age: 0, .. } => {
             let seed = Color::new(0.86, 0.74, 0.50, 1.0);
             for dx in [-4.0, 0.0, 4.0] {
@@ -2453,6 +2498,12 @@ pub(super) fn draw_crop(
                 draw_rectangle(foot.x + 1.0 + sway, foot.y - 8.0, 2.0, 1.0, g);
             }
         },
+        // 다 익은 산딸기: 그림이 있으면 열매까지 그려진 덤불 한 장(시트 E5).
+        Plot::Ripe(Crop::Berry) if hub.is_some() => {
+            if let Some(hub) = hub {
+                art::draw_hub(hub, art::HUB_BERRY_BUSH, foot + vec2(sway, 1.0), WHITE);
+            }
+        }
         Plot::Ripe(Crop::Berry) => {
             match sunny {
                 Some(s) => sn::draw_at_foot(&s.sheet, sn::BUSH_SMALL, foot, WHITE),

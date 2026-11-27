@@ -243,7 +243,9 @@ def style_board():
 
     cells = [cell("nail.png", 28, 0), cell("popo.png", 32, 0), cell("susu.png", 32, 0)]
     cells += [cell("props.png", 24, c) for c in (0, 1, 2, 4)]
-    cells += [cell("hub.png", 48, c) for c in (2, 3, 4)]
+    # 화덕 돌 고리(칸 1)는 바닥에 누운 것의 각도 기준: 물웅덩이·샘을 받을 때 "이 고리와 같은 각도로"라고 쓴다(2026-11-27 —
+    # 각도 기준 없이 받은 샘은 돌 테두리 옆면이 보여 우물처럼 서 있었다).
+    cells += [cell("hub.png", 48, c) for c in (2, 3, 4, 1)]
     k, gap = 6, 5
     h = max(c.height for c in cells) + 2 * gap
     w = sum(c.width for c in cells) + gap * (len(cells) + 1)

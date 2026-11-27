@@ -177,3 +177,32 @@ IMPORTANT: draw ONLY the objects. Do NOT draw any ground, grass or soil around t
 2. The same garden plot just planted: the same soil and plank edging, with three tiny seed mounds and a small wooden marker stick at one corner.
 3. A ripe wild berry bush, about as wide as the mole and two thirds as tall: a round leafy green bush full of small bright red berries.
 ```
+
+### 받은 것(2026-11-27)
+- E1·E2·E3·E5: `hub_e1_v1.png`·`hub_e2_v1.png`·`hub_e3_v1.png`·`hub_e5_v1.png` → `hub_ai.py` `ITEMS` → `hub.png` 칸 6~17.
+  바람종은 가는 기둥이 외곽선 벗기기(6px)에 사라져 따로 벗김 4px·키 30(`THIN`), 텃밭 흙은 줄이면 민무늬가 돼 이랑과 알갱이를
+  찍는다(`soil_grain` — 사장 "중간에 노이즈가 좀 있어야").
+- E4(깃발 줄·실 그네·실 고리): 아직.
+
+### E6 — 물웅덩이 · 다시 솟는 샘 · 길의 샘
+첫 판은 각도를 적지 않아 돌 테두리의 옆면이 보이는 우물 같은 그림이 왔다(사장 "각도가 좀 맘에 안 드네"). 그림체 판에 화덕 돌 고리를
+넣고(`hub_ref.py`) "그 고리와 같은 각도, 옆면 없이, 납작한 타원"이라고 적는다. 물결·솟는 물방울은 코드가 얹는다.
+
+```
+Draw three new props in EXACTLY the same pixel art style as the attached sprites (a cute top-down action game:
+chunky pixels, each pixel a 6x6 block, dark plum 1px outline, soft 3-4 tone shading, light from the top-left,
+warm cozy colors). The attached sprites are only a STYLE reference: do not redraw them.
+
+VIEWING ANGLE IS THE MOST IMPORTANT RULE: all three are FLAT things lying on the ground, seen from high above,
+at exactly the same angle as the grey stone campfire ring in the attached image (the last sprite on the right).
+The water surface is level with the ground. Rim stones are low flat stones lying on the ground: show only their
+tops, NO side walls, NO raised basin, NOT a well. Each shape is a wide flat oval, about twice as wide as it is tall.
+
+Make them rich and handcrafted: clear water with soft reflections, wet dark earth, moss, small pebbles.
+Solid magenta background (#FF00FF), one row, three props well separated, no text, no shadows, no glow.
+IMPORTANT: draw ONLY the objects. Do NOT draw any ground, grass or soil around them.
+1. A small shallow puddle, about as wide as the mole: clear blue water with a thin uneven rim of wet dark earth and one soft light reflection. No stones.
+2. A small natural spring, a little wider than the mole: the same kind of flat pool with a loose ring of small flat mossy stones around it and a small circle of lighter water in the middle where water wells up.
+3. A larger spring pool, about two moles wide: a flat oval pool of clear blue-green water with a loose ring of flat mossy stones and a few tiny white flowers between them.
+```
+

@@ -38,7 +38,7 @@ pub struct Art {
     /// 굽기가 CPU 그림을 쓰니 그림도 둔다. 없으면 화단은 코드 그림, 바탕 들꽃은 없음.
     pub plants: Option<Texture2D>,
     pub plants_img: Option<Image>,
-    /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸 여섯(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리·뿌리 길 입구. 없으면 팩·코드 그림.
+    /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리·뿌리 길 입구 + 이웃 등불·샘 그릇·갈대 피리(시트 E1)·큰 깍정이·풀 방석·버섯 등(시트 E2)·솜털 잠자리·꽃밭·바람종(E3)·텃밭 셋(E5). 없으면 팩·코드 그림.
     pub hub: Option<Texture2D>,
     /// 큰 나무 잎 단계 다섯 칸(tree.png, `tools/art/tree_ai.py`, 0238).
     pub tree: Option<Texture2D>,
@@ -165,6 +165,25 @@ pub const HUB_BOULDER: u32 = 3;
 pub const HUB_LOG: u32 = 4;
 /// 뿌리 길 입구(팻말 + 첫 구멍). 구멍 가운데 = 발 + (5, -9).
 pub const HUB_GATE: u32 = 5;
+/// 시트 E1(사장 2026-11-27): 이웃 등불(막대에 걸린 유리 등 — 유리 가운데 = 발 + `HUB_LAMP_GLASS`, 빛은 코드가 얹는다),
+/// 샘 그릇(포포의 부탁 흔적), 통나무에 기댄 갈대 피리(보리의 부탁 흔적).
+pub const HUB_LAMP: u32 = 6;
+pub const HUB_LAMP_GLASS: Vec2 = Vec2::new(2.0, -6.0);
+pub const HUB_BOWL: u32 = 7;
+pub const HUB_PIPE: u32 = 8;
+/// 시트 E2: 큰 깍정이(도토)·풀 방석(수수)·버섯 등(콩이 — 갓 가운데 = 발 + `HUB_SHROOM_CAP`, 빛은 코드가 얹는다).
+pub const HUB_CAP: u32 = 9;
+pub const HUB_CUSHION: u32 = 10;
+pub const HUB_SHROOM: u32 = 11;
+pub const HUB_SHROOM_CAP: Vec2 = Vec2::new(0.0, -9.0);
+/// 시트 E3: 솜털 잠자리(토끼풀)·모모의 꽃밭·바람종(꾸미기 4).
+pub const HUB_NEST: u32 = 12;
+pub const HUB_FLOWERS: u32 = 13;
+pub const HUB_CHIME: u32 = 14;
+/// 시트 E5(텃밭): 빈 흙 칸·갓 심은 칸(씨앗 둔덕 + 표지 막대)·다 익은 산딸기 덤불.
+pub const HUB_PLOT: u32 = 15;
+pub const HUB_PLOT_SOWN: u32 = 16;
+pub const HUB_BERRY_BUSH: u32 = 17;
 
 /// 큰 나무 칸(tree.png, 0238): 잎 단계 0~4 다섯 칸 한 줄. 밑동(줄기 아래 가운데)이 칸의 (W/2, `TREE_BASE`).
 pub const TREE_W: f32 = 128.0;

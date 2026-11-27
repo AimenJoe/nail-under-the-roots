@@ -38,7 +38,7 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
     list.push((pp.y + 6.0, Drawable::Player));
     collect_folk(w, alpha, ground, &mut list);
     if let Some(v) = &w.adv.village {
-        collect_village(w, v, ground, &mut list);
+        collect_village(art, w, v, ground, &mut list);
     }
     collect_enemies(w, alpha, ground, &mut list);
     draw_ground_hazards(w, alpha, ground);
@@ -181,6 +181,7 @@ fn collect_folk(w: &World, alpha: f32, ground: bool, list: &mut Vec<(f32, Drawab
 /// 마을의 것: 텃밭 흙(바닥)과 자라는 것, 화단 꽃, 지도 표지 자리의 큰 나무·샘·실 고리·부탁의 흔적·꾸미기.
 /// 마을 물건을 더하면 여기와 `Drawable`·`draw_one`을 연다.
 fn collect_village(
+    art: &Art,
     w: &World,
     v: &crate::village::State,
     ground: bool,
@@ -189,7 +190,11 @@ fn collect_village(
     // 텃밭(0304 G1): 흙은 바닥(먼저), 자라는 것은 앞뒤를 가린다. 옮겨 심은 꽃은 정한 자리에 수만큼.
     for (k, at) in w.garden_plots().into_iter().enumerate() {
         if ground {
-            draw_plot_soil(at);
+            let sown = matches!(
+                v.plots.get(k),
+                Some(crate::garden::Plot::Growing { age: 0, .. })
+            );
+            draw_plot_soil(art.hub.as_ref(), at, sown);
         }
         if let Some(&p) = v.plots.get(k) {
             if p != crate::garden::Plot::Empty {
@@ -463,7 +468,7 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
                 .position(|l| l.who == n.who)
                 .is_some_and(|k| w.adv.village.is_some_and(|v| v.lamps[k]));
             if lamp && !shadow_pass() {
-                draw_neighbor_lamp(n.pos + vec2(21.0, 3.0), w.time);
+                draw_neighbor_lamp(art.hub.as_ref(), n.pos + LAMP_OFFSET, w.time);
             }
             // 몸은 `draw_neighbor_body` 하나(수첩·등불 아이콘과 같이 쓴다, 0307 R44). 마을에서만 하는 연출은 여기에:
             // 모모는 그루터기 위에 앉고, 토끼풀 곁에는 아기 둘.
@@ -516,18 +521,22 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
             }
         }
         Drawable::Decor(i, at) => {
-            match &art.sunny {
-                Some(sunny) if decor_uses_pack(i) => draw_decor_sunny(sunny, i, at, w.time),
-                _ => draw_decor(i, at, w.time),
-            }
+            draw_decor_art(Some(art), i, at, w.time);
             // 돌 우물 위의 반딧불: 맡긴 빛의 단계만큼(0269 2.9 A). 그림자 패스에는 넣지 않는다.
             if i == crate::village::EXTRA_FIRST && !shadow_pass() {
                 draw_well_fireflies(at, w.time, w.adv.village.map_or(0, |v| v.glow));
             }
         }
         Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
-        Drawable::Trace(i, at) => draw_quest_trace(i, at, w.time),
-        Drawable::Crop(p, at) => draw_crop(art.sunny.as_ref(), art.plants.as_ref(), p, at, w.time),
+        Drawable::Trace(i, at) => draw_quest_trace(art.hub.as_ref(), i, at, w.time),
+        Drawable::Crop(p, at) => draw_crop(
+            art.hub.as_ref(),
+            art.sunny.as_ref(),
+            art.plants.as_ref(),
+            p,
+            at,
+            w.time,
+        ),
         Drawable::Flower(b, k, at) => {
             draw_garden_flower(art.sunny.as_ref(), art.plants.as_ref(), b, k, at, w.time)
         }
@@ -548,14 +557,17 @@ fn trace_of(c: char) -> usize {
 
 /// 흔적 자리: 기호에서 얼마나 떨어져 있나(포포 왼쪽 아래 — 좌판과 사이 · 보리 오른쪽 · 모모 자리 오른쪽 · 큰 나무 밑동 오른쪽).
 /// 수수는 마을에 살지 않아 모닥불 곁(Naïl 자리 'n'에서 모닥불 왼쪽 아래), 콩이는 바위 곁, 토끼풀은 가족 자리 오른쪽.
+/// 이웃 등불 자리(이웃 발에서): 오른쪽 뒤. 21px는 몸과 겹쳤다(사장 2026-11-27 "너무 캐릭터 가까이").
+const LAMP_OFFSET: Vec2 = vec2(27.0, 1.0);
+
 const TRACE_OFFSET: [Vec2; 7] = [
-    vec2(-11.0, 12.0),
-    vec2(11.0, 5.0),
+    vec2(-15.0, 15.0),
+    vec2(26.0, 9.0),
     vec2(18.0, 7.0),
     vec2(17.0, 24.0),
     vec2(-2.0, 20.0),
-    vec2(14.0, 6.0),
-    vec2(16.0, 8.0),
+    vec2(25.0, 8.0),
+    vec2(2.0, 16.0),
 ];
 
 /// 이웃 한 명의 몸(0307 R44): 마을에 선 모습. 마을의 정렬 그리기와 마을 창·앨범의 이웃 아이콘이 같이 쓴다 —
@@ -650,10 +662,53 @@ fn draw_root_grass(b: Vec2) {
 
 /// 들어준 부탁의 흔적(0273 B). 0 샘 그릇(물이 반짝), 1 갈대 피리(가끔 음표가 오른다), 2 꽃밭(분홍·흰 꽃 넷), 3 큰 깍정이,
 /// 4 풀 방석, 5 버섯 등(빛), 6 솜털 잠자리. 마을 수첩 그림도 이것(`pub(super)`).
-pub(super) fn draw_quest_trace(i: usize, at: Vec2, time: f32) {
+pub(super) fn draw_quest_trace(hub: Option<&Texture2D>, i: usize, at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round());
     let px = |dx: f32, dy: f32, w: f32, h: f32, c: Color| draw_rectangle(x + dx, y + dy, w, h, c);
     let dark = Color::new(0.22, 0.15, 0.13, 1.0);
+    // 흔적의 그림은 `hub.png`(시트 E, 사장 2026-11-27 — 코드로 찍은 그림이 "성의 없다"). 움직이는 것만 코드가 얹는다:
+    // 물 위 반짝임, 오르는 음표, 버섯 등의 빛. 그림이 없는 빌드는 아래 코드 그림.
+    let frame = match i {
+        0 => Some((art::HUB_BOWL, 8.0)),
+        1 => Some((art::HUB_PIPE, 13.0)),
+        2 => Some((art::HUB_FLOWERS, 10.0)),
+        3 => Some((art::HUB_CAP, 7.0)),
+        4 => Some((art::HUB_CUSHION, 8.0)),
+        5 => Some((art::HUB_SHROOM, 6.0)),
+        6 => Some((art::HUB_NEST, 9.0)),
+        _ => None,
+    };
+    if let (Some(hub), Some((frame, half))) = (hub, frame) {
+        let foot = vec2(x, y + 4.0);
+        if !shadow_pass() {
+            draw_ellipse(foot.x, foot.y - 1.0, half, 2.0, 0.0, SHADOW_SOFT);
+            if i == 5 {
+                let a = 0.12 + 0.08 * (time * 1.7).sin().abs();
+                let c = foot + art::HUB_SHROOM_CAP;
+                draw_circle(c.x, c.y, 10.0, Color::new(0.55, 0.85, 1.0, a));
+            }
+        }
+        art::draw_hub(hub, frame, foot, WHITE);
+        if shadow_pass() {
+            return;
+        }
+        if i == 0 {
+            if (time * 1.3).sin() > 0.4 {
+                px(-2.0, -4.0, 2.0, 1.0, Color::new(0.90, 0.97, 1.0, 1.0));
+            }
+        } else if i == 1 {
+            let t = (time * crate::tuning::PIPE_RATE).fract();
+            if t < 0.45 {
+                let k = t / 0.45;
+                let (nx, ny) = (x + 8.0 + (k * 6.0).sin() * 2.0, y - 14.0 - k * 12.0);
+                let c = Color::new(0.96, 0.92, 0.80, 1.0 - k);
+                draw_rectangle(nx.round(), ny.round(), 2.0, 2.0, c);
+                draw_rectangle(nx.round() + 1.0, ny.round() - 4.0, 1.0, 4.0, c);
+                draw_rectangle(nx.round() + 2.0, ny.round() - 4.0, 1.0, 1.0, c);
+            }
+        }
+        return;
+    }
     if !shadow_pass() {
         draw_ellipse(x, y + 3.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
     }

@@ -971,14 +971,10 @@ impl Renderer {
         // 그림 좌표(게임 px): 칸 가운데 아래.
         let foot = vec2(r.w / zoom / 2.0, r.h / zoom - 4.0);
         match pic {
-            VillagePic::Decor(i) => match self.art.as_ref().and_then(|a| a.sunny.as_ref()) {
-                // 마을에 놓이는 그림과 같은 것을 창에도(`decor_uses_pack` 한 곳): 전에는 여기만 0·2·3·7로 따로 적혀 있어
-                // 돌 우물·해바라기·작은 소나무가 창에서는 팩 없는 빌드의 대신 그림(타원·세모)으로 나왔다(2026-11-27 조사).
-                Some(sunny) if props::decor_uses_pack(i) => {
-                    draw_decor_sunny(sunny, i, foot - vec2(0.0, 4.0), t)
-                }
-                _ => draw_decor(i, foot - vec2(0.0, 4.0), t),
-            },
+            // 마을에 놓이는 그림과 같은 것을 창에도(`draw_decor_art` 한 곳).
+            VillagePic::Decor(i) => {
+                props::draw_decor_art(self.art.as_ref(), i, foot - vec2(0.0, 4.0), t)
+            }
             VillagePic::Pack(crate::village::PackKind::Berry) => {
                 draw_berry(foot.x, foot.y - 5.0, 1.0, 1.0)
             }
@@ -1001,9 +997,12 @@ impl Renderer {
             }
             VillagePic::Plot(p) => {
                 let at = foot - vec2(0.0, 4.0);
-                props::draw_plot_soil(at);
                 let art = self.art.as_ref();
+                let hub = art.and_then(|a| a.hub.as_ref());
+                let sown = matches!(p, crate::garden::Plot::Growing { age: 0, .. });
+                props::draw_plot_soil(hub, at, sown);
                 props::draw_crop(
+                    hub,
                     art.and_then(|a| a.sunny.as_ref()),
                     art.and_then(|a| a.plants.as_ref()),
                     p,
@@ -1049,8 +1048,14 @@ impl Renderer {
                 }
             }
             Spot::Loop => draw_dream_loop(foot - vec2(0.0, 2.0), t),
-            Spot::Trace(i) => sorted::draw_quest_trace(i as usize, foot - vec2(0.0, 3.0), t),
-            Spot::Lamps => props::draw_neighbor_lamp(foot + vec2(0.0, 2.0), t),
+            Spot::Trace(i) => {
+                let hub = art.and_then(|a| a.hub.as_ref());
+                sorted::draw_quest_trace(hub, i as usize, foot - vec2(0.0, 3.0), t)
+            }
+            Spot::Lamps => {
+                let hub = art.and_then(|a| a.hub.as_ref());
+                props::draw_neighbor_lamp(hub, foot + vec2(0.0, 2.0), t)
+            }
             _ => {}
         }
     }

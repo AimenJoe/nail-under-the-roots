@@ -1213,8 +1213,9 @@ fn pic_garden(c: PicCtx) {
     let step = (time / 1.2) as u32;
     for k in 0..3u32 {
         let at = vec2((w * (0.42 + 0.2 * k as f32)).round(), y - 2.0);
-        props::draw_plot_soil(at);
         let stage = (step + k) % 3;
+        let hub = art.and_then(|a| a.hub.as_ref());
+        props::draw_plot_soil(hub, at, stage == 0);
         let crop = if (step / 3).is_multiple_of(2) {
             Crop::Berry
         } else {
@@ -1225,7 +1226,14 @@ fn pic_garden(c: PicCtx) {
             1 => Plot::Growing { crop, age: 1 },
             _ => Plot::Ripe(crop),
         };
-        props::draw_crop(sunny, art.and_then(|a| a.plants.as_ref()), plot, at, time);
+        props::draw_crop(
+            hub,
+            sunny,
+            art.and_then(|a| a.plants.as_ref()),
+            plot,
+            at,
+            time,
+        );
     }
     nail(art, ((time * 2.0) as u32) % 2, 0, vec2(18.0, y), false);
 }
