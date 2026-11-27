@@ -1185,8 +1185,6 @@ pub static EN: Strings = Strings {
     vn_fire_d: "The campfire under the Great Tree. Neighbors gather round it and swap stories about the burrows below.",
     vn_gate: "Root path",
     vn_gate_d: "Where the Great Tree's roots reach down into the earth. Every trip into the burrows starts here.",
-    vn_puddle: "Puddle",
-    vn_puddle_d: "A clear puddle. Look in and you see your own face. On still days the Great Tree's leaves show in it too.",
     vn_popo_d: "Popo's stall, always busy turning burrow finds into something new. Nearly every decoration in the village passed through Popo's paws.",
     vn_seat: "Empty seat",
     vn_seat_d: "One log seat always stays empty, as if waiting for someone to come back.",

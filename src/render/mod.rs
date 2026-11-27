@@ -1037,7 +1037,6 @@ impl Renderer {
                 Some(h) => art::draw_hub(h, art::HUB_GATE, foot + vec2(-5.0, 4.0), WHITE),
                 None => draw_exit(foot - vec2(0.0, 6.0), t, true),
             },
-            Spot::Puddle => draw_puddle(foot - vec2(0.0, 6.0), t),
             Spot::Spring => props::draw_village_spring(foot - vec2(0.0, 6.0), t),
             Spot::Seat => draw_seat(Rect::new(foot.x - 8.0, foot.y - 14.0, 16.0, 16.0), 0),
             Spot::Loop => draw_dream_loop(foot - vec2(0.0, 2.0), t),

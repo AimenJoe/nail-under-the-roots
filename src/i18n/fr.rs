@@ -1185,8 +1185,6 @@ pub static FR: Strings = Strings {
     vn_fire_d: "Le feu sous le Grand Arbre. Les voisins s'assoient autour et se racontent les terriers d'en bas.",
     vn_gate: "Sentier des racines",
     vn_gate_d: "Là où les racines du Grand Arbre plongent dans la terre. Chaque descente dans les terriers commence ici.",
-    vn_puddle: "Flaque",
-    vn_puddle_d: "Une flaque bien claire. Penche-toi et tu y vois ton propre visage. Les jours sans vent, les feuilles du Grand Arbre s'y reflètent aussi.",
     vn_popo_d: "L'étal de Popo, où l'on fabrique toujours quelque chose avec les trouvailles des terriers. Presque chaque décoration du village vient de là.",
     vn_seat: "Place vide",
     vn_seat_d: "Un siège en rondin reste toujours vide, comme s'il attendait que quelqu'un revienne.",

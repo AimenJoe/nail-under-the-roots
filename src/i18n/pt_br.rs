@@ -1185,8 +1185,6 @@ pub static PT_BR: Strings = Strings {
     vn_fire_d: "A fogueira sob a Grande Árvore. Os vizinhos se sentam em volta e trocam histórias sobre as tocas lá embaixo.",
     vn_gate: "Caminho das raízes",
     vn_gate_d: "Onde as raízes da Grande Árvore descem terra adentro. Toda descida às tocas começa aqui.",
-    vn_puddle: "Poça",
-    vn_puddle_d: "Uma poça limpinha. Olhe dentro e verá o seu próprio rosto. Em dias sem vento, as folhas da Grande Árvore aparecem nela também.",
     vn_popo_d: "A barraquinha do Popo. Ali sempre se faz alguma coisa com o que vem das tocas. Quase todo enfeite da vila passou pelas patas do Popo.",
     vn_seat: "Lugar vazio",
     vn_seat_d: "Um banquinho de tronco fica sempre vazio, como se esperasse alguém voltar.",

@@ -214,8 +214,13 @@ CELL = 48
 def board(items):
     w = 4 + 24 + 8 + len(items) * (CELL + 6) + 4
     out = Image.new("RGBA", (w * Z, (CELL + 8) * Z), (255, 0, 255, 255))
-    nail = Image.open(HERE.parents[1] / "assets" / "art" / "nail.png").convert("RGBA").crop((0, 0, 24, 24))
-    out.alpha_composite(nail.resize((24 * Z, 24 * Z), Image.NEAREST), (4 * Z, (4 + CELL - 24) * Z))
+    # Naïl은 그림이 있는 자리만 잘라 발을 물건의 발 줄에 맞춘다(칸 크기가 바뀌어도 어긋나지 않게 — 지금 28칸).
+    nail = Image.open(HERE.parents[1] / "assets" / "art" / "nail.png").convert("RGBA").crop((0, 0, 28, 28))
+    nail = nail.crop(nail.getbbox())
+    out.alpha_composite(
+        nail.resize((nail.width * Z, nail.height * Z), Image.NEAREST),
+        ((4 + (24 - nail.width) // 2) * Z, (4 + FOOT - nail.height) * Z),
+    )
     for i, fn in enumerate(items):
         p = Pad(CELL, CELL)
         fn(p, CELL / 2)
@@ -224,20 +229,29 @@ def board(items):
 
 
 def style_board():
-    """그림체 판: 우리 새 그림 몇 칸을 발 줄을 맞춰 6배로(마젠타 바탕)."""
+    """그림체 판: 우리 새 그림 몇 칸을 발 줄을 맞춰 6배로(마젠타 바탕).
+
+    칸마다 그림이 있는 자리만 잘라 아래를 맞춘다 — 칸 크기를 숫자로 적어 두면 시트가 바뀔 때 어긋난다(Naïl이 24칸에서
+    28칸이 된 뒤에도 24로 잘라 몸이 잘린 채 붙였다, 사장 2026-11-27 "저 캐릭터 그림도 좀 이상한데"). 마을 물건을 받을 때
+    쓰는 판이라 이미 들어간 마을 물건(그루터기·바위·통나무 자리, `hub.png`)도 넣는다.
+    """
     art = HERE.parents[1] / "assets" / "art"
-    cells = [
-        (Image.open(art / "nail.png").convert("RGBA").crop((0, 0, 24, 24)), 22),
-        (Image.open(art / "popo.png").convert("RGBA").crop((0, 0, 32, 32)), 30),
-        (Image.open(art / "susu.png").convert("RGBA").crop((0, 0, 32, 32)), 30),
-    ] + [(Image.open(art / "props.png").convert("RGBA").crop((c * 24, 0, c * 24 + 24, 24)), 22) for c in (0, 1, 2, 4)]
-    k, foot = 6, 34
-    w = sum(c.width for c, _ in cells) + 4 * (len(cells) + 1)
-    out = Image.new("RGBA", (w, foot + 4), (255, 0, 255, 255))
-    x = 4
-    for c, f in cells:
-        out.alpha_composite(c, (x, foot - f))
-        x += c.width + 4
+
+    def cell(name, size, col):
+        im = Image.open(art / name).convert("RGBA").crop((col * size, 0, (col + 1) * size, size))
+        return im.crop(im.getbbox())
+
+    cells = [cell("nail.png", 28, 0), cell("popo.png", 32, 0), cell("susu.png", 32, 0)]
+    cells += [cell("props.png", 24, c) for c in (0, 1, 2, 4)]
+    cells += [cell("hub.png", 48, c) for c in (2, 3, 4)]
+    k, gap = 6, 5
+    h = max(c.height for c in cells) + 2 * gap
+    w = sum(c.width for c in cells) + gap * (len(cells) + 1)
+    out = Image.new("RGBA", (w, h), (255, 0, 255, 255))
+    x = gap
+    for c in cells:
+        out.alpha_composite(c, (x, h - gap - c.height))
+        x += c.width + gap
     return out.resize((out.width * k, out.height * k), Image.NEAREST)
 
 

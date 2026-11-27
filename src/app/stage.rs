@@ -994,8 +994,8 @@ impl App {
         ui.rect(face, ui::PANEL_LIGHT);
         let happy = self.shop_msg.is_some_and(|m| m.happy);
         let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
+        // 테두리는 두르지 않는다(마을 창과 같이, 사장 2026-11-27): 초상화가 칸 밖으로 나오게 그려져 있다.
         self.renderer.draw_portrait(ui, face, frame);
-        ui.rect_lines(face, ui::BORDER);
         let say = self.shop_msg.map(|m| tr(m.text)).unwrap_or(s.shop_hi);
         let tx = face.right() + 6.0;
         for (k, l) in ui::wrap(ui, say, panel.right() - tx - 6.0, FONT_PX)

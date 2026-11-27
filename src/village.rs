@@ -196,8 +196,10 @@ pub const DECOR_ALL: usize = EXTRA_FIRST + EXTRA_DECOR.len();
 
 /// 놓으면 길을 막는 꾸미기의 자리(칸 가운데 `at` 기준). 돌 우물만: 몸이 커서 걸어 들어가면 우물 그림이 캐릭터를
 /// 덮었다(사장 2026-11-27). 나머지 꾸미기는 낮거나 가늘어 지나다닌다.
+/// 자리는 우물의 **몸 전체**(그림은 발 `at.y + 6`에서 위로 20px)에 맞춘다: 처음에는 바닥 쪽 9px만 막아 뒤에 선 캐릭터가
+/// 허리까지 가려졌다("우물이 너무 높은 느낌" — 위로 더 넓게, 아래로는 조금 작게).
 pub fn decor_blocker(i: usize, at: macroquad::prelude::Vec2) -> Option<macroquad::prelude::Rect> {
-    (i == EXTRA_FIRST).then(|| macroquad::prelude::Rect::new(at.x - 8.0, at.y - 3.0, 16.0, 9.0))
+    (i == EXTRA_FIRST).then(|| macroquad::prelude::Rect::new(at.x - 8.0, at.y - 11.0, 16.0, 14.0))
 }
 
 /// 지도 글자 → 꾸미기 번호.

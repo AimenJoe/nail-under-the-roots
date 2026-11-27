@@ -1185,8 +1185,6 @@ pub static DE: Strings = Strings {
     vn_fire_d: "Das Feuer unter dem Großen Baum. Die Nachbarn sitzen drumherum und erzählen von den Bauen dort unten.",
     vn_gate: "Wurzelpfad",
     vn_gate_d: "Hier reichen die Wurzeln des Großen Baums hinab in die Erde. Jeder Abstieg in die Baue beginnt hier.",
-    vn_puddle: "Pfütze",
-    vn_puddle_d: "Eine klare Pfütze. Schau hinein, und du siehst dein eigenes Gesicht. An windstillen Tagen spiegeln sich auch die Blätter des Großen Baums darin.",
     vn_popo_d: "Popos Stand. Hier entsteht ständig etwas aus Fundstücken aus den Bauen. Fast jeder Schmuck im Dorf ist durch Popos Pfoten gegangen.",
     vn_seat: "Leerer Platz",
     vn_seat_d: "Ein Baumstumpfsitz bleibt immer leer, als warte er darauf, dass jemand zurückkommt.",

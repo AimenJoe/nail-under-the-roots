@@ -1185,8 +1185,6 @@ pub static PL: Strings = Strings {
     vn_fire_d: "Ognisko pod Wielkim Drzewem. Sąsiedzi siadają wokół i opowiadają o norach w dole.",
     vn_gate: "Korzeniowa ścieżka",
     vn_gate_d: "Tu korzenie Wielkiego Drzewa schodzą w głąb ziemi. Każde zejście do nor zaczyna się tutaj.",
-    vn_puddle: "Kałuża",
-    vn_puddle_d: "Czysta kałuża. Zajrzyj, a zobaczysz swoją buzię. W bezwietrzne dni odbijają się w niej też liście Wielkiego Drzewa.",
     vn_popo_d: "Stragan Popo. Zawsze powstaje tu coś z rzeczy znalezionych w norach. Prawie każda ozdoba w wiosce przeszła przez łapki Popo.",
     vn_seat: "Puste miejsce",
     vn_seat_d: "Jeden pieniek do siedzenia zawsze stoi pusty, jakby czekał, aż ktoś wróci.",

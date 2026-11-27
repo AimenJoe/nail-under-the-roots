@@ -1185,8 +1185,6 @@ pub static ES: Strings = Strings {
     vn_fire_d: "La hoguera bajo el Gran Árbol. Los vecinos se sientan alrededor y se cuentan historias de las madrigueras de abajo.",
     vn_gate: "Senda de raíces",
     vn_gate_d: "Donde las raíces del Gran Árbol se hunden en la tierra. Toda bajada a las madrigueras empieza aquí.",
-    vn_puddle: "Charco",
-    vn_puddle_d: "Un charco muy claro. Asómate y verás tu propia cara. Los días sin viento, también se reflejan las hojas del Gran Árbol.",
     vn_popo_d: "El puesto de Popo. Siempre se fabrica algo con lo que se encuentra en las madrigueras. Casi todos los adornos de la aldea pasaron por sus patas.",
     vn_seat: "Sitio vacío",
     vn_seat_d: "Un asiento de tronco siempre está vacío, como si esperara que alguien volviera.",
