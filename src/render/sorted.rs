@@ -222,9 +222,9 @@ fn collect_village(
                 }
             }
             // 물웅덩이는 바닥: 맨 먼저. 무무를 풀어 주면(0275 P5) 다시 솟는 샘 — 누구로 걸어도 보인다.
-            'W' if ground && v.spring => draw_village_spring(*at, w.time),
+            'W' if ground && v.spring => draw_village_spring(art.hub.as_ref(), *at, w.time),
             'W' if ground && w.character == crate::equipment::Character::Mole => {
-                draw_puddle(*at, w.time)
+                draw_puddle(art.hub.as_ref(), *at, w.time)
             }
             'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
             // 들어준 부탁의 흔적(0273 B): 그 이웃 자리 곁(이웃이 없어도 — 플레이어가 그 이웃이어도 흔적은 남는다).

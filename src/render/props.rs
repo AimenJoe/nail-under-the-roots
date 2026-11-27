@@ -578,9 +578,19 @@ pub(super) fn draw_exit(p: Vec2, time: f32, down: bool) {
     }
 }
 
-pub(super) fn draw_spring(sp: &world::Spring, time: f32) {
+pub(super) fn draw_spring(hub: Option<&Texture2D>, sp: &world::Spring, time: f32) {
     let (x, y) = (sp.pos.x.round(), sp.pos.y.round() + 2.0);
     let live = if sp.drunk { 0.35 } else { 1.0 };
+    // 바탕: `hub.png`의 샘 그림(시트 E6), 없으면 코드 그림(젖은 흙 + 돌 테두리 + 물). 물결과 반짝임은 어느 쪽이든 코드.
+    if let Some(hub) = hub {
+        art::draw_hub(hub, art::HUB_POOL, vec2(x, y + 12.0), WHITE);
+    } else {
+        draw_spring_base(x, y);
+    }
+    draw_spring_ripples(x, y, live, time);
+}
+
+fn draw_spring_base(x: f32, y: f32) {
     // 젖은 흙 + 돌 테두리.
     draw_ellipse(
         x,
@@ -612,6 +622,9 @@ pub(super) fn draw_spring(sp: &world::Spring, time: f32) {
         0.0,
         Color::new(0.55, 0.80, 0.90, 1.0),
     );
+}
+
+fn draw_spring_ripples(x: f32, y: f32, live: f32, time: f32) {
     // 물결 고리: 가운데에서 퍼져 옅어진다.
     for k in 0..2 {
         let ph = (time * 0.45 + k as f32 * 0.5).fract();
@@ -1263,18 +1276,22 @@ pub(super) fn draw_dream_loop(at: Vec2, time: f32) {
 }
 
 /// 마을 물웅덩이(0048): 파란 타원 + 떠다니는 반짝임 둘.
-pub(super) fn draw_puddle(at: Vec2, time: f32) {
+pub(super) fn draw_puddle(hub: Option<&Texture2D>, at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round() + 3.0);
-    draw_ellipse(x, y, 11.0, 5.0, 0.0, Color::new(0.20, 0.30, 0.28, 1.0));
-    draw_ellipse(x, y, 10.0, 4.0, 0.0, Color::new(0.38, 0.62, 0.78, 1.0));
-    draw_ellipse(
-        x - 2.0,
-        y - 1.0,
-        5.0,
-        1.5,
-        0.0,
-        Color::new(0.62, 0.82, 0.92, 1.0),
-    );
+    if let Some(hub) = hub {
+        art::draw_hub(hub, art::HUB_PUDDLE, vec2(x, y + 5.0), WHITE);
+    } else {
+        draw_ellipse(x, y, 11.0, 5.0, 0.0, Color::new(0.20, 0.30, 0.28, 1.0));
+        draw_ellipse(x, y, 10.0, 4.0, 0.0, Color::new(0.38, 0.62, 0.78, 1.0));
+        draw_ellipse(
+            x - 2.0,
+            y - 1.0,
+            5.0,
+            1.5,
+            0.0,
+            Color::new(0.62, 0.82, 0.92, 1.0),
+        );
+    }
     for k in 0..2 {
         let ph = (time * 0.7 + k as f32 * 0.5).fract();
         let c = Color::new(1.0, 1.0, 1.0, 0.8 * (1.0 - ph));
@@ -1289,17 +1306,21 @@ pub(super) fn draw_puddle(at: Vec2, time: f32) {
 }
 
 /// 다시 솟는 샘(0275 P5): 물웅덩이 바탕에 가운데서 물이 솟아 고리가 퍼지고, 물방울이 튀며, 둘레에 젖은 이끼 테.
-pub(super) fn draw_village_spring(at: Vec2, time: f32) {
+pub(super) fn draw_village_spring(hub: Option<&Texture2D>, at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round() + 3.0);
-    draw_ellipse(
-        x,
-        y + 1.0,
-        13.0,
-        6.0,
-        0.0,
-        Color::new(0.24, 0.42, 0.34, 1.0),
-    );
-    draw_puddle(at, time);
+    if let Some(hub) = hub {
+        art::draw_hub(hub, art::HUB_SPRING, vec2(x, y + 7.0), WHITE);
+    } else {
+        draw_ellipse(
+            x,
+            y + 1.0,
+            13.0,
+            6.0,
+            0.0,
+            Color::new(0.24, 0.42, 0.34, 1.0),
+        );
+        draw_puddle(None, at, time);
+    }
     // 솟는 자리: 밝은 둥근 물 + 퍼지는 고리 둘.
     let bob = (time * 5.0).sin() * 0.5;
     draw_ellipse(

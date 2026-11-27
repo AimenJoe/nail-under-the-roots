@@ -363,7 +363,7 @@ impl Renderer {
                 draw_room_art(art, w);
             }
             if let Some(sp) = &w.spring {
-                draw_spring(sp, w.time);
+                draw_spring(art.hub.as_ref(), sp, w.time);
             }
             for (item, at) in w.story.pickups() {
                 draw_story_pickup(item, at, w.time, false);
@@ -1038,7 +1038,10 @@ impl Renderer {
                 Some(h) => art::draw_hub(h, art::HUB_GATE, foot + vec2(-5.0, 4.0), WHITE),
                 None => draw_exit(foot - vec2(0.0, 6.0), t, true),
             },
-            Spot::Spring => props::draw_village_spring(foot - vec2(0.0, 6.0), t),
+            Spot::Spring => {
+                let hub = art.and_then(|a| a.hub.as_ref());
+                props::draw_village_spring(hub, foot - vec2(0.0, 6.0), t)
+            }
             // 빈 자리: 마을에 놓인 통나무 자리 그림 그대로(전에는 그림이 있어도 대신 그림을 불렀다, 2026-11-27 조사).
             Spot::Seat => {
                 let r = Rect::new(foot.x - 8.0, foot.y - 14.0, 16.0, 16.0);

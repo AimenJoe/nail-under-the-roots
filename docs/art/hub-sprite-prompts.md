@@ -206,3 +206,7 @@ IMPORTANT: draw ONLY the objects. Do NOT draw any ground, grass or soil around t
 3. A larger spring pool, about two moles wide: a flat oval pool of clear blue-green water with a loose ring of flat mossy stones and a few tiny white flowers between them.
 ```
 
+**E6 받음(2026-11-27, `hub_e6_v1.png`)**: 위 프롬프트로 다시 받은 것도 "아직 너무 위에서 보는 것 같다"(사장) — 모델이 각도를 글로는 잘
+안 따른다. 다시 받지 않고 **변환기가 세로로 누른다**(`hub_ai.py` `SQUASH`: 물웅덩이 0.72·샘 0.64·길의 샘 0.76 → 폭이 높이의 두 배쯤).
+바닥에 누운 것을 받을 때는 각도를 글로 맞추려 하지 말고 받은 뒤 누르는 쪽이 빠르다.
+

@@ -976,7 +976,7 @@ fn pic_road(c: PicCtx) {
         pos: vec2(25.0, y - 6.0),
         drunk: false,
     };
-    props::draw_spring(&spring, time);
+    props::draw_spring(art.and_then(|a| a.hub.as_ref()), &spring, time);
     let chest = Rect::new(58.0, y - 12.0, 16.0, 16.0);
     let open = ph > 1.2;
     props::draw_chest(art.and_then(|a| a.props.as_ref()), chest, open, time);

@@ -38,7 +38,7 @@ pub struct Art {
     /// 굽기가 CPU 그림을 쓰니 그림도 둔다. 없으면 화단은 코드 그림, 바탕 들꽃은 없음.
     pub plants: Option<Texture2D>,
     pub plants_img: Option<Image>,
-    /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리·뿌리 길 입구 + 이웃 등불·샘 그릇·갈대 피리(시트 E1)·큰 깍정이·풀 방석·버섯 등(시트 E2)·솜털 잠자리·꽃밭·바람종(E3)·텃밭 셋(E5). 없으면 팩·코드 그림.
+    /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리·뿌리 길 입구 + 이웃 등불·샘 그릇·갈대 피리(시트 E1)·큰 깍정이·풀 방석·버섯 등(시트 E2)·솜털 잠자리·꽃밭·바람종(E3)·텃밭 셋(E5)·물 셋(E6). 없으면 팩·코드 그림.
     pub hub: Option<Texture2D>,
     /// 큰 나무 잎 단계 다섯 칸(tree.png, `tools/art/tree_ai.py`, 0238).
     pub tree: Option<Texture2D>,
@@ -184,6 +184,10 @@ pub const HUB_CHIME: u32 = 14;
 pub const HUB_PLOT: u32 = 15;
 pub const HUB_PLOT_SOWN: u32 = 16;
 pub const HUB_BERRY_BUSH: u32 = 17;
+/// 시트 E6(물, 세로로 눌러 넣음): 마을 물웅덩이·다시 솟는 샘·길의 샘. 물결·반짝임·솟는 물방울은 코드가 얹는다.
+pub const HUB_PUDDLE: u32 = 18;
+pub const HUB_SPRING: u32 = 19;
+pub const HUB_POOL: u32 = 20;
 
 /// 큰 나무 칸(tree.png, 0238): 잎 단계 0~4 다섯 칸 한 줄. 밑동(줄기 아래 가운데)이 칸의 (W/2, `TREE_BASE`).
 pub const TREE_W: f32 = 128.0;
