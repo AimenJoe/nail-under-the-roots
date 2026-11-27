@@ -62,6 +62,35 @@ pub(super) struct VillageUi {
     pub view: crate::ui::ListView,
     /// 텃밭 탭에서 심을 씨앗(`garden::Crop::ALL` 번호).
     pub crop: usize,
+    /// 포포가 지금 하는 한마디(없으면 고른 줄의 설명).
+    pub say: Option<Say>,
+}
+
+/// 포포의 한마디: 글, 남은 시간, 웃으며 하는 말인가. 얼굴은 글을 견주지 않고 이것으로 정한다(0307 R42).
+#[derive(Clone, Copy)]
+pub(super) struct Say {
+    pub text: Tr,
+    pub secs: f32,
+    pub happy: bool,
+}
+
+impl Say {
+    pub fn plain(text: Tr, secs: f32) -> Say {
+        Say {
+            text,
+            secs,
+            happy: false,
+        }
+    }
+
+    /// 사거나 심거나 거둔 뒤의 고맙다는 한마디: 포포가 웃는다.
+    pub fn thanks(text: Tr, secs: f32) -> Say {
+        Say {
+            text,
+            secs,
+            happy: true,
+        }
+    }
 }
 
 impl Default for VillageUi {
@@ -72,6 +101,7 @@ impl Default for VillageUi {
             cursor: 0,
             view: Default::default(),
             crop: 0,
+            say: None,
         }
     }
 }
@@ -226,7 +256,7 @@ impl App {
         self.village_ui.cursor = 0;
         self.village_ui.tab = 0;
         // 처음 열면 포포의 인사(자세히 칸의 말 자리, 몇 초 뒤 설명으로).
-        self.shop_msg = Some((|s| s.decor_hi, 3.5));
+        self.village_ui.say = Some(Say::plain(|s| s.decor_hi, 3.5));
         self.village_ui.view = Default::default();
         self.world.freeze();
         self.scene = Scene::Decor;
@@ -237,21 +267,21 @@ impl App {
         self.village_ui.tabs = GARDEN_TABS;
         self.village_ui.tab = 0;
         self.village_ui.cursor = i.min(crate::garden::PLOTS - 1);
-        self.shop_msg = None;
+        self.village_ui.say = None;
         self.village_ui.view = Default::default();
         self.world.freeze();
         self.scene = Scene::Decor;
     }
 
     pub(super) fn update_village_menu(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
-        if let Some((_, t)) = self.shop_msg.as_mut() {
-            *t -= dt;
-            if *t <= 0.0 {
-                self.shop_msg = None;
+        if let Some(m) = self.village_ui.say.as_mut() {
+            m.secs -= dt;
+            if m.secs <= 0.0 {
+                self.village_ui.say = None;
             }
         }
         if a.cancel || matches!(tap_hit, Some(Hit::Close)) {
-            self.shop_msg = None;
+            self.village_ui.say = None;
             self.scene = Scene::Game;
             return;
         }
@@ -273,7 +303,7 @@ impl App {
             self.village_ui.tab = tab;
             self.village_ui.cursor = 0;
             self.village_ui.view = Default::default();
-            self.shop_msg = None;
+            self.village_ui.say = None;
             self.sfx.play(crate::sfx::Id::UiMove);
             return;
         }
@@ -299,7 +329,7 @@ impl App {
             Some(step) => (t.act)(self, i, step),
             // 터치로 처음 고른 줄: 한 번 더 누르면 한다고 알려 준다.
             None if moved && tap_hit.is_some() && (t.tap_hint)(&self.village_ctx(), i) => {
-                self.shop_msg = Some((|s| s.tap_again, 2.5));
+                self.village_ui.say = Some(Say::plain(|s| s.tap_again, 2.5));
             }
             None => {}
         }
@@ -348,14 +378,14 @@ impl App {
             self.profile.set(&key_decor(i));
             self.write_profile();
             self.sync_village();
-            self.shop_msg = Some((|s| s.decor_thanks, 2.5));
+            self.village_ui.say = Some(Say::thanks(|s| s.decor_thanks, 2.5));
             self.sfx.play(crate::sfx::Id::Buy);
         } else if decor_price(i).is_none() {
             // 저널 꾸미기는 사지 않는다 — 발자국 목표의 보상.
-            self.shop_msg = Some((|s| s.decor_journal_d, 3.0));
+            self.village_ui.say = Some(Say::plain(|s| s.decor_journal_d, 3.0));
             self.sfx.play(crate::sfx::Id::Deny);
         } else {
-            self.shop_msg = Some((|s| s.decor_poor, 3.0));
+            self.village_ui.say = Some(Say::plain(|s| s.decor_poor, 3.0));
             self.sfx.play(crate::sfx::Id::Deny);
         }
     }
@@ -365,16 +395,16 @@ impl App {
         let have = self.profile.count(KEY_SEEDS);
         let packed = self.profile.count(key_pack(p.kind));
         if packed >= p.max {
-            self.shop_msg = Some((|s| s.pack_full, 3.0));
+            self.village_ui.say = Some(Say::plain(|s| s.pack_full, 3.0));
             self.sfx.play(crate::sfx::Id::Deny);
         } else if have < p.price {
-            self.shop_msg = Some((|s| s.decor_poor, 3.0));
+            self.village_ui.say = Some(Say::plain(|s| s.decor_poor, 3.0));
             self.sfx.play(crate::sfx::Id::Deny);
         } else {
             self.profile.set_count(KEY_SEEDS, have - p.price);
             self.profile.set_count(key_pack(p.kind), packed + 1);
             self.write_profile();
-            self.shop_msg = Some((|s| s.pack_thanks, 2.5));
+            self.village_ui.say = Some(Say::thanks(|s| s.pack_thanks, 2.5));
             self.sfx.play(crate::sfx::Id::Buy);
         }
     }
@@ -390,7 +420,7 @@ impl App {
         self.profile.set_count(key_pack(p.kind), packed - 1);
         self.profile.add(KEY_SEEDS, p.price);
         self.write_profile();
-        self.shop_msg = Some((|s| s.pack_back, 2.5));
+        self.village_ui.say = Some(Say::plain(|s| s.pack_back, 2.5));
         self.sfx.play(crate::sfx::Id::UiMove);
     }
 
@@ -434,17 +464,15 @@ impl App {
                 if on { ui::ACCENT } else { ui::TEXT_DIM },
             );
         }
-        // 왼쪽 위 포포 + 위쪽 말 칸(사장 2026-11-02: 초상화는 왼쪽 위, 대화는 위). 산 뒤에는 웃는다.
+        // 왼쪽 위 포포 + 위쪽 말 칸(사장 2026-11-02: 초상화는 왼쪽 위, 대화는 위). 고맙다는 한마디를 하는 동안 웃는다.
         let face = Rect::new(PANEL.x + 6.0, PANEL.y + 21.0, 36.0, 36.0);
         ui.rect(face, ui::PANEL_LIGHT);
-        let happy = self
-            .shop_msg
-            .is_some_and(|(m, _)| tr(m) == s.decor_thanks || tr(m) == s.pack_thanks);
+        let happy = self.village_ui.say.is_some_and(|m| m.happy);
         let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
         self.renderer.draw_portrait(ui, face, frame);
         ui.rect_lines(face, ui::BORDER);
-        let say = match self.shop_msg {
-            Some((m, _)) => tr(m).to_string(),
+        let say = match self.village_ui.say {
+            Some(m) => tr(m.text).to_string(),
             None => {
                 let c = self.village_ctx();
                 let t = &tabs[self.village_ui.tab.min(n - 1)];
@@ -692,21 +720,21 @@ impl App {
         let stage = match next(&self.profile, i, ch) {
             Next::Ready { stage, cost } if have >= cost => stage,
             Next::Ready { .. } => {
-                self.shop_msg = Some((|s| s.lamp_poor, 2.5));
+                self.village_ui.say = Some(Say::plain(|s| s.lamp_poor, 2.5));
                 self.sfx.play(crate::sfx::Id::Deny);
                 return;
             }
             Next::Done => {
-                self.shop_msg = Some((|s| s.lamp_done, 2.5));
+                self.village_ui.say = Some(Say::plain(|s| s.lamp_done, 2.5));
                 return;
             }
             Next::Later => {
-                self.shop_msg = Some((|s| s.lamp_later, 2.5));
+                self.village_ui.say = Some(Say::plain(|s| s.lamp_later, 2.5));
                 self.sfx.play(crate::sfx::Id::Deny);
                 return;
             }
             Next::Other => {
-                self.shop_msg = Some((|s| s.lamp_other, 2.5));
+                self.village_ui.say = Some(Say::plain(|s| s.lamp_other, 2.5));
                 self.sfx.play(crate::sfx::Id::Deny);
                 return;
             }
@@ -719,7 +747,7 @@ impl App {
         // 셋째면 곁에 등불, 맡긴 반딧불이 줄었으니 우물 위 반딧불·큰 나무 빛도 — 모두 기록에서(R41).
         self.sync_village();
         self.sfx.play(crate::sfx::Id::Buy);
-        self.shop_msg = None;
+        self.village_ui.say = None;
         self.scene = Scene::Game;
         self.play(cutscene::lamp_scene(
             &self.world,
@@ -737,7 +765,7 @@ impl App {
         if step != Step::Pick {
             if plot == Plot::Empty {
                 self.village_ui.crop = (self.village_ui.crop + 1) % Crop::ALL.len();
-                self.shop_msg = None;
+                self.village_ui.say = None;
                 self.sfx.play(crate::sfx::Id::UiMove);
             }
             return;
@@ -747,13 +775,13 @@ impl App {
             Plot::Empty => match garden::plant(&mut self.profile, i, crop) {
                 Ok(()) => Some((|s: &i18n::Strings| s.garden_planted) as Tr),
                 Err(No::Poor) => {
-                    self.shop_msg = Some((|s| s.decor_poor, 3.0));
+                    self.village_ui.say = Some(Say::plain(|s| s.decor_poor, 3.0));
                     None
                 }
                 Err(No::Busy) => None,
             },
             Plot::Growing { .. } => {
-                self.shop_msg = Some((|s| s.garden_wait, 2.5));
+                self.village_ui.say = Some(Say::plain(|s| s.garden_wait, 2.5));
                 None
             }
             Plot::Ripe(_) => {
@@ -777,7 +805,7 @@ impl App {
         if self.recording() {
             self.save_profile();
         }
-        self.shop_msg = Some((msg, 3.0));
+        self.village_ui.say = Some(Say::thanks(msg, 3.0));
         self.sfx.play(crate::sfx::Id::Buy);
     }
 }
