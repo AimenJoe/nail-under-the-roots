@@ -114,8 +114,14 @@ async function run() {
     if (process.env.VERBOSE) console.log(`${lang}: 로딩 ${loadFrames}프레임`);
     if (now > START_MS - 10000) throw new Error(`로딩이 너무 길었다(가짜 ${now}ms) — START_MS를 늘린다`);
     await tick(START_MS - now); await pg.focus('#glcanvas');
-    // 키 이벤트가 페이지에서 처리된 뒤에 시계를 흘린다(빈 evaluate 한 번 = 메인 스레드 한 바퀴): 안 그러면 가끔 키가 한 프레임 늦는다.
-    const key = async (down, k) => { await (down ? pg.keyboard.down(k) : pg.keyboard.up(k)); await pg.evaluate(() => 0); };
+    // 키는 브라우저의 입력 길(CDP → 브라우저 → 합성 스레드 → 메인 스레드)로 넣지 않고 **페이지 안에서 바로** 쏜다:
+    // 그 길은 `runFor`(메인 스레드로 곧장 가는 evaluate)와 순서가 보장되지 않아, 기계가 바쁘면 키가 한두 프레임 늦게 닿았다
+    // (걷다 멈춘 자리가 달라지고 그 뒤 화면이 통째로 갈렸다). web/nail-host.js가 창의 keydown·keyup을 받아 게임에 넘긴다.
+    const key = async (down, k) => {
+      await pg.evaluate(([type, code]) => {
+        window.dispatchEvent(new KeyboardEvent(type, { code, key: code, bubbles: true, cancelable: true }));
+      }, [down ? 'keydown' : 'keyup', k]);
+    };
     const press = async (k, ms = 300) => { await key(true, k); await tick(50); await key(false, k); await tick(ms); };
     const hold = async (k, ms) => { await key(true, k); await tick(ms); await key(false, k); await tick(250); };
     // 찍기 전에 실제 시간으로 잠깐: 마지막으로 그린 프레임이 화면에 올라온 뒤에 찍는다(가짜 시계와 상관없는 Node 쪽 기다림).
