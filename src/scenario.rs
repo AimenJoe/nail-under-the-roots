@@ -668,9 +668,16 @@ fn prep_check_village(p: &mut crate::profile::Profile) {
     use crate::world::Who;
     *p = check_village_base();
     p.set_count(crate::talents::KEY_LIGHT, 450);
-    // 부탁 둘은 들어줬다(흔적 + 보리의 둘째·셋째 등불 이야기 조건).
+    // 부탁 둘은 들어줬다(흔적 + 보리의 둘째·셋째 등불 이야기 조건). 들음·찾음·돌려줌을 다 적는다 —
+    // 돌려줌만 적으면 포포가 부탁을 다시 꺼내려 해 말을 걸어도 마을 창이 안 열렸다.
     for q in [crate::quests::POPO, crate::quests::BORI] {
-        p.set(crate::quests::DONE_KEYS[q]);
+        for step in [
+            crate::quests::ASKED,
+            crate::quests::FOUND,
+            crate::quests::DONE,
+        ] {
+            p.set(&crate::quests::key_of(q, step));
+        }
     }
     // 등불: 포포는 다 들었고(곁에 등불), 보리는 셋째만 남았다(300), 모모는 하나.
     for (who, level) in [(Who::Popo, 3), (Who::Bori, 2), (Who::Momo, 1)] {
@@ -678,6 +685,9 @@ fn prep_check_village(p: &mut crate::profile::Profile) {
             p.set_count(l.key, level);
         }
     }
+    // 꾸미기 하나는 이미 놓았고(목록의 "놓았다" 줄), 짐에 산딸기 하나.
+    p.set(&crate::village::key_decor(0));
+    p.set_count(crate::village::key_pack(crate::village::PackKind::Berry), 1);
     // 텃밭: 첫 칸은 다 자란 라벤더, 둘째 칸은 자라는 산딸기. 심는 값을 치르고 남는 씨앗이 50.
     let (flower, berry) = (Crop::Flower(Bloom::Lavender), Crop::Berry);
     p.set_count(
@@ -1415,6 +1425,12 @@ mod tests {
         assert_eq!(p.count(KEY_SEEDS), 50);
         let v = State::of(&p, Character::Mole);
         assert!(v.lamps[0] && !v.lamps[bori], "포포 곁에는 이미 등불");
+        // 포포에게 말을 걸면 부탁이 아니라 마을 창이 열린다.
+        assert_eq!(
+            crate::quests::talk(crate::world::Who::Popo, &p).map(|(q, _)| q),
+            None,
+            "포포의 부탁은 끝나 있다"
+        );
     }
 
     /// 개발 시나리오 전부: 가만히 서서 600틱(10초)을 돌려도 panic이 없고 플레이어가 살아 있거나 쓰러졌거나 둘 중 하나다.

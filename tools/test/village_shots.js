@@ -3,7 +3,7 @@
 // 차이(잡음 바닥)를 잰다(KB solo-game-codebase-health-signals: 잡음을 안 재면 화면 비교는 아무것도 말해 주지 않는다).
 //   cargo build --release --target wasm32-unknown-unknown
 //   python3 tools/web/assemble.py dist local dev
-//   node tools/test/village_shots.js dist out-a          # 한국어·독일어로 찍는다
+//   node tools/test/village_shots.js dist out-a          # 한국어·독일어로 33장씩 찍는다
 //   node tools/test/village_shots.js dist out-b
 //   python3 tools/test/shots_diff.py out-a out-b         # 파일마다 다른 픽셀 수
 // 기록은 개발 판(sandbox)이라 슬롯에 쓰지 않는다. 등불·텃밭·화단이 고루 보이게 채운 기록으로 연다.
@@ -18,7 +18,7 @@ const LOCALES = (process.env.LOCALES || 'ko-KR,de-DE').split(',');
 const PORT = +(process.env.PORT || 8131);
 const START_MS = 30000;
 // 개발 목록의 어느 줄에서 시작하나: 기본은 "마을"(아래 기록으로). 확인용 줄(기록을 스스로 꾸민다)도 이름으로 고를 수 있다.
-const ENTRY = process.env.ENTRY || '마을';
+const ENTRY = process.env.ENTRY || '확인 0307: 사자마자 마을에';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.wasm': 'application/wasm', '.png': 'image/png',
   '.ttf': 'font/ttf', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown',
   '.webmanifest': 'application/manifest+json' };
@@ -76,9 +76,13 @@ async function run() {
     const errors = [];
     // 알려진 잡음(smoke.js KNOWN_NOISE와 같다): 번들의 quad_net 플러그인.
     pg.on('pageerror', (e) => { if (!/register_plugin is not defined/.test(String(e))) errors.push(String(e)); });
-    // 시계는 페이지를 열기 전에 건다. 게임이 뜬 뒤(타이틀)에 걸었더니 마을 전경(게임 장면)만 검게 찍혔다 — 창은 멀쩡했다.
-    // 열기 전에 걸면 사라진다(도중에 걸 때 게임이 보는 시각이 한 번 뛰는 탓으로 짐작). 그 뒤로는 가짜 시계만 흘린다.
-    await pg.clock.install({ time: new Date('2026-01-01T12:00:00Z') });
+    // 시계는 페이지를 열기 전에 걸고 **바로 멈춘다**. `clock.install`만으로는 시계가 멈추지 않는다 — 실제 시간과 함께 계속 흐르고
+    // `runFor`가 그 위에 더할 뿐이다(Playwright 1.63에서 잼: install 뒤 실제 0.5초 = 가짜 0.5초, `pauseAt` 뒤에는 0).
+    // 그래서 같은 빌드를 두 번 찍으면 스크립트가 걸린 실제 시간만큼 게임 시각이 달랐다(입자·몸짓·걷는 거리까지).
+    // `pauseAt` 뒤로는 `runFor`로 흘린 만큼만 흐른다. 게임이 뜬 뒤에 걸면 시각이 한 번 뛰어 게임 장면이 검게 찍힌다 — 열기 전에.
+    const T0 = new Date('2026-01-01T12:00:00Z');
+    await pg.clock.install({ time: T0 });
+    await pg.clock.pauseAt(new Date(T0.getTime() + 1000));
     let now = 0;                                              // 가짜 시계가 흐른 ms
     const tick = async (ms) => { await pg.clock.runFor(ms); now += ms; };
     await pg.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'load' });
@@ -93,9 +97,12 @@ async function run() {
     }
     if (now > START_MS - 10000) throw new Error(`로딩이 너무 길었다(가짜 ${now}ms) — START_MS를 늘린다`);
     await tick(START_MS - now); await pg.focus('#glcanvas');
-    const press = async (k, ms = 300) => { await pg.keyboard.down(k); await tick(50); await pg.keyboard.up(k); await tick(ms); };
-    const hold = async (k, ms) => { await pg.keyboard.down(k); await tick(ms); await pg.keyboard.up(k); await tick(250); };
-    const shot = async (tag) => { await pg.screenshot({ path: path.join(OUT, `${lang}_${tag}.png`) }); };
+    // 키 이벤트가 페이지에서 처리된 뒤에 시계를 흘린다(빈 evaluate 한 번 = 메인 스레드 한 바퀴): 안 그러면 가끔 키가 한 프레임 늦는다.
+    const key = async (down, k) => { await (down ? pg.keyboard.down(k) : pg.keyboard.up(k)); await pg.evaluate(() => 0); };
+    const press = async (k, ms = 300) => { await key(true, k); await tick(50); await key(false, k); await tick(ms); };
+    const hold = async (k, ms) => { await key(true, k); await tick(ms); await key(false, k); await tick(250); };
+    // 찍기 전에 실제 시간으로 잠깐: 마지막으로 그린 프레임이 화면에 올라온 뒤에 찍는다(가짜 시계와 상관없는 Node 쪽 기다림).
+    const shot = async (tag) => { await new Promise((r) => setTimeout(r, 80)); await pg.screenshot({ path: path.join(OUT, `${lang}_${tag}.png`) }); };
 
     await press('ArrowUp', 300); await press('Enter', 800);    // 타이틀: 위로 = 마지막 줄(개발)
     for (let i = 0; i < VILLAGE[0]; i++) await press('ArrowRight', 120);
@@ -104,28 +111,48 @@ async function run() {
     for (let i = 0; i < 14; i++) await press('Enter', 400);  // 들어서며 나오는 한마디를 넘긴다(어느 줄이 나올지는 난수 — 넉넉히)
     await tick(1000);
     await shot('01_village');
-    // 텃밭(뿌리 길 오른쪽 아래): 창 → 둘째 칸 → 빈 셋째 칸에서 씨앗 바꾸기.
+    // 텃밭(뿌리 길 오른쪽 아래): 창 → 칸마다 → 빈 칸에서 씨앗 바꾸고 심기 → 자라는 칸에서 확인 → 다 자란 칸 거두기.
     await hold('ArrowRight', 330); await hold('ArrowDown', 220);
     await shot('02_garden_walk');
     await press('KeyJ', 600); await shot('03_garden_ripe');
     await press('ArrowDown', 300); await shot('04_garden_growing');
-    await press('ArrowDown', 300); await press('ArrowRight', 300); await shot('05_garden_empty');
-    await press('Escape', 600);
-    // 포포(왼쪽 위 좌판): 마을 창 탭 넷.
-    await hold('ArrowUp', 1120); await hold('ArrowLeft', 1150); await hold('ArrowUp', 150); await hold('ArrowDown', 130); await hold('ArrowLeft', 200);
-    await shot('06_popo_walk');
-    await press('KeyJ', 700); await tick(4000);               // 인사말이 설명으로 바뀔 때까지
-    await shot('07_decor'); await press('ArrowDown', 300); await shot('08_decor_2');
-    await press('KeyE', 400); await shot('09_pack');
-    await press('KeyE', 400); await shot('10_lamp_done');
-    await press('ArrowDown', 300); await shot('11_lamp_next');
-    await press('ArrowDown', 300); await shot('12_lamp_first');
-    await press('KeyE', 400); await shot('13_notes');
+    await press('Enter', 300); await shot('05_garden_wait');
+    await press('ArrowDown', 300); await press('ArrowRight', 300); await shot('06_garden_empty');
+    await press('Enter', 300); await shot('07_garden_planted');
+    await press('ArrowUp', 300); await press('ArrowUp', 300); await press('Enter', 300); await shot('08_garden_harvested');
+    await press('Escape', 600); await tick(400); await shot('09_village_after_garden');
+    // 포포(왼쪽 위 좌판): 마을 창 탭 넷을 보고, 탭마다 한 번씩 해 본다.
+    await hold('ArrowUp', 1120); await hold('ArrowLeft', 1150); await hold('ArrowUp', 150); await hold('ArrowDown', 130); await hold('ArrowLeft', 320);
+    await tick(600);                                          // 멈춘 뒤 말 걸기 표시가 뜰 때까지(바로 누르면 헛손질이 된다)
+    await shot('10_popo_walk');
+    await press('KeyJ', 700); await shot('11_decor_hello'); await tick(4000);   // 인사말 → 설명
+    await shot('12_decor'); await press('ArrowDown', 300); await shot('13_decor_2');
+    await press('ArrowDown', 300); await press('Enter', 300); await shot('14_decor_bought');
+    await press('Enter', 300); await shot('15_decor_again');
+    await press('ArrowUp', 300); await press('ArrowUp', 300); await press('ArrowUp', 300); await press('Enter', 300); await shot('16_decor_journal');
+    await press('KeyE', 400); await shot('17_pack');
+    await press('ArrowRight', 300); await shot('18_pack_plus');
+    await press('ArrowRight', 300); await press('ArrowRight', 300); await shot('19_pack_full');
+    await press('ArrowLeft', 300); await shot('20_pack_minus');
+    await press('ArrowDown', 300); await press('ArrowDown', 300); await shot('21_pack_pouch');
+    await press('KeyE', 400); await shot('22_lamp_done'); await press('Enter', 300); await shot('23_lamp_done_msg');
+    await press('ArrowDown', 300); await shot('24_lamp_next');
+    await press('ArrowDown', 300); await shot('25_lamp_first');
+    await press('KeyE', 400); await shot('26_notes');
     for (let i = 0; i < 6; i++) await press('ArrowDown', 200);
-    await shot('14_notes_neighbor');
-    await press('Escape', 600); await shot('15_closed');
+    await shot('27_notes_neighbor');
+    for (let i = 0; i < 12; i++) await press('ArrowDown', 120);
+    await shot('28_notes_end');
+    await press('KeyQ', 400); await shot('29_tab_back');     // 앞 탭으로: 등불
+    // 보리에게 셋째 등불(300): 장면이 나오고, 끝나면 곁에 등불이 걸린다. 남은 반딧불로는 모모의 다음 이야기(200)가 모자란다.
+    await press('ArrowDown', 300); await press('Enter', 1500); await shot('30_lamp_scene');
+    for (let i = 0; i < 30; i++) await press('Enter', 500);
+    await tick(1500); await shot('31_village_after_lamp');
+    await press('KeyJ', 700); await press('KeyE', 400); await press('KeyE', 400);
+    await press('ArrowDown', 300); await press('ArrowDown', 300); await press('Enter', 300); await shot('32_lamp_poor');
+    await press('Escape', 600); await shot('33_closed');
     if (errors.length) { console.error(`${lang}: 페이지 에러 ${JSON.stringify(errors)}`); process.exitCode = 1; }
-    console.log(`${lang}: 15장 → ${OUT}`);
+    console.log(`${lang}: 33장 → ${OUT}`);
     await ctx.close();
   }
   await browser.close(); srv.close();
