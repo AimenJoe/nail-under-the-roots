@@ -527,7 +527,7 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
                 draw_well_fireflies(at, w.time, w.adv.village.map_or(0, |v| v.glow));
             }
         }
-        Drawable::DreamLoop(at) => draw_dream_loop(at, w.time),
+        Drawable::DreamLoop(at) => draw_dream_loop(art.hub.as_ref(), at, w.time),
         Drawable::Trace(i, at) => draw_quest_trace(art.hub.as_ref(), i, at, w.time),
         Drawable::Crop(p, at) => draw_crop(
             art.hub.as_ref(),

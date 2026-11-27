@@ -1050,7 +1050,10 @@ impl Renderer {
                     None => draw_seat(r, 0),
                 }
             }
-            Spot::Loop => draw_dream_loop(foot - vec2(0.0, 2.0), t),
+            Spot::Loop => {
+                let hub = art.and_then(|a| a.hub.as_ref());
+                draw_dream_loop(hub, foot - vec2(0.0, 2.0), t)
+            }
             Spot::Trace(i) => {
                 let hub = art.and_then(|a| a.hub.as_ref());
                 sorted::draw_quest_trace(hub, i as usize, foot - vec2(0.0, 3.0), t)

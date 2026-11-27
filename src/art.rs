@@ -38,7 +38,7 @@ pub struct Art {
     /// 굽기가 CPU 그림을 쓰니 그림도 둔다. 없으면 화단은 코드 그림, 바탕 들꽃은 없음.
     pub plants: Option<Texture2D>,
     pub plants_img: Option<Image>,
-    /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리·뿌리 길 입구 + 이웃 등불·샘 그릇·갈대 피리(시트 E1)·큰 깍정이·풀 방석·버섯 등(시트 E2)·솜털 잠자리·꽃밭·바람종(E3)·텃밭 셋(E5)·물 셋(E6). 없으면 팩·코드 그림.
+    /// 마을·쉼터 공용 물건(tools/art/hub_ai.py, 0224 A): 48칸(`HUB_*`) — 좌판·화덕·그루터기·바위·통나무 자리·뿌리 길 입구 + 이웃 등불·샘 그릇·갈대 피리(시트 E1)·큰 깍정이·풀 방석·버섯 등(시트 E2)·솜털 잠자리·꽃밭·바람종(E3)·텃밭 셋(E5)·물 셋(E6)·깃발 줄·실 그네·실 고리 막대(E4). 없으면 팩·코드 그림.
     pub hub: Option<Texture2D>,
     /// 큰 나무 잎 단계 다섯 칸(tree.png, `tools/art/tree_ai.py`, 0238).
     pub tree: Option<Texture2D>,
@@ -188,6 +188,11 @@ pub const HUB_BERRY_BUSH: u32 = 17;
 pub const HUB_PUDDLE: u32 = 18;
 pub const HUB_SPRING: u32 = 19;
 pub const HUB_POOL: u32 = 20;
+/// 시트 E4: 깃발 줄(꾸미기 5)·실 그네(꾸미기 8)·실 고리의 막대(흰 실을 묶은 막대 — 막대 꼭대기 = 발 + `HUB_LOOP_TOP`).
+pub const HUB_BUNTING: u32 = 21;
+pub const HUB_SWING: u32 = 22;
+pub const HUB_LOOP: u32 = 23;
+pub const HUB_LOOP_TOP: Vec2 = Vec2::new(-1.0, -21.0);
 
 /// 큰 나무 칸(tree.png, 0238): 잎 단계 0~4 다섯 칸 한 줄. 밑동(줄기 아래 가운데)이 칸의 (W/2, `TREE_BASE`).
 pub const TREE_W: f32 = 128.0;

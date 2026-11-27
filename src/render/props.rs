@@ -1216,32 +1216,48 @@ pub(super) fn draw_seat_sunny(sunny: &art::Sunny, r: Rect, petals: u8) {
 }
 
 /// 실 고리(0055): 막대 둘에 걸린 흰 실 고리(실뜨기 모양 하나). 둥실 떠오르며 보랏빛으로 숨 쉰다.
-pub(super) fn draw_dream_loop(at: Vec2, time: f32) {
+/// 막대는 `hub.png`의 그림(흰 실을 묶은 막대, 시트 E4)을 둘 세우고, 그 사이에 뜬 실뜨기와 빛은 코드 — 그림이 없으면 막대도 코드.
+pub(super) fn draw_dream_loop(hub: Option<&Texture2D>, at: Vec2, time: f32) {
     let (x, y) = (at.x.round(), at.y.round());
-    // 막대 둘
-    for dx in [-7.0, 7.0] {
-        draw_rectangle(x + dx - 1.0, y - 14.0, 2.0, 18.0, OUTLINE);
-        draw_rectangle(
-            x + dx - 0.5,
-            y - 13.0,
-            1.0,
-            16.0,
-            Color::new(0.55, 0.40, 0.30, 1.0),
-        );
-    }
+    // 막대 둘: (실이 묶이는 꼭대기 x, y)와 실뜨기가 뜨는 높이.
+    let (half, top, mid) = match hub {
+        Some(hub) => {
+            for dx in [-9.0, 9.0] {
+                art::draw_hub(hub, art::HUB_LOOP, vec2(x + dx, y + 4.0), WHITE);
+            }
+            (
+                9.0 + art::HUB_LOOP_TOP.x,
+                y + 4.0 + art::HUB_LOOP_TOP.y,
+                15.0,
+            )
+        }
+        None => {
+            for dx in [-7.0, 7.0] {
+                draw_rectangle(x + dx - 1.0, y - 14.0, 2.0, 18.0, OUTLINE);
+                draw_rectangle(
+                    x + dx - 0.5,
+                    y - 13.0,
+                    1.0,
+                    16.0,
+                    Color::new(0.55, 0.40, 0.30, 1.0),
+                );
+            }
+            (7.0, y - 13.0, 12.0)
+        }
+    };
     let bob = ((time * 1.6).sin() * 1.5).round();
     let glow = 0.35 + 0.25 * (time * 2.2).sin().abs();
     if !shadow_pass() {
         draw_circle(
             x,
-            y - 12.0 + bob,
+            y - mid + bob,
             9.0,
             Color::new(0.72, 0.62, 0.95, glow * 0.35),
         );
     }
     // 실뜨기 마름모 + 가로줄
     let c = Color::new(0.95, 0.93, 1.0, 1.0);
-    let (cx, cy) = (x, y - 12.0 + bob);
+    let (cx, cy) = (x, y - mid + bob);
     let pts = [
         vec2(cx - 6.0, cy),
         vec2(cx, cy - 5.0),
@@ -1260,8 +1276,8 @@ pub(super) fn draw_dream_loop(at: Vec2, time: f32) {
         1.0,
         Color::new(0.80, 0.72, 1.0, 1.0),
     );
-    draw_line(x - 7.0, y - 13.0, cx - 6.0, cy, 1.0, c);
-    draw_line(x + 7.0, y - 13.0, cx + 6.0, cy, 1.0, c);
+    draw_line(x - half, top, cx - 6.0, cy, 1.0, c);
+    draw_line(x + half, top, cx + 6.0, cy, 1.0, c);
     // 떠오르는 빛 알갱이
     for k in (0..2).filter(|_| !shadow_pass()) {
         let ph = (time * 0.7 + k as f32 * 0.5).fract();
@@ -1623,14 +1639,22 @@ pub(super) fn draw_well_fireflies(at: Vec2, time: f32, glow: u8) {
     }
 }
 
-/// 꾸미기 하나를 가진 그림으로: `hub.png`의 그림(바람종, 시트 E3) → 팩 그림 → 코드 그림 차례. 마을과 마을 창이 같이 쓴다.
+/// 꾸미기 하나를 가진 그림으로: `hub.png`의 그림(바람종·깃발 줄·실 그네, 시트 E3·E4) → 팩 그림 → 코드 그림 차례.
+/// 마을과 마을 창이 같이 쓴다.
 pub(super) fn draw_decor_art(art: Option<&art::Art>, i: usize, at: Vec2, time: f32) {
-    if let (Some(hub), 4) = (art.and_then(|a| a.hub.as_ref()), i) {
+    // (칸, 발밑 그늘의 반폭)
+    let frame = match i {
+        4 => Some((art::HUB_CHIME, 5.0)),
+        5 => Some((art::HUB_BUNTING, 18.0)),
+        8 => Some((art::HUB_SWING, 11.0)),
+        _ => None,
+    };
+    if let (Some(hub), Some((frame, half))) = (art.and_then(|a| a.hub.as_ref()), frame) {
         let foot = vec2(at.x.round(), at.y.round() + 6.0);
         if !shadow_pass() {
-            draw_ellipse(foot.x, foot.y - 1.0, 5.0, 2.0, 0.0, SHADOW_SOFT);
+            draw_ellipse(foot.x, foot.y - 1.0, half, 2.0, 0.0, SHADOW_SOFT);
         }
-        art::draw_hub(hub, art::HUB_CHIME, foot, WHITE);
+        art::draw_hub(hub, frame, foot, WHITE);
         return;
     }
     match art.and_then(|a| a.sunny.as_ref()) {

@@ -1193,7 +1193,7 @@ fn pic_knot(c: PicCtx) {
         art, time, mid, y, ..
     } = c;
     // 실 고리 곁에 선다(실뜨기 단계 · 실의 꿈).
-    props::draw_dream_loop(vec2(mid + 14.0, y), time);
+    props::draw_dream_loop(art.and_then(|a| a.hub.as_ref()), vec2(mid + 14.0, y), time);
     nail(
         art,
         ((time * 2.0) as u32) % 2,
