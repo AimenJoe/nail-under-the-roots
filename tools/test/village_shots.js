@@ -1,12 +1,17 @@
-// 마을 화면 기준선(0307 0단계): 리팩터링 앞뒤로 마을 전경·마을 창 탭·텃밭 창을 같은 순서로 찍어 견준다.
-// 가짜 시계(Playwright `page.clock`)로 멈춰 두고 흘리므로 같은 빌드는 같은 그림이 나와야 한다 — 먼저 같은 빌드를 두 번 찍어
-// 차이(잡음 바닥)를 잰다(KB solo-game-codebase-health-signals: 잡음을 안 재면 화면 비교는 아무것도 말해 주지 않는다).
+// 마을 화면 기준선(0307): 리팩터링 앞뒤로 마을 전경·마을 창 탭·텃밭 창을 같은 순서로 찍어 견준다(한국어·독일어 33장씩).
+// 같은 빌드가 같은 그림을 내게 하려고 한 것(하나씩 재서 확인 — docs/decisions/0307 "구현 — 2단계"):
+//   · 가짜 시계는 `install`만으로 멈추지 않는다 → 페이지를 열기 전에 `pauseAt`. 그 뒤로는 `runFor`로 흘린 만큼만 흐른다.
+//   · 키는 브라우저의 입력 길이 아니라 페이지 안에서 바로 쏜다(시계를 흘리는 명령과 순서가 보장되게).
+//   · 한 프레임을 흘리기 전에 받는 중인 요청·소리 풀기가 끝날 때까지 기다린다(로딩 프레임 수가 실제 시간에 기대지 않게).
+//   · 확인용 개발 줄(기록을 스스로 꾸미고 난수 씨앗을 고정한다, src/scenario.rs `Entry::prep`)에서 시작한다.
+// **남은 것**: 여섯 번에 한 번쯤 한 번의 실행이 통째로(두 언어 다, 첫 장부터) 한두 프레임 어긋난 갈래로 나온다 — 원인 못 찾음.
+//   견줬을 때 모든 장이 조금씩 다르면 그 실행이 다른 갈래다: 한 번 더 찍는다. 같은 갈래끼리는 픽셀까지 같다.
 //   cargo build --release --target wasm32-unknown-unknown
 //   python3 tools/web/assemble.py dist local dev
-//   node tools/test/village_shots.js dist out-a          # 한국어·독일어로 33장씩 찍는다
+//   node tools/test/village_shots.js dist out-a
 //   node tools/test/village_shots.js dist out-b
 //   python3 tools/test/shots_diff.py out-a out-b         # 파일마다 다른 픽셀 수
-// 기록은 개발 판(sandbox)이라 슬롯에 쓰지 않는다. 등불·텃밭·화단이 고루 보이게 채운 기록으로 연다.
+// 기록은 개발 판(sandbox)이라 슬롯에 쓰지 않는다. VERBOSE=1이면 로딩 프레임 수를 찍는다.
 const { chromium } = require('playwright');
 const http = require('http');
 const fs = require('fs');
@@ -68,8 +73,7 @@ async function run() {
   fs.mkdirSync(OUT, { recursive: true });
   const srv = await serve();
   for (const locale of LOCALES) {
-    // 언어마다 브라우저를 새로 띄운다: 한 브라우저에서 한국어 다음에 독일어를 찍으면 독일어 화면이 가끔(기계가 바쁠 때)
-    // 통째로 다른 갈래로 나왔다 — 독일어만 따로 네 번은 늘 같았다. 원인은 못 찾았다(0307).
+    // 언어마다 브라우저를 새로 띄운다(앞 언어의 상태가 남지 않게).
     const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     const lang = locale.slice(0, 2);
     const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale });

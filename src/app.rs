@@ -1691,8 +1691,8 @@ impl App {
                     if let Some(prep) = e.prep {
                         prep(&mut self.profile);
                         self.apply_assist();
-                        // 꾸민 상황은 난수도 같은 자리에서 시작한다(0307): 들어서며 나오는 한마디를 난수로 고르는데, 줄 길이가 달라
-                        // 대화가 닫히는 때가 달라지면 그 뒤 화면이 통째로 어긋난다 — 리팩터링 앞뒤 화면을 견주려면 같아야 한다.
+                        // 꾸민 상황은 난수도 같은 자리에서 시작한다(0307): 화면 기준선(tools/test/village_shots.js)이 같은 빌드에서
+                        // 같은 그림을 내게 — 입자·떨어지는 것의 난수가 켤 때마다 다른 자리에서 시작하지 않게.
                         macroquad::rand::srand(0x0307);
                     }
                     self.start(e.scenario);
