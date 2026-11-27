@@ -563,12 +563,45 @@ def shrink_head(k):
     return prep
 
 
+# 모델이 혼자 크게 그려 온 칸: 줄이기 전에 그 칸만 발 가운데를 기준으로 줄인다. 2타 들기는 다른 칸보다 키가 3px(12%) 컸다 —
+# 콤보 가운데에서 한 칸만 몸이 부풀었다.
+SCALE_V5 = {"windup1": 0.89}
+
+
+def scale_frames(scales):
+    """`Source.prep`: 이름이 `scales`에 있는 칸을 그 배율로(칸 상자 안에서 아래 가운데 기준, 빈 자리는 바탕)."""
+    def prep(img, frames):
+        out = img.copy()
+        for name, (x0, y0, x1, y1) in frames.items():
+            k = scales.get(name)
+            if not k:
+                continue
+            a = out[y0:y1, x0:x1]
+            fg = ~((a[..., 0] > 170) & (a[..., 1] < 110) & (a[..., 2] > 170))
+            ys, xs = np.nonzero(fg)
+            bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+            fig = Image.fromarray(a[by0:by1, bx0:bx1].astype(np.uint8), "RGB")
+            nw, nh = max(1, round(fig.width * k)), max(1, round(fig.height * k))
+            small = np.asarray(fig.resize((nw, nh), Image.NEAREST)).astype(int)
+            a[:] = (255, 0, 255)
+            left = (bx0 + bx1) // 2 - nw // 2
+            a[by1 - nh:by1, left:left + nw] = small
+        return out, frames
+    return prep
+
+
+def prep_v5(head):
+    """v5 원본의 손질: 혼자 큰 칸 줄이기 → 머리 줄이기."""
+    def prep(img, frames):
+        img, frames = scale_frames(SCALE_V5)(img, frames)
+        return shrink_head(head)(img, frames)
+    return prep
+
+
 def spec_v5(head=1.0):
-    """머리 배율을 준 v5 설정(`head` = 1이면 `SPEC_V5` 그대로)."""
-    if head == 1.0:
-        return SPEC_V5
+    """머리 배율을 준 v5 설정."""
     return Spec(
-        sources=[Source(s.path, s.frames, groups=s.groups, tidy=s.tidy, strip=s.strip, prep=shrink_head(head)) for s in SPEC_V5.sources],
+        sources=[Source(s.path, s.frames, groups=s.groups, tidy=s.tidy, strip=s.strip, prep=prep_v5(head)) for s in SPEC_V5.sources],
         palette_ref=SPEC_V5.palette_ref, body_h=SPEC_V5.body_h, breathe=SPEC_V5.breathe)
 
 
@@ -582,7 +615,7 @@ def build_v5(walk="gif", lines=True, head=HEAD_V5):
     idle_img = None
     for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W), (SHEET_V5_DIVE, _V5_D),
                           (SHEET_V5_FALL, _V5_F)):
-        img, _ = shrink_head(head)(np.asarray(Image.open(sheet).convert("RGB")).astype(int), frames)
+        img, _ = prep_v5(head)(np.asarray(Image.open(sheet).convert("RGB")).astype(int), frames)
         if sheet == SHEET_V5_A:
             idle_img = img
         for name, box in frames.items():
