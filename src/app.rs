@@ -1671,7 +1671,13 @@ impl App {
                 if let Some(i) = chosen.and_then(|k| items.get(k).copied()) {
                     // 개발 판(0269 B3): 여기서 연 판은 슬롯에 쓰지 않는다. 타이틀로 돌아오면 슬롯을 다시 읽는다.
                     crate::profile::set_sandbox(true);
-                    self.start(scenario::LIST[i].scenario);
+                    let e = &scenario::LIST[i];
+                    // 확인용 줄은 기록 사본을 그 상황으로 꾸민 뒤 시작한다(0307). 슬롯에는 쓰지 않는다.
+                    if let Some(prep) = e.prep {
+                        prep(&mut self.profile);
+                        self.apply_assist();
+                    }
+                    self.start(e.scenario);
                 }
             }
             Scene::Settings { back } => {

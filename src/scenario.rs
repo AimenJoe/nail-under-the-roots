@@ -163,394 +163,532 @@ pub struct Entry {
     pub name: &'static str,
     pub desc: &'static str,
     pub scenario: Scenario,
+    /// 시작하기 전에 개발 판의 기록 사본을 이 줄에 맞게 꾸민다(0307): 확인할 상황을 기록으로 만들어 둔다.
+    /// 슬롯에는 쓰지 않는다 — 개발 판은 sandbox고, 타이틀로 돌아오면 슬롯을 다시 읽는다(0269 B3).
+    pub prep: Option<fn(&mut crate::profile::Profile)>,
 }
 
-pub const LIST: [Entry; 64] = [
+pub const LIST: [Entry; 66] = [
     Entry {
         cat: Cat::Tools,
         name: "대화 검수",
         desc: "한마디 표·말 걸기·빈 자리 말을 미리 짠 기록(또는 지금 슬롯 복사본)·캐릭터마다 본다. 왜 나오고 왜 안 나오는지, 확인으로 실제 대화창(복사본에만 봄이 남는다).",
         scenario: Scenario::DialogueCheck,
+        prep: None,
     },
     Entry {
         cat: Cat::Tools,
         name: "연구실: 손맛 실험",
         desc: "손맛 수치(흔들림·피격 등급·공격·이동·박자) 37개를 보고 바꾼다. 프리셋 칸 셋(진행 기록과 따로). 게임 중에는 일시정지 메뉴의 \"연구실\"로도 연다.",
         scenario: Scenario::LabScreen,
+        prep: None,
     },
     Entry {
         cat: Cat::Tools,
         name: "연구실 연습장",
         desc: "피격 등급 비교(0269): 들쥐(보통·돌진은 센 공격), 두꺼비 혀(센 공격), 포자버섯(구름), 왼쪽 가시 덤불(바닥). 일시정지 연구실에서 값을 바꾸고 다시 맞아 본다.",
         scenario: Scenario::LabRange,
+        prep: None,
     },
     Entry {
         cat: Cat::Tools,
         name: "빈 방",
         desc: "적 없음. 이동·굴파기 손맛만 본다.",
         scenario: Scenario::Empty,
+        prep: None,
     },
     Entry {
         cat: Cat::Story,
         name: "오프닝 컷씬",
         desc: "컷씬 재생 확인. 끝나면 빈 방.",
         scenario: Scenario::CutsceneOnly,
+        prep: None,
     },
     Entry {
         cat: Cat::Story,
         name: "튜토리얼",
         desc: "컷씬 없이 플레이 튜토리얼만(이동→3연타→굴파기→솟구침).",
         scenario: Scenario::Tutorial,
+        prep: None,
     },
     Entry {
         cat: Cat::Story,
         name: "이야기 일러스트",
         desc: "모모가 돌아옴 → 반쪽 엔딩 → 참 엔딩·에필로그. 기록에 반쪽·참 엔딩이 있으면 놓아준 뒤의 장면(다시 내려간 첫 줄·짧은 엔딩·이뤄진 약속, 0270).",
         scenario: Scenario::StoryPreview,
+        prep: None,
     },
     Entry {
         cat: Cat::Story,
         name: "가장 깊은 곳",
         desc: "런의 끝: 할매와 실매듭 셋(0162). 셋 다 끊으면 반쪽 엔딩을 보고 타이틀로. 세 번 감기면 쉼터로.",
         scenario: Scenario::Deepest,
+        prep: None,
     },
     Entry {
         cat: Cat::Story,
         name: "마을로 올라오기",
         desc: "엔딩 뒤처럼 가장 깊은 곳(130m)에서 땅 위까지 올라와 뿌리 길 곁으로 튀어나온다(0204).",
         scenario: Scenario::Ascent,
+        prep: None,
     },
     Entry {
         cat: Cat::Story,
         name: "실의 기억",
         desc: "던전 시작방 곁 바닥에 실의 기억 넷째 조각. 밟으면 그림 + 내레이션(0273 A).",
         scenario: Scenario::Memory,
+        prep: None,
     },
     Entry {
         cat: Cat::Story,
         name: "부탁 물건",
         desc: "던전 시작방 곁 바닥에 모모의 꽃씨 주머니(부탁 물건). 밟으면 누구에게 가져갈지 알림(0273 B).",
         scenario: Scenario::QuestItem,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "필드(모험)",
         desc: "컷씬·튜토리얼 없이 필드에서. 남쪽 굴 입구로 던전, 저장 지점(초록 버섯 고리).",
         scenario: Scenario::Field,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "쉼터",
         desc: "첫 쉼터, 씨앗 40. 포포 가게·보리·빈 자리, 아래 뿌리 길에서 길 지도.",
         scenario: Scenario::Camp,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "쉼터: 둘째",
         desc: "둘째 쉼터 지도(뿌리 동굴). 오른쪽 아래 바위 너머 숨은 자리에 반딧불·씨앗. 셋째는 \"마지막 쉼터\".",
         scenario: Scenario::Camp2,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "마지막 쉼터",
         desc: "마지막 길(길 지도의 끝이 가장 깊은 곳). 씨앗 40.",
         scenario: Scenario::LastCamp,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "쉼터: 옆 굴",
         desc: "옆 굴 쉼터(0275, 넷째 길 앞 — 낮고 긴 굴, 왼쪽 위 좁은 틈에 숨은 자리). 길 지도의 끝은 가장 깊은 곳. 씨앗 40.",
         scenario: Scenario::SideCamp,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "셋째 길 끝: 물길 굴 묻기",
         desc: "엔딩을 본 기록처럼 물길 굴을 열고, 셋째 길 주인을 이긴 뒤 출구의 묻는 창(0275)부터. 가장 깊은 곳 / 물길 굴.",
         scenario: Scenario::SideAsk,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "쉼터: 실뿌리 둘",
         desc: "실뿌리 둘이 감긴 채 체력 1, 곁에 들쥐(0225). 맞으면 셋째가 감기며 런이 끝나는 연출 → 확인으로 마을.",
         scenario: Scenario::LastRootlet,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "마을",
         desc: "큰 나무 아래 마을(지금 기록의 모습).",
         scenario: Scenario::Village,
+        prep: None,
+    },
+    Entry {
+        cat: Cat::Places,
+        name: "확인 0307: 우물 반딧불",
+        desc: "맡긴 반딧불 400, 돌 우물(왼쪽 아래) 위 불빛 여섯. 큰 나무에서 재주를 깨울 때마다 불빛이 넷 → 둘로 바로 준다(전에는 마을에 다시 들어와야 줄었다). 일시정지 → 발자국에서 반딧불 보상을 받으면 다시 는다.",
+        scenario: Scenario::Village,
+        prep: Some(prep_check_well),
+    },
+    Entry {
+        cat: Cat::Places,
+        name: "확인 0307: 사자마자 마을에",
+        desc: "반딧불 450·씨앗 50. 포포에게서 꾸미기를 사고, 등불 탭에서 보리에게 건네고(곁에 등불, 반딧불 150), 텃밭에서 라벤더를 거둔다(화단에 핀다). 창을 닫자마자 마을이 그대로 바뀌어 있어야 한다.",
+        scenario: Scenario::Village,
+        prep: Some(prep_check_village),
     },
     Entry {
         cat: Cat::Places,
         name: "던전 바로",
         desc: "새로 생성한 던전 시작방에서. 전투방은 들어서면 문이 닫힌다. 보스를 잡으면 출구.",
         scenario: Scenario::Dungeon,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "길의 샘",
         desc: "길의 샘 칸. 쉼방 가운데 샘에 발을 담그면 가득 회복(0159).",
         scenario: Scenario::Spring,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "출구",
         desc: "적 없는 한 방 굴. 들어서면 내려가는 출구가 열린다(0159, 화면 밖이면 가장자리 표시).",
         scenario: Scenario::Exit,
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "실타래 굴: 뿌리",
         desc: "방 셋, 싸움방마다 가시뿌리 덤불. 끝방에 엘리트 + 졸개 둘, 이기면 장신구.",
         scenario: Scenario::Tangle(Biome::Roots),
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "실타래 굴: 심층",
         desc: "방 셋, 싸움하는 동안 천장에서 돌이 떨어진다. 끝방에 엘리트 + 졸개 둘.",
         scenario: Scenario::Tangle(Biome::Deep),
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "실타래 굴: 흰 실",
         desc: "흰 실 굴 3방 + 흰 실 그물(걸으면 느림, 발톱으로 끊김).",
         scenario: Scenario::Tangle(Biome::Silk),
+        prep: None,
     },
     Entry {
         cat: Cat::Places,
         name: "실타래 굴: 물길",
         desc: "물길 굴 3방 + 물살(0275: 흐르는 칸이 걷는 것을 민다 — 적도).",
         scenario: Scenario::Tangle(Biome::Water),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "넓은 방",
         desc: "둘째 길의 보통 굴, 화면 두 칸짜리 넓은 방 안(0244). 카메라가 방 안을 따라가고 두 칸의 적이 함께 깬다. 방마다 지형(기둥·골짜기·돌밭).",
         scenario: Scenario::Hall(crate::equipment::Character::Mole),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "넓은 방: 모모",
         desc: "넓은 방(0244)을 모모로.",
         scenario: Scenario::Hall(crate::equipment::Character::Momo),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "넓은 방: 도토",
         desc: "넓은 방(0244)을 도토로.",
         scenario: Scenario::Hall(crate::equipment::Character::Doto),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "방 짜임: 물결",
         desc: "시작방 옆 방이 물결(0257): 하나 남으면 다음 무리가 땅에서 솟는다. 문 곁에 씨앗 표지(붉은 테).",
         scenario: Scenario::Rooms(0),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "방 짜임: 매복",
         desc: "시작방 옆 방이 매복(0257): 가운데에 오면 둘레에서 떨어진다. 문 곁에 상자 표지.",
         scenario: Scenario::Rooms(1),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "방 짜임: 버티기",
         desc: "시작방 옆 방이 버티기(0257): 15초 동안 솟고, 다 되면 무너져 묻힌다. 문 곁에 반딧불 표지.",
         scenario: Scenario::Rooms(2),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "환경: 꽃 핀 입구",
         desc: "밝고 꽃이 많은 첫 환경. 돌격형 1 + 원거리형 1.",
         scenario: Scenario::InBiome(Biome::Meadow),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "환경: 뿌리 지대",
         desc: "꽃이 줄고 뿌리가 드러난다. 가장자리가 어두워진다.",
         scenario: Scenario::InBiome(Biome::Roots),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "환경: 어두운 심층",
         desc: "빛은 나일 주변뿐. 이끼와 빛나는 버섯.",
         scenario: Scenario::InBiome(Biome::Deep),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "환경: 흰 실 굴",
         desc: "굴토끼 옛 굴의 지대(0165). 보랏빛 흙에 흰 실 얼룩, 보풀.",
         scenario: Scenario::InBiome(Biome::Silk),
+        prep: None,
     },
     Entry {
         cat: Cat::Rooms,
         name: "환경: 물길 굴",
         desc: "옆 굴의 지대(0275). 젖은 청회색 돌, 청록 이끼, 물안개·물방울. 실제 굴처럼 굽는 격자 아레나 — 위 벽 틈에서 솟아 구불구불 내려가는 물줄기, 웅덩이 둘. 가재·소금쟁이·두꺼비.",
         scenario: Scenario::InBiome(Biome::Water),
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "튜토리얼 보스",
         desc: "필드 남쪽 공터 앞. 들어서면 문이 닫히고 들쥐 대장이 깬다. 이기면 굴 입구 → 쉼터.",
         scenario: Scenario::Boss,
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "모모 첫 만남",
         desc: "첫 길 끝 굴에서 시작. 끝방의 모모: 높이 뛰기·뒷발 차기. 이기면 달아나는 장면.",
         scenario: Scenario::Momo(0),
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "모모 세 번째",
         desc: "굴로 숨기·이어 뛰기까지. 이기면 모모가 돌아오는 장면(기록은 남기지 않는다).",
         scenario: Scenario::Momo(2),
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "도토",
         desc: "둘째 길 끝 굴. 끝방의 도토: 도토리 부채꼴·높이 뛰기·도토리 묻기. 이기면 기억해 내는 장면(기록은 남기지 않는다).",
         scenario: Scenario::Doto,
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "콩이",
         desc: "셋째 길 끝 굴. 끝방의 콩이: 굴러 튕기기·웅크려 버티기(발톱은 튕김, 솟구치기·드릴은 뚫음). 이기면 바위 발톱.",
         scenario: Scenario::Kongi,
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "토끼풀",
         desc: "굴토끼 옛 굴(흰 실 굴). 끝방의 토끼풀: 발 구르기(충격파·실 그물)·두 번 차기·내려앉기, 반 아래면 품기(실 한 가닥). 고치는 못 때린다.",
         scenario: Scenario::Clover,
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "넷째 길 끝: 무무",
         desc: "옆 굴(물길 굴) 끝방의 무무(0275 P5): 만남 장면 → 싸움 → 실이 풀리고 무무는 물길에 남는다(마을 샘이 다시 솟는다). 그림은 임시.",
         scenario: Scenario::Mumu,
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "보스 2단계: 대장",
         desc: "빈 방에 들쥐 대장, 체력 반(0233). 깨자마자 2단계 — 붉은 발밑 고리, 빨라진 예고·걸음, 덜 멈칫.",
         scenario: Scenario::BossHalf(Kind::Chief),
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "보스 2단계: 모모",
         desc: "첫 만남 모모, 체력 반(0233). 2단계면 첫 만남에도 굴로 숨고 뛰기를 두 번 잇는다.",
         scenario: Scenario::BossHalf(Kind::Momo),
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "무무(물길 아레나)",
         desc: "넷째 길의 주인 무무를 물줄기 아레나에서(0275 P5). 물줄기(점선 — 되받아침)·미끄러져 돌진(띠)·꼬리 물결(원판 — 피함). 땅속이면 못 찾는다. 그림은 나노바나나 `mumu.png`(56칸).",
         scenario: Scenario::MumuArena(false),
+        prep: None,
     },
     Entry {
         cat: Cat::Bosses,
         name: "보스 2단계: 무무",
         desc: "무무 체력 반 — 물줄기 세 갈래·돌진 두 번·물결 두 겹(0275 P5).",
         scenario: Scenario::MumuArena(true),
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "아레나 웨이브",
         desc: "예전 첫 시작: 방 하나에서 웨이브 1부터(손맛 시험장).",
         scenario: Scenario::Arena,
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "웨이브 3부터",
         desc: "4마리(종류는 무작위)부터 자동 웨이브.",
         scenario: Scenario::FromWave(3),
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "적 다섯 종",
         desc: "들쥐·생쥐 떼·시궁쥐·다람쥐·청설모. 도감 탭에 차례로 적힌다.",
         scenario: Scenario::AllSpecies,
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "새 졸개 다섯",
         desc: "땃쥐(두 번 물기)·고슴도치(가시 공)·두꺼비(혀)·박쥐(솟구치기 안 닿음)·포자버섯(구름). 심층에서.",
         scenario: Scenario::NewMobs,
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "물길 굴 잡몹",
         desc: "가재 둘(집게 띠 — 받아침, 맞으면 뒤로 튀고 벽에 박히면 어질어질)·소금쟁이 둘(물 위에서 빠름, 물결 고리 — 피함)·두꺼비 하나. 물줄기·웅덩이 아레나(0275 P4).",
         scenario: Scenario::WaterMobs,
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "들쥐 1마리",
         desc: "예고→돌진→멈춤 타이밍 확인.",
         scenario: Scenario::Chargers(1),
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "다람쥐 1마리",
         desc: "거리 유지·투사체. 솟구침으로 투사체 지우기.",
         scenario: Scenario::Shooters(1),
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "들쥐 3마리",
         desc: "판정 2: 위치 선정을 생각하게 되는가.",
         scenario: Scenario::Chargers(3),
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "1+1",
         desc: "들쥐 1 + 다람쥐 1. 다음 웨이브 없음.",
         scenario: Scenario::OneEach,
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "모모: 아레나",
         desc: "모모로 웨이브(0056). 뒷발 차기 콤보·깡충 회피·이어 뛰기(게이지 가득). 기록과 상관없이 바로.",
         scenario: Scenario::MomoArena,
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "도토: 아레나",
         desc: "도토로 웨이브(0195). 던지기 3타·강타(큰 도토리)·뒤로 뛰기·묻기(게이지 가득). 받아치기는 던지는 순간.",
         scenario: Scenario::DotoArena,
+        prep: None,
     },
     Entry {
         cat: Cat::Combat,
         name: "도토: 새 졸개",
         desc: "도토로 새 졸개 다섯(어두운 심층). 박쥐도 도토리는 닿는다. 고슴도치 가시는 큰 도토리·묻은 도토리로.",
         scenario: Scenario::DotoMobs,
+        prep: None,
     },
     Entry {
         cat: Cat::Items,
         name: "무기 비교",
         desc: "고른 캐릭터의 무기가 다 가방에(Naïl 발톱 넷, 모모·도토 넷씩, 0246), 빈 방에 허수아비 셋. 메뉴 → 가방에서 확인으로 바꿔 낀다.",
         scenario: Scenario::AllClaws,
+        prep: None,
     },
     Entry {
         cat: Cat::Items,
         name: "떨어지는 것 확인",
         desc: "체력 2/5. 반딧불 12마리와 산딸기 2개가 튀어나온다. 왼쪽엔 산딸기·지렁이·씨앗·뿌리 심장·장신구가 놓여 있다(주울 수 있다 표시).",
         scenario: Scenario::Loot,
+        prep: None,
     },
     Entry {
         cat: Cat::Items,
         name: "장신구·필살기 확인",
         desc: "장신구 5개가 가방에, 산딸기 3·지렁이 2, 분노 가득, 뿌리 심장 하나. 들쥐 2마리. L/B 드릴, I/Y 먹기, Q·E/LB·RB 넘기기.",
         scenario: Scenario::Gear,
+        prep: None,
     },
     Entry {
         cat: Cat::Items,
         name: "부술 수 있는 것 다섯",
         desc: "흙더미·뿌리혹·돌무더기·실뭉치·젖은 강돌(물길 굴, 0275). 쳐서 깨면 운에 따라 씨앗·산딸기·반딧불·지렁이(0177).",
         scenario: Scenario::Breakables,
+        prep: None,
     },
 ];
+
+/// 0307 확인용 마을의 바탕 기록: 이웃이 다 돌아왔고(반쪽 엔딩까지), 들어설 때의 한마디는 이미 들었고, 돌 우물이 놓여 있다.
+/// 슬롯 기록과 섞이지 않게 빈 기록에서 시작한다.
+fn check_village_base() -> crate::profile::Profile {
+    use crate::profile::{key, Profile};
+    let mut p = Profile::default();
+    for k in [
+        key::TUTORIAL,
+        key::BORI_BACK,
+        key::MOMO_BACK,
+        key::DOTO_MEMORY,
+        key::KONGI_BACK,
+        key::CLOVER_BACK,
+        key::HALF_ENDING,
+    ] {
+        p.set(k);
+    }
+    for id in ["village_intro", "halmae_arrive"] {
+        p.set(&key::line(id));
+    }
+    p.set(&crate::village::key_decor(crate::village::EXTRA_FIRST));
+    p
+}
+
+/// "확인 0307: 우물 반딧불": 반딧불 400(불빛 단계 3의 맨 아래) — 어느 첫 칸을 깨워도 우물 위 불빛이 한 단계 준다(R41 덧).
+fn prep_check_well(p: &mut crate::profile::Profile) {
+    *p = check_village_base();
+    p.set_count(crate::talents::KEY_LIGHT, 400);
+}
+
+/// "확인 0307: 사자마자 마을에": 꾸미기·등불·텃밭을 한 번씩 해 볼 수 있는 기록(R41).
+fn prep_check_village(p: &mut crate::profile::Profile) {
+    use crate::garden::{self, Bloom, Crop};
+    use crate::world::Who;
+    *p = check_village_base();
+    p.set_count(crate::talents::KEY_LIGHT, 450);
+    // 부탁 둘은 들어줬다(흔적 + 보리의 둘째·셋째 등불 이야기 조건).
+    for q in [crate::quests::POPO, crate::quests::BORI] {
+        p.set(crate::quests::DONE_KEYS[q]);
+    }
+    // 등불: 포포는 다 들었고(곁에 등불), 보리는 셋째만 남았다(300), 모모는 하나.
+    for (who, level) in [(Who::Popo, 3), (Who::Bori, 2), (Who::Momo, 1)] {
+        if let Some(l) = crate::lanterns::ALL.iter().find(|l| l.who == who) {
+            p.set_count(l.key, level);
+        }
+    }
+    // 텃밭: 첫 칸은 다 자란 라벤더, 둘째 칸은 자라는 산딸기. 심는 값을 치르고 남는 씨앗이 50.
+    let (flower, berry) = (Crop::Flower(Bloom::Lavender), Crop::Berry);
+    p.set_count(
+        crate::village::KEY_SEEDS,
+        50 + flower.price() + berry.price(),
+    );
+    let _ = garden::plant(p, 0, flower);
+    garden::grow(p);
+    let _ = garden::plant(p, 1, berry);
+    garden::grow(p);
+}
 
 /// 시나리오에 맞는 월드를 만든다.
 pub fn build(s: Scenario) -> World {
@@ -1214,6 +1352,70 @@ mod tests {
     use crate::input::Actions;
     use crate::tuning as t;
     use macroquad::math::Vec2;
+
+    /// 확인용 줄(0307)의 기록이 설명한 상황 그대로다: 우물 줄은 불빛 여섯에서 시작해 어느 첫 칸을 깨워도 한 단계 줄고
+    /// 발자국에 받을 반딧불이 있다, 마을 줄은 꾸미기·등불·텃밭을 한 번씩 할 수 있다.
+    #[test]
+    fn check_entries_prepare_what_they_describe() {
+        use crate::equipment::Character;
+        use crate::garden::{self, Plot};
+        use crate::journal::Reward;
+        use crate::lanterns::{self, Next};
+        use crate::profile::Profile;
+        use crate::talents::{TreeView, BRANCH_COUNT, KEY_LIGHT};
+        use crate::village::{State, KEY_SEEDS};
+        let prep = |name: &str| {
+            let e = LIST.iter().find(|e| e.name == name).expect(name);
+            assert_eq!(e.scenario, Scenario::Village);
+            // 슬롯 기록이 무엇이든 같은 상황이 된다.
+            let mut p = Profile::default();
+            p.set_count(KEY_LIGHT, 9999);
+            (e.prep.expect("꾸미는 함수"))(&mut p);
+            p
+        };
+        // 우물: 불빛 여섯(단계 3), 밑동이 빛난다. 첫 칸(깊이 0)은 어느 갈래든 살 수 있고, 사고 나면 단계가 내려간다.
+        let p = prep("확인 0307: 우물 반딧불");
+        let v = State::of(&p, Character::Mole);
+        assert!(v.decor[crate::village::EXTRA_FIRST], "돌 우물");
+        assert_eq!((v.glow, v.tree_ready), (3, true));
+        let have = p.count(KEY_LIGHT);
+        let view = TreeView {
+            p: &p,
+            ch: Character::Mole,
+        };
+        for b in 0..BRANCH_COUNT {
+            let cost = view.node(b, 0, 0).cost;
+            assert!(cost <= have, "갈래 {b} 첫 칸 {cost}");
+            assert!(
+                crate::village::glow_level(have - cost) < v.glow,
+                "갈래 {b}: 깨우면 불빛이 준다"
+            );
+        }
+        assert!(
+            crate::journal::visible(&p)
+                .iter()
+                .any(|g| g.ready(&p) && matches!(g.reward, Reward::Light(_))),
+            "발자국에 받을 반딧불 보상"
+        );
+        // 마을: 보리의 셋째 등불을 건넬 수 있고, 첫 칸이 다 자랐고, 씨앗 50.
+        let p = prep("확인 0307: 사자마자 마을에");
+        let bori = lanterns::ALL
+            .iter()
+            .position(|l| l.who == crate::world::Who::Bori)
+            .unwrap();
+        match lanterns::next(&p, bori, Character::Mole) {
+            Next::Ready { stage, cost } => {
+                assert_eq!(stage, 2);
+                assert!(cost <= p.count(KEY_LIGHT));
+            }
+            _ => panic!("보리의 셋째 이야기가 열려 있어야 한다"),
+        }
+        assert!(matches!(garden::plot(&p, 0), Plot::Ripe(_)));
+        assert!(matches!(garden::plot(&p, 1), Plot::Growing { .. }));
+        assert_eq!(p.count(KEY_SEEDS), 50);
+        let v = State::of(&p, Character::Mole);
+        assert!(v.lamps[0] && !v.lamps[bori], "포포 곁에는 이미 등불");
+    }
 
     /// 개발 시나리오 전부: 가만히 서서 600틱(10초)을 돌려도 panic이 없고 플레이어가 살아 있거나 쓰러졌거나 둘 중 하나다.
     /// 0269: 개발 목록의 묶음 탭마다 줄이 있고, 이름이 겹치지 않는다(연기 시험이 이름으로 고른다).

@@ -17,6 +17,8 @@ const OUT = path.resolve(process.argv[3] || 'village-shots');
 const LOCALES = (process.env.LOCALES || 'ko-KR,de-DE').split(',');
 const PORT = +(process.env.PORT || 8131);
 const START_MS = 30000;
+// 개발 목록의 어느 줄에서 시작하나: 기본은 "마을"(아래 기록으로). 확인용 줄(기록을 스스로 꾸민다)도 이름으로 고를 수 있다.
+const ENTRY = process.env.ENTRY || '마을';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.wasm': 'application/wasm', '.png': 'image/png',
   '.ttf': 'font/ttf', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown',
   '.webmanifest': 'application/manifest+json' };
@@ -34,7 +36,7 @@ const PROFILE = ['nail-profile 1',
   'count garden.flowers 4', 'count garden.spot.0 1', 'count garden.spot.1 3', 'count garden.spot.2 4', 'count garden.spot.3 7',
   'count garden.berries 1', ''].join('\n');
 
-// 개발 목록에서 "마을"의 자리: [묶음 번호, 묶음 안 자리](src/scenario.rs — smoke.js와 같은 읽기).
+// 개발 목록에서 시작할 줄(ENTRY)의 자리: [묶음 번호, 묶음 안 자리](src/scenario.rs — smoke.js와 같은 읽기).
 const VILLAGE = (() => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'scenario.rs'), 'utf8');
   const all = src.slice(src.indexOf('pub const ALL'), src.indexOf('];', src.indexOf('pub const ALL')));
@@ -42,10 +44,10 @@ const VILLAGE = (() => {
   const seen = {};
   for (const m of src.slice(src.indexOf('pub const LIST')).matchAll(/cat: Cat::(\w+),\s*name: "(.*?)"/g)) {
     const c = cats.indexOf(m[1]); seen[c] = seen[c] || 0;
-    if (m[2] === '마을') return [c, seen[c]];
+    if (m[2] === ENTRY) return [c, seen[c]];
     seen[c]++;
   }
-  throw new Error('개발 목록에 "마을"이 없다');
+  throw new Error(`개발 목록에 "${ENTRY}"이 없다`);
 })();
 
 function serve() {
