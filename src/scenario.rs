@@ -304,14 +304,14 @@ pub const LIST: [Entry; 66] = [
     },
     Entry {
         cat: Cat::Places,
-        name: "확인 0307: 우물 반딧불",
+        name: "확인: 우물 반딧불",
         desc: "맡긴 반딧불 400, 돌 우물(왼쪽 아래) 위 불빛 여섯. 큰 나무에서 재주를 깨울 때마다 불빛이 넷 → 둘로 바로 준다(전에는 마을에 다시 들어와야 줄었다). 일시정지 → 발자국에서 반딧불 보상을 받으면 다시 는다.",
         scenario: Scenario::Village,
         prep: Some(prep_check_well),
     },
     Entry {
         cat: Cat::Places,
-        name: "확인 0307: 사자마자 마을에",
+        name: "확인: 사자마자 마을에",
         desc: "반딧불 450·씨앗 50. 포포에게서 꾸미기를 사고, 등불 탭에서 보리에게 건네고(곁에 등불, 반딧불 150), 텃밭에서 라벤더를 거둔다(화단에 핀다). 창을 닫자마자 마을이 그대로 바뀌어 있어야 한다.",
         scenario: Scenario::Village,
         prep: Some(prep_check_village),
@@ -671,14 +671,14 @@ fn hear_village_lines(p: &mut crate::profile::Profile) {
     }
 }
 
-/// "확인 0307: 우물 반딧불": 반딧불 400(불빛 단계 3의 맨 아래) — 어느 첫 칸을 깨워도 우물 위 불빛이 한 단계 준다(R41 덧).
+/// "확인: 우물 반딧불": 반딧불 400(불빛 단계 3의 맨 아래) — 어느 첫 칸을 깨워도 우물 위 불빛이 한 단계 준다(R41 덧).
 fn prep_check_well(p: &mut crate::profile::Profile) {
     *p = check_village_base();
     p.set_count(crate::talents::KEY_LIGHT, 400);
     hear_village_lines(p);
 }
 
-/// "확인 0307: 사자마자 마을에": 꾸미기·등불·텃밭을 한 번씩 해 볼 수 있는 기록(R41).
+/// "확인: 사자마자 마을에": 꾸미기·등불·텃밭을 한 번씩 해 볼 수 있는 기록(R41).
 fn prep_check_village(p: &mut crate::profile::Profile) {
     use crate::garden::{self, Bloom, Crop};
     use crate::world::Who;
@@ -1401,7 +1401,7 @@ mod tests {
             p
         };
         // 우물: 불빛 여섯(단계 3), 밑동이 빛난다. 첫 칸(깊이 0)은 어느 갈래든 살 수 있고, 사고 나면 단계가 내려간다.
-        let p = prep("확인 0307: 우물 반딧불");
+        let p = prep("확인: 우물 반딧불");
         let v = State::of(&p, Character::Mole);
         assert!(v.decor[crate::village::EXTRA_FIRST], "돌 우물");
         assert_eq!((v.glow, v.tree_ready), (3, true));
@@ -1425,7 +1425,7 @@ mod tests {
             "발자국에 받을 반딧불 보상"
         );
         // 마을: 보리의 셋째 등불을 건넬 수 있고, 첫 칸이 다 자랐고, 씨앗 50.
-        let p = prep("확인 0307: 사자마자 마을에");
+        let p = prep("확인: 사자마자 마을에");
         let bori = lanterns::ALL
             .iter()
             .position(|l| l.who == crate::world::Who::Bori)

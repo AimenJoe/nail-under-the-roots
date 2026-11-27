@@ -75,6 +75,8 @@ pub struct Room {
     pub streams: Vec<(Vec2, Vec2)>,
     /// 고인 물웅덩이 칸(0275, 칸 가운데). 물살처럼 굽지만 흐르지도 밀지도 않는다.
     pub pools: Vec<Vec2>,
+    /// 격자·소품 밖에서 막는 자리(마을의 돌 우물처럼 놓은 꾸미기). `set_blockers`로만 바꾼다.
+    blockers: Vec<Rect>,
 }
 
 impl Room {
@@ -119,6 +121,7 @@ impl Room {
             webs: Vec::new(),
             streams: Vec::new(),
             pools: Vec::new(),
+            blockers: Vec::new(),
         }
     }
 
@@ -138,6 +141,7 @@ impl Room {
             webs: Vec::new(),
             streams: Vec::new(),
             pools: Vec::new(),
+            blockers: Vec::new(),
         };
         r.rebuild_solids();
         r
@@ -170,7 +174,16 @@ impl Room {
             }
         }
         solids.extend(self.props.iter().filter(|p| p.solid()).map(|p| p.rect));
+        solids.extend(self.blockers.iter().copied());
         self.solids = solids;
+    }
+
+    /// 격자·소품 밖에서 막는 자리를 정한다(마을의 꾸미기). 같은 목록이면 아무것도 하지 않는다.
+    pub fn set_blockers(&mut self, blockers: Vec<Rect>) {
+        if self.blockers != blockers {
+            self.blockers = blockers;
+            self.rebuild_solids();
+        }
     }
 
     /// 던전 방의 문을 잠그거나 연다(격자 방만).

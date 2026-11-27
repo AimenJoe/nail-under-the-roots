@@ -234,6 +234,8 @@ pub struct Adventure {
     pub marks: Vec<(char, Vec2)>,
     /// 보리 피리(0273 B)의 지난 틱 박자 자리(0..1). 0을 지나면 한 가락 — 그림의 음표(`render::sorted` 흔적)와 같은 주기.
     pipe_phase: f32,
+    /// 마을에 들어선 뒤 음표가 오른 횟수(피리 소리는 `PIPE_EVERY`번에 한 번).
+    pipe_count: u32,
     /// 이번 런에서 마지막으로 이름 카드를 보인 지대(같은 지대로 내려가면 다시 띄우지 않는다, 0156).
     pub shown_biome: Option<Biome>,
     /// 지대 이름 카드: (지대, 깊이 m, 남은 시간).
@@ -414,6 +416,7 @@ impl World {
         }
         w.adv.marks = p.marks.clone();
         w.adv.village = Some(v);
+        w.sync_village_blockers();
         w.player.pos = p.start;
         w.player.prev_pos = p.start;
         w.adv.place = Place::Village;
@@ -1086,8 +1089,32 @@ impl World {
         self.snap_cam();
     }
 
-    /// 보리의 갈대 피리(0273 B): 부탁을 들어준 마을에서, 보리 곁(`PIPE_HEAR` 안)에 있으면 음표가 오를 때마다 한 가락.
-    /// 주기는 그림과 같다(`PIPE_RATE`, 음표가 오르는 첫 순간 = 박자 자리가 0을 지날 때).
+    /// 마을 모습(`adv.village`)에 맞춰 막는 자리를 다시 정한다: 놓인 돌 우물은 지나갈 수 없다.
+    /// 마을을 지을 때와 기록이 바뀐 뒤(`App::sync_village`)에 부른다.
+    pub fn sync_village_blockers(&mut self) {
+        let Some(v) = self.adv.village.as_ref() else {
+            return;
+        };
+        let blockers = self
+            .adv
+            .marks
+            .iter()
+            .filter_map(|(c, at)| {
+                let i = crate::village::slot_decor(*c)?;
+                v.decor
+                    .get(i)
+                    .copied()
+                    .unwrap_or(false)
+                    .then(|| crate::village::decor_blocker(i, *at))
+                    .flatten()
+            })
+            .collect();
+        self.room.set_blockers(blockers);
+    }
+
+    /// 보리의 갈대 피리(0273 B): 부탁을 들어준 마을에서, 보리 바로 곁(`PIPE_HEAR` 안)에 있으면 음표가 `PIPE_EVERY`번
+    /// 오를 때마다 한 가락(사장 2026-11-27: 음표마다 불면 배경 음악을 방해했다 — 가까이서만, 드물게, 작게).
+    /// 음표의 주기는 그림과 같다(`PIPE_RATE`, 음표가 오르는 첫 순간 = 박자 자리가 0을 지날 때).
     pub fn pipe_tick(&mut self) -> bool {
         let Some(v) = self.adv.village.as_ref() else {
             return false;
@@ -1098,6 +1125,10 @@ impl World {
         let phase = (self.time * t::PIPE_RATE).fract();
         let wrapped = phase < self.adv.pipe_phase;
         self.adv.pipe_phase = phase;
+        if wrapped {
+            self.adv.pipe_count = self.adv.pipe_count.wrapping_add(1);
+        }
+        let wrapped = wrapped && self.adv.pipe_count.is_multiple_of(t::PIPE_EVERY);
         let near = self
             .adv
             .marks

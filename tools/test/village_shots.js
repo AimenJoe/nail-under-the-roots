@@ -23,7 +23,7 @@ const LOCALES = (process.env.LOCALES || 'ko-KR,de-DE').split(',');
 const PORT = +(process.env.PORT || 8131);
 const START_MS = 30000;
 // 개발 목록의 어느 줄에서 시작하나: 기본은 "마을"(아래 기록으로). 확인용 줄(기록을 스스로 꾸민다)도 이름으로 고를 수 있다.
-const ENTRY = process.env.ENTRY || '확인 0307: 사자마자 마을에';
+const ENTRY = process.env.ENTRY || '확인: 사자마자 마을에';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.wasm': 'application/wasm', '.png': 'image/png',
   '.ttf': 'font/ttf', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown',
   '.webmanifest': 'application/manifest+json' };

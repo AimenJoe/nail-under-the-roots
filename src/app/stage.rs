@@ -1236,8 +1236,8 @@ impl App {
             tw,
             FONT_PX + 4.0,
         );
-        // 마을 오른쪽 위의 숫자 두 줄(y 14~39)과 겹치면 말풍선을 그 왼쪽으로 민다(할매·실 고리 곁, 0089).
-        if village && r.y < 40.0 {
+        // 마을 오른쪽 위의 숫자 두 줄(y 18~43)과 겹치면 말풍선을 그 왼쪽으로 민다(할매·실 고리 곁, 0089).
+        if village && r.y < 44.0 {
             let seeds = fill(
                 s.village_seeds,
                 &[&self.profile.count(crate::village::KEY_SEEDS)],

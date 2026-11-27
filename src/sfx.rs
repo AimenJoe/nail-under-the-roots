@@ -616,7 +616,7 @@ async fn load_samples(samples: &[i16]) -> Sound {
 }
 
 /// 보리의 갈대 피리(0273 B): 솔·라·미(한 음 0.34초, 마지막은 길게), 사인 + 2배음 조금, 5Hz 떨림, 숨소리.
-/// 음마다 부드럽게 들어가고(0.04초) 잦아든다. 마을 소리라 작게(최대 0.22).
+/// 음마다 부드럽게 들어가고(0.04초) 잦아든다. 마을 소리라 작게(최대 0.12 — 0.22는 배경 음악 위에서 튀었다, 사장 2026-11-27).
 fn pipe() -> Vec<i16> {
     use std::f32::consts::TAU;
     let notes = [(784.0f32, 0.34f32), (880.0, 0.34), (659.0, 0.62)];
@@ -638,7 +638,7 @@ fn pipe() -> Vec<i16> {
             let noise = (rng as f32 / u32::MAX as f32) * 2.0 - 1.0;
             lp += (noise - lp) * 0.08;
             let v = (TAU * ph).sin() * 0.8 + (TAU * ph * 2.0).sin() * 0.15 + lp * 0.25;
-            out.push((v * env * 0.22 * i16::MAX as f32) as i16);
+            out.push((v * env * 0.12 * i16::MAX as f32) as i16);
         }
         start += d;
     }

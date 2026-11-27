@@ -194,6 +194,12 @@ pub const EXTRA_FIRST: usize = DECOR.len() + JOURNAL_DECOR.len();
 /// 꾸미기 전체 수(가게 + 저널 + 더한 것).
 pub const DECOR_ALL: usize = EXTRA_FIRST + EXTRA_DECOR.len();
 
+/// 놓으면 길을 막는 꾸미기의 자리(칸 가운데 `at` 기준). 돌 우물만: 몸이 커서 걸어 들어가면 우물 그림이 캐릭터를
+/// 덮었다(사장 2026-11-27). 나머지 꾸미기는 낮거나 가늘어 지나다닌다.
+pub fn decor_blocker(i: usize, at: macroquad::prelude::Vec2) -> Option<macroquad::prelude::Rect> {
+    (i == EXTRA_FIRST).then(|| macroquad::prelude::Rect::new(at.x - 8.0, at.y - 3.0, 16.0, 9.0))
+}
+
 /// 지도 글자 → 꾸미기 번호.
 pub fn slot_decor(c: char) -> Option<usize> {
     match c {
@@ -549,6 +555,36 @@ mod glow_tests {
             let g = super::glow_level(n);
             assert!(g >= last);
             last = g;
+        }
+    }
+}
+
+#[cfg(test)]
+mod blocker_tests {
+    /// 놓인 돌 우물은 길을 막고(걸어 들어가 그림에 덮이지 않게), 놓기 전에는 막지 않는다. 다른 꾸미기는 지나다닌다.
+    #[test]
+    fn the_stone_well_blocks_once_placed() {
+        use crate::equipment::Character;
+        let mut p = crate::profile::Profile::default();
+        let mut w = crate::world::World::village(super::State::of(&p, Character::Mole));
+        let at = w
+            .adv
+            .marks
+            .iter()
+            .find(|(c, _)| *c == 'u')
+            .map(|(_, at)| *at)
+            .expect("우물 자리");
+        assert!(!w.room.is_solid(at, 1.0), "놓기 전에는 빈 땅");
+        p.set(&super::key_decor(super::EXTRA_FIRST));
+        w.adv.village = Some(super::State::of(&p, Character::Mole));
+        w.sync_village_blockers();
+        assert!(w.room.is_solid(at, 1.0), "놓으면 막는다");
+        for i in 0..super::DECOR_ALL {
+            assert_eq!(
+                super::decor_blocker(i, at).is_some(),
+                i == super::EXTRA_FIRST,
+                "꾸미기 {i}"
+            );
         }
     }
 }

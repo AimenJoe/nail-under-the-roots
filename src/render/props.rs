@@ -1572,6 +1572,7 @@ pub(super) fn draw_great_tree(at: Vec2, growth: u8, time: f32) {
 /// 마을 꾸미기(0045): 0 꽃밭, 1 반딧불 등, 2 빛나는 버섯, 3 통나무 의자, 4 바람종, 5 깃발 줄.
 /// 마을 꾸미기, 팩 그림판(0066): 0 꽃밭 = 열매·꽃 덤불 + 들꽃, 2 빛나는 버섯 = 파란 버섯 셋(움직임).
 /// 돌 우물 위를 천천히 떠도는 반딧불(0269 2.9 A): 맡긴 반딧불 단계 `glow`(0..4)마다 둘씩, 빛은 숨 쉬듯.
+/// 한 점짜리는 풀밭 위에서 안 보였다(사장 2026-11-27 "우물에 불빛 안 보임") — 두 점 몸에 둥근 빛을 두르고 더 넓게 돈다.
 pub(super) fn draw_well_fireflies(at: Vec2, time: f32, glow: u8) {
     let n = glow.min(4) as usize * 2;
     for k in 0..n {
@@ -1579,23 +1580,25 @@ pub(super) fn draw_well_fireflies(at: Vec2, time: f32, glow: u8) {
         let a = time * (0.35 + 0.05 * (k % 3) as f32) + ph;
         // 우물 테두리보다 위 허공에서(풀 위 점과 섞이지 않게).
         let p = vec2(
-            at.x + a.cos() * (6.0 + (k % 2) as f32 * 5.0),
-            at.y - 22.0 + (a * 1.7).sin() * 4.0 - (k % 3) as f32 * 4.0,
+            at.x + a.cos() * (8.0 + (k % 2) as f32 * 7.0),
+            at.y - 20.0 + (a * 1.7).sin() * 5.0 - (k % 3) as f32 * 5.0,
         )
         .round();
         let on = 0.5 + 0.5 * (time * 2.1 + ph).sin();
-        // 낮에도 보이게: 따뜻한 노란 점 + 십자 모양으로 번지는 빛(풀의 초록 점과 모양·색 둘 다 다르게).
-        let halo = Color::new(1.0, 0.92, 0.35, 0.35 * on);
-        for (dx, dy) in [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)] {
-            draw_rectangle(p.x + dx, p.y + dy, 1.0, 1.0, halo);
-        }
-        draw_rectangle(
-            p.x,
-            p.y,
-            1.0,
-            1.0,
-            Color::new(1.0, 1.0, 0.75, 0.55 + 0.45 * on),
+        // 낮에도 보이게: 따뜻한 노란 빛 무리(둥글게 두 겹) + 밝은 두 점 몸. 풀의 초록 점과 크기·모양·색이 다르다.
+        draw_circle(
+            p.x + 1.0,
+            p.y + 1.0,
+            5.0,
+            Color::new(1.0, 0.90, 0.35, 0.16 + 0.16 * on),
         );
+        draw_circle(
+            p.x + 1.0,
+            p.y + 1.0,
+            3.0,
+            Color::new(1.0, 0.93, 0.45, 0.34 + 0.34 * on),
+        );
+        draw_rectangle(p.x, p.y, 2.0, 2.0, Color::new(1.0, 1.0, 0.82, 1.0));
     }
 }
 

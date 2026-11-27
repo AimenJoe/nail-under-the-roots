@@ -35,6 +35,9 @@ pub(super) struct Detail {
     pub pic: VillagePic,
     pub name: String,
     pub info: String,
+    /// 설명을 늘 그림 아래에 쓴다. 등불·텃밭처럼 줄마다 글 길이가 달라지는 탭은 켠다 — 안 켜면 짧은 글은 그림 오른쪽,
+    /// 긴 글은 그림 아래로 가서 같은 탭 안에서 자리가 줄마다 달랐다(사장 2026-11-27 "콩이의 이야기는 왜 아래쪽에").
+    pub below: bool,
 }
 
 /// 고른 줄에 한 일: 확인(또는 고른 줄을 다시 누름) / 왼쪽·− / 오른쪽·+.
@@ -442,8 +445,8 @@ impl App {
         ui.rect(face, ui::PANEL_LIGHT);
         let happy = self.village_ui.say.is_some_and(|m| m.happy);
         let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
+        // 테두리는 두르지 않는다: 초상화가 칸 밖으로 나오게 그려져 있어 테두리가 얼굴을 가로질렀다(사장 2026-11-27).
         self.renderer.draw_portrait(ui, face, frame);
-        ui.rect_lines(face, ui::BORDER);
         let say = match self.village_ui.say {
             Some(m) => tr(m.text).to_string(),
             None => {
@@ -487,7 +490,7 @@ impl App {
                 body.right() - list.right() - 8.0,
                 body.h,
             );
-            let y = self.draw_village_detail(ui, detail, d.pic, &d.name, &d.info);
+            let y = self.draw_village_detail(ui, detail, &d);
             if let Some(extra) = t.extra {
                 extra(self, ui, list, detail, y, i);
             }
@@ -546,14 +549,8 @@ impl App {
     }
 
     /// 오른쪽 칸: 큰 그림, 이름, 그 아래 한 줄(값·놓음·얻는 곳). 그 아래 줄 `y`를 돌려준다(짐은 거기에 −·+).
-    fn draw_village_detail(
-        &mut self,
-        ui: &Ui,
-        r: Rect,
-        pic: VillagePic,
-        name: &str,
-        info: &str,
-    ) -> f32 {
+    fn draw_village_detail(&mut self, ui: &Ui, r: Rect, d: &Detail) -> f32 {
+        let (pic, name, info) = (d.pic, d.name.as_str(), d.info.as_str());
         let t = get_time() as f32;
         let art = Rect::new(r.x, r.y, 44.0, 44.0);
         ui.rect(art, Color::new(0.20, 0.30, 0.18, 1.0));
@@ -571,7 +568,7 @@ impl App {
         // 그림 오른쪽은 세 줄 자리(44px). 이름과 함께 넘치면 설명은 그림 아래에 칸 폭 그대로 — 등불 다음 이야기·텃밭 자라는 중처럼
         // 긴 글이 잘려 값이 안 보이던 것(0306 뒤 검토). 아래로 간 줄 수만큼 돌려주는 y가 내려간다.
         let side = ui::wrap(ui, info, r.right() - tx, FONT_PX);
-        if names.len() + side.len() <= 3 {
+        if !d.below && names.len() + side.len() <= 3 {
             for l in &side {
                 ui.text(l, tx, y + 2.0, FONT_PX, ui::TEXT);
                 y += 12.0;
@@ -828,6 +825,7 @@ fn decor_detail(c: &Ctx, at: usize) -> Detail {
         pic: VillagePic::Decor(i),
         name: tr(decor_name(i)).to_string(),
         info,
+        below: false,
     }
 }
 
@@ -873,6 +871,7 @@ fn pack_detail(_: &Ctx, i: usize) -> Detail {
         pic: VillagePic::Pack(p.kind),
         name: pack_name(p),
         info: fill(i18n::s().shop_price, &[&p.price]),
+        below: false,
     }
 }
 
@@ -909,6 +908,7 @@ fn notes_detail(c: &Ctx, i: usize) -> Detail {
         pic: VillagePic::Spot(note.spot),
         name: tr(note.title).to_string(),
         info: String::new(),
+        below: false,
     }
 }
 
@@ -947,6 +947,7 @@ fn lamp_detail(c: &Ctx, at: usize) -> Detail {
         pic: VillagePic::Neighbor(ALL[i].who),
         name: tr(ALL[i].name).to_string(),
         info,
+        below: true,
     }
 }
 
@@ -1000,7 +1001,12 @@ fn garden_detail(c: &Ctx, i: usize) -> Detail {
             s.garden_ripe_flower.to_string(),
         ),
     };
-    Detail { pic, name, info }
+    Detail {
+        pic,
+        name,
+        info,
+        below: true,
+    }
 }
 
 #[cfg(test)]

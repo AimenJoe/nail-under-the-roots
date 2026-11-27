@@ -1942,26 +1942,29 @@ impl App {
                     let ready = self.tree_affordable();
                     let n = self.profile.count(crate::village::KEY_SEEDS);
                     let t = fill(i18n::s().village_seeds, &[&n]);
-                    ui.text_right(&t, 316.0, 14.0, FONT_PX, ui::TEXT);
+                    // 오른쪽 위 게이지 판(y 15까지) 아래에서 시작하고, 밝은 바닥·나무 위에서도 읽히게 테두리(사장 2026-11-27:
+                    // 글자가 게이지 판과 겹쳤다).
+                    let out = ui.with_outline();
+                    out.text_right(&t, 316.0, 18.0, FONT_PX, ui::TEXT);
                     let l = self.profile.count(crate::talents::KEY_LIGHT);
                     let t = fill(i18n::s().tree_light, &[&l]);
                     let pulse =
                         (0.5 + 0.5 * (self.world.time * 4.0).sin()) * f32::from(u8::from(ready));
                     let c = if ready { ui::ACCENT } else { ui::TEXT };
-                    ui.text_right(&t, 316.0, 27.0, FONT_PX, c);
+                    out.text_right(&t, 316.0, 31.0, FONT_PX, c);
                     // 반딧불 점(글 왼쪽): 깨울 수 있으면 숨 쉬듯 커진다.
                     let x = 316.0 - ui.text_w(&t, FONT_PX) - 6.0;
                     let g = crate::world::GLOW;
                     ui.rect(
                         Rect::new(
                             x - 1.0 - pulse,
-                            31.0 - pulse,
+                            35.0 - pulse,
                             3.0 + 2.0 * pulse,
                             3.0 + 2.0 * pulse,
                         ),
                         Color::new(g.r, g.g, g.b, 0.35 + 0.35 * pulse),
                     );
-                    ui.rect(Rect::new(x, 32.0, 1.0, 1.0), g);
+                    ui.rect(Rect::new(x, 36.0, 1.0, 1.0), g);
                 }
                 // 말풍선은 마을 숫자(오른쪽 위) 뒤에: 할매·실 고리 곁에서 숫자가 말풍선 위로 찍혔다(0089).
                 if self.gift.is_none() {
@@ -2065,6 +2068,7 @@ impl App {
     pub(super) fn sync_village(&mut self) {
         if self.world.adv.village.is_some() {
             self.world.adv.village = Some(self.village_state());
+            self.world.sync_village_blockers();
         }
     }
 
