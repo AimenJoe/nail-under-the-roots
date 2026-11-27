@@ -656,10 +656,26 @@ fn check_village_base() -> crate::profile::Profile {
     p
 }
 
+/// 마을에 들어설 때의 한마디(모두 한 번짜리)는 다 들은 것으로 한다: 확인하러 들어가면 대화 없이 바로 걷는다.
+/// 기록을 다 꾸민 뒤에 부른다(부탁·등불 깃발이 새 줄을 열 수 있다).
+fn hear_village_lines(p: &mut crate::profile::Profile) {
+    for _ in 0..64 {
+        match crate::story::take(
+            p,
+            crate::story::When::Village,
+            crate::equipment::Character::Mole,
+        ) {
+            Some(l) if l.once => {}
+            _ => break,
+        }
+    }
+}
+
 /// "확인 0307: 우물 반딧불": 반딧불 400(불빛 단계 3의 맨 아래) — 어느 첫 칸을 깨워도 우물 위 불빛이 한 단계 준다(R41 덧).
 fn prep_check_well(p: &mut crate::profile::Profile) {
     *p = check_village_base();
     p.set_count(crate::talents::KEY_LIGHT, 400);
+    hear_village_lines(p);
 }
 
 /// "확인 0307: 사자마자 마을에": 꾸미기·등불·텃밭을 한 번씩 해 볼 수 있는 기록(R41).
@@ -698,6 +714,7 @@ fn prep_check_village(p: &mut crate::profile::Profile) {
     garden::grow(p);
     let _ = garden::plant(p, 1, berry);
     garden::grow(p);
+    hear_village_lines(p);
 }
 
 /// 시나리오에 맞는 월드를 만든다.
@@ -1425,6 +1442,13 @@ mod tests {
         assert_eq!(p.count(KEY_SEEDS), 50);
         let v = State::of(&p, Character::Mole);
         assert!(v.lamps[0] && !v.lamps[bori], "포포 곁에는 이미 등불");
+        // 들어설 때의 한마디는 다 들은 것으로 되어 있다: 대화 없이 바로 걷는다(화면 기준선이 대화가 닫히는 때에 기대지 않는다).
+        assert!(
+            crate::story::candidates(&p, crate::story::When::Village, Character::Mole)
+                .iter()
+                .all(|c| !c.chosen),
+            "마을에 들어설 때 대화가 나오지 않는다"
+        );
         // 포포에게 말을 걸면 부탁이 아니라 마을 창이 열린다.
         assert_eq!(
             crate::quests::talk(crate::world::Who::Popo, &p).map(|(q, _)| q),

@@ -115,7 +115,7 @@ async function run() {
     for (let i = 0; i < VILLAGE[1]; i++) await press('ArrowDown', 120);
     // 장면이 시작하며 읽는 것(마을의 곡·환경음)도 같은 까닭으로 실제 시간을 주며 흘린다(가짜 시간으로는 전과 같은 3초).
     await press('Enter', 100); await settle(60); await tick(3000 - 100 - 60 * 16);
-    for (let i = 0; i < 14; i++) await press('Enter', 400);  // 들어서며 나오는 한마디를 넘긴다(어느 줄이 나올지는 난수 — 넉넉히)
+    // 확인용 줄은 들어설 때의 한마디를 다 들은 기록이라 대화가 없다(src/scenario.rs `hear_village_lines`) — 넘길 것 없이 바로 찍는다.
     await tick(1000);
     await shot('01_village');
     // 텃밭(뿌리 길 오른쪽 아래): 창 → 칸마다 → 빈 칸에서 씨앗 바꾸고 심기 → 자라는 칸에서 확인 → 다 자란 칸 거두기.
