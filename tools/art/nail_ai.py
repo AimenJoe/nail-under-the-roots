@@ -434,21 +434,80 @@ def stamp_face(spr, shines):
     return out
 
 
-def build_v5(walk="step"):
+LINE = (43, 29, 42)     # 변환기가 두르는 외곽선 색(sprite_ai.OUTLINE)
+
+
+def ink_lines(spr, sheet, box, strength=0.72, cover=0.26):
+    """원본에 그려진 **안쪽 선**(머리와 몸 사이·앞발 둘레·목도리 주름)을 줄인 그림에 그늘 줄로 되살린다.
+
+    원본의 선은 한 블록(≈6px) 굵기라 키 24로 줄이면(원본 15px = 한 점) 다수결에서 늘 져서 사라지고, 몸이 한 덩어리가 된다.
+    줄인 점마다 원본에서 그 점이 덮는 네모 안의 "어두운 선"(실루엣 가장자리에서 9px 안쪽) 비율이 `cover`를 넘으면 그 점을
+    제 색의 어두운 음영(`strength`배)으로 — 검은 선이 아니라 그 자리 색의 그늘이라 눈에 거슬리지 않는다."""
+    x0, y0, x1, y1 = box
+    a = np.asarray(Image.open(sheet).convert("RGB")).astype(int)[y0:y1, x0:x1]
+    fg = ~((a[..., 0] > 170) & (a[..., 1] < 110) & (a[..., 2] > 170))
+    ys, xs = np.nonzero(fg)
+    fx0, fx1, fy0, fy1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    inner = np.asarray(Image.fromarray((fg * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(19))) > 0
+    dark = (a.sum(-1) < 210) & inner
+    out = spr.copy()
+    oys, oxs = np.nonzero(out[..., 3] > 0)
+    ox0, ox1, oy0, oy1 = oxs.min(), oxs.max() + 1, oys.min(), oys.max() + 1
+    sx, sy = (fx1 - fx0) / (ox1 - ox0), (fy1 - fy0) / (oy1 - oy0)
+    for y in range(oy0, oy1):
+        for x in range(ox0, ox1):
+            if out[y, x, 3] == 0 or tuple(out[y, x, :3]) == LINE:
+                continue
+            cell = dark[int(fy0 + (y - oy0) * sy):int(fy0 + (y - oy0 + 1) * sy), int(fx0 + (x - ox0) * sx):int(fx0 + (x - ox0 + 1) * sx)]
+            if cell.size and cell.mean() >= cover:
+                out[y, x, :3] = (out[y, x, :3].astype(float) * strength).astype(np.uint8)
+    return out
+
+
+def tinted_outline(cell, lit=0.40, shade=0.27, keep=0.25):
+    """한 색 외곽선을 **곁의 색을 따르는 외곽선**으로(도트의 sel-out): 외곽선 점마다 맞닿은 안쪽 점들의 평균색을 어둡게 한 색.
+    분홍 앞발 둘레는 짙은 장미색, 목도리는 짙은 녹빛, 털은 짙은 갈색이 된다. 빛이 왼쪽 위에서 오니 위·왼쪽 가장자리는 조금 밝게
+    (`lit`), 아래·오른쪽은 더 어둡게(`shade`). 전체가 한 그림으로 묶이게 원래 선 색을 `keep`만큼 섞는다. 안쪽 이웃이 없는 점(가는 끝)은 그대로."""
+    out = cell.copy()
+    H, W = cell.shape[:2]
+    line = (cell[..., 3] > 0) & np.all(cell[..., :3] == LINE, axis=-1)
+    body = (cell[..., 3] > 0) & ~line
+    for y, x in zip(*np.nonzero(line)):
+        cols, dy, dx = [], 0.0, 0.0
+        for ny in (y - 1, y, y + 1):
+            for nx in (x - 1, x, x + 1):
+                if 0 <= ny < H and 0 <= nx < W and body[ny, nx]:
+                    cols.append(cell[ny, nx, :3].astype(float))
+                    dy += ny - y
+                    dx += nx - x
+        if not cols:
+            continue
+        k = lit if (dy + dx) > 0 else shade          # 안쪽이 아래·오른쪽에 있으면 이 점은 위·왼쪽 가장자리
+        c = np.mean(cols, axis=0) * k
+        out[y, x, :3] = (c * (1 - keep) + np.array(LINE) * keep).astype(np.uint8)
+    return out
+
+
+def build_v5(walk="step", lines=True):
     """v5 시트. `walk`: "step" = 걷기 첫 칸에서 발만 딛는 네 칸(0241, 지금까지의 방식), "sheet" = 받은 걷기 네 칸 그대로,
     "gif" = 걷기 영상에서 뽑은 네 칸."""
     spr = convert(SPEC_V5)
     for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W)):
         for name, box in frames.items():
+            if lines:
+                spr[name] = ink_lines(spr[name], sheet, box)
             spr[name] = stamp_face(spr[name], eye_shines(sheet, box))
+    if lines:
+        spr["idle_b"] = ink_lines(spr["idle_b"], SHEET_V5_A, _V5_A["idle_a"])
     spr["idle_b"] = stamp_face(spr["idle_b"], [(x, y + 1 / BODY_H_V5) for x, y in eye_shines(SHEET_V5_A, _V5_A["idle_a"])])
-    sat = lambda k: fill_holes(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT))
+    edge = tinted_outline if lines else (lambda c: c)
+    sat = lambda k: edge(fill_holes(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT)))
     if walk == "step":
         walk4 = step_cycle(sat("walk_1"), FOOT - 1)
     else:
         walk4 = [sat(f"{'walkg' if walk == 'gif' else 'walk'}_{i}") for i in (1, 2, 3, 4)]
     rows = [
-        [fill_holes(seat(spr["idle_a"], CELL, FOOT)), fill_holes(seat(spr["idle_b"], CELL, FOOT))] + walk4,
+        [edge(fill_holes(seat(spr["idle_a"], CELL, FOOT))), edge(fill_holes(seat(spr["idle_b"], CELL, FOOT)))] + walk4,
         [sat(k) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
         [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
     ]

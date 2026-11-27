@@ -247,3 +247,15 @@ Row 2: (1) strike 2: left paw swiped forward; (2) heavy wind-up: crouched low, b
 Row 3: (1) settle: paws coming back down to the sides; (2) diving into the ground: head and front paws pointing down,
        body tilted forward; (3) bursting up: jumping straight up, paws raised, body stretched.
 ```
+
+### 받은 것과 변환(2026-11-27)
+- 시트 A·B(`nail_v5_a.png`·`nail_v5_b.png`), 걷기 영상에서 뽑은 네 칸(`nail_v5_walk.png` — GIF 30칸·한 바퀴 약 11.5칸에서 0·3·6·9).
+- `nail_ai.py` `SPEC_V5`·`build_v5`: 키 24px. 큰 눈과 볼 홍조는 줄이면 얼룩이 돼 원본의 눈 반짝 자리를 재서 같은 눈을 찍는다(`stamp_face`).
+- 사장 "외곽선이 좀 더 예술적으로 들어가야 잘 보일 듯" + agent-sprite-forge를 공부해 보자 → 그 저장소의 문서·코드를 읽고 두 가지를 옮겼다:
+  **곁의 색을 따르는 외곽선**(`tinted_outline` — 외곽선 점마다 맞닿은 안쪽 색을 어둡게, 빛 쪽은 조금 밝게),
+  **원본의 안쪽 선 살리기**(`ink_lines` — 줄이면 사라지는 한 블록 굵기의 선을 그 자리 색의 그늘로).
+  그 저장소가 말하는 더 근본적인 길은 "줄이지 말고 그림의 격자를 그대로 읽기"다: 우리 원본은 한 블록 6px에 키 60블록이라 24px로 줄이면
+  2.5블록이 한 점이 되어 모델이 그린 선과 눈이 사라진다. 처음부터 **한 블록 = 게임의 한 점**(키 24블록, 블록 약 30px)으로 받으려면
+  게임 크기 스프라이트를 크게 키운 "자" 그림 옆에 그리게 해야 한다(글로 크기를 말하면 두 배쯤 잘게 온다고 한다) — 아직 해 보지 않았다.
+- 게임 그림(`assets/art/nail.png`)은 아직 v4다. 사장이 고르면 `build()`를 v5로 바꾸고 칸을 32로 넓힌다.
+
