@@ -412,6 +412,33 @@ enum Hit {
     CharCard(usize),
 }
 
+/// 가게·마을 창·큰 나무의 한마디: 글, 남은 시간, 웃으며 하는 말인가. 포포의 얼굴은 번역된 글을 견주지 않고 이것으로 정한다(0307 R42).
+#[derive(Clone, Copy)]
+pub(super) struct Say {
+    pub text: Tr,
+    pub secs: f32,
+    pub happy: bool,
+}
+
+impl Say {
+    pub fn plain(text: Tr, secs: f32) -> Say {
+        Say {
+            text,
+            secs,
+            happy: false,
+        }
+    }
+
+    /// 사거나 심거나 거둔 뒤의 고맙다는 한마디: 포포가 웃는다.
+    pub fn thanks(text: Tr, secs: f32) -> Say {
+        Say {
+            text,
+            secs,
+            happy: true,
+        }
+    }
+}
+
 pub struct App {
     scene: Scene,
     intro_t: f32,
@@ -514,7 +541,7 @@ pub struct App {
     route_cancel: bool,
     /// 가게: 고른 줄, 방금 한 일(글, 남은 시간).
     shop_cursor: usize,
-    shop_msg: Option<(Tr, f32)>,
+    shop_msg: Option<Say>,
     /// 사기 전에 묻는 중: (물건 줄, "사기"에 커서가 있나).
     shop_ask: Option<(usize, bool)>,
     /// 일시정지 메뉴에서 묻는 중(다시 시작·타이틀로): (메뉴 항목, "예"에 커서가 있나). 기본은 "아니오"(사장 2026-11-03).

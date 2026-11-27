@@ -66,33 +66,6 @@ pub(super) struct VillageUi {
     pub say: Option<Say>,
 }
 
-/// 포포의 한마디: 글, 남은 시간, 웃으며 하는 말인가. 얼굴은 글을 견주지 않고 이것으로 정한다(0307 R42).
-#[derive(Clone, Copy)]
-pub(super) struct Say {
-    pub text: Tr,
-    pub secs: f32,
-    pub happy: bool,
-}
-
-impl Say {
-    pub fn plain(text: Tr, secs: f32) -> Say {
-        Say {
-            text,
-            secs,
-            happy: false,
-        }
-    }
-
-    /// 사거나 심거나 거둔 뒤의 고맙다는 한마디: 포포가 웃는다.
-    pub fn thanks(text: Tr, secs: f32) -> Say {
-        Say {
-            text,
-            secs,
-            happy: true,
-        }
-    }
-}
-
 impl Default for VillageUi {
     fn default() -> Self {
         VillageUi {

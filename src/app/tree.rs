@@ -3,7 +3,7 @@
 
 use macroquad::prelude::*;
 
-use super::{App, Hit, Scene};
+use super::{App, Hit, Say, Scene};
 use crate::equipment::Character;
 use crate::i18n::{self, fill, tr, Tr};
 use crate::input::{Actions, Verb};
@@ -96,9 +96,9 @@ impl App {
     /// 닫기: 뒤로·✕·바깥. 캐릭터 탭은 LB·RB(0142·0195).
     pub(super) fn update_tree(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
         use crate::talents::{key_awake, key_pick, Node, KEY_LIGHT};
-        if let Some((_, t)) = self.shop_msg.as_mut() {
-            *t -= dt;
-            if *t <= 0.0 {
+        if let Some(m) = self.shop_msg.as_mut() {
+            m.secs -= dt;
+            if m.secs <= 0.0 {
                 self.shop_msg = None;
             }
         }
@@ -154,26 +154,26 @@ impl App {
                         self.profile.set_count(KEY_LIGHT, have - cost);
                         self.profile.set(&key_awake(ch, slot, side));
                         self.profile.set_count(&pick, side as u32 + 1);
-                        self.shop_msg = Some((|s| s.tree_awake, 2.5));
+                        self.shop_msg = Some(Say::plain(|s| s.tree_awake, 2.5));
                         self.sfx.play(crate::sfx::Id::Heal);
                     } else if self.profile.count(&pick) == side as u32 + 1 {
                         self.profile.set_count(&pick, 0);
-                        self.shop_msg = Some((|s| s.tree_unequip, 2.0));
+                        self.shop_msg = Some(Say::plain(|s| s.tree_unequip, 2.0));
                     } else {
                         self.profile.set_count(&pick, side as u32 + 1);
-                        self.shop_msg = Some((|s| s.tree_equip, 2.0));
+                        self.shop_msg = Some(Say::plain(|s| s.tree_equip, 2.0));
                         self.sfx.play(crate::sfx::Id::Emerge);
                     }
                 }
                 Node::Plus(_) | Node::Sig if awake => {
-                    self.shop_msg = Some((|s| s.tree_always, 1.5));
+                    self.shop_msg = Some(Say::plain(|s| s.tree_always, 1.5));
                 }
                 Node::Plus(_) | Node::Sig => {
                     self.profile.set_count(KEY_LIGHT, have - cost);
                     if let Some(k) = self.tree_view(ch).key(row, depth) {
                         self.profile.set(&k);
                     }
-                    self.shop_msg = Some((|s| s.tree_awake, 2.5));
+                    self.shop_msg = Some(Say::plain(|s| s.tree_awake, 2.5));
                     self.sfx.play(crate::sfx::Id::Heal);
                 }
             }
@@ -414,7 +414,7 @@ impl App {
                 other = Some(self.tree_node(ch, cur_r, d, 1 - side).1);
             }
             let state = match (self.shop_msg, tree(ch)[cur_r].1[d]) {
-                (Some((m, _)), _) => tr(m).to_string(),
+                (Some(m), _) => tr(m.text).to_string(),
                 _ if !awake => path_line(),
                 (None, Node::Pick(slot))
                     if self.profile.count(&key_pick(ch, slot)) == side as u32 + 1 =>

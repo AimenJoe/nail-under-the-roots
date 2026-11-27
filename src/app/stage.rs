@@ -6,7 +6,7 @@
 
 use macroquad::prelude::*;
 
-use super::{App, Hit, Scene};
+use super::{App, Hit, Say, Scene};
 use crate::adventure::{AdvEvent, Interact};
 use crate::cutscene::{self, Cutscene, Face, Speaker};
 use crate::equipment::CHARMS;
@@ -846,9 +846,9 @@ impl App {
     }
 
     pub(super) fn update_shop(&mut self, a: &Actions, tap_hit: Option<Hit>, dt: f32) {
-        if let Some((_, time)) = self.shop_msg.as_mut() {
-            *time -= dt;
-            if *time <= 0.0 {
+        if let Some(m) = self.shop_msg.as_mut() {
+            m.secs -= dt;
+            if m.secs <= 0.0 {
                 self.shop_msg = None;
             }
         }
@@ -880,7 +880,7 @@ impl App {
             let ware = wares[self.shop_cursor];
             match self.cant_buy(ware) {
                 // 살 수 없으면 묻지 않고 바로 포포가 말한다.
-                Some(why) => self.shop_msg = Some((why, 2.0)),
+                Some(why) => self.shop_msg = Some(Say::plain(why, 2.0)),
                 None => self.shop_ask = Some((self.shop_cursor, true)),
             }
         }
@@ -926,9 +926,9 @@ impl App {
     fn buy(&mut self, ware: Ware) {
         let price = self.ware_cost(ware);
         let w = &mut self.world;
-        let msg: Tr = if w.inv.seeds < price {
+        let msg = if w.inv.seeds < price {
             self.sfx.play(crate::sfx::Id::Deny);
-            |s| s.shop_poor
+            Say::plain(|s| s.shop_poor, 2.0)
         } else {
             let ok = match ware {
                 Ware::Berry => {
@@ -964,13 +964,13 @@ impl App {
             if ok {
                 w.inv.seeds -= price;
                 self.sfx.play(crate::sfx::Id::Buy);
-                |s| s.shop_thanks
+                Say::thanks(|s| s.shop_thanks, 2.0)
             } else {
                 self.sfx.play(crate::sfx::Id::Deny);
-                |s| s.shop_full
+                Say::plain(|s| s.shop_full, 2.0)
             }
         };
-        self.shop_msg = Some((msg, 2.0));
+        self.shop_msg = Some(msg);
     }
 
     pub(super) fn draw_shop(&mut self, ui: &Ui) {
@@ -992,11 +992,11 @@ impl App {
         // 길 무기(0246)까지 물건이 다섯이 되면 넘쳐서 초상화 칸을 44 → 36으로(인사 세 줄 = 36px).
         let face = Rect::new(panel.x + 6.0, panel.y + 22.0, 36.0, 36.0);
         ui.rect(face, ui::PANEL_LIGHT);
-        let happy = self.shop_msg.is_some_and(|(m, _)| tr(m) == s.shop_thanks);
+        let happy = self.shop_msg.is_some_and(|m| m.happy);
         let frame = cutscene::Portrait::POPO.frame(if happy { Face::Happy } else { Face::Normal });
         self.renderer.draw_portrait(ui, face, frame);
         ui.rect_lines(face, ui::BORDER);
-        let say = self.shop_msg.map(|(m, _)| tr(m)).unwrap_or(s.shop_hi);
+        let say = self.shop_msg.map(|m| tr(m.text)).unwrap_or(s.shop_hi);
         let tx = face.right() + 6.0;
         for (k, l) in ui::wrap(ui, say, panel.right() - tx - 6.0, FONT_PX)
             .iter()
