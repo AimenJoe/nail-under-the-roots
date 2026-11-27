@@ -360,6 +360,13 @@ _V5_D = {"dive_ref": (120, 21, 440, 360), "dive_a": (801, 51, 1144, 360), "dive_
 # 영상이 그려 넣은 흰 충격 효과가 있는 칸(5~7)은 피했다.
 SHEET_V5_FALL = SPRITES / "nail_v5_fall.png"
 _V5_F = {"fall_ref": (186, 73, 378, 313), "hurtg": (793, 68, 1013, 315), "deadg": (1391, 168, 1666, 334)}
+# 치기 영상(GIF 30칸, 16:9 첫 칸 — 그림이 작게 와 키 약 120px): 0(서기 — 배율 기준), 1타 4(오른발을 머리 뒤로)·6(주둥이 앞까지 뻗음),
+# 2타 12·14, 3타·강타 21(두 발을 머리 위로)·27(앞으로 낮게 내려찍음). 흐려진 칸(3·11·25)은 피했다. 거두기는 시트 B 그대로.
+SHEET_V5_ATTACK = SPRITES / "nail_v5_attack.png"
+_V5_K = {
+    "atk_ref": (267, 174, 372, 304), "windup0g": (897, 171, 1015, 304), "attack0g": (1556, 176, 1710, 304), "windup1g": (2182, 172, 2297, 304),
+    "attack1g": (2836, 176, 2990, 304), "windup2g": (3454, 147, 3568, 304), "attack2g": (4116, 191, 4258, 310),
+}
 # 머리가 위에 있지 않은 칸은 `shrink_head`가 머리 띠를 못 찾는다. 파고들기는 기준 칸(dive_ref)도 줄이지 않는다 — 줄이면 배율이
 # 커져 줄지 않은 머리가 더 커진다(머리 +18%). 그대로 두면 온몸 크기가 맞고 머리 +7%·몸 −9%쯤(0.1초 스치는 칸이라 받아들인다).
 NO_SHRINK = {"dead", "deadg", "dive_ref", "dive_a", "dive_b"}
@@ -375,6 +382,7 @@ SPEC_V5 = Spec(
         Source(SHEET_V5_WALK, _V5_W, groups=dict.fromkeys(_V5_W, "walkg_1"), tidy=0.15, strip=4),
         Source(SHEET_V5_DIVE, _V5_D, groups=dict.fromkeys(_V5_D, "dive_ref"), tidy=0.15, strip=3),
         Source(SHEET_V5_FALL, _V5_F, groups=dict.fromkeys(_V5_F, "fall_ref"), tidy=0.15, strip=3),
+        Source(SHEET_V5_ATTACK, _V5_K, groups=dict.fromkeys(_V5_K, "atk_ref"), tidy=0.15, strip=2),
     ],
     palette_ref=(0, "idle_a"),
     body_h=BODY_H_V5,
@@ -422,6 +430,36 @@ def eye_shines(img, box):
             py, px = np.mean([q[0] for q in pts]), np.mean([q[1] for q in pts])
             out.append(((px - fx0) / (fx1 - fx0), (py - fy0) / (fy1 - fy0)))
     return out
+
+
+def eye_dark(img, box):
+    """작게 온 영상 칸(키 약 120px)은 눈의 흰 반짝이 한두 점이라 `eye_shines`가 못 찾는다 → 눈 자체(짙고 둥근 덩어리)의 가운데를 잰다.
+    → (x, y) 그림 둘레 상자 기준 0..1, 못 찾으면 None(든 발이 눈 곁에 붙어 덩어리가 외곽선과 이어진 칸 — `EYES`에 적는다)."""
+    x0, y0, x1, y1 = box
+    a = img[y0:y1, x0:x1]
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    fg = ~((r > 170) & (g < 110) & (b > 170))
+    ys, xs = np.nonzero(fg)
+    fx0, fx1, fy0, fy1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    for pts in _blobs((r + g + b < 210) & fg)[:8]:
+        p = np.array(pts)
+        h, w = p[:, 0].max() - p[:, 0].min() + 1, p[:, 1].max() - p[:, 1].min() + 1
+        if len(p) >= 80 and len(p) / (w * h) > 0.55 and 0.6 < w / h < 1.6:
+            return (p[:, 1].mean() - fx0) / (fx1 - fx0), (p[:, 0].mean() - fy0) / (fy1 - fy0)
+    return None
+
+
+# `eye_dark`가 못 찾는 칸의 눈 가운데(원본을 보고 적은 값, 그림 둘레 상자 기준 0..1).
+EYES = {"windup0g": (0.55, 0.36), "windup1g": (0.54, 0.36)}
+
+
+def stamp_eye(spr, at):
+    """눈 가운데 `at`에 `stamp_face`와 같은 얼굴을 찍는다(가까운 눈 3×3 + 반짝, 먼 눈은 6px 오른쪽, 홍조)."""
+    ys, xs = np.nonzero(spr[..., 3] > 0)
+    x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    w, h = x1 - x0, y1 - y0
+    ex, ey = x0 + at[0] * w - 1, y0 + at[1] * h - 1
+    return stamp_face(spr, [((ex - x0) / w, (ey - y0) / h), ((ex + 6 - x0) / w, (ey - y0) / h)])
 
 
 def stamp_face(spr, shines):
@@ -614,14 +652,18 @@ def build_v5(walk="gif", lines=True, head=HEAD_V5):
     spr = convert(spec_v5(head))
     idle_img = None
     for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W), (SHEET_V5_DIVE, _V5_D),
-                          (SHEET_V5_FALL, _V5_F)):
+                          (SHEET_V5_FALL, _V5_F), (SHEET_V5_ATTACK, _V5_K)):
         img, _ = prep_v5(head)(np.asarray(Image.open(sheet).convert("RGB")).astype(int), frames)
         if sheet == SHEET_V5_A:
             idle_img = img
         for name, box in frames.items():
             if lines:
                 spr[name] = ink_lines(spr[name], img, box)
-            spr[name] = stamp_face(spr[name], eye_shines(img, box))
+            if sheet == SHEET_V5_ATTACK:
+                at = EYES.get(name) or eye_dark(img, box)
+                spr[name] = stamp_eye(spr[name], at) if at else spr[name]
+            else:
+                spr[name] = stamp_face(spr[name], eye_shines(img, box))
             if name in CLOSED_EYES:
                 spr[name] = stamp_shut(spr[name], *CLOSED_EYES[name])
     if lines:
@@ -636,7 +678,7 @@ def build_v5(walk="gif", lines=True, head=HEAD_V5):
     rows = [
         [edge(fill_holes(seat(spr["idle_a"], CELL, FOOT))), edge(fill_holes(seat(spr["idle_b"], CELL, FOOT)))] + walk4
         + [sat("dive_a"), sat("dive_b"), sat("burst")],
-        [sat(k) for k in ("attack0", "attack1", "attack2", "hurtg", "deadg", "windup0", "windup1", "windup2", "settle")],
+        [sat(k) for k in ("attack0g", "attack1g", "attack2g", "hurtg", "deadg", "windup0g", "windup1g", "windup2g", "settle")],
         [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
     ]
     return rows

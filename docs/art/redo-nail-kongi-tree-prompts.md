@@ -260,4 +260,5 @@ Row 3: (1) settle: paws coming back down to the sides; (2) diving into the groun
 - 맞음·쓰러짐 칸은 감은 눈(`stamp_shut`), 머리는 `HEAD_V5` 0.85배(`shrink_head`), 걷기는 영상 네 칸 — 2026-11-27 개발판에 넣었다(칸 32, docs/decisions/0308).
 - 파고들기는 영상(GIF 30칸)에서 두 칸(`nail_v5_dive.png`), 솟구치기는 시트 B의 칸 — 영상의 솟는 칸은 비율이 달라져 쓰지 않았다(0308 "파고들기·솟구치기 칸").
 - 맞음·쓰러짐도 영상에서(`nail_v5_fall.png`, 칸 12·25) — 16:9 첫 칸 + "옆모습·비율 유지" 한 줄을 붙여 받으니 카메라·비율이 지켜졌다.
+- 치기 여섯 칸도 영상에서(`nail_v5_attack.png`, 세 번 치는 클립 하나) — 그림이 작게 와 눈은 짙은 덩어리로 찾는다(0308 "치기 칸을 영상에서").
 
