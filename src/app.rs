@@ -1896,9 +1896,6 @@ impl App {
                 let strata = self.world.descent().is_some_and(|d| d.cover > 0.5);
                 if self.world.adv.place == crate::adventure::Place::Village && !strata {
                     let ready = self.tree_affordable();
-                    if let Some(v) = self.world.adv.village.as_mut() {
-                        v.tree_ready = ready;
-                    }
                     let n = self.profile.count(crate::village::KEY_SEEDS);
                     let t = fill(i18n::s().village_seeds, &[&n]);
                     ui.text_right(&t, 316.0, 14.0, FONT_PX, ui::TEXT);

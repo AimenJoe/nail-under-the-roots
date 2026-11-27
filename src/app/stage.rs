@@ -1363,7 +1363,7 @@ impl App {
         };
         crate::profile::save(&self.profile);
         match r {
-            Reward::Decor(_) => self.sync_village(),
+            Reward::Decor(_) => {}
             // 장신구는 바로 가방에(0050). 이번 런의 상자에서는 다시 안 나온다.
             Reward::Charm(c) => {
                 self.world.inv.charm_pool =
@@ -1379,6 +1379,8 @@ impl App {
             }
             Reward::Light(_) | Reward::Seeds(_) | Reward::Tale(_) => {}
         }
+        // 마을에서 받았으면 마을 모습도 기록대로: 꾸미기가 놓이고, 반딧불을 받았으면 우물 위 반딧불·큰 나무 밑동 빛이 따라온다(R41).
+        self.sync_village();
         self.journal_ready = crate::journal::ready_count(&self.profile);
         self.sfx.play(crate::sfx::Id::Heal);
     }

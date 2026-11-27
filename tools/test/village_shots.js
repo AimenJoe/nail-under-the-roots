@@ -27,7 +27,7 @@ const PROFILE = ['nail-profile 1',
   'flag half_ending', 'flag line.halmae_arrive',
   'flag quest.popo.asked', 'flag quest.popo.found', 'flag quest.popo.done',
   'flag quest.bori.asked', 'flag quest.bori.found', 'flag quest.bori.done',
-  'flag decor.0', 'flag decor.2',
+  'flag decor.0', 'flag decor.2', 'flag decor.9',   // 꽃밭·통나무 의자·돌 우물(9 = village::EXTRA_FIRST — 위에 맡긴 반딧불이 뜬다)
   'count glowbugs_banked 450', 'count village_seeds 50', 'count pack.berry 1',
   'count lamp.popo 3', 'count lamp.bori 2', 'count lamp.momo 1',
   'count plot.0.crop 6', 'count plot.0.age 2', 'count plot.1.crop 2', 'count plot.1.age 1',
