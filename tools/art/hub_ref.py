@@ -215,7 +215,7 @@ def board(items):
     w = 4 + 24 + 8 + len(items) * (CELL + 6) + 4
     out = Image.new("RGBA", (w * Z, (CELL + 8) * Z), (255, 0, 255, 255))
     # Naïl은 그림이 있는 자리만 잘라 발을 물건의 발 줄에 맞춘다(칸 크기가 바뀌어도 어긋나지 않게 — 지금 28칸).
-    nail = Image.open(HERE.parents[1] / "assets" / "art" / "nail.png").convert("RGBA").crop((0, 0, 28, 28))
+    nail = Image.open(HERE.parents[1] / "assets" / "art" / "nail.png").convert("RGBA").crop((0, 0, 32, 32))
     nail = nail.crop(nail.getbbox())
     out.alpha_composite(
         nail.resize((nail.width * Z, nail.height * Z), Image.NEAREST),
@@ -241,7 +241,7 @@ def style_board():
         im = Image.open(art / name).convert("RGBA").crop((col * size, 0, (col + 1) * size, size))
         return im.crop(im.getbbox())
 
-    cells = [cell("nail.png", 28, 0), cell("popo.png", 32, 0), cell("susu.png", 32, 0)]
+    cells = [cell("nail.png", 32, 0), cell("popo.png", 32, 0), cell("susu.png", 32, 0)]
     cells += [cell("props.png", 24, c) for c in (0, 1, 2, 4)]
     # 화덕 돌 고리(칸 1)는 바닥에 누운 것의 각도 기준: 물웅덩이·샘을 받을 때 "이 고리와 같은 각도로"라고 쓴다(2026-11-27 —
     # 각도 기준 없이 받은 샘은 돌 테두리 옆면이 보여 우물처럼 서 있었다).

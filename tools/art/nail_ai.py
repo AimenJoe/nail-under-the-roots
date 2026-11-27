@@ -1,4 +1,4 @@
-"""Naïl 스프라이트 시트(28×28 칸): 나노바나나 원본(tools/art/sources/ai/sprites/)을 게임 도트로 옮긴다(0206 → 0238).
+"""Naïl 스프라이트 시트(32×32 칸): 나노바나나 원본(tools/art/sources/ai/sprites/)을 게임 도트로 옮긴다(0206 → 0238 → 0308).
 
 실행: python3 tools/art/nail_ai.py [출력 경로]   (기본 assets/art/nail.png. 털빛 시트 nail_fur*.png는 0272에서 뺐다)
 
@@ -6,7 +6,9 @@
 설정(`SPEC`)과 시트 배치뿐이다. 왜 이 길인가(0203 → 0206 → 0238): 16칸 손 그림은 "두더지 같지 않다"(사장) → 실루엣 시안 1
 (`nail_s1_v2`, 몸 16px) → 사장 "처음부터 다시"(0238): 큰 그림 다섯 안에서 고른 1번(서서 삽 손을 벌린 몸 + 주황 목도리)을
 시트 둘(`nail_v3_a`·`nail_v3_b`)로 받아 키 약 22px로(모모 23·도토 25와 나란히). 0242: 머리를 키운 시험(`chibi`, 사장 "좋은데?") →
-그 비율로 처음부터 그린 v4 시트 둘(`nail_v4_a`·`nail_v4_b`, 2.5등신·큰 눈)을 받아 지금 쓴다(`SPEC`, 외곽선까지 키 약 21px — 아기라 이웃보다 작게). 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
+그 비율로 처음부터 그린 v4 시트 둘(`nail_v4_a`·`nail_v4_b`, 2.5등신·큰 눈, `SPEC` — 지금은 `build_v4`로만). 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
+0308: 초상화 얼굴에서 다시 그린 v5(`nail_v5_a`·`_b` + 걷기 영상 띠 `nail_v5_walk`)를 지금 쓴다(`build` = `build_v5`): 키 24px, 눈은 원본의
+반짝 자리를 재서 같은 도장으로, 외곽선은 곁의 털색으로 물들이고 안쪽 선을 원본에서 옮긴다. 머리는 `HEAD_V5`배(이웃과 나란히 보아 고른 값).
 
 칸 배치(게임 코드는 칸 크기 `art::NAIL_CELL`만 안다):
   줄 0: 서기 2, 걷기 4 / 줄 1: 치기 3, 맞음, 쓰러짐, 들기 3, 거두기 / 줄 2: 흙더미 2, 그림자(16칸 그림을 칸 아래 가운데에)
@@ -24,8 +26,8 @@ import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림을 같이
 from sprite_ai import Source, Spec, convert, magenta, seat, seat_on_fur, step_cycle  # noqa: E402
 
 SPRITES = HERE / "sources" / "ai" / "sprites"
-CELL = 28          # 키 약 24px(머리 키운 뒤, 0242) + 뻗은 발톱(0238: 18px는 모모 23·도토 25보다 작아 주인공이 가장 작았다)
-FOOT = 26          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(`art::nail_origin`).
+CELL = 32          # 키 24px + 뻗은 발톱·날리는 목도리(0308: v5의 치기 칸이 28칸 가장자리에 닿았다. 0238의 28칸은 v4까지)
+FOOT = 30          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(`art::nail_origin`).
 
 # 원본(0238, 사장 고름 1단계 1번 → 2단계 시트 둘, ✦ 지움). 칸 상자는 redo_concepts.components로 찾은 값.
 # 시트 A(3줄 × 4): 줄 1 서기·서기(숨)·맞음·쓰러짐, 줄 2·3 걷기(줄 2 첫 칸만 쓴다 — 네 칸이 거의 같고 앞발만 튀어서, 0241). 서기 두 칸은 벌린 발톱끼리 붙어 있어
@@ -551,7 +553,10 @@ def spec_v5(head=1.0):
         palette_ref=SPEC_V5.palette_ref, body_h=SPEC_V5.body_h, breathe=SPEC_V5.breathe)
 
 
-def build_v5(walk="step", lines=True, head=1.0):
+HEAD_V5 = 0.85      # 머리 배율(사장 2026-11-27 "너무 이등신 느낌 … 포포 정도면") — 머리 너비가 포포(15px)에 가깝다(받은 그대로 19 → 16px)
+
+
+def build_v5(walk="gif", lines=True, head=HEAD_V5):
     """v5 시트. `walk`: "step" = 걷기 첫 칸에서 발만 딛는 네 칸(0241, 지금까지의 방식), "sheet" = 받은 걷기 네 칸 그대로,
     "gif" = 걷기 영상에서 뽑은 네 칸. `head` = 머리 배율(`shrink_head`)."""
     spr = convert(spec_v5(head))
@@ -583,18 +588,8 @@ def build_v5(walk="step", lines=True, head=1.0):
     return rows
 
 
-def build():
-    spr = convert(SPEC)
-    sat = lambda k: touch(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT), k)
-    idle = touch(seat(spr["idle_a"], CELL, FOOT), "idle_a")
-    rows = [
-        [idle, touch(seat(spr["idle_b"], CELL, FOOT), "idle_b")]
-        # v4도 걷기 넷을 그려 왔지만 넷째 칸만 몸이 좁고 키가 커 걸음마다 튀었다 → 첫 칸에서 발만 딛게(0241, 다른 캐릭터와 같이).
-        + step_cycle(sat("walk_1"), FOOT - 1),
-        # 동작 칸은 몸통 털의 가운데를 서기 칸에 맞춘다(발톱을 뻗어도 몸이 옆으로 뛰지 않게).
-        [sat(k) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
-        [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
-    ]
+def sheet_of(rows):
+    """줄 0~2(그림)와 줄 3~5(흰 실루엣)를 한 장으로."""
     sheet = np.zeros((CELL * 6, CELL * 9, 4), np.uint8)
     for r, row in enumerate(rows):
         for c, cell in enumerate(row):
@@ -607,6 +602,27 @@ def build():
             sil[~on] = 0
             sheet[(r + 3) * CELL:(r + 4) * CELL, c * CELL:(c + 1) * CELL] = sil
     return sheet
+
+
+def build():
+    """지금 게임 시트: v5(걷기는 영상 네 칸, 머리 `HEAD_V5`)."""
+    return sheet_of(build_v5())
+
+
+def build_v4():
+    """옛 v4 시트(견줄 때만)."""
+    spr = convert(SPEC)
+    sat = lambda k: touch(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT), k)
+    idle = touch(seat(spr["idle_a"], CELL, FOOT), "idle_a")
+    rows = [
+        [idle, touch(seat(spr["idle_b"], CELL, FOOT), "idle_b")]
+        # v4도 걷기 넷을 그려 왔지만 넷째 칸만 몸이 좁고 키가 커 걸음마다 튀었다 → 첫 칸에서 발만 딛게(0241, 다른 캐릭터와 같이).
+        + step_cycle(sat("walk_1"), FOOT - 1),
+        # 동작 칸은 몸통 털의 가운데를 서기 칸에 맞춘다(발톱을 뻗어도 몸이 옆으로 뛰지 않게).
+        [sat(k) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
+        [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
+    ]
+    return sheet_of(rows)
 
 
 if __name__ == "__main__":

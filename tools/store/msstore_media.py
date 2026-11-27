@@ -37,7 +37,8 @@ def main() -> None:
     wm = wordmark()
     title = Image.open(ILL / "title.png").convert("RGBA")  # 640×360
     tree = Image.open(ILL / "great_tree.png").convert("RGBA")
-    nail = Image.open(SHOTS / "sp_nail.png").convert("RGBA").crop((0, 0, 28, 28))
+    nail = Image.open(SHOTS / "sp_nail.png").convert("RGBA")
+    nail = nail.crop((0, 0, nail.height, nail.height))   # 걷는 띠의 첫 칸(칸 = 띠 높이)
 
     # 상자 1:1: 타이틀 왼쪽 360×360(굴 속에 잠든 나일) ×6, 제목은 위 2/3 안(가운데 위).
     box = up(title.crop((0, 0, 360, 360)), 6)
@@ -49,7 +50,7 @@ def main() -> None:
     for (w, h, k) in [(240, 360, 6), (288, 512, 5)]:
         x0 = (tree.width - w) // 2
         post = up(tree.crop((x0, 0, x0 + w, h)), k)
-        post.alpha_composite(up(nail, 9), (200, post.height - 300 - 28 * 9))
+        post.alpha_composite(up(nail, 9), (200, post.height - 300 - nail.height * 9))
         place(post, fit(wm, 1300, 420), 720, 360)
         post.convert("RGB").save(OUT / f"poster-{w * k}x{h * k}.png", optimize=True)
 

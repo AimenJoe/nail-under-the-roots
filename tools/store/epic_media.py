@@ -97,8 +97,9 @@ def main() -> None:
     x0 = (tree.width - 300) // 2
     port = up(tree.crop((x0, 0, x0 + 300, 400)), 4)
     # 주인공: 걷는 띠의 첫 칸(28칸) ×8을 뿌리 앞에
-    nail = Image.open(SHOTS / "sp_nail.png").convert("RGBA").crop((0, 0, 28, 28))
-    port.alpha_composite(up(nail, 8), (330 - 112, 1180 - 28 * 8))  # 왼쪽 풀밭 위(뿌리 위는 어두워 묻힌다)
+    nail = Image.open(SHOTS / "sp_nail.png").convert("RGBA")
+    nail = nail.crop((0, 0, nail.height, nail.height))   # 걷는 띠의 첫 칸(칸 = 띠 높이)
+    port.alpha_composite(up(nail, 8), (330 - nail.height * 4, 1180 - nail.height * 8))  # 왼쪽 풀밭 위(뿌리 위는 어두워 묻힌다)
     place(port, up(wm, 7), 600, 300)
     port.convert("RGB").save(OUT / "offer-portrait-1200x1600.png", optimize=True)
 
