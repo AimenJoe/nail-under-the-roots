@@ -7,7 +7,7 @@
 (`nail_s1_v2`, 몸 16px) → 사장 "처음부터 다시"(0238): 큰 그림 다섯 안에서 고른 1번(서서 삽 손을 벌린 몸 + 주황 목도리)을
 시트 둘(`nail_v3_a`·`nail_v3_b`)로 받아 키 약 22px로(모모 23·도토 25와 나란히). 0242: 머리를 키운 시험(`chibi`, 사장 "좋은데?") →
 그 비율로 처음부터 그린 v4 시트 둘(`nail_v4_a`·`nail_v4_b`, 2.5등신·큰 눈, `SPEC` — 지금은 `build_v4`로만). 원본 손발이 이미 분홍·크림이라 `Limbs`·`swing`은 없다.
-0308: 초상화 얼굴에서 다시 그린 v5(`nail_v5_a`·`_b` + 걷기 영상 띠 `nail_v5_walk`)를 지금 쓴다(`build` = `build_v5`): 키 24px, 눈은 원본의
+0308: 초상화 얼굴에서 다시 그린 v5(`nail_v5_a`·`_b` + 걷기 영상 띠 `nail_v5_walk`)를 지금 쓴다(`build` = `build_v5`): 키 23px, 눈은 원본의
 반짝 자리를 재서 같은 도장으로, 외곽선은 곁의 털색으로 물들이고 안쪽 선을 원본에서 옮긴다. 머리는 `HEAD_V5`배(이웃과 나란히 보아 고른 값).
 
 칸 배치(게임 코드는 칸 크기 `art::NAIL_CELL`만 안다):
@@ -23,10 +23,10 @@ from PIL import Image, ImageDraw, ImageFilter
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import nail as legacy  # noqa: E402  흙더미·그림자 16칸 그림을 같이 쓴다
-from sprite_ai import Source, Spec, convert, magenta, seat, seat_on_fur, step_cycle  # noqa: E402
+from sprite_ai import Source, Spec, breathe, convert, magenta, seat, seat_on_fur, step_cycle  # noqa: E402
 
 SPRITES = HERE / "sources" / "ai" / "sprites"
-CELL = 32          # 키 24px + 뻗은 발톱·날리는 목도리(0308: v5의 치기 칸이 28칸 가장자리에 닿았다. 0238의 28칸은 v4까지)
+CELL = 32          # 키 23px + 뻗은 발톱·날리는 목도리(0308: v5의 치기 칸이 28칸 가장자리에 닿았다. 0238의 28칸은 v4까지)
 FOOT = 30          # 발바닥 줄(칸 위에서). 게임은 발을 몸 자리 + 6에 둔다(`art::nail_origin`).
 
 # 원본(0238, 사장 고름 1단계 1번 → 2단계 시트 둘, ✦ 지움). 칸 상자는 redo_concepts.components로 찾은 값.
@@ -334,7 +334,7 @@ def touch(cell, name):
 # 치기 2·강타 들기·강타 / 거두기·파고들기(안 씀 — 영상에서 뽑은 두 칸을 쓴다)·솟구치기. 상자는 그림 둘레 + 8px.
 SHEET_V5_A = SPRITES / "nail_v5_a.png"
 SHEET_V5_B = SPRITES / "nail_v5_b.png"
-BODY_H_V5 = 24
+BODY_H_V5 = 23      # 사장 2026-11-27 "전체적으로 아주 약간만 크기 줄일 수 있나" — 24 → 23(모모와 같은 키). 22는 눈에 띄게 작다
 _V5_A = {
     "idle_a": (34, 5, 335, 380), "hurt": (718, 12, 1007, 379), "dead": (1035, 104, 1362, 379),
     "walk_1": (42, 382, 322, 752), "walk_2": (388, 380, 668, 752), "walk_3": (723, 380, 1003, 756),
@@ -650,12 +650,9 @@ def build_v5(walk="gif", lines=True, head=HEAD_V5):
     """v5 시트. `walk`: "step" = 걷기 첫 칸에서 발만 딛는 네 칸(0241, 지금까지의 방식), "sheet" = 받은 걷기 네 칸 그대로,
     "gif" = 걷기 영상에서 뽑은 네 칸. `head` = 머리 배율(`shrink_head`)."""
     spr = convert(spec_v5(head))
-    idle_img = None
     for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W), (SHEET_V5_DIVE, _V5_D),
                           (SHEET_V5_FALL, _V5_F), (SHEET_V5_ATTACK, _V5_K)):
         img, _ = prep_v5(head)(np.asarray(Image.open(sheet).convert("RGB")).astype(int), frames)
-        if sheet == SHEET_V5_A:
-            idle_img = img
         for name, box in frames.items():
             if lines:
                 spr[name] = ink_lines(spr[name], img, box)
@@ -666,9 +663,9 @@ def build_v5(walk="gif", lines=True, head=HEAD_V5):
                 spr[name] = stamp_face(spr[name], eye_shines(img, box))
             if name in CLOSED_EYES:
                 spr[name] = stamp_shut(spr[name], *CLOSED_EYES[name])
-    if lines:
-        spr["idle_b"] = ink_lines(spr["idle_b"], idle_img, _V5_A["idle_a"])
-    spr["idle_b"] = stamp_face(spr["idle_b"], [(x, y + 1 / BODY_H_V5) for x, y in eye_shines(idle_img, _V5_A["idle_a"])])
+    # 내쉰 칸은 눈·선을 다 찍은 들이쉰 칸에서 만든다: 아랫몸 한 줄만 빠지고 머리는 점 하나까지 같다(1px 내려갈 뿐).
+    # 전에는 내쉰 칸에 눈을 따로 찍어 자리가 반 점 어긋나고 밑의 뭉개진 눈이 삐져나왔다 — 사장 "눈이 커졌다 작아지면서 위치가 이상함".
+    spr["idle_b"] = breathe(spr["idle_a"])
     edge = tinted_outline if lines else (lambda c: c)
     sat = lambda k: edge(fill_holes(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT)))
     if walk == "step":

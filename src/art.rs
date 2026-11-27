@@ -262,7 +262,7 @@ pub const PORTRAIT: f32 = 88.0;
 pub const PORTRAIT_COLS: u32 = 12;
 
 pub const CELL: f32 = 16.0;
-/// Naïl 시트(nail.png)의 칸: 32×32(몸 키 24px + 뻗은 발톱·날리는 목도리, 0308 — 0238의 28칸은 v5의 치기 칸이 가장자리에 닿았다),
+/// Naïl 시트(nail.png)의 칸: 32×32(몸 키 23px + 뻗은 발톱·날리는 목도리, 0308 — 0238의 28칸은 v5의 치기 칸이 가장자리에 닿았다),
 /// 발바닥 줄 `NAIL_FOOT`(칸 위에서). 다른 시트는 `CELL`.
 pub const NAIL_CELL: f32 = 32.0;
 pub const NAIL_FOOT: f32 = 30.0;
