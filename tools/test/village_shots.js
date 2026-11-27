@@ -74,6 +74,21 @@ async function run() {
     const lang = locale.slice(0, 2);
     const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale });
     await ctx.addInitScript((p) => { try { localStorage.clear(); localStorage.setItem('nail.profile', p); } catch (e) {} }, PROFILE);
+    await ctx.addInitScript(() => {
+      // 풀고 있는 소리 수를 센다(기준선 도구가 "다 끝났나"를 보려고).
+      window.__nailDecoding = 0;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const orig = AC.prototype.decodeAudioData;
+      AC.prototype.decodeAudioData = function (buf, ok, err) {
+        window.__nailDecoding++;
+        let open = true;
+        const done = () => { if (open) { open = false; window.__nailDecoding--; } };
+        const p = orig.call(this, buf, (b) => { done(); if (ok) ok(b); }, (e) => { done(); if (err) err(e); });
+        if (p && p.then) p.then(done, done);
+        return p;
+      };
+    });
     const pg = await ctx.newPage();
     const errors = [];
     // 알려진 잡음(smoke.js KNOWN_NOISE와 같다): 번들의 quad_net 플러그인.
@@ -100,9 +115,14 @@ async function run() {
     // **한 프레임을 흘리기 전에 받는 중인 것이 다 올 때까지 기다린다**(실제 시간): 게임은 프레임마다 "다 왔나"를 보고 다음 것을 읽으니,
     // 받는 데 걸린 실제 시간이 프레임 수로 새면 게임이 시작한 프레임이 실행마다 달라진다(기계가 바쁠 때 화면이 통째로 다른 갈래로 나왔다).
     // 다 온 뒤에 한 프레임씩이면 프레임 수는 읽을 것의 수로 정해진다.
+    // 소리 풀기(decodeAudioData)도 실제 시간으로 끝나는 일이라 같이 기다린다(요청은 끝났어도 풀기가 남아 있다).
     const idle = async () => {
       let quiet = 0;
-      for (let i = 0; i < 1000 && quiet < 6; i++) { await new Promise((r) => setTimeout(r, 5)); quiet = inflight === 0 ? quiet + 1 : 0; }
+      for (let i = 0; i < 600 && quiet < 3; i++) {
+        await new Promise((r) => setTimeout(r, 8));
+        const busy = inflight !== 0 || (await pg.evaluate(() => window.__nailDecoding || 0)) !== 0;
+        quiet = busy ? 0 : quiet + 1;
+      }
     };
     const settle = async (frames) => { for (let i = 0; i < frames; i++) { await idle(); await tick(16); } };
     let loadFrames = 0;
