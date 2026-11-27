@@ -356,9 +356,16 @@ _V5_W = {
 # ✦를 지우고 바탕을 순수 마젠타로 정리한 띠. 솟구치는 칸(11~19)은 쓰지 않는다 — 몸이 정면으로 돌고 길게 늘어나 다른 동물이 됐다(0308).
 SHEET_V5_DIVE = SPRITES / "nail_v5_dive.png"
 _V5_D = {"dive_ref": (120, 21, 440, 360), "dive_a": (801, 51, 1144, 360), "dive_b": (1439, 13, 1754, 357)}
+# 맞음 → 쓰러짐 영상(GIF 30칸, 16:9 첫 칸으로 받아 카메라가 안 움직였다)에서: 0(서기 — 배율 기준), 12(뒤로 밀려나며 눈을 꼭 감음), 25(등을 대고 누움).
+# 영상이 그려 넣은 흰 충격 효과가 있는 칸(5~7)은 피했다.
+SHEET_V5_FALL = SPRITES / "nail_v5_fall.png"
+_V5_F = {"fall_ref": (186, 73, 378, 313), "hurtg": (793, 68, 1013, 315), "deadg": (1391, 168, 1666, 334)}
 # 머리가 위에 있지 않은 칸은 `shrink_head`가 머리 띠를 못 찾는다. 파고들기는 기준 칸(dive_ref)도 줄이지 않는다 — 줄이면 배율이
 # 커져 줄지 않은 머리가 더 커진다(머리 +18%). 그대로 두면 온몸 크기가 맞고 머리 +7%·몸 −9%쯤(0.1초 스치는 칸이라 받아들인다).
-NO_SHRINK = {"dead", "dive_ref", "dive_a", "dive_b"}
+NO_SHRINK = {"dead", "deadg", "dive_ref", "dive_a", "dive_b"}
+# 목도리가 가려 머리 띠를 못 찾는 칸은 목 자리를 적어 준다: 칸 상자 안의 (목 줄 y, 목 가운데 x), 원본 px.
+# 맞음 칸(hurtg)은 든 두 발이 목도리를 가린다 — 발도 머리 띠 안이라 같이 줄어든다.
+NECK = {"hurtg": (150, 125)}
 SPEC_V5 = Spec(
     sources=[
         Source(SHEET_V5_A, _V5_A, groups=dict.fromkeys(_V5_A, "idle_a"), tidy=0.15, strip=6),
@@ -367,6 +374,7 @@ SPEC_V5 = Spec(
         # 영상은 그린 크기가 또 다르다(키 약 250px) → 첫 칸의 키로. 외곽선이 가늘어(≈4px) 덜 벗긴다.
         Source(SHEET_V5_WALK, _V5_W, groups=dict.fromkeys(_V5_W, "walkg_1"), tidy=0.15, strip=4),
         Source(SHEET_V5_DIVE, _V5_D, groups=dict.fromkeys(_V5_D, "dive_ref"), tidy=0.15, strip=3),
+        Source(SHEET_V5_FALL, _V5_F, groups=dict.fromkeys(_V5_F, "fall_ref"), tidy=0.15, strip=3),
     ],
     palette_ref=(0, "idle_a"),
     body_h=BODY_H_V5,
@@ -446,7 +454,7 @@ def stamp_face(spr, shines):
 
 # 감은 눈(사장 2026-11-27 "눈 감는 게 좀 어색하다"): 맞음·쓰러짐 칸은 원본의 가는 감은 눈 선이 줄이면 사라져 얼굴이 민둥해졌다.
 # 눈 자리(원본 그림 둘레 상자 기준 0..1, 원본을 보고 적은 값)에 읽히는 모양을 찍는다: 맞음 = 질끈 감은 ">", 쓰러짐 = "×".
-CLOSED_EYES = {"hurt": ((0.34, 0.30), ">"), "dead": ((0.24, 0.34), "x")}
+CLOSED_EYES = {"hurt": ((0.34, 0.30), ">"), "dead": ((0.24, 0.34), "x"), "hurtg": ((0.36, 0.30), ">"), "deadg": ((0.22, 0.38), "x")}
 _SHUT = {">": ((0, 0), (1, 0), (2, 1), (0, 2), (1, 2)), "x": ((0, 0), (2, 0), (1, 1), (0, 2), (2, 2))}
 
 
@@ -533,13 +541,16 @@ def shrink_head(k):
             fg = ~((r > 170) & (g < 110) & (b > 170))
             ys, xs = np.nonzero(fg)
             fy0, fx0, fx1 = ys.min(), xs.min(), xs.max() + 1
-            scarf = fg & (r > 140) & (g > 50) & (g < 150) & (b < 80) & (r - g > 50)
-            rows = np.nonzero(scarf.sum(1) >= 0.12 * (fx1 - fx0))[0]
-            rows = rows[rows > fy0 + (ys.max() - fy0) * 0.3]          # 머리 위쪽의 주황 점은 목도리가 아니다
-            if len(rows) == 0:
-                continue
-            neck = int(rows[0]) + 2                                    # 목도리 윗줄을 조금 덮게
-            cx = int(np.nonzero(scarf[rows[0]])[0].mean())
+            if name in NECK:
+                neck, cx = NECK[name]
+            else:
+                scarf = fg & (r > 140) & (g > 50) & (g < 150) & (b < 80) & (r - g > 50)
+                rows = np.nonzero(scarf.sum(1) >= 0.12 * (fx1 - fx0))[0]
+                rows = rows[rows > fy0 + (ys.max() - fy0) * 0.3]          # 머리 위쪽의 주황 점은 목도리가 아니다
+                if len(rows) == 0:
+                    continue
+                neck = int(rows[0]) + 2                                    # 목도리 윗줄을 조금 덮게
+                cx = int(np.nonzero(scarf[rows[0]])[0].mean())
             head = Image.fromarray(a[fy0:neck].astype(np.uint8), "RGB")
             nw, nh = max(1, round(head.width * k)), max(1, round(head.height * k))
             small = np.asarray(head.resize((nw, nh), Image.NEAREST)).astype(int)
@@ -569,7 +580,8 @@ def build_v5(walk="gif", lines=True, head=HEAD_V5):
     "gif" = 걷기 영상에서 뽑은 네 칸. `head` = 머리 배율(`shrink_head`)."""
     spr = convert(spec_v5(head))
     idle_img = None
-    for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W), (SHEET_V5_DIVE, _V5_D)):
+    for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W), (SHEET_V5_DIVE, _V5_D),
+                          (SHEET_V5_FALL, _V5_F)):
         img, _ = shrink_head(head)(np.asarray(Image.open(sheet).convert("RGB")).astype(int), frames)
         if sheet == SHEET_V5_A:
             idle_img = img
@@ -591,7 +603,7 @@ def build_v5(walk="gif", lines=True, head=HEAD_V5):
     rows = [
         [edge(fill_holes(seat(spr["idle_a"], CELL, FOOT))), edge(fill_holes(seat(spr["idle_b"], CELL, FOOT)))] + walk4
         + [sat("dive_a"), sat("dive_b"), sat("burst")],
-        [sat(k) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
+        [sat(k) for k in ("attack0", "attack1", "attack2", "hurtg", "deadg", "windup0", "windup1", "windup2", "settle")],
         [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
     ]
     return rows
