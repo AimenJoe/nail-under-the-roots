@@ -927,6 +927,22 @@ pub struct Portrait {
 }
 
 impl Portrait {
+    /// 이웃의 초상화(0307 R44): 마을 창의 수첩처럼 이웃을 `Who`로 아는 화면이 쓴다(대화창은 화자 `Speaker`의 배우가 정한다).
+    pub fn of(who: crate::world::Who) -> Portrait {
+        use crate::world::Who;
+        match who {
+            Who::Popo => Portrait::POPO,
+            Who::Bori => Portrait::BORI,
+            Who::Halmae => Portrait::HALMAE,
+            Who::Momo => Portrait::MOMO,
+            Who::Doto => Portrait::DOTO,
+            Who::Susu => Portrait::SUSU,
+            Who::Kongi => Portrait::KONGI,
+            Who::Clover => Portrait::CLOVER,
+            Who::Nail => Portrait::NAIL,
+        }
+    }
+
     /// Naïl: 칸 0~3(보통·기쁨·걱정·결의). 칸 18~29는 옛 털빛 셋(0048 → 0272에서 뺐다) — 칸 번호가 밀리지 않게 시트에 남긴다.
     pub const NAIL: Portrait = Portrait { first: 0, faces: 4 };
     /// 물든 모모(굴토끼, 히로인): 칸 7 차가움(보통), 칸 8 괴로움(걱정). 이름은 나중에 밝혀진다 — 그때까지 "???"

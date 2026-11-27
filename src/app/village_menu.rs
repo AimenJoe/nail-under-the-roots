@@ -520,17 +520,16 @@ impl App {
     }
 
     fn draw_notes_tab(&mut self, ui: &Ui, body: Rect) {
-        use crate::village_notes::{Spot, NOTES};
+        use crate::village_notes::NOTES;
         let rows: Vec<(VillagePic, String, String, bool)> =
             crate::village_notes::visible(&self.profile)
                 .iter()
                 .map(|&i| {
                     let n = &NOTES[i];
                     // 이웃 줄은 마을에 선 모습을 아이콘으로(사장 2026-11-23: 인물만 아이콘이 비어 어색했다).
-                    let pic = if n.spot.neighbor() {
-                        VillagePic::Neighbor(n.spot)
-                    } else {
-                        VillagePic::Spot(n.spot)
+                    let pic = match n.spot.who() {
+                        Some(who) => VillagePic::Neighbor(who),
+                        None => VillagePic::Spot(n.spot),
                     };
                     (pic, tr(n.title).to_string(), String::new(), false)
                 })
@@ -546,18 +545,9 @@ impl App {
         );
         self.draw_village_detail(ui, detail, VillagePic::Spot(note.spot), tr(note.title), "");
         // 이웃은 그림 칸에 초상화.
-        let portrait = match note.spot {
-            Spot::Stall => Some(cutscene::Portrait::POPO),
-            Spot::Bori => Some(cutscene::Portrait::BORI),
-            Spot::Momo => Some(cutscene::Portrait::MOMO),
-            Spot::Doto => Some(cutscene::Portrait::DOTO),
-            Spot::Kongi => Some(cutscene::Portrait::KONGI),
-            Spot::Clover => Some(cutscene::Portrait::CLOVER),
-            Spot::Halmae => Some(cutscene::Portrait::HALMAE),
-            _ => None,
-        };
-        if let Some(p) = portrait.filter(|_| note.spot.neighbor()) {
+        if let Some(who) = note.spot.who() {
             let art = Rect::new(detail.x + 4.0, detail.y + 4.0, 36.0, 36.0);
+            let p = cutscene::Portrait::of(who);
             self.renderer.draw_portrait(ui, art, p.frame(Face::Normal));
         }
     }
@@ -778,7 +768,7 @@ impl App {
                     _ => true,
                 };
                 (
-                    VillagePic::Neighbor(lamp_spot(ALL[i].who)),
+                    VillagePic::Neighbor(ALL[i].who),
                     tr(ALL[i].name).to_string(),
                     format!("{}/3", level(&self.profile, i)),
                     dim,
@@ -805,7 +795,7 @@ impl App {
         let y = self.draw_village_detail(
             ui,
             detail,
-            VillagePic::Neighbor(lamp_spot(ALL[i].who)),
+            VillagePic::Neighbor(ALL[i].who),
             tr(ALL[i].name),
             &info,
         );
@@ -903,22 +893,6 @@ impl App {
             FONT_PX,
             ui::TEXT,
         );
-    }
-}
-
-/// 등불 탭의 이웃 그림: 수첩과 같은 이웃 자리(포포는 좌판).
-pub(super) fn lamp_spot(who: crate::world::Who) -> crate::village_notes::Spot {
-    use crate::village_notes::Spot;
-    use crate::world::Who;
-    match who {
-        Who::Popo => Spot::Stall,
-        Who::Bori => Spot::Bori,
-        Who::Momo => Spot::Momo,
-        Who::Doto => Spot::Doto,
-        Who::Kongi => Spot::Kongi,
-        Who::Clover => Spot::Clover,
-        Who::Halmae => Spot::Halmae,
-        Who::Susu | Who::Nail => Spot::Stall,
     }
 }
 

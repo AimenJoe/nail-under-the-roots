@@ -227,10 +227,9 @@ impl App {
             if let (true, AlbumKind::Lamp(who, stage)) = (item.seen, item.kind) {
                 // 등불 이야기: 마을 풀빛 바탕에 그 이웃, 오른쪽 위에 작은 등불, 아래에 몇째 이야기인지 점.
                 ui.rect(r, Color::new(0.20, 0.30, 0.18, 1.0));
-                let spot = super::village_menu::lamp_spot(crate::lanterns::ALL[who].who);
                 self.renderer.draw_village_pic(
                     ui,
-                    crate::render::VillagePic::Neighbor(spot),
+                    crate::render::VillagePic::Neighbor(crate::lanterns::ALL[who].who),
                     Rect::new(
                         r.center().x - (r.h - 2.0) / 2.0 - 4.0,
                         r.y + 1.0,

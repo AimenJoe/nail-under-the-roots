@@ -67,8 +67,10 @@ function serve() {
 async function run() {
   fs.mkdirSync(OUT, { recursive: true });
   const srv = await serve();
-  const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   for (const locale of LOCALES) {
+    // 언어마다 브라우저를 새로 띄운다: 한 브라우저에서 한국어 다음에 독일어를 찍으면 독일어 화면이 가끔(기계가 바쁠 때)
+    // 통째로 다른 갈래로 나왔다 — 독일어만 따로 네 번은 늘 같았다. 원인은 못 찾았다(0307).
+    const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     const lang = locale.slice(0, 2);
     const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, locale });
     await ctx.addInitScript((p) => { try { localStorage.clear(); localStorage.setItem('nail.profile', p); } catch (e) {} }, PROFILE);
@@ -154,7 +156,8 @@ async function run() {
     if (errors.length) { console.error(`${lang}: 페이지 에러 ${JSON.stringify(errors)}`); process.exitCode = 1; }
     console.log(`${lang}: 33장 → ${OUT}`);
     await ctx.close();
+    await browser.close();
   }
-  await browser.close(); srv.close();
+  srv.close();
 }
 run();

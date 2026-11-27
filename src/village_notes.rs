@@ -34,18 +34,20 @@ pub enum Spot {
 }
 
 impl Spot {
-    /// 이웃이면 초상화로 그린다.
-    pub fn neighbor(self) -> bool {
-        matches!(
-            self,
-            Spot::Stall
-                | Spot::Bori
-                | Spot::Momo
-                | Spot::Doto
-                | Spot::Kongi
-                | Spot::Clover
-                | Spot::Halmae
-        )
+    /// 이 자리의 이웃(0307 R44): 이웃 줄은 그 이웃의 모습을 아이콘으로, 자세히 칸은 초상화로 그린다.
+    /// 그림·초상화는 `Who`가 안다(`render::draw_neighbor_body`·`art::Portrait::of`) — 자리마다 따로 고르지 않는다.
+    pub fn who(self) -> Option<crate::world::Who> {
+        use crate::world::Who;
+        match self {
+            Spot::Stall => Some(Who::Popo),
+            Spot::Bori => Some(Who::Bori),
+            Spot::Momo => Some(Who::Momo),
+            Spot::Doto => Some(Who::Doto),
+            Spot::Kongi => Some(Who::Kongi),
+            Spot::Clover => Some(Who::Clover),
+            Spot::Halmae => Some(Who::Halmae),
+            _ => None,
+        }
     }
 }
 

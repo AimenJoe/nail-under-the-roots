@@ -465,45 +465,28 @@ fn draw_one(art: &Art, w: &World, alpha: f32, d: Drawable) {
             if lamp && !shadow_pass() {
                 draw_neighbor_lamp(n.pos + vec2(21.0, 3.0), w.time);
             }
-            match n.who {
-                world::Who::Popo => {
-                    draw_critter_at(art, art::RACCOON_ROW, n.pos, left, false, w.time)
-                }
-                world::Who::Bori => draw_bori_at(art, n.pos, left, false, w.time),
-                world::Who::Halmae => draw_halmae_at(
-                    art,
-                    n.pos,
-                    w.time,
-                    w.adv.village.is_some_and(|v| v.halmae_awake),
-                ),
-                world::Who::Momo => {
-                    let on_seat = n.pos - vec2(0.0, 7.0);
-                    draw_critter_at(art, art::MOMO_BLOOM_ROW, on_seat, left, false, w.time);
-                }
-                world::Who::Doto => {
-                    draw_critter_at(art, art::DOTO_BACK_ROW, n.pos, left, false, w.time)
-                }
-                world::Who::Susu => draw_critter_at(art, art::SUSU_ROW, n.pos, left, false, w.time),
-                world::Who::Kongi => {
-                    draw_critter_at(art, art::KONGI_BACK_ROW, n.pos, left, false, w.time)
-                }
-                world::Who::Nail => draw_nail_at(art, n.pos, left, w.time),
-                world::Who::Clover => {
-                    // 토끼풀 + 아기 둘(0165): 어미 곁에서 아기들이 번갈아 깡충.
-                    draw_critter_at(art, art::CLOVER_BACK_ROW, n.pos, left, false, w.time);
-                    for (k, off) in [vec2(-13.0, 5.0), vec2(12.0, 7.0)].into_iter().enumerate() {
-                        let hop = ((w.time * 2.0 + k as f32 * 1.7).sin() * 2.0)
-                            .max(0.0)
-                            .round();
-                        draw_critter_at(
-                            art,
-                            art::BABY_ROW,
-                            n.pos + off - vec2(0.0, hop),
-                            k == 0,
-                            false,
-                            w.time,
-                        );
-                    }
+            // 몸은 `draw_neighbor_body` 하나(수첩·등불 아이콘과 같이 쓴다, 0307 R44). 마을에서만 하는 연출은 여기에:
+            // 모모는 그루터기 위에 앉고, 토끼풀 곁에는 아기 둘.
+            let awake = w.adv.village.is_some_and(|v| v.halmae_awake);
+            let at = match n.who {
+                world::Who::Momo => n.pos - vec2(0.0, 7.0),
+                _ => n.pos,
+            };
+            draw_neighbor_body(art, n.who, at, left, awake, w.time);
+            if n.who == world::Who::Clover {
+                // 토끼풀 + 아기 둘(0165): 어미 곁에서 아기들이 번갈아 깡충.
+                for (k, off) in [vec2(-13.0, 5.0), vec2(12.0, 7.0)].into_iter().enumerate() {
+                    let hop = ((w.time * 2.0 + k as f32 * 1.7).sin() * 2.0)
+                        .max(0.0)
+                        .round();
+                    draw_critter_at(
+                        art,
+                        art::BABY_ROW,
+                        n.pos + off - vec2(0.0, hop),
+                        k == 0,
+                        false,
+                        w.time,
+                    );
                 }
             }
         }
@@ -574,6 +557,29 @@ const TRACE_OFFSET: [Vec2; 7] = [
     vec2(14.0, 6.0),
     vec2(16.0, 8.0),
 ];
+
+/// 이웃 한 명의 몸(0307 R44): 마을에 선 모습. 마을의 정렬 그리기와 마을 창·앨범의 이웃 아이콘이 같이 쓴다 —
+/// 이웃의 그림을 바꾸면 여기 한 곳. `awake`는 할매가 눈을 떴나(참 엔딩 뒤, 0270).
+pub(super) fn draw_neighbor_body(
+    art: &Art,
+    who: world::Who,
+    pos: Vec2,
+    left: bool,
+    awake: bool,
+    time: f32,
+) {
+    match who {
+        world::Who::Popo => draw_critter_at(art, art::RACCOON_ROW, pos, left, false, time),
+        world::Who::Bori => draw_bori_at(art, pos, left, false, time),
+        world::Who::Halmae => draw_halmae_at(art, pos, time, awake),
+        world::Who::Momo => draw_critter_at(art, art::MOMO_BLOOM_ROW, pos, left, false, time),
+        world::Who::Doto => draw_critter_at(art, art::DOTO_BACK_ROW, pos, left, false, time),
+        world::Who::Susu => draw_critter_at(art, art::SUSU_ROW, pos, left, false, time),
+        world::Who::Kongi => draw_critter_at(art, art::KONGI_BACK_ROW, pos, left, false, time),
+        world::Who::Nail => draw_nail_at(art, pos, left, time),
+        world::Who::Clover => draw_critter_at(art, art::CLOVER_BACK_ROW, pos, left, false, time),
+    }
+}
 
 /// 정렬 그리기 한 개의 발 x(그림자 패스가 모닥불까지 거리를 잴 때).
 pub(super) fn drawable_x(w: &World, alpha: f32, d: &Drawable) -> f32 {
