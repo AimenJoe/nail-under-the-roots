@@ -343,11 +343,20 @@ _V5_B = {
     "attack1": (58, 300, 327, 597), "windup2": (493, 304, 734, 597), "attack2": (882, 316, 1148, 605),
     "settle": (62, 608, 286, 888),
 }
+# 걷기 영상(사장이 받은 GIF 30칸·10fps, 한 바퀴 ≈ 11.5칸)에서 네 칸(0·3·6·9)을 뽑아 바탕을 순수 마젠타로 정리한 띠.
+# 영상은 같은 몸이 이어져 움직여 칸마다 얼굴·몸이 달라지지 않는다. 목도리 끝이 뒤로 날린다(서 있을 때는 늘어져 있다).
+SHEET_V5_WALK = SPRITES / "nail_v5_walk.png"
+_V5_W = {
+    "walkg_1": (13, 3, 249, 272), "walkg_2": (282, 11, 520, 273), "walkg_3": (551, 5, 793, 272),
+    "walkg_4": (822, 11, 1059, 273),
+}
 SPEC_V5 = Spec(
     sources=[
         Source(SHEET_V5_A, _V5_A, groups=dict.fromkeys(_V5_A, "idle_a"), tidy=0.15, strip=6),
         # 시트 B는 따로 받아 그려 온 크기가 조금 다르다 → 똑바로 선 거두기 칸의 키로 한 배율.
         Source(SHEET_V5_B, _V5_B, groups=dict.fromkeys(_V5_B, "settle"), tidy=0.15, strip=6),
+        # 영상은 그린 크기가 또 다르다(키 약 250px) → 첫 칸의 키로. 외곽선이 가늘어(≈4px) 덜 벗긴다.
+        Source(SHEET_V5_WALK, _V5_W, groups=dict.fromkeys(_V5_W, "walkg_1"), tidy=0.15, strip=4),
     ],
     palette_ref=(0, "idle_a"),
     body_h=BODY_H_V5,
@@ -426,14 +435,18 @@ def stamp_face(spr, shines):
 
 
 def build_v5(walk="step"):
-    """v5 시트. `walk`: "step" = 걷기 첫 칸에서 발만 딛는 네 칸(0241, 지금까지의 방식), "sheet" = 받은 걷기 네 칸 그대로."""
+    """v5 시트. `walk`: "step" = 걷기 첫 칸에서 발만 딛는 네 칸(0241, 지금까지의 방식), "sheet" = 받은 걷기 네 칸 그대로,
+    "gif" = 걷기 영상에서 뽑은 네 칸."""
     spr = convert(SPEC_V5)
-    for name, box in list(_V5_A.items()) + list(_V5_B.items()):
-        sheet = SHEET_V5_A if name in _V5_A else SHEET_V5_B
-        spr[name] = stamp_face(spr[name], eye_shines(sheet, box))
+    for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W)):
+        for name, box in frames.items():
+            spr[name] = stamp_face(spr[name], eye_shines(sheet, box))
     spr["idle_b"] = stamp_face(spr["idle_b"], [(x, y + 1 / BODY_H_V5) for x, y in eye_shines(SHEET_V5_A, _V5_A["idle_a"])])
     sat = lambda k: fill_holes(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT))
-    walk4 = step_cycle(sat("walk_1"), FOOT - 1) if walk == "step" else [sat(f"walk_{i}") for i in (1, 2, 3, 4)]
+    if walk == "step":
+        walk4 = step_cycle(sat("walk_1"), FOOT - 1)
+    else:
+        walk4 = [sat(f"{'walkg' if walk == 'gif' else 'walk'}_{i}") for i in (1, 2, 3, 4)]
     rows = [
         [fill_holes(seat(spr["idle_a"], CELL, FOOT)), fill_holes(seat(spr["idle_b"], CELL, FOOT))] + walk4,
         [sat(k) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
