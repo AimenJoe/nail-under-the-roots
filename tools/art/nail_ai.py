@@ -325,6 +325,123 @@ def touch(cell, name):
     return out
 
 
+# v5(사장 2026-11-27 "아직 예쁘지 않거든, 주인공인데도"): **초상화를 붙여** 받은 여섯 안 가운데 6번(뾰족 털 머리·밝은 주둥이·큰 눈)으로
+# 받은 시트 둘. v4는 머리 키운 옛 스프라이트를 붙여 받아 거의 검은 갈색·옆얼굴·점 하나 눈이 따라왔다. 아기 느낌은 키가 아니라
+# 귀여움(큰 머리·큰 눈·둥근 몸)이라 키를 줄이지 않는다(`BODY_H_V5`).
+# 시트 A(2줄 × 4): 줄 1 서기·서기 숨(안 씀 — `breathe`)·맞음·쓰러짐, 줄 2 걷기 넷. 시트 B(3줄 × 3): 들기 1·치기 1·들기 2 /
+# 치기 2·강타 들기·강타 / 거두기·파고들기(안 씀)·솟기(안 씀). 상자는 그림 둘레 + 8px.
+SHEET_V5_A = SPRITES / "nail_v5_a.png"
+SHEET_V5_B = SPRITES / "nail_v5_b.png"
+BODY_H_V5 = 24
+_V5_A = {
+    "idle_a": (34, 5, 335, 380), "hurt": (718, 12, 1007, 379), "dead": (1035, 104, 1362, 379),
+    "walk_1": (42, 382, 322, 752), "walk_2": (388, 380, 668, 752), "walk_3": (723, 380, 1003, 756),
+    "walk_4": (1063, 381, 1344, 751),
+}
+_V5_B = {
+    "windup0": (56, 5, 290, 297), "attack0": (484, 5, 752, 297), "windup1": (894, 5, 1123, 297),
+    "attack1": (58, 300, 327, 597), "windup2": (493, 304, 734, 597), "attack2": (882, 316, 1148, 605),
+    "settle": (62, 608, 286, 888),
+}
+SPEC_V5 = Spec(
+    sources=[
+        Source(SHEET_V5_A, _V5_A, groups=dict.fromkeys(_V5_A, "idle_a"), tidy=0.15, strip=6),
+        # 시트 B는 따로 받아 그려 온 크기가 조금 다르다 → 똑바로 선 거두기 칸의 키로 한 배율.
+        Source(SHEET_V5_B, _V5_B, groups=dict.fromkeys(_V5_B, "settle"), tidy=0.15, strip=6),
+    ],
+    palette_ref=(0, "idle_a"),
+    body_h=BODY_H_V5,
+    breathe=("idle_a", "idle_b"),
+)
+INK_V5 = {"eye": (30, 22, 48), "shine": (255, 255, 255), "blush": (232, 140, 150)}
+
+
+def _blobs(mask):
+    """붙어 있는 점 덩어리들(큰 것부터)."""
+    seen = np.zeros_like(mask)
+    H, W = mask.shape
+    out = []
+    for y, x in zip(*np.nonzero(mask)):
+        if seen[y, x]:
+            continue
+        stack, pts = [(y, x)], []
+        while stack:
+            cy, cx = stack.pop()
+            if cy < 0 or cx < 0 or cy >= H or cx >= W or seen[cy, cx] or not mask[cy, cx]:
+                continue
+            seen[cy, cx] = True
+            pts.append((cy, cx))
+            stack += [(cy + 1, cx), (cy - 1, cx), (cy, cx + 1), (cy, cx - 1)]
+        out.append(pts)
+    return sorted(out, key=len, reverse=True)
+
+
+def eye_shines(sheet, box):
+    """원본 칸에서 눈의 흰 반짝을 찾는다 → [(x, y)] 큰 것(가까운 눈)부터, 그림 둘레 상자 기준 0..1.
+
+    큰 눈은 24px로 줄이면 칸마다 다른 얼룩이 되고 색표(서기 칸 기준)에 눈 색이 없어 분홍·갈색으로 바뀐다. 원본에서 눈 자리를 재서
+    줄인 칸의 같은 자리에 같은 눈을 찍는다. 흰색(세 값 다 205 넘음)은 머리에서 눈 반짝뿐이다(발톱은 크림). 감은 눈(맞음·쓰러짐)은 없다."""
+    x0, y0, x1, y1 = box
+    a = np.asarray(Image.open(sheet).convert("RGB")).astype(int)[y0:y1, x0:x1]
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    fg = ~((r > 170) & (g < 110) & (b > 170))
+    ys, xs = np.nonzero(fg)
+    fx0, fx1, fy0, fy1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    white = (np.minimum(np.minimum(r, g), b) > 205) & fg
+    white[int(fy0 + (fy1 - fy0) * 0.55):] = False
+    out = []
+    for pts in _blobs(white)[:2]:
+        if len(pts) >= 10:
+            py, px = np.mean([q[0] for q in pts]), np.mean([q[1] for q in pts])
+            out.append(((px - fx0) / (fx1 - fx0), (py - fy0) / (fy1 - fy0)))
+    return out
+
+
+def stamp_face(spr, shines):
+    """줄인 그림(앉히기 전)에 눈과 볼 홍조를 찍는다. 가까운 눈 = 가로 3 × 세로 3 짙은 남색 + 왼쪽 위 흰 반짝(반짝 자리가 기준),
+    먼 눈 = 세로 2 + 위 반짝, 홍조 = 가까운 눈 왼쪽 아래 분홍 두 점."""
+    out = spr.copy()
+    ys, xs = np.nonzero(out[..., 3] > 0)
+    x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+
+    def put(x, y, ink):
+        if 0 <= y < out.shape[0] and 0 <= x < out.shape[1] and out[y, x, 3] > 0:
+            out[y, x] = INK_V5[ink] + (255,)
+
+    for i, (nx, ny) in enumerate(shines):
+        ex, ey = int(x0 + nx * (x1 - x0)), int(y0 + ny * (y1 - y0))
+        if i == 0:
+            for dy in range(3):
+                for dx in range(3):
+                    put(ex + dx, ey + dy, "eye")
+            put(ex, ey, "shine")
+            put(ex - 2, ey + 3, "blush")
+            put(ex - 1, ey + 3, "blush")
+        else:
+            put(ex, ey, "shine")
+            put(ex, ey + 1, "eye")
+            put(ex + 1, ey, "eye")
+            put(ex + 1, ey + 1, "eye")
+    return out
+
+
+def build_v5(walk="step"):
+    """v5 시트. `walk`: "step" = 걷기 첫 칸에서 발만 딛는 네 칸(0241, 지금까지의 방식), "sheet" = 받은 걷기 네 칸 그대로."""
+    spr = convert(SPEC_V5)
+    for name, box in list(_V5_A.items()) + list(_V5_B.items()):
+        sheet = SHEET_V5_A if name in _V5_A else SHEET_V5_B
+        spr[name] = stamp_face(spr[name], eye_shines(sheet, box))
+    spr["idle_b"] = stamp_face(spr["idle_b"], [(x, y + 1 / BODY_H_V5) for x, y in eye_shines(SHEET_V5_A, _V5_A["idle_a"])])
+    sat = lambda k: fill_holes(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT))
+    walk4 = step_cycle(sat("walk_1"), FOOT - 1) if walk == "step" else [sat(f"walk_{i}") for i in (1, 2, 3, 4)]
+    rows = [
+        [fill_holes(seat(spr["idle_a"], CELL, FOOT)), fill_holes(seat(spr["idle_b"], CELL, FOOT))] + walk4,
+        [sat(k) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
+        [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
+    ]
+    return rows
+
+
 def build():
     spr = convert(SPEC)
     sat = lambda k: touch(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT), k)
