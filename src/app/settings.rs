@@ -495,7 +495,7 @@ impl App {
             v.step(self.assist_cursor, adjust);
             if v != self.assist() {
                 v.write(&mut self.profile);
-                crate::profile::save(&self.profile);
+                self.write_profile();
                 self.apply_assist();
                 self.sfx.play(crate::sfx::Id::Claw(0));
             }

@@ -42,7 +42,7 @@ impl App {
                 && self.recording()
                 && self.profile.set(&help::seen_key(TOPICS[i].id))
             {
-                crate::profile::save(&self.profile);
+                self.write_profile();
             }
         }
     }

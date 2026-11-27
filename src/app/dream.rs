@@ -173,7 +173,7 @@ impl App {
         run.won = true;
         let (row, secs, clean) = (run.row, run.time, run.clean);
         let best = dream::record(&mut self.profile, row, secs, clean);
-        crate::profile::save(&self.profile);
+        self.write_profile();
         self.sfx.play(crate::sfx::Id::Heal);
         self.world.juice.toast = Some((
             if best {

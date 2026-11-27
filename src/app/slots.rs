@@ -30,7 +30,7 @@ impl App {
     /// `load`: 이어하기로 열었나(false = 시작하기).
     pub(super) fn open_slots(&mut self, load: bool) {
         // 지금 기록을 먼저 써 둬야 창의 요약이 맞는다.
-        crate::profile::save(&self.profile);
+        self.write_profile();
         self.refresh_slots();
         let cur = profile::slot();
         self.slots_load = load;
@@ -67,7 +67,7 @@ impl App {
         profile::save_run(i, None);
         profile::set_slot(i);
         self.profile = Profile::default();
-        profile::save(&self.profile);
+        self.write_profile();
         self.refresh_slots();
         self.apply_assist();
         self.begin_run();

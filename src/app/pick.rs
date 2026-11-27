@@ -45,7 +45,7 @@ impl App {
                 crate::profile::key::CHAR_PICK,
                 list[self.char_cursor.min(list.len() - 1)].code as u32,
             );
-            crate::profile::save(&self.profile);
+            self.write_profile();
             match self.pick_for.take() {
                 Some(row) => self.begin_dream_run(row),
                 None => self.village_route(),

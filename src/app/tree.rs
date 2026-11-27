@@ -177,7 +177,7 @@ impl App {
                     self.sfx.play(crate::sfx::Id::Heal);
                 }
             }
-            crate::profile::save(&self.profile);
+            self.write_profile();
             // 반딧불을 썼다: 우물 위 반딧불 단계와 밑동 빛이 바로 따라온다(R41 — 전에는 마을에 다시 들어와야 우물이 줄었다).
             self.sync_village();
             if ch == self.world.character {

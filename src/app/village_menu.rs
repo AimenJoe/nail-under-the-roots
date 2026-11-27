@@ -211,7 +211,7 @@ impl App {
         } else if let Some(price) = decor_price(i).filter(|p| have >= *p) {
             self.profile.set_count(KEY_SEEDS, have - price);
             self.profile.set(&key_decor(i));
-            crate::profile::save(&self.profile);
+            self.write_profile();
             self.sync_village();
             self.shop_msg = Some((|s| s.decor_thanks, 2.5));
             self.sfx.play(crate::sfx::Id::Buy);
@@ -260,7 +260,7 @@ impl App {
         } else {
             self.profile.set_count(KEY_SEEDS, have - p.price);
             self.profile.set_count(key_pack(p.kind), packed + 1);
-            crate::profile::save(&self.profile);
+            self.write_profile();
             self.shop_msg = Some((|s| s.pack_thanks, 2.5));
             self.sfx.play(crate::sfx::Id::Buy);
         }
@@ -276,7 +276,7 @@ impl App {
         }
         self.profile.set_count(key_pack(p.kind), packed - 1);
         self.profile.add(KEY_SEEDS, p.price);
-        crate::profile::save(&self.profile);
+        self.write_profile();
         self.shop_msg = Some((|s| s.pack_back, 2.5));
         self.sfx.play(crate::sfx::Id::UiMove);
     }

@@ -1290,7 +1290,7 @@ impl App {
             self.world.inv.bag.berries += picked as u8;
         }
         if any {
-            crate::profile::save(&self.profile);
+            self.write_profile();
             self.world.juice.toast = Some((|s| s.toast_pack, 3.5));
         }
     }
@@ -1320,7 +1320,7 @@ impl App {
         let n = self.world.knots.glow(n);
         self.profile.add(crate::talents::KEY_LIGHT, n);
         self.profile.add(crate::journal::stat::LIGHT, n);
-        crate::profile::save(&self.profile);
+        self.write_profile();
         n
     }
 
@@ -1361,7 +1361,7 @@ impl App {
         let Some(r) = claim(&mut self.profile, g) else {
             return;
         };
-        crate::profile::save(&self.profile);
+        self.write_profile();
         match r {
             Reward::Decor(_) => {}
             // 장신구는 바로 가방에(0050). 이번 런의 상자에서는 다시 안 나온다.

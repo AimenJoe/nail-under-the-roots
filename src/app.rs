@@ -783,14 +783,34 @@ impl App {
         })
     }
 
-    /// 기록을 저장한다. 이번 런에서 만난 이웃도 함께 남긴다. 바뀐 것이 없으면 쓰지 않는다(`profile::put`).
+    /// 기록을 슬롯에 쓰는 **한 곳**(0269 R31 → 0307 R43): 쓰고, 상점 업적을 맞춘다. 바뀐 것이 없으면 쓰지 않는다(`profile::put`).
+    /// 앱의 모든 저장이 여기를 지난다(`profile_is_written_in_one_place`) — 꾸미기·큰 나무·발자국 보상처럼 런 밖에서 한 일도
+    /// 그 자리에서 업적이 맞춰진다. 개발 판(sandbox)은 슬롯에도 업적에도 쓰지 않는다(0269 B3).
+    /// 월드에서 만난 이웃은 적지 않는다 — 월드가 이 기록의 것이 아닐 수 있는 자리(슬롯 창·지우기·타이틀)에서도 부른다(0264).
+    pub(super) fn write_profile(&mut self) {
+        Self::write(&self.profile, &mut self.steam, &mut self.epic);
+    }
+
+    /// `write_profile`의 몸: 앱의 다른 칸(컷씬)을 빌린 채로도 부를 수 있게 칸만 받는다.
+    fn write(
+        profile: &crate::profile::Profile,
+        steam: &mut crate::steam::Steam,
+        epic: &mut crate::epic::Epic,
+    ) {
+        crate::profile::save(profile);
+        if crate::profile::sandbox() {
+            return;
+        }
+        steam.sync(profile);
+        epic.sync(profile);
+    }
+
+    /// 런의 기록을 저장한다: 이번 런에서 만난 이웃을 적고 쓴다(`write_profile`).
     fn save_profile(&mut self) {
         for k in &self.world.seen {
             self.profile.set(&crate::profile::key::mob(k));
         }
-        crate::profile::save(&self.profile);
-        self.steam.sync(&self.profile);
-        self.epic.sync(&self.profile);
+        self.write_profile();
     }
 
     /// 이벤트 저장(0265, 0264의 5초 주기 저장을 대신함): 굴의 방 경계(방을 비움·다음 방으로 넘어섬)·상자·물건 받기·일시정지에서
@@ -862,7 +882,7 @@ impl App {
         let Some(l) = crate::story::take(&mut self.profile, when, self.world.character) else {
             return false;
         };
-        crate::profile::save(&self.profile);
+        self.write_profile();
         let c = cutscene::talk(&self.world, &[(l.who, l.text, cutscene::Face::Happy)]);
         if self.cutscene.is_none() {
             self.cutscene = Some(c);
@@ -957,7 +977,7 @@ impl App {
                             .profile
                             .set(&crate::profile::key::illust(il.spec().file))
                         {
-                            crate::profile::save(&self.profile);
+                            Self::write(&self.profile, &mut self.steam, &mut self.epic);
                         }
                     }
                     // 컷씬에서 받은 무기는 컷씬이 끝난 뒤 창으로 보여 준다.
@@ -1275,7 +1295,7 @@ impl App {
         if s == Scenario::Normal && !self.resuming {
             // 텃밭(0304 G1): 이야기 런을 새로 떠날 때마다 한 단계. 거둔 산딸기는 꾸린 짐과 함께 꺼낸다.
             if self.recording() && crate::garden::grow(&mut self.profile) {
-                crate::profile::save(&self.profile);
+                self.write_profile();
             }
             self.unpack();
         }
@@ -1294,7 +1314,7 @@ impl App {
     fn note_run_start(&mut self, s: Scenario) {
         if s == Scenario::Normal && !self.resuming {
             self.profile.add(crate::profile::key::RUNS, 1);
-            crate::profile::save(&self.profile);
+            self.write_profile();
         }
         // 새 런을 시작하거나 마을로 돌아오면 쉼터 이어하기는 끝났다(0080).
         if matches!(s, Scenario::Normal | Scenario::Village) && !self.resuming {
@@ -1731,7 +1751,7 @@ impl App {
                     if self.erase_armed {
                         self.erase_armed = false;
                         self.profile = crate::profile::Profile::default();
-                        crate::profile::save(&self.profile);
+                        self.write_profile();
                         self.apply_assist();
                         self.sfx.play(crate::sfx::Id::Hurt);
                     } else {
@@ -2037,7 +2057,7 @@ impl App {
             self.profile
                 .set_count(key::KNOT_PICK, self.knot_level as u32);
             self.profile.unset(key::KNOT_NEW);
-            crate::profile::save(&self.profile);
+            self.write_profile();
             // 마을로 돌아간다. 고른 단계는 뿌리 길로 내려갈 때 걸린다.
             self.scene = Scene::Game;
             return;
@@ -2556,6 +2576,31 @@ impl App {
 #[cfg(test)]
 mod bag_tests {
     use super::*;
+
+    /// 저장은 한 곳(0269 R31 → 0307 R43): 앱 코드에서 지금 기록을 슬롯에 쓰는 호출은 `App::write` 안 하나뿐이다.
+    /// 다른 곳에서 바로 쓰면 상점 업적 맞추기가 그 저장에서 빠진다 — `self.write_profile()`(런 중이면 `save_profile()`)을 부른다.
+    /// (다른 슬롯을 비우는 `save_slot`·이어하기 칸 `save_run`은 다른 일이라 세지 않는다.)
+    #[test]
+    fn profile_is_written_in_one_place() {
+        let call = concat!("profile::", "save(");
+        let mut files = vec![std::path::PathBuf::from("src/app.rs")];
+        for e in std::fs::read_dir("src/app").unwrap().flatten() {
+            if e.path().extension().is_some_and(|x| x == "rs") {
+                files.push(e.path());
+            }
+        }
+        let mut at = Vec::new();
+        for f in &files {
+            let text = std::fs::read_to_string(f).unwrap();
+            for (n, l) in text.lines().enumerate() {
+                if l.contains(call) {
+                    at.push(format!("{}:{}", f.display(), n + 1));
+                }
+            }
+        }
+        assert_eq!(at.len(), 1, "기록을 바로 쓰는 곳: {at:?}");
+        assert!(at[0].starts_with("src/app.rs:"), "{at:?}");
+    }
 
     /// 가방은 캐릭터마다(0246): 도토 가방엔 발톱·모모 장신구가 안 들어가고, 누구나 장신구·도토 것은 들어간다.
     #[test]
