@@ -90,3 +90,72 @@ no grid lines, no shadows, no glow effects. Top-down 3/4 view, light from the to
 4. a small shallow puddle of blue water with a light reflection line
 5. a white silk thread loop tied to the top of a short wooden stick stuck in the ground
 ```
+
+## 시트 E — 이웃의 흔적·이웃 등불·코드로 그린 꾸미기 (사장 판정 2026-11-27)
+
+사장: "상의 없는 그림들", "갈대 피리·이웃 곁의 등불·샘 그릇 너무 성의 없음", 등불은 "그림 자체도 성의 없고 어떤 의미인지도 모르겠다".
+이웃의 부탁 흔적 일곱(0273)과 이웃 등불(0304)은 0224 뒤에 코드로 그려 넣은 것이고, 꾸미기 가운데 바람종·깃발 줄·실 그네와 실 고리는
+0224의 시트 B·C를 아직 받지 않아 코드 그림으로 남아 있다(나머지 꾸미기는 팩 그림). 위 시트 B·C 대신 **이 넷을 받는다** — A에서 배운 대로
+그림체 판 `ref_hub_style.png` 한 장만 붙이고, 한 장에 셋, 크기는 글로.
+받은 원본은 `tools/art/sources/ai/sprites/hub_e<1~4>_v1.png`로(✦는 `strip_logo.py`), `hub_ai.py`의 `ITEMS`에 줄을 더해 `hub.png` 칸으로.
+등불 유리 속 빛·버섯 등의 빛·피리의 음표는 지금처럼 코드가 얹는다(그림에는 넣지 않는다).
+
+### E1 — 이웃 등불 · 샘 그릇 · 갈대 피리
+
+```
+Draw three new props in EXACTLY the same pixel art style as the attached sprites (a cute top-down action game:
+chunky pixels, each pixel a 6x6 block, dark plum 1px outline, soft 3-4 tone shading, light from the top-left,
+warm cozy colors). The attached sprites are only a STYLE reference: do not redraw them.
+
+Make the props rich and handcrafted: wood grain, glass shine, wet stone, little highlights and dark corners.
+Top-down 3/4 view. Solid magenta background (#FF00FF), one row, three props well separated, no text, no shadows, no glow.
+IMPORTANT: draw ONLY the objects. Do NOT draw any ground, grass or soil around them.
+1. A small firefly lantern on a wooden post, about as tall as the mole and one third as wide: a round glass lantern with a tiny wooden roof, hanging from a curved hook at the top of a thin post. The glass is EMPTY and dark teal (the game adds the light).
+2. A small stone wash bowl, about half a mole wide and low: a rough round grey stone bowl filled with clear blue spring water, one bright highlight on the water, two wet pebbles beside it.
+3. A reed flute leaning on a short log, about as wide as the mole and half as tall: a short mossy log lying on its side, and a pale yellow reed flute with four finger holes and a red cord tied at one end leaning against it.
+```
+
+### E2 — 큰 깍정이 · 풀 방석 · 버섯 등
+
+```
+Draw three new props in EXACTLY the same pixel art style as the attached sprites (a cute top-down action game:
+chunky pixels, each pixel a 6x6 block, dark plum 1px outline, soft 3-4 tone shading, light from the top-left,
+warm cozy colors). The attached sprites are only a STYLE reference: do not redraw them.
+
+Make the props rich and handcrafted: scaly acorn texture, braided straw, soft mushroom gills, little highlights and dark corners.
+Top-down 3/4 view. Solid magenta background (#FF00FF), one row, three props well separated, no text, no shadows, no glow.
+IMPORTANT: draw ONLY the objects. Do NOT draw any ground, grass or soil around them.
+1. A big old acorn cap lying upside-down like a bowl, about half a mole wide: brown and scaly outside, smooth and pale inside, with a short stem.
+2. A round woven grass cushion, about two thirds of a mole wide and flat: dry yellow straw braided in a spiral, a few loose blades sticking out.
+3. A mushroom lamp, about half a mole wide and as tall as half a mole: a pale blue mushroom cap on a short white stem, set on a small flat grey stone. No glow (the game adds the light).
+```
+
+### E3 — 솜털 잠자리 · 모모의 꽃밭 · 바람종
+
+```
+Draw three new props in EXACTLY the same pixel art style as the attached sprites (a cute top-down action game:
+chunky pixels, each pixel a 6x6 block, dark plum 1px outline, soft 3-4 tone shading, light from the top-left,
+warm cozy colors). The attached sprites are only a STYLE reference: do not redraw them.
+
+Make the props rich and handcrafted: fluffy seeds, tilled soil, petals, metal shine, little highlights and dark corners.
+Top-down 3/4 view. Solid magenta background (#FF00FF), one row, three props well separated, no text, no shadows, no glow.
+IMPORTANT: draw ONLY the objects. Do NOT draw any ground, grass or soil around them.
+1. A little bed of dandelion fluff, about as wide as the mole and low: a ring of small twigs filled with soft white fluffy seeds.
+2. A short row of four flowers planted in a strip of dark tilled soil, about as wide as the mole: pink and white flowers alternating, green stems and leaves.
+3. A wind chime, about as tall as the mole and half as wide: a thin wooden post with a short cross bar and three hanging metal tubes of different lengths.
+```
+
+### E4 — 깃발 줄 · 실 그네 · 실 고리
+
+```
+Draw three new props in EXACTLY the same pixel art style as the attached sprites (a cute top-down action game:
+chunky pixels, each pixel a 6x6 block, dark plum 1px outline, soft 3-4 tone shading, light from the top-left,
+warm cozy colors). The attached sprites are only a STYLE reference: do not redraw them.
+
+Make the props rich and handcrafted: wood grain, cloth folds, fine white thread, little highlights and dark corners.
+Top-down 3/4 view. Solid magenta background (#FF00FF), one row, three props well separated, no text, no shadows, no glow.
+IMPORTANT: draw ONLY the objects. Do NOT draw any ground, grass or soil around them.
+1. A string of small triangle flags between two short wooden posts, about two moles wide and as tall as the mole: flags in red, yellow and blue.
+2. A small swing, about as tall and as wide as the mole: a wooden frame with two white silk threads holding a small wooden seat.
+3. A white silk thread loop tied to the top of a short wooden stick stuck upright, about half a mole wide and as tall as the mole.
+```
