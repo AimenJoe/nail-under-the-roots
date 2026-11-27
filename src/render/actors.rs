@@ -1087,6 +1087,15 @@ pub(super) fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {
             let k = (bt / t::BURROW_DIVE_TIME).clamp(0.0, 1.0);
             let o = art::nail_origin(pos);
             let sink = (art::NAIL_CELL * k).round();
+            // 가라앉는 몸은 파고드는 두 칸(0308): 앞으로 숙였다가 머리부터 내려간다.
+            let dive = art::nail_cell(
+                if k < 0.4 {
+                    art::NAIL_DIVE
+                } else {
+                    art::NAIL_DIVE + 1
+                },
+                0,
+            );
             if sink < art::NAIL_CELL {
                 draw_texture_ex(
                     &art.nail,
@@ -1094,7 +1103,12 @@ pub(super) fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {
                     o.y + sink,
                     WHITE,
                     DrawTextureParams {
-                        source: Some(Rect::new(0.0, 0.0, art::NAIL_CELL, art::NAIL_CELL - sink)),
+                        source: Some(Rect::new(
+                            dive.x,
+                            dive.y,
+                            art::NAIL_CELL,
+                            art::NAIL_CELL - sink,
+                        )),
                         dest_size: Some(vec2(art::NAIL_CELL, art::NAIL_CELL - sink)),
                         flip_x: p.face_left,
                         ..Default::default()
@@ -1138,7 +1152,8 @@ pub(super) fn draw_nail(art: &Art, p: &Player, alpha: f32, time: f32) {
         player::State::Burrow { time: bt } => {
             (((bt * (12.0 + 16.0 * p.burrow_charge())) as u32) % 2, 2)
         }
-        player::State::Emerge { .. } | player::State::Drill { .. } => (2, 1),
+        player::State::Emerge { .. } => (art::NAIL_BURST, 0),
+        player::State::Drill { .. } => (2, 1),
         player::State::Recover { .. } => (3, 1),
         // 한 타 = 들기 → 치기 → (마지막 타) 거두기. 1·2타는 가까운 발·먼 발을 번갈아, 마지막 타는 두 발(0082).
         player::State::Attack { idx, time: at, .. } => {

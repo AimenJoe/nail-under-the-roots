@@ -266,6 +266,10 @@ pub const CELL: f32 = 16.0;
 /// 발바닥 줄 `NAIL_FOOT`(칸 위에서). 다른 시트는 `CELL`.
 pub const NAIL_CELL: f32 = 32.0;
 pub const NAIL_FOOT: f32 = 30.0;
+/// 줄 0에서 파고드는 두 칸(숙임·머리부터)의 첫 열 — 걷기 넷(열 2~5) 다음(0308).
+pub const NAIL_DIVE: u32 = 6;
+/// 줄 0의 솟구치는 칸(두 발을 머리 곁으로 들고 뛰어오른다, 0308).
+pub const NAIL_BURST: u32 = 8;
 
 /// critters.png에서 실루엣 줄까지의 거리(그림 줄 수).
 pub const CRITTER_ROWS: u32 = 22;

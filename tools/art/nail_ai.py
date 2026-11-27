@@ -11,7 +11,7 @@
 반짝 자리를 재서 같은 도장으로, 외곽선은 곁의 털색으로 물들이고 안쪽 선을 원본에서 옮긴다. 머리는 `HEAD_V5`배(이웃과 나란히 보아 고른 값).
 
 칸 배치(게임 코드는 칸 크기 `art::NAIL_CELL`만 안다):
-  줄 0: 서기 2, 걷기 4 / 줄 1: 치기 3, 맞음, 쓰러짐, 들기 3, 거두기 / 줄 2: 흙더미 2, 그림자(16칸 그림을 칸 아래 가운데에)
+  줄 0: 서기 2, 걷기 4, 파고들기 2(숙임·머리부터), 솟구치기 / 줄 1: 치기 3, 맞음, 쓰러짐, 들기 3, 거두기 / 줄 2: 흙더미 2, 그림자(16칸 그림을 칸 아래 가운데에)
   줄 3~5: 줄 0~2의 흰 실루엣(피격 번쩍·다 모인 몸빛)
 """
 import sys
@@ -331,7 +331,7 @@ def touch(cell, name):
 # 받은 시트 둘. v4는 머리 키운 옛 스프라이트를 붙여 받아 거의 검은 갈색·옆얼굴·점 하나 눈이 따라왔다. 아기 느낌은 키가 아니라
 # 귀여움(큰 머리·큰 눈·둥근 몸)이라 키를 줄이지 않는다(`BODY_H_V5`).
 # 시트 A(2줄 × 4): 줄 1 서기·서기 숨(안 씀 — `breathe`)·맞음·쓰러짐, 줄 2 걷기 넷. 시트 B(3줄 × 3): 들기 1·치기 1·들기 2 /
-# 치기 2·강타 들기·강타 / 거두기·파고들기(안 씀)·솟기(안 씀). 상자는 그림 둘레 + 8px.
+# 치기 2·강타 들기·강타 / 거두기·파고들기(안 씀 — 영상에서 뽑은 두 칸을 쓴다)·솟구치기. 상자는 그림 둘레 + 8px.
 SHEET_V5_A = SPRITES / "nail_v5_a.png"
 SHEET_V5_B = SPRITES / "nail_v5_b.png"
 BODY_H_V5 = 24
@@ -343,7 +343,7 @@ _V5_A = {
 _V5_B = {
     "windup0": (56, 5, 290, 297), "attack0": (484, 5, 752, 297), "windup1": (894, 5, 1123, 297),
     "attack1": (58, 300, 327, 597), "windup2": (493, 304, 734, 597), "attack2": (882, 316, 1148, 605),
-    "settle": (62, 608, 286, 888),
+    "settle": (62, 608, 286, 888), "burst": (910, 593, 1148, 896),
 }
 # 걷기 영상(사장이 받은 GIF 30칸·10fps, 한 바퀴 ≈ 11.5칸)에서 네 칸(0·3·6·9)을 뽑아 바탕을 순수 마젠타로 정리한 띠.
 # 영상은 같은 몸이 이어져 움직여 칸마다 얼굴·몸이 달라지지 않는다. 목도리 끝이 뒤로 날린다(서 있을 때는 늘어져 있다).
@@ -352,6 +352,13 @@ _V5_W = {
     "walkg_1": (13, 3, 249, 272), "walkg_2": (282, 11, 520, 273), "walkg_3": (551, 5, 793, 272),
     "walkg_4": (822, 11, 1059, 273),
 }
+# 파고들기 영상(사장이 받은 GIF 30칸, 640×360)에서 뽑은 칸: 23(다시 선 모습 — 배율의 기준으로만), 5(앞으로 숙임), 8(머리부터 내려감).
+# ✦를 지우고 바탕을 순수 마젠타로 정리한 띠. 솟구치는 칸(11~19)은 쓰지 않는다 — 몸이 정면으로 돌고 길게 늘어나 다른 동물이 됐다(0308).
+SHEET_V5_DIVE = SPRITES / "nail_v5_dive.png"
+_V5_D = {"dive_ref": (120, 21, 440, 360), "dive_a": (801, 51, 1144, 360), "dive_b": (1439, 13, 1754, 357)}
+# 머리가 위에 있지 않은 칸은 `shrink_head`가 머리 띠를 못 찾는다. 파고들기는 기준 칸(dive_ref)도 줄이지 않는다 — 줄이면 배율이
+# 커져 줄지 않은 머리가 더 커진다(머리 +18%). 그대로 두면 온몸 크기가 맞고 머리 +7%·몸 −9%쯤(0.1초 스치는 칸이라 받아들인다).
+NO_SHRINK = {"dead", "dive_ref", "dive_a", "dive_b"}
 SPEC_V5 = Spec(
     sources=[
         Source(SHEET_V5_A, _V5_A, groups=dict.fromkeys(_V5_A, "idle_a"), tidy=0.15, strip=6),
@@ -359,6 +366,7 @@ SPEC_V5 = Spec(
         Source(SHEET_V5_B, _V5_B, groups=dict.fromkeys(_V5_B, "settle"), tidy=0.15, strip=6),
         # 영상은 그린 크기가 또 다르다(키 약 250px) → 첫 칸의 키로. 외곽선이 가늘어(≈4px) 덜 벗긴다.
         Source(SHEET_V5_WALK, _V5_W, groups=dict.fromkeys(_V5_W, "walkg_1"), tidy=0.15, strip=4),
+        Source(SHEET_V5_DIVE, _V5_D, groups=dict.fromkeys(_V5_D, "dive_ref"), tidy=0.15, strip=3),
     ],
     palette_ref=(0, "idle_a"),
     body_h=BODY_H_V5,
@@ -518,7 +526,7 @@ def shrink_head(k):
     def prep(img, frames):
         out = img.copy()
         for name, (x0, y0, x1, y1) in frames.items():
-            if k == 1.0 or name == "dead":
+            if k == 1.0 or name in NO_SHRINK:
                 continue
             a = out[y0:y1, x0:x1]
             r, g, b = a[..., 0], a[..., 1], a[..., 2]
@@ -561,7 +569,7 @@ def build_v5(walk="gif", lines=True, head=HEAD_V5):
     "gif" = 걷기 영상에서 뽑은 네 칸. `head` = 머리 배율(`shrink_head`)."""
     spr = convert(spec_v5(head))
     idle_img = None
-    for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W)):
+    for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W), (SHEET_V5_DIVE, _V5_D)):
         img, _ = shrink_head(head)(np.asarray(Image.open(sheet).convert("RGB")).astype(int), frames)
         if sheet == SHEET_V5_A:
             idle_img = img
@@ -581,7 +589,8 @@ def build_v5(walk="gif", lines=True, head=HEAD_V5):
     else:
         walk4 = [sat(f"{'walkg' if walk == 'gif' else 'walk'}_{i}") for i in (1, 2, 3, 4)]
     rows = [
-        [edge(fill_holes(seat(spr["idle_a"], CELL, FOOT))), edge(fill_holes(seat(spr["idle_b"], CELL, FOOT)))] + walk4,
+        [edge(fill_holes(seat(spr["idle_a"], CELL, FOOT))), edge(fill_holes(seat(spr["idle_b"], CELL, FOOT)))] + walk4
+        + [sat("dive_a"), sat("dive_b"), sat("burst")],
         [sat(k) for k in ("attack0", "attack1", "attack2", "hurt", "dead", "windup0", "windup1", "windup2", "settle")],
         [small(legacy.MOUND_A), small(legacy.MOUND_B), small(legacy.SHADOW)],
     ]
