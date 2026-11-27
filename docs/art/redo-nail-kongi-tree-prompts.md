@@ -198,3 +198,52 @@ Row 3: (1) settle: paws coming back down to the sides; (2) diving into the groun
 
 받으면: `nail_ai.py`에 v4 원본·칸 상자를 넣고 `chibi`는 끈 채(원본이 이미 머리 큰 비율) 줄여, 지금 시트와 8배 나란히 비교 그림을 만든다 →
 사장이 고른 쪽을 쓴다. 고르기 전에는 `assets/art/nail.png`를 바꾸지 않는다.
+
+## Naïl 5단계 — 초상화의 나일을 스프라이트로(사장 2026-11-27 "아직 예쁘지 않거든, 주인공인데도")
+지금 스프라이트(v4)는 거의 검은 갈색 한 덩어리·옆얼굴·점 하나 눈이라 초상화(따뜻한 갈색 털·밝은 주둥이·반짝이는 큰 눈·볼 홍조)와
+다른 캐릭터처럼 보인다. v4는 머리 키운 옛 스프라이트를 붙여 받아 어두운 색과 옆얼굴이 따라왔다 → 이번에는 **초상화를 붙여** 여섯 안을
+받았다(`sprites/nail_v5_concepts.png`). 줄인 시험에서 여섯 다 지금보다 잘 읽혔고, 사장이 **6번·4번**을 골랐다(둘 다 뾰족 털 머리).
+사장: "아기 느낌은 단순히 크기가 문제가 아니라 귀여움이 중요한 거야" — 키를 줄여 아기로 만들지 않는다. 큰 머리·큰 눈·둥근 몸이 먼저고,
+크기는 눈과 홍조가 읽히는 데서 정한다.
+
+붙이는 것(새 대화): **6번 안** `ref/ref_nail_v5_pick.png` + **그림체 판** `ref/ref_redo_style.png`. 4번에서 가져올 것(옆으로 벌린 앞발,
+끝이 늘어진 목도리)은 글로 적는다 — 두 안을 같이 붙이면 섞인다. 받은 원본은 `sprites/nail_v5_a.png`·`nail_v5_b.png`.
+
+### Naïl v5 시트 A — 서기·맞음·쓰러짐·걷기(붙임: ref_nail_v5_pick + ref_redo_style)
+```
+Redraw the baby mole hero from the first attached image as a pixel art sprite sheet, in EXACTLY the pixel style of
+the second attached image (chunky pixels, dark plum 1px outline, soft 3-4 tone shading, light from the top-left).
+The second image is only a style reference: do not draw those animals.
+
+CUTENESS IS THE MOST IMPORTANT RULE. He is a baby: a big round fluffy head that is HALF of his total height, a small
+soft chubby body, short stubby legs, everything rounded. Keep his design exactly as in the first image: warm mid-brown
+fluffy fur with little spiky tufts on the top and back of the head, a pale tan muzzle, a big round pink nose, a BIG
+shiny dark eye with a white highlight (the far eye partly visible), a pink blush on the cheek, big pink spade paws with
+cream claws, small pink feet, a tiny tail, and an orange knitted scarf tied in front with a short hanging end.
+The fur must stay clearly LIGHTER than the outline in every frame. The big shiny eye and the blush must be visible in
+every frame except where noted.
+
+2 rows x 4 frames, evenly spaced on a solid magenta background (#FF00FF), no text, no grid lines, no shadows, no ground,
+no effects. Every frame the same character size and the same pixel block size, facing right in a 3/4 top-down view,
+feet on the same baseline in each row.
+Row 1: (1) idle: standing, the big paws held out to the sides; (2) idle breathing: body 1 pixel lower, paws slightly
+       lower; (3) hurt: flinching backward, eye squeezed shut, paws up near the cheeks (not covering the face);
+       (4) knocked down: lying on his back, paws limp, eye closed.
+Row 2: walk cycle, 4 frames: short legs clearly stepping (one foot forward, then the other), the paws swinging forward
+       and back in opposition, head and body bobbing 1 pixel. The head size stays the same in every frame.
+```
+
+### Naïl v5 시트 B — 치기·모으기·거두기(A를 받은 뒤. 붙임: 받은 시트 A + ref_redo_style)
+```
+Using the attached sprite sheet of the baby mole (same character, same big fluffy head, same size, same pixel block
+size, same colors and outline), draw his attack frames in the same pixel style. 3 rows x 3 frames, evenly spaced on a
+solid magenta background (#FF00FF), no text, no grid lines, no shadows, no ground, no motion lines, no slash effects,
+facing right, feet on the same baseline. Keep him just as cute: the big shiny eye and the blush stay visible in every
+frame (do not hide the face behind the paws), the fur stays lighter than the outline.
+Row 1: (1) wind-up 1: right paw pulled back; (2) strike 1: right paw swiped forward, claws leading;
+       (3) wind-up 2: left paw pulled back across the body.
+Row 2: (1) strike 2: left paw swiped forward; (2) heavy wind-up: crouched low, both paws raised beside the head (not
+       covering it); (3) heavy strike: both paws slammed down in front, body leaning forward.
+Row 3: (1) settle: paws coming back down to the sides; (2) diving into the ground: head and front paws pointing down,
+       body tilted forward; (3) bursting up: jumping straight up, paws raised, body stretched.
+```
