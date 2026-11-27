@@ -385,13 +385,13 @@ def _blobs(mask):
     return sorted(out, key=len, reverse=True)
 
 
-def eye_shines(sheet, box):
+def eye_shines(img, box):
     """원본 칸에서 눈의 흰 반짝을 찾는다 → [(x, y)] 큰 것(가까운 눈)부터, 그림 둘레 상자 기준 0..1.
 
     큰 눈은 24px로 줄이면 칸마다 다른 얼룩이 되고 색표(서기 칸 기준)에 눈 색이 없어 분홍·갈색으로 바뀐다. 원본에서 눈 자리를 재서
     줄인 칸의 같은 자리에 같은 눈을 찍는다. 흰색(세 값 다 205 넘음)은 머리에서 눈 반짝뿐이다(발톱은 크림). 감은 눈(맞음·쓰러짐)은 없다."""
     x0, y0, x1, y1 = box
-    a = np.asarray(Image.open(sheet).convert("RGB")).astype(int)[y0:y1, x0:x1]
+    a = img[y0:y1, x0:x1]
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
     fg = ~((r > 170) & (g < 110) & (b > 170))
     ys, xs = np.nonzero(fg)
@@ -434,17 +434,37 @@ def stamp_face(spr, shines):
     return out
 
 
+# 감은 눈(사장 2026-11-27 "눈 감는 게 좀 어색하다"): 맞음·쓰러짐 칸은 원본의 가는 감은 눈 선이 줄이면 사라져 얼굴이 민둥해졌다.
+# 눈 자리(원본 그림 둘레 상자 기준 0..1, 원본을 보고 적은 값)에 읽히는 모양을 찍는다: 맞음 = 질끈 감은 ">", 쓰러짐 = "×".
+CLOSED_EYES = {"hurt": ((0.34, 0.30), ">"), "dead": ((0.24, 0.34), "x")}
+_SHUT = {">": ((0, 0), (1, 0), (2, 1), (0, 2), (1, 2)), "x": ((0, 0), (2, 0), (1, 1), (0, 2), (2, 2))}
+
+
+def stamp_shut(spr, at, kind):
+    """줄인 그림(앉히기 전)에 감은 눈과 볼 홍조를 찍는다."""
+    out = spr.copy()
+    ys, xs = np.nonzero(out[..., 3] > 0)
+    x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    ex, ey = int(x0 + at[0] * (x1 - x0)), int(y0 + at[1] * (y1 - y0))
+    for dx, dy in _SHUT[kind]:
+        out[ey + dy, ex + dx] = INK_V5["eye"] + (255,)
+    for dx in (-2, -1):
+        if out[ey + 3, ex + dx, 3] > 0:
+            out[ey + 3, ex + dx] = INK_V5["blush"] + (255,)
+    return out
+
+
 LINE = (43, 29, 42)     # 변환기가 두르는 외곽선 색(sprite_ai.OUTLINE)
 
 
-def ink_lines(spr, sheet, box, strength=0.72, cover=0.26):
+def ink_lines(spr, img, box, strength=0.72, cover=0.26):
     """원본에 그려진 **안쪽 선**(머리와 몸 사이·앞발 둘레·목도리 주름)을 줄인 그림에 그늘 줄로 되살린다.
 
     원본의 선은 한 블록(≈6px) 굵기라 키 24로 줄이면(원본 15px = 한 점) 다수결에서 늘 져서 사라지고, 몸이 한 덩어리가 된다.
     줄인 점마다 원본에서 그 점이 덮는 네모 안의 "어두운 선"(실루엣 가장자리에서 9px 안쪽) 비율이 `cover`를 넘으면 그 점을
     제 색의 어두운 음영(`strength`배)으로 — 검은 선이 아니라 그 자리 색의 그늘이라 눈에 거슬리지 않는다."""
     x0, y0, x1, y1 = box
-    a = np.asarray(Image.open(sheet).convert("RGB")).astype(int)[y0:y1, x0:x1]
+    a = img[y0:y1, x0:x1]
     fg = ~((a[..., 0] > 170) & (a[..., 1] < 110) & (a[..., 2] > 170))
     ys, xs = np.nonzero(fg)
     fx0, fx1, fy0, fy1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
@@ -488,18 +508,67 @@ def tinted_outline(cell, lit=0.40, shade=0.27, keep=0.25):
     return out
 
 
-def build_v5(walk="step", lines=True):
+def shrink_head(k):
+    """`Source.prep`: 칸마다 머리(목도리 윗선 위)를 목을 기준으로 `k`배. 사장 2026-11-27 "다른 캐릭터에 비해 너무 이등신 느낌".
+
+    머리 띠(그림 맨 위 ~ 목도리의 주황이 처음 넓게 나오는 줄)를 통째로 줄여 목 가운데에 다시 붙인다 — 머리가 몸 위에 얹힌 그림이라
+    줄어든 자리는 바탕이 된다. 누운 칸(쓰러짐)은 머리가 옆이라 그대로. 키는 변환기가 서기 칸 전체 높이로 맞추니 머리가 줄면 몸이 그만큼 커진다."""
+    def prep(img, frames):
+        out = img.copy()
+        for name, (x0, y0, x1, y1) in frames.items():
+            if k == 1.0 or name == "dead":
+                continue
+            a = out[y0:y1, x0:x1]
+            r, g, b = a[..., 0], a[..., 1], a[..., 2]
+            fg = ~((r > 170) & (g < 110) & (b > 170))
+            ys, xs = np.nonzero(fg)
+            fy0, fx0, fx1 = ys.min(), xs.min(), xs.max() + 1
+            scarf = fg & (r > 140) & (g > 50) & (g < 150) & (b < 80) & (r - g > 50)
+            rows = np.nonzero(scarf.sum(1) >= 0.12 * (fx1 - fx0))[0]
+            rows = rows[rows > fy0 + (ys.max() - fy0) * 0.3]          # 머리 위쪽의 주황 점은 목도리가 아니다
+            if len(rows) == 0:
+                continue
+            neck = int(rows[0]) + 2                                    # 목도리 윗줄을 조금 덮게
+            cx = int(np.nonzero(scarf[rows[0]])[0].mean())
+            head = Image.fromarray(a[fy0:neck].astype(np.uint8), "RGB")
+            nw, nh = max(1, round(head.width * k)), max(1, round(head.height * k))
+            small = np.asarray(head.resize((nw, nh), Image.NEAREST)).astype(int)
+            a[fy0:neck] = (255, 0, 255)
+            left = int(round(cx - cx * k))
+            dst = a[neck - nh:neck, left:left + nw]
+            keep = ~((small[..., 0] > 170) & (small[..., 1] < 110) & (small[..., 2] > 170))
+            dst[keep] = small[keep]
+        return out, frames
+    return prep
+
+
+def spec_v5(head=1.0):
+    """머리 배율을 준 v5 설정(`head` = 1이면 `SPEC_V5` 그대로)."""
+    if head == 1.0:
+        return SPEC_V5
+    return Spec(
+        sources=[Source(s.path, s.frames, groups=s.groups, tidy=s.tidy, strip=s.strip, prep=shrink_head(head)) for s in SPEC_V5.sources],
+        palette_ref=SPEC_V5.palette_ref, body_h=SPEC_V5.body_h, breathe=SPEC_V5.breathe)
+
+
+def build_v5(walk="step", lines=True, head=1.0):
     """v5 시트. `walk`: "step" = 걷기 첫 칸에서 발만 딛는 네 칸(0241, 지금까지의 방식), "sheet" = 받은 걷기 네 칸 그대로,
-    "gif" = 걷기 영상에서 뽑은 네 칸."""
-    spr = convert(SPEC_V5)
+    "gif" = 걷기 영상에서 뽑은 네 칸. `head` = 머리 배율(`shrink_head`)."""
+    spr = convert(spec_v5(head))
+    idle_img = None
     for sheet, frames in ((SHEET_V5_A, _V5_A), (SHEET_V5_B, _V5_B), (SHEET_V5_WALK, _V5_W)):
+        img, _ = shrink_head(head)(np.asarray(Image.open(sheet).convert("RGB")).astype(int), frames)
+        if sheet == SHEET_V5_A:
+            idle_img = img
         for name, box in frames.items():
             if lines:
-                spr[name] = ink_lines(spr[name], sheet, box)
-            spr[name] = stamp_face(spr[name], eye_shines(sheet, box))
+                spr[name] = ink_lines(spr[name], img, box)
+            spr[name] = stamp_face(spr[name], eye_shines(img, box))
+            if name in CLOSED_EYES:
+                spr[name] = stamp_shut(spr[name], *CLOSED_EYES[name])
     if lines:
-        spr["idle_b"] = ink_lines(spr["idle_b"], SHEET_V5_A, _V5_A["idle_a"])
-    spr["idle_b"] = stamp_face(spr["idle_b"], [(x, y + 1 / BODY_H_V5) for x, y in eye_shines(SHEET_V5_A, _V5_A["idle_a"])])
+        spr["idle_b"] = ink_lines(spr["idle_b"], idle_img, _V5_A["idle_a"])
+    spr["idle_b"] = stamp_face(spr["idle_b"], [(x, y + 1 / BODY_H_V5) for x, y in eye_shines(idle_img, _V5_A["idle_a"])])
     edge = tinted_outline if lines else (lambda c: c)
     sat = lambda k: edge(fill_holes(seat_on_fur(spr[k], spr["idle_a"], CELL, FOOT)))
     if walk == "step":
