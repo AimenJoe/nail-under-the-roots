@@ -97,6 +97,10 @@ async function run() {
       await tick(16); await new Promise((r) => setTimeout(r, 50));
       if (await pg.evaluate(() => document.getElementById('loading').classList.contains('done'))) break;
     }
+    // 첫 그림 뒤에도 뒤에서 읽는 것(곡·늦게 오는 그림)이 실제 시간으로 끝난다: 가짜 시각을 크게 건너뛰기 전에 실제 시간을 주며
+    // 한 프레임씩 흘린다 — 안 그러면 그것들이 "장면이 시작한 뒤"에 도착하는 실행이 생겨 화면이 통째로 다른 갈래가 된다.
+    const settle = async (frames) => { for (let i = 0; i < frames; i++) { await tick(16); await new Promise((r) => setTimeout(r, 40)); } };
+    await settle(80);
     if (now > START_MS - 10000) throw new Error(`로딩이 너무 길었다(가짜 ${now}ms) — START_MS를 늘린다`);
     await tick(START_MS - now); await pg.focus('#glcanvas');
     // 키 이벤트가 페이지에서 처리된 뒤에 시계를 흘린다(빈 evaluate 한 번 = 메인 스레드 한 바퀴): 안 그러면 가끔 키가 한 프레임 늦는다.
@@ -109,7 +113,8 @@ async function run() {
     await press('ArrowUp', 300); await press('Enter', 800);    // 타이틀: 위로 = 마지막 줄(개발)
     for (let i = 0; i < VILLAGE[0]; i++) await press('ArrowRight', 120);
     for (let i = 0; i < VILLAGE[1]; i++) await press('ArrowDown', 120);
-    await press('Enter', 3000);
+    // 장면이 시작하며 읽는 것(마을의 곡·환경음)도 같은 까닭으로 실제 시간을 주며 흘린다(가짜 시간으로는 전과 같은 3초).
+    await press('Enter', 100); await settle(60); await tick(3000 - 100 - 60 * 16);
     for (let i = 0; i < 14; i++) await press('Enter', 400);  // 들어서며 나오는 한마디를 넘긴다(어느 줄이 나올지는 난수 — 넉넉히)
     await tick(1000);
     await shot('01_village');
