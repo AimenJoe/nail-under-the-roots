@@ -1676,6 +1676,9 @@ impl App {
                     if let Some(prep) = e.prep {
                         prep(&mut self.profile);
                         self.apply_assist();
+                        // 꾸민 상황은 난수도 같은 자리에서 시작한다(0307): 들어서며 나오는 한마디를 난수로 고르는데, 줄 길이가 달라
+                        // 대화가 닫히는 때가 달라지면 그 뒤 화면이 통째로 어긋난다 — 리팩터링 앞뒤 화면을 견주려면 같아야 한다.
+                        macroquad::rand::srand(0x0307);
                     }
                     self.start(e.scenario);
                 }
