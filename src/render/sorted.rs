@@ -33,197 +33,16 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
     let ground = sun.is_none();
     SHADOW_PASS.with(|c| c.set(!ground));
     let mut list: Vec<(f32, Drawable)> = Vec::new();
-    for (i, p) in w.room.props.iter().enumerate() {
-        list.push((p.rect.bottom(), Drawable::Pillar(i)));
-    }
-    for (i, p) in w.pickups.iter().enumerate() {
-        list.push((p.pos.y + 4.0, Drawable::Pickup(i)));
-        if ground {
-            draw_ellipse(p.pos.x, p.pos.y + 4.0, 5.0, 1.8, 0.0, SHADOW_SOFT);
-        }
-    }
-    for (i, l) in w.loot.iter().enumerate() {
-        if !ground {
-            continue;
-        }
-        let q = lerp(l.prev_pos, l.pos, alpha);
-        list.push((q.y + 2.0, Drawable::Loot(i)));
-        let r = if l.kind == loot::LootKind::Berry {
-            3.0
-        } else {
-            2.0
-        };
-        draw_ellipse(q.x, q.y + 2.0, r, 1.0, 0.0, SHADOW_SOFT);
-    }
+    collect_room(w, alpha, ground, &mut list);
     let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
     list.push((pp.y + 6.0, Drawable::Player));
-    if let Some(n) = &w.npc {
-        let q = lerp(n.prev_pos, n.pos, alpha);
-        list.push((q.y + 6.0, Drawable::Npc));
-        if ground {
-            draw_ellipse(q.x, q.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
-        }
-    }
-    for (i, n) in w.neighbors.iter().enumerate() {
-        let big = n.who == world::Who::Bori;
-        if n.who == world::Who::Momo {
-            // 모모는 빈 자리 그루터기 위에 앉는다: 그루터기(칸 아래 끝) 뒤에 그린다, 그림자 없이.
-            list.push((n.pos.y + 9.0, Drawable::Neighbor(i)));
-            continue;
-        }
-        // 보리(32px 그림)는 발이 그림 맨 아래 줄(pos.y + 7)이고 몸이 발보다 넓다: 발밑 그림자를 발 줄에 크게 두어야
-        // 몸 밖으로 보인다(y + 6, 가로 12였을 때는 몸에 거의 다 가려 그림자가 없는 것처럼 보였다).
-        let (foot, shadow_y, rx, ry): (f32, f32, f32, f32) = if big {
-            (7.0, 7.5, 14.0, 3.0)
-        } else {
-            (6.0, 6.0, 6.0, 2.5)
-        };
-        list.push((n.pos.y + foot, Drawable::Neighbor(i)));
-        if ground {
-            draw_ellipse(n.pos.x, n.pos.y + shadow_y, rx, ry, 0.0, SHADOW_SOFT);
-        }
-    }
+    collect_folk(w, alpha, ground, &mut list);
     if let Some(v) = &w.adv.village {
-        // 텃밭(0304 G1): 흙은 바닥(먼저), 자라는 것은 앞뒤를 가린다. 옮겨 심은 꽃은 정한 자리에 수만큼.
-        for (k, at) in w.garden_plots().into_iter().enumerate() {
-            if ground {
-                draw_plot_soil(at);
-            }
-            if let Some(&p) = v.plots.get(k) {
-                if p != crate::garden::Plot::Empty {
-                    list.push((at.y + 4.0, Drawable::Crop(p, at)));
-                }
-            }
-        }
-        for (k, (&(cx, cy), bloom)) in crate::garden::FLOWER_SPOTS.iter().zip(v.blooms).enumerate()
-        {
-            if let Some(b) = bloom {
-                let at = crate::map::cell_center(cx as usize, cy as usize);
-                list.push((at.y + 4.0, Drawable::Flower(b, k, at)));
-            }
-        }
-        for (c, at) in &w.adv.marks {
-            match c {
-                'Y' => {
-                    list.push((at.y + 8.0, Drawable::Tree(*at, v.growth)));
-                    if v.traces[crate::quests::DOTO] {
-                        let t = *at + TRACE_OFFSET[crate::quests::DOTO];
-                        list.push((t.y + 3.0, Drawable::Trace(crate::quests::DOTO, t)));
-                    }
-                    // 깨울 재주가 있으면 밑동이 빛난다(그림자처럼 먼저, 0061).
-                    if v.tree_ready && ground {
-                        draw_tree_glow(*at + vec2(0.0, 14.0), w.time);
-                    }
-                }
-                // 물웅덩이는 바닥: 맨 먼저. 무무를 풀어 주면(0275 P5) 다시 솟는 샘 — 누구로 걸어도 보인다.
-                'W' if ground && v.spring => draw_village_spring(*at, w.time),
-                'W' if ground && w.character == crate::equipment::Character::Mole => {
-                    draw_puddle(*at, w.time)
-                }
-                'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
-                // 들어준 부탁의 흔적(0273 B): 그 이웃 자리 곁(이웃이 없어도 — 플레이어가 그 이웃이어도 흔적은 남는다).
-                'K' | 'b' | 'M' | 'n' | 'g' | 'j' if v.traces[trace_of(*c)] => {
-                    let i = trace_of(*c);
-                    let at = *at + TRACE_OFFSET[i];
-                    list.push((at.y + 3.0, Drawable::Trace(i, at)));
-                }
-                c if crate::village::slot_decor(*c).is_some() => {
-                    let i = crate::village::slot_decor(*c).unwrap_or(0);
-                    if v.decor.get(i).copied().unwrap_or(false) {
-                        list.push((at.y + 6.0, Drawable::Decor(i, *at)));
-                    }
-                }
-                _ => {}
-            }
-        }
+        collect_village(w, v, ground, &mut list);
     }
-    for (i, e) in w.enemies.iter().enumerate() {
-        let ep = lerp(e.prev_pos, e.pos, alpha);
-        if !e.hittable() {
-            // 땅속: 그림자 없이 둔덕만.
-            if ground {
-                list.push((ep.y + e.radius(), Drawable::Enemy(i)));
-            }
-            continue;
-        }
-        list.push((ep.y + e.radius(), Drawable::Enemy(i)));
-        if !ground {
-            continue;
-        }
-        draw_ellipse(
-            ep.x,
-            ep.y + e.radius(),
-            e.radius() + 1.0,
-            2.5,
-            0.0,
-            SHADOW_SOFT,
-        );
-    }
-    // 묻힌 도토리는 바닥에(세워 그리는 것들보다 먼저).
-    for m in w.hazards.mines.iter().filter(|_| ground) {
-        draw_mine(m, w.time);
-    }
-    for b in w.toss.buried.iter().filter(|_| ground) {
-        draw_buried(b, w.time);
-    }
-    for p in w.toss.patches.iter().filter(|_| ground) {
-        draw_thorn_patch(p, w.time);
-    }
-    for c in w.hazards.clouds.iter().filter(|_| ground) {
-        draw_cloud(c, w.time);
-    }
-    let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
-    for c in w.room.thorns.iter().filter(|_| ground) {
-        let near = 1.0 - ((*c - pp).length() - 14.0).clamp(0.0, 30.0) / 30.0;
-        draw_thorn(*c, w.time, near);
-    }
-    for c in w.room.webs.iter().filter(|_| ground) {
-        let near = 1.0 - ((*c - pp).length() - 14.0).clamp(0.0, 30.0) / 30.0;
-        draw_web(*c, w.time, near);
-    }
-    // 물살(0275): 물 바닥은 지형에 구워 있고, 여기서는 움직이는 물결·반짝임과 물줄기 끝만.
-    let baked = w.room.grid.is_some();
-    for (c, d) in w.room.streams.iter().filter(|_| ground) {
-        let has = |p: Vec2| {
-            w.room
-                .streams
-                .iter()
-                .any(|(q, _)| q.distance_squared(p) < 1.0)
-        };
-        // 굽은 곳(다음 칸이 옆으로 한 칸 비껴 이어짐)도 이어진 것으로 — 끝이 아니다.
-        let perp = vec2(d.y.abs(), d.x.abs()) * 16.0;
-        let end = |p: Vec2| {
-            if has(p) || has(p + perp) || has(p - perp) {
-                StreamEnd::Open
-            } else if w.room.is_solid(p, 1.0) {
-                StreamEnd::Wall
-            } else {
-                StreamEnd::Floor
-            }
-        };
-        draw_stream(
-            *c,
-            *d,
-            w.time,
-            end(*c - *d * 16.0),
-            end(*c + *d * 16.0),
-            baked,
-        );
-    }
-    // 고인 웅덩이(0275): 물결 없이 반짝임만.
-    for c in w.room.pools.iter().filter(|_| ground) {
-        draw_pool_glint(*c, w.time, baked);
-    }
-    for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
-        let q = lerp(p.prev_pos, p.pos, alpha);
-        list.push((q.y + 3.0, Drawable::Projectile(i)));
-        draw_ellipse(q.x, q.y + 6.0, 2.5, 1.2, 0.0, SHADOW_SOFT);
-    }
-    for (i, s) in w.toss.shots.iter().enumerate().filter(|_| ground) {
-        let q = lerp(s.prev, s.pos, alpha);
-        list.push((q.y + 3.0, Drawable::Shot(i)));
-        draw_ellipse(q.x, q.y + 6.0, s.radius * 0.8, 1.2, 0.0, SHADOW_SOFT);
-    }
+    collect_enemies(w, alpha, ground, &mut list);
+    draw_ground_hazards(w, alpha, ground);
+    collect_shots(w, alpha, ground, &mut list);
     let standing = !matches!(
         w.player.state,
         player::State::Burrow { .. } | player::State::Dead
@@ -301,6 +120,222 @@ pub(super) fn draw_sorted(art: &Art, w: &World, alpha: f32, sun: Option<ShadowLi
         }
     }
     SHADOW_PASS.with(|c| c.set(false));
+}
+
+/// 방의 것(0307 R45 — `draw_sorted`의 단계, 본문 그대로): 기둥·소품, 줍는 것, 떨어진 것. 바닥 그림자는 그 자리에서 바로.
+fn collect_room(w: &World, alpha: f32, ground: bool, list: &mut Vec<(f32, Drawable)>) {
+    for (i, p) in w.room.props.iter().enumerate() {
+        list.push((p.rect.bottom(), Drawable::Pillar(i)));
+    }
+    for (i, p) in w.pickups.iter().enumerate() {
+        list.push((p.pos.y + 4.0, Drawable::Pickup(i)));
+        if ground {
+            draw_ellipse(p.pos.x, p.pos.y + 4.0, 5.0, 1.8, 0.0, SHADOW_SOFT);
+        }
+    }
+    for (i, l) in w.loot.iter().enumerate() {
+        if !ground {
+            continue;
+        }
+        let q = lerp(l.prev_pos, l.pos, alpha);
+        list.push((q.y + 2.0, Drawable::Loot(i)));
+        let r = if l.kind == loot::LootKind::Berry {
+            3.0
+        } else {
+            2.0
+        };
+        draw_ellipse(q.x, q.y + 2.0, r, 1.0, 0.0, SHADOW_SOFT);
+    }
+}
+
+/// 길동무·이웃: 발 줄과 발밑 그림자.
+fn collect_folk(w: &World, alpha: f32, ground: bool, list: &mut Vec<(f32, Drawable)>) {
+    if let Some(n) = &w.npc {
+        let q = lerp(n.prev_pos, n.pos, alpha);
+        list.push((q.y + 6.0, Drawable::Npc));
+        if ground {
+            draw_ellipse(q.x, q.y + 6.0, 6.0, 2.0, 0.0, SHADOW_SOFT);
+        }
+    }
+    for (i, n) in w.neighbors.iter().enumerate() {
+        let big = n.who == world::Who::Bori;
+        if n.who == world::Who::Momo {
+            // 모모는 빈 자리 그루터기 위에 앉는다: 그루터기(칸 아래 끝) 뒤에 그린다, 그림자 없이.
+            list.push((n.pos.y + 9.0, Drawable::Neighbor(i)));
+            continue;
+        }
+        // 보리(32px 그림)는 발이 그림 맨 아래 줄(pos.y + 7)이고 몸이 발보다 넓다: 발밑 그림자를 발 줄에 크게 두어야
+        // 몸 밖으로 보인다(y + 6, 가로 12였을 때는 몸에 거의 다 가려 그림자가 없는 것처럼 보였다).
+        let (foot, shadow_y, rx, ry): (f32, f32, f32, f32) = if big {
+            (7.0, 7.5, 14.0, 3.0)
+        } else {
+            (6.0, 6.0, 6.0, 2.5)
+        };
+        list.push((n.pos.y + foot, Drawable::Neighbor(i)));
+        if ground {
+            draw_ellipse(n.pos.x, n.pos.y + shadow_y, rx, ry, 0.0, SHADOW_SOFT);
+        }
+    }
+}
+
+/// 마을의 것: 텃밭 흙(바닥)과 자라는 것, 화단 꽃, 지도 표지 자리의 큰 나무·샘·실 고리·부탁의 흔적·꾸미기.
+/// 마을 물건을 더하면 여기와 `Drawable`·`draw_one`을 연다.
+fn collect_village(
+    w: &World,
+    v: &crate::village::State,
+    ground: bool,
+    list: &mut Vec<(f32, Drawable)>,
+) {
+    // 텃밭(0304 G1): 흙은 바닥(먼저), 자라는 것은 앞뒤를 가린다. 옮겨 심은 꽃은 정한 자리에 수만큼.
+    for (k, at) in w.garden_plots().into_iter().enumerate() {
+        if ground {
+            draw_plot_soil(at);
+        }
+        if let Some(&p) = v.plots.get(k) {
+            if p != crate::garden::Plot::Empty {
+                list.push((at.y + 4.0, Drawable::Crop(p, at)));
+            }
+        }
+    }
+    for (k, (&(cx, cy), bloom)) in crate::garden::FLOWER_SPOTS.iter().zip(v.blooms).enumerate() {
+        if let Some(b) = bloom {
+            let at = crate::map::cell_center(cx as usize, cy as usize);
+            list.push((at.y + 4.0, Drawable::Flower(b, k, at)));
+        }
+    }
+    for (c, at) in &w.adv.marks {
+        match c {
+            'Y' => {
+                list.push((at.y + 8.0, Drawable::Tree(*at, v.growth)));
+                if v.traces[crate::quests::DOTO] {
+                    let t = *at + TRACE_OFFSET[crate::quests::DOTO];
+                    list.push((t.y + 3.0, Drawable::Trace(crate::quests::DOTO, t)));
+                }
+                // 깨울 재주가 있으면 밑동이 빛난다(그림자처럼 먼저, 0061).
+                if v.tree_ready && ground {
+                    draw_tree_glow(*at + vec2(0.0, 14.0), w.time);
+                }
+            }
+            // 물웅덩이는 바닥: 맨 먼저. 무무를 풀어 주면(0275 P5) 다시 솟는 샘 — 누구로 걸어도 보인다.
+            'W' if ground && v.spring => draw_village_spring(*at, w.time),
+            'W' if ground && w.character == crate::equipment::Character::Mole => {
+                draw_puddle(*at, w.time)
+            }
+            'X' if v.halmae => list.push((at.y + 6.0, Drawable::DreamLoop(*at))),
+            // 들어준 부탁의 흔적(0273 B): 그 이웃 자리 곁(이웃이 없어도 — 플레이어가 그 이웃이어도 흔적은 남는다).
+            'K' | 'b' | 'M' | 'n' | 'g' | 'j' if v.traces[trace_of(*c)] => {
+                let i = trace_of(*c);
+                let at = *at + TRACE_OFFSET[i];
+                list.push((at.y + 3.0, Drawable::Trace(i, at)));
+            }
+            c if crate::village::slot_decor(*c).is_some() => {
+                let i = crate::village::slot_decor(*c).unwrap_or(0);
+                if v.decor.get(i).copied().unwrap_or(false) {
+                    list.push((at.y + 6.0, Drawable::Decor(i, *at)));
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// 적: 발 줄과 발밑 그림자(땅속이면 둔덕만).
+fn collect_enemies(w: &World, alpha: f32, ground: bool, list: &mut Vec<(f32, Drawable)>) {
+    for (i, e) in w.enemies.iter().enumerate() {
+        let ep = lerp(e.prev_pos, e.pos, alpha);
+        if !e.hittable() {
+            // 땅속: 그림자 없이 둔덕만.
+            if ground {
+                list.push((ep.y + e.radius(), Drawable::Enemy(i)));
+            }
+            continue;
+        }
+        list.push((ep.y + e.radius(), Drawable::Enemy(i)));
+        if !ground {
+            continue;
+        }
+        draw_ellipse(
+            ep.x,
+            ep.y + e.radius(),
+            e.radius() + 1.0,
+            2.5,
+            0.0,
+            SHADOW_SOFT,
+        );
+    }
+}
+
+/// 바닥에 바로 그리는 것(세워 그리는 것들보다 먼저): 묻힌 도토리·덤불·구름·가시·그물·물살·웅덩이. 그림자 패스에는 없다.
+fn draw_ground_hazards(w: &World, alpha: f32, ground: bool) {
+    // 묻힌 도토리는 바닥에(세워 그리는 것들보다 먼저).
+    for m in w.hazards.mines.iter().filter(|_| ground) {
+        draw_mine(m, w.time);
+    }
+    for b in w.toss.buried.iter().filter(|_| ground) {
+        draw_buried(b, w.time);
+    }
+    for p in w.toss.patches.iter().filter(|_| ground) {
+        draw_thorn_patch(p, w.time);
+    }
+    for c in w.hazards.clouds.iter().filter(|_| ground) {
+        draw_cloud(c, w.time);
+    }
+    let pp = lerp(w.player.prev_pos, w.player.pos, alpha);
+    for c in w.room.thorns.iter().filter(|_| ground) {
+        let near = 1.0 - ((*c - pp).length() - 14.0).clamp(0.0, 30.0) / 30.0;
+        draw_thorn(*c, w.time, near);
+    }
+    for c in w.room.webs.iter().filter(|_| ground) {
+        let near = 1.0 - ((*c - pp).length() - 14.0).clamp(0.0, 30.0) / 30.0;
+        draw_web(*c, w.time, near);
+    }
+    // 물살(0275): 물 바닥은 지형에 구워 있고, 여기서는 움직이는 물결·반짝임과 물줄기 끝만.
+    let baked = w.room.grid.is_some();
+    for (c, d) in w.room.streams.iter().filter(|_| ground) {
+        let has = |p: Vec2| {
+            w.room
+                .streams
+                .iter()
+                .any(|(q, _)| q.distance_squared(p) < 1.0)
+        };
+        // 굽은 곳(다음 칸이 옆으로 한 칸 비껴 이어짐)도 이어진 것으로 — 끝이 아니다.
+        let perp = vec2(d.y.abs(), d.x.abs()) * 16.0;
+        let end = |p: Vec2| {
+            if has(p) || has(p + perp) || has(p - perp) {
+                StreamEnd::Open
+            } else if w.room.is_solid(p, 1.0) {
+                StreamEnd::Wall
+            } else {
+                StreamEnd::Floor
+            }
+        };
+        draw_stream(
+            *c,
+            *d,
+            w.time,
+            end(*c - *d * 16.0),
+            end(*c + *d * 16.0),
+            baked,
+        );
+    }
+    // 고인 웅덩이(0275): 물결 없이 반짝임만.
+    for c in w.room.pools.iter().filter(|_| ground) {
+        draw_pool_glint(*c, w.time, baked);
+    }
+}
+
+/// 날아가는 것: 적의 탄·던진 도토리(바닥 패스만).
+fn collect_shots(w: &World, alpha: f32, ground: bool, list: &mut Vec<(f32, Drawable)>) {
+    for (i, p) in w.projectiles.iter().enumerate().filter(|_| ground) {
+        let q = lerp(p.prev_pos, p.pos, alpha);
+        list.push((q.y + 3.0, Drawable::Projectile(i)));
+        draw_ellipse(q.x, q.y + 6.0, 2.5, 1.2, 0.0, SHADOW_SOFT);
+    }
+    for (i, s) in w.toss.shots.iter().enumerate().filter(|_| ground) {
+        let q = lerp(s.prev, s.pos, alpha);
+        list.push((q.y + 3.0, Drawable::Shot(i)));
+        draw_ellipse(q.x, q.y + 6.0, s.radius * 0.8, 1.2, 0.0, SHADOW_SOFT);
+    }
 }
 
 /// 정렬 그리기 한 개(땅 위 그림, 해 그림자 패스에서는 눕힌 행렬 안에서).
