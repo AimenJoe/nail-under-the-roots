@@ -78,6 +78,10 @@ async function run() {
     const errors = [];
     // 알려진 잡음(smoke.js KNOWN_NOISE와 같다): 번들의 quad_net 플러그인.
     pg.on('pageerror', (e) => { if (!/register_plugin is not defined/.test(String(e))) errors.push(String(e)); });
+    let inflight = 0;                                         // 받는 중인 요청 수
+    pg.on('request', () => { inflight++; });
+    pg.on('requestfinished', () => { inflight--; });
+    pg.on('requestfailed', () => { inflight--; });
     // 시계는 페이지를 열기 전에 걸고 **바로 멈춘다**. `clock.install`만으로는 시계가 멈추지 않는다 — 실제 시간과 함께 계속 흐르고
     // `runFor`가 그 위에 더할 뿐이다(Playwright 1.63에서 잼: install 뒤 실제 0.5초 = 가짜 0.5초, `pauseAt` 뒤에는 0).
     // 그래서 같은 빌드를 두 번 찍으면 스크립트가 걸린 실제 시간만큼 게임 시각이 달랐다(입자·몸짓·걷는 거리까지).
@@ -93,14 +97,21 @@ async function run() {
     // 몇 프레임이 걸릴지 실행마다 다르다: 한 프레임씩 흘리며 첫 그림을 기다린 뒤 가짜 시각을 정한 값(START_MS)까지 맞춘다 —
     // 그때는 인트로(8.3초)가 저절로 끝나 타이틀이고, 그 뒤의 모든 시각이 실행마다 같다.
     await pg.waitForFunction(() => typeof wasm_exports !== 'undefined' && !!wasm_exports, null, { timeout: 60000 });
-    for (let i = 0; i < 1200; i++) {
-      await tick(16); await new Promise((r) => setTimeout(r, 50));
+    // **한 프레임을 흘리기 전에 받는 중인 것이 다 올 때까지 기다린다**(실제 시간): 게임은 프레임마다 "다 왔나"를 보고 다음 것을 읽으니,
+    // 받는 데 걸린 실제 시간이 프레임 수로 새면 게임이 시작한 프레임이 실행마다 달라진다(기계가 바쁠 때 화면이 통째로 다른 갈래로 나왔다).
+    // 다 온 뒤에 한 프레임씩이면 프레임 수는 읽을 것의 수로 정해진다.
+    const idle = async () => {
+      let quiet = 0;
+      for (let i = 0; i < 1000 && quiet < 6; i++) { await new Promise((r) => setTimeout(r, 5)); quiet = inflight === 0 ? quiet + 1 : 0; }
+    };
+    const settle = async (frames) => { for (let i = 0; i < frames; i++) { await idle(); await tick(16); } };
+    let loadFrames = 0;
+    for (; loadFrames < 3000; loadFrames++) {
+      await idle(); await tick(16);
       if (await pg.evaluate(() => document.getElementById('loading').classList.contains('done'))) break;
     }
-    // 첫 그림 뒤에도 뒤에서 읽는 것(곡·늦게 오는 그림)이 실제 시간으로 끝난다: 가짜 시각을 크게 건너뛰기 전에 실제 시간을 주며
-    // 한 프레임씩 흘린다 — 안 그러면 그것들이 "장면이 시작한 뒤"에 도착하는 실행이 생겨 화면이 통째로 다른 갈래가 된다.
-    const settle = async (frames) => { for (let i = 0; i < frames; i++) { await tick(16); await new Promise((r) => setTimeout(r, 40)); } };
-    await settle(80);
+    await settle(80);                                         // 첫 그림 뒤에 읽기 시작하는 것(타이틀 곡 등)
+    if (process.env.VERBOSE) console.log(`${lang}: 로딩 ${loadFrames}프레임`);
     if (now > START_MS - 10000) throw new Error(`로딩이 너무 길었다(가짜 ${now}ms) — START_MS를 늘린다`);
     await tick(START_MS - now); await pg.focus('#glcanvas');
     // 키 이벤트가 페이지에서 처리된 뒤에 시계를 흘린다(빈 evaluate 한 번 = 메인 스레드 한 바퀴): 안 그러면 가끔 키가 한 프레임 늦는다.
