@@ -972,7 +972,9 @@ impl Renderer {
         let foot = vec2(r.w / zoom / 2.0, r.h / zoom - 4.0);
         match pic {
             VillagePic::Decor(i) => match self.art.as_ref().and_then(|a| a.sunny.as_ref()) {
-                Some(sunny) if matches!(i, 0 | 2 | 3 | 7) => {
+                // 마을에 놓이는 그림과 같은 것을 창에도(`decor_uses_pack` 한 곳): 전에는 여기만 0·2·3·7로 따로 적혀 있어
+                // 돌 우물·해바라기·작은 소나무가 창에서는 팩 없는 빌드의 대신 그림(타원·세모)으로 나왔다(2026-11-27 조사).
+                Some(sunny) if props::decor_uses_pack(i) => {
                     draw_decor_sunny(sunny, i, foot - vec2(0.0, 4.0), t)
                 }
                 _ => draw_decor(i, foot - vec2(0.0, 4.0), t),
@@ -1038,7 +1040,14 @@ impl Renderer {
                 None => draw_exit(foot - vec2(0.0, 6.0), t, true),
             },
             Spot::Spring => props::draw_village_spring(foot - vec2(0.0, 6.0), t),
-            Spot::Seat => draw_seat(Rect::new(foot.x - 8.0, foot.y - 14.0, 16.0, 16.0), 0),
+            // 빈 자리: 마을에 놓인 통나무 자리 그림 그대로(전에는 그림이 있어도 대신 그림을 불렀다, 2026-11-27 조사).
+            Spot::Seat => {
+                let r = Rect::new(foot.x - 8.0, foot.y - 14.0, 16.0, 16.0);
+                match art.and_then(|a| a.hub.as_ref()) {
+                    Some(hub) => draw_seat_hub(hub, r, 0),
+                    None => draw_seat(r, 0),
+                }
+            }
             Spot::Loop => draw_dream_loop(foot - vec2(0.0, 2.0), t),
             Spot::Trace(i) => sorted::draw_quest_trace(i as usize, foot - vec2(0.0, 3.0), t),
             Spot::Lamps => props::draw_neighbor_lamp(foot + vec2(0.0, 2.0), t),

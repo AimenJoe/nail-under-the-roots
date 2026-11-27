@@ -159,3 +159,21 @@ IMPORTANT: draw ONLY the objects. Do NOT draw any ground, grass or soil around t
 2. A small swing, about as tall and as wide as the mole: a wooden frame with two white silk threads holding a small wooden seat.
 3. A white silk thread loop tied to the top of a short wooden stick stuck upright, about half a mole wide and as tall as the mole.
 ```
+
+### E5 — 텃밭: 빈 흙 칸 · 갓 심은 칸 · 다 익은 산딸기 덤불 (사장 2026-11-27 "텃밭도")
+
+텃밭에서 코드로 그리는 것은 흙 칸(네모 넷)·갓 심은 씨앗(점 셋)·다 익은 산딸기의 빨간 알 셋이다. 자라는 새싹과 꽃 일곱은
+팩·CC0 그림(`plants.png`)이라 그대로 둔다(`docs/art/code-drawn-inventory.md`).
+
+```
+Draw three new props in EXACTLY the same pixel art style as the attached sprites (a cute top-down action game:
+chunky pixels, each pixel a 6x6 block, dark plum 1px outline, soft 3-4 tone shading, light from the top-left,
+warm cozy colors). The attached sprites are only a STYLE reference: do not redraw them.
+
+Make the props rich and handcrafted: crumbly dark soil, wooden edging, leaves and berries, little highlights and dark corners.
+Top-down 3/4 view. Solid magenta background (#FF00FF), one row, three props well separated, no text, no shadows, no glow.
+IMPORTANT: draw ONLY the objects. Do NOT draw any ground, grass or soil around them.
+1. An empty garden plot, about as wide as the mole and low: a small rectangle of dark tilled soil with three furrows, edged with short wooden planks.
+2. The same garden plot just planted: the same soil and plank edging, with three tiny seed mounds and a small wooden marker stick at one corner.
+3. A ripe wild berry bush, about as wide as the mole and two thirds as tall: a round leafy green bush full of small bright red berries.
+```
