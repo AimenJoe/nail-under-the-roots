@@ -86,12 +86,8 @@ impl App {
     /// 타이틀 위라 월드는 비어 있다 — 이어하기는 기록에서 되살리니 바꿔도 된다(대화 검수와 같게).
     fn replay_lamp(&mut self, who: usize, stage: usize) {
         use crate::lanterns::{lines, ALL};
-        use crate::profile::key;
-        let mut v = self.village_state();
-        v.momo = self.profile.flag(key::MOMO_BACK);
-        v.doto = self.profile.flag(key::DOTO_MEMORY);
-        v.nail = false;
-        self.world = World::village(v);
+        // 이웃 모두 제자리: Naïl로 걷는 마을.
+        self.world = World::village(crate::village::State::of(&self.profile, Character::Mole));
         self.tally = Tally::of(&self.world);
         self.cutscene = Some(cutscene::lamp_scene(
             &self.world,

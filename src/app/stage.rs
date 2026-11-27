@@ -537,8 +537,9 @@ impl App {
                     // 이웃의 부탁(0273 B): 부탁 한마디 / 찾아 온 것을 돌려받는 한마디 + 마을의 흔적.
                     Talk::Quest(q, step) => {
                         use crate::quests::{Step, ALL};
+                        // 개발 시나리오도 기록 사본에는 적는다(슬롯에는 쓰지 않는다 — sandbox, 0269 B3).
+                        crate::quests::advance(&mut self.profile, q, step);
                         if self.recording() {
-                            crate::quests::advance(&mut self.profile, q, step);
                             self.save_profile();
                         }
                         let (line, face) = match step {
@@ -546,9 +547,7 @@ impl App {
                             Step::Thanks => (ALL[q].thanks, Face::Happy),
                         };
                         if step == Step::Thanks {
-                            if let Some(v) = self.world.adv.village.as_mut() {
-                                v.traces[q] = true;
-                            }
+                            self.sync_village();
                             self.journal_ready = crate::journal::ready_count(&self.profile);
                         }
                         self.play(cutscene::talk(
@@ -1364,11 +1363,7 @@ impl App {
         };
         crate::profile::save(&self.profile);
         match r {
-            Reward::Decor(i) => {
-                if let Some(v) = self.world.adv.village.as_mut() {
-                    v.decor[i] = true;
-                }
-            }
+            Reward::Decor(_) => self.sync_village(),
             // 장신구는 바로 가방에(0050). 이번 런의 상자에서는 다시 안 나온다.
             Reward::Charm(c) => {
                 self.world.inv.charm_pool =

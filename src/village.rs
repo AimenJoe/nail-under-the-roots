@@ -270,6 +270,47 @@ pub struct State {
     pub glow: u8,
 }
 
+impl State {
+    /// 기록 → 마을 모습(0307 R41). 마을의 모든 칸은 기록에서 나온다 — 기록이 바뀌면 이것으로 다시 만든다(`App::sync_village`),
+    /// 칸을 하나씩 손으로 맞추지 않는다. `walking`: 지금 걷는 캐릭터(그 이웃 자리는 빈다 — 플레이어가 그 자신이다, 0249).
+    pub fn of(p: &crate::profile::Profile, walking: crate::equipment::Character) -> State {
+        use crate::equipment::Character;
+        use crate::profile::key;
+        let mut decor = [false; DECOR_ALL];
+        for (i, d) in decor.iter_mut().enumerate() {
+            *d = p.flag(&key_decor(i));
+        }
+        State {
+            bori: p.flag(key::BORI_BACK),
+            halmae: p.flag(key::HALF_ENDING) || p.flag(key::TRUE_ENDING),
+            // 참 엔딩 뒤 할매는 눈을 뜬다(0270): 그림 칸 4·5.
+            halmae_awake: p.flag(key::TRUE_ENDING),
+            momo: p.flag(key::MOMO_BACK) && walking != Character::Momo,
+            doto: p.flag(key::DOTO_MEMORY) && walking != Character::Doto,
+            kongi: p.flag(key::KONGI_BACK),
+            clover: p.flag(key::CLOVER_BACK),
+            spring: p.flag(key::MUMU_FREED),
+            traces: std::array::from_fn(|i| crate::quests::done(p, i)),
+            lamps: std::array::from_fn(|i| crate::lanterns::level(p, i) >= 3),
+            plots: crate::garden::plots(p),
+            blooms: crate::garden::spots(p),
+            // 거꾸로 Naïl은 다른 캐릭터로 걸을 때 큰 나무 곁에 남는다(0249).
+            nail: walking != Character::Mole,
+            decor,
+            // 토끼풀 가족이 돌아오면(0165) 큰 나무의 잎이 한 단계 더.
+            growth: growth(
+                crate::characters::ALL
+                    .iter()
+                    .map(|d| p.count(&key::clears(d.id)))
+                    .sum::<u32>()
+                    + u32::from(p.flag(key::CLOVER_BACK)),
+            ),
+            tree_ready: crate::talents::any_affordable(p),
+            glow: glow_level(p.count(crate::talents::KEY_LIGHT)),
+        }
+    }
+}
+
 /// 맡긴 반딧불 수 → 우물 위 반딧불 단계(0 = 없음, 4 = 많이). 큰 나무를 다 깨운 뒤에도 쌓이는 빛이 마을에 보이게(0269 2.9 A).
 /// 기준은 재주 한 칸 값(120~495, 0246)과 런 하나에 모이는 양(약 240, 0236 — 지금은 끝까지 간 런 ≈ 285, 0305)에서: 조금·한 런·나무 한 칸 넘게·많이.
 pub fn glow_level(banked: u32) -> u8 {
@@ -325,6 +366,88 @@ pub fn growth(clears: u32) -> u8 {
 mod tests {
     use super::*;
     use crate::map::Cell;
+
+    /// 마을 모습은 기록의 함수(0307 R41): 걷는 캐릭터의 자리는 비고, Naïl은 다른 캐릭터로 걸을 때만 이웃으로 선다.
+    #[test]
+    fn state_leaves_the_walking_characters_seat_empty() {
+        use crate::equipment::Character;
+        use crate::profile::{key, Profile};
+        let mut p = Profile::default();
+        for k in [
+            key::BORI_BACK,
+            key::MOMO_BACK,
+            key::DOTO_MEMORY,
+            key::KONGI_BACK,
+        ] {
+            p.set(k);
+        }
+        let v = State::of(&p, Character::Mole);
+        assert!(v.bori && v.momo && v.doto && v.kongi && !v.nail);
+        assert!(!v.halmae && !v.clover && !v.spring);
+        let v = State::of(&p, Character::Momo);
+        assert!(
+            !v.momo && v.doto && v.nail,
+            "모모로 걸으면 모모 자리가 비고 Naïl이 선다"
+        );
+        let v = State::of(&p, Character::Doto);
+        assert!(v.momo && !v.doto && v.nail);
+        // 할매: 반쪽 엔딩이면 마을에, 참 엔딩이면 눈을 뜬다.
+        p.set(key::HALF_ENDING);
+        let v = State::of(&p, Character::Mole);
+        assert!(v.halmae && !v.halmae_awake);
+        p.set(key::TRUE_ENDING);
+        assert!(State::of(&p, Character::Mole).halmae_awake);
+    }
+
+    /// 맡긴 반딧불이 바뀌면 우물 위 반딧불 단계와 큰 나무 밑동 빛이 따라온다 — 재주를 깨우거나 등불을 건넨 뒤 다시 만들면 준다.
+    #[test]
+    fn state_follows_banked_light() {
+        use crate::equipment::Character;
+        use crate::profile::Profile;
+        use crate::talents::KEY_LIGHT;
+        let mut p = Profile::default();
+        let v = State::of(&p, Character::Mole);
+        assert_eq!((v.glow, v.tree_ready), (0, false));
+        p.set_count(KEY_LIGHT, 450);
+        let v = State::of(&p, Character::Mole);
+        assert_eq!(v.glow, glow_level(450));
+        assert!(v.tree_ready, "첫 칸 값(120)은 넘는다");
+        p.set_count(KEY_LIGHT, 30);
+        let v = State::of(&p, Character::Mole);
+        assert_eq!(
+            (v.glow, v.tree_ready),
+            (1, false),
+            "쓰고 나면 단계가 내려가고 밑동 빛이 꺼진다"
+        );
+    }
+
+    /// 꾸미기·부탁의 흔적·등불(셋째 이야기 뒤)·텃밭·화단이 기록 그대로다.
+    #[test]
+    fn state_mirrors_decor_traces_lamps_and_garden() {
+        use crate::equipment::Character;
+        use crate::garden::{self, Crop, Plot};
+        use crate::profile::Profile;
+        let mut p = Profile::default();
+        let v = State::of(&p, Character::Mole);
+        assert!(v.decor.iter().all(|d| !d) && v.traces.iter().all(|t| !t));
+        assert!(v.lamps.iter().all(|l| !l) && v.blooms.iter().all(|b| b.is_none()));
+        p.set(&key_decor(2));
+        p.set(crate::quests::DONE_KEYS[crate::quests::DOTO]);
+        p.set_count(crate::lanterns::ALL[0].key, 2);
+        p.set_count(crate::lanterns::ALL[1].key, 3);
+        p.set_count(KEY_SEEDS, 20);
+        garden::plant(&mut p, 1, Crop::Berry).unwrap();
+        let v = State::of(&p, Character::Mole);
+        assert!(v.decor[2] && !v.decor[0]);
+        assert!(v.traces[crate::quests::DOTO] && !v.traces[crate::quests::POPO]);
+        assert!(
+            !v.lamps[0] && v.lamps[1],
+            "등불은 셋째 이야기까지 들은 이웃 곁에만"
+        );
+        assert!(matches!(v.plots[1], Plot::Growing { .. }) && v.plots[0] == Plot::Empty);
+        assert_eq!(v.plots, garden::plots(&p));
+        assert_eq!(v.blooms, garden::spots(&p));
+    }
 
     #[test]
     fn village_has_gate_neighbors_tree_and_six_decor_slots() {

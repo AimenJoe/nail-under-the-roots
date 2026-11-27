@@ -66,10 +66,7 @@ impl App {
 
     /// 맡긴 반딧불로 지금 깨울 수 있는 재주 칸이 있나(어느 캐릭터든). 나무 밑동 빛·HUD가 본다(0061).
     pub(super) fn tree_affordable(&self) -> bool {
-        let have = self.profile.count(crate::talents::KEY_LIGHT);
-        self.tree_chars()
-            .iter()
-            .any(|&ch| self.tree_view(ch).affordable(have))
+        crate::talents::any_affordable(&self.profile)
     }
 
     /// 큰 나무의 줄 수(갈래 셋 — 모든 캐릭터 같은 꼴, 0247).

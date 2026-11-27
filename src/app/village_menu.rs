@@ -212,9 +212,7 @@ impl App {
             self.profile.set_count(KEY_SEEDS, have - price);
             self.profile.set(&key_decor(i));
             crate::profile::save(&self.profile);
-            if let Some(v) = self.world.adv.village.as_mut() {
-                v.decor[i] = true;
-            }
+            self.sync_village();
             self.shop_msg = Some((|s| s.decor_thanks, 2.5));
             self.sfx.play(crate::sfx::Id::Buy);
         } else if decor_price(i).is_none() {
@@ -612,25 +610,13 @@ impl App {
                 return;
             }
         };
-        // 개발 시나리오는 기록 없이 이번에만 듣는다(부탁과 같게).
+        // 개발 시나리오도 기록 사본에는 적는다(슬롯에는 쓰지 않는다 — sandbox, 타이틀로 돌아오면 슬롯을 다시 읽는다, 0269 B3).
+        give(&mut self.profile, i, ch);
         if self.recording() {
-            give(&mut self.profile, i, ch);
             self.save_profile();
         }
-        if stage == 2 {
-            if let Some(v) = self.world.adv.village.as_mut() {
-                v.lamps[i] = true;
-            }
-        }
-        // 맡긴 반딧불이 줄었다: 우물 위 반딧불·큰 나무 빛도 따라서.
-        let (glow, ready) = (
-            crate::village::glow_level(self.profile.count(crate::talents::KEY_LIGHT)),
-            self.tree_affordable(),
-        );
-        if let Some(v) = self.world.adv.village.as_mut() {
-            v.glow = glow;
-            v.tree_ready = ready;
-        }
+        // 셋째면 곁에 등불, 맡긴 반딧불이 줄었으니 우물 위 반딧불·큰 나무 빛도 — 모두 기록에서(R41).
+        self.sync_village();
         self.sfx.play(crate::sfx::Id::Buy);
         self.shop_msg = None;
         self.scene = Scene::Game;
@@ -692,11 +678,7 @@ impl App {
             self.sfx.play(crate::sfx::Id::Deny);
             return;
         };
-        let (plots, blooms) = (garden::plots(&self.profile), garden::spots(&self.profile));
-        if let Some(v) = self.world.adv.village.as_mut() {
-            v.plots = plots;
-            v.blooms = blooms;
-        }
+        self.sync_village();
         if self.recording() {
             self.save_profile();
         }

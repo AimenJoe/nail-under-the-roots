@@ -2015,41 +2015,15 @@ impl App {
         }
     }
 
-    /// 기록 → 마을 모습.
+    /// 기록 → 마을 모습(`village::State::of`, 0307 R41).
     fn village_state(&self) -> crate::village::State {
-        use crate::profile::key;
-        let mut decor = [false; crate::village::DECOR_ALL];
-        for (i, d) in decor.iter_mut().enumerate() {
-            *d = self.profile.flag(&crate::village::key_decor(i));
-        }
-        crate::village::State {
-            bori: self.profile.flag(key::BORI_BACK),
-            halmae: self.profile.flag(key::HALF_ENDING) || self.profile.flag(key::TRUE_ENDING),
-            // 참 엔딩 뒤 할매는 눈을 뜬다(0270): 그림 칸 4·5.
-            halmae_awake: self.profile.flag(key::TRUE_ENDING),
-            // 고른 캐릭터로 마을을 걸으면(모모·도토) 그 이웃은 자리에 따로 서 있지 않는다 — 플레이어가 그 자신이다.
-            momo: self.profile.flag(key::MOMO_BACK) && self.picked() != Character::Momo,
-            doto: self.profile.flag(key::DOTO_MEMORY) && self.picked() != Character::Doto,
-            kongi: self.profile.flag(key::KONGI_BACK),
-            clover: self.profile.flag(key::CLOVER_BACK),
-            spring: self.profile.flag(key::MUMU_FREED),
-            traces: std::array::from_fn(|i| crate::quests::done(&self.profile, i)),
-            lamps: std::array::from_fn(|i| crate::lanterns::level(&self.profile, i) >= 3),
-            plots: crate::garden::plots(&self.profile),
-            blooms: crate::garden::spots(&self.profile),
-            // 거꾸로 Naïl은 다른 캐릭터로 걸을 때 큰 나무 곁에 남는다(0249).
-            nail: self.picked() != Character::Mole,
-            decor,
-            // 토끼풀 가족이 돌아오면(0165) 큰 나무의 잎이 한 단계 더.
-            growth: crate::village::growth(
-                crate::characters::ALL
-                    .iter()
-                    .map(|d| self.profile.count(&key::clears(d.id)))
-                    .sum::<u32>()
-                    + u32::from(self.profile.flag(key::CLOVER_BACK)),
-            ),
-            tree_ready: self.tree_affordable(),
-            glow: crate::village::glow_level(self.profile.count(crate::talents::KEY_LIGHT)),
+        crate::village::State::of(&self.profile, self.picked())
+    }
+
+    /// 기록이 바뀐 뒤: 마을에 서 있으면 마을 모습을 기록에서 다시 만든다(0307 R41). 칸을 하나씩 손으로 맞추지 않는다.
+    pub(super) fn sync_village(&mut self) {
+        if self.world.adv.village.is_some() {
+            self.world.adv.village = Some(self.village_state());
         }
     }
 

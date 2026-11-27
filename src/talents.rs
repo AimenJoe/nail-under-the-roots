@@ -1008,6 +1008,12 @@ pub struct NodeInfo {
 }
 
 /// 한 캐릭터의 큰 나무를 기록(`Profile`)으로 본 것. 줄 = 갈래, 칸 = (깊이, 고르기 쪽).
+/// 맡긴 반딧불로 지금 깨울 수 있는 재주 칸이 있나(고를 수 있는 어느 캐릭터든). 나무 밑동 빛·HUD가 본다(0061).
+pub fn any_affordable(p: &crate::profile::Profile) -> bool {
+    let have = p.count(KEY_LIGHT);
+    crate::characters::available(p).any(|d| TreeView { p, ch: d.id }.affordable(have))
+}
+
 pub struct TreeView<'a> {
     pub p: &'a crate::profile::Profile,
     pub ch: Character,
