@@ -1,7 +1,7 @@
 # 0307. v1.1 도중 리팩터링 점검(R41~R47) — 제안
 
 - 날짜: 2026-11-27
-- 상태: **제안**(코드는 바꾸지 않았다 — 사장이 고른 것만 한다)
+- 상태: **제안 + 계획**(코드는 바꾸지 않았다 — 사장이 고른 것만 한다). 대상 갈래·설계·개발 계획은 7~10절(사장 2026-11-27 "대상 브랜치, 설계 및 개발 계획, KB·웹의 best practice도")
 - 사장: "리팩토링 할 만한 요소가 있는지 살펴봐 줘. 추상화 정도도 고려 대상이야."
 - 잣대: 0169·0170·0230·0248과 같다(KB `concepts/solo-game-codebase-health-signals.md` — 크기 → 추상화 깊이 → 곧 바뀔 곳,
   `concepts/game-menu-scene-stack-and-focus.md` — 목록 화면 = 줄 표 하나·화면별 커서를 앱에 쌓지 않기).
@@ -80,7 +80,7 @@
 ## 6. 추천 순서
 1. **R41 → R43**(반나절 안): 버그 하나를 고치고, 두 "한 곳"을 되돌린다. 동작이 바뀌는 것은 우물 반딧불과 업적 시점뿐.
 2. **R42**: v1.1을 닫기 전, 사장의 등불·텃밭 검토가 끝난 뒤(검토 중에 틀을 바꾸면 판정과 코드 변화가 섞인다).
-3. **R45·R44**: 마을 그림을 다음에 만질 때 함께.
+3. **R45·R44**: R42의 준비로 그 앞에(R44가 탭의 그림 칸을 `Who`로 바꿔 둔다). R42를 안 하면 마을 그림을 다음에 만질 때.
 4. **R46**: v1.1을 닫은 뒤, v1.2를 시작하기 전.
 5. R47은 미룬다.
 
@@ -88,3 +88,122 @@
 - R41·R43을 지금 할지(추천).
 - R42를 v1.1 안에 넣을지, v1.1을 닫은 뒤로 미룰지.
 - R46을 v1.2 준비로 잡을지.
+
+## 7. 대상 갈래
+**`release/v1.1`에 바로, 작은 커밋으로.** 따로 리팩터링 갈래를 만들지 않는다.
+
+| 갈래 | 이 일에서 | 까닭 |
+|---|---|---|
+| `release/v1.1` | **여기서 한다** | 작업 갈래(사장 2026-11-23). 고칠 코드의 절반(등불·텃밭 탭, 화단 그리기)이 여기에만 있다. push마다 CI(fmt·clippy·시험·연기 시험)와 개발판이 돈다 |
+| `release/v1.0` | 건드리지 않는다 | PR #30(v1.0.1)이 MS Store 인증을 기다린다 — 여기에 커밋하면 나갈 1.0.1의 내용이 바뀌고, 이미 올린 상점 빌드(Epic `1.0.1-9b4480d`)와 어긋난다. 지금 v1.0은 v1.1에 다 들어 있다(v1.0에만 있는 커밋 0) |
+| `main` | 건드리지 않는다 | 운영판. v1.1을 닫을 때 `release/v1.1 → main` PR로 함께 간다 |
+| 따로 만든 리팩터링 갈래 | 만들지 않는다 | 오래 사는 갈래는 리팩터링을 막는다(아래 8절 Fowler) — 그 사이 `release/v1.1`에 들어오는 일과 합칠 때 부딪친다. 한 걸음 = 한 커밋이면 되돌리기는 `git revert` 하나 |
+
+- **v1.0으로 되가져가지 않는다**: R41의 우물 반딧불은 v1.0에도 있지만 보이는 것뿐이고, R43의 업적 시점도 다음 저장에 따라잡는다. 1.0.x에 꼭 넣고 싶으면 1.0.1이 나간 뒤 그 두 커밋만 골라 옮긴다(따로 물을 것).
+- **합치는 방향의 위험**: v1.0 패치는 v1.1에 합친다(0193). 파일을 나누는 R46 뒤에는 v1.0의 `world.rs` 패치가 저절로 합쳐지지 않는다(git은 파일 나누기를 따라가지 못한다) → **R46은 PR #30이 Merge된 뒤**에 하고, 그 뒤 v1.0 패치는 손으로 옮긴다고 `docs/release.md`에 한 줄.
+- 세션의 지정 갈래(`claude/…`)는 쓰지 않는다 — 이 레포의 규칙(CLAUDE.md "갈래")이 먼저고, `release/v1.1` push는 된다(0307 커밋으로 확인).
+
+## 8. 바깥 기준(KB·웹)
+| 기준 | 출처·확인 수준 | 이 계획에서 |
+|---|---|---|
+| 구조를 바꾸는 커밋과 동작을 바꾸는 커밋을 나눈다 | Kent Beck *Tidy First?* — **2차**(검색 요약·서평, 책 원문은 못 봄) | 걸음마다 "동작 그대로" 커밋. 동작이 바뀌는 둘(우물 반딧불·업적 시점)은 제 커밋으로, 제목에 적는다 |
+| 다음 기능이 쉬워지게 먼저 고친다(준비 리팩터링). 갈래가 며칠 넘게 살면 합치기가 어려워 리팩터링을 꺼리게 된다. 일부러 틀리게 해 시험이 잡는지 본다 | Martin Fowler "OpportunisticRefactoring" — **1차**(원문 읽음) | 7절(따로 갈래 없음), 순서(R44 → R42, R46 → v1.2), 걸음마다 "고침을 빼면 실패하는가" 확인(0248 R26이 하던 것) |
+| 큰 교체는 본줄기에서 조금씩: 새 틀을 옛것 곁에 두고 쓰는 쪽을 하나씩 옮긴 뒤 옛것을 지운다 | Fowler "BranchByAbstraction" — **1차** | R42: 탭 표의 새 칸을 더하고 탭을 하나씩 옮긴다 — 커밋마다 게임이 돈다 |
+| 지금 하는 대로를 먼저 박제하고(특성 시험·골든 마스터) 옮긴다. 흔들리는 값은 가린다 | Michael Feathers — **2차**(위키·블로그) | 0단계: 마을 창 스크린숏 기준선·시험 이름 목록·옮긴 줄 비교 |
+| `const`의 참조는 같은 주소라는 보장이 없다 | Rust Reference "Constant items" — **1차** | R42에서 `ptr::eq(tabs, GARDEN_TABS)`를 표의 칸으로 |
+| 리팩터링 순서(부작용 → 단계 → 묶음 → 파일), 본문은 그대로 옮긴다, 기능 작업과 섞지 않는다, 사람 판정 뒤에 | KB `solo-game-codebase-health-signals`(1차 — 이 레포 0169~0248) | 순서·검토 뒤 R42 |
+| 화면 비교는 같은 빌드를 두 번 찍은 차이(잡음 바닥)부터. 믿을 순서: 시험 이름 목록 → 바뀐 파일 → 시나리오 시험 → 화면 | 같은 노트(1차 — knellroot 0159) | 0단계와 걸음마다의 확인 |
+| 구조체 칸을 묶을 때는 텍스트 치환이 아니라 컴파일러 진단으로 자리를 찾는다 | 같은 노트(1차 — knellroot 0251) | R42의 `VillageUi`, R47 |
+| 목록 화면 = 줄 표 하나(입력과 그림이 같은 표), 화면별 커서를 앱에 쌓지 않는다 | KB `game-menu-scene-stack-and-focus`(1차 — knellroot) | R42 설계 |
+| 결정은 순수 함수, 껍데기는 실행만(functional core, imperative shell) | KB 같은 노트 + Bernhardt(2차) | R41 `State::of`, R42 `rows`·`detail` |
+
+## 9. 설계
+### R41 마을 상태 = 기록의 함수
+```rust
+// village.rs — 순수. 앱·월드를 모른다.
+impl State {
+    pub fn of(p: &Profile, walking: Character) -> State { /* 지금 App::village_state 본문 */ }
+}
+// app.rs
+fn sync_village(&mut self) {            // 기록이 바뀐 뒤 한 줄
+    if self.world.adv.village.is_some() {
+        self.world.adv.village = Some(village::State::of(&self.profile, self.picked()));
+    }
+}
+```
+- `tree_ready`(깨울 재주가 있나)도 기록에서 나온다 → `talents`의 순수 함수로 옮겨 `State::of` 안에서 부른다. 그리기 함수의 쓰기는 지운다.
+- 손으로 맞추던 일곱 군데(꾸미기·저널 보상·부탁·등불·텃밭)와 큰 나무 깨우기 뒤에 `sync_village()`.
+- **개발 시나리오**: 지금 부탁·등불은 개발 판에서 기록을 안 바꾸고 월드 사본만 고친다. 기록 사본을 바꾸는 것으로 통일한다 — 디스크는 `profile::put`의 sandbox가 막고, 타이틀로 돌아오면 슬롯을 다시 읽는다(0269 B3). "이번에만"은 그대로다.
+- 앨범 다시 듣기는 `State::of(&profile, Character::Mole)`(이웃 모두 제자리)로 — 덮어쓰던 칸 셋이 없어진다.
+- 시험(`village.rs`): 캐릭터마다 제 자리가 빈다, 등불 셋째 뒤 `lamps[i]`, 반딧불 수 → `glow`, 깨울 수 있으면 `tree_ready`, 텃밭·화단이 기록과 같다.
+- 동작이 바뀌는 것: 재주를 깨운 뒤 우물 반딧불이 바로 준다(커밋을 나눈다).
+
+### R43 저장 한 곳
+```rust
+fn save_profile(&mut self) {
+    if crate::profile::sandbox() { return; }      // 개발 판: 디스크도 업적도 건드리지 않는다
+    /* 만난 이웃 적기 → profile::save → steam.sync → epic.sync */
+}
+```
+- 직접 호출 19곳을 `self.save_profile()`로. sandbox 검사를 안으로 넣으면 `if self.recording() { self.save_profile() }` 꼴의 바깥 검사는 남겨도 뜻이 같다(이번에는 지우지 않는다 — 걸음을 작게).
+- 시험: `src/app*` 글에서 `profile::save(`가 `save_profile` 본문 한 곳뿐(R25 `every_key_is_used_somewhere`와 같은 낱말 시험).
+- 동작이 바뀌는 것: 꾸미기·큰 나무·저널 보상을 한 순간에 업적이 맞춰진다.
+
+### R44 이웃 그리기를 `Who` 하나로(R42의 준비)
+- `render`: `draw_neighbor(art, who, pos, left, awake, t)` 하나 — `sorted.rs`의 이웃 갈래 본문을 옮기고, 수첩·등불 아이콘(`draw_note_neighbor`)이 이것을 부른다.
+- `VillagePic::Neighbor(Who)`, `village_notes::Spot::who() -> Option<Who>`(지금 `neighbor()` 자리), 초상화는 `story::speaker(who)`가 이미 안다 → `lamp_spot`·수첩 탭의 초상화 match를 지운다.
+- 확인: 수첩·등불 탭 스크린숏이 기준선과 같다.
+
+### R45 `draw_sorted` 단계
+- `collect_room`·`collect_actors`·`collect_village`·`draw_ground`(바닥에 바로 그리는 위험물·물살) + 정렬·그리기 고리. `draw_one`의 마을 갈래(나무·꾸미기·흔적·작물·꽃)는 `draw_village_thing`으로. **본문 그대로**, 순서 그대로(같은 발 줄이면 넣은 순서가 앞뒤를 정한다 — 순서를 바꾸지 않는다).
+
+### R42 마을 창 = 줄 표 하나
+```rust
+struct Row    { pic: VillagePic, name: String, right: String, dim: bool }
+struct Detail { pic: VillagePic, name: String, info: String, foot: Option<String> }
+enum   Step   { Pick, Dec, Inc }                       // 확인·다시 누름 / 왼쪽·− / 오른쪽·+
+struct Ctx<'a> { p: &'a Profile, ch: Character, crop: usize }   // 순수 쪽이 보는 것 전부
+
+struct VillageTab {
+    name: Tr,
+    lr: bool,                                 // 좌우를 탭 안에서 쓰나
+    rows:   fn(&Ctx) -> Vec<Row>,             // 입력과 그림이 같이 쓴다
+    detail: fn(&Ctx, usize) -> Detail,
+    say:    fn(&Ctx, usize) -> String,
+    hint:   fn() -> String,                   // 주소 비교 대신
+    act:    fn(&mut App, usize, Step),        // 사기·건네기·심기 — 껍데기
+    extra:  Option<fn(&mut App, &Ui, Rect, f32)>,   // 짐의 −+ 단추처럼 틀 밖의 것
+}
+struct Say { text: Tr, secs: f32, mood: Mood }          // Mood::{Plain, Thanks, Deny} — 얼굴·소리는 기분에서
+struct VillageUi { tabs, tab, cursor, view, crop, say: Option<Say> }   // App의 칸 여섯 → 하나
+```
+- 몰이꾼(`update_village_menu`·`draw_village_menu`)이 줄 옮기기·터치 "한 번 더"·목록·자세히 칸·누를 자리를 한다. 탭은 표와 `act`만.
+- `rows`·`detail`·`say`가 `Ctx`만 보니 **시험이 붙는다**(앱 없이): 탭마다 줄 수, 흐림 규칙(값이 모자람·다 들음), 등불 네 상태의 설명 글, 텃밭 세 상태.
+- 옮기는 차례(Fowler의 곁에 두고 하나씩): 표에 새 칸을 `Option`으로 더함 → 수첩(가장 단순) → 꾸미기 → 등불 → 텃밭 → 짐(`extra`) → 옛 `update`·`draw` 칸 지움 → `VillageUi` 묶기(컴파일러 진단) → 이름 바꾸기(`Scene::Decor`는 그대로 둔다 — 장면 이름은 `Scene::layer()`·연기 시험이 본다).
+- 쉼터 가게의 `tr(m) == s.shop_thanks`도 `Say`로.
+- 확인: 탭 다섯 × 두 언어(한국어·독일어) 스크린숏이 기준선과 같다. 달라져도 되는 것은 하나 — 포포가 텃밭·등불의 고맙다는 말에도 웃는다(따로 커밋).
+
+### R46 `world.rs` → `world/`
+- `world/deep.rs`(가장 깊은 곳: `Deep`·`Pull`·`Sweep`·`Knot` + `deep_*`·`tick_shades`), `strike.rs`(타격·`hit_player`·`bowl`·떨어뜨리기), `hazards.rs`, `story.rs`(`Story`·`StorySeed`·꽃잎·부탁·기억), `fx.rs`(`cue`·입자). 각 파일은 `use super::*;` + `impl World { … }`(0169 R4 방식), 묶음의 필드 공개 범위는 `pub(super)`가 필요한 곳만.
+- 시험 모듈(912줄)은 `world/tests.rs`로.
+- 옮긴 뒤 옛 경로를 보는 곳을 grep(`tools`·`docs`·`.github`·CLAUDE.md — KB 함정: 경로를 보는 도구가 깨진다).
+
+### R47 `App` 장면 상태 묶음
+- 미룬다. 할 때는 장면 하나씩(`SlotsUi` → `PauseUi` → …), 컴파일러 진단으로.
+
+## 10. 개발 계획
+걸음마다: 커밋 하나, CLAUDE.md "커밋 전" 목록 전부(fmt·clippy 여섯 갈래·wasm 빌드·`cargo test`), push 뒤 `smoke-web`이 초록인지 본다.
+
+| 단계 | 언제 | 무엇 | 확인(끝난 꼴) | 품 |
+|---|---|---|---|---|
+| **0 안전망** | 맨 먼저 | ① `tools/test/village_shots.js`: 개발 시나리오 "마을"에서 마을 창 탭 넷 + 텃밭 창, 마을 전경을 가짜 시계(Playwright `page.clock`)로 한국어·독일어로 찍는다. **같은 빌드를 두 번 찍어 차이(잡음 바닥)를 잰다** ② `cargo test -- --list` 이름 목록을 떠 둔다 ③ 옮긴 줄 비교 스크립트(옛 파일의 줄 다중집합 = 새 파일들의 합) | 기준선 PNG·이름 목록·잡음 수치를 이 문서에 적는다. 잡음이 0이 아니면 그 화면은 화면 비교에서 뺀다 | 1~2시간 |
+| **1** | 사장이 고르면 바로 | R41(구조) → R41 덧(우물 반딧불, 동작) → R43(구조 + 업적 시점) | 시험 +5 안팎, 손으로 맞추는 자리 0(grep), `profile::save(` 한 곳(시험). 기준선 스크린숏 같음. **고침을 빼면 새 시험이 실패**하는 것을 한 번씩 확인 | 반나절 안 |
+| *(사람)* | — | 등불·텃밭 결 검토(개발판) — 값·글이 바뀌면 그 커밋이 먼저 | | |
+| **2** | 검토 뒤, v1.1을 닫기 전 | R45 → R44 → R42(옮기는 차례대로 커밋 8개 안팎) | `draw_sorted` ≤ 80줄, `village_menu.rs` 약 650줄, 탭 시험 ≥ 6, 스크린숏 같음(포포 웃음 커밋만 다름), 열한 언어 넘침은 가짜 언어·독일어로 한 번 | 하루 |
+| *(사람)* | — | 개발판에서 마을 창 한 바퀴(스크린숏 앞뒤 표를 드린다) → v1.1 닫기·배포 시점 | | |
+| **3** | v1.1을 닫고 PR #30도 Merge된 뒤, v1.2 시작 전 | R46 | 시험 이름 목록이 앞뒤 같다(경로만 다름), 옮긴 줄 비교 통과, 바뀐 파일이 `src/world*`뿐, `world.rs` ≤ 1,500줄 | 반나절 |
+| 미룸 | — | R47 | | 하루 |
+
+- **되돌리기**: 걸음마다 커밋이 하나라 `git revert <커밋>`. 2단계 R42는 옛 칸을 마지막 커밋에서야 지우므로 중간 어디서 멈춰도 게임이 돈다.
+- **멈출 조건**: 기준선과 다른 화면이 나오면(잡음 바닥 밖) 그 걸음을 되돌리고 원인을 적는다 — "조금 다른 건 괜찮겠지"로 넘기지 않는다.
+- **끝나면**: 이 문서에 "구현" 절(전 → 후 수치), CLAUDE.md의 마을 창·월드 줄, KB `solo-game-codebase-health-signals`에 1차 확인으로(리팩터링 갈래 고르기·`const` 주소 비교 함정·"기록의 함수인 상태를 손으로 맞추지 않기").
