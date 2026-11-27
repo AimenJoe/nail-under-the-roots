@@ -536,16 +536,8 @@ pub struct App {
     erase_armed: bool,
     /// 이 컷씬이 끝나면 갈 곳(엔딩 = 런의 끝).
     after_cutscene: AfterCut,
-    /// 마을 꾸미기 가게의 커서.
-    decor_cursor: usize,
-    /// 마을 가게 탭(0259): 0 꾸미기, 1 짐 꾸리기.
-    decor_tab: usize,
-    /// 마을 창의 탭 표: 포포에게서 열면 `VILLAGE_TABS`, 텃밭 칸 앞에서 열면 `GARDEN_TABS`(0304 G1).
-    village_tabs: &'static [village_menu::VillageTab],
-    /// 텃밭 탭에서 심을 씨앗(`garden::Crop::ALL` 번호).
-    garden_crop: usize,
-    /// 마을 창 목록의 창(0269).
-    village_view: crate::ui::ListView,
+    /// 마을 창(포포의 탭 넷·텃밭 창)의 상태(0307 R42).
+    village_ui: village_menu::VillageUi,
     /// 재주 창 커서(자리, 갈래).
     tree_cursor: (usize, usize),
     /// 일시정지 재주 탭의 고른 칸(줄, 칸, 0247).
@@ -742,11 +734,7 @@ impl App {
             album_view: None,
             album_rows: Default::default(),
             after_cutscene: AfterCut::Game,
-            decor_cursor: 0,
-            decor_tab: 0,
-            village_tabs: village_menu::VILLAGE_TABS,
-            garden_crop: 0,
-            village_view: Default::default(),
+            village_ui: Default::default(),
             tree_cursor: (0, 0),
             pause_tree_cursor: (0, 0),
             tree_char: Character::Mole,

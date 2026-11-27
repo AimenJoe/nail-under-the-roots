@@ -52,6 +52,30 @@ pub(super) struct Ctx<'a> {
     pub crop: usize,
 }
 
+/// 마을 창이 열려 있는 동안의 상태(0307 R42): 어느 탭 묶음(포포의 넷 / 텃밭 하나)의 어느 탭, 고른 줄, 굴림 창, 텃밭에서 고른 씨앗.
+/// 새 창은 이렇게 제 묶음을 갖는다(`LabUi`·`DialogueUi`와 같게) — 화면마다의 커서를 `App`에 흩지 않는다.
+pub(super) struct VillageUi {
+    pub tabs: &'static [VillageTab],
+    pub tab: usize,
+    /// 고른 줄(탭을 바꾸면 0). 텃밭 창은 칸 번호.
+    pub cursor: usize,
+    pub view: crate::ui::ListView,
+    /// 텃밭 탭에서 심을 씨앗(`garden::Crop::ALL` 번호).
+    pub crop: usize,
+}
+
+impl Default for VillageUi {
+    fn default() -> Self {
+        VillageUi {
+            tabs: VILLAGE_TABS,
+            tab: 0,
+            cursor: 0,
+            view: Default::default(),
+            crop: 0,
+        }
+    }
+}
+
 /// 마을 창의 탭 하나.
 pub(super) struct VillageTab {
     pub name: Tr,
@@ -198,23 +222,23 @@ const LIST_W: f32 = 150.0;
 
 impl App {
     pub(super) fn open_village_menu(&mut self) {
-        self.village_tabs = VILLAGE_TABS;
-        self.decor_cursor = 0;
-        self.decor_tab = 0;
+        self.village_ui.tabs = VILLAGE_TABS;
+        self.village_ui.cursor = 0;
+        self.village_ui.tab = 0;
         // 처음 열면 포포의 인사(자세히 칸의 말 자리, 몇 초 뒤 설명으로).
         self.shop_msg = Some((|s| s.decor_hi, 3.5));
-        self.village_view = Default::default();
+        self.village_ui.view = Default::default();
         self.world.freeze();
         self.scene = Scene::Decor;
     }
 
     /// 텃밭 칸 `i` 앞에서: 텃밭 탭 하나짜리 마을 창을 그 칸에 맞춰 연다(0304 G1).
     pub(super) fn open_garden(&mut self, i: usize) {
-        self.village_tabs = GARDEN_TABS;
-        self.decor_tab = 0;
-        self.decor_cursor = i.min(crate::garden::PLOTS - 1);
+        self.village_ui.tabs = GARDEN_TABS;
+        self.village_ui.tab = 0;
+        self.village_ui.cursor = i.min(crate::garden::PLOTS - 1);
         self.shop_msg = None;
-        self.village_view = Default::default();
+        self.village_ui.view = Default::default();
         self.world.freeze();
         self.scene = Scene::Decor;
     }
@@ -231,9 +255,9 @@ impl App {
             self.scene = Scene::Game;
             return;
         }
-        let tabs = self.village_tabs;
+        let tabs = self.village_ui.tabs;
         let n = tabs.len();
-        let cur = self.decor_tab.min(n - 1);
+        let cur = self.village_ui.tab.min(n - 1);
         let lr = tabs[cur].lr;
         let mut tab = cur;
         if a.tab_prev || (!lr && a.left) {
@@ -246,9 +270,9 @@ impl App {
             tab = i.min(n - 1);
         }
         if tab != cur {
-            self.decor_tab = tab;
-            self.decor_cursor = 0;
-            self.village_view = Default::default();
+            self.village_ui.tab = tab;
+            self.village_ui.cursor = 0;
+            self.village_ui.view = Default::default();
             self.shop_msg = None;
             self.sfx.play(crate::sfx::Id::UiMove);
             return;
@@ -262,7 +286,7 @@ impl App {
         let (moved, again) = self.village_pick(a, tap_hit, n);
         let step = match tap_hit {
             Some(Hit::PackStep(k, d)) => {
-                self.decor_cursor = k.min(n - 1);
+                self.village_ui.cursor = k.min(n - 1);
                 Some(if d > 0 { Step::Inc } else { Step::Dec })
             }
             _ if lr && a.right => Some(Step::Inc),
@@ -270,7 +294,7 @@ impl App {
             _ if lr && a.left => Some(Step::Dec),
             _ => None,
         };
-        let i = self.decor_cursor.min(n - 1);
+        let i = self.village_ui.cursor.min(n - 1);
         match step {
             Some(step) => (t.act)(self, i, step),
             // 터치로 처음 고른 줄: 한 번 더 누르면 한다고 알려 준다.
@@ -286,28 +310,29 @@ impl App {
         Ctx {
             p: &self.profile,
             ch: self.world.character,
-            crop: self.garden_crop,
+            crop: self.village_ui.crop,
         }
     }
 
     /// 위아래·끌기로 줄을 옮기고, 누른 줄을 돌려준다: (고른 줄이 바뀌었나, 이미 고른 줄을 다시 눌렀나).
     fn village_pick(&mut self, a: &Actions, tap_hit: Option<Hit>, n: usize) -> (bool, bool) {
-        let was = self.decor_cursor;
+        let was = self.village_ui.cursor;
         if a.up {
-            self.decor_cursor = (self.decor_cursor + n - 1) % n;
+            self.village_ui.cursor = (self.village_ui.cursor + n - 1) % n;
         }
         if a.down {
-            self.decor_cursor = (self.decor_cursor + 1) % n;
+            self.village_ui.cursor = (self.village_ui.cursor + 1) % n;
         }
-        self.village_view
-            .scroll(self.scroll_in, &mut self.decor_cursor, n);
+        self.village_ui
+            .view
+            .scroll(self.scroll_in, &mut self.village_ui.cursor, n);
         let mut again = false;
         if let Some(Hit::ShopItem(i)) = tap_hit {
-            again = i == self.decor_cursor;
-            self.decor_cursor = i.min(n - 1);
+            again = i == self.village_ui.cursor;
+            self.village_ui.cursor = i.min(n - 1);
         }
-        self.decor_cursor = self.decor_cursor.min(n - 1);
-        let moved = self.decor_cursor != was;
+        self.village_ui.cursor = self.village_ui.cursor.min(n - 1);
+        let moved = self.village_ui.cursor != was;
         if moved {
             self.sfx.play(crate::sfx::Id::UiMove);
         }
@@ -384,7 +409,7 @@ impl App {
             FONT_PX,
             ui::TEXT,
         );
-        let tabs = self.village_tabs;
+        let tabs = self.village_ui.tabs;
         let n = tabs.len();
         let tab_w = ((PANEL.w - 30.0 - seeds_w) / n as f32).clamp(30.0, 90.0);
         for (i, t) in tabs.iter().enumerate() {
@@ -395,7 +420,7 @@ impl App {
                 FONT_PX + 4.0,
             );
             self.hits.push((r, Hit::ShopTab(i)));
-            let on = i == self.decor_tab;
+            let on = i == self.village_ui.tab;
             if on {
                 ui.rect(r, ui::PANEL_LIGHT);
                 ui.rect_lines(r, ui::ACCENT);
@@ -422,9 +447,9 @@ impl App {
             Some((m, _)) => tr(m).to_string(),
             None => {
                 let c = self.village_ctx();
-                let t = &tabs[self.decor_tab.min(n - 1)];
+                let t = &tabs[self.village_ui.tab.min(n - 1)];
                 let rows = (t.rows)(&c).len();
-                (t.say)(&c, self.decor_cursor.min(rows.saturating_sub(1)))
+                (t.say)(&c, self.village_ui.cursor.min(rows.saturating_sub(1)))
             }
         };
         let tx = face.right() + 6.0;
@@ -442,13 +467,13 @@ impl App {
             PANEL.w - 12.0,
             PANEL.bottom() - 4.0 - top,
         );
-        let tab = self.decor_tab.min(n - 1);
+        let tab = self.village_ui.tab.min(n - 1);
         // 탭 몸: 왼쪽 목록 + 오른쪽 자세히 칸 + 탭마다 얹는 것. 줄이 없으면(등불 탭에 이웃이 없을 때) 비워 둔다.
         let t = &tabs[tab];
         let (rows, picked) = {
             let c = self.village_ctx();
             let rows = (t.rows)(&c);
-            let i = self.decor_cursor.min(rows.len().saturating_sub(1));
+            let i = self.village_ui.cursor.min(rows.len().saturating_sub(1));
             let d = (!rows.is_empty()).then(|| (t.detail)(&c, i));
             (rows, d.map(|d| (i, d)))
         };
@@ -476,13 +501,16 @@ impl App {
     fn draw_village_list(&mut self, ui: &Ui, r: Rect, rows: &[Row]) {
         let fits = ((r.h / ROW_H).floor() as usize).max(1);
         let n = rows.len();
-        let first = self.village_view.window(self.decor_cursor, n, fits, ROW_H);
+        let first = self
+            .village_ui
+            .view
+            .window(self.village_ui.cursor, n, fits, ROW_H);
         let t = get_time() as f32;
         for (k, row) in rows.iter().enumerate().skip(first).take(fits) {
             let (pic, name, right, dim) = (&row.pic, &row.name, &row.right, &row.dim);
             let row = Rect::new(r.x, r.y + (k - first) as f32 * ROW_H, r.w, ROW_H - 1.0);
             self.hits.push((row, Hit::ShopItem(k)));
-            let on = k == self.decor_cursor;
+            let on = k == self.village_ui.cursor;
             if on {
                 ui.rect(row, ui::PANEL_LIGHT);
                 ui.rect_lines(row, ui::ACCENT);
@@ -708,13 +736,13 @@ impl App {
         let plot = garden::plot(&self.profile, i);
         if step != Step::Pick {
             if plot == Plot::Empty {
-                self.garden_crop = (self.garden_crop + 1) % Crop::ALL.len();
+                self.village_ui.crop = (self.village_ui.crop + 1) % Crop::ALL.len();
                 self.shop_msg = None;
                 self.sfx.play(crate::sfx::Id::UiMove);
             }
             return;
         }
-        let crop = Crop::ALL[self.garden_crop % Crop::ALL.len()];
+        let crop = Crop::ALL[self.village_ui.crop % Crop::ALL.len()];
         let done = match plot {
             Plot::Empty => match garden::plant(&mut self.profile, i, crop) {
                 Ok(()) => Some((|s: &i18n::Strings| s.garden_planted) as Tr),
