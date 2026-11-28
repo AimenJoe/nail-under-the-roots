@@ -808,20 +808,33 @@ fn by_id(id: &str) -> Option<&'static Goal> {
     GOALS.iter().find(|g| g.id == id)
 }
 
+/// 이 목표가 이웃의 부탁이면 그 번호(`quests::ALL`). 목표 아이디는 `quest_<부탁 아이디>`.
+pub fn quest_of(g: &Goal) -> Option<usize> {
+    let id = g.id.strip_prefix("quest_")?;
+    crate::quests::ALL.iter().position(|q| q.id == id)
+}
+
+/// 지금 들어 둔 부탁의 목표인가(들었고 아직 돌려주지 않았다) — 발자국에서 맨 위 가까이, 상태 글과 함께 보인다.
+pub fn is_open_quest(g: &Goal, p: &Profile) -> bool {
+    quest_of(g).is_some_and(|q| crate::quests::open(p) == Some(q))
+}
+
 /// 지금 보이는 목표(앞 목표를 이룬 것만), 표 순서.
 pub fn visible(p: &Profile) -> Vec<&'static Goal> {
     let mut v: Vec<&'static Goal> = GOALS
         .iter()
         .filter(|g| g.after.and_then(by_id).is_none_or(|a| a.done(p)))
         .collect();
-    // 받을 것이 맨 위, 하는 중이 가운데, 받은 것은 아래(같은 묶음 안에서는 표 순서, 0173).
+    // 받을 것이 맨 위, 들어 둔 부탁이 그다음, 하는 중이 가운데, 받은 것은 아래(같은 묶음 안에서는 표 순서, 0173).
     v.sort_by_key(|g| {
         if g.ready(p) {
             0
         } else if g.claimed(p) {
-            2
-        } else {
+            3
+        } else if is_open_quest(g, p) {
             1
+        } else {
+            2
         }
     });
     v
@@ -900,6 +913,28 @@ pub fn charm_pool(p: &Profile, ch: crate::equipment::Character) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 들어 둔 부탁(들었고 아직 안 돌려줌)은 받을 것 바로 다음, 다른 하는 중인 목표보다 위에 온다. 부탁마다 목표가 하나씩 있다.
+    #[test]
+    fn the_open_quest_floats_above_other_goals_in_progress() {
+        use crate::quests;
+        for i in 0..quests::ALL.len() {
+            let id = format!("quest_{}", quests::ALL[i].id);
+            assert_eq!(by_id(&id).and_then(quest_of), Some(i), "{id}");
+        }
+        let mut p = Profile::default();
+        p.set(key::TUTORIAL);
+        assert!(visible(&p).iter().all(|g| !is_open_quest(g, &p)));
+        p.set(&quests::key_of(quests::POPO, quests::ASKED));
+        let v = visible(&p);
+        let at = v.iter().position(|g| is_open_quest(g, &p)).unwrap();
+        assert_eq!(v[at].id, "quest_popo");
+        assert!(v[..at].iter().all(|g| g.ready(&p)));
+        assert!(v[at + 1..].iter().all(|g| !g.ready(&p)));
+        // 돌려주면 더는 "들어 둔 부탁"이 아니다(받을 것이 된다).
+        p.set(&quests::key_of(quests::POPO, quests::DONE));
+        assert!(visible(&p).iter().all(|g| !is_open_quest(g, &p)));
+    }
 
     #[test]
     fn ids_are_unique_and_prerequisites_exist() {

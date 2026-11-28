@@ -1041,6 +1041,9 @@ impl App {
                     vec2(cx, cy + 4.0),
                     col,
                 );
+            } else if crate::journal::is_open_quest(g, p) {
+                // 들어 둔 부탁: 채운 네모(하는 중인 다른 목표의 빈 네모와 구별).
+                ui.rect(Rect::new(cx - 3.0, cy - 3.0, 6.0, 6.0), ui::ACCENT);
             } else {
                 ui.rect_lines(Rect::new(cx - 3.0, cy - 3.0, 6.0, 6.0), ui::TEXT_DIM);
             }
@@ -1110,6 +1113,9 @@ impl App {
         // 아래에서부터 쌓는다: 상태(받기 상자 / 어디 있나 두 줄 / 진행 막대) 위에 보상(아이콘 + 두 줄까지), 남은 자리에 설명(세 줄까지).
         let claimed = g.claimed(p);
         let ready = g.ready(p);
+        // 지금 들어 둔 부탁의 목표인가(`quests::ALL` 번호).
+        let open_quest =
+            crate::journal::quest_of(g).filter(|_| crate::journal::is_open_quest(g, p));
         let state_l: Vec<String> = if claimed {
             let mut l = ui::wrap(ui, tr(crate::journal::reward_place(g.reward)), ww, FONT_PX);
             if l.len() > 2 {
@@ -1150,9 +1156,15 @@ impl App {
                 ui.text(l, dx, sy + k as f32 * 13.0, FONT_PX, ui::TEXT_DIM);
             }
         } else {
-            // 진행 막대 + 숫자.
-            let prog = fill(s.j_progress, &[&g.progress(p), &g.goal]);
-            ui.text_right(&prog, dx + dw, sy + 1.0, FONT_PX, ui::TEXT_DIM);
+            // 진행 막대 + 숫자. 들어 둔 부탁은 숫자 자리에 "찾는 중"(아직 못 찾았을 때).
+            let seeking = open_quest
+                .is_some_and(|q| !p.flag(&crate::quests::key_of(q, crate::quests::FOUND)));
+            if seeking {
+                ui.text_right(s.j_quest_seek, dx + dw, sy + 1.0, FONT_PX, ui::ACCENT);
+            } else {
+                let prog = fill(s.j_progress, &[&g.progress(p), &g.goal]);
+                ui.text_right(&prog, dx + dw, sy + 1.0, FONT_PX, ui::TEXT_DIM);
+            }
             let b = Rect::new(dx, sy + 14.0, dw, 3.0);
             ui.rect(b, bar_bg);
             let k = (g.progress(p) as f32 / g.goal.max(1) as f32).min(1.0);
@@ -1160,14 +1172,23 @@ impl App {
         }
         let top = c.y + 29.0;
         let room = (((by - 2.0 - top) / 13.0).floor().max(1.0) as usize).min(3);
-        let desc = ui::wrap(ui, tr(g.desc), ww, FONT_PX);
+        // 들어 둔 부탁은 강조 색으로: 찾는 중이면 설명 그대로(누구의 부탁·무엇을·어디서), 찾았으면 누구에게 가져갈지(주웠을 때 본 글).
+        let found = open_quest
+            .filter(|&q| p.flag(&crate::quests::key_of(q, crate::quests::FOUND)))
+            .map(|q| tr(crate::quests::ALL[q].found));
+        let desc = ui::wrap(ui, found.unwrap_or(tr(g.desc)), ww, FONT_PX);
         for (k, l) in desc.iter().take(room).enumerate() {
             let l = if k + 1 == room && desc.len() > room {
                 ui.fit(&format!("{l}…"), dw, FONT_PX)
             } else {
                 l.clone()
             };
-            ui.text(&l, dx, top + k as f32 * 13.0, FONT_PX, ui::TEXT);
+            let col = if open_quest.is_some() {
+                ui::ACCENT
+            } else {
+                ui::TEXT
+            };
+            ui.text(&l, dx, top + k as f32 * 13.0, FONT_PX, col);
         }
     }
 
