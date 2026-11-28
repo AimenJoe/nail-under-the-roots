@@ -373,7 +373,7 @@ impl App {
         self.journal_view
             .scroll(self.scroll_in, &mut self.journal_cursor, n);
         if let Some(Hit::JournalItem(i)) = tap_hit {
-            // 고른 칸을 한 번 더 누르면 받는다.
+            // 고른 칸을 한 번 더 누르면 받는다. 자세히 칸의 받기 상자도 고른 칸의 번호로 온다(누르면 바로 받는다).
             take = i == self.journal_cursor;
             self.journal_cursor = i;
         }
@@ -1151,6 +1151,12 @@ impl App {
             ui.rect(b, ui::PANEL_LIGHT);
             ui.rect_lines(b, if blink { ui::ACCENT } else { ui::BORDER });
             ui.text(&state_l[0], dx + 3.0, ui::mid_y(b), FONT_PX, ui::ACCENT);
+            // 단추처럼 생겼으니 단추로: 누르면 받는다(고른 줄을 다시 누른 것과 같다 — `update_journal_tab`).
+            // 손가락에 맞게 누르는 자리는 상자보다 위아래로 조금 넓다.
+            self.hits.push((
+                Rect::new(b.x, b.y - 4.0, b.w, b.h + 8.0),
+                Hit::JournalItem(self.journal_cursor),
+            ));
         } else if claimed {
             for (k, l) in state_l.iter().enumerate() {
                 ui.text(l, dx, sy + k as f32 * 13.0, FONT_PX, ui::TEXT_DIM);
