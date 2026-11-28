@@ -191,7 +191,7 @@ pub(super) const GARDEN_TABS: &[VillageTab] = &[VillageTab {
     tap_hint: |_, _| true,
     hint: hint_garden,
     act: |app, i, step| app.garden_act(i, step),
-    extra: Some(|app, ui, _, detail, y, _| app.draw_garden_extra(ui, detail, y)),
+    extra: Some(|app, ui, _, detail, y, i| app.draw_garden_extra(ui, detail, y, i)),
 }];
 
 /// 꾸미기 탭의 줄: 가게 꾸미기(더한 것 포함) + 저널 꾸미기, 지운 1번 등·6번 병은 빼고(0269).
@@ -607,10 +607,22 @@ impl App {
         }
     }
 
-    /// 텃밭: 거둬 둔 산딸기(다음 길 가방에), 마을에 옮겨 심은 꽃.
-    fn draw_garden_extra(&mut self, ui: &Ui, detail: Rect, y: f32) {
+    /// 텃밭: 빈 칸이면 씨앗을 바꾸는 ◀ ▶ 단추, 그 아래 거둬 둔 산딸기(다음 길 가방에)·마을에 옮겨 심은 꽃.
+    fn draw_garden_extra(&mut self, ui: &Ui, detail: Rect, y: f32, i: usize) {
         use crate::garden;
         let s = i18n::s();
+        // 씨앗 바꾸기 단추(터치·마우스 — 키·패드는 좌우). 전에는 이름 곁의 "◀ ▶" 글자뿐이라 터치로는 다른 씨앗을 고를 수 없었다.
+        // 그림(44px) 오른쪽, 이름 두 줄 아래 자리.
+        if garden::plot(&self.profile, i) == garden::Plot::Empty {
+            let (bx, by) = (detail.x + 50.0, detail.y + 44.0 - (FONT_PX + 4.0));
+            for (k, (label, d)) in [("◀", -1i8), ("▶", 1)].into_iter().enumerate() {
+                let r = Rect::new(bx + k as f32 * 30.0, by, 24.0, FONT_PX + 4.0);
+                ui.rect(r, ui::PANEL_LIGHT);
+                ui.rect_lines(r, ui::BORDER);
+                ui.text_center(label, r.center().x, ui::mid_y(r), FONT_PX, ui::TEXT);
+                self.hits.push((r, Hit::PackStep(i, d)));
+            }
+        }
         let p = &self.profile;
         let stock = fill(
             s.garden_stock,
@@ -727,14 +739,16 @@ impl App {
         ));
     }
 
-    /// 텃밭 탭에서 고른 칸에 한 일: 빈 칸에서 좌우 = 심을 씨앗 바꾸기, 확인 = 심기 / 거두기(다 자란 칸) / 기다리라는 말(자라는 칸).
+    /// 텃밭 탭에서 고른 칸에 한 일: 빈 칸에서 좌우(터치는 ◀ ▶ 단추) = 심을 씨앗을 앞뒤로 바꾸기, 확인 = 심기 / 거두기(다 자란 칸) / 기다리라는 말(자라는 칸).
     /// 개발 시나리오는 저장하지 않는다(이번 세션의 기록 사본에만 — 다시 열면 그대로 보인다).
     fn garden_act(&mut self, i: usize, step: Step) {
         use crate::garden::{self, Crop, No, Plot};
         let plot = garden::plot(&self.profile, i);
         if step != Step::Pick {
             if plot == Plot::Empty {
-                self.village_ui.crop = (self.village_ui.crop + 1) % Crop::ALL.len();
+                let n = Crop::ALL.len();
+                let by = if step == Step::Dec { n - 1 } else { 1 };
+                self.village_ui.crop = (self.village_ui.crop + by) % n;
                 self.village_ui.say = None;
                 self.sfx.play(crate::sfx::Id::UiMove);
             }
@@ -982,7 +996,7 @@ fn garden_detail(c: &Ctx, i: usize) -> Detail {
     let (pic, name, info) = match plots[i] {
         Plot::Empty => (
             VillagePic::Plot(Plot::Ripe(crop)),
-            format!("◀ {} ▶", tr(crop.name())),
+            tr(crop.name()).to_string(),
             fill(s.garden_plant, &[&crop.price()]),
         ),
         Plot::Growing { crop, age } => (
